@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/data-model-inventory.schema.json",
+  "$comment": "DEVAI-native (Phase 17.C3): brownfield data-model inventory body shape. Not absorbed from redox; redox emits prose Database Reference, not a structured machine artifact. Required because INV-INVENTORY-002 (Phase 17.D, 'every PII-flagged column has legalBasis and retention') presupposes column-level inventory.",
+  "title": "Data Model Inventory",
+  "description": "Database-schema inventory (tables + columns + relations) discovered by deterministic static introspection of migration files (Postgres SQL DDL initially; dialect-specific adapters later). Emitted as a SensorReading body at tier L0 by inventory_data_model sensors (Phase 17.C3). Feeds inventory_rbac (RBAC-table detection) and inventory_data_handling (PII column heuristics). Per Constitution Article 17 (sensors); per D-57 (brownfield-adoption substrate).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dialect": {
+      "type": "string",
+      "enum": ["postgres", "mysql", "oracle", "sqlite", "mssql", "unknown"]
+    },
+    "sourceRepo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Table"
+      }
+    },
+    "views": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/View"
+      },
+      "default": []
+    },
+    "enums": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Enum"
+      },
+      "default": []
+    }
+  },
+  "required": ["schemaVersion", "generatedAt", "dialect", "tables"],
+  "$defs": {
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": ["path", "startLine", "endLine"]
+    },
+    "Column": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "default": {
+          "type": "string"
+        },
+        "primary": {
+          "type": "boolean"
+        },
+        "unique": {
+          "type": "boolean"
+        },
+        "pii_class": {
+          "type": "string",
+          "description": "Optional PII classification (filled by inventory_data_handling, refinable by hand). Free-form to support per-jurisdiction taxonomies (LGPD, GDPR, HIPAA, CCPA).",
+          "minLength": 1
+        },
+        "legal_basis": {
+          "type": "string",
+          "description": "Optional legal basis under LGPD / GDPR. Required for compliance gates (Phase 17.D INV-INVENTORY-002)."
+        },
+        "retention": {
+          "type": "string",
+          "description": "Optional retention policy. Required for compliance gates (Phase 17.D INV-INVENTORY-002)."
+        }
+      },
+      "required": ["name", "type"]
+    },
+    "ForeignKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "references_table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "references_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "on_delete": {
+          "type": "string",
+          "enum": ["cascade", "restrict", "set null", "set default", "no action"]
+        },
+        "on_update": {
+          "type": "string",
+          "enum": ["cascade", "restrict", "set null", "set default", "no action"]
+        }
+      },
+      "required": ["columns", "references_table", "references_columns"]
+    },
+    "Table": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "type": "string",
+          "default": "public"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Column"
+          },
+          "minItems": 1
+        },
+        "primary_key": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "foreign_keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ForeignKey"
+          },
+          "default": []
+        },
+        "unique_constraints": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "default": []
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["name", "columns", "evidence"]
+    },
+    "View": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        }
+      },
+      "required": ["name"]
+    },
+    "Enum": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        }
+      },
+      "required": ["name", "values"]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "generatedAt": "2026-07-14T23:48:59.076Z",
+      "dialect": "postgres",
+      "tables": []
+    }
+  ]
+}

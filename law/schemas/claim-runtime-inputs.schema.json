@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/claim-runtime-inputs.schema.json",
+  "title": "Phase-bound current-claim runtime inputs",
+  "description": "Self-digested, candidate-bound runtime values whose provenance is outside the tracked candidate tree.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "round", "phase", "candidate", "inputs", "inputs_digest_sha256"],
+  "$defs": {
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "round": { "type": "string", "pattern": "^R-[0-9]{4}$" },
+    "phase": { "enum": ["pre-review", "post-publication"] },
+    "candidate": { "$ref": "#/$defs/sha1" },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["input_id", "value", "evidence_manifest", "input_digest_sha256"],
+        "properties": {
+          "input_id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+          "value": { "type": "string", "minLength": 1 },
+          "evidence_manifest": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "content_digest"],
+              "properties": {
+                "ref": { "type": "string", "minLength": 1 },
+                "content_digest": { "$ref": "#/$defs/sha256" }
+              }
+            }
+          },
+          "input_digest_sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "inputs_digest_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "round": "R-9999",
+      "phase": "pre-review",
+      "candidate": "1111111111111111111111111111111111111111",
+      "inputs": [
+        {
+          "input_id": "site_artifact_path",
+          "value": "scratch/site/R-9999.tgz",
+          "evidence_manifest": [
+            {
+              "ref": "scratch/site/R-9999.tgz",
+              "content_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          ],
+          "input_digest_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ],
+      "inputs_digest_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ]
+}

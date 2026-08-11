@@ -1,0 +1,40 @@
+{
+  "name": "@devai-nyx/authority",
+  "version": "1.0.0",
+  "description": "DEVAI authority runtime, policy resolution, capability boundaries, and guarded host effects.",
+  "license": "Apache-2.0",
+  "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm --dir ../.. run test:authority"
+  },
+  "dependencies": {
+    "@devai-nyx/utils": "workspace:*",
+    "minimatch": "^9.0.0",
+    "typescript": "^5.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarusso-nyx/devai.git",
+    "directory": "packages/authority"
+  },
+  "private": true
+}

@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/sensor-registry.schema.json",
+  "title": "DEVAI sensor registry",
+  "description": "The single schema-backed registry of current emitter-backed sensor kinds, scorecard reachability, execution tiers, and design-note state.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "entries"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "sensor-registry"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "type",
+        "status",
+        "date",
+        "authority",
+        "kind",
+        "emitter_module",
+        "effect",
+        "tiers",
+        "design_note"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "sensor-registry-entry"
+        },
+        "status": {
+          "const": "active"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "authority": {
+          "const": "Architect"
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "emitter_module": {
+          "type": "string",
+          "pattern": "^packages/[A-Za-z0-9._/-]+\\.ts$"
+        },
+        "effect": {
+          "enum": ["read", "harness-write", "local-write", "remote-write"],
+          "description": "Maximum intrinsic effect of executing this sensor kind without implicit reading persistence. Generic sense-run persistence is separately forbidden by the preset policy."
+        },
+        "effect_basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["capabilities", "source_paths", "rationale"],
+          "properties": {
+            "capabilities": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(fs:(f5-config|f5-state|f4-inventory|proofs|worktree-admin|workspace|unknown-write)|db:(read|write|unclassified)|host-cache:write|proc:[a-z0-9._-]+|net:[a-z0-9._-]+)$"
+              }
+            },
+            "source_paths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(packages|law)/[A-Za-z0-9._/-]+$"
+              }
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 20
+            }
+          }
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["substrate", "property"],
+            "properties": {
+              "substrate": {
+                "$ref": "common-defs.schema.json#/$defs/substrate"
+              },
+              "property": {
+                "$ref": "common-defs.schema.json#/$defs/transversal"
+              }
+            }
+          }
+        },
+        "diagnostic": {
+          "const": true
+        },
+        "tiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "contains": {
+            "const": "SWEEP"
+          },
+          "items": {
+            "enum": ["BASELINE", "TIER2", "TIER3", "SWEEP"]
+          }
+        },
+        "design_note": {
+          "$ref": "#/$defs/designNote"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["cells"],
+          "not": {
+            "required": ["diagnostic"]
+          }
+        },
+        {
+          "required": ["diagnostic"],
+          "not": {
+            "required": ["cells"]
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": ["effect"],
+            "properties": {
+              "effect": {
+                "not": {
+                  "const": "read"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["effect_basis"]
+          },
+          "else": {
+            "not": {
+              "required": ["effect_basis"]
+            }
+          }
+        }
+      ]
+    },
+    "designNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "path"],
+      "properties": {
+        "state": {
+          "const": "active"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^law/policy/sensor-notes/[a-z][a-z0-9_]*\\.md$",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "examples": [{}]
+}

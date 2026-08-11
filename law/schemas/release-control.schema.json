@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-control.schema.json",
+  "title": "Release Control",
+  "description": "Output record for `devai release check`, `devai release verify`, and `devai release drift`. It records the release decision and its inputs under .devai/state/releases/REL-<id>.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "kind", "decided_at", "verdict", "inputs"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^REL-[0-9]{4,}$",
+      "description": "Stable id, monotonically allocated from the REL counter."
+    },
+    "kind": {
+      "enum": ["gate", "postdeploy-verify", "runtime-drift"],
+      "description": "Which release verb produced the record."
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "artifact_ref": {
+      "type": "string",
+      "description": "Optional immutable artifact identifier (digest, tag, container image, etc.) the gate decision applies to."
+    },
+    "environment": {
+      "enum": ["dev", "staging", "stage", "prod", "preview", "other"],
+      "description": "Target environment for the gate decision."
+    },
+    "verdict": {
+      "enum": ["pass", "block", "review", "inconclusive"],
+      "description": "Final gate decision. block = deploy not permitted; review = human attention required; inconclusive = inputs insufficient; pass = OK to proceed."
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Plain-language reasons backing the verdict. Empty when verdict=pass."
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scorecard_ref": {
+          "type": "string",
+          "description": "Path to the scorecard JSON consumed (or null when none provided)."
+        },
+        "sensor_readings_dir": {
+          "type": "string",
+          "description": "Directory of SensorReading records consumed."
+        },
+        "invariants_dir": {
+          "type": "string",
+          "description": "Directory of invariant.schema.json records consumed."
+        },
+        "audit_chain_head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of the audit chain head at the moment of the gate."
+        },
+        "artifact_chain_head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Claimed chain head baked into the artifact and checked by release verification."
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "description": "Individual gate-component checks that contributed to the verdict.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "verdict"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "enum": ["pass", "block", "review", "inconclusive", "skipped"]
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rollback_recommended": {
+      "type": "boolean",
+      "description": "Set by release verification or drift inspection when the deployed runtime diverges from the artifact of record."
+    },
+    "drift_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["surface", "delta"],
+        "properties": {
+          "surface": {
+            "type": "string",
+            "description": "What drifted (route, table, env var, …)."
+          },
+          "delta": {
+            "type": "string",
+            "description": "Description of the divergence."
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "REL-0001",
+      "kind": "gate",
+      "decided_at": "2026-07-14T03:48:10.569Z",
+      "verdict": "pass",
+      "inputs": {}
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "scanner": {
+    "name": "devai-scanner",
+    "version": "1.2.3",
+    "database_updated_at": "2026-07-17T00:00:00.000Z"
+  },
+  "generated_at": "2026-07-17T01:00:00.000Z",
+  "lockfile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "advisories": [
+    {
+      "id": "ADV-LOW-1",
+      "package": "low-package",
+      "severity": "low",
+      "affected_range": "<2.0.0",
+      "fixed_versions": ["2.0.0"],
+      "aliases": []
+    },
+    {
+      "id": "ADV-MODERATE-1",
+      "package": "moderate-package",
+      "severity": "moderate",
+      "affected_range": "<3.0.0",
+      "fixed_versions": ["3.0.0"],
+      "aliases": []
+    }
+  ]
+}

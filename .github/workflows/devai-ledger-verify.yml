@@ -1,0 +1,97 @@
+name: DEVAI ledger verification
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: devai-ledger-verify-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-ledger:
+    name: Verify externally attested local ledger
+    runs-on: ubuntu-latest
+    environment: devai-ledger-verification
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          path: candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pinned independent verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: devai-nyx/devai-verifier
+          ref: 2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c
+          path: .devai-verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up verifier runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Materialize externally controlled verification inputs
+        shell: bash
+        env:
+          ENVELOPE_B64: ${{ secrets.DEVAI_LEDGER_ENVELOPE_B64 }}
+          RESULTS_TGZ_B64: ${{ secrets.DEVAI_LEDGER_RESULTS_TGZ_B64 }}
+          TASK_POLICY_B64: ${{ secrets.DEVAI_LEDGER_TASK_POLICY_B64 }}
+          TRUST_STORE_B64: ${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$ENVELOPE_B64"
+          test -n "$RESULTS_TGZ_B64"
+          test -n "$TASK_POLICY_B64"
+          test -n "$TRUST_STORE_B64"
+          control="$RUNNER_TEMP/devai-ledger-control"
+          mkdir -p "$control/results"
+          printf '%s' "$ENVELOPE_B64" | base64 --decode > "$control/envelope.json"
+          printf '%s' "$TASK_POLICY_B64" | base64 --decode > "$control/task-policy.json"
+          printf '%s' "$TRUST_STORE_B64" | base64 --decode > "$control/trust-store.json"
+          printf '%s' "$RESULTS_TGZ_B64" | base64 --decode > "$control/results.tgz"
+          if tar -tzf "$control/results.tgz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo 'DEVAI_LEDGER_RESULTS_ARCHIVE_PATH_INVALID' >&2
+            exit 2
+          fi
+          tar -xzf "$control/results.tgz" -C "$control/results"
+
+      - name: Bind exact candidate identity
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "$CANDIDATE_SHA"
+          echo "tree=$(git -C candidate rev-parse "${CANDIDATE_SHA}^{tree}")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify ledger only
+        shell: bash
+        env:
+          POLICY_DIGEST: ${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
+        run: |
+          set -euo pipefail
+          test "$POLICY_DIGEST" != ""
+          node .devai-verifier/src/cli.js \
+            --envelope "$RUNNER_TEMP/devai-ledger-control/envelope.json" \
+            --results-dir "$RUNNER_TEMP/devai-ledger-control/results" \
+            --task-policy "$RUNNER_TEMP/devai-ledger-control/task-policy.json" \
+            --trust "$RUNNER_TEMP/devai-ledger-control/trust-store.json" \
+            --repository "${{ github.repository }}" \
+            --commit "$CANDIDATE_SHA" \
+            --tree "${{ steps.candidate.outputs.tree }}" \
+            --policy-digest "$POLICY_DIGEST"

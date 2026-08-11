@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/subprocess-effects.schema.json",
+  "title": "Subprocess Effects Registry",
+  "description": "Architect-authored classification of statically extracted subprocess command templates. This is the complete trusted annotation surface for effects that cross the in-program analysis boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "source_authority", "materialization", "templates"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "subprocess-effects"
+    },
+    "source_authority": {
+      "const": "F1-architect"
+    },
+    "materialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "allowed_verbs",
+        "authority_and_consent_required",
+        "byte_identity_required",
+        "adopter_binding_path_required",
+        "direct_writes_forbidden"
+      ],
+      "properties": {
+        "target": {
+          "const": ".devai/config/subprocess-effects.json"
+        },
+        "allowed_verbs": {
+          "const": ["devai init bind"]
+        },
+        "authority_and_consent_required": {
+          "const": true
+        },
+        "byte_identity_required": {
+          "const": true
+        },
+        "adopter_binding_path_required": {
+          "const": true
+        },
+        "direct_writes_forbidden": {
+          "const": true
+        }
+      }
+    },
+    "templates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template_id",
+          "executable",
+          "argv_shape",
+          "capabilities",
+          "effect",
+          "reason",
+          "owner"
+        ],
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "executable": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._+-]+$"
+          },
+          "argv_shape": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "fs:f5-config",
+                    "fs:f5-state",
+                    "fs:f4-inventory",
+                    "fs:proofs",
+                    "fs:worktree-admin",
+                    "fs:workspace",
+                    "fs:unknown-write",
+                    "db:read",
+                    "db:write",
+                    "db:unclassified",
+                    "host-cache:write"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "pattern": "^proc:[a-z][a-z0-9-]*$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^net:[a-z][a-z0-9-]*$"
+                }
+              ]
+            }
+          },
+          "effect": {
+            "enum": ["read", "harness-write", "local-write", "remote-write"],
+            "description": "Derived public consent summary retained for a mechanical capabilities-to-effect consistency check."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "owner": {
+            "const": "architect"
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "subprocess-effects",
+      "source_authority": "F1-architect",
+      "materialization": {
+        "target": ".devai/config/subprocess-effects.json",
+        "allowed_verbs": ["devai init bind"],
+        "authority_and_consent_required": true,
+        "byte_identity_required": true,
+        "adopter_binding_path_required": true,
+        "direct_writes_forbidden": true
+      },
+      "templates": []
+    }
+  ]
+}

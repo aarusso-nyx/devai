@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/rgr.schema.json",
+  "title": "Reference Gap Report",
+  "description": "Upward semantic-escalation artifact. Emitted by any agent discipline when triage classifies a failure as reference-gap, or when the agent encounters a spec ambiguity it cannot resolve within its authority. Per Constitution Article 22.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "emitting_task_id",
+    "emitting_discipline",
+    "created_at",
+    "problem",
+    "questions",
+    "evidence_refs",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^RGR-[0-9]{4,}$"
+    },
+    "emitting_task_id": {
+      "type": "string",
+      "pattern": "^TASK-"
+    },
+    "emitting_discipline": {
+      "enum": ["engineer", "inspector", "auditor"],
+      "description": "Owner and Architect cannot emit RGRs; they set the reference."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target_authority": {
+      "enum": ["owner", "architect"],
+      "description": "Which authority must resolve. Owner for business-tier gaps; Architect for engineering-tier."
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "ambiguity"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ambiguity": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Precise statement of what is silent, contradictory, or ambiguous."
+        },
+        "invariants_impacted": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^INV-"
+          }
+        },
+        "journeys_impacted": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^JNY-"
+          }
+        },
+        "surfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Impacted code surfaces (API endpoints, components, tables, modules)."
+        },
+        "risk_class": {
+          "enum": [
+            "security",
+            "data_loss",
+            "compliance",
+            "ux",
+            "correctness",
+            "performance",
+            "none"
+          ]
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["qid", "question"],
+        "properties": {
+          "qid": {
+            "type": "string",
+            "pattern": "^Q[0-9]+$"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Candidate answers. Non-authoritative; the resolver may choose 'other' and provide their own."
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^Q[0-9]+$"
+            },
+            "description": "Other QIDs whose answer determines whether this question applies."
+          }
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^EV-"
+      },
+      "minItems": 1
+    },
+    "proposed_resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Non-authoritative suggestion from the emitting agent.",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "suggested_invariant_patches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "status": {
+      "enum": ["open", "in_review", "resolved", "rejected", "superseded"]
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resolved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolver": {
+          "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["qid", "answer"],
+            "properties": {
+              "qid": {
+                "type": "string",
+                "pattern": "^Q[0-9]+$"
+              },
+              "answer": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "resulting_commits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resumed_task_id": {
+          "type": ["string", "null"],
+          "pattern": "^TASK-",
+          "description": "Task spawned on the new integration HEAD after spec update."
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "RGR-0001",
+      "emitting_task_id": "TASK-0042",
+      "emitting_discipline": "engineer",
+      "created_at": "2026-07-23T00:00:00.000Z",
+      "problem": {
+        "summary": "Authorization specification is silent on refresh.",
+        "ambiguity": "Whether stale refresh tokens are rejected."
+      },
+      "questions": [
+        {
+          "qid": "Q1",
+          "question": "Must stale refresh tokens be rejected?"
+        }
+      ],
+      "evidence_refs": ["EV-abcdef01"],
+      "status": "open"
+    }
+  ]
+}

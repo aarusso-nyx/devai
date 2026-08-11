@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/trace.schema.json",
+  "title": "Trace",
+  "description": "Architect-authored mapping from invariants to documents, tests, and code areas. Declares intent: which tests are supposed to probe which invariants. Per Constitution Article 13. The corresponding measurement output is trace-resolution.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "version", "invariants", "test_corpus"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "version": {
+      "type": "string",
+      "description": "Trace artifact's own semver; bumped on Architect commits to this file."
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "last_updated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completeness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_invariants_with_tests_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_must_invariants_with_tests_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "require_doc_links": {
+              "type": "boolean"
+            },
+            "require_test_links": {
+              "type": "boolean"
+            }
+          }
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Regeneration provenance for this trace artifact."
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tests"],
+        "properties": {
+          "id": {
+            "$ref": "common-defs.schema.json#/$defs/id_invariant"
+          },
+          "docs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["doc", "anchor"],
+              "properties": {
+                "doc": {
+                  "type": "string"
+                },
+                "anchor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["suite", "path"],
+              "properties": {
+                "suite": {
+                  "enum": ["unit", "contract", "api", "int", "e2e", "sec", "perf", "journey", "db"]
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+                },
+                "target_type": {
+                  "enum": ["test", "config-attestation", "script"],
+                  "default": "test",
+                  "description": "The evidence represented by `path`. 'test' is an executable test discovered by the named suite and is selected when omitted. 'config-attestation' is a configuration file consumed at runtime but not exercised by a test. 'script' is an executable verifier outside test discovery. Attestation-only invariants remain distinct so trace completeness does not overstate active verification."
+                },
+                "names": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Test name patterns (typically referencing the invariant ID via marker convention)."
+                },
+                "assertions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Human-readable list of what the test should assert."
+                },
+                "mode": {
+                  "enum": ["black_box", "gray_box", "white_box"],
+                  "description": "Information regime for runtime/integration tests."
+                },
+                "reliability": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "flaky": {
+                      "type": "boolean"
+                    },
+                    "quarantine": {
+                      "type": "boolean"
+                    },
+                    "quarantine_ticket": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "runtime": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "typical_ms": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "timeout_ms": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "code_areas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "test_corpus": {
+      "type": "array",
+      "description": "Complete canonical mapping for every discovered test file. Detailed invariant entries may retain richer representative assertions.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "suite",
+          "invariant_ids",
+          "lifecycle",
+          "assertion_count",
+          "assertion_digest_sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suite": {
+            "enum": ["unit", "int", "e2e", "sec", "smoke", "contract", "regression"]
+          },
+          "invariant_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^INV-"
+            }
+          },
+          "lifecycle": {
+            "enum": ["supported", "experimental"]
+          },
+          "assertion_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Deterministic count of executable assertion call sites in the exact traced source bytes."
+          },
+          "assertion_digest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 of the canonical ordered assertion-site projection for this exact test source."
+          }
+        }
+      }
+    },
+    "suites": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "max_minutes": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "$comment": "Entry ids reference common-defs id_invariant. Trace is a single Architect-owned F1 artifact (Article 13); Inspector and Engineer consume it but never edit it.",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "version": "1.0.0",
+      "invariants": [],
+      "test_corpus": []
+    }
+  ]
+}

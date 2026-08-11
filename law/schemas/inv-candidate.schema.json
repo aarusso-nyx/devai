@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/inv-candidate.schema.json",
+  "$comment": "Internal proposed-invariant record derived from inventory observations for Architect review.",
+  "title": "Invariant Candidate",
+  "description": "A proposed-invariant record derived from inventory observations. Each candidate is anchored to a concrete surface artifact, categorized, confidence-scored, and includes a skeleton for Architect review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "generated_at",
+    "category",
+    "source_sensor",
+    "target",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^INV-CANDIDATE-[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "INV-CANDIDATE-<ulid>. ULID for sortable, content-derivable IDs."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "unmapped_route",
+        "unmapped_endpoint",
+        "unbound_endpoint",
+        "unlabeled_pii_column",
+        "forbidden_edge"
+      ],
+      "description": "What kind of gap this candidate flags. Drives the suggested-invariant template downstream."
+    },
+    "source_sensor": {
+      "type": "string",
+      "enum": [
+        "inventory_api",
+        "inventory_routes",
+        "inventory_coverage",
+        "inventory_rbac",
+        "inventory_data_handling",
+        "inventory_dep_graph"
+      ],
+      "description": "Which sensor reading the candidate was derived from."
+    },
+    "source_reading_id": {
+      "type": "string",
+      "pattern": "^SR-[a-f0-9]{16}$",
+      "description": "Optional SensorReading id (Phase 4 contract) tying this candidate back to the exact reading that produced it."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Heuristic confidence in the candidate's relevance. high = direct schema mismatch; medium = pattern-matched; low = inferred / ambiguous.",
+      "default": "medium"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "identifier"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["endpoint", "route", "column", "edge", "table"]
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable human-readable handle for the target: 'METHOD /path' for endpoints, route id for routes, 'table.column' for columns, 'from->to' for edges, table name for tables."
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "startLine", "endLine"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "startLine": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "endLine": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "suggested_invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A skeleton invariant the Architect can use as a starting point. Not validated against invariant.schema.json (which would require id pattern, scope, etc.); the Architect fills those in during curation.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_suggestion": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]{1,15}$"
+        },
+        "severity_suggestion": {
+          "type": "string",
+          "enum": ["constitutional", "hard-fail", "gate", "warn", "advisory"]
+        },
+        "measurable_via_suggestion": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": ["title", "statement", "severity_suggestion"]
+    },
+    "related_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^INV-"
+      },
+      "description": "Existing invariants the candidate relates to (e.g. INV-INVENTORY-002 for PII columns).",
+      "default": []
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "rejected", "converted"],
+      "description": "Curation status. 'converted' = an INV-CLIENT-* file has been authored from this candidate.",
+      "default": "proposed"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "INV-CANDIDATE-01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "generated_at": "2026-07-23T00:00:00.000Z",
+      "category": "unmapped_endpoint",
+      "source_sensor": "inventory_api",
+      "target": {
+        "kind": "endpoint",
+        "identifier": "GET /health"
+      },
+      "status": "proposed"
+    }
+  ]
+}

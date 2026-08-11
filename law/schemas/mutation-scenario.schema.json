@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/mutation-scenario.schema.json",
+  "title": "Mutation scenario",
+  "description": "One executable mutation scenario consumed by the current mutation runner.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "kind", "target", "mutations", "expectations"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "kind": { "const": "mutation" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file"],
+      "properties": {
+        "file": { "$ref": "#/$defs/relativePath" },
+        "symbol": { "type": "string", "minLength": 1 },
+        "invariant_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "mutations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/mutation" }
+    },
+    "expectations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/expectation" }
+    },
+    "domain_tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rationale": { "type": "string", "minLength": 1 },
+    "timeout_ms": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "replace"],
+      "properties": {
+        "type": { "enum": ["string-replace", "regex-replace"] },
+        "find": { "type": "string" },
+        "pattern": { "type": "string" },
+        "flags": { "type": "string", "pattern": "^[dgimsuvy]*$" },
+        "replace": { "type": "string" },
+        "mutator_name": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "string-replace" } } },
+          "then": { "required": ["find"], "not": { "required": ["pattern"] } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "regex-replace" } } },
+          "then": { "required": ["pattern"], "not": { "required": ["find"] } }
+        }
+      ]
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertion", "specs"],
+      "properties": {
+        "assertion": { "enum": ["tests-detect", "tests-tolerate"] },
+        "specs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" }
+        },
+        "threshold": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": { "enum": ["Killed", "Survived", "Timeout", "RuntimeError"] }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "example-string-replacement",
+      "kind": "mutation",
+      "target": { "file": "packages/example.ts" },
+      "mutations": [
+        {
+          "type": "string-replace",
+          "find": "before",
+          "replace": "after"
+        }
+      ],
+      "expectations": [
+        {
+          "assertion": "tests-detect",
+          "specs": ["tests/example.test.ts"]
+        }
+      ]
+    }
+  ]
+}

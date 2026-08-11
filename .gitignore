@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+.DS_Store
+scratch/*
+!scratch/README.md
+.claude/*
+!.claude/settings.json
+.devai/state/*
+!.devai/state/.gitkeep
+.devai/worktrees/*
+!.devai/worktrees/.gitkeep

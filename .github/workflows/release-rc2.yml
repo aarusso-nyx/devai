@@ -1,0 +1,337 @@
+name: Publish DEVAI 1.0.0-rc.2
+
+on:
+  push:
+    tags: [v1.0.0-rc.2]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devai-release-v1.0.0-rc.2
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: '@aarusso-nyx/devai'
+  PACKAGE_VERSION: 1.0.0-rc.2
+  RELEASE_TAG: v1.0.0-rc.2
+  VERIFIER_COMMIT: 2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c
+
+jobs:
+  verify-ledger:
+    name: Verify protected RC ledger
+    runs-on: ubuntu-latest
+    environment: devai-ledger-verification
+    timeout-minutes: 5
+    outputs:
+      tree: ${{ steps.bindings.outputs.tree }}
+      envelope_sha256: ${{ steps.bindings.outputs.envelope_sha256 }}
+      results_sha256: ${{ steps.bindings.outputs.results_sha256 }}
+      task_policy_sha256: ${{ steps.bindings.outputs.task_policy_sha256 }}
+      trust_store_sha256: ${{ steps.bindings.outputs.trust_store_sha256 }}
+      policy_digest: ${{ steps.bindings.outputs.policy_digest }}
+    steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pinned independent verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: devai-nyx/devai-verifier
+          ref: 2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c
+          path: .devai-verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up verifier runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Materialize protected ledger inputs
+        shell: bash
+        env:
+          ENVELOPE_B64: ${{ secrets.DEVAI_LEDGER_ENVELOPE_B64 }}
+          RESULTS_TGZ_B64: ${{ secrets.DEVAI_LEDGER_RESULTS_TGZ_B64 }}
+          TASK_POLICY_B64: ${{ secrets.DEVAI_LEDGER_TASK_POLICY_B64 }}
+          TRUST_STORE_B64: ${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$ENVELOPE_B64"
+          test -n "$RESULTS_TGZ_B64"
+          test -n "$TASK_POLICY_B64"
+          test -n "$TRUST_STORE_B64"
+          control="$RUNNER_TEMP/devai-ledger-control"
+          mkdir -p "$control/results"
+          printf '%s' "$ENVELOPE_B64" | base64 --decode > "$control/envelope.json"
+          printf '%s' "$RESULTS_TGZ_B64" | base64 --decode > "$control/results.tgz"
+          printf '%s' "$TASK_POLICY_B64" | base64 --decode > "$control/task-policy.json"
+          printf '%s' "$TRUST_STORE_B64" | base64 --decode > "$control/trust-store.json"
+          if tar -tzf "$control/results.tgz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo 'DEVAI_LEDGER_RESULTS_ARCHIVE_PATH_INVALID' >&2
+            exit 2
+          fi
+          tar -xzf "$control/results.tgz" -C "$control/results"
+
+      - name: Bind and verify exact release evidence
+        id: bindings
+        shell: bash
+        env:
+          POLICY_DIGEST: ${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
+        run: |
+          set -euo pipefail
+          test -n "$POLICY_DIGEST"
+          test "$(git -C candidate rev-parse HEAD)" = "$GITHUB_SHA"
+          tree="$(git -C candidate rev-parse "${GITHUB_SHA}^{tree}")"
+          control="$RUNNER_TEMP/devai-ledger-control"
+          node .devai-verifier/src/cli.js \
+            --envelope "$control/envelope.json" \
+            --results-dir "$control/results" \
+            --task-policy "$control/task-policy.json" \
+            --trust "$control/trust-store.json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --commit "$GITHUB_SHA" \
+            --tree "$tree" \
+            --policy-digest "$POLICY_DIGEST"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "envelope_sha256=$(sha256sum "$control/envelope.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "results_sha256=$(sha256sum "$control/results.tgz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "task_policy_sha256=$(sha256sum "$control/task-policy.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "trust_store_sha256=$(sha256sum "$control/trust-store.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "policy_digest=$POLICY_DIGEST" >> "$GITHUB_OUTPUT"
+
+  build-and-publish:
+    name: Build once and publish exact package
+    needs: verify-ledger
+    runs-on: ubuntu-latest
+    environment: devai-rc-release
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out exact tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Set up Node and GitHub Packages
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@aarusso-nyx'
+
+      - name: Verify immutable source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = tag
+          test "$GITHUB_REF_NAME" = "$RELEASE_TAG"
+          test "$(git cat-file -t "$RELEASE_TAG")" = tag
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
+          test "$(git rev-parse "${GITHUB_SHA}^{tree}")" = "${{ needs.verify-ledger.outputs.tree }}"
+          test "$(node -p "require('./packages/cli/package.json').name")" = "$PACKAGE_NAME"
+          test "$(node -p "require('./packages/cli/package.json').version")" = "$PACKAGE_VERSION"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package and site once
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build
+          pnpm run release:closure
+          pnpm --filter "$PACKAGE_NAME" run pack:smoke
+          npm --prefix docs/site ci
+          npm --prefix docs/site run typecheck
+          npm --prefix docs/site run build
+
+      - name: Assemble immutable release artifacts
+        id: artifacts
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          TREE_SHA: ${{ needs.verify-ledger.outputs.tree }}
+          LEDGER_ENVELOPE_SHA256: ${{ needs.verify-ledger.outputs.envelope_sha256 }}
+          LEDGER_RESULTS_SHA256: ${{ needs.verify-ledger.outputs.results_sha256 }}
+          LEDGER_TASK_POLICY_SHA256: ${{ needs.verify-ledger.outputs.task_policy_sha256 }}
+          LEDGER_TRUST_STORE_SHA256: ${{ needs.verify-ledger.outputs.trust_store_sha256 }}
+          LEDGER_POLICY_DIGEST: ${{ needs.verify-ledger.outputs.policy_digest }}
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/devai-release"
+          mkdir -p "$release_dir"
+          pack_json="$(pnpm --dir packages/cli pack --json --pack-destination "$release_dir")"
+          tarball="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.filename)' "$pack_json")"
+          tarball="$release_dir/$(basename "$tarball")"
+          sbom_root="$RUNNER_TEMP/devai-sbom"
+          mkdir -p "$sbom_root"
+          tar -xzf "$tarball" -C "$sbom_root"
+          npm --prefix "$sbom_root/package" install --package-lock-only --ignore-scripts --no-audit --no-fund
+          sbom="$release_dir/devai-$PACKAGE_VERSION.cdx.json"
+          pnpm exec cyclonedx-npm \
+            --package-lock-only \
+            --omit dev \
+            --output-reproducible \
+            --validate \
+            --mc-type application \
+            --output-format JSON \
+            --output-file "$sbom" \
+            "$sbom_root/package/package.json"
+          site="$release_dir/devai-site-$PACKAGE_VERSION.tar.gz"
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -czf "$site" -C docs/site/build .
+          manifest="$release_dir/release-manifest.json"
+          PACKAGE_TARBALL="$tarball" SITE_ARCHIVE="$site" SBOM_FILE="$sbom" OUTPUT_FILE="$manifest" \
+            VERIFIER_COMMIT="$VERIFIER_COMMIT" node scripts/create-release-manifest.mjs
+          (cd "$release_dir" && sha256sum "$(basename "$tarball")" "$(basename "$sbom")" \
+            "$(basename "$site")" "$(basename "$manifest")" | sort -k2 > SHA256SUMS)
+          echo "release_dir=$release_dir" >> "$GITHUB_OUTPUT"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact package once
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            test "$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
+            echo 'Exact package version already exists; publication is not repeated.'
+          else
+            npm publish "${{ steps.artifacts.outputs.tarball }}" \
+              --tag next \
+              --registry https://npm.pkg.github.com
+          fi
+
+      - name: Upload release candidate assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: devai-v1.0.0-rc.2-assets
+          path: ${{ steps.artifacts.outputs.release_dir }}/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: docs/site/build
+
+  finalize-release:
+    name: Verify public package and create prerelease
+    needs: [verify-ledger, build-and-publish]
+    runs-on: ubuntu-latest
+    environment: devai-rc-publication
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node and GitHub Packages
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@aarusso-nyx'
+
+      - name: Download exact release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: devai-v1.0.0-rc.2-assets
+          path: release-assets
+
+      - name: Verify registry bytes from a clean authenticated install
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/devai-registry-smoke"
+          mkdir -p "$project/registry-pack"
+          npm --prefix "$project" init --yes >/dev/null
+          npm --prefix "$project" install --save-exact "$PACKAGE_NAME@$PACKAGE_VERSION" \
+            --registry https://npm.pkg.github.com
+          binary="$project/node_modules/.bin/devai"
+          test "$($binary --version | cut -d' ' -f1)" = "devai/$PACKAGE_VERSION"
+          test "$("$binary" catalog actions --format json | node -e \
+            'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).result.value.length)))')" = 41
+          npm pack "$PACKAGE_NAME@$PACKAGE_VERSION" \
+            --registry https://npm.pkg.github.com \
+            --pack-destination "$project/registry-pack" >/dev/null
+          source_tgz="$(find release-assets -maxdepth 1 -name '*.tgz' -print -quit)"
+          registry_tgz="$(find "$project/registry-pack" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$source_tgz"
+          test -n "$registry_tgz"
+          test "$(sha256sum "$source_tgz" | cut -d' ' -f1)" = "$(sha256sum "$registry_tgz" | cut -d' ' -f1)"
+          (cd release-assets && sha256sum --check SHA256SUMS)
+
+      - name: Create or repair the immutable GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --prerelease \
+              --title "DEVAI $PACKAGE_VERSION" \
+              --notes-file CHANGELOG.md
+          fi
+
+  deploy-pages:
+    name: Deploy and verify GitHub Pages
+    needs: finalize-release
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+
+      - name: Verify live documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='https://aarusso-nyx.github.io/devai/'
+          home="$(curl --fail --location --retry 8 --retry-delay 5 "$root")"
+          grep -F '@aarusso-nyx/devai@1.0.0-rc.2' <<<"$home"
+          curl --fail --location --retry 8 --retry-delay 5 "${root}docs/adopters/install" >/dev/null
+          curl --fail --location --retry 8 --retry-delay 5 "${root}docs/reference/cli" >/dev/null

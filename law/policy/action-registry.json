@@ -1,0 +1,2493 @@
+{
+  "$schema": "../schemas/action-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "action-registry",
+  "authority": "Architect",
+  "ordering": "utf8-bytes",
+  "generated_views": [
+    "packages/cli/src/generated/action-registry.ts",
+    "packages/effects-check/src/generated/action-catalog.ts",
+    "packages/sensors/src/generated/action-kinds.ts"
+  ],
+  "counts": {
+    "stable": 20,
+    "preview": 10,
+    "internal": 11,
+    "total": 41
+  },
+  "entries": [
+    {
+      "action_id": "catalog actions",
+      "handler": "catalog actions",
+      "path": ["catalog", "actions"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "List registered DEVAI actions as JSON.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/actions-list-output.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "catalog actions",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "check",
+      "handler": "check",
+      "path": ["check"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "policy_firewall",
+      "description": "Run a canonical check suite or one named check with fail-closed aggregate output.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "check",
+        "effect": "local-write",
+        "capabilities": [
+          "db:read",
+          "db:write",
+          "fs:f5-state",
+          "fs:workspace",
+          "fs:worktree-admin",
+          "proc:docker",
+          "proc:dynamic",
+          "proc:git",
+          "proc:pnpm",
+          "proc:psql",
+          "proc:sandbox-exec"
+        ],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["inspector"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "check-bounded-plan",
+          "target_kinds": ["fs", "git-ref", "db"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": [
+            "fs-authority-boundary",
+            "git-ref-authority-boundary",
+            "db-authority-boundary"
+          ],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "doctor",
+      "handler": "doctor",
+      "path": ["doctor"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Diagnose an adopter repository against its installed DEVAI contracts.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "doctor",
+        "effect": "read",
+        "capabilities": ["proc:sh", "proc:dynamic", "proc:git", "proc:npx", "proc:gh"],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "evidence collect",
+      "handler": "evidence collect",
+      "path": ["evidence", "collect"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Collect governed evidence from one declared source into harness state.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "evidence collect",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "proc:git"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "evidence-collect-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "evidence record",
+      "handler": "evidence record",
+      "path": ["evidence", "record"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Record one governed evidence kind through the append-only evidence boundary.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "evidence record",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "proc:git", "proc:sh"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "evidence-record-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "evidence redact",
+      "handler": "evidence redact",
+      "path": ["evidence", "redact"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Apply a redaction policy to a record, re-link downstream, and log a redaction event",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "evidence redact",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "evidence-redact-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "evidence render",
+      "handler": "evidence render",
+      "path": ["evidence", "render"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Render one evidence view from canonical records.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "evidence render",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "evidence-render-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "evidence verify",
+      "handler": "evidence verify",
+      "path": ["evidence", "verify"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Verify a declared evidence scope, including optional read-only chain-head inspection.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "evidence verify",
+        "effect": "read",
+        "capabilities": ["proc:git"],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "init apply architect",
+      "handler": "init apply architect",
+      "path": ["init", "apply", "architect"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Apply the Architect-owned initialization projection with explicit write consent.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init apply architect",
+        "effect": "local-write",
+        "capabilities": ["fs:f5-config", "fs:workspace"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["architect"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "init-apply-architect-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "init apply harness",
+      "handler": "init apply harness",
+      "path": ["init", "apply", "harness"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Apply the canonical harness projection with explicit Architect-initiated write consent.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init apply harness",
+        "effect": "local-write",
+        "capabilities": ["fs:f5-config", "fs:workspace"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "binding",
+          "transition": "bind",
+          "initiator": {
+            "allowed_roles": ["architect"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "init-apply-harness-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "init apply owner",
+      "handler": "init apply owner",
+      "path": ["init", "apply", "owner"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Apply the Owner-owned initialization projection with explicit write consent.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init apply owner",
+        "effect": "local-write",
+        "capabilities": ["fs:workspace"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["owner"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "init-apply-owner-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "init bind",
+      "handler": "init bind",
+      "path": ["init", "bind"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Bind the installed DEVAI package contracts into an adopter repository.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "effect": "local-write",
+        "capabilities": ["fs:f5-config"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "binding",
+          "transition": "bind",
+          "initiator": {
+            "allowed_roles": ["architect"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "init-bind-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "init plan",
+      "handler": "init plan",
+      "path": ["init", "plan"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Build the exact segmented bootstrap plan without authorizing a mutation.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init plan",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release check",
+      "handler": "release check",
+      "path": ["release", "check"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "release_controller",
+      "description": "Evaluate release eligibility without granting publication authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release check",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["architect"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-check-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release drift",
+      "handler": "release drift",
+      "path": ["release", "drift"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "release_controller",
+      "description": "Inspect and record release-runtime drift under the release controller.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release drift",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["architect"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-drift-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release status",
+      "handler": "release status",
+      "path": ["release", "status"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "release_controller",
+      "description": "Read release-control status without persisting evidence or state.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release status",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release verify",
+      "handler": "release verify",
+      "path": ["release", "verify"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "release_controller",
+      "description": "Verify post-deployment release state under the release controller.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release verify",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["architect"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-verify-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round assess",
+      "handler": "round assess",
+      "path": ["round", "assess"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Summarize tasks and open gaps for one active round.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round assess",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round close",
+      "handler": "round close",
+      "path": ["round", "close"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Execute the authorized round-close transition; never infer release or publication.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round close",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "round-close-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round gap create",
+      "handler": "round gap create",
+      "path": ["round", "gap", "create"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Create a governed round gap record through the harness boundary.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round gap create",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "round-gap-create-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round gap list",
+      "handler": "round gap list",
+      "path": ["round", "gap", "list"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "List governed gaps for the active round.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round gap list",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round gap resolve",
+      "handler": "round gap resolve",
+      "path": ["round", "gap", "resolve"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Resolve a governed round gap through the harness boundary.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round gap resolve",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "round-gap-resolve-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round gap show",
+      "handler": "round gap show",
+      "path": ["round", "gap", "show"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Show one governed round gap.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round gap show",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round plan",
+      "handler": "round plan",
+      "path": ["round", "plan"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Create or render Architect-owned round planning material from canonical inputs.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round plan",
+        "effect": "local-write",
+        "capabilities": [
+          "fs:f5-state",
+          "fs:proofs",
+          "fs:workspace",
+          "proc:dynamic",
+          "proc:mmdc",
+          "proc:which"
+        ],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["architect"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "round-plan-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round run",
+      "handler": "round run",
+      "path": ["round", "run"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Advance selected ready tasks within one active round through their declared executors.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round run",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "fs:worktree-admin"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "round-run-bounded-plan",
+          "target_kinds": ["fs", "git-ref"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary", "git-ref-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round seal",
+      "handler": "round seal",
+      "path": ["round", "seal"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Seal Architect-owned round material without publishing it.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round seal",
+        "effect": "local-write",
+        "capabilities": ["fs:workspace"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["architect"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "round-seal-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "round status",
+      "handler": "round status",
+      "path": ["round", "status"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Read one governed round in place and report its schema-valid canonical status.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "round status",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "sense inventory",
+      "handler": "sense inventory",
+      "path": ["sense", "inventory"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "sensor",
+      "description": "Render one canonical repository inventory slice without persistence.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "sense inventory",
+        "effect": "read",
+        "capabilities": ["proc:git"],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "sense migrate",
+      "handler": "sense migrate",
+      "path": ["sense", "migrate"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "sensor",
+      "description": "Execute the DB-writing migration sensor with explicit Engineer write consent.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "sense migrate",
+        "effect": "local-write",
+        "capabilities": ["db:read", "db:write"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["engineer"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "sense-migrate-bounded-plan",
+          "target_kinds": ["db"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["db-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "sense record",
+      "handler": "sense record",
+      "path": ["sense", "record"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "sensor",
+      "description": "Persist or rebuild declared sensor readings through the harness boundary.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "sense record",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "sense-record-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "sense run",
+      "handler": "sense run",
+      "path": ["sense", "run"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "remote-write",
+      "authority": "sensor",
+      "description": "Run one resolved sensor kind or preset; per-kind effect and authority are enforced before execution.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "sense run",
+        "effect": "remote-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "proc:dynamic", "net:sensor-runtime"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": true,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "sense-run-sweep-bounded-plan",
+          "target_kinds": ["fs", "remote"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary", "remote-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task escalate",
+      "handler": "task escalate",
+      "path": ["task", "escalate"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Escalate one round-subordinate task through hidden plumbing.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task escalate",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-escalate-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task finish",
+      "handler": "task finish",
+      "path": ["task", "finish"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Finish one round-subordinate task and release its declared resources.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task finish",
+        "effect": "local-write",
+        "capabilities": ["db:write", "fs:f5-state", "fs:proofs", "fs:worktree-admin"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-finish-bounded-plan",
+          "target_kinds": ["fs", "git-ref", "db"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": [
+            "fs-authority-boundary",
+            "git-ref-authority-boundary",
+            "db-authority-boundary"
+          ],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task pause",
+      "handler": "task pause",
+      "path": ["task", "pause"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Pause one round-subordinate task on a governed gap.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task pause",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-pause-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task queue add",
+      "handler": "task queue add",
+      "path": ["task", "queue", "add"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Add one task to an active round queue through hidden plumbing.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task queue add",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-queue-add-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task queue complete",
+      "handler": "task queue complete",
+      "path": ["task", "queue", "complete"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Complete one active-round queue item through hidden plumbing.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task queue complete",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-queue-complete-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task queue list",
+      "handler": "task queue list",
+      "path": ["task", "queue", "list"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "List active-round queue items through hidden plumbing.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task queue list",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task queue next",
+      "handler": "task queue next",
+      "path": ["task", "queue", "next"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Select the next ready active-round queue item through hidden plumbing.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task queue next",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task resume",
+      "handler": "task resume",
+      "path": ["task", "resume"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Resume one paused round-subordinate task after its governed gap resolves.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task resume",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-resume-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task start",
+      "handler": "task start",
+      "path": ["task", "start"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Start one round-subordinate task and provision only its declared resources.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task start",
+        "effect": "local-write",
+        "capabilities": [
+          "db:write",
+          "fs:f5-state",
+          "fs:proofs",
+          "fs:workspace",
+          "fs:worktree-admin",
+          "proc:git",
+          "proc:node",
+          "proc:npx",
+          "proc:pnpm"
+        ],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["engineer"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "task-start-bounded-plan",
+          "target_kinds": ["fs", "git-ref", "db"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": [
+            "fs-authority-boundary",
+            "git-ref-authority-boundary",
+            "db-authority-boundary"
+          ],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "task status",
+      "handler": "task status",
+      "path": ["task", "status"],
+      "status": "internal",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "mesh_controller",
+      "description": "Read task and managed-resource status for one active round.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "task status",
+        "effect": "read",
+        "capabilities": [],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    }
+  ]
+}

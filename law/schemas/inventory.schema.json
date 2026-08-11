@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/inventory.schema.json",
+  "title": "Inventory",
+  "description": "F4 manifest. Deterministic derivation from F1+F2+F3 at a given integration HEAD. Plant-identification subsystem output. Per Constitution Article 4 (F4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generated_at",
+    "integration_head",
+    "modules",
+    "routes",
+    "schemas",
+    "components",
+    "test_inventory",
+    "dependency_graph_hash"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "integration_head": {
+      "type": "string",
+      "description": "Git SHA at which this inventory was regenerated."
+    },
+    "modules": {
+      "type": "array",
+      "description": "Modules in the repository. Items accept either stable MOD-* ids or objects carrying {id, file}, allowing reverse-adherence analysis to read per-surface file paths without another extraction pass.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^MOD-"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "file"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^MOD-"
+              },
+              "file": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "path", "module"],
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string",
+            "pattern": "^MOD-"
+          },
+          "auth": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable per-route id used by reverse-adherence analysis. Format: `ROUTE-<sha256_hex_8>` derived from method, path, and module."
+          },
+          "file": {
+            "type": "string",
+            "description": "Source file containing the route declaration, used to match trace.invariants[*].code_areas globs."
+          }
+        }
+      }
+    },
+    "schemas": {
+      "type": "array",
+      "description": "Database schemas/tables and DTO/JSON schemas.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name"],
+        "properties": {
+          "kind": {
+            "enum": ["db_table", "db_view", "dto", "openapi", "json_schema"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string",
+            "pattern": "^MOD-"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "description": "Angular components, NestJS services, etc.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name", "module"],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string",
+            "pattern": "^MOD-"
+          },
+          "path": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable per-component id used by reverse-adherence analysis. Format: `COMP-<sha256_hex_8>` derived from kind, name, and module."
+          },
+          "file": {
+            "type": "string",
+            "description": "Source file containing the component declaration. It normally equals `path` and remains separate so every surface kind exposes the same file-bearing shape."
+          }
+        }
+      }
+    },
+    "test_inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "suite", "invariants"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "suite": {
+            "enum": ["unit", "api", "int", "e2e", "sec", "perf", "journey", "db"]
+          },
+          "invariants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^INV-"
+            }
+          },
+          "module": {
+            "type": "string",
+            "pattern": "^MOD-"
+          }
+        }
+      }
+    },
+    "dependency_graph_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the canonical-form module dependency graph. Drift indicates structural change."
+    },
+    "dependency_graph": {
+      "type": "array",
+      "description": "Per-node dependency-graph surfaces. Each entry carries an id and file so reverse-adherence analysis can read this slice with the same shape as routes, modules, and components. The full edge list requires a fresh dependency extraction; this array provides the surface view.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "file"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^DEP-"
+          },
+          "file": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "feature_matrix": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Client-specific feature×module coverage matrix, populated by configured projection skills."
+    },
+    "checksums": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "description": "SHA-256 hashes of the configured repository contracts for F5 drift detection (Article 36)."
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "generated_at": "2026-05-17T22:18:48.691Z",
+      "integration_head": "9f0a4dd26d81ef2cc009074820c767f7be3c9682",
+      "modules": [],
+      "routes": [],
+      "schemas": [],
+      "components": [],
+      "test_inventory": [],
+      "dependency_graph_hash": "7a4f762c34ee000f2d806468755ea30d08f032d3055913a11a3f92dda8f18d53"
+    }
+  ]
+}

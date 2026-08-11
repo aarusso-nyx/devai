@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/runtime-charter.schema.json",
+  "title": "Runtime Probe Charter",
+  "description": "Charter that scopes a runtime probe run. It declares the mission, target environment, in-scope invariants, allowed credentials, probe sequence, expected evidence, and side-effect policy consumed through `devai sense run`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "kind", "mission", "target", "probes"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^RPC-[A-Za-z0-9_-]{1,64}$",
+      "description": "Stable charter id. Free-form within the pattern; not minted from a counter (charters are authored artifacts, not generated)."
+    },
+    "kind": {
+      "enum": ["api", "auth", "data"],
+      "description": "Which runtime-probe family executes this charter. api = HTTP/GraphQL/RPC; auth = RBAC/session/protected-surface; data = DB/state/consistency."
+    },
+    "mission": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Plain-language statement of what this probe set is verifying."
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_url"],
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "description": "Base URL for the deployed runtime under probe. For data-kind probes this may be a DB connection string instead."
+        },
+        "environment": {
+          "enum": ["dev", "staging", "stage", "prod", "preview", "other"]
+        },
+        "deployed_artifact_ref": {
+          "type": "string",
+          "description": "Optional artifact-of-record id for evidence cross-referencing."
+        }
+      }
+    },
+    "threat_model": {
+      "type": "string",
+      "description": "Free-form threat model: what surfaces are sensitive, what side effects are explicitly allowed/forbidden."
+    },
+    "in_scope_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^INV-"
+      },
+      "description": "Invariants this probe set claims to exercise. Failures map back to these ids."
+    },
+    "allowed_credentials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "role"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "secret_ref": {
+            "type": "string",
+            "description": "Reference to a secret (env var, vault path); the charter never inlines secrets."
+          }
+        }
+      }
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pid", "name", "expect"],
+        "properties": {
+          "pid": {
+            "type": "string",
+            "pattern": "^P[0-9]+$",
+            "description": "Probe id within this charter (P1, P2, …). Stable across charter revisions."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method or RPC verb (api/auth kinds)."
+          },
+          "path": {
+            "type": "string",
+            "description": "URL path or RPC name (api/auth kinds)."
+          },
+          "query": {
+            "type": "string",
+            "description": "SQL or DB-query expression (data kind)."
+          },
+          "as_credential": {
+            "type": "string",
+            "description": "Which allowed_credentials.name to use."
+          },
+          "body": {
+            "description": "Optional request body for the probe."
+          },
+          "expect": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "row_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "contains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Substrings expected in the response body."
+              },
+              "absent": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Substrings that MUST NOT appear (e.g., leaked PII)."
+              },
+              "invariant": {
+                "type": "string",
+                "pattern": "^INV-",
+                "description": "Optional invariant this probe is the observable for."
+              }
+            }
+          }
+        }
+      }
+    },
+    "side_effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "enum": ["read-only", "idempotent_writes", "destructive_with_isolation"],
+          "description": "Default: read-only. Probes that write must declare so explicitly."
+        },
+        "isolation_note": {
+          "type": "string",
+          "description": "For destructive_with_isolation: how isolation is achieved (per-test tenant, sandbox env, etc.)."
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "RPC-health",
+      "kind": "api",
+      "mission": "Verify the deployed health endpoint.",
+      "target": {
+        "base_url": "https://example.invalid"
+      },
+      "probes": [
+        {
+          "pid": "P1",
+          "name": "Health responds",
+          "expect": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/error.schema.json",
+  "title": "DEVAI structured error",
+  "description": "The closed, machine-readable error envelope. Errors are distinct from judgment verdicts.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "code", "class", "exit", "message"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+    },
+    "class": {
+      "enum": [
+        "routing-authority",
+        "gate-fail",
+        "invalid-input",
+        "precondition",
+        "infrastructure",
+        "contract-violation"
+      ]
+    },
+    "exit": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 7
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "remediation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "record": {
+          "type": "string",
+          "pattern": "^(?:DII-(?:REJ-)?[A-Z0-9]+|ADR-[0-9]{3}|INV-[A-Z]+-[0-9]{3})$"
+        },
+        "doc": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]+(?:#[A-Za-z0-9._:-]+)?$"
+        }
+      }
+    },
+    "context": {
+      "description": "Code-specific structured context. The schema for each code closes this object further.",
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "class": {
+          "const": "routing-authority"
+        },
+        "exit": {
+          "const": 2
+        }
+      }
+    },
+    {
+      "properties": {
+        "class": {
+          "const": "gate-fail"
+        },
+        "exit": {
+          "const": 3
+        }
+      }
+    },
+    {
+      "properties": {
+        "class": {
+          "const": "invalid-input"
+        },
+        "exit": {
+          "const": 4
+        }
+      }
+    },
+    {
+      "properties": {
+        "class": {
+          "const": "precondition"
+        },
+        "exit": {
+          "const": 5
+        }
+      }
+    },
+    {
+      "properties": {
+        "class": {
+          "const": "infrastructure"
+        },
+        "exit": {
+          "const": 6
+        }
+      }
+    },
+    {
+      "properties": {
+        "class": {
+          "const": "contract-violation"
+        },
+        "exit": {
+          "const": 7
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "code": "AUTHORITY_DENIED",
+      "class": "routing-authority",
+      "exit": 2,
+      "message": "The active role cannot write the requested path.",
+      "remediation": "Route the change to the role authorized for that path.",
+      "refs": {
+        "doc": "law/constitution.md#article-6"
+      },
+      "context": {
+        "role": "Engineer",
+        "path": "law/schemas/error.schema.json"
+      }
+    }
+  ]
+}

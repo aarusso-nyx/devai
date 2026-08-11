@@ -1,0 +1,520 @@
+{
+  "schemaVersion": "1.0.0",
+  "roles": ["operator", "owner", "architect", "inspector", "engineer", "auditor"],
+  "cases": [
+    {
+      "id": "UC-devai-cli-current-actions",
+      "title": "Use the current DEVAI CLI",
+      "goal": "Select and run one of the 41 supported release-candidate actions.",
+      "actors": ["operator", "owner", "architect", "inspector", "engineer", "auditor"],
+      "preconditions": [
+        "DEVAI is installed in an adopter repository.",
+        "The caller satisfies the selected action authority and consent contract."
+      ],
+      "triggers": [
+        "A developer needs to inspect, initialize, check, sense, execute, record, or verify work."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Use `catalog actions`: List registered DEVAI actions as JSON.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "catalog actions"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Use `check`: Run a canonical check suite or one named check with fail-closed aggregate output.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "check"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Use `doctor`: Composite repo health check. Posture: --self (full DEVAI checks), --adopter (subset that applies to adopter repos), --auto (default; sniff repo-root for DEVAI shape).",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "doctor"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-04",
+          "action": "Use `evidence collect`: Collect governed evidence from one declared source into harness state.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "evidence collect"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-05",
+          "action": "Use `evidence record`: Record one governed evidence kind through the append-only evidence boundary.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "evidence record"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-06",
+          "action": "Use `evidence redact`: Apply a redaction policy to a record, re-link downstream, and log a redaction event",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "evidence redact"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-07",
+          "action": "Use `evidence render`: Render one evidence view from canonical records.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "evidence render"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-08",
+          "action": "Use `evidence verify`: Verify a declared evidence scope, including optional read-only chain-head inspection.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "evidence verify"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-09",
+          "action": "Use `init apply architect`: Apply the Architect-owned initialization projection with explicit write consent.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init apply architect"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-10",
+          "action": "Use `init apply harness`: Apply the canonical harness projection with explicit Architect-initiated write consent.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init apply harness"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-11",
+          "action": "Use `init apply owner`: Apply the Owner-owned initialization projection with explicit write consent.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init apply owner"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-12",
+          "action": "Use `init plan`: Build the exact segmented bootstrap plan without authorizing a mutation.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init plan"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-13",
+          "action": "Use `init bind`: Bind selected installed DEVAI contracts into an adopter repository.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init bind"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-14",
+          "action": "Use `release check`: Evaluate release eligibility without granting publication authority.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release check"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-15",
+          "action": "Use `release drift`: Inspect and record release-runtime drift under the release controller.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release drift"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-16",
+          "action": "Use `release status`: Read release-control status without persisting evidence or state.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-17",
+          "action": "Use `release verify`: Verify post-deployment release state under the release controller.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release verify"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-18",
+          "action": "Use `round assess`: Compute or render the active round assessment and governed triage views.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round assess"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-19",
+          "action": "Use `round close`: Execute the authorized round-close transition; never infer release or publication.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round close"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-20",
+          "action": "Use `round gap create`: Create a governed round gap record through the harness boundary.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round gap create"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-21",
+          "action": "Use `round gap list`: List governed gaps for the active round.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round gap list"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-22",
+          "action": "Use `round gap resolve`: Resolve a governed round gap through the harness boundary.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round gap resolve"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-23",
+          "action": "Use `round gap show`: Show one governed round gap.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round gap show"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-24",
+          "action": "Use `round plan`: Create or render Architect-owned round planning material from canonical inputs.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round plan"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-25",
+          "action": "Use `round run`: Advance selected ready tasks within one active round through their declared executors.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round run"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-26",
+          "action": "Use `round seal`: Seal Architect-owned round material without publishing it.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round seal"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-27",
+          "action": "Use `round status`: Read one governed round in place and report its schema-valid canonical status.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-28",
+          "action": "Use `sense inventory`: Render one canonical repository inventory slice without persistence.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "sense inventory"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-29",
+          "action": "Use `sense migrate`: Execute the DB-writing migration sensor with explicit Engineer write consent.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "sense migrate"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-30",
+          "action": "Use `sense record`: Persist or rebuild declared sensor readings through the harness boundary.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "sense record"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-31",
+          "action": "Use `sense run`: Run one resolved sensor kind or preset; per-kind effect and authority are enforced before execution.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "sense run"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-32",
+          "action": "Use `task escalate`: Escalate one round-subordinate task through hidden plumbing.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task escalate"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-33",
+          "action": "Use `task finish`: Finish one round-subordinate task and release its declared resources.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task finish"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-34",
+          "action": "Use `task pause`: Pause one round-subordinate task on a governed gap.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task pause"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-35",
+          "action": "Use `task queue add`: Add one task to an active round queue through hidden plumbing.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task queue add"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-36",
+          "action": "Use `task queue complete`: Complete one active-round queue item through hidden plumbing.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task queue complete"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-37",
+          "action": "Use `task queue list`: List active-round queue items through hidden plumbing.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task queue list"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-38",
+          "action": "Use `task queue next`: Select the next ready active-round queue item through hidden plumbing.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task queue next"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-39",
+          "action": "Use `task resume`: Resume one paused round-subordinate task after its governed gap resolves.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task resume"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-40",
+          "action": "Use `task start`: Start one round-subordinate task and provision only its declared resources.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task start"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-41",
+          "action": "Use `task status`: Read task and managed-resource status for one active round.",
+          "actorRole": "operator",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task status"
+              }
+            ]
+          }
+        }
+      ],
+      "postconditions": [
+        "The selected action returns its declared result envelope or a fail-closed refusal."
+      ],
+      "acceptanceCriteria": [
+        "Every action reference resolves exactly once in the current action registry.",
+        "The use case describes exactly the current registered action population."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@devai-nyx/utils",
+  "version": "1.0.0",
+  "description": "Shared foundations for DEVAI: canonical JSON, counters, templates, state, profiles, glob guards, logging, exit codes, and redaction.",
+  "license": "Apache-2.0",
+  "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm --dir ../.. run test:utils"
+  },
+  "dependencies": {
+    "minimatch": "^9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarusso-nyx/devai.git",
+    "directory": "packages/utils"
+  },
+  "private": true
+}

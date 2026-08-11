@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-round",
+  "status": "preview",
+  "description": "Preview a local round workflow with explicit phases and runtime-state-only coordination.",
+  "variants": {
+    "assess": {
+      "description": "Inspect the prospective round subject without creating state.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["round.assess"]
+    },
+    "plan": {
+      "description": "Materialize a local preview plan in runtime state.",
+      "effect": "runtime-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": [".devai/state/round-runs/**"] },
+      "operations": ["round.plan.preview"]
+    },
+    "run": {
+      "description": "Coordinate explicitly authorized local child operations and record runtime progress.",
+      "effect": "runtime-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": [".devai/state/round-runs/**"] },
+      "operations": ["round.run.preview"]
+    },
+    "close": {
+      "description": "Verify local completion and write a runtime-only close summary.",
+      "effect": "runtime-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": [".devai/state/round-runs/**"] },
+      "operations": ["round.close.preview"]
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/glob-guards.schema.json",
+  "title": "Glob Guards Registry",
+  "description": "Adopter-declared glob patterns that MUST continue matching at least min_matches files. This catches CI triggers, generator inputs, and validation targets that silently stop matching after a rename or restructure. The default registry lives at .devai/config/glob-guards.json; absent or empty is valid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "guards"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "guards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "pattern"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_-]*$",
+            "description": "Stable identifier for this guard."
+          },
+          "description": {
+            "type": "string",
+            "description": "Why this pattern is load-bearing and what would silently break if it stopped matching."
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Glob pattern (minimatch syntax), relative to repo root."
+          },
+          "min_matches": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Minimum number of files the pattern must match. Defaults to 1 (pure zero-match detection); set higher to also catch partial coverage loss against a known-good baseline count."
+          },
+          "source": {
+            "type": "string",
+            "description": "Optional pointer to where this glob is consumed, e.g. a CI workflow path or a generator script path."
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "guards": []
+    }
+  ]
+}

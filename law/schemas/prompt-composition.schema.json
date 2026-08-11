@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/prompt-composition.schema.json",
+  "title": "Prompt Composition",
+  "description": "Records the prompt stack composed for a task spawn. Deterministic: same registry + same overlays + same payload = identical stack_hash. Drift in any component is detectable and attributable. Per Constitution Article 37.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "generated_at", "task_id", "components", "stack_sha256"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^PC-[a-f0-9]{16}$",
+      "description": "Content-hash derived from stack_sha256."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^TASK-"
+    },
+    "model_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "enum": ["claude", "codex", "other"]
+        },
+        "model": {
+          "type": "string"
+        },
+        "tier": {
+          "enum": ["default", "bumped", "fallback"]
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["layer", "name", "body_sha256"],
+        "properties": {
+          "layer": {
+            "enum": ["global", "role", "discipline", "task", "payload", "overlay"]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Canonical name of the component (e.g., 'engineer.role', 'task.feedback', 'rgr.context')."
+          },
+          "source": {
+            "type": "string",
+            "description": "Path or registry key where this component lives."
+          },
+          "body_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 of the canonicalized body text."
+          },
+          "body_length": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "stack_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of canonical(layer || name || body_sha256) concatenated in deterministic order. Overall fingerprint."
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": ["info", "warning", "error"]
+          }
+        }
+      }
+    },
+    "frozen_against": {
+      "type": ["string", "null"],
+      "description": "Reference to a prompt-hash freeze artifact when prompt behavior is part of a governed loop (Article 37)."
+    },
+    "drift_from_frozen": {
+      "type": "boolean",
+      "description": "True if any component's hash differs from the frozen reference."
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "PC-0123456789abcdef",
+      "generated_at": "2026-07-23T00:00:00.000Z",
+      "task_id": "TASK-0001",
+      "components": [
+        {
+          "layer": "global",
+          "name": "global",
+          "body_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "stack_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}

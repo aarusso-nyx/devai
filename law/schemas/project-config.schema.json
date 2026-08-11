@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/project-config.schema.json",
+  "title": "DEVAI Project Config",
+  "description": "Per-repository DEVAI project declaration at .devai/config/project.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project_type"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "project_type": {
+      "enum": ["runtime-host", "platform-package", "docs-archive", "framework"],
+      "description": "runtime-host is a deployed application; platform-package is a consumed library; docs-archive has no runtime; framework is supporting tooling without a client substrate."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "enum": ["tier1", "tier2", "tier3"],
+      "description": "Adoption profile. tier1 provides deterministic gates and evidence; tier2 adds specification and sensor contracts; tier3 adds the complete human-supervised workflow. When absent, the strict tier3 posture applies."
+    },
+    "adopted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the repo first adopted DEVAI."
+    },
+    "devai_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+      "description": "Machine-managed package version stamped during initialization. `devai doctor` compares it with the installed @aarusso-nyx/devai version."
+    },
+    "constitution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "description": "Constitution binding pin for the vendored `.devai/pin/constitution.md` copy. `devai doctor` verifies the digest; `devai init bind --constitution --write` refreshes the copy and pin.",
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "The constitution version the repo is bound to, parsed from the vendored copy's version header."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "sha256 of the vendored constitution text. Makes the pin load-bearing: doctor fails the binding check when the pin and the vendored copy disagree."
+        }
+      }
+    },
+    "invariant_filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-type rule filtering. Invariants whose `project_types` array (when present) excludes this project_type are skipped by validators.",
+      "properties": {
+        "include_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "feature_flags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "description": "Per-repo toggles for opt-in DEVAI features."
+    },
+    "authority_enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["cli-only", "host-integrated"],
+          "description": "cli-only covers DEVAI runtime actions; host-integrated additionally declares external-tool enforcement."
+        },
+        "adapter_config": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repo-relative host adapter configuration, required for host-integrated mode."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "host-integrated"
+              }
+            }
+          },
+          "then": {
+            "required": ["adapter_config"]
+          }
+        }
+      ]
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Repository classification metadata. Added in R13 per ADR-DOCS-GOVERNANCE Decision 1.",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["library", "application"],
+          "description": "library: package consumed by other projects (MUST use docusaurus). application: business app running production traffic."
+        }
+      }
+    },
+    "docs": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Documentation build and publish configuration. Added in R13 per ADR-DOCS-GOVERNANCE Decisions 2+4 and ADR-LOCAL-PUBLISH-WORKFLOW Decisions 2+4.",
+      "required": ["builder"],
+      "properties": {
+        "builder": {
+          "enum": ["docusaurus", "jekyll"],
+          "description": "Documentation builder. library repos MUST use docusaurus (ADR-DOCS-GOVERNANCE Decision 2)."
+        },
+        "build_command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Command to build the docs site. Defaults per builder if absent."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path from repo root to the build output directory."
+        },
+        "custom_domain": {
+          "type": ["string", "null"],
+          "description": "Custom domain for the published docs site. null or empty string means no custom domain (no CNAME file written)."
+        },
+        "ia": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Docs information-architecture declarations (ADR-DOCS-IA). Both properties predate or accompany D-125; collapsed_sections (Decision 11) was already in adopter use but had never been declared in this schema file until D-125 added the `ia` node for path_overrides.",
+          "properties": {
+            "collapsed_sections": {
+              "type": "array",
+              "items": {
+                "enum": ["theory", "framework", "roles", "adopters", "reference", "meta"]
+              },
+              "uniqueItems": true,
+              "description": "ADR-DOCS-IA Decision 11: sections an application-tier adopter with no downstream consumers collapses to a single stub page pointing upstream, instead of authoring in full. Recorded alongside an adopter-side ADR-DOCS-IA-COLLAPSE per Decision 11."
+            },
+            "path_overrides": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "D-125: maps a canonical F1/reading-order key (a docs/-rooted path with the docs/ prefix stripped, e.g. \"framework/contracts\") to the adopter's actual current relative path (e.g. \"reference/contracts\") when a binding ADR has relocated that substrate. Consulted by `devai doctor`'s f1-paths-present and agents-claude-sync checks before they test path existence / reading-order substring match. Absent key, or absent docs.ia entirely, leaves both checks byte-identical to pre-D-125 behavior."
+            }
+          }
+        }
+      }
+    },
+    "ci_economy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "CI-economy law configuration. Added per ADR-CI-ECONOMY Decision 8 as amended by D-116.",
+      "properties": {
+        "profile": {
+          "enum": ["full", "gate-staged"],
+          "description": "Enforcement profile for `devai check --only ci-economy`. full makes every rule binding. gate-staged keeps the evidence-gate rule visible but advisory while the other rules remain binding."
+        },
+        "local_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required_jobs"],
+          "description": "Local-CI-evidence policy (D-117; ADR-CI-ECONOMY Decisions 1-3 promoted from the stynx prototype). Declares what a local-evidence manifest must prove for `devai evidence local verify` to let the remote gate skip heavy tiers. Absent means the repo does not accept local evidence (the gate's fallback path always runs heavy tiers remotely).",
+          "properties": {
+            "manifest_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Committed manifest location. Default: .ci/evidence/local-ci.json (matches pre-promotion consumers; zero migration)."
+            },
+            "max_age_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "description": "Maximum manifest age accepted by verification. Default 24."
+            },
+            "required_jobs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "Local job names that must all be present with result=success in the manifest."
+            },
+            "allowed_platforms": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(linux|darwin)/(amd64|arm64)$"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "Platforms local jobs may run on. Default: linux/arm64, linux/amd64."
+            },
+            "forbidden_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Path prefixes whose changes reject evidence mode (policy-sensitive surfaces). Merged with the built-in defaults (.github/workflows/, .devai/config/, the manifest's own directory); entries here extend, never replace."
+            },
+            "require_docker": {
+              "type": "boolean",
+              "description": "When true, verification requires observed docker version evidence in the manifest. Default false (not every adopter's local CI is containerized)."
+            }
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "project_type": "runtime-host"
+    }
+  ]
+}

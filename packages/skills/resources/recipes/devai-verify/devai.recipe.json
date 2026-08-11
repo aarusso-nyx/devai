@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-verify",
+  "status": "stable",
+  "description": "Review code, documentation, or evidence without modifying product files.",
+  "variants": {
+    "change": {
+      "description": "Review a bounded change and its focused evidence.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["check.inspect", "evidence.verify"]
+    },
+    "docs-coherence": {
+      "description": "Compare named documents and report contradictions or stale references.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["check.inspect"]
+    },
+    "rc": {
+      "description": "Verify the complete local RC evidence population.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["evidence.verify"]
+    }
+  }
+}

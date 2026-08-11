@@ -1,0 +1,607 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/task.schema.json",
+  "title": "Round-subordinate task",
+  "description": "The immutable requested work contract for one task in exactly one round. Discipline supplies authority; executor kind, model capability, and model size never widen it. Only this schema version is accepted.",
+  "schema_version": "2.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "round_id",
+    "status",
+    "discipline",
+    "title",
+    "target_modules",
+    "target_substrates",
+    "created_at",
+    "db_isolation",
+    "iteration_count",
+    "executor"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^TASK-[0-9]{4,}$"
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4}$",
+      "description": "The sole active governed round that owns this task. Runtime matching and active-round validation are mandatory before resource acquisition."
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "ready",
+        "lock_denied",
+        "in_progress",
+        "checkpoint",
+        "pre_merge",
+        "merging",
+        "completed",
+        "awaiting_human_review",
+        "experimental_blocked",
+        "escalated",
+        "rgr_pending",
+        "cancelled"
+      ]
+    },
+    "discipline": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "description": "The governance authority source. Executor kind, runtime, model, effort, skill, and capabilities cannot change this value or its path/effect authority."
+    },
+    "discipline_specialization": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string"
+    },
+    "lifecycle": {
+      "enum": ["supported", "experimental"],
+      "default": "supported"
+    },
+    "acceptance_commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/argv"
+      },
+      "description": "Literal shell-free argv arrays for task-specific acceptance."
+    },
+    "coupled_task_group": {
+      "type": ["string", "null"],
+      "pattern": "^CTG-[0-9]{4,}$"
+    },
+    "coupled_pipeline_position": {
+      "type": ["string", "null"],
+      "enum": [null, "architect", "inspector", "engineer"]
+    },
+    "upstream_task_id": {
+      "type": ["string", "null"],
+      "pattern": "^TASK-[0-9]{4,}$"
+    },
+    "target_substrates": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["F1", "F2", "F3", "F4", "F5"]
+      }
+    },
+    "target_modules": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^MOD-"
+      },
+      "description": "Module resource-lock keys. Empty is permitted only when the task has no module target."
+    },
+    "target_invariants": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^INV-"
+      }
+    },
+    "db_isolation": {
+      "enum": ["database", "cluster"]
+    },
+    "iteration_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_iterations": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "spawned_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "branch": {
+      "type": ["string", "null"]
+    },
+    "worktree_id": {
+      "type": ["string", "null"],
+      "pattern": "^WT-"
+    },
+    "prompt_composition_id": {
+      "type": ["string", "null"],
+      "pattern": "^PC-[a-f0-9]{16}$"
+    },
+    "executor": {
+      "description": "Immutable requested executor contract. Resolution is recorded only in task-execution evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {},
+        "action_id": {},
+        "argv": {},
+        "cwd": {},
+        "inputs": {},
+        "outputs": {},
+        "effects": {},
+        "timeout_ms": {},
+        "authority_checks": {},
+        "runtime": {},
+        "model": {},
+        "effort": {},
+        "selection": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": {
+              "enum": ["exact", "preferred", "policy"]
+            }
+          }
+        },
+        "recipe_name": {},
+        "recipe_variant": {},
+        "prompt_composition_id": {},
+        "max_iterations": {},
+        "capabilities": {},
+        "role": {},
+        "instructions_ref": {},
+        "completion_evidence": {},
+        "timeout_behavior": {},
+        "child_task_ids": {},
+        "dependencies": {},
+        "failure_policy": {}
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/routineExecutor",
+          "properties": {
+            "kind": {
+              "const": "routine"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/agentExecutor",
+          "properties": {
+            "kind": {
+              "const": "agent"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/humanExecutor",
+          "properties": {
+            "kind": {
+              "const": "human"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/compositeExecutor",
+          "properties": {
+            "kind": {
+              "const": "composite"
+            }
+          }
+        }
+      ]
+    },
+    "intent_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "planned_files": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          }
+        },
+        "planned_steps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "actual_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files_changed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "additions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deletions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diff_evidence_ref": {
+          "type": "string",
+          "pattern": "^EV-"
+        }
+      }
+    },
+    "iteration_trail": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["iteration", "started_at", "verdict"],
+        "properties": {
+          "iteration": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "verdict": {
+            "enum": ["PASS", "REVIEW", "FAIL", "RGR", "ESCALATED"]
+          },
+          "hard_gate_failures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "soft_gate_failures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^EV-"
+            }
+          }
+        }
+      }
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "effects": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["read", "harness-write", "local-write", "remote-write"]
+      }
+    },
+    "routineExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "cwd", "inputs", "outputs", "effects", "timeout_ms", "authority_checks"],
+      "properties": {
+        "kind": {
+          "const": "routine"
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argv": {
+          "$ref": "#/$defs/argv"
+        },
+        "cwd": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "inputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          }
+        },
+        "effects": {
+          "$ref": "#/$defs/effects"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "authority_checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["action_id"],
+          "not": {
+            "required": ["argv"]
+          }
+        },
+        {
+          "required": ["argv"],
+          "not": {
+            "required": ["action_id"]
+          }
+        }
+      ]
+    },
+    "agentSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "registry_id"],
+      "properties": {
+        "mode": {
+          "const": "exact"
+        },
+        "registry_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "agentExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "runtime",
+        "model",
+        "effort",
+        "selection",
+        "prompt_composition_id",
+        "max_iterations",
+        "capabilities"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effort": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection": {
+          "$ref": "#/$defs/agentSelection"
+        },
+        "recipe_name": {
+          "enum": [
+            "devai-assess",
+            "devai-plan",
+            "devai-fix",
+            "devai-docs",
+            "devai-scaffold",
+            "devai-verify",
+            "devai-round"
+          ]
+        },
+        "recipe_variant": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "prompt_composition_id": {
+          "type": "string",
+          "pattern": "^PC-[a-f0-9]{16}$"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "humanExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "role",
+        "instructions_ref",
+        "completion_evidence",
+        "timeout_ms",
+        "timeout_behavior"
+      ],
+      "properties": {
+        "kind": {
+          "const": "human"
+        },
+        "role": {
+          "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        "instructions_ref": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "completion_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_behavior": {
+          "enum": ["block", "escalate"]
+        }
+      }
+    },
+    "compositeExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "child_task_ids", "dependencies", "failure_policy"],
+      "properties": {
+        "kind": {
+          "const": "composite"
+        },
+        "child_task_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^TASK-[0-9]{4,}$"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "depends_on"],
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "pattern": "^TASK-[0-9]{4,}$"
+              },
+              "depends_on": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^TASK-[0-9]{4,}$"
+                }
+              }
+            }
+          }
+        },
+        "failure_policy": {
+          "enum": ["stop-dependent-branch", "stop-composite"]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "2.0.0",
+      "id": "TASK-7001",
+      "round_id": "R-0100",
+      "status": "queued",
+      "discipline": "engineer",
+      "title": "Implement the approved executor substrate",
+      "target_modules": [],
+      "target_substrates": ["F2"],
+      "created_at": "2026-08-07T00:00:00.000Z",
+      "db_isolation": "database",
+      "iteration_count": 0,
+      "executor": {
+        "kind": "routine",
+        "argv": ["pnpm", "run", "typecheck"],
+        "cwd": ".",
+        "inputs": ["packages"],
+        "outputs": [],
+        "effects": ["read"],
+        "timeout_ms": 120000,
+        "authority_checks": ["action-registry-effect-and-consent"]
+      }
+    }
+  ]
+}

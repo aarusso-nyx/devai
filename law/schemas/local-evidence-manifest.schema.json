@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/local-evidence-manifest.schema.json",
+  "title": "DEVAI CI Evidence Manifest",
+  "description": "Manifest claiming that expensive checks ran against an exact committed value. Local and GitHub Actions producers are both bound through sourceHash and their declared policy and jobs. A claimed-but-invalid manifest fails closed when consumed by `devai evidence verify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": ["origin"],
+        "properties": {
+          "origin": {
+            "const": "actions-run"
+          }
+        }
+      },
+      "then": {
+        "required": ["actionsRun"]
+      },
+      "else": {
+        "not": {
+          "required": ["actionsRun"]
+        }
+      }
+    }
+  ],
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "expiresAt",
+    "subject",
+    "sourceHash",
+    "policy",
+    "tools",
+    "platforms",
+    "jobs"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "origin": {
+      "enum": ["local", "actions-run"],
+      "description": "Evidence producer. Omission selects the local producer."
+    },
+    "actionsRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflowRef",
+        "eventName",
+        "runId",
+        "runAttempt",
+        "actor",
+        "headSha",
+        "baseSha",
+        "mergeBaseSha",
+        "testedCommitSha",
+        "testedTree",
+        "digests"
+      ],
+      "description": "Identity and invalidation contract for provisional GitHub Actions evidence. Every caller-provided member is data to verify, never an authority selector.",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "workflowRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventName": {
+          "enum": ["pull_request", "merge_group"]
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headSha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "baseSha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "mergeBaseSha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "testedCommitSha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "testedTree": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["algorithm", "value"],
+              "properties": {
+                "algorithm": {
+                  "const": "sha1"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{40}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["algorithm", "value"],
+              "properties": {
+                "algorithm": {
+                  "const": "sha256"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          ]
+        },
+        "digests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workflowPolicySha256",
+            "lockfileSha256",
+            "toolchainContractSha256",
+            "testContractSha256",
+            "serviceContractSha256"
+          ],
+          "properties": {
+            "workflowPolicySha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "lockfileSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "toolchainContractSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "testContractSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "serviceContractSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the manifest was collected. Verification rejects manifests older than policy.maxAgeHours or timestamped in the future (beyond a 5-minute clock-skew allowance)."
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Explicit terminal validity instant derived by the producer from generatedAt plus the declared maximum age. The verifier recomputes and binds this value."
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commitSha", "tree"],
+      "description": "Exact committed subject proven by this manifest. It is producer-derived and verifier-recomputed; callers cannot select or substitute it.",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commitSha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "tree": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm", "value"],
+          "properties": {
+            "algorithm": { "enum": ["sha1", "sha256"] },
+            "value": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+          }
+        }
+      }
+    },
+    "sourceHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value", "fileCount"],
+      "description": "Deterministic digest over every git-tracked file (path, byte length, per-file sha256), excluding the manifest's own directory. Binds the evidence claim to the exact tree it was produced from.",
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fileCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxAgeHours", "requiredJobs", "allowedPlatforms"],
+      "description": "The policy the manifest claims to satisfy. Verification cross-checks these values against the adopter's declared `ci_economy.local_evidence` config (project-config.schema.json); a manifest carrying a laxer policy than the repo declares is rejected.",
+      "properties": {
+        "maxAgeHours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 168
+        },
+        "requiredJobs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allowedPlatforms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(linux|darwin)/(amd64|arm64)$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "description": "Observed toolchain versions per tool (node, the declared package manager, docker, ...). Verification checks `node` against engines.node's major and the package manager against the packageManager field when declared.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observed"],
+        "properties": {
+          "expected": {
+            "type": "string"
+          },
+          "observed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "platforms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Distinct platforms observed across the collected jobs."
+    },
+    "jobs": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "One entry per collected local job, keyed by job name. Every policy.requiredJobs entry must be present with result=success.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["result", "metadata", "artifactChecksum"],
+        "properties": {
+          "result": {
+            "enum": ["success"]
+          },
+          "artifactDir": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "required": ["job", "platform"],
+            "properties": {
+              "job": {
+                "type": "string",
+                "minLength": 1
+              },
+              "platform": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "artifactChecksum": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["algorithm", "value", "fileCount"],
+            "properties": {
+              "algorithm": {
+                "const": "sha256"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "fileCount": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": 1,
+      "generatedAt": "2026-07-18T06:02:06.771Z",
+      "expiresAt": "2026-07-19T06:02:06.771Z",
+      "subject": {
+        "repository": "aarusso-nyx/devai",
+        "commitSha": "bafdaf27de19fe1e03d3e6fdc0b62f043cb8a308",
+        "tree": {
+          "algorithm": "sha1",
+          "value": "3376e906ec36322b76607501e2330225b8fd0f2d"
+        }
+      },
+      "origin": "actions-run",
+      "sourceHash": {
+        "algorithm": "sha256",
+        "value": "97d19c8c98a871e3eddd12ea338c8281ff0ba353a07462eeb2bee0255e100993",
+        "fileCount": 1935
+      },
+      "policy": {
+        "maxAgeHours": 24,
+        "requiredJobs": ["merged-coverage"],
+        "allowedPlatforms": ["linux/amd64"]
+      },
+      "tools": {},
+      "platforms": [],
+      "jobs": {
+        "inventory-spec-validation": {
+          "result": "success",
+          "metadata": {
+            "job": "inventory-spec-validation",
+            "platform": "linux/amd64"
+          },
+          "artifactChecksum": {
+            "algorithm": "sha256",
+            "value": "73e9ba5b5766f7b445c10778f03fa35ecec7bf0a35504c3d8a3fe8af44224b97",
+            "fileCount": 0
+          }
+        }
+      },
+      "actionsRun": {
+        "repository": "aarusso-nyx/devai",
+        "workflowRef": "aarusso-nyx/devai/.github/workflows/ci.yml@refs/pull/46/merge",
+        "eventName": "pull_request",
+        "runId": "29632550731",
+        "runAttempt": 1,
+        "actor": "aarusso-nyx",
+        "headSha": "f74c617100220d0adbffd3281ed79b1498edfba7",
+        "baseSha": "400bcf70181874108d6a0152626d1f85b53c03e0",
+        "mergeBaseSha": "400bcf70181874108d6a0152626d1f85b53c03e0",
+        "testedCommitSha": "bafdaf27de19fe1e03d3e6fdc0b62f043cb8a308",
+        "testedTree": {
+          "algorithm": "sha1",
+          "value": "3376e906ec36322b76607501e2330225b8fd0f2d"
+        },
+        "digests": {
+          "workflowPolicySha256": "3a7a18bda8f63e5669da31904fca015cced3629558f2d2cc4a4bc58f7475512d",
+          "lockfileSha256": "1edd5e009e83c9eb639406e135ed50d7dbe025af78b780a42c0c56c3a712610b",
+          "toolchainContractSha256": "259eb0b4967883225c85e4eb7a4b68c12879e7f254596025164d04ff26ddccc8",
+          "testContractSha256": "6f41247644e309b986793280d736ead486db6c4af6a673258e66eb7512fa44ba",
+          "serviceContractSha256": "fe8c37f5da91dc678c604f44941966d0b15493e2f83516e74ed571c81fb8ac2e"
+        }
+      }
+    }
+  ]
+}

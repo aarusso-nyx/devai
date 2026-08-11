@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-plan",
+  "status": "stable",
+  "description": "Turn repository evidence and user intent into a bounded implementation plan without mutating the repository.",
+  "variants": {
+    "change": {
+      "description": "Plan a bounded code or documentation change from current evidence.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["check.inspect", "sense.inventory"]
+    },
+    "init": {
+      "description": "Preview initialization changes through the deterministic initializer.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["init.plan"]
+    },
+    "module": {
+      "description": "Plan a module from explicit requirements and discovered repository structure.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["sense.inventory"]
+    }
+  }
+}

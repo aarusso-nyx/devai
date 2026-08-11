@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/invariant.schema.json",
+  "title": "Invariant",
+  "description": "Atomic Architect-authored specification unit. The control setpoint of the framework. Per Constitution Article 11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "domain",
+    "severity",
+    "type",
+    "title",
+    "statement",
+    "status",
+    "verification",
+    "authority_docs",
+    "scope",
+    "change_policy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "$ref": "common-defs.schema.json#/$defs/id_invariant"
+    },
+    "domain": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]{1,15}$",
+      "description": "Uppercase domain code. Must match a domain declared in .devai/config/domains.json."
+    },
+    "lifecycle": {
+      "$ref": "common-defs.schema.json#/$defs/inv_lifecycle"
+    },
+    "severity": {
+      "$ref": "common-defs.schema.json#/$defs/severity"
+    },
+    "type": {
+      "enum": [
+        "api_contract",
+        "data_contract",
+        "security",
+        "rbac",
+        "abac",
+        "rls",
+        "tenancy",
+        "state_machine",
+        "lifecycle",
+        "performance",
+        "validation",
+        "error_semantics",
+        "ui_behavior",
+        "audit",
+        "compliance",
+        "governance"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical wording. Single sentence preferred. The exact text agents reference."
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "status": {
+      "enum": ["draft", "active"]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_suites", "oracle"],
+      "properties": {
+        "required_suites": {
+          "type": "array",
+          "items": {
+            "enum": ["unit", "api", "int", "e2e", "sec", "perf", "journey", "db"]
+          },
+          "minItems": 1
+        },
+        "optional_suites": {
+          "type": "array",
+          "items": {
+            "enum": ["unit", "api", "int", "e2e", "sec", "perf", "journey", "db"]
+          }
+        },
+        "oracle": {
+          "enum": ["tests", "static_analysis", "runtime_probe", "llm_judge"]
+        },
+        "strategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary", "deterministic_check_available", "rationale"],
+          "properties": {
+            "primary": {
+              "enum": [
+                "regression",
+                "feature-overlay",
+                "behavioral-equivalence",
+                "structural",
+                "semantic-review"
+              ]
+            },
+            "supplemental": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "regression",
+                  "feature-overlay",
+                  "behavioral-equivalence",
+                  "structural",
+                  "semantic-review"
+                ]
+              }
+            },
+            "deterministic_check_available": {
+              "type": "boolean"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "semantic_review_justification": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "primary": {
+                    "const": "semantic-review"
+                  }
+                }
+              },
+              "then": {
+                "required": ["semantic_review_justification"]
+              }
+            }
+          ]
+        },
+        "flake_sensitive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "authority_docs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["docs"],
+      "properties": {
+        "docs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["doc", "anchor"],
+            "properties": {
+              "doc": {
+                "type": "string",
+                "minLength": 1
+              },
+              "anchor": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "References to ADRs (file paths or ADR IDs) that establish this invariant."
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["components"],
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Logical components this invariant constrains (backend, frontend, db, etc.)."
+        },
+        "code_areas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Path globs for the code expected to implement this invariant."
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Schema/table/entity references."
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^MOD-"
+          },
+          "description": "F4 module IDs this invariant is associated with."
+        }
+      }
+    },
+    "change_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["breaking_change_requires", "test_weakening_allowed", "human_approval_required"],
+      "properties": {
+        "breaking_change_requires": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "doc_update",
+              "trace_update",
+              "test_update",
+              "migration",
+              "human_approval",
+              "adr"
+            ]
+          }
+        },
+        "test_weakening_allowed": {
+          "type": "boolean",
+          "description": "If false, any AST-level weakening of tests referencing this invariant is unjustified regardless of threshold."
+        },
+        "human_approval_required": {
+          "type": "boolean",
+          "description": "If true, any change to this invariant requires an explicit human Architect commit."
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+      "description": "Per-invariant semver, bumped on each substantive change. The aggregate `law/invariants/VERSION` file records the directory-level version."
+    },
+    "measurable_via": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Current facade action ids that measure this invariant (for example, 'check' or 'sense inventory'). Every registered action must be claimed by at least one invariant's measurable_via."
+    },
+    "measurable_via_mode": {
+      "enum": ["any", "all"],
+      "description": "How measurable_via entries combine. 'any' is used when absent and means one listed action is sufficient. 'all' requires every listed action, for invariants whose statement genuinely needs multiple observations."
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Origin and replacement provenance for this invariant."
+    },
+    "supersedes": {
+      "type": ["array", "null"],
+      "items": {
+        "$ref": "common-defs.schema.json#/$defs/id_invariant"
+      }
+    },
+    "superseded_by": {
+      "anyOf": [
+        {
+          "$ref": "common-defs.schema.json#/$defs/id_invariant"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["severity", "status"],
+        "properties": {
+          "severity": {
+            "enum": ["constitutional", "hard-fail", "gate"]
+          },
+          "status": {
+            "const": "active"
+          },
+          "lifecycle": {
+            "not": {
+              "const": "experimental"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "required": ["strategy"]
+          }
+        }
+      }
+    }
+  ],
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "version": "1.0.0",
+      "id": "INV-AUTH-001",
+      "domain": "AUTH",
+      "lifecycle": "supported",
+      "severity": "constitutional",
+      "type": "governance",
+      "title": "Human authority is explicit and machine authority is derived without elevation",
+      "statement": "Every human-principal mutation performed through DEVAI MUST identify exactly one caller-declarable constitutional role through an invocation flag or explicit valid authority-session reference and MUST ignore ambient role/session state for authorization; a derived machine contract MUST declare its non-empty allowed initiator-role set, runtime MUST bind exactly one actual role from that set matching the invocation/declaration, and derivation MUST preserve and MUST NOT erase, substitute for, widen, or elevate that initiator or consent; the bootstrap identity MAY plan or orchestrate but MUST NOT authorize mutation, and cross-role bootstrap apply batches MUST use distinct invocation/declaration boundaries, each using either a direct flag or valid authority session.",
+      "rationale": "Articles 6-10 make role declaration and separation load-bearing. An implicit role or caller-selected machine actor would turn the authority boundary into advisory metadata.",
+      "status": "active",
+      "verification": {
+        "required_suites": ["unit", "int", "e2e"],
+        "oracle": "tests",
+        "strategy": {
+          "primary": "regression",
+          "deterministic_check_available": true,
+          "rationale": "The registered test corpus provides deterministic regression evidence for this invariant."
+        }
+      },
+      "authority_docs": {
+        "docs": [
+          {
+            "doc": "CONSTITUTION.md",
+            "anchor": "article-7-human-roles"
+          },
+          {
+            "doc": "docs/meta/adr/ADR-003-runtime-authority-enforcement.md",
+            "anchor": "2-human-declarations-and-sessions"
+          }
+        ],
+        "decisions": ["ADR-003"]
+      },
+      "scope": {
+        "components": ["authority-runtime", "authority-sessions", "machine-principals"],
+        "code_areas": [
+          "packages/authority/src/**",
+          "packages/cli/src/command-router.ts",
+          "packages/cli/src/authority/**"
+        ]
+      },
+      "change_policy": {
+        "breaking_change_requires": [
+          "doc_update",
+          "trace_update",
+          "test_update",
+          "human_approval",
+          "adr"
+        ],
+        "test_weakening_allowed": false,
+        "human_approval_required": true
+      },
+      "tags": [
+        "authority",
+        "explicit-role",
+        "session",
+        "machine-principal",
+        "non-elevation",
+        "article-7"
+      ],
+      "measurable_via": ["init bind", "check"],
+      "provenance": ["example:INV-AUTH-001"]
+    }
+  ],
+  "$comment": "Invariant anchor-document objects use `authority_docs`; record-meta `authority` remains the distinct authoring-role field."
+}

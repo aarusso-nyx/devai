@@ -1,0 +1,547 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/validation-result.schema.json",
+  "title": "Validation Result",
+  "description": "Independent, report-only completion evidence for one untrusted translation witness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "witness_id",
+    "task_id",
+    "recipe_name",
+    "recipe_variant",
+    "base_sha",
+    "candidate_sha",
+    "strategy",
+    "environment_digest_sha256",
+    "started_at",
+    "completed_at",
+    "isolation",
+    "executions",
+    "frames",
+    "expected_diff",
+    "cleanup",
+    "verdict",
+    "report_only",
+    "readiness_eligible",
+    "evidence_chain_refs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^VR-[a-f0-9]{16}$"
+    },
+    "witness_id": {
+      "type": "string",
+      "pattern": "^TW-[a-f0-9]{16}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^TASK-[0-9]{4,}$"
+    },
+    "recipe_name": {
+      "enum": [
+        "devai-assess",
+        "devai-plan",
+        "devai-fix",
+        "devai-docs",
+        "devai-scaffold",
+        "devai-verify",
+        "devai-round"
+      ]
+    },
+    "recipe_variant": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "base_sha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "candidate_sha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "test_overlay_sha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "strategy": {
+      "$ref": "#/$defs/strategy"
+    },
+    "environment_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "network_egress", "database", "readiness_eligible"],
+      "properties": {
+        "mode": {
+          "enum": ["linux-container-no-network", "macos-best-effort"]
+        },
+        "network_egress": {
+          "enum": ["denied", "not-proven"]
+        },
+        "database": {
+          "const": "per-task-database"
+        },
+        "readiness_eligible": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "linux-container-no-network"
+              },
+              "network_egress": {
+                "const": "denied"
+              }
+            },
+            "required": ["mode", "network_egress"]
+          },
+          "then": {
+            "properties": {
+              "readiness_eligible": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "readiness_eligible": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "macos-best-effort"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "network_egress": {
+                "const": "not-proven"
+              },
+              "readiness_eligible": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "executions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "test_ref", "outcome", "failure_mode", "evidence_ref"],
+        "properties": {
+          "phase": {
+            "enum": ["base", "candidate", "test-overlay"]
+          },
+          "test_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome": {
+            "enum": ["pass", "fail", "crash"]
+          },
+          "failure_mode": {
+            "enum": [
+              "none",
+              "assertion",
+              "missing-file",
+              "load-error",
+              "timeout",
+              "signal",
+              "infrastructure"
+            ]
+          },
+          "evidence_ref": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "evidence_refs"],
+        "properties": {
+          "name": {
+            "enum": [
+              "witness-structure",
+              "no-op",
+              "red-proof",
+              "candidate-proof",
+              "scope",
+              "authority",
+              "test-weakening",
+              "inventory",
+              "effects",
+              "infrastructure",
+              "network-egress",
+              "strategy-coverage",
+              "expected-diff",
+              "cleanup"
+            ]
+          },
+          "status": {
+            "$ref": "common-defs.schema.json#/$defs/verdict_core"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/evidenceRef"
+            }
+          },
+          "finding": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expected_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_digest_sha256", "expected", "observed", "unexpected"],
+      "properties": {
+        "manifest_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "expected": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stateChange"
+          }
+        },
+        "observed": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stateChange"
+          }
+        },
+        "unexpected": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stateChange"
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "worktree", "database", "recovery_scan"],
+      "properties": {
+        "lease_id": {
+          "type": "string",
+          "pattern": "^TVL-[a-f0-9]{16}$"
+        },
+        "worktree": {
+          "enum": ["removed", "not-created", "orphan-fail"]
+        },
+        "database": {
+          "enum": ["removed", "not-created", "orphan-fail"]
+        },
+        "recovery_scan": {
+          "enum": ["clean", "recovered", "fail"]
+        },
+        "recovered_lease_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^TVL-[a-f0-9]{16}$"
+          }
+        }
+      }
+    },
+    "verdict": {
+      "$ref": "common-defs.schema.json#/$defs/verdict_core"
+    },
+    "report_only": {
+      "const": true
+    },
+    "readiness_eligible": {
+      "const": false
+    },
+    "evidence_chain_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "feature-overlay"
+          }
+        }
+      },
+      "then": {
+        "required": ["test_overlay_sha"],
+        "properties": {
+          "executions": {
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "phase": {
+                      "const": "test-overlay"
+                    }
+                  },
+                  "required": ["phase"]
+                }
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "phase": {
+                      "const": "candidate"
+                    }
+                  },
+                  "required": ["phase"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "semantic-review"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "frames": {
+            "contains": {
+              "properties": {
+                "name": {
+                  "const": "candidate-proof"
+                },
+                "status": {
+                  "const": "REVIEW"
+                }
+              },
+              "required": ["name", "status"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "frames": {
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "FAIL"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "const": "FAIL"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "frames": {
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "REVIEW"
+                }
+              }
+            }
+          }
+        },
+        "not": {
+          "properties": {
+            "frames": {
+              "contains": {
+                "properties": {
+                  "status": {
+                    "const": "FAIL"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "const": "REVIEW"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "expected_diff": {
+            "properties": {
+              "unexpected": {
+                "minItems": 1
+              }
+            },
+            "required": ["unexpected"]
+          }
+        },
+        "required": ["expected_diff"]
+      },
+      "then": {
+        "properties": {
+          "frames": {
+            "contains": {
+              "properties": {
+                "name": {
+                  "const": "expected-diff"
+                },
+                "status": {
+                  "const": "FAIL"
+                }
+              },
+              "required": ["name", "status"]
+            }
+          },
+          "verdict": {
+            "const": "FAIL"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidenceRef": {
+      "type": "string",
+      "pattern": "^EV-[a-f0-9]{16}$"
+    },
+    "strategy": {
+      "enum": [
+        "regression",
+        "feature-overlay",
+        "behavioral-equivalence",
+        "structural",
+        "semantic-review"
+      ]
+    },
+    "stateChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "operation"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"
+        },
+        "operation": {
+          "enum": ["create", "append", "retire"]
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "VR-0123456789abcdef",
+      "witness_id": "TW-0123456789abcdef",
+      "task_id": "TASK-0028",
+      "recipe_name": "devai-fix",
+      "recipe_variant": "test",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidate_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "strategy": "regression",
+      "environment_digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "started_at": "2026-07-20T20:00:00.000Z",
+      "completed_at": "2026-07-20T20:01:00.000Z",
+      "isolation": {
+        "mode": "linux-container-no-network",
+        "network_egress": "denied",
+        "database": "per-task-database",
+        "readiness_eligible": true
+      },
+      "executions": [],
+      "frames": [
+        {
+          "name": "red-proof",
+          "status": "PASS",
+          "evidence_refs": []
+        }
+      ],
+      "expected_diff": {
+        "manifest_digest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "expected": [],
+        "observed": [],
+        "unexpected": []
+      },
+      "cleanup": {
+        "lease_id": "TVL-0123456789abcdef",
+        "worktree": "removed",
+        "database": "removed",
+        "recovery_scan": "clean"
+      },
+      "verdict": "PASS",
+      "report_only": true,
+      "readiness_eligible": false,
+      "evidence_chain_refs": ["EV-0123456789abcdef"]
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/glossary-entry.schema.json",
+  "title": "Glossary Entry",
+  "description": "Shared term definition mediating between business and technical language. Joint Owner/Architect authority per Constitution Article 6 (Owner-authority paths).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "term", "definition", "authority", "status"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^GE-[0-9]{3}$"
+    },
+    "term": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical form of the term, exactly as used in specs."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Alternate forms, synonyms, abbreviations, or historical names."
+    },
+    "definition": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Single, unambiguous, closed-world definition. No 'usually' or 'typically'."
+    },
+    "authority": {
+      "$ref": "common-defs.schema.json#/$defs/role",
+      "description": "joint entries require dual sign-off in merge protocol."
+    },
+    "category": {
+      "enum": ["business", "technical", "regulatory", "operational"]
+    },
+    "see_also": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^GE-[0-9]{3}$"
+      }
+    },
+    "related_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^INV-"
+      }
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "counterexamples": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Things that look like the term but are not. Useful for disambiguation."
+    },
+    "status": {
+      "enum": ["draft", "active", "deprecated", "retired"]
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Absorption/supersession provenance per the record meta-structure (\u00a75.1)."
+    },
+    "supersedes": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string"
+      }
+    },
+    "superseded_by": {
+      "type": ["string", "null"]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "GE-001",
+      "term": "Owner",
+      "definition": "The role with authority over business and behavioral specifications. The Owner authors journeys, user stories, and acceptance criteria under docs/product/; co-owns the glossary with the Architect. The Owner does not write invariants directly (D-7); Owner artifacts compile to Architect-authored invariants via explicit related_invariants references.",
+      "authority": "joint",
+      "category": "business",
+      "status": "active",
+      "see_also": ["GE-004", "GE-005", "GE-019"],
+      "related_invariants": ["INV-DEVAI-001"]
+    }
+  ],
+  "$comment": "W02 RESOLVED: glossary authority uses the shared role vocabulary, including the joint token required by Constitution Article 6."
+}

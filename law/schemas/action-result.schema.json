@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/action-result.schema.json",
+  "title": "DEVAI action result",
+  "description": "Closed action-bound machine envelope for one successful result or one structured error. Human presentation is outside this contract.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "action_id", "ok"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*( [a-z0-9][a-z0-9_-]*)*$"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "$ref": "#/$defs/result"
+    },
+    "error": {
+      "$ref": "error.schema.json"
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["result"],
+      "properties": {
+        "ok": {
+          "const": true
+        }
+      },
+      "not": {
+        "required": ["error"]
+      }
+    },
+    {
+      "required": ["error"],
+      "properties": {
+        "ok": {
+          "const": false
+        }
+      },
+      "not": {
+        "required": ["result"]
+      }
+    }
+  ],
+  "$defs": {
+    "result": {
+      "description": "A closed transport frame. JSON payload semantics remain governed by the action's payload schema when one is declared.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["media_type", "value"],
+      "properties": {
+        "media_type": {
+          "enum": ["application/json", "text/plain", "none"]
+        },
+        "value": {}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "media_type": {
+                "const": "text/plain"
+              }
+            },
+            "required": ["media_type"]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "media_type": {
+                "const": "none"
+              }
+            },
+            "required": ["media_type"]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "action_id": "catalog actions",
+      "ok": true,
+      "result": {
+        "media_type": "application/json",
+        "value": []
+      }
+    }
+  ]
+}

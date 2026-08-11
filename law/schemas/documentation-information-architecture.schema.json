@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/documentation-information-architecture.schema.json",
+  "title": "Documentation information architecture",
+  "description": "Canonical routing, page manifest, generated-reference boundary, semantic-field contract, and completeness gates for current CLI documentation.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "ordering",
+    "source_routing_rules",
+    "semantic_fields",
+    "pages",
+    "categories",
+    "completeness_gates"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/documentation-information-architecture.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "documentation-information-architecture"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "ordering": {
+      "const": "policy-declared-page-category-and-projection-order"
+    },
+    "source_routing_rules": {
+      "$ref": "#/$defs/sourceRoutingRules"
+    },
+    "semantic_fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/page"
+      }
+    },
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/category"
+      }
+    },
+    "completeness_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/gate"
+      }
+    }
+  },
+  "$defs": {
+    "repositoryPath": {
+      "type": "string",
+      "pattern": "^(?:docs|law)/[A-Za-z0-9._/#*-]+$"
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "pointer", "projection"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^#(?:/.*)?$"
+        },
+        "projection": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sourceRoutingRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_sources_only",
+        "narrative_population_copy",
+        "generated_order",
+        "generated_write_mode",
+        "missing_source",
+        "unknown_projection"
+      ],
+      "properties": {
+        "canonical_sources_only": {
+          "const": true
+        },
+        "narrative_population_copy": {
+          "const": "forbidden"
+        },
+        "generated_order": {
+          "const": "canonical-source-order"
+        },
+        "generated_write_mode": {
+          "const": "check-without-write-or-deterministic-materialization"
+        },
+        "missing_source": {
+          "const": "fail-closed"
+        },
+        "unknown_projection": {
+          "const": "fail-closed"
+        }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "page_id",
+        "planned_path",
+        "title",
+        "purpose",
+        "content_mode",
+        "mutable_population_mode",
+        "category_ids",
+        "source_refs"
+      ],
+      "properties": {
+        "page_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "planned_path": {
+          "type": "string",
+          "pattern": "^docs/reference/cli/[a-z0-9-]+\\.md$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_mode": {
+          "enum": ["narrative", "generated-reference", "narrative-with-generated-links"]
+        },
+        "mutable_population_mode": {
+          "enum": ["none", "generated-from-canonical-source"]
+        },
+        "category_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          }
+        }
+      }
+    },
+    "category": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category_id",
+        "page_id",
+        "canonical_source",
+        "source_refs",
+        "population_contract",
+        "ordering",
+        "rendering"
+      ],
+      "properties": {
+        "category_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "page_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "canonical_source": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          }
+        },
+        "population_contract": {
+          "const": "source-derived-exact-ordered-bijection-no-copied-list"
+        },
+        "ordering": {
+          "enum": ["source-order", "utf8-bytes-after-deduplication"]
+        },
+        "rendering": {
+          "const": "generated-reference"
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "phase", "scope", "condition", "failure"],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "pattern": "^docs-[a-z0-9-]+$"
+        },
+        "phase": {
+          "const": "current"
+        },
+        "scope": {
+          "enum": ["policy", "page-manifest", "category", "entry", "example", "narrative", "claim"]
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure": {
+          "type": "string",
+          "pattern": "^DOCS_[A-Z0-9_]+$"
+        }
+      }
+    }
+  },
+  "examples": [{}]
+}

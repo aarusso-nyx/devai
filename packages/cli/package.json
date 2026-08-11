@@ -1,0 +1,58 @@
+{
+  "name": "@aarusso-nyx/devai",
+  "version": "1.0.0-rc.2",
+  "description": "Human-supervised developer-acceleration CLI with bounded automation and trustworthy evidence.",
+  "license": "Apache-2.0",
+  "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "devai": "./dist/runtime/index/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b --force && node scripts/assemble-package.mjs",
+    "clean": "tsc -b --clean",
+    "pack:smoke": "node scripts/installed-tarball-smoke.mjs",
+    "test": "pnpm --dir ../.. run test:cli"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.1",
+    "cac": "^6.7.0",
+    "minimatch": "^9.0.0",
+    "openai": "^4.65.0",
+    "pg": "^8.13.0",
+    "typescript": "^5.6.0"
+  },
+  "devDependencies": {
+    "@devai-nyx/authority": "workspace:*",
+    "@devai-nyx/effects-check": "workspace:*",
+    "@devai-nyx/evidence": "workspace:*",
+    "@devai-nyx/loop": "workspace:*",
+    "@devai-nyx/schemas": "workspace:*",
+    "@devai-nyx/sensors": "workspace:*",
+    "@devai-nyx/skills": "workspace:*",
+    "@devai-nyx/spec": "workspace:*",
+    "@devai-nyx/utils": "workspace:*",
+    "@types/istanbul-lib-coverage": "^2.0.6",
+    "@types/node": "^24.0.0",
+    "istanbul-lib-coverage": "^3.2.2",
+    "rolldown": "1.1.5",
+    "typescript": "^5.6.0",
+    "vitest": "^4.0.18"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarusso-nyx/devai.git",
+    "directory": "packages/cli"
+  }
+}

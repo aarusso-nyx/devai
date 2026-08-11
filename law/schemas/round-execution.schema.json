@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/round-execution.schema.json",
+  "title": "Round execution policy",
+  "description": "Schema for the round/task containment, selection, ordering, role, resource, lifecycle, failure, rollback, output, and public vocabulary policy.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "task_contract",
+    "selection",
+    "dependencies",
+    "roles",
+    "resources",
+    "lifecycle",
+    "failure",
+    "rollback",
+    "outputs",
+    "vocabularies"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/round-execution.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "round-execution"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "task_contract": {
+      "$ref": "#/$defs/section"
+    },
+    "selection": {
+      "$ref": "#/$defs/section"
+    },
+    "dependencies": {
+      "$ref": "#/$defs/section"
+    },
+    "roles": {
+      "$ref": "#/$defs/section"
+    },
+    "resources": {
+      "$ref": "#/$defs/section"
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initial", "terminal", "transitions", "undeclared_transition", "timestamps"],
+      "properties": {
+        "initial": {
+          "const": "queued"
+        },
+        "terminal": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/taskStatus"
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "$ref": "#/$defs/taskStatus"
+              },
+              "to": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/$defs/taskStatus"
+                }
+              }
+            }
+          }
+        },
+        "undeclared_transition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamps": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "failure": {
+      "$ref": "#/$defs/section"
+    },
+    "rollback": {
+      "$ref": "#/$defs/section"
+    },
+    "outputs": {
+      "$ref": "#/$defs/section"
+    },
+    "vocabularies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inventory_slices",
+        "adoption_tiers",
+        "surface_tiers",
+        "verdicts",
+        "action_lifecycles"
+      ],
+      "properties": {
+        "inventory_slices": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/namedPopulation"
+          }
+        },
+        "adoption_tiers": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/namedPopulation"
+          }
+        },
+        "surface_tiers": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/namedPopulation"
+          }
+        },
+        "verdicts": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "pass"
+            },
+            {
+              "const": "review"
+            },
+            {
+              "const": "fail"
+            },
+            {
+              "const": "unknown"
+            },
+            {
+              "const": "na"
+            },
+            {
+              "const": "skipped"
+            },
+            {
+              "const": "error"
+            },
+            {
+              "const": "killed"
+            }
+          ],
+          "items": false,
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "action_lifecycles": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "supported"
+            },
+            {
+              "const": "experimental"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "taskStatus": {
+      "enum": [
+        "queued",
+        "ready",
+        "lock_denied",
+        "in_progress",
+        "checkpoint",
+        "pre_merge",
+        "merging",
+        "completed",
+        "awaiting_human_review",
+        "experimental_blocked",
+        "escalated",
+        "rgr_pending",
+        "cancelled"
+      ]
+    },
+    "namedPopulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "members"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "members": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "examples": [{}]
+}

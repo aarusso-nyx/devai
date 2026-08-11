@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/stack-adapter.schema.json",
+  "$comment": "DEVAI-native (Phase 17.G): stack-adapter pack manifest. Composes through the --seeds plumbing (Phase 11) and the law-pack precedent (Phase 10.K, D-53). Per D-57.",
+  "title": "Stack Adapter Pack Manifest",
+  "description": "Manifest record at the root of a stack-adapter pack (e.g. examples/redox-pack-nestjs-postgres-react/stack-adapter.json). Declares detection heuristics, inventory-sensor parameter overrides, writer-skill prompt overlays, and seed invariants. Loaded by the seed-merge plumbing (Phase 11) when the adopter passes `--seeds <path>` or when auto-detection picks the pack. Per Constitution Article 6 (authority); per D-57 (brownfield-adoption substrate); per D-53 (examples/ is integral to DEVAI).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "version", "stack", "detect"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^redox-pack-[a-z0-9][a-z0-9-]*$",
+      "description": "Pack id (kebab-case). Prefix 'redox-pack-' is the canonical convention for packs absorbed from / inspired by redox's stack-adapter taxonomy; non-redox-derived packs MAY use a different prefix once the prefix taxonomy is formalized (deferred)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "stack": {
+      "type": "object",
+      "description": "Triple naming the (backend, frontend, db) the pack targets. Used by the detector and by writer prompt overlays.",
+      "additionalProperties": false,
+      "required": ["backend", "frontend", "db"],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frontend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "db": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cloud": {
+          "type": "string"
+        }
+      }
+    },
+    "detect": {
+      "type": "object",
+      "description": "Heuristics that mark a repo as matching this stack. Detection MAY combine signals; the pack matches when ANY of `signals[]` matches (OR semantics). Phase 17.G ships only filesystem-presence + package.json-dep signals; future signals (composer.json deps, Gemfile, go.mod) ride the same shape.",
+      "additionalProperties": false,
+      "required": ["signals"],
+      "properties": {
+        "signals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/DetectSignal"
+          }
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 50,
+          "description": "When multiple packs match the same repo, the highest-priority pack wins. Ties surface as a scorecard ambiguity and defer to Architect (Article 19)."
+        }
+      }
+    },
+    "extractor_params": {
+      "type": "object",
+      "description": "Per-sensor parameter overrides. Each key is an inventory sensor kind (inventory_api / inventory_routes / inventory_data_model / inventory_rbac / inventory_data_handling / inventory_dep_graph / inventory_coverage); each value is an opaque parameter object passed to the sensor at run time. Sensor adapters that read these fields validate them per-sensor (this schema does not constrain the shape).",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "seed_invariants": {
+      "type": "array",
+      "description": "Relative paths (from this manifest) to INV-CLIENT-*.json files the pack seeds. Each must validate against invariant.schema.json when copied into the adopter's law/invariants/.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "DetectSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "file_present",
+            "dir_present",
+            "package_dep_present",
+            "composer_dep_present",
+            "gemfile_dep_present"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "Relative path under the adopter repo root. Required for file_present + dir_present."
+        },
+        "package": {
+          "type": "string",
+          "description": "Package name. Required for *_dep_present signals."
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "description": "Optional weight (future: weighted-OR detection). Phase 17.G uses OR semantics regardless."
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "redox-pack-express-knex-postgres-angular",
+      "name": "Express + Knex + Postgres + Angular",
+      "version": "1.0.0",
+      "stack": {
+        "backend": "express",
+        "frontend": "angular",
+        "db": "postgres"
+      },
+      "detect": {
+        "signals": [
+          {
+            "kind": "package_dep_present"
+          }
+        ]
+      }
+    }
+  ]
+}

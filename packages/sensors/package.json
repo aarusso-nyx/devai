@@ -1,0 +1,62 @@
+{
+  "name": "@devai-nyx/sensors",
+  "version": "1.0.0",
+  "description": "Schema-valid DEVAI sensor implementations backed by the canonical law registry.",
+  "license": "Apache-2.0",
+  "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./inventory-slices": {
+      "types": "./dist/inventory-slices.d.ts",
+      "development": "./src/inventory-slices.ts",
+      "default": "./dist/inventory-slices.js"
+    },
+    "./presets": {
+      "types": "./dist/sense-presets.d.ts",
+      "development": "./src/sense-presets.ts",
+      "default": "./dist/sense-presets.js"
+    },
+    "./registry": {
+      "types": "./dist/sensor-registry.d.ts",
+      "development": "./src/sensor-registry.ts",
+      "default": "./dist/sensor-registry.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -b && node scripts/copy-law.mjs",
+    "clean": "tsc -b --clean",
+    "test": "pnpm --dir ../.. run test:sensors"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarusso-nyx/devai.git",
+    "directory": "packages/sensors"
+  },
+  "dependencies": {
+    "@devai-nyx/authority": "workspace:*",
+    "@devai-nyx/effects-check": "workspace:*",
+    "@devai-nyx/schemas": "workspace:*",
+    "@devai-nyx/utils": "workspace:*",
+    "pg": "^8.13.0",
+    "typescript": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "vitest": "^4.0.18"
+  },
+  "private": true
+}

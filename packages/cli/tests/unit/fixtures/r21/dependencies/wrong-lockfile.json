@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "scanner": {
+    "name": "devai-scanner",
+    "version": "1.2.3",
+    "database_updated_at": "2026-07-17T00:00:00.000Z"
+  },
+  "generated_at": "2026-07-17T01:00:00.000Z",
+  "lockfile_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "advisories": []
+}

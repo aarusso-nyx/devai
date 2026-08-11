@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyx.local/schemas/recipe.schema.json",
+  "title": "DEVAI RC agent recipe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "status", "description", "variants"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "name": {
+      "enum": [
+        "devai-assess",
+        "devai-plan",
+        "devai-fix",
+        "devai-docs",
+        "devai-scaffold",
+        "devai-verify",
+        "devai-round"
+      ]
+    },
+    "status": { "enum": ["stable", "preview"] },
+    "description": { "type": "string", "minLength": 1 },
+    "variants": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": { "name": { "const": "devai-round" } }
+      },
+      "then": {
+        "type": "object",
+        "properties": { "status": { "const": "preview" } }
+      },
+      "else": {
+        "type": "object",
+        "properties": { "status": { "const": "stable" } }
+      }
+    }
+  ],
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "effect", "write_policy", "operations"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "effect": { "enum": ["read", "local-write", "runtime-write"] },
+        "write_policy": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode"],
+              "properties": { "mode": { "const": "none" } }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "scopes"],
+              "properties": {
+                "mode": { "enum": ["explicit-files", "bounded-patterns"] },
+                "scopes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          ]
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?!.*(?:publish|push))[a-z][a-z0-9.-]*$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "effect": { "const": "read" } }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "write_policy": {
+                "type": "object",
+                "properties": { "mode": { "const": "none" } }
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "write_policy": {
+                "type": "object",
+                "properties": {
+                  "mode": { "enum": ["explicit-files", "bounded-patterns"] }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "effect": { "const": "runtime-write" } }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "write_policy": {
+                "type": "object",
+                "properties": {
+                  "scopes": {
+                    "type": "array",
+                    "items": { "type": "string", "pattern": "^\\.devai/state/" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "effect": { "const": "local-write" } }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "write_policy": {
+                "type": "object",
+                "properties": {
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "not": { "pattern": "^\\.devai/state/" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

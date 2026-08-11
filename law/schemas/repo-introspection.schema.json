@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/repo-introspection.schema.json",
+  "title": "Repo Introspection",
+  "description": "Repository-shape discovery consumed by `devai init plan` to populate appropriate .devai/config/project.json values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "target_root",
+    "generated_at",
+    "package_manager",
+    "languages",
+    "frameworks",
+    "source_globs",
+    "test_globs",
+    "protected_surfaces",
+    "existing_devai_config"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "target_root": {
+      "type": "string",
+      "description": "Absolute or repo-relative path that was introspected."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "package_manager": {
+      "enum": ["pnpm", "yarn", "npm", "bun", "unknown"],
+      "description": "Detected by lockfile presence. 'unknown' when no recognized lockfile or package.json was found."
+    },
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "file_count"],
+        "properties": {
+          "name": {
+            "enum": [
+              "typescript",
+              "javascript",
+              "python",
+              "go",
+              "rust",
+              "java",
+              "kotlin",
+              "csharp",
+              "ruby",
+              "other"
+            ]
+          },
+          "file_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "frameworks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "evidence"],
+        "properties": {
+          "name": {
+            "enum": [
+              "nestjs",
+              "angular",
+              "react",
+              "vue",
+              "express",
+              "fastify",
+              "next",
+              "vite",
+              "django",
+              "flask",
+              "fastapi",
+              "rails",
+              "spring",
+              "other"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "description": "What the detector saw (e.g. \"package.json dep: @nestjs/core\")."
+          }
+        }
+      }
+    },
+    "source_globs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Heuristic source-code globs to seed plant.source_globs in the config."
+    },
+    "test_globs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Heuristic test-suite globs to seed plant.test_globs in the config."
+    },
+    "protected_surfaces": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Detected secret-like files (.env*, *.pem, credentials.json, etc.) that should land in the protected_surfaces list before any agent action."
+    },
+    "existing_devai_config": {
+      "type": "boolean",
+      "description": "True when .devai/config/project.json already exists; the bootstrap plan should treat this as deny-by-default."
+    },
+    "proposed_project_type": {
+      "enum": ["runtime-host", "platform-package", "docs-archive", "framework"],
+      "description": "Best-guess project_type for project-config.schema.json. Architect-approved before adoption."
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Free-form observations the detector wants to surface (ambiguity, multiple frameworks, monorepo signal, etc.)."
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "target_root": ".",
+      "generated_at": "2026-07-23T00:00:00.000Z",
+      "package_manager": "pnpm",
+      "languages": [],
+      "frameworks": [],
+      "source_globs": [],
+      "test_globs": [],
+      "protected_surfaces": [],
+      "existing_devai_config": false
+    }
+  ]
+}

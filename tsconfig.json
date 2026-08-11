@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "incremental": false,
+    "noEmit": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["packages/*/tests/**/*.ts", "tests/**/*.ts"],
+  "references": [
+    { "path": "./packages/utils" },
+    { "path": "./packages/schemas" },
+    { "path": "./packages/authority" },
+    { "path": "./packages/evidence" },
+    { "path": "./packages/spec" },
+    { "path": "./packages/effects-check" },
+    { "path": "./packages/sensors" },
+    { "path": "./packages/loop" },
+    { "path": "./packages/skills" },
+    { "path": "./packages/cli" }
+  ]
+}

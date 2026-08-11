@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/sense-presets.schema.json",
+  "title": "DEVAI sense-preset policy",
+  "description": "Closed Architect-owned ordered sense presets derived from the canonical sensor registry and effect classification.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "registry",
+    "ordering",
+    "implicit_persistence",
+    "selection_effect_rule",
+    "presets",
+    "exclusion_reasons",
+    "output"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/sense-presets.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "sense-presets"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "registry": {
+      "const": "law/policy/sensor-registry.json"
+    },
+    "ordering": {
+      "const": "canonical-sensor-registry-order"
+    },
+    "implicit_persistence": {
+      "const": "forbidden"
+    },
+    "selection_effect_rule": {
+      "$ref": "#/$defs/nonemptyObject"
+    },
+    "presets": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/baseline"
+        },
+        {
+          "$ref": "#/$defs/structural"
+        },
+        {
+          "$ref": "#/$defs/governed"
+        },
+        {
+          "$ref": "#/$defs/sweep"
+        }
+      ],
+      "items": false
+    },
+    "exclusion_reasons": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 20
+      }
+    },
+    "output": {
+      "$ref": "#/$defs/nonemptyObject"
+    }
+  },
+  "$defs": {
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "nonemptyObject": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": ["string", "boolean"]
+      }
+    },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "members", "excluded", "round_required"],
+      "properties": {
+        "name": {
+          "enum": ["baseline", "structural", "governed", "sweep"]
+        },
+        "members": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/kind"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/kind"
+          }
+        },
+        "round_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "baseline": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/preset"
+        },
+        {
+          "if": true,
+          "then": {
+            "properties": {
+              "name": {
+                "const": "baseline"
+              },
+              "round_required": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "structural": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/preset"
+        },
+        {
+          "if": true,
+          "then": {
+            "properties": {
+              "name": {
+                "const": "structural"
+              },
+              "round_required": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "governed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/preset"
+        },
+        {
+          "if": true,
+          "then": {
+            "properties": {
+              "name": {
+                "const": "governed"
+              },
+              "round_required": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sweep": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/preset"
+        },
+        {
+          "if": true,
+          "then": {
+            "properties": {
+              "name": {
+                "const": "sweep"
+              },
+              "round_required": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [{}]
+}

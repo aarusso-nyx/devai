@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/assessment.schema.json",
+  "title": "Status Assessment",
+  "description": "Human-readable Auditor status report derived from scorecard delta. Drives backlog refresh. Per Constitution Article 33 (Auditor as state estimator).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "generated_at",
+    "scorecard_id",
+    "previous_assessment_id",
+    "narrative",
+    "deltas",
+    "backlog_actions",
+    "recommended_priorities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^AS-[0-9]{8}T[0-9]{6}-[0-9]{3}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scorecard_id": {
+      "type": "string",
+      "pattern": "^SC-"
+    },
+    "previous_assessment_id": {
+      "type": ["string", "null"],
+      "pattern": "^AS-"
+    },
+    "narrative": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable summary, written by the Auditor agent."
+    },
+    "deltas": {
+      "type": "array",
+      "description": "Aspect-level changes since previous assessment.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["substrate", "property", "direction"],
+        "properties": {
+          "substrate": {
+            "enum": ["F1", "F2", "F3", "F4", "F5"]
+          },
+          "property": {
+            "enum": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9"]
+          },
+          "direction": {
+            "enum": ["improved", "regressed", "unchanged", "newly_evaluated"]
+          },
+          "previous_verdict": {
+            "enum": ["PASS", "REVIEW", "FAIL", "N/A", "UNKNOWN"]
+          },
+          "current_verdict": {
+            "enum": ["PASS", "REVIEW", "FAIL", "N/A", "UNKNOWN"]
+          },
+          "delta_score": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "regressions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["substrate", "property", "summary"],
+        "properties": {
+          "substrate": {
+            "enum": ["F1", "F2", "F3", "F4", "F5"]
+          },
+          "property": {
+            "enum": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9"]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "likely_cause_commits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "backlog_actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["additions", "completions", "deprioritizations"],
+      "properties": {
+        "additions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "rationale"],
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "pattern": "^TASK-"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "completions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^TASK-"
+          }
+        },
+        "deprioritizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "pattern": "^TASK-"
+              },
+              "new_priority": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "recommended_priorities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_id", "priority", "rationale"],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "pattern": "^TASK-"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "rationale": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "quarantine_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "current_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "added_since_last": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resolved_since_last": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oldest_quarantined_age_days": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "open_rgrs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^RGR-"
+      }
+    },
+    "open_escalations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ESC-"
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "AS-20260518T065029-001",
+      "generated_at": "2026-05-18T06:50:29.114Z",
+      "scorecard_id": "SC-20260518T065029-001",
+      "previous_assessment_id": null,
+      "narrative": "Overall: RED. 36/45 cells passing. 2 cell(s) failing. 5 cell(s) in review. 1 cell(s) unknown (sensor coverage gap). Per-cell signals:\n  - F1×T6 REVIEW: SPEC_SECURITY_NO_PII_REGISTRY\n  - F3×T2 FAIL: test_coverage_depth → TEST_COVERAGE_BELOW_THRESHOLD: Lines coverage 20.4% is below review threshold (50%).\n  - F4×T1 REVIEW: COVERAGE_PARTIAL_USE_CASE_LINKING, DATA_HANDLING_NO_PII_DETECTED, DATA_MODEL_EMPTY, ROUTES_INVENTORY_EMPTY\n  - F4×T2 REVIEW: COVERAGE_PARTIAL_USE_CASE_LINKING, DATA_MODEL_EMPTY, ROUTES_INVENTORY_EMPTY\n  - F4×T6 REVIEW: DATA_HANDLING_NO_PII_DETECTED\n  - F5×T5 REVIEW: HARNESS_IDIOMATICITY_NO_REUSABLE_WORKFLOWS\n  - F5×T9 FAIL: harness_green_main → HARNESS_GREEN_MAIN_BELOW_THRESHOLD: Main branch success rate 19.4% (over last 31 runs) is below review threshold 80%.",
+      "deltas": [],
+      "backlog_actions": {
+        "additions": [],
+        "completions": [],
+        "deprioritizations": []
+      },
+      "recommended_priorities": []
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "cells": [
+    {
+      "cell": "F1:T1",
+      "reason": "Contract validation has no live emitter, so contract_validation is explicitly N/A rather than presented as reachable.",
+      "constitution_anchor": "Article 5"
+    }
+  ]
+}

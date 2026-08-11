@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/inv-override.schema.json",
+  "title": "Invariant Override",
+  "description": "In-source override of a non-constitutional, non-hard-fail invariant. Parsed from `// inv-override:` annotation blocks in source files. Constitutional and hard-fail invariants cannot be overridden; they require an Architect amendment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "invariant_id",
+    "file",
+    "line",
+    "reason",
+    "ticket",
+    "expires",
+    "approver",
+    "detected_at"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^OVR-[a-f0-9]{16}$",
+      "description": "Content-hash id: sha256(invariant_id|file|line|reason).slice(0,16)."
+    },
+    "invariant_id": {
+      "type": "string",
+      "pattern": "^INV-",
+      "description": "The invariant being overridden. The invariant's severity MUST be gate, warn, or advisory."
+    },
+    "file": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Repo-relative path of the source file containing the annotation."
+    },
+    "line": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "1-based line number of the `// inv-override:` line."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-sentence justification for the override."
+    },
+    "ticket": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tracker id (e.g. ENG-1234, GH-#42)."
+    },
+    "expires": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(Q[1-4]|(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]))$",
+      "description": "Expiry: `YYYY-Qx` (quarter) or `YYYY-MM-DD`. CI rejects expired overrides."
+    },
+    "approver": {
+      "type": "string",
+      "pattern": "^@[A-Za-z0-9_-]+$",
+      "description": "GitHub handle of the override approver."
+    },
+    "adr": {
+      "type": "string",
+      "pattern": "^ADR-",
+      "description": "Optional ADR id justifying the override pattern."
+    },
+    "detected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp the override was scanned."
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "OVR-9da3c05a4300318b",
+      "invariant_id": "INV-DEVAI-005",
+      "file": "packages/cli/tests/unit/check-adapters-acceptance.test.ts",
+      "line": 73,
+      "reason": "temporary exception for sample widget while refactor lands",
+      "ticket": "ENG-1234",
+      "expires": "2099-12-31",
+      "approver": "@testuser",
+      "detected_at": "2026-05-25T06:25:29.132Z"
+    }
+  ]
+}

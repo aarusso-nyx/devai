@@ -1,0 +1,1356 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "sensor-registry",
+  "entries": [
+    {
+      "id": "type_check",
+      "title": "Type Check",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "type_check",
+      "emitter_module": "packages/sensors/src/type-check.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T8"
+        }
+      ],
+      "tiers": ["BASELINE", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/type_check.md"
+      }
+    },
+    {
+      "id": "lint",
+      "title": "Lint",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "lint",
+      "emitter_module": "packages/sensors/src/lint.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T5"
+        }
+      ],
+      "tiers": ["BASELINE", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/lint.md"
+      }
+    },
+    {
+      "id": "build",
+      "title": "Build",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "build",
+      "emitter_module": "packages/sensors/src/build.ts",
+      "effect": "local-write",
+      "effect_basis": {
+        "capabilities": ["proc:pnpm-build", "fs:workspace"],
+        "source_paths": ["packages/sensors/src/build.ts", "packages/cli/src/command-manifest.ts"],
+        "rationale": "The sensor executes the workspace build, whose compiler outputs materialize under package directories; fs:workspace derives local-write."
+      },
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T9"
+        }
+      ],
+      "tiers": ["BASELINE", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/build.md"
+      }
+    },
+    {
+      "id": "unit_test",
+      "title": "Unit Test",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "unit_test",
+      "emitter_module": "packages/sensors/src/test.ts",
+      "effect": "harness-write",
+      "effect_basis": {
+        "capabilities": ["proc:pnpm-vitest", "fs:f5-state"],
+        "source_paths": ["packages/sensors/src/test.ts", "packages/cli/src/command-manifest.ts"],
+        "rationale": "The sensor executes the unit-test harness, including bounded test-runtime materialization; the harness state capability derives harness-write."
+      },
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T1"
+        }
+      ],
+      "tiers": ["BASELINE", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/unit_test.md"
+      }
+    },
+    {
+      "id": "integration_test",
+      "title": "Integration Test",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "integration_test",
+      "emitter_module": "packages/sensors/src/test.ts",
+      "effect": "harness-write",
+      "effect_basis": {
+        "capabilities": ["proc:pnpm-vitest", "fs:f5-state"],
+        "source_paths": ["packages/sensors/src/test.ts", "packages/cli/src/command-manifest.ts"],
+        "rationale": "The sensor executes the integration-test harness and its bounded runtime fixtures; the harness state capability derives harness-write."
+      },
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T1"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/integration_test.md"
+      }
+    },
+    {
+      "id": "e2e_test",
+      "title": "E2e Test",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "e2e_test",
+      "emitter_module": "packages/sensors/src/test.ts",
+      "effect": "harness-write",
+      "effect_basis": {
+        "capabilities": ["proc:pnpm-vitest", "fs:f5-state"],
+        "source_paths": ["packages/sensors/src/test.ts", "packages/cli/src/command-manifest.ts"],
+        "rationale": "The sensor executes the end-to-end test harness and its bounded runtime fixtures; the harness state capability derives harness-write."
+      },
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T1"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/e2e_test.md"
+      }
+    },
+    {
+      "id": "migration_check",
+      "title": "Migration Check",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "migration_check",
+      "emitter_module": "packages/sensors/src/migrate-check.ts",
+      "effect": "local-write",
+      "effect_basis": {
+        "capabilities": ["proc:psql", "db:write", "fs:f5-state"],
+        "source_paths": [
+          "packages/sensors/src/migrate-check.ts",
+          "packages/cli/src/command-manifest.ts"
+        ],
+        "rationale": "The sensor creates roles and tracking tables, applies migration SQL, and may persist a body; db:write derives local-write."
+      },
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T4"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/migration_check.md"
+      }
+    },
+    {
+      "id": "inventory_regeneration",
+      "title": "Inventory Regeneration",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_regeneration",
+      "emitter_module": "packages/cli/src/commands/sense/readings-rebuild.ts",
+      "effect": "harness-write",
+      "effect_basis": {
+        "capabilities": ["fs:f5-state"],
+        "source_paths": [
+          "packages/cli/src/commands/sense/readings-rebuild.ts",
+          "packages/cli/src/command-manifest.ts"
+        ],
+        "rationale": "The readings rebuild command writes synthesized SensorReading files below .devai/state, whose capability derives harness-write."
+      },
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T9"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_regeneration.md"
+      }
+    },
+    {
+      "id": "test_weakening_review",
+      "title": "Test Weakening Review",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_weakening_review",
+      "emitter_module": "packages/sensors/src/test-weakening.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T9"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_weakening_review.md"
+      }
+    },
+    {
+      "id": "trace_resolution",
+      "title": "Trace Resolution",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "trace_resolution",
+      "emitter_module": "packages/sensors/src/trace-resolve.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/trace_resolution.md"
+      }
+    },
+    {
+      "id": "security_scan",
+      "title": "Security Scan",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "security_scan",
+      "emitter_module": "packages/sensors/src/security-scan.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T6"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/security_scan.md"
+      }
+    },
+    {
+      "id": "perf_test",
+      "title": "Perf Test",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "perf_test",
+      "emitter_module": "packages/sensors/src/perf-test.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T7"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/perf_test.md"
+      }
+    },
+    {
+      "id": "llm_judge",
+      "title": "Llm Judge",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "llm_judge",
+      "emitter_module": "packages/sensors/src/judge.ts",
+      "effect": "remote-write",
+      "effect_basis": {
+        "capabilities": ["net:llm-provider"],
+        "source_paths": [
+          "packages/sensors/src/judge.ts",
+          "packages/cli/src/commands/sense/adapters.ts",
+          "packages/cli/src/command-manifest.ts"
+        ],
+        "rationale": "The judge invokes a configured external model provider. The binding authority vocabulary conservatively derives remote-write from every net capability."
+      },
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/llm_judge.md"
+      }
+    },
+    {
+      "id": "runtime_probe_api",
+      "title": "Runtime Probe Api",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "runtime_probe_api",
+      "emitter_module": "packages/sensors/src/runtime-probe.ts",
+      "effect": "remote-write",
+      "effect_basis": {
+        "capabilities": ["net:runtime-probe"],
+        "source_paths": [
+          "packages/sensors/src/runtime-probe.ts",
+          "packages/cli/src/command-manifest.ts"
+        ],
+        "rationale": "API charters issue network requests with caller-declared HTTP methods and optional bodies; net capability conservatively derives remote-write."
+      },
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/runtime_probe_api.md"
+      }
+    },
+    {
+      "id": "runtime_probe_auth",
+      "title": "Runtime Probe Auth",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "runtime_probe_auth",
+      "emitter_module": "packages/sensors/src/runtime-probe.ts",
+      "effect": "remote-write",
+      "effect_basis": {
+        "capabilities": ["net:runtime-probe"],
+        "source_paths": [
+          "packages/sensors/src/runtime-probe.ts",
+          "packages/cli/src/command-manifest.ts"
+        ],
+        "rationale": "Auth charters issue credentialed network requests with caller-declared HTTP methods and optional bodies; net capability derives remote-write."
+      },
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/runtime_probe_auth.md"
+      }
+    },
+    {
+      "id": "runtime_probe_data",
+      "title": "Runtime Probe Data",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "runtime_probe_data",
+      "emitter_module": "packages/sensors/src/runtime-probe-data.ts",
+      "effect": "remote-write",
+      "effect_basis": {
+        "capabilities": ["net:runtime-probe", "db:unclassified"],
+        "source_paths": [
+          "packages/sensors/src/runtime-probe-data.ts",
+          "packages/cli/src/command-manifest.ts"
+        ],
+        "rationale": "Data charters open a target connection and may permit idempotent or isolated destructive SQL; net capability conservatively derives remote-write."
+      },
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/runtime_probe_data.md"
+      }
+    },
+    {
+      "id": "inventory_api",
+      "title": "Inventory Api",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_api",
+      "emitter_module": "packages/sensors/src/inventory-api.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_api.md"
+      }
+    },
+    {
+      "id": "inventory_routes",
+      "title": "Inventory Routes",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_routes",
+      "emitter_module": "packages/sensors/src/inventory-routes.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_routes.md"
+      }
+    },
+    {
+      "id": "inventory_data_model",
+      "title": "Inventory Data Model",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_data_model",
+      "emitter_module": "packages/sensors/src/inventory-data-model.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_data_model.md"
+      }
+    },
+    {
+      "id": "inventory_rbac",
+      "title": "Inventory Rbac",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_rbac",
+      "emitter_module": "packages/sensors/src/inventory-rbac.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T6"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_rbac.md"
+      }
+    },
+    {
+      "id": "inventory_data_handling",
+      "title": "Inventory Data Handling",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_data_handling",
+      "emitter_module": "packages/sensors/src/inventory-data-handling.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T6"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_data_handling.md"
+      }
+    },
+    {
+      "id": "inventory_dep_graph",
+      "title": "Inventory Dep Graph",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_dep_graph",
+      "emitter_module": "packages/sensors/src/inventory-dep-graph.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_dep_graph.md"
+      }
+    },
+    {
+      "id": "inventory_coverage",
+      "title": "Inventory Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_coverage",
+      "emitter_module": "packages/sensors/src/inventory-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T1"
+        },
+        {
+          "substrate": "F4",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_coverage.md"
+      }
+    },
+    {
+      "id": "spec_depth",
+      "title": "Spec Depth",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_depth",
+      "emitter_module": "packages/sensors/src/spec-depth.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_depth.md"
+      }
+    },
+    {
+      "id": "spec_idiomaticity",
+      "title": "Spec Idiomaticity",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_idiomaticity",
+      "emitter_module": "packages/sensors/src/spec-idiomaticity.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T5"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_idiomaticity.md"
+      }
+    },
+    {
+      "id": "spec_freshness",
+      "title": "Spec Freshness",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_freshness",
+      "emitter_module": "packages/sensors/src/spec-freshness.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T9"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_freshness.md"
+      }
+    },
+    {
+      "id": "plant_coverage",
+      "title": "Plant Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "plant_coverage",
+      "emitter_module": "packages/sensors/src/plant-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T1"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/plant_coverage.md"
+      }
+    },
+    {
+      "id": "test_coverage_depth",
+      "title": "Test Coverage Depth",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_coverage_depth",
+      "emitter_module": "packages/sensors/src/test-coverage-depth.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_coverage_depth.md"
+      }
+    },
+    {
+      "id": "test_invariant_alignment",
+      "title": "Test Invariant Alignment",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_invariant_alignment",
+      "emitter_module": "packages/sensors/src/test-invariant-alignment.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T4"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_invariant_alignment.md"
+      }
+    },
+    {
+      "id": "inventory_adherence",
+      "title": "Inventory Adherence",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_adherence",
+      "emitter_module": "packages/sensors/src/inventory-adherence.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T4"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_adherence.md"
+      }
+    },
+    {
+      "id": "inventory_determinism",
+      "title": "Inventory Determinism",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_determinism",
+      "emitter_module": "packages/sensors/src/inventory-determinism.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T8"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_determinism.md"
+      }
+    },
+    {
+      "id": "harness_security",
+      "title": "Harness Security",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_security",
+      "emitter_module": "packages/sensors/src/harness-security.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T6"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_security.md"
+      }
+    },
+    {
+      "id": "harness_green_main",
+      "title": "Harness Green Main",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_green_main",
+      "emitter_module": "packages/sensors/src/harness-green-main.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T9"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_green_main.md"
+      }
+    },
+    {
+      "id": "spec_alignment",
+      "title": "Spec Alignment",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_alignment",
+      "emitter_module": "packages/sensors/src/spec-alignment.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T4"
+        }
+      ],
+      "tiers": ["TIER2", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_alignment.md"
+      }
+    },
+    {
+      "id": "spec_security_coverage",
+      "title": "Spec Security Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_security_coverage",
+      "emitter_module": "packages/sensors/src/spec-security-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T6"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_security_coverage.md"
+      }
+    },
+    {
+      "id": "spec_performance_targets",
+      "title": "Spec Performance Targets",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_performance_targets",
+      "emitter_module": "packages/sensors/src/spec-performance-targets.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T7"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_performance_targets.md"
+      }
+    },
+    {
+      "id": "spec_robustness_targets",
+      "title": "Spec Robustness Targets",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "spec_robustness_targets",
+      "emitter_module": "packages/sensors/src/spec-robustness-targets.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F1",
+          "property": "T8"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/spec_robustness_targets.md"
+      }
+    },
+    {
+      "id": "plant_depth",
+      "title": "Plant Depth",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "plant_depth",
+      "emitter_module": "packages/sensors/src/plant-depth.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/plant_depth.md"
+      }
+    },
+    {
+      "id": "plant_coherence",
+      "title": "Plant Coherence",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "plant_coherence",
+      "emitter_module": "packages/sensors/src/plant-coherence.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F2",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/plant_coherence.md"
+      }
+    },
+    {
+      "id": "test_coherence",
+      "title": "Test Coherence",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_coherence",
+      "emitter_module": "packages/sensors/src/test-coherence.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_coherence.md"
+      }
+    },
+    {
+      "id": "test_idiomaticity",
+      "title": "Test Idiomaticity",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_idiomaticity",
+      "emitter_module": "packages/sensors/src/test-idiomaticity.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T5"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_idiomaticity.md"
+      }
+    },
+    {
+      "id": "test_security_coverage",
+      "title": "Test Security Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_security_coverage",
+      "emitter_module": "packages/sensors/src/test-security-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T6"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_security_coverage.md"
+      }
+    },
+    {
+      "id": "test_performance_coverage",
+      "title": "Test Performance Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_performance_coverage",
+      "emitter_module": "packages/sensors/src/test-performance-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T7"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_performance_coverage.md"
+      }
+    },
+    {
+      "id": "test_robustness_coverage",
+      "title": "Test Robustness Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "test_robustness_coverage",
+      "emitter_module": "packages/sensors/src/test-robustness-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F3",
+          "property": "T8"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/test_robustness_coverage.md"
+      }
+    },
+    {
+      "id": "harness_coverage",
+      "title": "Harness Coverage",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_coverage",
+      "emitter_module": "packages/sensors/src/harness-coverage.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T1"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_coverage.md"
+      }
+    },
+    {
+      "id": "harness_depth",
+      "title": "Harness Depth",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_depth",
+      "emitter_module": "packages/sensors/src/harness-depth.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T2"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_depth.md"
+      }
+    },
+    {
+      "id": "harness_coherence",
+      "title": "Harness Coherence",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_coherence",
+      "emitter_module": "packages/sensors/src/harness-coherence.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_coherence.md"
+      }
+    },
+    {
+      "id": "harness_invariant_alignment",
+      "title": "Harness Invariant Alignment",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_invariant_alignment",
+      "emitter_module": "packages/sensors/src/harness-invariant-alignment.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T4"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_invariant_alignment.md"
+      }
+    },
+    {
+      "id": "harness_idiomaticity",
+      "title": "Harness Idiomaticity",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_idiomaticity",
+      "emitter_module": "packages/sensors/src/harness-idiomaticity.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T5"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_idiomaticity.md"
+      }
+    },
+    {
+      "id": "harness_performance",
+      "title": "Harness Performance",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_performance",
+      "emitter_module": "packages/sensors/src/harness-performance.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T7"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_performance.md"
+      }
+    },
+    {
+      "id": "harness_robustness",
+      "title": "Harness Robustness",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "harness_robustness",
+      "emitter_module": "packages/sensors/src/harness-robustness.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T8"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/harness_robustness.md"
+      }
+    },
+    {
+      "id": "inventory_performance",
+      "title": "Inventory Performance",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "inventory_performance",
+      "emitter_module": "packages/sensors/src/inventory-performance.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F4",
+          "property": "T7"
+        }
+      ],
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/inventory_performance.md"
+      }
+    },
+    {
+      "id": "decision_record_integrity",
+      "title": "Decision Record Integrity",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "decision_record_integrity",
+      "emitter_module": "packages/loop/src/governance-ledger/index.ts",
+      "effect": "read",
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/decision_record_integrity.md"
+      }
+    },
+    {
+      "id": "decision_citation_resolution",
+      "title": "Decision Citation Resolution",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "decision_citation_resolution",
+      "emitter_module": "packages/loop/src/governance-ledger/index.ts",
+      "effect": "read",
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/decision_citation_resolution.md"
+      }
+    },
+    {
+      "id": "archive_immutability",
+      "title": "Archive Immutability",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "archive_immutability",
+      "emitter_module": "packages/loop/src/governance-ledger/index.ts",
+      "effect": "read",
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/archive_immutability.md"
+      }
+    },
+    {
+      "id": "round_record_integrity",
+      "title": "Round Record Integrity",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "round_record_integrity",
+      "emitter_module": "packages/loop/src/governance-ledger/index.ts",
+      "effect": "read",
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/round_record_integrity.md"
+      }
+    },
+    {
+      "id": "docs_drift",
+      "title": "Docs Drift",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "docs_drift",
+      "emitter_module": "packages/sensors/src/docs-drift.ts",
+      "effect": "read",
+      "cells": [
+        {
+          "substrate": "F5",
+          "property": "T3"
+        }
+      ],
+      "tiers": ["TIER3", "SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/docs_drift.md"
+      }
+    },
+    {
+      "id": "site_drift",
+      "title": "Site Drift",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "site_drift",
+      "emitter_module": "packages/sensors/src/site-drift.ts",
+      "effect": "read",
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/site_drift.md"
+      }
+    },
+    {
+      "id": "action_effect_inference",
+      "title": "Action Effect Inference",
+      "type": "sensor-registry-entry",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "kind": "action_effect_inference",
+      "emitter_module": "packages/sensors/src/action-effect-inference.ts",
+      "effect": "read",
+      "diagnostic": true,
+      "tiers": ["SWEEP"],
+      "design_note": {
+        "state": "active",
+        "path": "law/policy/sensor-notes/action_effect_inference.md"
+      }
+    }
+  ]
+}

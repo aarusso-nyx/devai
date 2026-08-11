@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/model-runtime-registry.schema.json",
+  "title": "Model runtime bridges",
+  "description": "Runtime/provider bridge capabilities for host-selected exact model execution.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "id", "status", "authority", "runtimes"],
+  "properties": {
+    "$schema": { "const": "../schemas/model-runtime-registry.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "const": "model-runtime-registry" },
+    "status": { "const": "active" },
+    "authority": { "const": "Architect" },
+    "runtimes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/runtime" }
+    }
+  },
+  "$defs": {
+    "stringSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "vendor",
+        "family",
+        "adapter_id",
+        "adapter_module",
+        "transport",
+        "efforts",
+        "capabilities",
+        "eligible_agent_classes",
+        "available",
+        "availability_basis"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "vendor": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "adapter_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "adapter_module": { "type": "string", "pattern": "^packages/[A-Za-z0-9._/-]+\\.ts$" },
+        "transport": { "enum": ["provider-api", "host-cli"] },
+        "executable": { "type": "string", "minLength": 1 },
+        "credential_binding": { "type": ["string", "null"] },
+        "efforts": { "$ref": "#/$defs/stringSet" },
+        "capabilities": { "$ref": "#/$defs/stringSet" },
+        "eligible_agent_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["coding-agent", "review-agent", "ops-agent"] }
+        },
+        "available": { "type": "boolean" },
+        "availability_basis": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "transport": { "const": "host-cli" } },
+            "required": ["transport"]
+          },
+          "then": { "required": ["executable"] }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "$schema": "../schemas/model-runtime-registry.schema.json",
+      "schemaVersion": "1.0.0",
+      "id": "model-runtime-registry",
+      "status": "active",
+      "authority": "Architect",
+      "runtimes": [
+        {
+          "id": "example-host-cli",
+          "vendor": "Example",
+          "family": "example",
+          "adapter_id": "example-host-cli-adapter",
+          "adapter_module": "packages/skills/src/model-bridge/index.ts",
+          "transport": "host-cli",
+          "executable": "example",
+          "credential_binding": "host-cli-session",
+          "efforts": ["default"],
+          "capabilities": ["text-generation"],
+          "eligible_agent_classes": ["coding-agent"],
+          "available": true,
+          "availability_basis": "The host validates executable availability before use."
+        }
+      ]
+    }
+  ]
+}

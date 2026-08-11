@@ -1,0 +1,47 @@
+{
+  "name": "@devai-nyx/spec",
+  "version": "1.0.0",
+  "description": "DEVAI specification, blueprint, ADR, translation, and RTD validation contracts.",
+  "license": "Apache-2.0",
+  "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm --dir ../.. run test:spec"
+  },
+  "dependencies": {
+    "@devai-nyx/authority": "workspace:*",
+    "@devai-nyx/evidence": "workspace:*",
+    "@devai-nyx/schemas": "workspace:*",
+    "@devai-nyx/utils": "workspace:*",
+    "minimatch": "^9.0.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "vitest": "^4.0.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarusso-nyx/devai.git",
+    "directory": "packages/spec"
+  },
+  "private": true
+}

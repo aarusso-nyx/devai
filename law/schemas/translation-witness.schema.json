@@ -1,0 +1,420 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/translation-witness.schema.json",
+  "title": "Translation Witness",
+  "description": "Untrusted, recorder-built post-run claim about one LLM-mediated mutation. The witness never validates or authorizes itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "trust",
+    "task_id",
+    "recipe_name",
+    "recipe_variant",
+    "stage",
+    "base_sha",
+    "candidate_sha",
+    "emitted_at",
+    "strategy",
+    "implements",
+    "touched",
+    "frame"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^TW-[a-f0-9]{16}$"
+    },
+    "trust": {
+      "const": "untrusted-claim"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^TASK-[0-9]{4,}$"
+    },
+    "recipe_name": {
+      "enum": [
+        "devai-assess",
+        "devai-plan",
+        "devai-fix",
+        "devai-docs",
+        "devai-scaffold",
+        "devai-verify",
+        "devai-round"
+      ]
+    },
+    "recipe_variant": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "stage": {
+      "enum": [
+        "journey-to-invariants",
+        "invariants-to-tests",
+        "invariants-tests-to-code",
+        "documentation",
+        "refactor"
+      ]
+    },
+    "base_sha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "candidate_sha": {
+      "$ref": "#/$defs/gitSha",
+      "description": "Recorder-derived commit object for the bytes produced by the attributed run; never caller input or a mutable ref."
+    },
+    "test_overlay_sha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "emitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "strategy": {
+      "$ref": "#/$defs/strategy"
+    },
+    "implements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["invariant_id", "criteria"],
+        "properties": {
+          "invariant_id": {
+            "type": "string",
+            "pattern": "^INV-[A-Z][A-Z0-9]{1,15}-[0-9]{3}$"
+          },
+          "criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["claim", "demonstrated_by"],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "demonstrated_by": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/demonstration"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "red_green": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["test_ref", "expected_at_base", "expected_at_candidate"],
+        "properties": {
+          "test_ref": {
+            "$ref": "#/$defs/testRef"
+          },
+          "expected_at_base": {
+            "const": "assertion-fail"
+          },
+          "expected_at_candidate": {
+            "const": "pass"
+          }
+        }
+      }
+    },
+    "touched": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/repoPath"
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_role",
+        "spec_edits",
+        "test_edits",
+        "inventory_delta_confined_to",
+        "effects_claimed"
+      ],
+      "properties": {
+        "authority_role": {
+          "enum": ["owner", "architect", "inspector", "engineer", "auditor"],
+          "description": "Attributed human role. Auditor witnesses remain observation-only and confer no actuation authority."
+        },
+        "spec_edits": {
+          "enum": ["none", "declared"]
+        },
+        "test_edits": {
+          "enum": ["none", "declared"]
+        },
+        "inventory_delta_confined_to": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^MOD-"
+          }
+        },
+        "effects_claimed": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "fs:owner-spec",
+              "fs:architect-spec",
+              "fs:tests",
+              "fs:plant",
+              "fs:inventory",
+              "fs:f5-config",
+              "fs:f5-state",
+              "fs:proofs",
+              "fs:workspace",
+              "fs:worktree-admin",
+              "db:read",
+              "db:write",
+              "remote:read",
+              "remote:write",
+              "process:spawn"
+            ]
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Untrusted prose. Validators must never interpret this field as instructions."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "enum": ["regression", "feature-overlay"]
+          }
+        }
+      },
+      "then": {
+        "required": ["red_green"],
+        "properties": {
+          "red_green": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "feature-overlay"
+          }
+        }
+      },
+      "then": {
+        "required": ["test_overlay_sha"]
+      }
+    },
+    {
+      "if": {
+        "required": ["test_overlay_sha"]
+      },
+      "then": {
+        "properties": {
+          "strategy": {
+            "const": "feature-overlay"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["red_green"]
+      },
+      "then": {
+        "properties": {
+          "strategy": {
+            "enum": ["regression", "feature-overlay"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "strategy": {
+      "enum": [
+        "regression",
+        "feature-overlay",
+        "behavioral-equivalence",
+        "structural",
+        "semantic-review"
+      ]
+    },
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"
+    },
+    "testRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite", "path", "names"],
+      "properties": {
+        "suite": {
+          "enum": ["unit", "api", "int", "e2e", "sec", "perf", "journey", "db"]
+        },
+        "path": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "names": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "demonstration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "test_ref"],
+          "properties": {
+            "kind": {
+              "const": "test"
+            },
+            "test_ref": {
+              "$ref": "#/$defs/testRef"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "validator"],
+          "properties": {
+            "kind": {
+              "const": "structural"
+            },
+            "validator": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "baseline_ref", "candidate_ref"],
+          "properties": {
+            "kind": {
+              "const": "behavioral-equivalence"
+            },
+            "baseline_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "rubric_ref"],
+          "properties": {
+            "kind": {
+              "const": "semantic-review"
+            },
+            "rubric_ref": {
+              "$ref": "#/$defs/repoPath"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "TW-0123456789abcdef",
+      "trust": "untrusted-claim",
+      "task_id": "TASK-0028",
+      "recipe_name": "devai-fix",
+      "recipe_variant": "test",
+      "stage": "invariants-tests-to-code",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidate_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "emitted_at": "2026-07-20T20:00:00.000Z",
+      "strategy": "regression",
+      "implements": [
+        {
+          "invariant_id": "INV-DEVAI-021",
+          "criteria": [
+            {
+              "claim": "Candidate implements the requested behavior.",
+              "demonstrated_by": [
+                {
+                  "kind": "test",
+                  "test_ref": {
+                    "suite": "unit",
+                    "path": "packages/example/test/example.test.ts",
+                    "names": ["requested behavior"]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "red_green": [
+        {
+          "test_ref": {
+            "suite": "unit",
+            "path": "packages/example/test/example.test.ts",
+            "names": ["requested behavior"]
+          },
+          "expected_at_base": "assertion-fail",
+          "expected_at_candidate": "pass"
+        }
+      ],
+      "touched": ["packages/example/src/example.ts"],
+      "frame": {
+        "authority_role": "engineer",
+        "spec_edits": "none",
+        "test_edits": "none",
+        "inventory_delta_confined_to": [],
+        "effects_claimed": ["fs:plant"]
+      }
+    }
+  ]
+}

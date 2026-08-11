@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/triage.schema.json",
+  "title": "Triage Verdict",
+  "description": "Failure classification before remediation routing. Every failure entering the framework is triaged. Per Constitution Article 15.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "generated_at",
+    "subject_evidence_ref",
+    "classification",
+    "confidence",
+    "summary",
+    "recommended_route"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^TRG-[a-f0-9]{16}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "subject_evidence_ref": {
+      "type": "string",
+      "pattern": "^EV-",
+      "description": "Evidence record being triaged (typically a failed sensor reading or test run)."
+    },
+    "subject_task_id": {
+      "type": ["string", "null"],
+      "pattern": "^TASK-"
+    },
+    "classification": {
+      "enum": ["plant_bug", "sensor_error", "policy_issue", "reference_gap", "inconclusive"],
+      "description": "inconclusive routes to tie-breaker ladder; explicit uncertainty per Article 39."
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score"],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "method": {
+          "type": "string"
+        }
+      }
+    },
+    "invariants_impacted": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^INV-"
+      }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "recommended_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discipline"],
+      "properties": {
+        "discipline": {
+          "enum": ["engineer", "inspector", "auditor", "architect", "owner", "harness_review"]
+        },
+        "action": {
+          "enum": [
+            "feedback_iteration",
+            "fix_test",
+            "fix_sensor_adapter",
+            "review_policy",
+            "review_thresholds",
+            "emit_rgr",
+            "escalate_to_human"
+          ]
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "tie_breaker_invoked": {
+      "type": "boolean",
+      "description": "True if classification required cross-model verification per Article 23."
+    },
+    "tie_breaker_evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^EV-"
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "TRG-0123456789abcdef",
+      "generated_at": "2026-07-23T00:00:00.000Z",
+      "subject_evidence_ref": "EV-abcdef01",
+      "classification": "plant_bug",
+      "confidence": {
+        "score": 1
+      },
+      "summary": "Plant behavior contradicts the invariant.",
+      "recommended_route": {
+        "discipline": "engineer"
+      }
+    }
+  ]
+}

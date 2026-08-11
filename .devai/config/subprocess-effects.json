@@ -1,0 +1,312 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "subprocess-effects",
+  "source_authority": "F1-architect",
+  "materialization": {
+    "target": ".devai/config/subprocess-effects.json",
+    "allowed_verbs": ["devai init bind"],
+    "authority_and_consent_required": true,
+    "byte_identity_required": true,
+    "adopter_binding_path_required": true,
+    "direct_writes_forbidden": true
+  },
+  "templates": [
+    {
+      "template_id": "gh-dynamic-read",
+      "executable": "gh",
+      "argv_shape": ["<dynamic-argv>"],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "Doctor probes a caller-selected GitHub CLI read command; runtime seam enforcement remains required for the dynamic argv.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "gh-auth-status",
+      "executable": "gh",
+      "argv_shape": ["auth", "status"],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "Doctor checks GitHub CLI authentication state without mutation.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-dynamic-read",
+      "executable": "git",
+      "argv_shape": ["<dynamic-argv>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Local-evidence verification supplies a bounded read-only git argv assembled by the verifier.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-dynamic-publish",
+      "executable": "git",
+      "argv_shape": ["<dynamic>"],
+      "capabilities": ["proc:git-remote", "net:github-pages"],
+      "effect": "remote-write",
+      "reason": "Documentation publication delegates a selected git publication operation and is conservatively remote-write.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-add",
+      "executable": "git",
+      "argv_shape": ["add", "--", "<dynamic>"],
+      "capabilities": ["proc:git-local", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "Round skill stages an explicit workspace path.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-commit",
+      "executable": "git",
+      "argv_shape": ["commit", "-m", "<dynamic>"],
+      "capabilities": ["proc:git-local", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "Round skill creates a local commit with an explicit message.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-diff-names",
+      "executable": "git",
+      "argv_shape": ["diff", "--name-only"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Round skill reads changed path names.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-log-renames",
+      "executable": "git",
+      "argv_shape": ["log", "--all", "--diff-filter=R", "--name-status", "--pretty=format:"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Round skill reads rename history.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-log-forbidden-actions",
+      "executable": "git",
+      "argv_shape": ["log", "<dynamic>", "--pretty=format:%H%x00%B%x1e"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Forbidden-action inspection reads a bounded number of commit messages.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-ls-remote",
+      "executable": "git",
+      "argv_shape": ["ls-remote", "origin", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Documentation governance reads the configured remote branch head.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-merge-base-ancestor",
+      "executable": "git",
+      "argv_shape": ["merge-base", "--is-ancestor", "<dynamic>", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Round skill checks ancestry without mutation.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-mv",
+      "executable": "git",
+      "argv_shape": ["mv", "<dynamic>", "<dynamic>"],
+      "capabilities": ["proc:git-local", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "Round skill renames an explicit workspace path.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-push-head",
+      "executable": "git",
+      "argv_shape": ["push", "origin", "HEAD"],
+      "capabilities": ["proc:git-remote", "net:github-pages"],
+      "effect": "remote-write",
+      "reason": "Round skill publishes the current branch only after explicit workflow authorization.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-cat-file-blob",
+      "executable": "git",
+      "argv_shape": ["cat-file", "blob", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Translation validation reads exact trace, invariant, and Inspector-overlay bytes from immutable commits.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-rev-list-parents",
+      "executable": "git",
+      "argv_shape": ["rev-list", "--parents", "-n", "1", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Evidence verification reads one commit and its parents.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-current-branch",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "--abbrev-ref", "HEAD"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Evidence and round tooling read the current branch.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-inside-worktree",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "--is-inside-work-tree"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Round skill verifies repository context.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-verify-ref",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "--verify", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Round skill verifies a selected ref.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-head",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "HEAD"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Inventory and evidence tooling read the current commit.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "npx-eslint-fix",
+      "executable": "npx",
+      "argv_shape": ["eslint", "--fix", "."],
+      "capabilities": ["proc:npx-local", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "Round skill invokes the explicit ESLint workspace fixer.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "pnpm-version",
+      "executable": "pnpm",
+      "argv_shape": ["--version"],
+      "capabilities": ["proc:pnpm-read"],
+      "effect": "read",
+      "reason": "Dependency policy reads the package-manager version.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "pnpm-audit",
+      "executable": "pnpm",
+      "argv_shape": ["audit", "--json"],
+      "capabilities": ["proc:pnpm-read"],
+      "effect": "read",
+      "reason": "Dependency policy requests the read-only audit report.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "sandbox-exec-translation-validation",
+      "executable": "sandbox-exec",
+      "argv_shape": ["-p", "<dynamic>", "<dynamic>"],
+      "capabilities": ["proc:sandbox-exec"],
+      "effect": "read",
+      "reason": "macOS validation runs a registry-derived test command with network and candidate-worktree writes denied; witness prose never supplies the executable or sandbox profile.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "shell-record-command",
+      "executable": "sh",
+      "argv_shape": ["-c", "<dynamic>"],
+      "capabilities": ["proc:shell-local", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "Evidence recording executes an explicitly supplied test command and conservatively assumes workspace writes.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "shell-command-probe",
+      "executable": "sh",
+      "argv_shape": ["-lc", "<dynamic>"],
+      "capabilities": ["proc:shell-read"],
+      "effect": "read",
+      "reason": "Doctor probes command availability through the login shell.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "which-mmdc",
+      "executable": "which",
+      "argv_shape": ["mmdc"],
+      "capabilities": ["proc:which"],
+      "effect": "read",
+      "reason": "Mermaid rendering checks for the configured renderer before a bounded local render.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "mmdc-version",
+      "executable": "mmdc",
+      "argv_shape": ["--version"],
+      "capabilities": ["proc:mmdc"],
+      "effect": "read",
+      "reason": "Mermaid rendering reads the selected renderer version before local output.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-doctor-log-records",
+      "executable": "git",
+      "argv_shape": ["log", "<dynamic>", "--pretty=format:%H%x00%an%x00%P%x00%B%x1e"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Doctor reads bounded commit records for governance diagnostics.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-doctor-rev-parse-pair",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "<dynamic>", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Doctor resolves two selected revision arguments without mutation.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-doctor-diff-tree-names",
+      "executable": "git",
+      "argv_shape": [
+        "diff-tree",
+        "--root",
+        "--no-commit-id",
+        "--name-status",
+        "-r",
+        "-M",
+        "-m",
+        "<dynamic>"
+      ],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Doctor reads bounded path-change metadata for one selected revision.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-doctor-diff-tree-patch",
+      "executable": "git",
+      "argv_shape": [
+        "diff-tree",
+        "--root",
+        "--no-commit-id",
+        "--no-ext-diff",
+        "--unified=0",
+        "-p",
+        "-m",
+        "<dynamic>"
+      ],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Doctor reads a zero-context patch for one selected revision.",
+      "owner": "architect"
+    }
+  ]
+}

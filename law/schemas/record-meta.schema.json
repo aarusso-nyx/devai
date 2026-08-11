@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/record-meta.schema.json",
+  "title": "Record meta-structure (section 5.1 fragment)",
+  "description": "The common front-matter/field fragment every governed append-able record carries. Per-type record schemas $ref this and extend.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "$ref": "common-defs.schema.json#/$defs/record_status"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersedes": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string"
+      }
+    },
+    "superseded_by": {
+      "type": ["string", "null"]
+    },
+    "provenance": {
+      "type": ["array", "string"],
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["id", "title", "type", "status", "date", "authority"],
+  "$comment": "additionalProperties deliberately absent here: extending schemas close their own world.",
+  "examples": [
+    {
+      "id": "REC-EXAMPLE",
+      "title": "Example active record",
+      "type": "example",
+      "status": "active",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "supersedes": null,
+      "superseded_by": null,
+      "provenance": ["example:source-record"]
+    }
+  ]
+}

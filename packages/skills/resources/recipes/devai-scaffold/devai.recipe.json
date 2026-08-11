@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-scaffold",
+  "status": "stable",
+  "description": "Generate one bounded artifact family from explicit structured inputs and reviewable templates.",
+  "variants": {
+    "db": {
+      "description": "Generate database migrations and seeds.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["domain/*/db/**"] },
+      "operations": ["scaffold.db"]
+    },
+    "api": {
+      "description": "Generate API module source.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["domain/*/api/src/**"] },
+      "operations": ["scaffold.api"]
+    },
+    "ui": {
+      "description": "Generate UI module source.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["domain/*/web/src/**"] },
+      "operations": ["scaffold.ui"]
+    },
+    "tests": {
+      "description": "Generate module test stubs.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["domain/*/api/test/**"] },
+      "operations": ["scaffold.tests"]
+    },
+    "tests-from-docs": {
+      "description": "Generate reviewed test candidates from explicit documentation.",
+      "effect": "local-write",
+      "write_policy": { "mode": "explicit-files", "scopes": ["packages/*/tests/**", "tests/**"] },
+      "operations": ["scaffold.tests-from-docs"]
+    },
+    "docs": {
+      "description": "Generate module documentation templates.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["domain/*/docs/**"] },
+      "operations": ["scaffold.docs"]
+    },
+    "ci": {
+      "description": "Generate one module CI workflow.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": [".github/workflows/module-*.yml"] },
+      "operations": ["scaffold.ci"]
+    }
+  }
+}

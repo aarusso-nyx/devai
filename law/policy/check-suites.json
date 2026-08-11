@@ -1,0 +1,58 @@
+{
+  "$schema": "../schemas/check-suites.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "check-suites",
+  "status": "active",
+  "authority": "Architect",
+  "ordering": "members-execute-in-declared-order-without-coalescing",
+  "unknown_behavior": "error-never-pass",
+  "prerequisites": [
+    "clean-or-explicitly-described-worktree",
+    "frozen-install-complete",
+    "pnpm-run-devai-prepare"
+  ],
+  "suites": [
+    {
+      "name": "quick",
+      "members": ["ledger-local"],
+      "excluded": []
+    },
+    {
+      "name": "standard",
+      "members": ["ledger-local"],
+      "excluded": []
+    },
+    {
+      "name": "full",
+      "members": ["ledger-rc"],
+      "excluded": []
+    },
+    {
+      "name": "release",
+      "members": ["ledger-rc"],
+      "excluded": []
+    }
+  ],
+  "member_definitions": [
+    {
+      "id": "ledger-local",
+      "binding": {
+        "kind": "runtime-gate",
+        "gate_id": "content-addressed-local-task-ledger"
+      },
+      "effect": "local-write",
+      "cost": "medium",
+      "output": "action-envelope-plus-local-task-ledger-report"
+    },
+    {
+      "id": "ledger-rc",
+      "binding": {
+        "kind": "runtime-gate",
+        "gate_id": "content-addressed-rc-task-ledger"
+      },
+      "effect": "local-write",
+      "cost": "high",
+      "output": "action-envelope-plus-rc-task-ledger-report"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/adr.schema.json",
+  "title": "Architecture Decision Record",
+  "description": "Frontmatter schema for live ADR markdown under law/adr/. The markdown body carries the mandatory Status, Context, Decision, Consequences, Alternatives Considered, and Affected Rules sections enforced by the production ADR validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "type",
+    "status",
+    "date",
+    "authority",
+    "supersedes",
+    "superseded_by",
+    "provenance",
+    "affected_rules"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ADR-[0-9]{3,}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "type": {
+      "const": "adr"
+    },
+    "status": {
+      "$ref": "common-defs.schema.json#/$defs/record_status",
+      "description": "Current lifecycle: draft is non-binding; active is accepted and binding; superseded names a replacement."
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersedes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "superseded_by": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "Null until one active-to-superseded transition appends the non-empty replacement id; superseded records are terminal."
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "affected_rules": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "active" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": { "supersedes": { "minItems": 1 } }
+      }
+    }
+  ],
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "id": "ADR-001",
+      "title": "Runtime authority enforcement",
+      "type": "adr",
+      "status": "draft",
+      "date": "2026-07-23",
+      "authority": "Architect",
+      "supersedes": ["ADR-003-runtime-authority-enforcement.md"],
+      "superseded_by": null,
+      "provenance": ["source disposition map"],
+      "affected_rules": []
+    }
+  ]
+}

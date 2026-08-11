@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/authority-session.schema.json",
+  "title": "Authority Session",
+  "description": "Explicit expiring human-role session state. The record is policy and repository bound; it contains no reusable bearer capability.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "session_id",
+    "repository_id",
+    "role",
+    "declaration_source",
+    "status",
+    "created_at",
+    "expires_at",
+    "created_by_invocation_id",
+    "policy_binding",
+    "constitution_binding",
+    "package_binding",
+    "session_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^AUTH-SESSION-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "role": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    "declaration_source": {
+      "const": "cli-flag"
+    },
+    "status": {
+      "enum": ["active", "revoked", "expired", "stale"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by_invocation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "policy_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_version", "resolved_digest_sha256"],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+        },
+        "resolved_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "constitution_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "digest_sha256"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "package_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "const": "@aarusso-nyx/devai"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+        }
+      }
+    },
+    "revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revoked_at", "revoked_by_invocation_id", "reason"],
+      "properties": {
+        "revoked_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "revoked_by_invocation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "stale_reason": {
+      "enum": ["policy-changed", "constitution-changed", "package-changed", "repository-mismatch"]
+    },
+    "session_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical SHA-256 of the record with session_digest_sha256 omitted. This is integrity evidence, not a bearer capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "revoked"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["revocation"]
+      },
+      "else": {
+        "not": {
+          "required": ["revocation"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "stale"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["stale_reason"]
+      },
+      "else": {
+        "not": {
+          "required": ["stale_reason"]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "session_id": "AUTH-SESSION-abcdefghijklmnop",
+      "repository_id": "devai",
+      "role": "architect",
+      "declaration_source": "cli-flag",
+      "status": "active",
+      "created_at": "2026-07-23T00:00:00.000Z",
+      "expires_at": "2026-07-23T01:00:00.000Z",
+      "created_by_invocation_id": "INVOCATION-0001",
+      "policy_binding": {
+        "policy_id": "devai-core-authority",
+        "policy_version": "1.0.0",
+        "resolved_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "constitution_binding": {
+        "version": "1.0.0",
+        "digest_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "package_binding": {
+        "name": "@aarusso-nyx/devai",
+        "version": "1.0.0"
+      },
+      "session_digest_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ]
+}

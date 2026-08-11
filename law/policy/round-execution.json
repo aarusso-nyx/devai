@@ -1,0 +1,288 @@
+{
+  "$schema": "../schemas/round-execution.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "round-execution",
+  "status": "active",
+  "authority": "Architect",
+  "task_contract": {
+    "schema": "law/schemas/task.schema.json",
+    "required_schema_version": "2.0.0",
+    "cardinality": "exactly-one-active-round-per-task",
+    "ordinary_entrypoint": "round run",
+    "plumbing_entrypoint": "task",
+    "unmanaged_task_execution": "forbidden",
+    "round_validation_before_resources": true,
+    "authority_source": "discipline",
+    "executor_model_or_capability_authority": "none"
+  },
+  "selection": {
+    "required_round_argument": true,
+    "round_must_be_active": true,
+    "modes": ["all-ready", "explicit-task-ids"],
+    "all_ready_population": "every nonterminal ready task whose task.round_id equals the requested active round",
+    "explicit_population": "only named tasks whose task.round_id equals the requested active round",
+    "dependency_closure": "mandatory-same-round",
+    "missing_dependency": "TASK_DEPENDENCY_MISSING",
+    "cross_round_dependency": "TASK_COMPOSITE_CROSS_ROUND",
+    "cycle": "TASK_COMPOSITE_CYCLE",
+    "order": [
+      "validate-complete-population",
+      "expand-same-round-dependency-closure",
+      "reject-missing-cross-round-or-cyclic-graph",
+      "topological-generation-ascending",
+      "coupled-authority-position-ascending",
+      "priority-descending",
+      "task-id-utf8-ascending"
+    ],
+    "parallelism": "same-topological-generation-and-resource-disjoint-only"
+  },
+  "dependencies": {
+    "edge_sources": [
+      "task.upstream_task_id",
+      "task.coupled_task_group-and-coupled_pipeline_position",
+      "task.executor.composite.dependencies"
+    ],
+    "composite_children": "explicit-task-ids-only",
+    "same_round_required": true,
+    "pre_dispatch_cycle_check": true,
+    "completed_dependency_required": true,
+    "failed_dependency": "dependent-remains-blocked",
+    "implicit_task_independence": "forbidden"
+  },
+  "roles": {
+    "coupled_order": ["inspector", "architect", "engineer"],
+    "coupled_merge_order": ["inspector", "architect", "engineer"],
+    "owner_or_auditor_inference": "forbidden",
+    "role_change": "new-session-and-commit-boundary",
+    "path_authority": "discipline-only",
+    "executor_override": "forbidden"
+  },
+  "resources": {
+    "acquire_before": "worktree-creation-or-executor-dispatch",
+    "lock_keys": [
+      "target-substrate-plus-target-module",
+      "database-isolation-identity",
+      "worktree-id"
+    ],
+    "acquisition_order": "utf8-ascending-canonical-key",
+    "all_or_nothing": true,
+    "conflict": "lock_denied-and-requeue",
+    "repeated_conflict": "escalate-for-human-review",
+    "release_on": ["completed", "escalated", "rgr_pending", "cancelled"],
+    "resource_claim_from_model": "forbidden"
+  },
+  "lifecycle": {
+    "initial": "queued",
+    "terminal": ["completed", "escalated", "cancelled"],
+    "transitions": [
+      {
+        "from": "queued",
+        "to": ["ready", "cancelled"]
+      },
+      {
+        "from": "ready",
+        "to": ["lock_denied", "in_progress", "cancelled"]
+      },
+      {
+        "from": "lock_denied",
+        "to": ["ready", "escalated", "cancelled"]
+      },
+      {
+        "from": "in_progress",
+        "to": [
+          "checkpoint",
+          "pre_merge",
+          "awaiting_human_review",
+          "experimental_blocked",
+          "escalated",
+          "rgr_pending",
+          "cancelled"
+        ]
+      },
+      {
+        "from": "checkpoint",
+        "to": ["in_progress", "pre_merge", "escalated", "rgr_pending", "cancelled"]
+      },
+      {
+        "from": "awaiting_human_review",
+        "to": ["in_progress", "pre_merge", "escalated", "cancelled"]
+      },
+      {
+        "from": "pre_merge",
+        "to": ["merging", "escalated", "cancelled"]
+      },
+      {
+        "from": "merging",
+        "to": ["completed", "escalated"]
+      },
+      {
+        "from": "experimental_blocked",
+        "to": ["ready", "escalated", "cancelled"]
+      },
+      {
+        "from": "rgr_pending",
+        "to": ["ready", "escalated", "cancelled"]
+      }
+    ],
+    "undeclared_transition": "TASK_LIFECYCLE_TRANSITION_FORBIDDEN",
+    "timestamps": "monotonic-and-evidenced"
+  },
+  "failure": {
+    "task_failure": "stop-dependent-branch",
+    "independent_branches": "may-continue-when-resource-disjoint",
+    "composite_stop_policy": "requested-closed-value",
+    "timeout": "fail-current-executor-and-apply-declared-human-timeout-behavior",
+    "agent_retry": "bounded-by-task-max-iterations",
+    "selection_fallback": "forbidden-exact-host-selection-only",
+    "implicit_fallback": "forbidden",
+    "unknown_or_malformed_output": "error-never-pass",
+    "partial_output": "retain-as-diagnostic-only",
+    "dependent_dispatch_after_failure": "forbidden"
+  },
+  "rollback": {
+    "automatic_remote_rollback": "forbidden",
+    "scope": "last-role-pure-batch",
+    "unmerged": "abandon-branch-or-create-explicit-revert-commit",
+    "merged": "new-authorized-revert-commit",
+    "destructive_reset": "forbidden",
+    "composite_order": "reverse-topological-completed-children",
+    "compensation": "explicit-registered-authorized-action-only",
+    "retain_failure_evidence": true,
+    "rollback_failure": "escalate-and-preserve-state"
+  },
+  "outputs": {
+    "task_execution_schema": "law/schemas/task-execution-evidence.schema.json",
+    "request_binding": "canonical-task-and-executor-sha256",
+    "requested_executor_copy": "forbidden",
+    "resolved_executor_required": true,
+    "action_envelope": "law/schemas/action-result.schema.json",
+    "stdout": "one-success-envelope-only",
+    "stderr": "one-structured-error-envelope-only",
+    "mixed_channels": "contract-violation",
+    "aggregate_precedence": ["error", "fail", "review", "unknown", "pass", "na"],
+    "aggregate_exit_codes": {
+      "pass": 0,
+      "na": 0,
+      "review": 1,
+      "unknown": 1,
+      "fail": 2,
+      "error": 2,
+      "contract-violation": 7,
+      "usage": 64
+    }
+  },
+  "vocabularies": {
+    "inventory_slices": [
+      {
+        "name": "pack",
+        "members": ["stack-adapter-pack-resolution"]
+      },
+      {
+        "name": "adherence",
+        "members": ["inventory-adherence"]
+      },
+      {
+        "name": "components",
+        "members": ["component-inventory"]
+      },
+      {
+        "name": "contracts",
+        "members": ["contract-inventory"]
+      },
+      {
+        "name": "coverage",
+        "members": ["inventory-coverage"]
+      },
+      {
+        "name": "dependencies",
+        "members": ["dependency-graph"]
+      },
+      {
+        "name": "glossary",
+        "members": ["glossary-inventory"]
+      },
+      {
+        "name": "modules",
+        "members": ["module-inventory"]
+      },
+      {
+        "name": "routes",
+        "members": ["route-inventory"]
+      },
+      {
+        "name": "schemas",
+        "members": ["schema-inventory"]
+      },
+      {
+        "name": "tests",
+        "members": ["test-inventory"]
+      },
+      {
+        "name": "all",
+        "members": [
+          "stack-adapter-pack-resolution",
+          "inventory-adherence",
+          "component-inventory",
+          "contract-inventory",
+          "inventory-coverage",
+          "dependency-graph",
+          "glossary-inventory",
+          "module-inventory",
+          "route-inventory",
+          "schema-inventory",
+          "test-inventory"
+        ]
+      }
+    ],
+    "adoption_tiers": [
+      {
+        "name": "tier1",
+        "members": [
+          "constitution-and-policy-pin",
+          "project-config",
+          "baseline-sensors",
+          "quick-check-suite"
+        ]
+      },
+      {
+        "name": "tier2",
+        "members": [
+          "constitution-and-policy-pin",
+          "project-config",
+          "baseline-sensors",
+          "quick-check-suite",
+          "structural-inventories",
+          "structural-sense-preset",
+          "standard-check-suite"
+        ]
+      },
+      {
+        "name": "tier3",
+        "members": [
+          "constitution-and-policy-pin",
+          "project-config",
+          "baseline-sensors",
+          "quick-check-suite",
+          "structural-inventories",
+          "structural-sense-preset",
+          "standard-check-suite",
+          "governed-trace-and-harness-controls",
+          "governed-sense-preset",
+          "full-check-suite"
+        ]
+      }
+    ],
+    "surface_tiers": [
+      {
+        "name": "porcelain",
+        "members": ["init", "doctor", "check", "sense", "round", "evidence", "release"]
+      },
+      {
+        "name": "plumbing",
+        "members": ["task", "catalog"]
+      }
+    ],
+    "verdicts": ["pass", "review", "fail", "unknown", "na", "skipped", "error", "killed"],
+    "action_lifecycles": ["supported", "experimental"]
+  }
+}

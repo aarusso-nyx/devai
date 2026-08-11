@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "BP-DEMO-BOOKMARK-001",
+  "module": { "name": "Bookmark", "namespace": "demo", "version": "1.0.0" },
+  "database": {
+    "entities": [
+      {
+        "name": "Bookmark",
+        "primaryKey": ["id"],
+        "fields": [
+          { "name": "id", "type": "uuid", "default": "gen_random_uuid()" },
+          { "name": "url", "type": "varchar(2048)" },
+          { "name": "note", "type": "text", "nullable": true }
+        ]
+      }
+    ]
+  },
+  "api": {
+    "basePath": "/api",
+    "resources": [{ "entity": "Bookmark", "operations": ["list", "get", "create"] }]
+  },
+  "auth": {
+    "rbac": { "roles": ["admin"], "permissions": [{ "role": "admin", "allow": ["manage"] }] }
+  }
+}

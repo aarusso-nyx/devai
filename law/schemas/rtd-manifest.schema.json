@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/rtd-manifest.schema.json",
+  "title": "RTD Manifest",
+  "description": "Hash-stamped aggregate view over canonical specification slices. Produced through `devai evidence record --kind rtd` for citation and independent audit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "generated_at",
+    "integration_head",
+    "components",
+    "readiness",
+    "manifest_hash"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^RTM-[0-9]{4,}$",
+      "description": "Monotonically-allocated id from the RTM counter (.devai/state/counters.json)."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "integration_head": {
+      "type": "string",
+      "description": "Git HEAD SHA at bundle time, or 40-char zero sentinel when --no-git is in effect."
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One entry per aggregated contract slice. `hash` is a SHA-256 over canonical JSON and `ok` reflects the slice validator. Counts are convenience numerics, never authoritative.",
+      "properties": {
+        "invariants": {
+          "$ref": "#/$defs/componentEntry"
+        },
+        "trace": {
+          "$ref": "#/$defs/componentEntry"
+        },
+        "journeys": {
+          "$ref": "#/$defs/componentEntry"
+        },
+        "glossary": {
+          "$ref": "#/$defs/componentEntry"
+        },
+        "adrs": {
+          "$ref": "#/$defs/componentEntry"
+        },
+        "forbidden_actions": {
+          "$ref": "#/$defs/componentEntry"
+        }
+      }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "sub_verdicts"],
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "description": "True iff every component's `ok` is true. The single signal external consumers gate on."
+        },
+        "sub_verdicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["component", "ok"],
+            "properties": {
+              "component": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "error_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the canonicalized manifest record minus this field. The single citable handle: `RTM-NNNN sha256:<manifest_hash>`."
+    }
+  },
+  "$defs": {
+    "componentEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash", "ok"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "RTM-0001",
+      "generated_at": "2026-05-13T05:13:10.858Z",
+      "integration_head": "98804f3c1b4f12af52239b37554bed0c6f6b2d15",
+      "components": {},
+      "readiness": {
+        "ok": true,
+        "sub_verdicts": []
+      },
+      "manifest_hash": "e01c22941a7fabd3c23b67cf94edd66e1bd438fdb3a7ed3018609cba83be1657"
+    }
+  ]
+}

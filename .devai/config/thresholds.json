@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "coverage": {
+    "lines": 70,
+    "branches": 60,
+    "functions": 70,
+    "statements": 70
+  },
+  "mutation": {
+    "score_min": 60,
+    "survived_max": 50
+  },
+  "lint": {
+    "max_errors": 0,
+    "max_warnings": 0
+  },
+  "typecheck": {
+    "max_errors": 0
+  },
+  "freshness": {
+    "default_max_age_hours": 168,
+    "scorecard_failure_max_age_hours": 168
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/scorecard-na-config.schema.json",
+  "title": "Scorecard N/A Override Config",
+  "description": "Optional per-repository override at `.devai/config/scorecard-na.json` declaring which F×T scorecard cells are structurally inapplicable. Each listed cell is forced to verdict 'N/A' after global structural exclusions and before reading-driven verdicts, and MUST carry a written reason.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cells"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cell", "reason"],
+        "properties": {
+          "cell": {
+            "type": "string",
+            "pattern": "^F[1-5]:T[1-9]$",
+            "description": "Cell coordinate in `Fx:Ty` form. F1-F5 substrate, T1-T9 property. Validation rejects coordinates outside the 5×9 grid."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Human-readable justification for declaring this cell N/A on this repo. REQUIRED so the carve-out is auditable; silent N/A is the failure mode this schema exists to prevent."
+          },
+          "constitution_anchor": {
+            "type": "string",
+            "description": "Optional but recommended: cite the constitutional article that anchors the carve-out (typically Article 5 for substrate-shape mismatches)."
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "cells": []
+    }
+  ]
+}

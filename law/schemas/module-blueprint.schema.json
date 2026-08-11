@@ -1,0 +1,600 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/module-blueprint.schema.json",
+  "$comment": "CODEX-BusinessModuleSpec: absorbed from /Users/aarusso/Development/tools/codex/doit/MACHINE_SPEC.md#businessmodulespec-yaml-definition in Phase 18.B (D-59). DEVAI-native restructuring: canonical schemaVersion semver, BP-<DOMAIN>-NNN id pattern, additionalProperties:false at every level, pii/retention enums tightened from codex's prose to discrete values that meet INV-INVENTORY-002 at the spec layer.",
+  "title": "Module Blueprint",
+  "description": "Owner-authored vertical-slice intent consumed by deterministic scaffold operations and the devai-plan module recipe.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "module", "database"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^BP-[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-[0-9]{3,}$",
+      "description": "Pattern: BP-<DOMAIN>-NNN (e.g. BP-GREETER-001, BP-USER-MGMT-042). Domain segment(s) are uppercase-leading; numeric suffix is at least three digits. Mirrors the INV-<DOMAIN>-NNN pattern."
+    },
+    "module": {
+      "$ref": "#/$defs/ModuleMeta"
+    },
+    "database": {
+      "$ref": "#/$defs/Database"
+    },
+    "api": {
+      "$ref": "#/$defs/Api"
+    },
+    "auth": {
+      "$ref": "#/$defs/Auth"
+    },
+    "ui": {
+      "$ref": "#/$defs/Ui"
+    },
+    "events": {
+      "$ref": "#/$defs/Events"
+    },
+    "audit": {
+      "$ref": "#/$defs/Audit"
+    },
+    "seed": {
+      "$ref": "#/$defs/Seed"
+    },
+    "ops": {
+      "$ref": "#/$defs/Ops"
+    },
+    "_codex_origin": {
+      "type": "string",
+      "description": "Optional pointer to the codex MACHINE_SPEC section or template this blueprint mirrors (forensic only; never load-bearing)."
+    }
+  },
+  "$defs": {
+    "ModuleMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "namespace", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "description": "PascalCase module name (e.g. Greeter, OrderItem, ProposalReview)."
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 2,
+          "maxLength": 32,
+          "description": "Short kebab/lowercase namespace (e.g. acct, demo, hr)."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "SemVer for the blueprint itself. Bumped when the blueprint's surface changes; scaffolders cite this in INV-SCAFFOLD-001 headers."
+        },
+        "owners": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Team handles or names responsible for the module. Free-form."
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "Database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entities"],
+      "properties": {
+        "entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Entity"
+          }
+        },
+        "enums": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "values"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              },
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "fields"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "description": "PascalCase entity name (e.g. Greeting, OrderItem)."
+        },
+        "table": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "Optional snake_case table override. Default is derived as <namespace>__<module-snake>_<entity-snake>."
+        },
+        "primaryKey": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "default": ["id"],
+          "description": "Composite PK supported by listing multiple field names. INV-BLUEPRINT-001 requires this be non-empty."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Relation"
+          }
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Index"
+          }
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "snake_case field name."
+        },
+        "type": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "uuid",
+                "text",
+                "int",
+                "bigint",
+                "bool",
+                "timestamptz",
+                "jsonb",
+                "date",
+                "smallint"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^varchar\\([0-9]+\\)$"
+            },
+            {
+              "type": "string",
+              "pattern": "^numeric\\([0-9]+,[0-9]+\\)$"
+            },
+            {
+              "type": "string",
+              "pattern": "^enum:[A-Z][A-Za-z0-9]*$",
+              "description": "Reference to a named enum from database.enums[]."
+            }
+          ]
+        },
+        "nullable": {
+          "type": "boolean",
+          "default": false
+        },
+        "default": {
+          "type": "string",
+          "description": "SQL default expression (e.g. now(), gen_random_uuid(), 'pending'). Pass-through to the migration template."
+        },
+        "unique": {
+          "type": "boolean",
+          "default": false
+        },
+        "check": {
+          "type": "string",
+          "description": "Optional SQL CHECK constraint expression."
+        },
+        "pii": {
+          "type": "string",
+          "enum": ["none", "low", "high"],
+          "default": "none",
+          "description": "PII classification at the spec layer. Drives INV-BLUEPRINT-002 (every pii≠none field must declare retention). The discrete enum (codex convention) is more constrained than data-model-inventory's free-form pii_class (which intentionally supports per-jurisdiction taxonomies); a scaffolded module's data-model-inventory will lift its pii_class from this field per a documented mapping."
+        },
+        "retention": {
+          "type": "string",
+          "enum": ["default", "90d", "1y", "forever"],
+          "default": "default",
+          "description": "Retention policy. INV-BLUEPRINT-002: any field with pii≠none MUST declare retention as something other than 'default'."
+        }
+      }
+    },
+    "Relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["many-to-one", "one-to-many", "many-to-many", "one-to-one"]
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "description": "Target entity name (PascalCase)."
+        },
+        "onDelete": {
+          "type": "string",
+          "enum": ["no action", "cascade", "restrict", "set null"],
+          "default": "no action"
+        },
+        "joinTable": {
+          "type": "string",
+          "description": "Optional explicit join-table name for many-to-many."
+        },
+        "field": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "Optional FK field name on this entity (default: <target-snake>_id)."
+        }
+      }
+    },
+    "Index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["columns"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unique": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Api": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basePath": {
+          "type": "string",
+          "default": "/api",
+          "description": "Global API prefix (e.g. /api, /api/v1)."
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Resource"
+          }
+        }
+      }
+    },
+    "Resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity"],
+      "properties": {
+        "entity": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/[a-z][a-z0-9-/]*$",
+          "description": "Resource path under basePath (kebab; default derived from entity)."
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["list", "get", "create", "update", "delete"]
+          }
+        },
+        "pagination": {
+          "type": "string",
+          "enum": ["limit-offset", "cursor", "none"],
+          "default": "limit-offset"
+        },
+        "sort": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "filter": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dto": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "request": {
+              "type": "object"
+            },
+            "response": {
+              "type": "object"
+            }
+          },
+          "description": "Optional DTO overrides; pass-through to the API generator."
+        }
+      }
+    },
+    "Auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rbac": {
+          "$ref": "#/$defs/Rbac"
+        },
+        "abac": {
+          "$ref": "#/$defs/Abac"
+        }
+      }
+    },
+    "Rbac": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roles", "permissions"],
+      "properties": {
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "allow"],
+            "properties": {
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "allow": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": ["list", "get", "create", "update", "delete", "manage"]
+                    },
+                    {
+                      "type": "string",
+                      "const": "*",
+                      "description": "Wildcard: grants every action defined in api.resources[*].operations[]."
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Abac": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "when"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "when": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Safe-expression condition (no eval). Codex's suggestions.md sketches the parser/interpreter; absorbed as bucket-D design intent. Phase 18 ships as opaque pass-through; the API scaffolder emits it verbatim into policy.config.ts; the runtime evaluator is a deferred follow-on."
+              }
+            }
+          }
+        }
+      }
+    },
+    "Ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routeBase": {
+          "type": "string",
+          "pattern": "^/[a-z][a-z0-9-/]*$"
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "entity"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["list", "detail", "form"]
+              },
+              "entity": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "defaultSort": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Events": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "publishes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Za-z0-9]*$"
+          }
+        },
+        "consumes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Za-z0-9]*$"
+          }
+        }
+      }
+    },
+    "Audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z_][a-z0-9_]*$"
+          }
+        }
+      }
+    },
+    "Seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entity", "data"],
+            "properties": {
+              "entity": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "Ops": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "featureFlags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "BP-DEMO-BOOKMARK-001",
+      "module": {
+        "name": "Bookmark",
+        "namespace": "demo",
+        "version": "1.0.0"
+      },
+      "database": {
+        "entities": [
+          {
+            "name": "Bookmark",
+            "fields": [
+              {
+                "name": "id",
+                "type": "uuid"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

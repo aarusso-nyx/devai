@@ -1,0 +1,535 @@
+{
+  "$schema": "../schemas/documentation-information-architecture.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "documentation-information-architecture",
+  "status": "active",
+  "authority": "Architect",
+  "ordering": "policy-declared-page-category-and-projection-order",
+  "source_routing_rules": {
+    "canonical_sources_only": true,
+    "narrative_population_copy": "forbidden",
+    "generated_order": "canonical-source-order",
+    "generated_write_mode": "check-without-write-or-deterministic-materialization",
+    "missing_source": "fail-closed",
+    "unknown_projection": "fail-closed"
+  },
+  "semantic_fields": [
+    "stable_id",
+    "user_facing_label",
+    "plain_language_purpose",
+    "population_or_projection",
+    "prerequisites",
+    "required_external_tools",
+    "accepted_inputs",
+    "defaults",
+    "output_contract",
+    "verdict_semantics",
+    "declared_effect",
+    "consent_flags",
+    "cost_class",
+    "when_to_use",
+    "when_not_to_use",
+    "failure_unknown_review_skipped_na_semantics",
+    "example",
+    "canonical_source_link",
+    "related_workflow"
+  ],
+  "pages": [
+    {
+      "page_id": "cli-overview",
+      "planned_path": "docs/reference/cli/index.md",
+      "title": "CLI overview",
+      "purpose": "Explain the seven-workflow mental model, typical adoption-to-release journey, and command-selection route without exposing plumbing as an eighth workflow.",
+      "content_mode": "narrative-with-generated-links",
+      "mutable_population_mode": "none",
+      "category_ids": [],
+      "source_refs": [
+        {
+          "path": "law/policy/action-registry.json",
+          "pointer": "#/entries",
+          "projection": "current porcelain action paths grouped under their canonical workflow domain"
+        }
+      ]
+    },
+    {
+      "page_id": "vocabulary",
+      "planned_path": "docs/reference/cli/vocabulary.md",
+      "title": "CLI vocabulary",
+      "purpose": "Define suite, preset, kind, slice, tier, round, subordinate task, role, effect, verdict, lifecycle, porcelain, and plumbing while keeping their populations source-derived.",
+      "content_mode": "narrative-with-generated-links",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["verdicts", "action-lifecycles", "surface-tiers"],
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies",
+          "projection": "public workflow vocabularies and their semantic distinctions"
+        },
+        {
+          "path": "law/schemas/action-registry.schema.json",
+          "pointer": "#/properties/entries/items/properties",
+          "projection": "role, effect, lifecycle, and surface-tier schema vocabularies"
+        }
+      ]
+    },
+    {
+      "page_id": "check-suites",
+      "planned_path": "docs/reference/cli/check-suites.md",
+      "title": "Check suites",
+      "purpose": "Render each check suite's exact membership, order, prerequisites, outputs, exit behavior, cost, use guidance, and examples.",
+      "content_mode": "generated-reference",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["check-suites"],
+      "source_refs": [
+        {
+          "path": "law/policy/check-suites.json",
+          "pointer": "#/suites",
+          "projection": "complete suite descriptors in declared order"
+        }
+      ]
+    },
+    {
+      "page_id": "sense-presets",
+      "planned_path": "docs/reference/cli/sense-presets.md",
+      "title": "Sense presets",
+      "purpose": "Render exact preset membership, cumulative relationships, sweep exclusions, persistence boundary, outputs, costs, and examples.",
+      "content_mode": "generated-reference",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["sense-presets"],
+      "source_refs": [
+        {
+          "path": "law/policy/sense-presets.json",
+          "pointer": "#/presets",
+          "projection": "complete preset descriptors in declared order"
+        }
+      ]
+    },
+    {
+      "page_id": "sensor-kinds",
+      "planned_path": "docs/reference/cli/sensor-kinds.md",
+      "title": "Sensor kinds",
+      "purpose": "Render every live kind with emitter, inputs, outputs, scorecard or diagnostic standing, preset membership, prerequisites, and effect.",
+      "content_mode": "generated-reference",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["sensor-kinds"],
+      "source_refs": [
+        {
+          "path": "law/policy/sensor-registry.json",
+          "pointer": "#/entries",
+          "projection": "entry.kind and all reference semantics joined only through canonical registry and preset descriptors"
+        },
+        {
+          "path": "law/policy/sense-presets.json",
+          "pointer": "#/presets",
+          "projection": "preset membership and sweep exclusion projection"
+        }
+      ]
+    },
+    {
+      "page_id": "inventory-slices",
+      "planned_path": "docs/reference/cli/inventory-slices.md",
+      "title": "Inventory slices",
+      "purpose": "Render each slice's exact contents, supported stacks, deterministic inputs, output body, limitations, effects, and examples.",
+      "content_mode": "generated-reference",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["inventory-slices"],
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/inventory_slices",
+          "projection": "complete inventory-slice descriptors in declared order"
+        }
+      ]
+    },
+    {
+      "page_id": "adoption-tiers",
+      "planned_path": "docs/reference/cli/adoption-tiers.md",
+      "title": "Adoption tiers",
+      "purpose": "Explain obligations, advisory versus binding behavior, climb requirements, and the distinction from check suites, sense presets, and surface tiers.",
+      "content_mode": "narrative-with-generated-links",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["adoption-tiers"],
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/adoption_tiers",
+          "projection": "complete adoption-tier descriptors in declared order"
+        }
+      ]
+    },
+    {
+      "page_id": "round-task-executors",
+      "planned_path": "docs/reference/cli/round-task-executors.md",
+      "title": "Rounds, tasks, and executors",
+      "purpose": "Explain one-round task containment, lifecycle, waves, dependencies, resources, recovery, hidden task plumbing, executor kinds, exact selection, and requested-versus-resolved execution evidence.",
+      "content_mode": "narrative-with-generated-links",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["executor-kinds", "agent-selection-modes"],
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#",
+          "projection": "round containment, scheduling, resource, and recovery semantics"
+        },
+        {
+          "path": "law/schemas/task.schema.json",
+          "pointer": "#/properties/executor",
+          "projection": "closed executor-kind branches and immutable requested contract"
+        },
+        {
+          "path": "law/schemas/task-execution-evidence.schema.json",
+          "pointer": "#",
+          "projection": "separate resolved execution evidence contract"
+        }
+      ]
+    },
+    {
+      "page_id": "authority-effects",
+      "planned_path": "docs/reference/cli/authority-effects.md",
+      "title": "Authority and effects",
+      "purpose": "Explain role authority, four effect classes, independent write and publish consent, refusals, and safe examples without deriving authority from executor or model capability.",
+      "content_mode": "narrative-with-generated-links",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["roles", "effects"],
+      "source_refs": [
+        {
+          "path": "law/schemas/action-registry.schema.json",
+          "pointer": "#/$defs/authorityContract",
+          "projection": "role, effect, and consent vocabulary"
+        },
+        {
+          "path": "law/policy/action-registry.json",
+          "pointer": "#/entries",
+          "projection": "per-action effect and authority contract"
+        }
+      ]
+    },
+    {
+      "page_id": "model-runtime",
+      "planned_path": "docs/reference/cli/model-runtime.md",
+      "title": "Model runtime bridges",
+      "purpose": "Render provider/runtime bridges, supported adapter efforts and capabilities, and the requirement for host-selected exact model identity.",
+      "content_mode": "generated-reference",
+      "mutable_population_mode": "generated-from-canonical-source",
+      "category_ids": ["runtimes", "supported-efforts"],
+      "source_refs": [
+        {
+          "path": "law/policy/model-runtime-registry.json",
+          "pointer": "#",
+          "projection": "runtime bridges with supported efforts and availability metadata"
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "category_id": "check-suites",
+      "page_id": "check-suites",
+      "canonical_source": "law/policy/check-suites.json",
+      "source_refs": [
+        {
+          "path": "law/policy/check-suites.json",
+          "pointer": "#/suites",
+          "projection": "suite stable identifiers in declared order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "sense-presets",
+      "page_id": "sense-presets",
+      "canonical_source": "law/policy/sense-presets.json",
+      "source_refs": [
+        {
+          "path": "law/policy/sense-presets.json",
+          "pointer": "#/presets",
+          "projection": "preset stable identifiers in declared order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "inventory-slices",
+      "page_id": "inventory-slices",
+      "canonical_source": "law/policy/round-execution.json",
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/inventory_slices",
+          "projection": "slice stable identifiers in declared order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "adoption-tiers",
+      "page_id": "adoption-tiers",
+      "canonical_source": "law/policy/round-execution.json",
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/adoption_tiers",
+          "projection": "adoption-tier stable identifiers in declared order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "executor-kinds",
+      "page_id": "round-task-executors",
+      "canonical_source": "law/schemas/task.schema.json",
+      "source_refs": [
+        {
+          "path": "law/schemas/task.schema.json",
+          "pointer": "#/properties/executor",
+          "projection": "executor discriminator constants from the closed schema branches"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "agent-selection-modes",
+      "page_id": "round-task-executors",
+      "canonical_source": "law/schemas/task.schema.json",
+      "source_refs": [
+        {
+          "path": "law/schemas/task.schema.json",
+          "pointer": "#/$defs/agentSelection/properties/mode/const",
+          "projection": "selection-mode strings in schema order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "roles",
+      "page_id": "authority-effects",
+      "canonical_source": "law/policy/round-execution.json",
+      "source_refs": [
+        {
+          "path": "law/schemas/action-registry.schema.json",
+          "pointer": "#/$defs/authorityContract/properties/subject/oneOf/1/properties/allowed_roles/items/enum",
+          "projection": "human governance roles only; joint is a multi-role authority marker, not a sixth role"
+        },
+        {
+          "path": "law/policy/action-registry.json",
+          "pointer": "#/entries/*/authority_contract",
+          "projection": "per-action role authority semantics"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "effects",
+      "page_id": "authority-effects",
+      "canonical_source": "law/schemas/action-registry.schema.json",
+      "source_refs": [
+        {
+          "path": "law/schemas/action-registry.schema.json",
+          "pointer": "#/properties/entries/items/properties/effect/enum",
+          "projection": "effect strings in schema order"
+        },
+        {
+          "path": "law/policy/action-registry.json",
+          "pointer": "#/entries",
+          "projection": "per-action effect assignments"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "verdicts",
+      "page_id": "vocabulary",
+      "canonical_source": "law/policy/round-execution.json",
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/verdicts",
+          "projection": "public aggregate verdict identifiers in declared order"
+        },
+        {
+          "path": "law/schemas/sensor-reading.schema.json",
+          "pointer": "#/properties/status/enum",
+          "projection": "sensor execution-state parity subset"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "action-lifecycles",
+      "page_id": "vocabulary",
+      "canonical_source": "law/schemas/action-registry.schema.json",
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/action_lifecycles",
+          "projection": "current action lifecycle strings in policy order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "surface-tiers",
+      "page_id": "vocabulary",
+      "canonical_source": "law/policy/round-execution.json",
+      "source_refs": [
+        {
+          "path": "law/policy/round-execution.json",
+          "pointer": "#/vocabularies/surface_tiers",
+          "projection": "surface-tier stable identifiers in declared order"
+        },
+        {
+          "path": "law/schemas/action-registry.schema.json",
+          "pointer": "#/properties/entries/items/properties/tier/enum",
+          "projection": "action registry tier parity"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "sensor-kinds",
+      "page_id": "sensor-kinds",
+      "canonical_source": "law/policy/sensor-registry.json",
+      "source_refs": [
+        {
+          "path": "law/policy/sensor-registry.json",
+          "pointer": "#/entries",
+          "projection": "entry.kind in registry order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "source-order",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "runtimes",
+      "page_id": "model-runtime",
+      "canonical_source": "law/policy/model-runtime-registry.json",
+      "source_refs": [
+        {
+          "path": "law/policy/model-runtime-registry.json",
+          "pointer": "#/runtimes",
+          "projection": "runtime stable identifiers in registry order"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "utf8-bytes-after-deduplication",
+      "rendering": "generated-reference"
+    },
+    {
+      "category_id": "supported-efforts",
+      "page_id": "model-runtime",
+      "canonical_source": "law/policy/model-runtime-registry.json",
+      "source_refs": [
+        {
+          "path": "law/policy/model-runtime-registry.json",
+          "pointer": "#/runtimes/*/efforts",
+          "projection": "flatten supported efforts, deduplicate, and order by UTF-8 bytes"
+        }
+      ],
+      "population_contract": "source-derived-exact-ordered-bijection-no-copied-list",
+      "ordering": "utf8-bytes-after-deduplication",
+      "rendering": "generated-reference"
+    }
+  ],
+  "completeness_gates": [
+    {
+      "gate_id": "docs-policy-schema",
+      "phase": "current",
+      "scope": "policy",
+      "condition": "the policy validates against documentation-information-architecture.schema.json",
+      "failure": "DOCS_POLICY_SCHEMA_INVALID"
+    },
+    {
+      "gate_id": "docs-page-manifest-unique",
+      "phase": "current",
+      "scope": "page-manifest",
+      "condition": "page identifiers and planned paths are nonempty and unique and every category points to one declared page",
+      "failure": "DOCS_PAGE_MANIFEST_INVALID"
+    },
+    {
+      "gate_id": "docs-source-routing-resolves",
+      "phase": "current",
+      "scope": "category",
+      "condition": "every canonical source exists at the candidate and every declared pointer or projection resolves without inference",
+      "failure": "DOCS_CANONICAL_SOURCE_UNRESOLVED"
+    },
+    {
+      "gate_id": "docs-category-census-exact",
+      "phase": "current",
+      "scope": "category",
+      "condition": "the machine report contains exactly the policy category identifiers with no missing or extra category",
+      "failure": "DOCS_CATEGORY_CENSUS_DRIFT"
+    },
+    {
+      "gate_id": "docs-category-bijection",
+      "phase": "current",
+      "scope": "category",
+      "condition": "each category's expected and documented identifiers are an exact ordered bijection with no missing extra or duplicate identifier",
+      "failure": "DOCS_CATEGORY_BIJECTION_FAILED"
+    },
+    {
+      "gate_id": "docs-entry-semantics-complete",
+      "phase": "current",
+      "scope": "entry",
+      "condition": "every documented value has every policy semantic field and every field is nonempty or carries an explicit not-applicable reason",
+      "failure": "DOCS_ENTRY_SEMANTICS_INCOMPLETE"
+    },
+    {
+      "gate_id": "docs-source-parity",
+      "phase": "current",
+      "scope": "category",
+      "condition": "all supplemental-source projections agree with the canonical population and semantic assignment",
+      "failure": "DOCS_SOURCE_PARITY_FAILED"
+    },
+    {
+      "gate_id": "docs-generated-deterministic",
+      "phase": "current",
+      "scope": "entry",
+      "condition": "two renders from identical canonical bytes are byte-identical and the check path performs no writes",
+      "failure": "DOCS_GENERATED_BYTES_DRIFT"
+    },
+    {
+      "gate_id": "docs-narrative-no-population-copy",
+      "phase": "current",
+      "scope": "narrative",
+      "condition": "narrative pages link to generated tables and contain no independently maintained complete mutable enumeration",
+      "failure": "DOCS_NARRATIVE_DUPLICATES_CANON"
+    },
+    {
+      "gate_id": "docs-examples-current-surface",
+      "phase": "current",
+      "scope": "example",
+      "condition": "every required example uses only the new grammar and passes a read-only or dry-run fixture or fails with its documented precondition",
+      "failure": "DOCS_EXAMPLE_INVALID"
+    },
+    {
+      "gate_id": "docs-page-set",
+      "phase": "current",
+      "scope": "page-manifest",
+      "condition": "every planned page exists at its exact path with all generated links and no undeclared competing canonical CLI page",
+      "failure": "DOCS_PAGE_SET_INCOMPLETE"
+    }
+  ]
+}

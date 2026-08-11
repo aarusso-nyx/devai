@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/common-defs.schema.json",
+  "title": "Common definitions",
+  "description": "Single-source vocabulary for DEVAI contracts. Schemas reference these definitions instead of restating them inline.",
+  "schema_version": "1.0.0",
+  "$defs": {
+    "execution_status_core": {
+      "enum": ["pass", "review", "fail"],
+      "$comment": "Lowercase values are execution-status outcomes; uppercase values are judgment verdicts. Context-specific extensions remain local to their consuming schemas."
+    },
+    "verdict_core": {
+      "enum": ["PASS", "REVIEW", "FAIL"],
+      "$comment": "See execution_status_core $comment (resolution recorded there)."
+    },
+    "severity": {
+      "enum": ["constitutional", "hard-fail", "gate", "warn", "advisory"]
+    },
+    "role": {
+      "enum": ["owner", "architect", "engineer", "inspector", "auditor", "joint"]
+    },
+    "substrate": {
+      "$comment": "Article 4 \u2014 the five fundamental substrates. Every artifact in a repo belongs to exactly one.",
+      "anyOf": [
+        {
+          "const": "F1",
+          "title": "Specification",
+          "description": "The reference signal: business specs, engineering specs, invariants, trace, ADRs, glossary, contracts."
+        },
+        {
+          "const": "F2",
+          "title": "Plant",
+          "description": "Application code under control: source, migrations, configuration, IaC, build scripts."
+        },
+        {
+          "const": "F3",
+          "title": "Observation",
+          "description": "Sensors: tests at all levels, plus executable-sensor configurations that encode intent."
+        },
+        {
+          "const": "F4",
+          "title": "Inventory",
+          "description": "Plant-identification artifacts, derived deterministically from F1-F3. Never authored."
+        },
+        {
+          "const": "F5",
+          "title": "Harness",
+          "description": "The DEVAI machinery as instantiated in the repo: pinned constitution, materialized config, runtime state."
+        }
+      ]
+    },
+    "transversal": {
+      "$comment": "Article 5 \u2014 the nine transversal properties. substrate x transversal = the 45-cell aspect grid; some cells are degenerate (N/A).",
+      "anyOf": [
+        {
+          "const": "T1",
+          "title": "Coverage",
+          "description": "How completely the substrate addresses its subject."
+        },
+        {
+          "const": "T2",
+          "title": "Depth",
+          "description": "How thoroughly, beyond surface presence."
+        },
+        {
+          "const": "T3",
+          "title": "Coherence",
+          "description": "Internal consistency; parts agree with each other."
+        },
+        {
+          "const": "T4",
+          "title": "Alignment",
+          "description": "Agreement with the reference signal above it."
+        },
+        {
+          "const": "T5",
+          "title": "Idiomaticity",
+          "description": "Conformance to the declared stack's and framework's idioms."
+        },
+        {
+          "const": "T6",
+          "title": "Security and Privacy",
+          "description": "Protection of assets and data across the substrate."
+        },
+        {
+          "const": "T7",
+          "title": "Performance and Efficiency",
+          "description": "Resource behavior and responsiveness."
+        },
+        {
+          "const": "T8",
+          "title": "Robustness",
+          "description": "Behavior under failure, edge cases, and adverse input."
+        },
+        {
+          "const": "T9",
+          "title": "Discipline",
+          "description": "Process health: the substrate is maintained the way the law says it is."
+        }
+      ]
+    },
+    "record_status": {
+      "enum": ["draft", "active", "superseded", "closed"]
+    },
+    "inv_lifecycle": {
+      "enum": ["supported", "experimental"]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "id_invariant": {
+      "type": "string",
+      "pattern": "^INV-[A-Z]+-[0-9]{3}$"
+    },
+    "id_decision": {
+      "type": "string",
+      "pattern": "^DII-(REJ-)?[A-Z0-9]+$"
+    },
+    "id_adr": {
+      "type": "string",
+      "pattern": "^ADR-[0-9]{3}$"
+    },
+    "id_closure": {
+      "type": "string",
+      "pattern": "^PC-[0-9]{4}$"
+    },
+    "id_round": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4}$"
+    },
+    "id_genesis": {
+      "type": "string",
+      "pattern": "^GEN-[0-9]{4}$"
+    }
+  },
+  "examples": [
+    {
+      "$comment": "defs-only schema; example shows a $ref consumer fragment",
+      "severity_use": {
+        "$ref": "common-defs.schema.json#/$defs/severity"
+      }
+    }
+  ]
+}

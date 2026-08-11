@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/mutation-intent.schema.json",
+  "title": "Mutation Intent",
+  "description": "Untrusted pre-run request for exactly one governed LLM-mediated mutation. It declares the immutable base and permitted scope but cannot select candidate provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "trust",
+    "task_id",
+    "recipe_name",
+    "recipe_variant",
+    "stage",
+    "base_sha",
+    "submitted_at",
+    "authority_role",
+    "strategy",
+    "implements",
+    "declared_touched",
+    "effects_permitted"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^MI-[a-f0-9]{16}$"
+    },
+    "trust": {
+      "const": "untrusted-intent"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^TASK-[0-9]{4,}$"
+    },
+    "recipe_name": {
+      "enum": [
+        "devai-assess",
+        "devai-plan",
+        "devai-fix",
+        "devai-docs",
+        "devai-scaffold",
+        "devai-verify",
+        "devai-round"
+      ]
+    },
+    "recipe_variant": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "stage": {
+      "enum": [
+        "journey-to-invariants",
+        "invariants-to-tests",
+        "invariants-tests-to-code",
+        "documentation",
+        "refactor"
+      ]
+    },
+    "base_sha": {
+      "$ref": "#/$defs/gitSha",
+      "description": "Immutable sole parent required for the recorder-derived candidate commit."
+    },
+    "test_overlay_sha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "authority_role": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "description": "Attributed human role. Auditor observations remain non-actuating and confer no mutation authority."
+    },
+    "strategy": {
+      "$ref": "#/$defs/strategy"
+    },
+    "implements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["invariant_id", "criteria"],
+        "properties": {
+          "invariant_id": {
+            "type": "string",
+            "pattern": "^INV-[A-Z][A-Z0-9]{1,15}-[0-9]{3}$"
+          },
+          "criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["claim", "demonstrated_by"],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "demonstrated_by": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/demonstration"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "red_green": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["test_ref", "expected_at_base", "expected_at_candidate"],
+        "properties": {
+          "test_ref": {
+            "$ref": "#/$defs/testRef"
+          },
+          "expected_at_base": {
+            "const": "assertion-fail"
+          },
+          "expected_at_candidate": {
+            "const": "pass"
+          }
+        }
+      }
+    },
+    "declared_touched": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/repoPath"
+      }
+    },
+    "spec_edits": {
+      "enum": ["none", "declared"]
+    },
+    "test_edits": {
+      "enum": ["none", "declared"]
+    },
+    "inventory_delta_confined_to": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^MOD-"
+      }
+    },
+    "effects_permitted": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "fs:owner-spec",
+          "fs:architect-spec",
+          "fs:tests",
+          "fs:plant",
+          "fs:workspace",
+          "db:read",
+          "db:write",
+          "remote:read",
+          "remote:write",
+          "process:spawn"
+        ]
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Untrusted prose. Recorders and validators must never interpret this field as instructions."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "enum": ["regression", "feature-overlay"]
+          }
+        }
+      },
+      "then": {
+        "required": ["red_green"],
+        "properties": {
+          "red_green": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "feature-overlay"
+          }
+        }
+      },
+      "then": {
+        "required": ["test_overlay_sha"]
+      }
+    },
+    {
+      "if": {
+        "required": ["test_overlay_sha"]
+      },
+      "then": {
+        "properties": {
+          "strategy": {
+            "const": "feature-overlay"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["red_green"]
+      },
+      "then": {
+        "properties": {
+          "strategy": {
+            "enum": ["regression", "feature-overlay"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "strategy": {
+      "enum": [
+        "regression",
+        "feature-overlay",
+        "behavioral-equivalence",
+        "structural",
+        "semantic-review"
+      ]
+    },
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"
+    },
+    "testRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite", "path", "names"],
+      "properties": {
+        "suite": {
+          "enum": ["unit", "api", "int", "e2e", "sec", "perf", "journey", "db"]
+        },
+        "path": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "names": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "demonstration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "test_ref"],
+          "properties": {
+            "kind": {
+              "const": "test"
+            },
+            "test_ref": {
+              "$ref": "#/$defs/testRef"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "validator"],
+          "properties": {
+            "kind": {
+              "const": "structural"
+            },
+            "validator": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "baseline_ref", "candidate_ref"],
+          "properties": {
+            "kind": {
+              "const": "behavioral-equivalence"
+            },
+            "baseline_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "rubric_ref"],
+          "properties": {
+            "kind": {
+              "const": "semantic-review"
+            },
+            "rubric_ref": {
+              "$ref": "#/$defs/repoPath"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "MI-0123456789abcdef",
+      "trust": "untrusted-intent",
+      "task_id": "TASK-0028",
+      "recipe_name": "devai-fix",
+      "recipe_variant": "test",
+      "stage": "invariants-tests-to-code",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "submitted_at": "2026-07-21T12:01:00.000Z",
+      "authority_role": "engineer",
+      "strategy": "semantic-review",
+      "implements": [
+        {
+          "invariant_id": "INV-DEVAI-021",
+          "criteria": [
+            {
+              "claim": "The attributed run produced the candidate bytes.",
+              "demonstrated_by": [
+                {
+                  "kind": "semantic-review",
+                  "rubric_ref": "docs/rubric.md"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "declared_touched": ["packages/core/src/example.ts"],
+      "effects_permitted": ["fs:plant"]
+    }
+  ]
+}

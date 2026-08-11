@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-fix",
+  "status": "stable",
+  "description": "Repair one failing engineering concern with explicit file bounds and focused verification.",
+  "variants": {
+    "lint": {
+      "description": "Repair lint failures in explicitly selected package files.",
+      "effect": "local-write",
+      "write_policy": {
+        "mode": "explicit-files",
+        "scopes": ["packages/**/*.{ts,tsx,js,jsx,json}"]
+      },
+      "operations": ["check.lint"]
+    },
+    "typecheck": {
+      "description": "Repair type errors in explicitly selected package source files.",
+      "effect": "local-write",
+      "write_policy": { "mode": "explicit-files", "scopes": ["packages/**/*.{ts,tsx}"] },
+      "operations": ["check.typecheck"]
+    },
+    "build": {
+      "description": "Repair a build failure in explicitly selected package source or configuration files.",
+      "effect": "local-write",
+      "write_policy": {
+        "mode": "explicit-files",
+        "scopes": ["packages/**", "*.json", "*.mjs", "*.ts"]
+      },
+      "operations": ["check.build"]
+    },
+    "test": {
+      "description": "Repair a failing test or its implementation within explicitly selected files.",
+      "effect": "local-write",
+      "write_policy": { "mode": "explicit-files", "scopes": ["packages/**", "tests/**"] },
+      "operations": ["check.test"]
+    },
+    "coverage": {
+      "description": "Add focused tests for an observed coverage gap without changing production behavior.",
+      "effect": "local-write",
+      "write_policy": { "mode": "explicit-files", "scopes": ["packages/*/tests/**", "tests/**"] },
+      "operations": ["check.coverage"]
+    }
+  }
+}

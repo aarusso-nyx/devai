@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/proof-epoch.schema.json",
+  "title": "Proof epoch JSONL line",
+  "description": "One canonical line in a per-round/per-kind proof epoch. Records and errata bind the preceding line; the terminal line additionally binds the final non-terminal hash and declared record count so truncation fails closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "line_type",
+    "round_id",
+    "kind",
+    "sequence",
+    "timestamp",
+    "payload",
+    "previous_line_hash",
+    "line_hash"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "1.0.0" },
+    "line_type": { "enum": ["record", "errata", "terminal"] },
+    "round_id": { "type": "string", "pattern": "^R-[0-9]{4}$" },
+    "kind": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" },
+    "previous_line_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "line_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "corrects_sequence": { "type": "integer", "minimum": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "record_count": { "type": "integer", "minimum": 0 },
+    "terminal_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "sequence": { "const": 1 } } },
+      "then": { "properties": { "previous_line_hash": { "type": "null" } } },
+      "else": { "properties": { "previous_line_hash": { "type": "string" } } }
+    },
+    {
+      "if": { "properties": { "line_type": { "const": "errata" } } },
+      "then": { "required": ["corrects_sequence", "reason"] },
+      "else": {
+        "not": { "anyOf": [{ "required": ["corrects_sequence"] }, { "required": ["reason"] }] }
+      }
+    },
+    {
+      "if": { "properties": { "line_type": { "const": "terminal" } } },
+      "then": { "required": ["record_count", "terminal_hash"] },
+      "else": {
+        "not": { "anyOf": [{ "required": ["record_count"] }, { "required": ["terminal_hash"] }] }
+      }
+    }
+  ],
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "line_type": "record",
+      "round_id": "R-0100",
+      "kind": "test-results",
+      "sequence": 1,
+      "timestamp": "2026-07-26T00:00:00.000Z",
+      "payload": { "status": "pass" },
+      "previous_line_hash": null,
+      "line_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/evidence.schema.json",
+  "title": "Evidence Manifest",
+  "description": "Hash-chained evidence envelope. Each record references the prior manifest_hash, forming a tamper-evident chain.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "timestamp",
+    "actor",
+    "actor_role",
+    "action",
+    "status",
+    "context",
+    "artifacts",
+    "previous_run_hash",
+    "manifest_hash"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^EV-[a-f0-9]{16}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human username, agent discipline+model id, or harness subsystem name."
+    },
+    "actor_role": {
+      "enum": [
+        "human:owner",
+        "human:architect",
+        "human:inspector",
+        "human:engineer",
+        "human:auditor",
+        "agent:owner",
+        "agent:architect",
+        "agent:inspector",
+        "agent:engineer",
+        "agent:auditor",
+        "harness"
+      ]
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical action name: 'task.spawn', 'task.merge', 'rgr.emit', 'sensor.run', 'inventory.regenerate', etc."
+    },
+    "lifecycle": {
+      "enum": ["supported", "experimental"],
+      "default": "supported",
+      "description": "Experimental evidence is retained but cannot promote supported readiness."
+    },
+    "status": {
+      "enum": ["started", "completed", "failed", "escalated", "paused"]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo_root", "git"],
+      "properties": {
+        "repo_root": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": ["string", "null"],
+          "pattern": "^TASK-[0-9]+$"
+        },
+        "worktree_id": {
+          "type": ["string", "null"],
+          "pattern": "^WT-"
+        },
+        "branch": {
+          "type": ["string", "null"]
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["head_sha", "dirty_files"],
+          "properties": {
+            "head_sha": {
+              "type": ["string", "null"]
+            },
+            "dirty_files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "findings_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "info": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warning": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional link to a separately validated authority-evidence.schema.json record. Presence alone is audit linkage, never an authorization capability or proof that enforcement occurred.",
+      "required": [
+        "contract_version",
+        "record_kind",
+        "authority_evidence_id",
+        "decision_id",
+        "decision_digest_sha256",
+        "policy_resolved_digest_sha256",
+        "authority_readiness_eligible"
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "1.0.0"
+        },
+        "record_kind": {
+          "const": "audit-only-non-capability"
+        },
+        "authority_evidence_id": {
+          "type": "string",
+          "pattern": "^AUTH-EV-[a-f0-9]{16}$"
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policy_resolved_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "authority_readiness_eligible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "previous_run_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the manifest_hash of the preceding evidence record. Null for chain genesis."
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of canonical(id || timestamp || actor || actor_role || action || status || git.head_sha || sorted(artifact.sha256) || previous_run_hash || 'GENESIS')."
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "EV-0000000000000001",
+      "timestamp": "2026-05-11T00:00:00.000Z",
+      "actor": "harness",
+      "actor_role": "harness",
+      "action": "harness.bootstrap",
+      "status": "completed",
+      "context": {
+        "repo_root": ".",
+        "git": {
+          "head_sha": null,
+          "dirty_files": []
+        }
+      },
+      "artifacts": [],
+      "previous_run_hash": null,
+      "manifest_hash": "acbd799553e4fc407a36a96cae1f5a9b3c4e8d6b291845f3187f30c89cb86788"
+    }
+  ]
+}

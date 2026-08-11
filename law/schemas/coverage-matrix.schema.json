@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/coverage-matrix.schema.json",
+  "$comment": "REDOX-CoverageMatrix: absorbed from /Users/aarusso/Development/tools/redox/src/schemas/CoverageMatrix.schema.json in Phase 17.B (D-57).",
+  "title": "Coverage Matrix",
+  "description": "Route ↔ Endpoint ↔ Use-Case traceability triads. Emitted as a SensorReading body at tier L0 by inventory_coverage sensors (Phase 17.C). Feeds INV-INVENTORY-001 (every route/endpoint covered by ≥1 use-case). Per Constitution Article 17 (sensors); per D-57 (brownfield-adoption substrate).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "endpoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "useCases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["id"]
+      },
+      "uniqueItems": true
+    },
+    "links": {
+      "description": "Triads establishing end-to-end traceability.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Triad"
+      }
+    },
+    "unmapped": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "required": ["routes", "endpoints"]
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routeCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endpointCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "useCaseCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "linkCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "routes",
+    "endpoints",
+    "useCases",
+    "links",
+    "unmapped"
+  ],
+  "$defs": {
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["path", "startLine", "endLine"]
+    },
+    "Triad": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routeId": {
+          "type": ["string", "null"]
+        },
+        "endpointId": {
+          "type": ["string", "null"]
+        },
+        "useCaseId": {
+          "type": "string"
+        },
+        "linkKind": {
+          "type": "string",
+          "enum": ["paired", "route-only", "endpoint-only"],
+          "description": "Phase 23.C: discriminator for the three link cardinalities. `paired` = both routeId and endpointId set (cross-product from a step with both axes). `route-only` = routeId set, endpointId null (step with only route refs — e.g. UI navigation without an API call). `endpoint-only` = endpointId set, routeId null (step with only endpoint refs — e.g. background job, system-to-system call). Pre-23.C bodies omit this field; they are equivalent to `paired`."
+        },
+        "inferred": {
+          "type": "boolean",
+          "default": false
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        }
+      },
+      "required": ["routeId", "endpointId", "useCaseId"]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "generatedAt": "2026-05-18T18:53:01.960Z",
+      "routes": [],
+      "endpoints": [],
+      "useCases": [],
+      "links": [],
+      "unmapped": {
+        "routes": [],
+        "endpoints": []
+      }
+    }
+  ]
+}

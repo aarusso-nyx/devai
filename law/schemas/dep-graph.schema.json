@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/dep-graph.schema.json",
+  "$comment": "REDOX-DepGraph: absorbed from /Users/aarusso/Development/tools/redox/src/schemas/DepGraph.schema.json in Phase 17.B (D-57).",
+  "title": "Dependency Graph",
+  "description": "Module dependency graph as an adjacency list (file path → imported file paths). Emitted as a SensorReading body at tier L0 by inventory_dep_graph sensors (Phase 17.C). Feeds INV-INVENTORY-004 (no module imports a peer's `internal/` subpath) and other forbidden-edge invariants. Per Constitution Article 17 (sensors); per D-57 (brownfield-adoption substrate).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "graph": {
+      "description": "Adjacency list: file path → array of imported file paths.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      }
+    }
+  },
+  "required": ["graph"],
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "graph": {}
+    }
+  ]
+}

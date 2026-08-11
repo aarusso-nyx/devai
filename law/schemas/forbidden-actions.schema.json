@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/forbidden-actions.schema.json",
+  "title": "Forbidden Actions Registry",
+  "description": "Canonical list of actions an automated agent MUST NOT perform without explicit per-action human authorisation. The default registry ships at .devai/config/forbidden-actions.json; adopters may extend but never relax it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "actions"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "waivers": {
+      "type": "array",
+      "description": "Explicit, reasoned exceptions for canonical protections this repository intentionally does not carry. A canonical id absent from both `actions` and `waivers` is an unwaived gap; extend the registry rather than silently dropping shipped protections.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "reason"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^FORBID-[A-Z][A-Z0-9_-]*$",
+            "description": "The canonical FORBID-* id being waived."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Why this repo does not carry this canonical protection. Forensic trail, not a rubber stamp."
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "action", "rationale", "severity", "detect_patterns"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^FORBID-[A-Z][A-Z0-9_-]*$"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Short imperative description, e.g. 'force-push to any branch'."
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": ["critical", "high", "medium"]
+          },
+          "detect_patterns": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Regex patterns (as strings) the scanner uses to detect violations in commit messages, recent commands, or reflog entries.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "allowed_change_line_patterns": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Optional exact development-context regexes. A detected commit-change occurrence is ignored only when its own changed line matches one of these patterns. Commit messages and other occurrences remain findings.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "safer_alternative": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "actions": [
+        {
+          "id": "FORBID-FORCE-PUSH",
+          "action": "Force-push to any branch",
+          "rationale": "Overwrites history",
+          "severity": "critical"
+        }
+      ]
+    }
+  ]
+}

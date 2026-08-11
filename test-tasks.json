@@ -1,0 +1,305 @@
+{
+  "schemaVersion": "1.0.0",
+  "descriptorVersion": "v1rc-survivor-2",
+  "repositoryId": "aarusso-nyx/devai",
+  "fallbackNodeId": "test:local-full",
+  "dynamicFallbackSelectors": [],
+  "tasks": [
+    {
+      "nodeId": "generate",
+      "dependencies": [],
+      "argv": ["pnpm", "run", "devai:prepare"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [
+        { "kind": "exact", "pattern": "scripts/generate-action-registry.mjs" },
+        { "kind": "exact", "pattern": "law/policy/action-registry.json" },
+        { "kind": "exact", "pattern": "package.json" },
+        { "kind": "exact", "pattern": "pnpm-lock.yaml" }
+      ],
+      "toolchainKeys": ["node", "pnpm"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "tracked-files",
+        "paths": [
+          "packages/cli/src/generated/action-registry.ts",
+          "packages/effects-check/src/generated/action-catalog.ts",
+          "packages/sensors/src/generated/action-kinds.ts"
+        ]
+      }
+    },
+    {
+      "nodeId": "test:authority",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:authority"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/authority/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" },
+        { "kind": "exact", "pattern": "vitest.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:cli",
+      "dependencies": ["build"],
+      "argv": ["pnpm", "run", "test:cli"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/cli/" },
+        { "kind": "prefix", "pattern": "packages/authority/src/" },
+        { "kind": "prefix", "pattern": "packages/evidence/src/" },
+        { "kind": "prefix", "pattern": "packages/sensors/src/" },
+        { "kind": "prefix", "pattern": "packages/skills/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" },
+        { "kind": "exact", "pattern": "vitest.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:effects",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:effects"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/effects-check/" },
+        { "kind": "prefix", "pattern": "packages/cli/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:evidence",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:evidence"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/evidence/" },
+        { "kind": "prefix", "pattern": "packages/authority/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:loop",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:loop"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/loop/" },
+        { "kind": "prefix", "pattern": "packages/authority/src/" },
+        { "kind": "prefix", "pattern": "packages/evidence/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:sensors",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:sensors"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/sensors/" },
+        { "kind": "prefix", "pattern": "packages/schemas/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:schemas",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:schemas"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/schemas/" },
+        { "kind": "prefix", "pattern": "law/schemas/" },
+        { "kind": "exact", "pattern": "law/policy/action-registry.json" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:skills",
+      "dependencies": ["build"],
+      "argv": ["pnpm", "run", "test:skills"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/skills/" },
+        { "kind": "prefix", "pattern": "packages/authority/src/" },
+        { "kind": "prefix", "pattern": "packages/spec/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:spec",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:spec"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/spec/" },
+        { "kind": "prefix", "pattern": "packages/schemas/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:utils",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "test:utils"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/utils/" },
+        { "kind": "prefix", "pattern": "packages/authority/src/" },
+        { "kind": "exact", "pattern": "tests/config/local.config.ts" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:root",
+      "dependencies": ["build"],
+      "argv": ["pnpm", "run", "test:root"],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "tests/contract/" },
+        { "kind": "prefix", "pattern": "tests/integration/" },
+        { "kind": "prefix", "pattern": "tests/helpers/" },
+        { "kind": "prefix", "pattern": "tests/config/" },
+        { "kind": "prefix", "pattern": "packages/cli/src/" },
+        { "kind": "prefix", "pattern": "packages/effects-check/src/" },
+        { "kind": "prefix", "pattern": "packages/evidence/src/" },
+        { "kind": "prefix", "pattern": "packages/loop/src/" },
+        { "kind": "prefix", "pattern": "packages/sensors/src/" },
+        { "kind": "prefix", "pattern": "packages/spec/src/" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "vitest", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "test:local-full",
+      "dependencies": [
+        "test:authority",
+        "test:cli",
+        "test:effects",
+        "test:evidence",
+        "test:loop",
+        "test:sensors",
+        "test:schemas",
+        "test:skills",
+        "test:spec",
+        "test:utils",
+        "test:root"
+      ],
+      "argv": ["node", "-e", "process.stdout.write('local test dependency closure complete\\n')"],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [{ "kind": "glob", "pattern": "**" }],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "marker", "value": "local test dependency closure complete" }
+    },
+    {
+      "nodeId": "build",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "-r", "build"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/" },
+        { "kind": "exact", "pattern": "package.json" },
+        { "kind": "exact", "pattern": "pnpm-lock.yaml" },
+        { "kind": "exact", "pattern": "tsconfig.json" },
+        { "kind": "exact", "pattern": "tsconfig.base.json" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "typescript"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "workspace-build",
+        "requiredResult": "pass",
+        "paths": ["scratch/coverage/rc-reachable-sources.json"]
+      }
+    },
+    {
+      "nodeId": "test:coverage:rc",
+      "dependencies": ["build"],
+      "argv": ["pnpm", "run", "test:coverage:rc"],
+      "cwd": ".",
+      "runner": "vitest-coverage-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/" },
+        { "kind": "prefix", "pattern": "tests/" },
+        { "kind": "exact", "pattern": "law/policy/thresholds.json" },
+        { "kind": "exact", "pattern": "tests/config/rc.coverage.config.ts" },
+        { "kind": "exact", "pattern": "package.json" },
+        { "kind": "exact", "pattern": "pnpm-lock.yaml" }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest", "typescript", "postgres"],
+      "allowlistedEnv": ["DEVAI_DB_TESTS", "DEVAI_DB_URL"],
+      "outputContract": {
+        "kind": "vitest-coverage",
+        "requiredResult": "pass",
+        "thresholds": { "statements": 70, "branches": 60, "functions": 70, "lines": 70 }
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "profileId": "affected",
+      "mode": "affected",
+      "requiredNodes": ["generate"],
+      "eligibleNodes": [
+        "generate",
+        "test:authority",
+        "test:cli",
+        "test:effects",
+        "test:evidence",
+        "test:loop",
+        "test:sensors",
+        "test:schemas",
+        "test:skills",
+        "test:spec",
+        "test:utils",
+        "test:root",
+        "test:local-full",
+        "build"
+      ]
+    },
+    {
+      "profileId": "rc",
+      "mode": "fixed",
+      "requiredNodes": ["test:coverage:rc"]
+    }
+  ]
+}

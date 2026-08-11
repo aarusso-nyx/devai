@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/test-weakening-config.schema.json",
+  "title": "Test-Weakening Config",
+  "description": "Per-project override file for `sense test-weakening` thresholds. Lives at `.devai/config/test-weakening.json` (optional; absence means use D-21 defaults). Per D-21 evolution in Phase 16.F: defaults are educated guesses; per-project measurement refines them empirically.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "threshold_ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Decrease ratio above which an assertion-count drop in a changed test file is flagged as unjustified weakening. D-21 default: 0.20 (a 20% decrease in a file's assertion count fires)."
+    },
+    "absolute_decrease_floor": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Minimum absolute decrease that always fires, regardless of ratio. D-21 default: 1 (any assertion removed in a file is a warning even if the ratio is below threshold_ratio)."
+    },
+    "skip_added_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of new `.skip` / `.only` / `.todo` annotations in a single file that triggers a finding. D-21 default: 1."
+    },
+    "invariant_reference_removed_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of `INV-*` references removed from test files in a single diff that triggers a finding. D-21 default: 1."
+    },
+    "ignored_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Glob patterns for test files exempt from weakening checks. Useful for legitimate test deprecations (e.g., a feature being removed). Each ignored path SHOULD have a corresponding entry in the project's CHANGELOG explaining the deprecation."
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "threshold_ratio": 0.2,
+      "absolute_decrease_floor": 1,
+      "skip_added_threshold": 1,
+      "invariant_reference_removed_threshold": 1,
+      "ignored_paths": []
+    }
+  ]
+}

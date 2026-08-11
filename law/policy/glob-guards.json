@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "guards": [
+    {
+      "id": "SCHEMAS_DIR",
+      "pattern": "law/schemas/*.schema.json",
+      "min_matches": 35,
+      "description": "Schema type generation and package staging must retain the complete current schema roster.",
+      "source": "packages/schemas/src/roster.ts"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "../schemas/model-runtime-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "model-runtime-registry",
+  "status": "active",
+  "authority": "Architect",
+  "runtimes": [
+    {
+      "id": "anthropic-api",
+      "vendor": "Anthropic",
+      "family": "claude",
+      "adapter_id": "anthropic-sdk-adapter",
+      "adapter_module": "packages/skills/src/model-bridge/index.ts",
+      "transport": "provider-api",
+      "credential_binding": "ANTHROPIC_API_KEY",
+      "efforts": ["default"],
+      "capabilities": ["text-generation", "structured-output-best-effort"],
+      "eligible_agent_classes": ["coding-agent", "review-agent", "ops-agent"],
+      "available": true,
+      "availability_basis": "adapter is present; credentials, provider reachability, exact model identity, and effort support require host preflight"
+    },
+    {
+      "id": "openai-api",
+      "vendor": "OpenAI",
+      "family": "codex",
+      "adapter_id": "openai-sdk-adapter",
+      "adapter_module": "packages/skills/src/model-bridge/index.ts",
+      "transport": "provider-api",
+      "credential_binding": "OPENAI_API_KEY",
+      "efforts": ["default", "low", "medium", "high", "xhigh", "max", "ultra"],
+      "capabilities": ["text-generation", "structured-output"],
+      "eligible_agent_classes": ["coding-agent", "review-agent", "ops-agent"],
+      "available": true,
+      "availability_basis": "adapter is present; credentials, provider reachability, exact model identity, and effort support require host preflight"
+    },
+    {
+      "id": "claude-cli",
+      "vendor": "Anthropic",
+      "family": "claude",
+      "adapter_id": "claude-cli-adapter",
+      "adapter_module": "packages/skills/src/model-bridge/index.ts",
+      "transport": "host-cli",
+      "executable": "claude",
+      "credential_binding": "host-cli-session",
+      "efforts": ["default", "low", "medium", "high"],
+      "capabilities": ["text-generation", "structured-output-best-effort", "repository-context"],
+      "eligible_agent_classes": ["coding-agent", "review-agent", "ops-agent"],
+      "available": true,
+      "availability_basis": "adapter is present; executable, login, exact model identity, and effort support require host preflight"
+    },
+    {
+      "id": "codex-cli",
+      "vendor": "OpenAI",
+      "family": "codex",
+      "adapter_id": "codex-cli-adapter",
+      "adapter_module": "packages/skills/src/model-bridge/index.ts",
+      "transport": "host-cli",
+      "executable": "codex",
+      "credential_binding": "host-cli-session",
+      "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"],
+      "capabilities": ["text-generation", "structured-output", "repository-context"],
+      "eligible_agent_classes": ["coding-agent", "review-agent", "ops-agent"],
+      "available": true,
+      "availability_basis": "adapter is present; executable, login, exact model identity, and effort support require host preflight"
+    }
+  ]
+}

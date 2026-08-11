@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-docs",
+  "status": "stable",
+  "description": "Create one evidence-grounded developer document at the selected variant's exact output path.",
+  "variants": {
+    "overview": {
+      "description": "Write the repository overview.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Overview.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "software-stack": {
+      "description": "Write the detected software stack.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Software Stack.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "architecture-guide": {
+      "description": "Write the architecture guide.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Architecture Guide.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "database-reference": {
+      "description": "Write the database reference.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Database Reference.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "erd": {
+      "description": "Write the entity relationship diagram.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/ERD.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "api-map": {
+      "description": "Write the API map.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/API Map.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "frontend-routes-map": {
+      "description": "Write the frontend routes map.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Frontend Routes Map.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "rbac-matrix": {
+      "description": "Write the RBAC matrix.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/RBAC Matrix.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "compliance-lgpd": {
+      "description": "Write the LGPD data inventory.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Compliance (LGPD).md"] },
+      "operations": ["sense.inventory"]
+    },
+    "compliance-gdpr": {
+      "description": "Write the GDPR data inventory.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Compliance (GDPR).md"] },
+      "operations": ["sense.inventory"]
+    },
+    "compliance-ccpa": {
+      "description": "Write the CCPA and CPRA data inventory.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Compliance (CCPA).md"] },
+      "operations": ["sense.inventory"]
+    },
+    "function-point-report": {
+      "description": "Write the function point report.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Function Point Report.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "threat-model": {
+      "description": "Write the security threat model.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Security Threat Model.md"] },
+      "operations": ["sense.inventory"]
+    },
+    "onboarding": {
+      "description": "Write the onboarding quickstart.",
+      "effect": "local-write",
+      "write_policy": { "mode": "bounded-patterns", "scopes": ["docs/Onboarding Quickstart.md"] },
+      "operations": ["sense.inventory"]
+    }
+  }
+}

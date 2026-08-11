@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/sensor-reading.schema.json",
+  "title": "Sensor Reading",
+  "description": "Uniform output envelope for any executable or analytical sensor. Per Constitution Article 32 (sensor adapter uniformity).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "sensor",
+    "timestamp",
+    "status",
+    "deterministic",
+    "command",
+    "command_hash"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "lifecycle": {
+      "enum": ["supported", "experimental"],
+      "default": "supported",
+      "description": "Experimental readings are retained but excluded from supported readiness aggregation."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^SR-[a-f0-9]{16}$",
+      "description": "Machine-only content-derived ID."
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "type_check",
+            "lint",
+            "build",
+            "unit_test",
+            "integration_test",
+            "api_test",
+            "db_test",
+            "e2e_test",
+            "journey_test",
+            "migration_check",
+            "contract_validation",
+            "inventory_regeneration",
+            "test_weakening_review",
+            "trace_resolution",
+            "mutation_test",
+            "security_scan",
+            "perf_test",
+            "llm_judge",
+            "runtime_probe_api",
+            "runtime_probe_auth",
+            "runtime_probe_data",
+            "inventory_api",
+            "inventory_routes",
+            "inventory_data_model",
+            "inventory_rbac",
+            "inventory_data_handling",
+            "inventory_dep_graph",
+            "inventory_coverage",
+            "spec_depth",
+            "spec_idiomaticity",
+            "spec_freshness",
+            "plant_coverage",
+            "test_coverage_depth",
+            "test_invariant_alignment",
+            "inventory_adherence",
+            "inventory_determinism",
+            "harness_security",
+            "harness_green_main",
+            "spec_alignment",
+            "spec_security_coverage",
+            "spec_performance_targets",
+            "spec_robustness_targets",
+            "plant_depth",
+            "plant_coherence",
+            "test_coherence",
+            "test_idiomaticity",
+            "test_security_coverage",
+            "test_performance_coverage",
+            "test_robustness_coverage",
+            "harness_coverage",
+            "harness_depth",
+            "harness_coherence",
+            "harness_invariant_alignment",
+            "harness_idiomaticity",
+            "harness_performance",
+            "harness_robustness",
+            "inventory_performance",
+            "docs_drift",
+            "site_drift",
+            "action_effect_inference"
+          ]
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tier": {
+      "enum": ["L0", "L1", "L2", "semantic"],
+      "description": "Sensor latency and scope tier. L0 is static module-local feedback; L1 is dynamic layer-local behavior; L2 is cross-layer integrity; semantic covers system-wide semantic confidence. The optional tier lets progressive checks select the appropriate readings."
+    },
+    "status": {
+      "enum": ["pass", "fail", "review", "skipped", "killed", "error", "unknown"],
+      "description": "Tri-state plus operational states. 'killed' = timeout exceeded; 'error' = sensor itself failed; 'unknown' = explicit uncertainty (Article 39)."
+    },
+    "deterministic": {
+      "type": "boolean",
+      "description": "True if the sensor produces identical output for identical input. Stochastic sensors require retry-and-vote handling and a confidence field."
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the canonical command for drift detection."
+    },
+    "exit_code": {
+      "type": ["integer", "null"]
+    },
+    "evidence_path": {
+      "type": ["string", "null"],
+      "description": "Path under .devai/evidence/ where full output is retained."
+    },
+    "out_head": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "err_head": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "killed": {
+      "type": "boolean",
+      "description": "True if the sensor was terminated due to timeout exceeded."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "code", "message"],
+        "properties": {
+          "severity": {
+            "enum": ["info", "warning", "error", "critical"]
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "invariant_id": {
+            "type": "string",
+            "pattern": "^INV-"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["number", "string", "boolean"]
+      },
+      "description": "Sensor-specific metrics (test count, coverage %, score, etc.)."
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Required for stochastic sensors; optional for deterministic.",
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interval_low": {
+          "type": "number"
+        },
+        "interval_high": {
+          "type": "number"
+        },
+        "method": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "SR-89f7974460e256a3",
+      "sensor": {
+        "name": "build",
+        "kind": "build"
+      },
+      "timestamp": "2026-07-14T23:48:45.669Z",
+      "status": "pass",
+      "deterministic": true,
+      "command": "pnpm run build",
+      "command_hash": "ce4dccceab6682814be8785fab6f7cc4c874a7a03ce125006766123b57dee5c8"
+    }
+  ]
+}

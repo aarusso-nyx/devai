@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/journey.schema.json",
+  "title": "Journey",
+  "description": "Owner-authored business journey. The business tier of the reference signal. Compiles down to or links to Architect-authored invariants. Per Constitution Article 12.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "persona",
+    "preconditions",
+    "steps",
+    "postconditions",
+    "acceptance_criteria",
+    "related_invariants",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^JNY-[0-9]{3}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "summary": {
+      "type": "string"
+    },
+    "lifecycle": {
+      "enum": ["supported", "experimental", "retired"],
+      "default": "supported"
+    },
+    "lifecycle_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "promotion_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenancy": {
+          "type": "string"
+        },
+        "permissions_required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "action"],
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "actor": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_outcome": {
+            "type": "string"
+          },
+          "alternative_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "postconditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "statement"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^AC-[0-9]{3}$"
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "measurable_via": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^INV-"
+            }
+          }
+        }
+      }
+    },
+    "related_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^INV-"
+      },
+      "description": "Invariants this journey depends on. The compilation link from Owner tier to Architect tier."
+    },
+    "compliance_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": ["draft", "active", "deprecated", "retired"]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Absorption/supersession provenance per the record meta-structure (§5.1)."
+    },
+    "supersedes": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string"
+      }
+    },
+    "superseded_by": {
+      "type": ["string", "null"]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "JNY-001",
+      "title": "Adopt DEVAI in a fresh client repository",
+      "persona": {
+        "role": "Adopter"
+      },
+      "preconditions": [],
+      "steps": [
+        {
+          "seq": 1,
+          "action": "Run `devai init plan --target .` and review the Owner, Architect, and F5 bootstrap segments"
+        }
+      ],
+      "postconditions": [],
+      "acceptance_criteria": [
+        {
+          "id": "AC-001",
+          "statement": "After step 5, `devai check --suite standard --as-role inspector --write` exits 0 and `devai evidence record --kind rtd --as-role inspector --write` produces a manifest whose readiness.ok is true."
+        }
+      ],
+      "related_invariants": [],
+      "status": "active"
+    }
+  ]
+}

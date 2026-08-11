@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1",
+  "name": "devai-assess",
+  "status": "stable",
+  "description": "Assess repository state and explain current evidence without changing product files.",
+  "variants": {
+    "health": {
+      "description": "Run the affected health check and explain failures.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["check.inspect"]
+    },
+    "inventory": {
+      "description": "Inspect the current repository inventory and surface gaps.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["sense.inventory"]
+    },
+    "round": {
+      "description": "Read the current round assessment without advancing it.",
+      "effect": "read",
+      "write_policy": { "mode": "none" },
+      "operations": ["round.assess"]
+    }
+  }
+}

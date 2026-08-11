@@ -1,0 +1,773 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/action-registry.schema.json",
+  "title": "DEVAI action catalog",
+  "description": "Canonical current-state source for every executable DEVAI action.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "authority",
+    "ordering",
+    "generated_views",
+    "counts",
+    "entries"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/action-registry.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "action-registry"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "ordering": {
+      "const": "utf8-bytes"
+    },
+    "generated_views": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable", "preview", "internal", "total"],
+      "properties": {
+        "stable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "preview": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "internal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "handler",
+          "path",
+          "status",
+          "profiles",
+          "effect",
+          "authority",
+          "description",
+          "output_contract",
+          "error_contract",
+          "authority_contract_version",
+          "authority_contract"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*( [a-z0-9][a-z0-9_-]*)*$"
+          },
+          "path": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]*$"
+            }
+          },
+          "profiles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": ["tier1", "tier2", "tier3"]
+            }
+          },
+          "effect": {
+            "enum": ["read", "harness-write", "local-write", "remote-write"],
+            "description": "Conservative action-level ceiling. Parameterized actions resolve a narrower registered member contract before authority and consent checks; the ceiling itself never authorizes an effect."
+          },
+          "authority": {
+            "type": ["string", "null"],
+            "enum": [
+              null,
+              "agent_runtime",
+              "host_tooling",
+              "mesh_controller",
+              "policy_firewall",
+              "release_controller",
+              "sensor",
+              "specifier"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "output_contract": {
+            "$ref": "#/$defs/outputContract"
+          },
+          "error_contract": {
+            "$ref": "#/$defs/errorContract"
+          },
+          "authority_contract_version": {
+            "const": "1.0.0"
+          },
+          "authority_contract": {
+            "$ref": "#/$defs/authorityContract"
+          },
+          "status": {
+            "enum": ["stable", "preview", "internal"]
+          },
+          "handler": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*( [a-z0-9][a-z0-9_-]*)*$"
+          }
+        },
+        "allOf": [
+          {
+            "properties": {
+              "path": {
+                "prefixItems": [
+                  {
+                    "enum": [
+                      "init",
+                      "doctor",
+                      "check",
+                      "sense",
+                      "round",
+                      "evidence",
+                      "release",
+                      "task",
+                      "catalog"
+                    ]
+                  }
+                ]
+              },
+              "output_contract": {
+                "properties": {
+                  "mode": {
+                    "const": "action-envelope"
+                  }
+                }
+              },
+              "error_contract": {
+                "properties": {
+                  "mode": {
+                    "const": "structured-error-envelope"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "outputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "mode", "envelope_schema", "success_channel", "payload_schema"],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "mode": {
+          "enum": ["action-envelope"]
+        },
+        "envelope_schema": {
+          "type": ["string", "null"],
+          "enum": ["law/schemas/action-result.schema.json", null]
+        },
+        "success_channel": {
+          "enum": ["stdout", "none"]
+        },
+        "payload_schema": {
+          "type": ["string", "null"],
+          "pattern": "^law/schemas/[a-z0-9-]+\\.schema\\.json$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "action-envelope"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "properties": {
+              "envelope_schema": {
+                "const": "law/schemas/action-result.schema.json"
+              },
+              "success_channel": {
+                "const": "stdout"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "envelope_schema": {
+                "type": "null"
+              },
+              "success_channel": {
+                "const": "none"
+              },
+              "payload_schema": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "errorContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "mode", "envelope_schema", "error_schema", "error_channel"],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "mode": {
+          "enum": ["structured-error-envelope"]
+        },
+        "envelope_schema": {
+          "type": ["string", "null"],
+          "enum": ["law/schemas/action-result.schema.json", null]
+        },
+        "error_schema": {
+          "type": ["string", "null"],
+          "enum": ["law/schemas/error.schema.json", null]
+        },
+        "error_channel": {
+          "enum": ["stderr", "none"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "structured-error-envelope"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "properties": {
+              "envelope_schema": {
+                "const": "law/schemas/action-result.schema.json"
+              },
+              "error_schema": {
+                "const": "law/schemas/error.schema.json"
+              },
+              "error_channel": {
+                "const": "stderr"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "envelope_schema": {
+                "type": "null"
+              },
+              "error_schema": {
+                "type": "null"
+              },
+              "error_channel": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "authorityContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "action_id",
+        "effect",
+        "capabilities",
+        "subject",
+        "consent",
+        "planner",
+        "boundary",
+        "readiness"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "action_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+        },
+        "effect": {
+          "enum": ["read", "harness-write", "local-write", "remote-write"]
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "oneOf": [
+              {
+                "enum": [
+                  "fs:f5-config",
+                  "fs:f5-state",
+                  "fs:proofs",
+                  "fs:f4-inventory",
+                  "fs:worktree-admin",
+                  "fs:workspace",
+                  "fs:unknown-write",
+                  "db:read",
+                  "db:write",
+                  "db:unclassified",
+                  "host-cache:write"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^proc:[a-z][a-z0-9-]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^net:[a-z][a-z0-9-]*$"
+              }
+            ]
+          },
+          "description": "Required per-domain effect upper bound for the catalogued action. Conservative fs:unknown-write and db:unclassified inference results must be covered by an explicit declaration before execution binding."
+        },
+        "subject": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "const": "none"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "allowed_roles"],
+              "properties": {
+                "kind": {
+                  "const": "human"
+                },
+                "allowed_roles": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "actor", "transition", "initiator"],
+              "properties": {
+                "kind": {
+                  "const": "derived-machine"
+                },
+                "actor": {
+                  "enum": ["harness", "binding", "release"],
+                  "description": "bootstrap is intentionally absent: it may plan/orchestrate but has no mutation authority."
+                },
+                "transition": {
+                  "enum": ["harness-write", "bind", "release"]
+                },
+                "initiator": {
+                  "oneOf": [
+                    {
+                      "const": "none"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["allowed_roles", "preserve_in_context"],
+                      "properties": {
+                        "allowed_roles": {
+                          "type": "array",
+                          "minItems": 1,
+                          "uniqueItems": true,
+                          "items": {
+                            "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+                          },
+                          "description": "The runtime binds exactly one actual initiated_by role from this set and requires it to match the invocation flag or session."
+                        },
+                        "preserve_in_context": {
+                          "const": true
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "oneOf": [
+                {
+                  "properties": {
+                    "actor": {
+                      "const": "harness"
+                    },
+                    "transition": {
+                      "const": "harness-write"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "actor": {
+                      "const": "binding"
+                    },
+                    "transition": {
+                      "const": "bind"
+                    },
+                    "initiator": {
+                      "type": "object",
+                      "required": ["allowed_roles"],
+                      "properties": {
+                        "allowed_roles": {
+                          "const": ["architect"]
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "actor": {
+                      "const": "release"
+                    },
+                    "transition": {
+                      "const": "release"
+                    },
+                    "initiator": {
+                      "type": "object",
+                      "required": ["allowed_roles"],
+                      "properties": {
+                        "allowed_roles": {
+                          "const": ["architect"]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "consent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["write", "allow_publish", "experimental"],
+          "properties": {
+            "write": {
+              "type": "boolean",
+              "description": "Satisfied only by explicit --write consent for the resolved invocation."
+            },
+            "allow_publish": {
+              "type": "boolean",
+              "description": "Internal publication-consent bit satisfied only by explicit --publish; independent of and never implied by --write."
+            },
+            "experimental": {
+              "type": "boolean"
+            }
+          }
+        },
+        "planner": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "const": "none"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "planner_id", "target_kinds", "atomicity"],
+              "properties": {
+                "kind": {
+                  "const": "exact-plan"
+                },
+                "planner_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target_kinds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["fs", "git-ref", "db", "remote"]
+                  }
+                },
+                "atomicity": {
+                  "const": "whole-plan"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "planner_id", "target_kinds", "bounds", "recovery"],
+              "properties": {
+                "kind": {
+                  "const": "bounded-batches"
+                },
+                "planner_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target_kinds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["fs", "git-ref", "db", "remote"]
+                  }
+                },
+                "bounds": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["max_batches", "max_targets_per_batch", "max_total_targets"],
+                  "properties": {
+                    "max_batches": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10000
+                    },
+                    "max_targets_per_batch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10000
+                    },
+                    "max_total_targets": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100000
+                    }
+                  }
+                },
+                "recovery": {
+                  "const": "preserve-and-report"
+                }
+              }
+            }
+          ]
+        },
+        "boundary": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "const": "none"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "adapter_ids", "final_reverification"],
+              "properties": {
+                "kind": {
+                  "const": "mutation-adapters"
+                },
+                "adapter_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "final_reverification": {
+                  "const": true
+                }
+              }
+            }
+          ]
+        },
+        "readiness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requires_binding", "independent_acceptance_required"],
+          "properties": {
+            "requires_binding": {
+              "type": "boolean"
+            },
+            "independent_acceptance_required": {
+              "const": true
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "properties": {
+              "subject": {
+                "properties": {
+                  "kind": {
+                    "const": "none"
+                  }
+                }
+              },
+              "consent": {
+                "properties": {
+                  "write": {
+                    "const": false
+                  },
+                  "allow_publish": {
+                    "const": false
+                  }
+                }
+              },
+              "planner": {
+                "properties": {
+                  "kind": {
+                    "const": "none"
+                  }
+                }
+              },
+              "boundary": {
+                "properties": {
+                  "kind": {
+                    "const": "none"
+                  }
+                }
+              },
+              "readiness": {
+                "properties": {
+                  "requires_binding": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "subject": {
+                "not": {
+                  "properties": {
+                    "kind": {
+                      "const": "none"
+                    }
+                  },
+                  "required": ["kind"]
+                }
+              },
+              "consent": {
+                "properties": {
+                  "write": {
+                    "const": true
+                  }
+                }
+              },
+              "planner": {
+                "not": {
+                  "properties": {
+                    "kind": {
+                      "const": "none"
+                    }
+                  },
+                  "required": ["kind"]
+                }
+              },
+              "boundary": {
+                "not": {
+                  "properties": {
+                    "kind": {
+                      "const": "none"
+                    }
+                  },
+                  "required": ["kind"]
+                }
+              },
+              "readiness": {
+                "properties": {
+                  "requires_binding": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "remote-write"
+              }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "properties": {
+              "consent": {
+                "properties": {
+                  "allow_publish": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [{}]
+}

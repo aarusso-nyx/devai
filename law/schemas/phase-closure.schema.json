@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/phase-closure.schema.json",
+  "title": "PhaseClosure",
+  "description": "Append-only machine closure record including decision bindings, delivered units, gate posture, validation criteria, and source-repository disposition. Corrections append a new record linked through `supersedes`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "round_id",
+    "declaring_decision",
+    "closing_decision",
+    "batches",
+    "gates",
+    "source_repo_deleted",
+    "validation_criteria",
+    "closed_at"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^PC-[0-9]{4}$",
+      "description": "Sequential closure id allocated as max(existing) + 1."
+    },
+    "round_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human identifier of the closed work unit."
+    },
+    "title": {
+      "type": "string",
+      "description": "One-line headline of what the closed work unit delivered."
+    },
+    "declaring_decision": {
+      "type": "string",
+      "pattern": "^(?:D-[0-9]+|DII-[0-9]+)$",
+      "description": "Decision record that declared the work unit."
+    },
+    "closing_decision": {
+      "type": "string",
+      "pattern": "^(?:D-[0-9]+|DII-[0-9]+)$",
+      "description": "Decision record containing the closing judgment."
+    },
+    "batches": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "roles", "headline"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": ["Owner", "Architect", "Inspector", "Engineer", "Auditor", "Machine"]
+            }
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+            "description": "Commit SHA containing the delivered unit. Optional when delivery is part of the closing commit."
+          },
+          "headline": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "roles": {
+                  "contains": {
+                    "const": "Machine"
+                  }
+                }
+              },
+              "required": ["roles"]
+            },
+            "then": {
+              "required": ["commit"]
+            }
+          }
+        ]
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "Gate results at close, keyed by check name.",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": ".*\\S.*"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "enum": ["pass", "fail", "skipped"]
+          },
+          "detail": {
+            "type": "string",
+            "description": "Free-form evidence, for example 'all selected checks passed'."
+          }
+        }
+      }
+    },
+    "source_repo_deleted": {
+      "type": "boolean",
+      "description": "Whether the closed work deleted a source repository."
+    },
+    "validation_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "verdict"],
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "enum": ["pass", "fail", "n/a"]
+          },
+          "evidence": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "supersedes": {
+      "type": "string",
+      "pattern": "^PC-[0-9]{4}$",
+      "description": "Set when this record corrects an earlier closure; the earlier record's bytes stay untouched."
+    },
+    "merged_as": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "description": "The integration commit that contains the closed work unit. Current closure writes require this field."
+    },
+    "release_disposition": {
+      "enum": ["published", "changeset-pending", "none-needed", "missing"],
+      "description": "Whether package changes have a release path: published, changeset-pending, none-needed, or missing."
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proof_epoch", "terminal_sha256"],
+      "properties": {
+        "proof_epoch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terminal_sha256": {
+          "$ref": "common-defs.schema.json#/$defs/sha256"
+        }
+      },
+      "description": "Machine-evidence epoch bound by this closure. The terminal hash commits to the complete line-hash chain."
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "PC-0001",
+      "closed_at": "2026-06-10T03:30:00.000Z",
+      "round_id": "maintenance",
+      "declaring_decision": "D-1",
+      "closing_decision": "D-2",
+      "batches": [
+        {
+          "id": "B1",
+          "roles": ["Architect"],
+          "headline": "Updated the declared contract and its validation evidence."
+        }
+      ],
+      "gates": {
+        "check": {
+          "status": "pass"
+        }
+      },
+      "source_repo_deleted": false,
+      "validation_criteria": [
+        {
+          "criterion": "declared checks pass",
+          "verdict": "pass"
+        }
+      ]
+    }
+  ]
+}
