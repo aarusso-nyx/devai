@@ -4,6 +4,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { createOperationHost, listOperations, runOperation } from '../../src/operations/index.js';
+import type {
+  OperationCommandRunner,
+  OperationHostRequest,
+  OperationResult,
+} from '../../src/operations/types.js';
 import { loadRecipe } from '../../src/recipes/index.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
 
@@ -14,7 +19,10 @@ describe('deterministic operation catalog', () => {
   });
 
   it('passes the exact variant contract to the host', async () => {
-    const execute = vi.fn(() => ({ operation: 'check.lint' as const, status: 'pass' as const }));
+    const execute = vi.fn<(request: OperationHostRequest) => OperationResult>(() => ({
+      operation: 'check.lint',
+      status: 'pass',
+    }));
     await runOperation(
       {
         recipe: 'devai-fix',
@@ -70,9 +78,9 @@ describe('deterministic operation catalog', () => {
   });
 
   it('supplies required deterministic arguments to current read operations', async () => {
-    const run = vi.fn((request: { operation?: string }) => ({
-      operation: (request.operation ?? 'sense.inventory') as 'sense.inventory',
-      status: 'pass' as const,
+    const run = vi.fn<OperationCommandRunner['run']>(() => ({
+      operation: 'sense.inventory',
+      status: 'pass',
     }));
     const host = createOperationHost({ run });
     await runOperation(

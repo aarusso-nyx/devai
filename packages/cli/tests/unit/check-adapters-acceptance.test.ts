@@ -15,7 +15,7 @@ const FIXTURE_ROOT = mkdtempSync(join(tmpdir(), 'devai-r0007-check-acceptance-')
 function member(serviceId: string): ResolvedCheckMember {
   return {
     id: serviceId,
-    source: 'migration-map',
+    source: 'current-selector',
     service_id: serviceId,
     binding: { kind: 'runtime-gate', gate_id: `check-${serviceId}` },
     effect: serviceId === 'translation' ? 'local-write' : 'read',

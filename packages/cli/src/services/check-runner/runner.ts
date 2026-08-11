@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { CheckCache } from './cache.js';
@@ -219,7 +219,18 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
   const toolchain =
     options.toolchain ?? resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options));
   const environment: Record<string, string> = { ...(options.environment ?? {}) };
-  for (const key of requiredEnvironmentKeys(options)) {
+  const requiredEnvironment = requiredEnvironmentKeys(options);
+  const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
+  if (requiredEnvironment.includes(authorityDigestKey)) {
+    const authorityPolicyPath = join(options.repoRoot, '.devai/config/authority-policy.json');
+    if (!existsSync(authorityPolicyPath)) {
+      throw new Error(
+        'CHECK_AUTHORITY_POLICY_REQUIRED: materialize .devai/config/authority-policy.json before planning release evidence',
+      );
+    }
+    environment[authorityDigestKey] = sha256Hex(readFileSync(authorityPolicyPath));
+  }
+  for (const key of requiredEnvironment) {
     const inheritedValue = process.env[key];
     if (environment[key] === undefined && inheritedValue !== undefined) {
       environment[key] = inheritedValue;

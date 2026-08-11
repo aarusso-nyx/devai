@@ -3,17 +3,23 @@ name: Publish DEVAI release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Signed annotated version tag to rehearse without publishing
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: devai-release-${{ github.ref_name }}
+  group: devai-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
-  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   VERIFIER_COMMIT: 2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c
 
 jobs:
@@ -23,19 +29,22 @@ jobs:
     environment: devai-ledger-verification
     timeout-minutes: 5
     outputs:
+      commit: ${{ steps.bindings.outputs.commit }}
       tree: ${{ steps.bindings.outputs.tree }}
       envelope_sha256: ${{ steps.bindings.outputs.envelope_sha256 }}
       results_sha256: ${{ steps.bindings.outputs.results_sha256 }}
       task_policy_sha256: ${{ steps.bindings.outputs.task_policy_sha256 }}
       trust_store_sha256: ${{ steps.bindings.outputs.trust_store_sha256 }}
+      toolchain_sha256: ${{ steps.bindings.outputs.toolchain_sha256 }}
+      environment_sha256: ${{ steps.bindings.outputs.environment_sha256 }}
       policy_digest: ${{ steps.bindings.outputs.policy_digest }}
     steps:
       - name: Check out exact release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.RELEASE_TAG }}
           path: candidate
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Check out pinned external verifier
@@ -59,18 +68,24 @@ jobs:
           RESULTS_TGZ_B64: ${{ secrets.DEVAI_LEDGER_RESULTS_TGZ_B64 }}
           TASK_POLICY_B64: ${{ secrets.DEVAI_LEDGER_TASK_POLICY_B64 }}
           TRUST_STORE_B64: ${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
+          TOOLCHAIN_B64: ${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
+          ENVIRONMENT_B64: ${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 }}
         run: |
           set -euo pipefail
           test -n "$ENVELOPE_B64"
           test -n "$RESULTS_TGZ_B64"
           test -n "$TASK_POLICY_B64"
           test -n "$TRUST_STORE_B64"
+          test -n "$TOOLCHAIN_B64"
+          test -n "$ENVIRONMENT_B64"
           control="$RUNNER_TEMP/devai-ledger-control"
           mkdir -p "$control/results"
           printf '%s' "$ENVELOPE_B64" | base64 --decode > "$control/envelope.json"
           printf '%s' "$RESULTS_TGZ_B64" | base64 --decode > "$control/results.tgz"
           printf '%s' "$TASK_POLICY_B64" | base64 --decode > "$control/task-policy.json"
           printf '%s' "$TRUST_STORE_B64" | base64 --decode > "$control/trust-store.json"
+          printf '%s' "$TOOLCHAIN_B64" | base64 --decode > "$control/toolchain.json"
+          printf '%s' "$ENVIRONMENT_B64" | base64 --decode > "$control/environment.json"
           if tar -tzf "$control/results.tgz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
             echo 'DEVAI_LEDGER_RESULTS_ARCHIVE_PATH_INVALID' >&2
             exit 2
@@ -85,23 +100,39 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$POLICY_DIGEST"
-          test "$(git -C candidate rev-parse HEAD)" = "$GITHUB_SHA"
-          tree="$(git -C candidate rev-parse "${GITHUB_SHA}^{tree}")"
+          test "$(git -C candidate cat-file -t "$RELEASE_TAG")" = tag
+          git -C candidate verify-tag "$RELEASE_TAG"
+          commit="$(git -C candidate rev-parse "${RELEASE_TAG}^{commit}")"
+          test "$(git -C candidate rev-parse HEAD)" = "$commit"
+          tree="$(git -C candidate rev-parse "${commit}^{tree}")"
           control="$RUNNER_TEMP/devai-ledger-control"
+          node .devai-verifier/src/build-policy-cli.js \
+            --repo candidate \
+            --descriptor candidate/test-tasks.json \
+            --profile rc \
+            --commit "$commit" \
+            --tree "$tree" \
+            --toolchain "$control/toolchain.json" \
+            --environment "$control/environment.json" \
+            --output "$control/expected-task-policy.json"
+          cmp "$control/expected-task-policy.json" "$control/task-policy.json"
           node .devai-verifier/src/cli.js \
             --envelope "$control/envelope.json" \
             --results-dir "$control/results" \
             --task-policy "$control/task-policy.json" \
             --trust "$control/trust-store.json" \
             --repository "$GITHUB_REPOSITORY" \
-            --commit "$GITHUB_SHA" \
+            --commit "$commit" \
             --tree "$tree" \
             --policy-digest "$POLICY_DIGEST"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "tree=$tree" >> "$GITHUB_OUTPUT"
           echo "envelope_sha256=$(sha256sum "$control/envelope.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "results_sha256=$(sha256sum "$control/results.tgz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "task_policy_sha256=$(sha256sum "$control/task-policy.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "trust_store_sha256=$(sha256sum "$control/trust-store.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "toolchain_sha256=$(sha256sum "$control/toolchain.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "environment_sha256=$(sha256sum "$control/environment.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "policy_digest=$POLICY_DIGEST" >> "$GITHUB_OUTPUT"
 
   build-release:
@@ -116,7 +147,7 @@ jobs:
       - name: Check out exact tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -136,13 +167,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$GITHUB_REF_TYPE" = tag
           package_version="$(node -p "require('./packages/cli/package.json').version")"
           test "$RELEASE_TAG" = "v$package_version"
           test "$(git cat-file -t "$RELEASE_TAG")" = tag
-          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "${{ needs.verify-ledger.outputs.commit }}"
           git verify-tag "$RELEASE_TAG"
-          test "$(git rev-parse "${GITHUB_SHA}^{tree}")" = "${{ needs.verify-ledger.outputs.tree }}"
+          test "$(git rev-parse "${{ needs.verify-ledger.outputs.commit }}^{tree}")" = "${{ needs.verify-ledger.outputs.tree }}"
           test "$(node -p "require('./packages/cli/package.json').name")" = "$PACKAGE_NAME"
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
           test -z "$(git status --porcelain --untracked-files=all)"
@@ -158,6 +188,7 @@ jobs:
           pnpm run release:closure
           pnpm --filter "$PACKAGE_NAME" run pack:smoke
           npm --prefix docs/site ci
+          npm --prefix docs/site run security:check
           npm --prefix docs/site run typecheck
           npm --prefix docs/site run build
 
@@ -165,12 +196,14 @@ jobs:
         id: artifacts
         shell: bash
         env:
-          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_SHA: ${{ needs.verify-ledger.outputs.commit }}
           TREE_SHA: ${{ needs.verify-ledger.outputs.tree }}
           LEDGER_ENVELOPE_SHA256: ${{ needs.verify-ledger.outputs.envelope_sha256 }}
           LEDGER_RESULTS_SHA256: ${{ needs.verify-ledger.outputs.results_sha256 }}
           LEDGER_TASK_POLICY_SHA256: ${{ needs.verify-ledger.outputs.task_policy_sha256 }}
           LEDGER_TRUST_STORE_SHA256: ${{ needs.verify-ledger.outputs.trust_store_sha256 }}
+          LEDGER_TOOLCHAIN_SHA256: ${{ needs.verify-ledger.outputs.toolchain_sha256 }}
+          LEDGER_ENVIRONMENT_SHA256: ${{ needs.verify-ledger.outputs.environment_sha256 }}
           LEDGER_POLICY_DIGEST: ${{ needs.verify-ledger.outputs.policy_digest }}
         run: |
           set -euo pipefail
@@ -220,6 +253,7 @@ jobs:
   finalize-release:
     name: Create canonical Release and mirror exact package
     needs: [verify-ledger, build-release]
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: devai-rc-publication
     timeout-minutes: 10
@@ -230,7 +264,7 @@ jobs:
       - name: Check out exact release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -319,6 +353,7 @@ jobs:
   deploy-pages:
     name: Deploy and verify GitHub Pages
     needs: finalize-release
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -365,3 +400,32 @@ jobs:
           grep -F "@aarusso-nyx/devai@${RELEASE_TAG#v}" <<<"$home"
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/adopters/install" >/dev/null
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/reference/cli" >/dev/null
+
+  rehearsal-summary:
+    name: Verify non-publishing rehearsal assets
+    needs: [verify-ledger, build-release]
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Download exact rehearsal assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: devai-release-assets
+          path: release-assets
+
+      - name: Verify and summarize rehearsal
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd release-assets && sha256sum --check SHA256SUMS)
+          {
+            echo '## DEVAI release rehearsal'
+            echo
+            echo "Candidate: \`${{ needs.verify-ledger.outputs.commit }}\`"
+            echo "Tag: \`$RELEASE_TAG\`"
+            echo
+            echo 'The exact release build and artifact assembly completed without publication.'
+          } >> "$GITHUB_STEP_SUMMARY"

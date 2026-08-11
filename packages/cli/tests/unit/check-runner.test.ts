@@ -632,6 +632,35 @@ describe('content-addressed check runner', () => {
     expect(receiptBytes).not.toContain('signature');
   });
 
+  it('binds a materialized authority policy into an allowlisted RC task key', () => {
+    const state = repository();
+    const taskDescriptor = JSON.parse(
+      readFileSync(join(state.root, 'test-tasks.json'), 'utf8'),
+    ) as {
+      tasks: { nodeId: string; allowlistedEnv: string[] }[];
+    };
+    const rcTask = taskDescriptor.tasks.find((task) => task.nodeId === 'test:rc');
+    if (rcTask === undefined) throw new Error('test fixture RC task missing');
+    rcTask.allowlistedEnv.push('DEVAI_AUTHORITY_POLICY_SHA256');
+    file(state.root, 'test-tasks.json', `${JSON.stringify(taskDescriptor, null, 2)}\n`);
+    file(state.root, '.gitignore', '.devai/state/*\n.devai/config/authority-policy.json\n');
+    git(state.root, ['add', '.']);
+    git(state.root, ['commit', '-qm', 'bind authority policy identity']);
+    expect(() => run(state.root, { target: 'rc', environment: { DEVAI_DB_TESTS: '1' } })).toThrow(
+      'CHECK_AUTHORITY_POLICY_REQUIRED',
+    );
+    file(state.root, '.devai/config/authority-policy.json', '{"policy":"first"}\n');
+    const first = run(state.root, { target: 'rc', environment: { DEVAI_DB_TESTS: '1' } });
+    file(state.root, '.devai/config/authority-policy.json', '{"policy":"second"}\n');
+    const second = run(state.root, { target: 'rc', environment: { DEVAI_DB_TESTS: '1' } });
+
+    expect(Object.keys(first.plan.taskPolicy).sort()).toEqual(
+      ['repositoryId', 'requiredNodes', 'schemaVersion'].sort(),
+    );
+    expect(second.plan.tasks.at(-1)?.taskKey).not.toBe(first.plan.tasks.at(-1)?.taskKey);
+    expect(second.plan.taskPolicyDigest).not.toBe(first.plan.taskPolicyDigest);
+  });
+
   it('authorizes only exact descriptor argv and repository-contained cwd for --run', () => {
     const state = repository();
     const request = (

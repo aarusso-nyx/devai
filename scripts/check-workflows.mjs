@@ -23,6 +23,8 @@ export const CONFIGURE_PAGES_COMMIT = '983d7736d9b0ae728b81ab479565c72886d7745b'
 export const UPLOAD_PAGES_COMMIT = '7b1f4a764d45c48632c6b24a0339c27f5614fb0b';
 export const DEPLOY_PAGES_COMMIT = 'd6db90164ac5ed86f2b6aed7e0febac5b3c0c03e';
 export const CANDIDATE_SHA_EXPRESSION = '${{ github.event.pull_request.head.sha || github.sha }}';
+export const RELEASE_TAG_EXPRESSION =
+  "${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}";
 
 const OLD_WORKFLOW_MARKERS = [
   'cold-sentinel',
@@ -245,6 +247,8 @@ function checkWorkflow(file, source, findings) {
     'secrets.DEVAI_LEDGER_RESULTS_TGZ_B64',
     'secrets.DEVAI_LEDGER_TASK_POLICY_B64',
     'secrets.DEVAI_LEDGER_TRUST_STORE_B64',
+    'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
+    'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
     'vars.DEVAI_LEDGER_POLICY_DIGEST',
   ];
   for (const input of externalInputs) {
@@ -285,19 +289,57 @@ function checkWorkflow(file, source, findings) {
       }
     }
   }
+  const policyBuilderRun = steps
+    .map((step) => (typeof step.run === 'string' ? step.run : ''))
+    .find((run) => run.includes('node .devai-verifier/src/build-policy-cli.js'));
+  if (policyBuilderRun === undefined) {
+    findings.push(
+      finding(
+        'CI_EXPECTED_POLICY_RECONSTRUCTION_MISSING',
+        file,
+        'pinned external policy builder is not invoked',
+      ),
+    );
+  } else {
+    for (const binding of [
+      '--repo candidate',
+      '--descriptor candidate/test-tasks.json',
+      '--profile rc',
+      '--commit "$CANDIDATE_SHA"',
+      '--tree "${{ steps.candidate.outputs.tree }}"',
+      '--toolchain "$control/toolchain.json"',
+      '--environment "$control/environment.json"',
+      'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
+    ]) {
+      if (!policyBuilderRun.includes(binding)) {
+        findings.push(finding('CI_EXPECTED_POLICY_BINDING_MISSING', file, binding));
+      }
+    }
+  }
 }
 
 function checkReleaseWorkflow(file, workflow, source, findings) {
   const triggers = object(workflow.on);
   const push = object(triggers.push);
+  const dispatch = object(triggers.workflow_dispatch);
+  const dispatchInputs = object(dispatch.inputs);
+  const releaseTagInput = object(dispatchInputs.release_tag);
   if (
-    Object.keys(triggers).length !== 1 ||
+    JSON.stringify(Object.keys(triggers).sort()) !==
+      JSON.stringify(['push', 'workflow_dispatch']) ||
     !Array.isArray(push.tags) ||
     push.tags.length !== 1 ||
-    push.tags[0] !== 'v*'
+    push.tags[0] !== 'v*' ||
+    JSON.stringify(Object.keys(dispatchInputs)) !== JSON.stringify(['release_tag']) ||
+    releaseTagInput.required !== true ||
+    releaseTagInput.type !== 'string'
   ) {
     findings.push(
-      finding('RELEASE_TRIGGER_INVALID', file, 'release must trigger only on version tags'),
+      finding(
+        'RELEASE_TRIGGER_INVALID',
+        file,
+        'release must accept version-tag publication and one release_tag rehearsal input only',
+      ),
     );
   }
   const permissions = object(workflow.permissions);
@@ -310,14 +352,20 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
     environment.PACKAGE_VERSION !== undefined ||
-    environment.RELEASE_TAG !== '${{ github.ref_name }}' ||
+    environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION ||
     environment.VERIFIER_COMMIT !== VERIFIER_COMMIT
   ) {
     findings.push(finding('RELEASE_IDENTITY_INVALID', file, 'package, tag, or verifier drift'));
   }
 
   const jobs = object(workflow.jobs);
-  const expectedJobs = ['build-release', 'deploy-pages', 'finalize-release', 'verify-ledger'];
+  const expectedJobs = [
+    'build-release',
+    'deploy-pages',
+    'finalize-release',
+    'rehearsal-summary',
+    'verify-ledger',
+  ];
   if (JSON.stringify(Object.keys(jobs).sort()) !== JSON.stringify(expectedJobs)) {
     findings.push(finding('RELEASE_JOB_SET_INVALID', file, Object.keys(jobs).sort().join(',')));
   }
@@ -325,6 +373,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const build = object(jobs['build-release']);
   const finalize = object(jobs['finalize-release']);
   const pages = object(jobs['deploy-pages']);
+  const rehearsal = object(jobs['rehearsal-summary']);
   if (verify.environment !== LEDGER_ENVIRONMENT) {
     findings.push(finding('RELEASE_LEDGER_ENVIRONMENT_INVALID', file, String(verify.environment)));
   }
@@ -338,6 +387,30 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   }
   if (object(pages.environment).name !== 'github-pages') {
     findings.push(finding('RELEASE_PAGES_ENVIRONMENT_INVALID', file, 'github-pages'));
+  }
+  const publishCondition = "${{ github.event_name == 'push' }}";
+  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' }}";
+  if (finalize.if !== publishCondition || pages.if !== publishCondition) {
+    findings.push(
+      finding(
+        'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
+        file,
+        'finalize-release and deploy-pages must be push-only',
+      ),
+    );
+  }
+  if (
+    rehearsal.if !== rehearsalCondition ||
+    JSON.stringify(rehearsal.needs) !== JSON.stringify(['verify-ledger', 'build-release']) ||
+    JSON.stringify(object(rehearsal.permissions)) !== JSON.stringify({ contents: 'read' })
+  ) {
+    findings.push(
+      finding(
+        'RELEASE_REHEARSAL_JOB_INVALID',
+        file,
+        'workflow_dispatch must end in a read-only rehearsal summary after the exact build',
+      ),
+    );
   }
 
   const immutablePins = new Map([
@@ -375,6 +448,10 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
 
   const requiredMarkers = [
     'node .devai-verifier/src/cli.js',
+    'node .devai-verifier/src/build-policy-cli.js',
+    'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
+    'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
+    'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
     'pnpm install --frozen-lockfile',
     'pnpm run build',
     'pnpm run release:closure',
@@ -388,6 +465,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'git verify-tag',
     'actions/deploy-pages@',
     'https://aarusso-nyx.github.io/devai/',
+    'The exact release build and artifact assembly completed without publication.',
   ];
   for (const marker of requiredMarkers) {
     if (!source.includes(marker)) findings.push(finding('RELEASE_CONTROL_MISSING', file, marker));
@@ -412,7 +490,11 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     findings.push(finding('RELEASE_PNPM_SETUP_MISSING', file, PNPM_SETUP_TAG_OBJECT));
   } else if (object(pnpmStep.step.with).version !== undefined) {
     findings.push(
-      finding('RELEASE_PNPM_VERSION_CONFLICT', file, 'packageManager is canonical; remove with.version'),
+      finding(
+        'RELEASE_PNPM_VERSION_CONFLICT',
+        file,
+        'packageManager is canonical; remove with.version',
+      ),
     );
   }
   if (source.includes('--clobber')) {

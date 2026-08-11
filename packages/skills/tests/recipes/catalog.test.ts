@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
+import type { AnySchema } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { listOperations, OPERATION_IDS } from '../../src/operations/index.js';
 import { loadRecipes } from '../../src/recipes/loader.js';
@@ -42,7 +43,7 @@ describe('v1 RC recipe catalog', () => {
     const schema: unknown = JSON.parse(
       readFileSync(join(first.resource_dir, '..', 'recipe.schema.json'), 'utf8'),
     );
-    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema as AnySchema);
 
     for (const recipe of recipes) {
       expect(validate(recipe.manifest), JSON.stringify(validate.errors)).toBe(true);

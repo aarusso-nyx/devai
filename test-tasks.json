@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "descriptorVersion": "v1rc-survivor-2",
+  "descriptorVersion": "v1rc-survivor-3",
   "repositoryId": "aarusso-nyx/devai",
   "fallbackNodeId": "test:local-full",
   "dynamicFallbackSelectors": [],
@@ -637,7 +637,7 @@
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest", "typescript", "postgres"],
-      "allowlistedEnv": ["DEVAI_DB_TESTS", "DEVAI_DB_URL"],
+      "allowlistedEnv": ["DEVAI_AUTHORITY_POLICY_SHA256", "DEVAI_DB_TESTS", "DEVAI_DB_URL"],
       "outputContract": {
         "kind": "vitest-coverage",
         "requiredResult": "pass",

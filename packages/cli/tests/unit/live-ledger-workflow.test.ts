@@ -98,6 +98,12 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN',
     },
     {
+      name: 'missing expected-policy reconstruction',
+      mutate: (source: string) =>
+        source.replace('node .devai-verifier/src/build-policy-cli.js', 'node -e "process.exit(0)"'),
+      diagnostic: 'CI_EXPECTED_POLICY_RECONSTRUCTION_MISSING',
+    },
+    {
       name: 'remote product tests',
       mutate: (source: string) => source.replace('test "$POLICY_DIGEST" != ""', 'pnpm vitest run'),
       diagnostic: 'CI_PRODUCT_EXECUTION_FORBIDDEN',
@@ -126,12 +132,14 @@ describe('live ledger-verification workflow', () => {
     expect(result.stderr).toContain('CI_OBSOLETE_WORKFLOW_PRESENT');
   });
 
-  it('keeps the release workflow tag-only, immutable, ledger-bound, and coverage-free', () => {
+  it('keeps publication tag-only and rehearsal non-publishing, ledger-bound, and coverage-free', () => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const result = check(fixture(release, 'release.yml'));
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('workflow contract: PASS\n');
     expect(release).toContain("tags: ['v*']");
+    expect(release).toContain('workflow_dispatch:');
+    expect(release).toContain("if: ${{ github.event_name == 'workflow_dispatch' }}");
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('pnpm run release:closure');
     expect(release).not.toContain('test:coverage');
@@ -157,6 +165,12 @@ describe('live ledger-verification workflow', () => {
       name: 'non-version trigger',
       mutate: (source: string) => source.replace("tags: ['v*']", 'tags: [release-*]'),
       diagnostic: 'RELEASE_TRIGGER_INVALID',
+    },
+    {
+      name: 'rehearsal publication guard removal',
+      mutate: (source: string) =>
+        source.replace("    if: ${{ github.event_name == 'push' }}\n", ''),
+      diagnostic: 'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
     },
     {
       name: 'redundant pnpm version input',

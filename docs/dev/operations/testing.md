@@ -31,11 +31,20 @@ unchanged throughout execution.
 ## Release-candidate gate
 
 ```bash
+pnpm run build
+pnpm run authority:materialize
 DEVAI_DB_TESTS=1 DEVAI_DB_URL=<reachable-test-database> \
   devai check --rc --task-plan --format json
 DEVAI_DB_TESTS=1 DEVAI_DB_URL=<reachable-test-database> \
   devai check --rc --run --as-role inspector --write --format json
 ```
+
+`authority:materialize` deterministically creates the ignored
+`.devai/config/authority-policy.json` from the bound Constitution. The RC task key binds its
+SHA-256 through the allowlisted `DEVAI_AUTHORITY_POLICY_SHA256` identity. This keeps the generated
+authority session out of Git while allowing the pinned external policy builder to reconstruct the
+same three-key task-policy schema. Missing materialization fails with
+`CHECK_AUTHORITY_POLICY_REQUIRED`; it must never be bypassed with a hand-authored policy.
 
 The fixed RC closure is three nodes: generation, build, then one `test:coverage:rc` node. That node
 collects the complete Vitest population exactly once and enforces coverage floors of 70%
@@ -45,7 +54,8 @@ RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The cu
 candidate collects **106 files and 915 tests** via `vitest list --json`; release records must
 recount the exact publication candidate rather than copying this development census. RC planning and
 execution refuse unless `DEVAI_DB_TESTS=1`; its value and `DEVAI_DB_URL` are bound into the RC
-task key. A reachable disposable database is required, and the release record must include the
+task key along with the authority-policy SHA-256. A reachable disposable database is required,
+and the release record must include the
 number of collected DB cases. The current DB-enabled rc.3 gate collected and passed **9 DB cases**
 inside the 915-test population. Real provider credentials are always explicit opt-in; ambient
 credentials must not create accidental cost or nondeterminism.
