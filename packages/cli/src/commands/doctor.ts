@@ -8,8 +8,8 @@ import { verifyChain } from '@devai-nyx/evidence';
 import {
   readProfile,
   profileAtLeast,
-  EXIT_FAIL,
   EXIT_PASS,
+  EXIT_REVIEW,
   EXIT_USAGE,
   type AdoptionProfile,
 } from '@devai-nyx/utils';
@@ -725,7 +725,7 @@ export const doctor = defineCommand({
         } else {
           process.stdout.write(JSON.stringify(report) + '\n');
         }
-        process.exit(report.ok ? EXIT_PASS : EXIT_FAIL);
+        process.exit(report.ok ? EXIT_PASS : EXIT_REVIEW);
       });
   },
 });

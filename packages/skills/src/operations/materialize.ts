@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { canonicalJson } from '@devai-nyx/utils';
 import type { OperationHostRequest, OperationResult } from './types.js';

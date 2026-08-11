@@ -31,10 +31,12 @@ and whose first path component is `W`. This formula, rather than a copied action
 overview aligned with the live registry. Query `devai catalog actions --format json` for the
 current stable, preview, and internal population.
 
-Machine output is one action-bound envelope on stdout. A successful envelope contains a closed
-result frame; a failed invocation emits one structured error envelope on stderr. Aggregate
-commands also carry a verdict. A process exit is transport/control information, not a substitute
-for reading that verdict. See [verdicts](./vocabulary.md#verdicts) and the
+Machine output is one action-bound envelope. A successful transport contains a closed result
+frame with `verdict: "pass" | "review"`; REVIEW remains a typed result on stdout and exits `1`.
+Routing, authority, infrastructure, input, and contract failures emit a structured error envelope
+on stderr and never stringify a valid domain payload into an error message. Human and JSON modes
+share the same exit taxonomy. A process exit is transport/control information, not a substitute
+for reading the result verdict. See [verdicts](./vocabulary.md#verdicts) and the
 [action-result schema](../../../law/schemas/action-result.schema.json).
 
 Routing, usage, precondition, authority, infrastructure, and contract failures stop or refuse the

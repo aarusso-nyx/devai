@@ -1,13 +1,14 @@
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   realpathSync,
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -216,7 +217,7 @@ export function buildHooksInstallPlan(opts: HooksInstallOptions): HooksInstallPl
     opts.command ??
     (hook === 'post-merge'
       ? postMergeCommand(resolve(opts.targetRoot))
-      : 'devai check --only forbidden-actions --strict');
+      : './node_modules/.bin/devai check --only forbidden-actions --strict');
   const { path, manager } = resolveHookPath(opts.targetRoot, hook);
   const newBlock = block(command);
 
@@ -263,9 +264,39 @@ export function buildHooksInstallPlan(opts: HooksInstallOptions): HooksInstallPl
 }
 
 export function executeHooksInstallPlan(plan: HooksInstallPlan): void {
-  if (plan.hook === 'post-merge') validatePostMergeAdapterInputs(plan);
+  preflightHooksInstallPlan(plan);
   mkdirSync(dirname(plan.path), { recursive: true });
   writeFileSync(plan.path, plan.content);
   chmodSync(plan.path, 0o755);
   if (plan.hook === 'post-merge') executePostMergeAdapter(plan);
+}
+
+export function preflightHooksInstallPlan(plan: HooksInstallPlan): readonly string[] {
+  const root = resolve(plan.targetRoot);
+  const targets = [plan.path];
+  if (plan.hook === 'post-merge') {
+    validatePostMergeAdapterInputs(plan);
+    targets.push(
+      join(root, '.git/devai/post-merge.key'),
+      join(root, '.git/devai/issue-post-merge-receipt.cjs'),
+      join(root, '.devai/config/post-merge-host-adapter.json'),
+    );
+  }
+  for (const target of targets) {
+    const fromRoot = relative(root, resolve(target));
+    if (fromRoot === '' || fromRoot === '..' || fromRoot.startsWith(`..${sep}`)) {
+      throw new Error(`HOOK_INSTALL_PATH_ESCAPE:${target}`);
+    }
+    let cursor = root;
+    for (const segment of fromRoot.split(sep).slice(0, -1)) {
+      cursor = join(cursor, segment);
+      if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+        throw new Error(`HOOK_INSTALL_SYMLINK_REFUSED:${target}`);
+      }
+    }
+    if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+      throw new Error(`HOOK_INSTALL_SYMLINK_REFUSED:${target}`);
+    }
+  }
+  return targets;
 }

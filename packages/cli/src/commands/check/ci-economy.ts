@@ -19,7 +19,7 @@ import { defineCommand } from '../../define-command.js';
  *      of pull_request + push + schedule. The single remote verifier has
  *      no scheduled product-validation lane.
  *   4. ci-economy.evidence-gate-wired — at least one workflow invokes the
- *      independently pinned DEVAI ledger verifier. Severity is
+ *      pinned external DEVAI ledger verifier. Severity is
  *      profile-conditioned (Decision 8 as amended by D-116): hard under
  *      the default `full` CI-economy profile; ADVISORY when the target
  *      repo's `.devai/config/project.json` declares
@@ -296,7 +296,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
     const notWiredMessage =
       files.length === 0
         ? `no workflow files found under ${opts.workflowsDir ?? DEFAULT_WORKFLOWS_DIR}`
-        : 'no workflow invokes the pinned independent DEVAI ledger verifier';
+        : 'no workflow invokes the pinned external DEVAI ledger verifier';
     findings.push(
       profile === 'gate-staged'
         ? {
@@ -390,7 +390,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
 export const checkCiEconomyCmd = defineCommand({
   name: 'check ci-economy',
   description:
-    'Validate .github/workflows/ against the cheap remote ledger-verification contract: cancel-in-progress concurrency on PR workflows, no macOS on pull_request, no pull_request+push+schedule triple triggers, and an independently pinned verifier. Rules 1-3 always hard-fail; rule 4 is hard under the default "full" profile and advisory under an explicit "gate-staged" profile. Path-filter, cron, macOS-cost, and DB-isolation findings remain advisory.',
+    'Validate .github/workflows/ against the cheap remote ledger-verification contract: cancel-in-progress concurrency on PR workflows, no macOS on pull_request, no pull_request+push+schedule triple triggers, and a pinned external verifier. Rules 1-3 always hard-fail; rule 4 is hard under the default "full" profile and advisory under an explicit "gate-staged" profile. Path-filter, cron, macOS-cost, and DB-isolation findings remain advisory.',
   authority: 'policy_firewall',
   register(cli: CAC): void {
     cli

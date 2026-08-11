@@ -36,8 +36,9 @@ is unchanged before and after execution and the commit/tree binding is exact.
 ## RC gate
 
 `devai check --rc --task-plan` selects the fixed release-candidate closure. The RC profile
-runs one coverage node after generation and build. That node collects the complete 104-file
-Vitest population exactly once, including database, E2E, performance, and containment tests, and
+runs one coverage node after generation and build. For the current rc.3 candidate that node
+collects 106 files and 915 tests exactly once, including database, E2E, performance, and
+containment tests, and
 enforces floors of 70% statements, 60% branches, 70% functions, and 70% lines. The narrower DB,
 E2E, performance, and containment scripts are diagnostic slices, not additional RC gates.
 
@@ -45,7 +46,7 @@ E2E, performance, and containment scripts are diagnostic slices, not additional 
 
 Remote CI does not rerun product tests. A candidate-independent exporter first validates the
 clean local receipt and exact results, then signs the canonical receipt outside the candidate
-repository. CI checks that export with an independently pinned verifier, an allowlisted,
+repository. CI checks that export with a pinned external verifier, an allowlisted,
 non-revoked Ed25519 public key, the exact repository/commit/tree, the approved task-policy
 digest, and the complete required-node closure. Missing, stale, malformed, unknown, FAIL, or
 ABORTED nodes reject the receipt.

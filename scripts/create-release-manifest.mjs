@@ -19,12 +19,14 @@ const siteFile = resolve(required('SITE_ARCHIVE'));
 const sbomFile = resolve(required('SBOM_FILE'));
 const outputFile = resolve(required('OUTPUT_FILE'));
 const packageManifest = JSON.parse(readFileSync('packages/cli/package.json', 'utf8'));
+const releaseTag = required('RELEASE_TAG');
+const packageName = required('PACKAGE_NAME');
 
 const manifest = {
   schemaVersion: '1.0.0',
   release: {
     repository: 'aarusso-nyx/devai',
-    tag: 'v1.0.0-rc.2',
+    tag: releaseTag,
     package: packageManifest.name,
     version: packageManifest.version,
     registry: 'https://npm.pkg.github.com',
@@ -51,10 +53,7 @@ const manifest = {
   },
 };
 
-if (
-  manifest.release.package !== '@aarusso-nyx/devai' ||
-  manifest.release.version !== '1.0.0-rc.2'
-) {
+if (manifest.release.package !== packageName || releaseTag !== `v${packageManifest.version}`) {
   throw new Error('RELEASE_MANIFEST_PACKAGE_IDENTITY_INVALID');
 }
 writeFileSync(outputFile, `${JSON.stringify(manifest, null, 2)}\n`);

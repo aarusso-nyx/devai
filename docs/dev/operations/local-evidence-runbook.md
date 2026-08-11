@@ -49,7 +49,7 @@ An absent allowlisted environment key is represented as `null`, not silently dro
 The GitHub workflow receives the envelope, result archive, task policy, and trust store through
 the protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy digest through
 `DEVAI_LEDGER_POLICY_DIGEST`. Candidate files do not control these inputs. CI checks out the exact
-candidate and the independent verifier at immutable commits, then verifies repository, commit,
+candidate and the pinned external verifier at immutable commits, then verifies repository, commit,
 tree, policy, signer allowlist/revocation state, and required-node completeness. It does not run
 the product test commands.
 

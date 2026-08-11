@@ -11,7 +11,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "devai:prepare": "node scripts/generate-action-registry.mjs",
+    "devai:prepare": "node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-action-registry.mjs",
+    "test-task-selectors:check": "node scripts/check-test-task-workspace-selectors.mjs --check",
     "action-registry:check": "node scripts/generate-action-registry.mjs --check",
     "release:closure": "node scripts/check-publishable-closure.mjs",
     "build": "pnpm run devai:prepare && pnpm -r build",

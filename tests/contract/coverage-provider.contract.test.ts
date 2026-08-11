@@ -280,10 +280,17 @@ describe('subprocess coverage measurement integrity', () => {
   });
 
   it('configures an auditable statement-level coverage artifact', async () => {
-    const config = (await import('../config/rc.coverage.config.js')).default as {
-      test?: { coverage?: { reporter?: string[] } };
-    };
-    expect(config.test?.coverage?.reporter).toContain('json');
+    const previous = process.env.DEVAI_DB_TESTS;
+    process.env.DEVAI_DB_TESTS = '1';
+    try {
+      const config = (await import('../config/rc.coverage.config.js')).default as {
+        test?: { coverage?: { reporter?: string[] } };
+      };
+      expect(config.test?.coverage?.reporter).toContain('json');
+    } finally {
+      if (previous === undefined) Reflect.deleteProperty(process.env, 'DEVAI_DB_TESTS');
+      else process.env.DEVAI_DB_TESTS = previous;
+    }
   });
 
   it('retains observable raw subprocess inputs beside the final coverage artifact', async () => {

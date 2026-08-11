@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from '@devai-nyx/authority';
-import { dirname, join } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, writeFileSync } from '@devai-nyx/authority';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 export interface CiScaffoldOptions {
   readonly targetRoot: string;
@@ -57,7 +57,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Check out pinned independent verifier
+      - name: Check out pinned external verifier
         uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
         with:
           repository: ${VERIFIER_REPOSITORY}
@@ -124,7 +124,22 @@ jobs:
 }
 
 export function buildCiScaffoldPlan(opts: CiScaffoldOptions): CiScaffoldPlan {
-  const path = opts.outputPath ?? join(opts.targetRoot, DEFAULT_OUTPUT_RELATIVE);
+  const root = resolve(opts.targetRoot);
+  const path = resolve(opts.outputPath ?? join(root, DEFAULT_OUTPUT_RELATIVE));
+  const fromRoot = relative(root, path);
+  if (fromRoot === '' || fromRoot === '..' || fromRoot.startsWith(`..${sep}`)) {
+    throw new Error(`CI_SCAFFOLD_PATH_ESCAPE:${path}`);
+  }
+  let cursor = root;
+  for (const segment of fromRoot.split(sep).slice(0, -1)) {
+    cursor = join(cursor, segment);
+    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+      throw new Error(`CI_SCAFFOLD_SYMLINK_REFUSED:${path}`);
+    }
+  }
+  if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
+    throw new Error(`CI_SCAFFOLD_SYMLINK_REFUSED:${path}`);
+  }
   return { path, content: ledgerVerificationWorkflow(), exists: existsSync(path) };
 }
 

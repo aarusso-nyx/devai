@@ -23,7 +23,7 @@ function fixture(source = ledgerVerificationWorkflow(), file = 'devai-ledger-ver
   const directory = join(root, '.github/workflows');
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, file), source);
-  const companion = file === 'release-rc2.yml' ? 'devai-ledger-verify.yml' : 'release-rc2.yml';
+  const companion = file === 'release.yml' ? 'devai-ledger-verify.yml' : 'release.yml';
   writeFileSync(
     join(directory, companion),
     readFileSync(join(ROOT, '.github/workflows', companion), 'utf8'),
@@ -127,11 +127,11 @@ describe('live ledger-verification workflow', () => {
   });
 
   it('keeps the release workflow tag-only, immutable, ledger-bound, and coverage-free', () => {
-    const release = readFileSync(join(ROOT, '.github/workflows/release-rc2.yml'), 'utf8');
-    const result = check(fixture(release, 'release-rc2.yml'));
+    const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const result = check(fixture(release, 'release.yml'));
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('workflow contract: PASS\n');
-    expect(release).toContain('tags: [v1.0.0-rc.2]');
+    expect(release).toContain("tags: ['v*']");
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('pnpm run release:closure');
     expect(release).not.toContain('test:coverage');
@@ -154,13 +154,37 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'RELEASE_TEST_REEXECUTION_FORBIDDEN',
     },
     {
-      name: 'moving tag trigger',
-      mutate: (source: string) => source.replace('tags: [v1.0.0-rc.2]', 'tags: [v*]'),
+      name: 'non-version trigger',
+      mutate: (source: string) => source.replace("tags: ['v*']", 'tags: [release-*]'),
       diagnostic: 'RELEASE_TRIGGER_INVALID',
     },
+    {
+      name: 'redundant pnpm version input',
+      mutate: (source: string) =>
+        source.replace('run_install: false', 'version: 9.15.0\n          run_install: false'),
+      diagnostic: 'RELEASE_PNPM_VERSION_CONFLICT',
+    },
+    {
+      name: 'peeled pnpm commit substituted for the authentic annotated-tag object',
+      mutate: (source: string) =>
+        source.replace(
+          '7088e561eb65bb68695d245aa206f005ef30921d',
+          'a7487c7e89a18df4991f7f222e4898a00d66ddda',
+        ),
+      diagnostic: 'CI_ACTION_PIN_MISMATCH',
+    },
+    {
+      name: 'replaceable Release assets',
+      mutate: (source: string) =>
+        source.replace(
+          'gh release create',
+          'gh release upload --clobber\n            gh release create',
+        ),
+      diagnostic: 'RELEASE_ASSET_CLOBBER_FORBIDDEN',
+    },
   ])('rejects $name', ({ mutate, diagnostic }) => {
-    const release = readFileSync(join(ROOT, '.github/workflows/release-rc2.yml'), 'utf8');
-    const result = check(fixture(mutate(release), 'release-rc2.yml'));
+    const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const result = check(fixture(mutate(release), 'release.yml'));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
   });

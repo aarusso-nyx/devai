@@ -299,11 +299,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const format = args.lastIndexOf('--format');
   const human = !args.includes('--json') && !(format >= 0 && args[format + 1] === 'json');
-  if (human) {
-    preserveHumanOutputBeforeExplicitExit();
-    runCliStage(machineAction, 'handler-dispatch', () => cli.parse(route.argv));
-    return;
-  }
+  if (human) preserveHumanOutputBeforeExplicitExit();
   const dispatched = runCliStage(machineAction, 'handler-dispatch', () => {
     cli.parse(route.argv, { run: false });
     return cli.runMatchedCommand() as unknown;
@@ -322,4 +318,10 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+try {
+  await main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`devai: ${message}\n`);
+  process.exitCode = 6;
+}

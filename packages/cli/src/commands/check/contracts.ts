@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ExecutorEffect } from '@devai-nyx/loop';
+import { resolveCanonicalPolicyContent } from '@devai-nyx/skills';
 import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW } from '@devai-nyx/utils';
 
 export type CheckSuiteName = 'quick' | 'standard' | 'full' | 'release';
@@ -122,8 +123,11 @@ function unique(values: readonly string[], code: string): void {
 }
 
 export function loadCheckSuitePolicy(repoRoot: string): CheckSuitePolicy {
+  const adopterPolicy = join(repoRoot, 'law/policy/check-suites.json');
   const source = JSON.parse(
-    readFileSync(join(repoRoot, 'law/policy/check-suites.json'), 'utf8'),
+    existsSync(adopterPolicy)
+      ? readFileSync(adopterPolicy, 'utf8')
+      : resolveCanonicalPolicyContent('check-suites.json'),
   ) as unknown;
   const policy = record(source, 'CHECK_POLICY_INVALID');
   if (

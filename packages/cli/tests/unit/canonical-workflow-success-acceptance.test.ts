@@ -2,7 +2,7 @@
 // Inspector acceptance: canonical read and local-write facades complete through
 // their real service seams while all mutations remain inside a temporary repo.
 import { createRequire } from 'node:module';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
@@ -131,5 +131,30 @@ describe('canonical workflow success acceptance', () => {
       ).toBe(readFileSync(join(TARGET, '.claude/skills', name, 'devai.operations.json'), 'utf8'));
     }
     expect(second.stdout).toContain('"written":[]');
+  });
+
+  it('preflights included-component conflicts before writing core bootstrap files', async () => {
+    const target = mkdtempSync(join(tmpdir(), 'devai-init-preflight-conflict-'));
+    try {
+      const conflict = join(target, '.agents/skills/devai-assess/SKILL.md');
+      mkdirSync(join(conflict, '..'), { recursive: true });
+      writeFileSync(conflict, 'adopter-owned conflict\n');
+      await expect(
+        invoke(initApplyHarness, [
+          'init-apply-harness',
+          '--target',
+          target,
+          '--tier',
+          'tier1',
+          '--include',
+          'skills',
+        ]),
+      ).rejects.toThrow(/RECIPE_ADAPTER_CONFLICT/u);
+      expect(existsSync(join(target, '.gitignore'))).toBe(false);
+      expect(existsSync(join(target, 'record/proofs/chain.json'))).toBe(false);
+      expect(readFileSync(conflict, 'utf8')).toBe('adopter-owned conflict\n');
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
   });
 });

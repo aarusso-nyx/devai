@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   createAuthorityDecisionIssuer,
@@ -31,6 +31,7 @@ import {
 
 const roots: string[] = [];
 const TOOLCHAIN = { node: 'v-test' } as const;
+const REPOSITORY_ROOT = resolve(import.meta.dirname, '../../../..');
 const PASS: TaskExecutionResult = {
   status: 0,
   signal: null,
@@ -261,6 +262,46 @@ describe('content-addressed check runner', () => {
     expect(affected.tasks.map((task) => task.nodeId)).not.toContain('test:local-full');
   });
 
+  it('selects authority after a committed utils change in a detached repository fixture', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'devai-selector-parity-'));
+    roots.push(fixtureRoot);
+    const clone = join(fixtureRoot, 'candidate');
+    const cloned = spawnSync('git', ['clone', '--quiet', REPOSITORY_ROOT, clone], {
+      encoding: 'utf8',
+    });
+    if (cloned.status !== 0) throw new Error(String(cloned.stderr));
+    git(clone, ['config', 'user.name', 'Selector Test']);
+    git(clone, ['config', 'user.email', 'selector@example.invalid']);
+    file(clone, 'test-tasks.json', readFileSync(join(REPOSITORY_ROOT, 'test-tasks.json'), 'utf8'));
+    git(clone, ['add', 'test-tasks.json']);
+    git(clone, ['commit', '-qm', 'bind generated task selectors']);
+    const base = git(clone, ['rev-parse', 'HEAD']);
+    commit(
+      clone,
+      'packages/utils/src/index.ts',
+      `${readFileSync(join(clone, 'packages/utils/src/index.ts'), 'utf8')}\nexport const selectorFixture = true;\n`,
+    );
+    const affected = withRunnerScope(() =>
+      buildTaskPlan({
+        repoRoot: clone,
+        descriptor: readTaskDescriptor(join(clone, 'test-tasks.json')),
+        target: 'affected',
+        baseCommit: base,
+        toolchain: {
+          node: 'v-test',
+          pnpm: '9.15.0',
+          vitest: '4.1.10',
+          typescript: '5.9.3',
+          postgres: 'psql-test',
+        },
+        environment: {},
+        cacheState: () => ({ cacheState: 'execute', reason: 'fixture' }),
+      }),
+    );
+    expect(affected.changedPaths).toContain('packages/utils/src/index.ts');
+    expect(affected.tasks.map((task) => task.nodeId)).toContain('test:authority');
+  });
+
   it('accounts for both sides of renames and for deleted paths', () => {
     const renamed = repository();
     git(renamed.root, ['mv', 'src/app.ts', 'src/renamed.ts']);
@@ -344,7 +385,7 @@ describe('content-addressed check runner', () => {
     };
     const rcTask = declared.tasks.find((task) => task.nodeId === 'test:rc');
     if (rcTask === undefined) throw new Error('test fixture is missing test:rc');
-    rcTask.allowlistedEnv = [environmentKey];
+    rcTask.allowlistedEnv = ['DEVAI_DB_TESTS', environmentKey];
     rcTask.argv = [
       'node',
       '-e',
@@ -353,7 +394,7 @@ describe('content-addressed check runner', () => {
     writeFileSync(join(state.root, 'test-tasks.json'), `${JSON.stringify(declared, null, 2)}\n`);
 
     const previousValue = process.env[environmentKey];
-    delete process.env[environmentKey];
+    Reflect.deleteProperty(process.env, environmentKey);
     try {
       const absent = withRunnerScope(() =>
         runCheckTasks({
@@ -362,7 +403,7 @@ describe('content-addressed check runner', () => {
           operation: 'run',
           cacheRoot: join(state.root, '.devai/state/absent-cache'),
           toolchain: TOOLCHAIN,
-          environment: {},
+          environment: { DEVAI_DB_TESTS: '1' },
           now: () => '2026-08-10T00:00:00.000Z',
         }),
       );
@@ -373,7 +414,7 @@ describe('content-addressed check runner', () => {
           operation: 'run',
           cacheRoot: join(state.root, '.devai/state/empty-cache'),
           toolchain: TOOLCHAIN,
-          environment: { [environmentKey]: '' },
+          environment: { DEVAI_DB_TESTS: '1', [environmentKey]: '' },
           now: () => '2026-08-10T00:00:00.000Z',
         }),
       );
@@ -393,9 +434,31 @@ describe('content-addressed check runner', () => {
       expect(absentTask?.taskKey).not.toBe(emptyTask?.taskKey);
       expect(absentTask?.inputDigest).not.toBe(emptyTask?.inputDigest);
     } finally {
-      if (previousValue === undefined) delete process.env[environmentKey];
+      if (previousValue === undefined) Reflect.deleteProperty(process.env, environmentKey);
       else process.env[environmentKey] = previousValue;
     }
+  });
+
+  it('refuses RC planning when database tests are disabled', () => {
+    const state = repository();
+    expect(() =>
+      withRunnerScope(() =>
+        runCheckTasks({
+          repoRoot: state.root,
+          target: 'rc',
+          operation: 'plan',
+          toolchain: TOOLCHAIN,
+          environment: { DEVAI_DB_TESTS: '' },
+        }),
+      ),
+    ).toThrow(/CHECK_RC_DB_TESTS_REQUIRED/u);
+
+    const actual = readTaskDescriptor(
+      fileURLToPath(new URL('../../../../test-tasks.json', import.meta.url)),
+    );
+    expect(
+      actual.tasks.find((task) => task.nodeId === 'test:coverage:rc')?.allowlistedEnv,
+    ).toContain('DEVAI_DB_TESTS');
   });
 
   it('reuses PASS only, binds output digests, and detects changed durable output', () => {

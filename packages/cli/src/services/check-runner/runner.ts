@@ -206,6 +206,12 @@ function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[]
 }
 
 export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
+  const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
+  if (options.target === 'rc' && configuredDbTests !== '1') {
+    throw new Error(
+      'CHECK_RC_DB_TESTS_REQUIRED: the RC profile requires DEVAI_DB_TESTS=1 so database cases cannot silently skip',
+    );
+  }
   const cacheRoot = resolve(
     options.cacheRoot ?? join(options.repoRoot, '.devai/state/check-cache/v1'),
   );

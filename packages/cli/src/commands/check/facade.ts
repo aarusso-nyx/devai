@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import type { CAC } from 'cac';
-import { EXIT_FAIL, EXIT_USAGE } from '@devai-nyx/utils';
+import { EXIT_FAIL, EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
+import { cliError, renderCliError } from '../../cli-error.js';
 import { defineCommand } from '../../define-command.js';
 import {
   runCheckTasks,
@@ -200,6 +201,33 @@ export const checkCmd = defineCommand({
           process.exitCode = report.exit_code;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+          if (
+            message.startsWith('CHECK_TASK_DESCRIPTOR_MISSING:') ||
+            message.startsWith('CHECK_RC_DB_TESTS_REQUIRED:')
+          ) {
+            const code = message.startsWith('CHECK_RC_DB_TESTS_REQUIRED:')
+              ? 'CHECK_RC_DB_TESTS_REQUIRED'
+              : 'CHECK_TASK_DESCRIPTOR_MISSING';
+            const diagnostic = cliError({
+              code,
+              class: 'precondition',
+              exit: 5,
+              message: message.replace(/^[A-Z0-9_]+:\s*/u, ''),
+              remediation:
+                code === 'CHECK_RC_DB_TESTS_REQUIRED'
+                  ? 'Set DEVAI_DB_TESTS=1, provide a reachable test database, and retry the RC plan or run.'
+                  : 'Create the adopter-owned test-tasks.json from docs/adopters/test-tasks.md, then retry.',
+              refs: {
+                doc:
+                  code === 'CHECK_RC_DB_TESTS_REQUIRED'
+                    ? 'docs/dev/operations/testing.md'
+                    : 'docs/adopters/test-tasks.md',
+              },
+            });
+            process.stderr.write(renderCliError(diagnostic, options.human !== true));
+            process.exitCode = EXIT_PRECONDITION;
+            return;
+          }
           process.stderr.write(`devai check: ${message}\n`);
           process.exitCode =
             message.startsWith('CHECK_SUITE_UNKNOWN') ||
