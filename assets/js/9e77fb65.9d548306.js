@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkdevai_docs_site=globalThis.webpackChunkdevai_docs_site||[]).push([[5212],{7014(a){a.exports=JSON.parse('{"tags":[{"label":"<scope-tag>","permalink":"/devai/docs/tags/scope-tag","count":1},{"label":"<area-tag>","permalink":"/devai/docs/tags/area-tag","count":1}]}')}}]);

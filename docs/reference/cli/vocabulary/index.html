@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-reference/cli/vocabulary" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.2">
+<title data-rh="true">CLI vocabulary | DEVAI</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://aarusso-nyx.github.io/devai/docs/reference/cli/vocabulary"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="CLI vocabulary | DEVAI"><meta data-rh="true" name="description" content="DEVAI uses different words for different control decisions. Keeping them separate prevents a"><meta data-rh="true" property="og:description" content="DEVAI uses different words for different control decisions. Keeping them separate prevents a"><link data-rh="true" rel="canonical" href="https://aarusso-nyx.github.io/devai/docs/reference/cli/vocabulary"><link data-rh="true" rel="alternate" href="https://aarusso-nyx.github.io/devai/docs/reference/cli/vocabulary" hreflang="en"><link data-rh="true" rel="alternate" href="https://aarusso-nyx.github.io/devai/docs/reference/cli/vocabulary" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"CLI overview","item":"https://aarusso-nyx.github.io/devai/docs/reference/cli/"},{"@type":"ListItem","position":2,"name":"CLI vocabulary","item":"https://aarusso-nyx.github.io/devai/docs/reference/cli/vocabulary"}]}</script><link rel="stylesheet" href="/devai/assets/css/styles.06fb8d52.css">
+<script src="/devai/assets/js/runtime~main.80410387.js" defer="defer"></script>
+<script src="/devai/assets/js/main.c00a5455.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||"light"),document.documentElement.setAttribute("data-theme-choice",t||"light")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/devai/"><b class="navbar__title text--truncate">DEVAI</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/devai/docs/">Docs</a><a class="navbar__item navbar__link" href="/devai/docs/adopters">Adopters</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/devai/docs/reference">Reference</a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/"><span class="categoryLinkLabel_W154">Start</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/framework"><span class="categoryLinkLabel_W154">Theory</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/roles/cross-role-coordination"><span class="categoryLinkLabel_W154">Roles</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/adopters/CONVENTIONS"><span class="categoryLinkLabel_W154">Adopters</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/dev/contributing"><span class="categoryLinkLabel_W154">Dev</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/devai/docs/reference"><span class="categoryLinkLabel_W154">Reference</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference"><span class="linkLabel_WmDU">Reference</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--active" tabindex="0" href="/devai/docs/reference/cli/"><span class="categoryLinkLabel_W154">CLI overview</span></a><button aria-label="Collapse sidebar category &#x27;CLI overview&#x27;" aria-expanded="true" type="button" class="clean-btn menu__caret"></button></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/adoption-tiers"><span class="linkLabel_WmDU">Adoption tiers</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/authority-effects"><span class="linkLabel_WmDU">Authority and effects</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/check-suites"><span class="linkLabel_WmDU">Check suites</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/inventory-slices"><span class="linkLabel_WmDU">Inventory slices</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/model-runtime"><span class="linkLabel_WmDU">Model runtime bridges</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/round-task-executors"><span class="linkLabel_WmDU">Rounds, tasks, and executors</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/sense-presets"><span class="linkLabel_WmDU">Sense presets</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/sensor-kinds"><span class="linkLabel_WmDU">Sensor-kind catalog</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/devai/docs/reference/cli/vocabulary"><span class="linkLabel_WmDU">CLI vocabulary</span></a></li></ul></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli"><span class="linkLabel_WmDU">CLI reference</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist" tabindex="0" href="/devai/docs/reference/contracts/"><span class="categoryLinkLabel_W154">Contracts</span></a><button aria-label="Expand sidebar category &#x27;Contracts&#x27;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/examples"><span class="linkLabel_WmDU">Examples and fixtures</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/glossary"><span class="linkLabel_WmDU">Glossary</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/law"><span class="linkLabel_WmDU">Law</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/product"><span class="linkLabel_WmDU">Product sources</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/recipes/"><span class="linkLabel_WmDU">Recipes</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/scripts"><span class="linkLabel_WmDU">Repository scripts</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/sensors-quick-ref"><span class="linkLabel_WmDU">Sensors quick reference</span></a></li></ul></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/devai/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Reference</span></li><li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/devai/docs/reference/cli/"><span>CLI overview</span></a></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">CLI vocabulary</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>CLI vocabulary</h1></header>
+<p>DEVAI uses different words for different control decisions. Keeping them separate prevents a
+larger check from being mistaken for broader authority, a model choice from being mistaken for a
+role, or an observation from being mistaken for a release verdict.</p>
+<p>The generated blocks on this page are deterministic projections of canonical policy and schema
+sources. Do not hand-edit their contents. The surrounding prose explains relationships without
+owning those mutable populations.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-selection-words">The selection words<a href="#the-selection-words" class="hash-link" aria-label="Direct link to The selection words" title="Direct link to The selection words" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="suite">Suite<a href="#suite" class="hash-link" aria-label="Direct link to Suite" title="Direct link to Suite" translate="no">​</a></h3>
+<p>A <strong>suite</strong> is a named, ordered population of validation members selected by <code>devai check --suite &lt;name&gt;</code>. It answers “which governed assertions should run together?” A suite owns member
+order, prerequisites, maximum effect, cost, output, and aggregation behavior; it does not own an
+adoption floor or grant a role.</p>
+<p>Use a suite when you want a repeatable validation population. Use <code>--only &lt;member&gt;</code> when the
+question is one check rather than the whole population. See the generated
+<a class="" href="/devai/docs/reference/cli/check-suites">check-suite reference</a>.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai check --suite quick --repo-root . --as-role inspector --write --format json</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="preset">Preset<a href="#preset" class="hash-link" aria-label="Direct link to Preset" title="Direct link to Preset" translate="no">​</a></h3>
+<p>A <strong>preset</strong> is a named, ordered population of sensor kinds selected by <code>devai sense run --preset &lt;name&gt;</code>. It answers “which observations should be gathered together?” A preset may require a round
+and may exclude kinds whose intrinsic effects exceed its boundary. Running one does not implicitly
+persist readings.</p>
+<p>Use a preset for a repeatable observation population. Use a positional kind when only one sensor
+is needed. Exact preset IDs come only from the candidate&#x27;s generated
+<a class="" href="/devai/docs/reference/cli/sense-presets">sense-preset reference</a>. An unknown ID yields UNKNOWN and is not remapped.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="kind">Kind<a href="#kind" class="hash-link" aria-label="Direct link to Kind" title="Direct link to Kind" translate="no">​</a></h3>
+<p>A <strong>kind</strong> is the stable identity of one sensor contract. It is a value in the sensor registry,
+not a separate CLI action. <code>devai sense run &lt;kind&gt;</code> resolves the kind&#x27;s inputs, tools, output,
+scorecard or diagnostic standing, intrinsic effect, and consent before dispatch.</p>
+<p>Use a kind for one precise observation. Do not infer that every sensor is read-only merely because
+it produces a reading. See the generated <a class="" href="/devai/docs/reference/cli/sensor-kinds">sensor-kind catalog</a>.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai sense run type_check --repo-root . --dry-run --format json</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="slice">Slice<a href="#slice" class="hash-link" aria-label="Direct link to Slice" title="Direct link to Slice" translate="no">​</a></h3>
+<p>A <strong>slice</strong> is a named deterministic projection of repository inventory selected with the
+<code>--slice &lt;name&gt;</code> option on <code>devai sense inventory</code>. It answers “which structural view should be
+rendered?” A slice is not a sensor preset and does not declare an adoption floor.</p>
+<p>Use a slice when the desired output is an inventory body rather than a sensor verdict. See the
+generated <a class="" href="/devai/docs/reference/cli/inventory-slices">inventory-slice reference</a>.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai sense inventory --slice modules --repo-root . --format json</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="tier">Tier<a href="#tier" class="hash-link" aria-label="Direct link to Tier" title="Direct link to Tier" translate="no">​</a></h3>
+<p>An unqualified <strong>tier</strong> is the repository&#x27;s declared adoption floor. It determines which
+obligations are binding and which higher obligations remain visible but advisory. It does not
+disable commands, select a check suite, select a sensor preset, or authorize an effect.</p>
+<p>“Surface tier” is a separate term that classifies CLI routes as porcelain or plumbing. See the
+generated <a class="" href="/devai/docs/reference/cli/adoption-tiers">adoption-tier descriptors</a> and the
+<a href="#surface-tiers" class="">surface-tier descriptors</a>.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai init plan --target . --tier tier1 --format json</span><br></div></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-work-words">The work words<a href="#the-work-words" class="hash-link" aria-label="Direct link to The work words" title="Direct link to The work words" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="round">Round<a href="#round" class="hash-link" aria-label="Direct link to Round" title="Direct link to Round" translate="no">​</a></h3>
+<p>A <strong>round</strong> is the governed container for one authorized body of work. Its stable identity has the
+shape <code>R-NNNN</code>. It owns intent, task population, active/closed standing, evidence boundaries, and
+the applicable close contract. A round result does not imply release.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai round status --round R-1000 --repo-root . --format json</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="task">Task<a href="#task" class="hash-link" aria-label="Direct link to Task" title="Direct link to Task" translate="no">​</a></h3>
+<p>A <strong>task</strong> is a subordinate work item owned by exactly one active round. Its immutable request
+declares a discipline, dependencies, resource targets, and exactly one executor contract. Ordinary
+operators execute it through <code>round run</code>; direct <code>task</code> routes are hidden plumbing and cannot
+bypass round containment.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai round run --round R-1000 --task TASK-7001 --repo-root . --as-role engineer --write --format json</span><br></div></code></pre></div></div>
+<p>See <a class="" href="/devai/docs/reference/cli/round-task-executors">rounds, tasks, and executors</a> for dependency, resource, selection,
+and recovery semantics.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-safety-words">The safety words<a href="#the-safety-words" class="hash-link" aria-label="Direct link to The safety words" title="Direct link to The safety words" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="role">Role<a href="#role" class="hash-link" aria-label="Direct link to Role" title="Direct link to Role" translate="no">​</a></h3>
+<p>A <strong>role</strong> is a human governance discipline and its path authority. It answers “who may perform
+this governed change?” A role is declared for a non-read invocation through <code>--as-role</code> or a live,
+repository-bound authority session. A model, runtime, skill, capability, or executor kind cannot
+grant or change the task&#x27;s role.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai init apply architect --target . --tier tier1 --as-role architect --write --help</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="effect">Effect<a href="#effect" class="hash-link" aria-label="Direct link to Effect" title="Direct link to Effect" translate="no">​</a></h3>
+<p>An <strong>effect</strong> is the maximum intrinsic mutation class of the resolved invocation. It answers “what
+may this invocation change?” Effects are conservative capability ceilings and are resolved before
+authority and consent. The effect does not grant authority; role, path policy, planner, mutation
+boundary, and explicit consent must all agree. Every resolved <code>remote-write</code> invocation, including
+a dry run, requires independent <code>--write</code> and <code>--publish</code> consent.</p>
+<p>See <a class="" href="/devai/docs/reference/cli/authority-effects">authority and effects</a>.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="verdict">Verdict<a href="#verdict" class="hash-link" aria-label="Direct link to Verdict" title="Direct link to Verdict" translate="no">​</a></h3>
+<p>A <strong>verdict</strong> is a governed evaluation outcome in an action, check, sensor, or task aggregate. It
+is not the same as process execution state: a command can execute successfully while reporting a
+non-passing readiness verdict. Aggregation follows canonical precedence, and missing, malformed,
+or unknown outcomes never default to pass.</p>
+<p>Read both the action envelope and the verdict it carries:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai check --only cli-reference --repo-root . --format json</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="lifecycle">Lifecycle<a href="#lifecycle" class="hash-link" aria-label="Direct link to Lifecycle" title="Direct link to Lifecycle" translate="no">​</a></h3>
+<p>An action&#x27;s <strong>lifecycle</strong> records whether its identity is supported or guarded by an explicit
+experimental boundary. Lifecycle is independent of a result verdict and independent of the
+repository&#x27;s adoption tier.</p>
+<p>Inspect a leaf without dispatching it:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai release status --help</span><br></div></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-surface-words">The surface words<a href="#the-surface-words" class="hash-link" aria-label="Direct link to The surface words" title="Direct link to The surface words" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="porcelain">Porcelain<a href="#porcelain" class="hash-link" aria-label="Direct link to Porcelain" title="Direct link to Porcelain" translate="no">​</a></h3>
+<p><strong>Porcelain</strong> is the workflow-facing CLI surface. It is shown in default help and is organized
+around the seven domains in the <a class="" href="/devai/docs/reference/cli/">CLI overview</a>. Porcelain may orchestrate internal
+services, but it retains exact action, effect, consent, and output contracts.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai catalog actions --format json</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="plumbing">Plumbing<a href="#plumbing" class="hash-link" aria-label="Direct link to Plumbing" title="Direct link to Plumbing" translate="no">​</a></h3>
+<p><strong>Plumbing</strong> is the hidden low-level surface used by orchestration and advanced automation. It is
+visible only in expanded help. Plumbing is not an eighth workflow, carries no broader authority,
+and cannot relax round containment or consent.</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai catalog actions --format json</span><br></div></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="distinctions-to-preserve">Distinctions to preserve<a href="#distinctions-to-preserve" class="hash-link" aria-label="Direct link to Distinctions to preserve" title="Direct link to Distinctions to preserve" translate="no">​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Do not conflate...</th><th>Because...</th></tr></thead><tbody><tr><td>suite and preset</td><td>suites validate; presets observe</td></tr><tr><td>preset and kind</td><td>a preset selects an ordered population; a kind identifies one sensor</td></tr><tr><td>slice and preset</td><td>a slice renders an inventory projection; a preset runs sensors</td></tr><tr><td>adoption tier and surface tier</td><td>one sets binding obligations; the other controls CLI visibility</td></tr><tr><td>round and task</td><td>the round is the governed container; the task is subordinate work</td></tr><tr><td>role and executor</td><td>discipline grants path authority; execution mechanism does not</td></tr><tr><td>capability and effect</td><td>capability is a reviewed ceiling input; resolved effect drives consent</td></tr><tr><td>process exit and verdict</td><td>transport completion does not make an evaluation pass</td></tr><tr><td>lifecycle and verdict</td><td>lifecycle describes an action identity; verdict describes one result</td></tr><tr><td>porcelain and plumbing</td><td>visibility and ergonomics do not change authority</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="canonical-verdict-descriptors">Canonical verdict descriptors<a href="#canonical-verdict-descriptors" class="hash-link" aria-label="Direct link to Canonical verdict descriptors" title="Direct link to Canonical verdict descriptors" translate="no">​</a></h2>
+<p>The renderer derives this complete descriptor population from
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json" target="_blank" rel="noopener noreferrer" class=""><code>round-execution.json#/vocabularies/verdicts</code></a>, with
+sensor-state parity checked against the
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json" target="_blank" rel="noopener noreferrer" class="">sensor-reading schema</a>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="verdicts">Verdicts<a href="#verdicts" class="hash-link" aria-label="Direct link to Verdicts" title="Direct link to Verdicts" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="pass--pass"><code>pass</code> — Pass<a href="#pass--pass" class="hash-link" aria-label="Direct link to pass--pass" title="Direct link to pass--pass" translate="no">  ​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> pass</li>
+<li class=""><strong>User-facing label:</strong> Pass</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>pass</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>pass</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>pass</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>pass</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="review--review"><code>review</code> — Review<a href="#review--review" class="hash-link" aria-label="Direct link to review--review" title="Direct link to review--review" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> review</li>
+<li class=""><strong>User-facing label:</strong> Review</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>review</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>review</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>review</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>review</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="fail--fail"><code>fail</code> — Fail<a href="#fail--fail" class="hash-link" aria-label="Direct link to fail--fail" title="Direct link to fail--fail" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> fail</li>
+<li class=""><strong>User-facing label:</strong> Fail</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>fail</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>fail</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>fail</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>fail</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="unknown--unknown"><code>unknown</code> — Unknown<a href="#unknown--unknown" class="hash-link" aria-label="Direct link to unknown--unknown" title="Direct link to unknown--unknown" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> unknown</li>
+<li class=""><strong>User-facing label:</strong> Unknown</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>unknown</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>unknown</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>unknown</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>unknown</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="na--na"><code>na</code> — Na<a href="#na--na" class="hash-link" aria-label="Direct link to na--na" title="Direct link to na--na" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> na</li>
+<li class=""><strong>User-facing label:</strong> Na</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>na</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>na</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>na</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>na</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="skipped--skipped"><code>skipped</code> — Skipped<a href="#skipped--skipped" class="hash-link" aria-label="Direct link to skipped--skipped" title="Direct link to skipped--skipped" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> skipped</li>
+<li class=""><strong>User-facing label:</strong> Skipped</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>skipped</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>skipped</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>skipped</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>skipped</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="error--error"><code>error</code> — Error<a href="#error--error" class="hash-link" aria-label="Direct link to error--error" title="Direct link to error--error" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> error</li>
+<li class=""><strong>User-facing label:</strong> Error</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>error</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>error</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>error</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>error</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="killed--killed"><code>killed</code> — Killed<a href="#killed--killed" class="hash-link" aria-label="Direct link to killed--killed" title="Direct link to killed--killed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> killed</li>
+<li class=""><strong>User-facing label:</strong> Killed</li>
+<li class=""><strong>Purpose:</strong> Represent the explicit <code>killed</code> aggregate outcome without coercing it to pass.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical verdicts value <code>killed</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>killed</code> retains its literal aggregate meaning and is never silently coerced to pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>killed</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/verdicts" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/sensor-reading.schema.json#/properties/status/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/sensor-reading.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="canonical-lifecycle-descriptors">Canonical lifecycle descriptors<a href="#canonical-lifecycle-descriptors" class="hash-link" aria-label="Direct link to Canonical lifecycle descriptors" title="Direct link to Canonical lifecycle descriptors" translate="no">​</a></h2>
+<p>The renderer derives this complete population from the lifecycle enum in the
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json" target="_blank" rel="noopener noreferrer" class="">action-registry schema</a>. Per-action assignment
+remains in the <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json" target="_blank" rel="noopener noreferrer" class="">action registry</a>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="action-lifecycles">Action lifecycles<a href="#action-lifecycles" class="hash-link" aria-label="Direct link to Action lifecycles" title="Direct link to Action lifecycles" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="supported--supported"><code>supported</code> — Supported<a href="#supported--supported" class="hash-link" aria-label="Direct link to supported--supported" title="Direct link to supported--supported" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> supported</li>
+<li class=""><strong>User-facing label:</strong> Supported</li>
+<li class=""><strong>Purpose:</strong> Describe an action whose canonical lifecycle is <code>supported</code>.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical action-lifecycles value <code>supported</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> Not applicable: this value classifies a record; the enclosing operation owns verdict semantics.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>supported</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai catalog actions --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/action_lifecycles" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>catalog</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="experimental--experimental"><code>experimental</code> — Experimental<a href="#experimental--experimental" class="hash-link" aria-label="Direct link to experimental--experimental" title="Direct link to experimental--experimental" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> experimental</li>
+<li class=""><strong>User-facing label:</strong> Experimental</li>
+<li class=""><strong>Purpose:</strong> Describe an action whose canonical lifecycle is <code>experimental</code>.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical action-lifecycles value <code>experimental</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> Not applicable: this value classifies a record; the enclosing operation owns verdict semantics.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing resolved action.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>experimental</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai catalog actions --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/action_lifecycles" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>catalog</code></li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="canonical-surface-tier-descriptors">Canonical surface-tier descriptors<a href="#canonical-surface-tier-descriptors" class="hash-link" aria-label="Direct link to Canonical surface-tier descriptors" title="Direct link to Canonical surface-tier descriptors" translate="no">​</a></h2>
+<p>The renderer derives this complete population and its exact domain projection from
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json" target="_blank" rel="noopener noreferrer" class=""><code>round-execution.json#/vocabularies/surface_tiers</code></a> and
+checks the identifiers against the action-registry schema.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="surface-tiers">Surface tiers<a href="#surface-tiers" class="hash-link" aria-label="Direct link to Surface tiers" title="Direct link to Surface tiers" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="porcelain--porcelain"><code>porcelain</code> — Porcelain<a href="#porcelain--porcelain" class="hash-link" aria-label="Direct link to porcelain--porcelain" title="Direct link to porcelain--porcelain" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> porcelain</li>
+<li class=""><strong>User-facing label:</strong> Porcelain</li>
+<li class=""><strong>Purpose:</strong> Select the canonical <code>porcelain</code> surface tier.</li>
+<li class=""><strong>Population or projection:</strong> <code>init</code>, <code>doctor</code>, <code>check</code>, <code>sense</code>, <code>round</code>, <code>evidence</code>, <code>release</code></li>
+<li class=""><strong>Prerequisites:</strong> A readable repository root and a canonical descriptor that resolves every selected member.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: no additional external tool is declared by the canonical surface tier descriptor.</li>
+<li class=""><strong>Accepted inputs:</strong> This classification is emitted by the hidden action catalog; it is not selected as a public workflow input.</li>
+<li class=""><strong>Defaults:</strong> No surface tier is inferred outside the canonical action registry.</li>
+<li class=""><strong>Output contract:</strong> action-envelope using law/schemas/action-result.schema.json.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>pass</code> requires the complete projection; unsupported or unresolved members return an error and never a partial pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing action, not this vocabulary value.</li>
+<li class=""><strong>Cost class:</strong> <code>moderate</code></li>
+<li class=""><strong>When to use:</strong> Use when the named surface tier is the exact requested scope.</li>
+<li class=""><strong>When not to use:</strong> Do not treat it as a check suite, sense preset, or authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai catalog actions --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/surface_tiers" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/properties/entries/items/properties/tier/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>catalog</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="plumbing--plumbing"><code>plumbing</code> — Plumbing<a href="#plumbing--plumbing" class="hash-link" aria-label="Direct link to plumbing--plumbing" title="Direct link to plumbing--plumbing" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> plumbing</li>
+<li class=""><strong>User-facing label:</strong> Plumbing</li>
+<li class=""><strong>Purpose:</strong> Select the canonical <code>plumbing</code> surface tier.</li>
+<li class=""><strong>Population or projection:</strong> <code>task</code>, <code>catalog</code></li>
+<li class=""><strong>Prerequisites:</strong> A readable repository root and a canonical descriptor that resolves every selected member.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: no additional external tool is declared by the canonical surface tier descriptor.</li>
+<li class=""><strong>Accepted inputs:</strong> This classification is emitted by the hidden action catalog; it is not selected as a public workflow input.</li>
+<li class=""><strong>Defaults:</strong> No surface tier is inferred outside the canonical action registry.</li>
+<li class=""><strong>Output contract:</strong> action-envelope using law/schemas/action-result.schema.json.</li>
+<li class=""><strong>Verdict semantics:</strong> <code>pass</code> requires the complete projection; unsupported or unresolved members return an error and never a partial pass.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: this vocabulary value grants no action effect.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: consent belongs to the enclosing action, not this vocabulary value.</li>
+<li class=""><strong>Cost class:</strong> <code>moderate</code></li>
+<li class=""><strong>When to use:</strong> Use when the named surface tier is the exact requested scope.</li>
+<li class=""><strong>When not to use:</strong> Do not treat it as a check suite, sense preset, or authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai catalog actions --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/round-execution.json#/vocabularies/surface_tiers" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/round-execution.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/properties/entries/items/properties/tier/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>catalog</code></li>
+</ul>
+<p>Canonical routing: <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json" target="_blank" rel="noopener noreferrer" class="">action registry</a>,
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/documentation-information-architecture.json" target="_blank" rel="noopener noreferrer" class="">documentation information architecture</a>.</p></div></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/devai/docs/reference/cli/sensor-kinds"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Sensor-kind catalog</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/devai/docs/reference/cli"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">CLI reference</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#the-selection-words" class="table-of-contents__link toc-highlight">The selection words</a><ul><li><a href="#suite" class="table-of-contents__link toc-highlight">Suite</a></li><li><a href="#preset" class="table-of-contents__link toc-highlight">Preset</a></li><li><a href="#kind" class="table-of-contents__link toc-highlight">Kind</a></li><li><a href="#slice" class="table-of-contents__link toc-highlight">Slice</a></li><li><a href="#tier" class="table-of-contents__link toc-highlight">Tier</a></li></ul></li><li><a href="#the-work-words" class="table-of-contents__link toc-highlight">The work words</a><ul><li><a href="#round" class="table-of-contents__link toc-highlight">Round</a></li><li><a href="#task" class="table-of-contents__link toc-highlight">Task</a></li></ul></li><li><a href="#the-safety-words" class="table-of-contents__link toc-highlight">The safety words</a><ul><li><a href="#role" class="table-of-contents__link toc-highlight">Role</a></li><li><a href="#effect" class="table-of-contents__link toc-highlight">Effect</a></li><li><a href="#verdict" class="table-of-contents__link toc-highlight">Verdict</a></li><li><a href="#lifecycle" class="table-of-contents__link toc-highlight">Lifecycle</a></li></ul></li><li><a href="#the-surface-words" class="table-of-contents__link toc-highlight">The surface words</a><ul><li><a href="#porcelain" class="table-of-contents__link toc-highlight">Porcelain</a></li><li><a href="#plumbing" class="table-of-contents__link toc-highlight">Plumbing</a></li></ul></li><li><a href="#distinctions-to-preserve" class="table-of-contents__link toc-highlight">Distinctions to preserve</a></li><li><a href="#canonical-verdict-descriptors" class="table-of-contents__link toc-highlight">Canonical verdict descriptors</a></li><li><a href="#verdicts" class="table-of-contents__link toc-highlight">Verdicts</a><ul><li><a href="#pass--pass" class="table-of-contents__link toc-highlight"><code>pass</code> — Pass</a></li><li><a href="#review--review" class="table-of-contents__link toc-highlight"><code>review</code> — Review</a></li><li><a href="#fail--fail" class="table-of-contents__link toc-highlight"><code>fail</code> — Fail</a></li><li><a href="#unknown--unknown" class="table-of-contents__link toc-highlight"><code>unknown</code> — Unknown</a></li><li><a href="#na--na" class="table-of-contents__link toc-highlight"><code>na</code> — Na</a></li><li><a href="#skipped--skipped" class="table-of-contents__link toc-highlight"><code>skipped</code> — Skipped</a></li><li><a href="#error--error" class="table-of-contents__link toc-highlight"><code>error</code> — Error</a></li><li><a href="#killed--killed" class="table-of-contents__link toc-highlight"><code>killed</code> — Killed</a></li></ul></li><li><a href="#canonical-lifecycle-descriptors" class="table-of-contents__link toc-highlight">Canonical lifecycle descriptors</a></li><li><a href="#action-lifecycles" class="table-of-contents__link toc-highlight">Action lifecycles</a><ul><li><a href="#supported--supported" class="table-of-contents__link toc-highlight"><code>supported</code> — Supported</a></li><li><a href="#experimental--experimental" class="table-of-contents__link toc-highlight"><code>experimental</code> — Experimental</a></li></ul></li><li><a href="#canonical-surface-tier-descriptors" class="table-of-contents__link toc-highlight">Canonical surface-tier descriptors</a></li><li><a href="#surface-tiers" class="table-of-contents__link toc-highlight">Surface tiers</a><ul><li><a href="#porcelain--porcelain" class="table-of-contents__link toc-highlight"><code>porcelain</code> — Porcelain</a></li><li><a href="#plumbing--plumbing" class="table-of-contents__link toc-highlight"><code>plumbing</code> — Plumbing</a></li></ul></li></ul></div></div></div></div></main></div></div></div></div>
+</body>
+</html>

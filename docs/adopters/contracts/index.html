@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-adopters/contracts/index" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.2">
+<title data-rh="true">Contracts — authoring rules | DEVAI</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://aarusso-nyx.github.io/devai/docs/adopters/contracts/"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Contracts — authoring rules | DEVAI"><meta data-rh="true" name="description" content="Authority: Architect. See CONVENTIONS.md for the adopter documentation conventions."><meta data-rh="true" property="og:description" content="Authority: Architect. See CONVENTIONS.md for the adopter documentation conventions."><link data-rh="true" rel="canonical" href="https://aarusso-nyx.github.io/devai/docs/adopters/contracts/"><link data-rh="true" rel="alternate" href="https://aarusso-nyx.github.io/devai/docs/adopters/contracts/" hreflang="en"><link data-rh="true" rel="alternate" href="https://aarusso-nyx.github.io/devai/docs/adopters/contracts/" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Contracts — authoring rules","item":"https://aarusso-nyx.github.io/devai/docs/adopters/contracts/"}]}</script><link rel="stylesheet" href="/devai/assets/css/styles.06fb8d52.css">
+<script src="/devai/assets/js/runtime~main.80410387.js" defer="defer"></script>
+<script src="/devai/assets/js/main.c00a5455.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||"light"),document.documentElement.setAttribute("data-theme-choice",t||"light")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/devai/"><b class="navbar__title text--truncate">DEVAI</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/devai/docs/">Docs</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/devai/docs/adopters">Adopters</a><a class="navbar__item navbar__link" href="/devai/docs/reference">Reference</a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/"><span class="categoryLinkLabel_W154">Start</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/framework"><span class="categoryLinkLabel_W154">Theory</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/roles/cross-role-coordination"><span class="categoryLinkLabel_W154">Roles</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/devai/docs/adopters/CONVENTIONS"><span class="categoryLinkLabel_W154">Adopters</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/CONVENTIONS"><span class="linkLabel_WmDU">Adopter conventions</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist" tabindex="0" href="/devai/docs/adopters/adr/"><span class="categoryLinkLabel_W154">ADR template &amp; authoring rules</span></a><button aria-label="Expand sidebar category &#x27;ADR template &amp; authoring rules&#x27;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/ci-economy"><span class="linkLabel_WmDU">Cheap local checks and receipt-only CI</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item"><div class="menu__list-item-collapsible menu__list-item-collapsible--active"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--active" aria-current="page" tabindex="0" href="/devai/docs/adopters/contracts/"><span class="categoryLinkLabel_W154">Contracts — authoring rules</span></a><button aria-label="Collapse sidebar category &#x27;Contracts — authoring rules&#x27;" aria-expanded="true" type="button" class="clean-btn menu__caret"></button></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/contracts/TEMPLATE"><span class="linkLabel_WmDU">&lt;Contract Name&gt;</span></a></li></ul></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/database-layout"><span class="linkLabel_WmDU">database/ layout — adopter guide</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/docs-layout"><span class="linkLabel_WmDU">Documentation layout</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/"><span class="linkLabel_WmDU">Adopters</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/install"><span class="linkLabel_WmDU">Install and adopt</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/language-policy"><span class="linkLabel_WmDU">Language policy — adopter guide</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/mutation-scenarios"><span class="linkLabel_WmDU">Mutation evidence</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/pack-resolution"><span class="linkLabel_WmDU">Stack-pack inventory</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/role-declaration"><span class="linkLabel_WmDU">Declaring a role</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/scorecard-na-overrides"><span class="linkLabel_WmDU">Scorecard N/A overrides</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/sense-migrate-check"><span class="linkLabel_WmDU">Migration sensing</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist" tabindex="0" href="/devai/docs/adopters/templates/"><span class="categoryLinkLabel_W154">Adopter templates</span></a><button aria-label="Expand sidebar category &#x27;Adopter templates&#x27;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/adopters/thresholds"><span class="linkLabel_WmDU">Threshold configuration</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/dev/contributing"><span class="categoryLinkLabel_W154">Dev</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/reference"><span class="categoryLinkLabel_W154">Reference</span></a></div></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/devai/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Adopters</span></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">Contracts — authoring rules</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>Contracts — authoring rules</h1></header>
+<p><strong>Authority:</strong> Architect. See <a class="" href="/devai/docs/adopters/CONVENTIONS">CONVENTIONS.md</a> for the adopter documentation conventions.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-a-contract-is">What a contract is<a href="#what-a-contract-is" class="hash-link" aria-label="Direct link to What a contract is" title="Direct link to What a contract is" translate="no">​</a></h2>
+<p>A <strong>contract</strong> is the stable shape one part of the system exposes to other parts that mustn&#x27;t depend on implementation internals. Three flavors:</p>
+<ul>
+<li class=""><strong>API contracts</strong> — HTTP/AsyncAPI/RPC route families. Producer is a service; consumers are SDKs and other services.</li>
+<li class=""><strong>Data contracts</strong> — JSON Schemas defining the on-wire / on-disk shape of an object that flows across team boundaries.</li>
+<li class=""><strong>DDL contracts</strong> — SQL DDL that downstream tools (replication, BI, other apps) compile against.</li>
+</ul>
+<p>Contracts live at <code>docs/reference/contracts/</code> in each adopting repo. Per the docs-layout canon (<a class="" href="/devai/docs/adopters/docs-layout"><code>../docs-layout.md</code></a>), <code>docs/reference/contracts/</code> is short-form only and is distinct from <code>law/schemas/</code> (internal request/response shapes).</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="per-contract-file-structure">Per-contract file structure<a href="#per-contract-file-structure" class="hash-link" aria-label="Direct link to Per-contract file structure" title="Direct link to Per-contract file structure" translate="no">​</a></h2>
+<p>Every contract file under <code>docs/reference/contracts/</code> contains, in order:</p>
+<ol>
+<li class=""><strong>Title</strong> — <code># &lt;Contract Name&gt;</code>.</li>
+<li class=""><strong>Authority</strong> — which role issued (Architect, almost always).</li>
+<li class=""><strong>Stability</strong> — one of <code>experimental</code>, <code>stable</code>, <code>deprecated</code>.</li>
+<li class=""><strong>Purpose</strong> — one paragraph: what shape this contract pins, why a contract rather than a per-caller convention.</li>
+<li class=""><strong>Producer</strong> — who writes / serves this contract. One service, one CLI, one repo.</li>
+<li class=""><strong>Consumers</strong> — who reads. List concretely.</li>
+<li class=""><strong>Schema</strong> — either inline (small contracts) or a link to <code>*.schema.json</code> / <code>openapi.json</code> / <code>asyncapi.yaml</code> in the same directory.</li>
+<li class=""><strong>Compatibility rules</strong> — what changes are non-breaking, what changes require a new version.</li>
+<li class=""><strong>Examples</strong> — at least one worked example. Three is better (happy path, edge case, error case).</li>
+<li class=""><strong>Change log</strong> — append-only list of revisions: <code>vN — YYYY-MM-DD — summary</code>. Pre-stable changes use date-only markers.</li>
+</ol>
+<p>Use <a class="" href="/devai/docs/adopters/contracts/TEMPLATE"><code>TEMPLATE.md</code></a> verbatim as the starting point.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="schema-transports">Schema transports<a href="#schema-transports" class="hash-link" aria-label="Direct link to Schema transports" title="Direct link to Schema transports" translate="no">​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Transport</th><th>When to use</th><th>Filename pattern</th></tr></thead><tbody><tr><td><strong>JSON Schema 2020-12</strong></td><td>data contracts, config files, on-disk artifacts</td><td><code>&lt;name&gt;.schema.json</code></td></tr><tr><td><strong>OpenAPI 3.1</strong></td><td>HTTP API contracts</td><td><code>openapi.json</code> (one per service) or <code>&lt;service&gt;.openapi.json</code></td></tr><tr><td><strong>AsyncAPI 2.6</strong></td><td>event-driven / pubsub contracts</td><td><code>&lt;topic&gt;.asyncapi.yaml</code></td></tr><tr><td><strong>SQL DDL</strong></td><td>database surface contracts</td><td><code>ddl/&lt;nn&gt;-&lt;name&gt;.sql</code> (per the database-layout canon)</td></tr></tbody></table>
+<p>Pick the one that matches the wire format; do not author two transports for the same contract. If a contract carries both HTTP and an underlying data shape, ship the OpenAPI and have it <code>$ref</code> the JSON Schema for the body.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="stability-levels">Stability levels<a href="#stability-levels" class="hash-link" aria-label="Direct link to Stability levels" title="Direct link to Stability levels" translate="no">​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Level</th><th>Compatibility commitment</th><th>What can change</th></tr></thead><tbody><tr><td><code>experimental</code></td><td>none</td><td>any shape change permitted; readers MUST pin a version.</td></tr><tr><td><code>stable</code></td><td>semver-style additive only</td><td>add fields, add enum values; never remove or rename.</td></tr><tr><td><code>deprecated</code></td><td>scheduled for removal</td><td>no changes; consumers migrate to the named replacement.</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="breaking-changes-require-a-new-contract-version--adr">Breaking changes require a new contract version + ADR<a href="#breaking-changes-require-a-new-contract-version--adr" class="hash-link" aria-label="Direct link to Breaking changes require a new contract version + ADR" title="Direct link to Breaking changes require a new contract version + ADR" translate="no">​</a></h2>
+<p>A breaking change is any of:</p>
+<ul>
+<li class="">removing a field, route, or schema;</li>
+<li class="">renaming a field, route, schema, or enum value;</li>
+<li class="">tightening a constraint (adding a <code>required</code> field, narrowing a <code>oneOf</code>, lowering a <code>maxItems</code>);</li>
+<li class="">changing the meaning of a field while keeping its name.</li>
+</ul>
+<p>To ship a breaking change:</p>
+<ol>
+<li class="">Open an ADR per <a href="https://github.com/aarusso-nyx/devai/blob/main/law/adr/README.md" target="_blank" rel="noopener noreferrer" class=""><code>../../meta/adr/README.md</code></a> recording the <em>why</em>.</li>
+<li class="">Ship a new contract file <code>&lt;name&gt;-v2.md</code> + <code>&lt;name&gt;-v2.schema.json</code>. Old version stays.</li>
+<li class="">Mark the old contract <code>deprecated</code> and link to the replacement.</li>
+<li class="">Bump consumers in a deliberate sequence.</li>
+<li class="">Eventually delete the old contract — but only after all consumers have migrated.</li>
+</ol>
+<p>A <code>schemaVersion</code> field inside a JSON Schema serves the same role at the data layer; bump it on any change a strict reader would reject.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="worked-stability--compatibility-matrix">Worked stability / compatibility matrix<a href="#worked-stability--compatibility-matrix" class="hash-link" aria-label="Direct link to Worked stability / compatibility matrix" title="Direct link to Worked stability / compatibility matrix" translate="no">​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Change</th><th><code>experimental</code></th><th><code>stable</code></th><th>Notes</th></tr></thead><tbody><tr><td>Add optional field</td><td>OK</td><td>OK</td><td>additive, always non-breaking</td></tr><tr><td>Add enum value</td><td>OK</td><td>OK if all consumers tolerate unknowns</td><td>otherwise breaking</td></tr><tr><td>Add <code>required</code> field</td><td>OK</td><td>breaking</td><td>tightens reader contract</td></tr><tr><td>Rename field</td><td>OK</td><td>breaking</td><td>ship <code>v2</code></td></tr><tr><td>Remove field</td><td>OK</td><td>breaking</td><td>ship <code>v2</code>, deprecate v1</td></tr><tr><td>Change type (string → number)</td><td>OK</td><td>breaking</td><td>always</td></tr><tr><td>Loosen <code>pattern</code> regex</td><td>OK</td><td>OK</td><td>wider acceptance</td></tr><tr><td>Tighten <code>pattern</code> regex</td><td>OK</td><td>breaking</td><td>narrower acceptance</td></tr><tr><td>Add HTTP route</td><td>OK</td><td>OK</td><td>additive</td></tr><tr><td>Add response field</td><td>OK</td><td>OK</td><td>additive</td></tr><tr><td>Add request body required field</td><td>OK</td><td>breaking</td><td>tightens producer requirement</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="index-pattern">Index pattern<a href="#index-pattern" class="hash-link" aria-label="Direct link to Index pattern" title="Direct link to Index pattern" translate="no">​</a></h2>
+<p>Every <code>docs/reference/contracts/README.md</code> lists its contracts in an index. Sample:</p>
+<div class="language-text codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">## Contracts</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">| Contract     | Transport   | Stability    | Producer            |</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">|--------------|-------------|--------------|---------------------|</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">| test-result  | JSON Schema | experimental | `devai evidence record --kind test` |</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">| thresholds   | JSON Schema | stable       | adopter-owned       |</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">| audit-events | OpenAPI     | stable       | platform-audit      |</span><br></div></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="cross-references">Cross-references<a href="#cross-references" class="hash-link" aria-label="Direct link to Cross-references" title="Direct link to Cross-references" translate="no">​</a></h2>
+<ul>
+<li class="">Template: <a class="" href="/devai/docs/adopters/contracts/TEMPLATE"><code>TEMPLATE.md</code></a>.</li>
+<li class="">ADR template (breaking changes): <a href="https://github.com/aarusso-nyx/devai/blob/main/law/adr/README.md" target="_blank" rel="noopener noreferrer" class=""><code>../../meta/adr/README.md</code></a>.</li>
+<li class="">Docs layout: <a class="" href="/devai/docs/adopters/docs-layout"><code>../docs-layout.md</code></a>.</li>
+<li class="">Database DDL conventions: <a class="" href="/devai/docs/adopters/database-layout"><code>../database-layout.md</code></a>.</li>
+<li class="">DEVAI&#x27;s current contracts: <a class="" href="/devai/docs/reference/contracts/"><code>../../docs/reference/contracts/</code></a>.</li>
+</ul></div></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/devai/docs/adopters/ci-economy"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Cheap local checks and receipt-only CI</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/devai/docs/adopters/contracts/TEMPLATE"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">&lt;Contract Name&gt;</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#what-a-contract-is" class="table-of-contents__link toc-highlight">What a contract is</a></li><li><a href="#per-contract-file-structure" class="table-of-contents__link toc-highlight">Per-contract file structure</a></li><li><a href="#schema-transports" class="table-of-contents__link toc-highlight">Schema transports</a></li><li><a href="#stability-levels" class="table-of-contents__link toc-highlight">Stability levels</a></li><li><a href="#breaking-changes-require-a-new-contract-version--adr" class="table-of-contents__link toc-highlight">Breaking changes require a new contract version + ADR</a></li><li><a href="#worked-stability--compatibility-matrix" class="table-of-contents__link toc-highlight">Worked stability / compatibility matrix</a></li><li><a href="#index-pattern" class="table-of-contents__link toc-highlight">Index pattern</a></li><li><a href="#cross-references" class="table-of-contents__link toc-highlight">Cross-references</a></li></ul></div></div></div></div></main></div></div></div></div>
+</body>
+</html>

@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-reference/cli/authority-effects" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.2">
+<title data-rh="true">Authority and effects | DEVAI</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://aarusso-nyx.github.io/devai/docs/reference/cli/authority-effects"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Authority and effects | DEVAI"><meta data-rh="true" name="description" content="DEVAI authorizes a non-read invocation only when two independent questions both resolve:"><meta data-rh="true" property="og:description" content="DEVAI authorizes a non-read invocation only when two independent questions both resolve:"><link data-rh="true" rel="canonical" href="https://aarusso-nyx.github.io/devai/docs/reference/cli/authority-effects"><link data-rh="true" rel="alternate" href="https://aarusso-nyx.github.io/devai/docs/reference/cli/authority-effects" hreflang="en"><link data-rh="true" rel="alternate" href="https://aarusso-nyx.github.io/devai/docs/reference/cli/authority-effects" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"CLI overview","item":"https://aarusso-nyx.github.io/devai/docs/reference/cli/"},{"@type":"ListItem","position":2,"name":"Authority and effects","item":"https://aarusso-nyx.github.io/devai/docs/reference/cli/authority-effects"}]}</script><link rel="stylesheet" href="/devai/assets/css/styles.06fb8d52.css">
+<script src="/devai/assets/js/runtime~main.80410387.js" defer="defer"></script>
+<script src="/devai/assets/js/main.c00a5455.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||"light"),document.documentElement.setAttribute("data-theme-choice",t||"light")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/devai/"><b class="navbar__title text--truncate">DEVAI</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/devai/docs/">Docs</a><a class="navbar__item navbar__link" href="/devai/docs/adopters">Adopters</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/devai/docs/reference">Reference</a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/"><span class="categoryLinkLabel_W154">Start</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/framework"><span class="categoryLinkLabel_W154">Theory</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/roles/cross-role-coordination"><span class="categoryLinkLabel_W154">Roles</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/adopters/CONVENTIONS"><span class="categoryLinkLabel_W154">Adopters</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/devai/docs/dev/contributing"><span class="categoryLinkLabel_W154">Dev</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/devai/docs/reference"><span class="categoryLinkLabel_W154">Reference</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference"><span class="linkLabel_WmDU">Reference</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--active" tabindex="0" href="/devai/docs/reference/cli/"><span class="categoryLinkLabel_W154">CLI overview</span></a><button aria-label="Collapse sidebar category &#x27;CLI overview&#x27;" aria-expanded="true" type="button" class="clean-btn menu__caret"></button></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/adoption-tiers"><span class="linkLabel_WmDU">Adoption tiers</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/devai/docs/reference/cli/authority-effects"><span class="linkLabel_WmDU">Authority and effects</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/check-suites"><span class="linkLabel_WmDU">Check suites</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/inventory-slices"><span class="linkLabel_WmDU">Inventory slices</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/model-runtime"><span class="linkLabel_WmDU">Model runtime bridges</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/round-task-executors"><span class="linkLabel_WmDU">Rounds, tasks, and executors</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/sense-presets"><span class="linkLabel_WmDU">Sense presets</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/sensor-kinds"><span class="linkLabel_WmDU">Sensor-kind catalog</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli/vocabulary"><span class="linkLabel_WmDU">CLI vocabulary</span></a></li></ul></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/cli"><span class="linkLabel_WmDU">CLI reference</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist" tabindex="0" href="/devai/docs/reference/contracts/"><span class="categoryLinkLabel_W154">Contracts</span></a><button aria-label="Expand sidebar category &#x27;Contracts&#x27;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/examples"><span class="linkLabel_WmDU">Examples and fixtures</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/glossary"><span class="linkLabel_WmDU">Glossary</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/law"><span class="linkLabel_WmDU">Law</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/product"><span class="linkLabel_WmDU">Product sources</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/recipes/"><span class="linkLabel_WmDU">Recipes</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/scripts"><span class="linkLabel_WmDU">Repository scripts</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/devai/docs/reference/sensors-quick-ref"><span class="linkLabel_WmDU">Sensors quick reference</span></a></li></ul></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/devai/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Reference</span></li><li class="breadcrumbs__item"><a class="breadcrumbs__link" href="/devai/docs/reference/cli/"><span>CLI overview</span></a></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">Authority and effects</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>Authority and effects</h1></header>
+<p>DEVAI authorizes a non-read invocation only when two independent questions both resolve:</p>
+<ol>
+<li class=""><strong>Authority:</strong> is the declared human role permitted to perform this action against these exact
+paths and resources?</li>
+<li class=""><strong>Effect:</strong> what is the maximum intrinsic mutation the resolved invocation can perform, and did
+the caller supply the required consent?</li>
+</ol>
+<p>A correct role cannot downgrade an effect. A declared effect cannot grant a role. Executor kind,
+runtime, model, effort, skill, and capability cannot answer either question on their own.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-authorization-sequence">The authorization sequence<a href="#the-authorization-sequence" class="hash-link" aria-label="Direct link to The authorization sequence" title="Direct link to The authorization sequence" translate="no">​</a></h2>
+<p>Before any mutation, the runtime:</p>
+<ol>
+<li class="">resolves the exact leaf action and any parameterized member population;</li>
+<li class="">derives the member population&#x27;s capability ceiling and maximum effect;</li>
+<li class="">resolves one human role declaration or one live, repository-bound authority session when the
+effect is non-read;</li>
+<li class="">checks action, role, canonical target path, operation, and active policy together;</li>
+<li class="">checks independent write and publication consent;</li>
+<li class="">installs the exact planner and mutation-adapter boundary; and</li>
+<li class="">re-verifies the final targets before committing the bounded effect.</li>
+</ol>
+<p>Missing metadata, an unresolved target, effect/capability divergence, or policy disagreement fails
+closed. A broad declaration is reviewable intent, not permission to perform an undeclared concrete
+operation.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="canonical-role-descriptors">Canonical role descriptors<a href="#canonical-role-descriptors" class="hash-link" aria-label="Direct link to Canonical role descriptors" title="Direct link to Canonical role descriptors" translate="no">​</a></h2>
+<p>The renderer derives the complete human-role population from the
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json" target="_blank" rel="noopener noreferrer" class="">action-registry schema</a> and joins it to
+role/effect rules in the <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json" target="_blank" rel="noopener noreferrer" class="">action registry</a>. The generated
+entries own labels, exact projections, prerequisites, inputs/defaults, outputs, effects/consent,
+cost, use guidance, non-pass behavior, examples, and source links.</p>
+<p>The multi-role authority marker <code>joint</code> is composition metadata, not another human role. A task&#x27;s
+<code>discipline</code> supplies its role; an executor may not override it. Cross-role work requires a session
+and commit boundary.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="roles">Roles<a href="#roles" class="hash-link" aria-label="Direct link to Roles" title="Direct link to Roles" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="owner--owner"><code>owner</code> — Owner<a href="#owner--owner" class="hash-link" aria-label="Direct link to owner--owner" title="Direct link to owner--owner" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> owner</li>
+<li class=""><strong>User-facing label:</strong> Owner</li>
+<li class=""><strong>Purpose:</strong> Identify the human <code>owner</code> discipline; only matching action authority contracts permit an invocation.</li>
+<li class=""><strong>Population or projection:</strong> 11 matching action contracts; effects <code>harness-write</code>, <code>local-write</code>, <code>remote-write</code>; actions <code>evidence collect</code>, <code>evidence record</code>, <code>evidence redact</code>, <code>evidence render</code>, <code>init apply owner</code>, <code>round close</code>, <code>round gap create</code>, <code>round gap resolve</code>, <code>round run</code>, <code>sense record</code>, <code>sense run</code>.</li>
+<li class=""><strong>Prerequisites:</strong> An invocation-scoped <code>--as-role owner</code> declaration or live repository-bound authority session, plus a matching action contract.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: a role is a governance discipline, not an executor or adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> <code>--as-role owner</code> only on a non-read action whose canonical authority contract allowlists this role.</li>
+<li class=""><strong>Defaults:</strong> No role is inferred from executor kind, model capability, environment, or prior invocation.</li>
+<li class=""><strong>Output contract:</strong> The resolved authority evidence preserves the initiating human role and exact action contract.</li>
+<li class=""><strong>Verdict semantics:</strong> A missing declaration, disallowed role, selector mismatch, or stale session refuses before effects.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: role discipline grants no effect by itself.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: explicit effect-specific consent remains independently required.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use <code>owner</code> only when operating within that discipline&#x27;s canonical path and action authority.</li>
+<li class=""><strong>When not to use:</strong> Do not use a role declaration to widen executor, model, mutation, publication, or path authority.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai round run --round R-1000 --repo-root . --as-role owner --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/$defs/authorityContract/properties/subject/oneOf/1/properties/allowed_roles/items/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries/*/authority_contract" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>round</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="architect--architect"><code>architect</code> — Architect<a href="#architect--architect" class="hash-link" aria-label="Direct link to architect--architect" title="Direct link to architect--architect" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> architect</li>
+<li class=""><strong>User-facing label:</strong> Architect</li>
+<li class=""><strong>Purpose:</strong> Identify the human <code>architect</code> discipline; only matching action authority contracts permit an invocation.</li>
+<li class=""><strong>Population or projection:</strong> 18 matching action contracts; effects <code>harness-write</code>, <code>local-write</code>, <code>remote-write</code>; actions <code>evidence collect</code>, <code>evidence record</code>, <code>evidence redact</code>, <code>evidence render</code>, <code>init apply architect</code>, <code>init apply harness</code>, <code>init bind</code>, <code>release check</code>, <code>release drift</code>, <code>release verify</code>, <code>round close</code>, <code>round gap create</code>, <code>round gap resolve</code>, <code>round plan</code>, <code>round run</code>, <code>round seal</code>, <code>sense record</code>, <code>sense run</code>.</li>
+<li class=""><strong>Prerequisites:</strong> An invocation-scoped <code>--as-role architect</code> declaration or live repository-bound authority session, plus a matching action contract.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: a role is a governance discipline, not an executor or adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> <code>--as-role architect</code> only on a non-read action whose canonical authority contract allowlists this role.</li>
+<li class=""><strong>Defaults:</strong> No role is inferred from executor kind, model capability, environment, or prior invocation.</li>
+<li class=""><strong>Output contract:</strong> The resolved authority evidence preserves the initiating human role and exact action contract.</li>
+<li class=""><strong>Verdict semantics:</strong> A missing declaration, disallowed role, selector mismatch, or stale session refuses before effects.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: role discipline grants no effect by itself.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: explicit effect-specific consent remains independently required.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use <code>architect</code> only when operating within that discipline&#x27;s canonical path and action authority.</li>
+<li class=""><strong>When not to use:</strong> Do not use a role declaration to widen executor, model, mutation, publication, or path authority.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai round run --round R-1000 --repo-root . --as-role architect --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/$defs/authorityContract/properties/subject/oneOf/1/properties/allowed_roles/items/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries/*/authority_contract" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>round</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="inspector--inspector"><code>inspector</code> — Inspector<a href="#inspector--inspector" class="hash-link" aria-label="Direct link to inspector--inspector" title="Direct link to inspector--inspector" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> inspector</li>
+<li class=""><strong>User-facing label:</strong> Inspector</li>
+<li class=""><strong>Purpose:</strong> Identify the human <code>inspector</code> discipline; only matching action authority contracts permit an invocation.</li>
+<li class=""><strong>Population or projection:</strong> 11 matching action contracts; effects <code>local-write</code>, <code>harness-write</code>, <code>remote-write</code>; actions <code>check</code>, <code>evidence collect</code>, <code>evidence record</code>, <code>evidence redact</code>, <code>evidence render</code>, <code>round close</code>, <code>round gap create</code>, <code>round gap resolve</code>, <code>round run</code>, <code>sense record</code>, <code>sense run</code>.</li>
+<li class=""><strong>Prerequisites:</strong> An invocation-scoped <code>--as-role inspector</code> declaration or live repository-bound authority session, plus a matching action contract.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: a role is a governance discipline, not an executor or adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> <code>--as-role inspector</code> only on a non-read action whose canonical authority contract allowlists this role.</li>
+<li class=""><strong>Defaults:</strong> No role is inferred from executor kind, model capability, environment, or prior invocation.</li>
+<li class=""><strong>Output contract:</strong> The resolved authority evidence preserves the initiating human role and exact action contract.</li>
+<li class=""><strong>Verdict semantics:</strong> A missing declaration, disallowed role, selector mismatch, or stale session refuses before effects.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: role discipline grants no effect by itself.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: explicit effect-specific consent remains independently required.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use <code>inspector</code> only when operating within that discipline&#x27;s canonical path and action authority.</li>
+<li class=""><strong>When not to use:</strong> Do not use a role declaration to widen executor, model, mutation, publication, or path authority.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai round run --round R-1000 --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/$defs/authorityContract/properties/subject/oneOf/1/properties/allowed_roles/items/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries/*/authority_contract" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>round</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="engineer--engineer"><code>engineer</code> — Engineer<a href="#engineer--engineer" class="hash-link" aria-label="Direct link to engineer--engineer" title="Direct link to engineer--engineer" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> engineer</li>
+<li class=""><strong>User-facing label:</strong> Engineer</li>
+<li class=""><strong>Purpose:</strong> Identify the human <code>engineer</code> discipline; only matching action authority contracts permit an invocation.</li>
+<li class=""><strong>Population or projection:</strong> 18 matching action contracts; effects <code>harness-write</code>, <code>local-write</code>, <code>remote-write</code>; actions <code>evidence collect</code>, <code>evidence record</code>, <code>evidence redact</code>, <code>evidence render</code>, <code>round close</code>, <code>round gap create</code>, <code>round gap resolve</code>, <code>round run</code>, <code>sense migrate</code>, <code>sense record</code>, <code>sense run</code>, <code>task escalate</code>, <code>task finish</code>, <code>task pause</code>, <code>task queue add</code>, <code>task queue complete</code>, <code>task resume</code>, <code>task start</code>.</li>
+<li class=""><strong>Prerequisites:</strong> An invocation-scoped <code>--as-role engineer</code> declaration or live repository-bound authority session, plus a matching action contract.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: a role is a governance discipline, not an executor or adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> <code>--as-role engineer</code> only on a non-read action whose canonical authority contract allowlists this role.</li>
+<li class=""><strong>Defaults:</strong> No role is inferred from executor kind, model capability, environment, or prior invocation.</li>
+<li class=""><strong>Output contract:</strong> The resolved authority evidence preserves the initiating human role and exact action contract.</li>
+<li class=""><strong>Verdict semantics:</strong> A missing declaration, disallowed role, selector mismatch, or stale session refuses before effects.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: role discipline grants no effect by itself.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: explicit effect-specific consent remains independently required.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use <code>engineer</code> only when operating within that discipline&#x27;s canonical path and action authority.</li>
+<li class=""><strong>When not to use:</strong> Do not use a role declaration to widen executor, model, mutation, publication, or path authority.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai round run --round R-1000 --repo-root . --as-role engineer --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/$defs/authorityContract/properties/subject/oneOf/1/properties/allowed_roles/items/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries/*/authority_contract" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>round</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="auditor--auditor"><code>auditor</code> — Auditor<a href="#auditor--auditor" class="hash-link" aria-label="Direct link to auditor--auditor" title="Direct link to auditor--auditor" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> auditor</li>
+<li class=""><strong>User-facing label:</strong> Auditor</li>
+<li class=""><strong>Purpose:</strong> Identify the human <code>auditor</code> discipline; only matching action authority contracts permit an invocation.</li>
+<li class=""><strong>Population or projection:</strong> 10 matching action contracts; effects <code>harness-write</code>, <code>remote-write</code>; actions <code>evidence collect</code>, <code>evidence record</code>, <code>evidence redact</code>, <code>evidence render</code>, <code>round close</code>, <code>round gap create</code>, <code>round gap resolve</code>, <code>round run</code>, <code>sense record</code>, <code>sense run</code>.</li>
+<li class=""><strong>Prerequisites:</strong> An invocation-scoped <code>--as-role auditor</code> declaration or live repository-bound authority session, plus a matching action contract.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: a role is a governance discipline, not an executor or adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> <code>--as-role auditor</code> only on a non-read action whose canonical authority contract allowlists this role.</li>
+<li class=""><strong>Defaults:</strong> No role is inferred from executor kind, model capability, environment, or prior invocation.</li>
+<li class=""><strong>Output contract:</strong> The resolved authority evidence preserves the initiating human role and exact action contract.</li>
+<li class=""><strong>Verdict semantics:</strong> A missing declaration, disallowed role, selector mismatch, or stale session refuses before effects.</li>
+<li class=""><strong>Declared effect:</strong> Not applicable: role discipline grants no effect by itself.</li>
+<li class=""><strong>Consent flags:</strong> Not applicable: explicit effect-specific consent remains independently required.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use <code>auditor</code> only when operating within that discipline&#x27;s canonical path and action authority.</li>
+<li class=""><strong>When not to use:</strong> Do not use a role declaration to widen executor, model, mutation, publication, or path authority.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai round run --round R-1000 --repo-root . --as-role auditor --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/$defs/authorityContract/properties/subject/oneOf/1/properties/allowed_roles/items/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries/*/authority_contract" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>round</code></li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="path-authority">Path authority<a href="#path-authority" class="hash-link" aria-label="Direct link to Path authority" title="Direct link to Path authority" translate="no">​</a></h2>
+<p>Role authority is positive and target-specific. The action contract and runtime target classifier
+own the mapping. In practical terms:</p>
+<ul>
+<li class="">business reference work stays with its business authority;</li>
+<li class="">engineering law, governed round intent, and human documentation stay with engineering-reference
+authority;</li>
+<li class="">tests stay with sensor authority;</li>
+<li class="">plant code and workspace tooling stay with plant authority;</li>
+<li class="">audit observation stays in the designated audit output; and</li>
+<li class="">machine records and mutable harness state are written only through attributed verbs, never by a
+human role editing them directly.</li>
+</ul>
+<p>This conceptual map is not an access-control list. Always use the exact
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json" target="_blank" rel="noopener noreferrer" class="">action contract</a> and current
+<a href="https://github.com/aarusso-nyx/devai/blob/main/packages/cli/src/authority/policy.ts" target="_blank" rel="noopener noreferrer" class="">runtime authority policy</a>. An apparently adjacent
+directory, generated materialization, or host-tool file can have a different owner or machine-only
+boundary.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="canonical-effect-descriptors">Canonical effect descriptors<a href="#canonical-effect-descriptors" class="hash-link" aria-label="Direct link to Canonical effect descriptors" title="Direct link to Canonical effect descriptors" translate="no">​</a></h2>
+<p>The renderer derives the complete ordered effect population from the
+<a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json" target="_blank" rel="noopener noreferrer" class="">action-registry schema</a> and joins each value to
+per-action assignment in the <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json" target="_blank" rel="noopener noreferrer" class="">action registry</a>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="effects">Effects<a href="#effects" class="hash-link" aria-label="Direct link to Effects" title="Direct link to Effects" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="read--read"><code>read</code> — Read<a href="#read--read" class="hash-link" aria-label="Direct link to read--read" title="Direct link to read--read" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> read</li>
+<li class=""><strong>User-facing label:</strong> Read</li>
+<li class=""><strong>Purpose:</strong> Declare the conservative <code>read</code> capability ceiling before authority and consent checks.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical effects value <code>read</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> Not applicable: this value classifies a record; the enclosing operation owns verdict semantics.</li>
+<li class=""><strong>Declared effect:</strong> <code>read</code></li>
+<li class=""><strong>Consent flags:</strong> No write or publish consent.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>read</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/properties/entries/items/properties/effect/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="harness-write--harness-write"><code>harness-write</code> — Harness Write<a href="#harness-write--harness-write" class="hash-link" aria-label="Direct link to harness-write--harness-write" title="Direct link to harness-write--harness-write" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> harness-write</li>
+<li class=""><strong>User-facing label:</strong> Harness Write</li>
+<li class=""><strong>Purpose:</strong> Declare the conservative <code>harness-write</code> capability ceiling before authority and consent checks.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical effects value <code>harness-write</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> Not applicable: this value classifies a record; the enclosing operation owns verdict semantics.</li>
+<li class=""><strong>Declared effect:</strong> <code>harness-write</code></li>
+<li class=""><strong>Consent flags:</strong> <code>--write</code> is required; <code>--publish</code> is not implied.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>harness-write</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/properties/entries/items/properties/effect/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="local-write--local-write"><code>local-write</code> — Local Write<a href="#local-write--local-write" class="hash-link" aria-label="Direct link to local-write--local-write" title="Direct link to local-write--local-write" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> local-write</li>
+<li class=""><strong>User-facing label:</strong> Local Write</li>
+<li class=""><strong>Purpose:</strong> Declare the conservative <code>local-write</code> capability ceiling before authority and consent checks.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical effects value <code>local-write</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> Not applicable: this value classifies a record; the enclosing operation owns verdict semantics.</li>
+<li class=""><strong>Declared effect:</strong> <code>local-write</code></li>
+<li class=""><strong>Consent flags:</strong> <code>--write</code> is required; <code>--publish</code> is not implied.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>local-write</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/properties/entries/items/properties/effect/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="remote-write--remote-write"><code>remote-write</code> — Remote Write<a href="#remote-write--remote-write" class="hash-link" aria-label="Direct link to remote-write--remote-write" title="Direct link to remote-write--remote-write" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Stable ID:</strong> remote-write</li>
+<li class=""><strong>User-facing label:</strong> Remote Write</li>
+<li class=""><strong>Purpose:</strong> Declare the conservative <code>remote-write</code> capability ceiling before authority and consent checks.</li>
+<li class=""><strong>Population or projection:</strong> The single canonical effects value <code>remote-write</code> and all records that select it.</li>
+<li class=""><strong>Prerequisites:</strong> A schema-valid canonical record selecting this exact value.</li>
+<li class=""><strong>Required external tools:</strong> Not applicable: this is a vocabulary value, not an executable adapter.</li>
+<li class=""><strong>Accepted inputs:</strong> Accepted only where the linked canonical schema or policy exposes this exact value.</li>
+<li class=""><strong>Defaults:</strong> No undocumented value or alias is inferred.</li>
+<li class=""><strong>Output contract:</strong> Appears in the enclosing action, reading, catalog, or execution-evidence schema.</li>
+<li class=""><strong>Verdict semantics:</strong> Not applicable: this value classifies a record; the enclosing operation owns verdict semantics.</li>
+<li class=""><strong>Declared effect:</strong> <code>remote-write</code></li>
+<li class=""><strong>Consent flags:</strong> <code>--write</code> and <code>--publish</code> are both required; neither implies the other.</li>
+<li class=""><strong>Cost class:</strong> <code>fast</code></li>
+<li class=""><strong>When to use:</strong> Use only when <code>remote-write</code> exactly describes the canonical record.</li>
+<li class=""><strong>When not to use:</strong> Do not use as a synonym for another canonical value or as an authority grant.</li>
+<li class=""><strong>Non-pass semantics:</strong> <code>fail</code> is a negative finding; <code>error</code> is an execution or producer defect; <code>unknown</code> never passes; <code>review</code> requires human disposition; <code>skipped</code> reports an unexecuted member; <code>N/A</code> is valid only when the governing contract explicitly permits it.</li>
+<li class=""><strong>Example:</strong> <code>devai check --suite standard --repo-root . --as-role inspector --write --format json</code></li>
+<li class=""><strong>Canonical source:</strong> <a href="https://github.com/aarusso-nyx/devai/blob/main/law/schemas/action-registry.schema.json#/properties/entries/items/properties/effect/enum" target="_blank" rel="noopener noreferrer" class=""><code>law/schemas/action-registry.schema.json</code></a>; <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json#/entries" target="_blank" rel="noopener noreferrer" class=""><code>law/policy/action-registry.json</code></a></li>
+<li class=""><strong>Related workflow:</strong> <code>check</code></li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="effect-ceilings-and-exact-resolution">Effect ceilings and exact resolution<a href="#effect-ceilings-and-exact-resolution" class="hash-link" aria-label="Direct link to Effect ceilings and exact resolution" title="Direct link to Effect ceilings and exact resolution" translate="no">​</a></h2>
+<p>An action registry entry declares a conservative capability ceiling. Build-time and contract-time
+analysis must prove that inferred direct and transitive effects stay within it. At runtime, the
+exact target and selected member population still have to resolve before authority.</p>
+<p>That distinction matters for parameterized facades:</p>
+<ul>
+<li class=""><code>devai sense run &lt;kind&gt;</code> resolves the named kind&#x27;s intrinsic effect before execution. The generic
+action ceiling does not force a read-only kind to request unrelated mutation authority, and it
+does not let a write-capable kind travel through a read boundary.</li>
+<li class=""><code>devai check --suite &lt;name&gt;</code> and <code>devai check --only &lt;member&gt;</code> resolve the maximum effect of the
+selected validation plan before execution.</li>
+<li class="">An action that emits a report can still be write-capable when its implementation mutates a
+database, workspace, remote, or harness state.</li>
+</ul>
+<p>Inspect a parameterized population without running it:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai sense run type_check --repo-root . --dry-run --format json</span><br></div></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="consent-flags">Consent flags<a href="#consent-flags" class="hash-link" aria-label="Direct link to Consent flags" title="Direct link to Consent flags" translate="no">​</a></h2>
+<p>Consent is invocation-scoped and independent:</p>
+<ul>
+<li class="">a non-read resolved effect requires explicit <code>--write</code>;</li>
+<li class="">every remote resolved effect additionally requires explicit <code>--publish</code>, including a dry run;</li>
+<li class=""><code>--publish</code> never implies <code>--write</code>;</li>
+<li class=""><code>--write</code> never implies <code>--publish</code>; and</li>
+<li class="">possession of a publication-capable action, role, model, adapter, or session does not satisfy
+either flag.</li>
+</ul>
+<p>For a read-only action, a role declaration and write/publication consent are not applicable and
+are refused rather than ignored. For a non-read action, provide exactly one <code>--as-role &lt;role&gt;</code> or
+<code>--authority-session &lt;id&gt;</code>, not both. A caller cannot declare a machine actor.</p>
+<p>A remote dry run performs no publication, but a selected sensor whose resolved effect is
+<code>remote-write</code> still requires its permitted role and both independent consent flags,
+<code>--write</code> and <code>--publish</code>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="safe-examples">Safe examples<a href="#safe-examples" class="hash-link" aria-label="Direct link to Safe examples" title="Direct link to Safe examples" translate="no">​</a></h2>
+<p>Read without a role declaration or consent:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai release status --repo-root . --format json</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">devai evidence verify --scope chain --show-head --repo-root . --format json</span><br></div></code></pre></div></div>
+<p>Inspect a local-write leaf without dispatching it:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai init apply architect --target . --tier tier1 --as-role architect --write --help</span><br></div></code></pre></div></div>
+<p>Perform that local write only after reviewing <code>init plan</code>:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai init apply architect --target . --tier tier1 --as-role architect --write --format json</span><br></div></code></pre></div></div>
+<p>Inspect the remote-capable sensor action without dispatching it:</p>
+<div class="language-sh codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-sh codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">devai sense run --help</span><br></div></code></pre></div></div>
+<p>The last command is help-only. A selected sensor kind determines the actual effect and consent.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="refusals-and-non-pass-behavior">Refusals and non-pass behavior<a href="#refusals-and-non-pass-behavior" class="hash-link" aria-label="Direct link to Refusals and non-pass behavior" title="Direct link to Refusals and non-pass behavior" translate="no">​</a></h2>
+<p>Authority is checked before handler dispatch. Typical refusals include a missing, conflicting,
+invalid, expired, stale, repository-mismatched, or policy-mismatched declaration; a role not
+allowed by the action; missing write or publication consent; unresolved target; unclassified
+resource; or absent final mutation boundary.</p>
+<p>These conditions produce one structured error envelope and no successful result envelope. Usage
+and policy refusals do not become <code>review</code> or <code>unknown</code>; they prevent execution. Infrastructure and
+contract violations use their own failure classes and cannot be treated as a completed action.</p>
+<p>For an aggregate command, read the <a class="" href="/devai/docs/reference/cli/vocabulary#verdicts">verdict descriptor</a> after authority
+succeeds. A permitted operation may still return review, unknown, fail, error, skipped, or N/A.
+Authorization means only that the bounded attempt was allowed.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="executor-authority-is-forbidden">Executor authority is forbidden<a href="#executor-authority-is-forbidden" class="hash-link" aria-label="Direct link to Executor authority is forbidden" title="Direct link to Executor authority is forbidden" translate="no">​</a></h2>
+<p>An executor says how to attempt a task. The host selects a provider and exact model; DEVAI owns no
+fixed roster, alias, preferred/default model, or policy fallback. Missing or unavailable selection
+fails closed without substitution. The selected model does not widen task discipline, target
+paths, effects, or consent. Execution evidence records the exact host selection; it does not grant
+authority retroactively.</p>
+<p>See <a class="" href="/devai/docs/reference/cli/round-task-executors#authority-stays-with-discipline">rounds, tasks, and executors</a> and
+the generated <a class="" href="/devai/docs/reference/cli/model-runtime">model/runtime reference</a>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="nonclaims">Nonclaims<a href="#nonclaims" class="hash-link" aria-label="Direct link to Nonclaims" title="Direct link to Nonclaims" translate="no">​</a></h2>
+<p>A policy allow proves only that one resolved invocation may attempt its bounded effects. It does
+not prove the command&#x27;s verdict, readiness, round closure, release eligibility, publication
+success, deployment, or evidence promotion.</p>
+<p>Canonical sources: <a href="https://github.com/aarusso-nyx/devai/blob/main/law/policy/action-registry.json" target="_blank" rel="noopener noreferrer" class="">action registry</a>,
+<a href="https://github.com/aarusso-nyx/devai/blob/main/packages/cli/src/authority/policy.ts" target="_blank" rel="noopener noreferrer" class="">runtime authority policy</a>.</p></div></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/devai/docs/reference/cli/adoption-tiers"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Adoption tiers</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/devai/docs/reference/cli/check-suites"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Check suites</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#the-authorization-sequence" class="table-of-contents__link toc-highlight">The authorization sequence</a></li><li><a href="#canonical-role-descriptors" class="table-of-contents__link toc-highlight">Canonical role descriptors</a></li><li><a href="#roles" class="table-of-contents__link toc-highlight">Roles</a><ul><li><a href="#owner--owner" class="table-of-contents__link toc-highlight"><code>owner</code> — Owner</a></li><li><a href="#architect--architect" class="table-of-contents__link toc-highlight"><code>architect</code> — Architect</a></li><li><a href="#inspector--inspector" class="table-of-contents__link toc-highlight"><code>inspector</code> — Inspector</a></li><li><a href="#engineer--engineer" class="table-of-contents__link toc-highlight"><code>engineer</code> — Engineer</a></li><li><a href="#auditor--auditor" class="table-of-contents__link toc-highlight"><code>auditor</code> — Auditor</a></li></ul></li><li><a href="#path-authority" class="table-of-contents__link toc-highlight">Path authority</a></li><li><a href="#canonical-effect-descriptors" class="table-of-contents__link toc-highlight">Canonical effect descriptors</a></li><li><a href="#effects" class="table-of-contents__link toc-highlight">Effects</a><ul><li><a href="#read--read" class="table-of-contents__link toc-highlight"><code>read</code> — Read</a></li><li><a href="#harness-write--harness-write" class="table-of-contents__link toc-highlight"><code>harness-write</code> — Harness Write</a></li><li><a href="#local-write--local-write" class="table-of-contents__link toc-highlight"><code>local-write</code> — Local Write</a></li><li><a href="#remote-write--remote-write" class="table-of-contents__link toc-highlight"><code>remote-write</code> — Remote Write</a></li></ul></li><li><a href="#effect-ceilings-and-exact-resolution" class="table-of-contents__link toc-highlight">Effect ceilings and exact resolution</a></li><li><a href="#consent-flags" class="table-of-contents__link toc-highlight">Consent flags</a></li><li><a href="#safe-examples" class="table-of-contents__link toc-highlight">Safe examples</a></li><li><a href="#refusals-and-non-pass-behavior" class="table-of-contents__link toc-highlight">Refusals and non-pass behavior</a></li><li><a href="#executor-authority-is-forbidden" class="table-of-contents__link toc-highlight">Executor authority is forbidden</a></li><li><a href="#nonclaims" class="table-of-contents__link toc-highlight">Nonclaims</a></li></ul></div></div></div></div></main></div></div></div></div>
+</body>
+</html>
