@@ -272,9 +272,6 @@ describe('content-addressed check runner', () => {
     if (cloned.status !== 0) throw new Error(String(cloned.stderr));
     git(clone, ['config', 'user.name', 'Selector Test']);
     git(clone, ['config', 'user.email', 'selector@example.invalid']);
-    file(clone, 'test-tasks.json', readFileSync(join(REPOSITORY_ROOT, 'test-tasks.json'), 'utf8'));
-    git(clone, ['add', 'test-tasks.json']);
-    git(clone, ['commit', '-qm', 'bind generated task selectors']);
     const base = git(clone, ['rev-parse', 'HEAD']);
     commit(
       clone,
