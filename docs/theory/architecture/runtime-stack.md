@@ -10,16 +10,17 @@ The source workspace behind the single publishable `@aarusso-nyx/devai` package 
 | ------------------ | --------------------------------------------------------------------------- |
 | Language           | TypeScript (strict mode, ESM modules throughout)                            |
 | Workspace manager  | pnpm workspaces (content-addressable store, lightweight orchestration)      |
-| Build              | `tsc -b` composite builds; project references per package                   |
+| Build              | `tsc -b` project references; Rolldown assembles one public CLI binary       |
 | Test runner        | Vitest (one root config + filename-suffix-driven test categories)           |
 | CLI framework      | `cac` (small, declarative, no plugin architecture)                          |
-| Type generation    | `json-schema-to-typescript` (schemas → `.d.ts` for compile-time validation) |
-| Runtime validation | `ajv` + `ajv-formats` (Draft 2020-12 schemas)                               |
-| Dev platform       | macOS                                                                       |
+| Schema contracts   | Governed JSON Schema roster plus explicit TypeScript runtime interfaces     |
+| Runtime validation | `ajv` + `ajv-formats` (Draft 2020-12 schemas, lazily compiled)              |
+| Dev platform       | Node.js 24 on macOS or Linux; Windows is not a supported RC target          |
 | CI platform        | Linux (GitHub Actions)                                                      |
 
-Generated TypeScript types are not committed (per [`.gitignore`](../../../.gitignore) —
-`packages/schemas/generated/`).
+Ten internal TypeScript workspace packages are development boundaries. Rolldown bundles their
+runtime closure into the single publishable `@aarusso-nyx/devai` package; adopters do not install
+the private `@devai-nyx/*` packages.
 
 ## Rationale
 
@@ -34,16 +35,18 @@ Plain npm workspaces work but lack a content-addressable store, which makes inst
 **Test framework — Vitest over Jest and `node:test`:**
 Jest is CJS-by-default and slow to start across a multi-package monorepo. `node:test` is minimal but lacks the watch / coverage / project-references behaviour the workflow depends on. Vitest is ESM-native, fast, and integrates cleanly with `tsc -b` composite builds.
 
-**Type generation + runtime validation — `json-schema-to-typescript` + `ajv`:**
-The repo ships 35+ JSON schemas (see [`../contracts/README.md`](../../reference/contracts/README.md)). Generating compile-time types from those schemas is non-negotiable; using a single canonical generator (`json-schema-to-typescript`) avoids type drift. Runtime validation must be JSON-Schema-2020-12-compliant; `ajv` with `ajv-formats` is the canonical choice in the JS ecosystem.
+**Schema roster + runtime validation — explicit TypeScript interfaces + `ajv`:**
+The governed roster in `packages/schemas/src/roster.ts` controls which authored schemas can become
+runtime validators and which schema references are packaged. AJV compiles validators lazily.
+Compile-time interfaces are explicit product code; there is no generated `.d.ts` pipeline in rc.3.
 
 ## Practical consequences
 
 1. **No new tooling layer without an explicit design decision.** Adding a build orchestrator, a different test runner, or a different CLI framework requires review of the relevant row above. The choices are firm but not constitutional.
 
-2. **Generated code is not committed.** Per [`CLAUDE.md`](../../../CLAUDE.md),
-   `packages/schemas/generated/*` is regenerated on demand. Local development regenerates it
-   through the content-addressed task ledger or `pnpm build`.
+2. **Generated registry views are checked, not trusted as authority.** The action registry source
+   in `law/policy/action-registry.json` regenerates three TypeScript views.
+   `pnpm run action-registry:check` parity is part of the build contract.
 
 3. **TypeScript composite builds enforce internal workspace boundaries.** Each internal module has a `tsconfig.json` with explicit `references`. The dependency graph is therefore declared, not inferred. Circular dependencies fail compilation. Those internal boundaries do not create additional publishable packages.
 

@@ -19,12 +19,14 @@ const siteFile = resolve(required('SITE_ARCHIVE'));
 const sbomFile = resolve(required('SBOM_FILE'));
 const outputFile = resolve(required('OUTPUT_FILE'));
 const packageManifest = JSON.parse(readFileSync('packages/cli/package.json', 'utf8'));
+const releaseTag = required('RELEASE_TAG');
+const packageName = required('PACKAGE_NAME');
 
 const manifest = {
   schemaVersion: '1.0.0',
   release: {
     repository: 'aarusso-nyx/devai',
-    tag: 'v1.0.0-rc.2',
+    tag: releaseTag,
     package: packageManifest.name,
     version: packageManifest.version,
     registry: 'https://npm.pkg.github.com',
@@ -43,6 +45,9 @@ const manifest = {
     results_archive_sha256: required('LEDGER_RESULTS_SHA256'),
     task_policy_sha256: required('LEDGER_TASK_POLICY_SHA256'),
     trust_store_sha256: required('LEDGER_TRUST_STORE_SHA256'),
+    toolchain_sha256: required('LEDGER_TOOLCHAIN_SHA256'),
+    environment_sha256: required('LEDGER_ENVIRONMENT_SHA256'),
+    release_signers_sha256: required('LEDGER_RELEASE_SIGNERS_SHA256'),
   },
   artifacts: {
     package: artifact(packageFile),
@@ -51,10 +56,7 @@ const manifest = {
   },
 };
 
-if (
-  manifest.release.package !== '@aarusso-nyx/devai' ||
-  manifest.release.version !== '1.0.0-rc.2'
-) {
+if (manifest.release.package !== packageName || releaseTag !== `v${packageManifest.version}`) {
   throw new Error('RELEASE_MANIFEST_PACKAGE_IDENTITY_INVALID');
 }
 writeFileSync(outputFile, `${JSON.stringify(manifest, null, 2)}\n`);

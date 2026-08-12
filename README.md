@@ -15,7 +15,7 @@ into seven workflow domains: `init`, `doctor`, `check`, `sense`, `round`,
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.0.0-rc.2
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.0.0-rc.6
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
@@ -26,12 +26,15 @@ Mutating actions require their declared role and explicit consent. Read the plan
 or dry-run output before granting `--write`; remote effects additionally require
 their separately declared publication consent.
 
-Tests use a content-addressed task DAG. During development, run affected nodes and
-reuse fresh PASS results for unchanged inputs. Full coverage and the expensive
-lanes are release-candidate gates. A signed candidate receipt binds a clean Git
+Each adopter owns its `test-tasks.json` content-addressed task DAG; DEVAI never
+invents project commands. During development, run affected nodes and reuse fresh
+PASS results for unchanged inputs. The full coverage gate is the required RC node;
+the narrower DB, E2E, performance, and containment commands are diagnostic slices.
+A signed candidate receipt binds a clean Git
 tree and task-policy digest to trusted local attestations; it does **not** prove
-that the signer actually executed the tasks. Remote CI validates that binding and
-the required-node closure cheaply.
+that the signer actually executed the tasks. The pinned external verifier validates
+that binding cheaply. Organizationally separate signing and verifier custody remain
+prerequisites for calling it independent.
 
 - [Start here](docs/start/index.md)
 - [Adopter guide](docs/adopters/install.md)

@@ -265,6 +265,17 @@ export function buildTrustedAuthoritySources(
         rationale: 'Article 6 Architect law authority.',
       }),
     ),
+    ...['work/rounds', 'work/rounds/**', 'work/audit', 'work/audit/**'].map((path, index) =>
+      rule({
+        id: `core-architect-work-records-${String(index + 1)}`,
+        origin: 'immutable-core',
+        precedence: 750,
+        actionIds: groups.architect,
+        selector: fsSelector(repositoryId, path),
+        subjects: human('architect'),
+        rationale: 'Article 6 Architect work-record authority.',
+      }),
+    ),
     rule({
       id: 'core-auditor-observation-root',
       origin: 'immutable-core',
@@ -413,6 +424,26 @@ export function buildTrustedAuthoritySources(
         subjects: [machineSubject('binding')],
         rationale:
           'Article 6 verb-attributed state output for the exact introspecting F5 bootstrap action.',
+      }),
+    ),
+    ...[
+      '.devai/state/**',
+      'record/proofs',
+      'record/proofs/**',
+      'record/derived/inventory',
+      'record/derived/inventory/**',
+      'scratch/worktrees',
+      'scratch/worktrees/**',
+    ].map((path, index) =>
+      rule({
+        id: `core-binding-init-harness-projection-${String(index + 1)}`,
+        origin: 'immutable-core',
+        precedence: 900,
+        actionIds: ['init apply harness'],
+        selector: fsSelector(repositoryId, path),
+        subjects: [machineSubject('binding')],
+        rationale:
+          'Article 6 derived binding authority for the declared canonical harness projection.',
       }),
     ),
     ...[

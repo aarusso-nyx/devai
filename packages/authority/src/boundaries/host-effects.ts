@@ -169,6 +169,68 @@ export function applyAuthorityHostEffectsAtomically(
   }
 }
 
+/**
+ * Run an already-authorized filesystem projection as one recoverable unit.
+ * Mutations inside `callback` still cross the guarded host-effect seam; this
+ * helper owns only the snapshots and raw rollback needed after a later guarded
+ * effect fails. Callers must preflight and enumerate every file they may touch.
+ */
+export function runAuthorityHostEffectsWithRollback<T>(
+  targetPaths: readonly string[],
+  callback: () => T,
+): T {
+  type Snapshot =
+    | Readonly<{ kind: 'absent'; path: string }>
+    | Readonly<{ kind: 'file'; path: string; mode: number; bytes: Buffer }>
+    | Readonly<{ kind: 'symlink'; path: string; target: string }>;
+  const paths = [...new Set(targetPaths)];
+  if (paths.some((path) => path.length === 0)) throw new Error('AUTHORITY_ROLLBACK_TARGET_INVALID');
+  const snapshots: Snapshot[] = [];
+  const captured = new Set<string>();
+  for (const path of paths) {
+    if (existsSync(path)) {
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) throw new Error(`AUTHORITY_ROLLBACK_FILE_TARGET_REQUIRED:${path}`);
+      snapshots.push(
+        stat.isSymbolicLink()
+          ? { kind: 'symlink', path, target: readlinkSync(path) }
+          : { kind: 'file', path, mode: stat.mode, bytes: readFileSync(path) },
+      );
+      captured.add(path);
+      continue;
+    }
+    snapshots.push({ kind: 'absent', path });
+    captured.add(path);
+    let parent = dirname(path);
+    while (!existsSync(parent) && !captured.has(parent)) {
+      snapshots.push({ kind: 'absent', path: parent });
+      captured.add(parent);
+      const next = dirname(parent);
+      if (next === parent) break;
+      parent = next;
+    }
+  }
+  try {
+    return callback();
+  } catch (error) {
+    try {
+      for (const snapshot of snapshots.toReversed()) {
+        nodeRmSync(snapshot.path, { recursive: true, force: true });
+        if (snapshot.kind === 'absent') continue;
+        nodeMkdirSync(dirname(snapshot.path), { recursive: true });
+        if (snapshot.kind === 'symlink') nodeSymlinkSync(snapshot.target, snapshot.path);
+        else {
+          nodeWriteFileSync(snapshot.path, snapshot.bytes);
+          nodeChmodSync(snapshot.path, snapshot.mode);
+        }
+      }
+    } catch {
+      throw new Error('AUTHORITY_ATOMIC_ROLLBACK_FAILED');
+    }
+    throw error;
+  }
+}
+
 export {
   existsSync,
   lstatSync,

@@ -37,7 +37,7 @@ describe('hooks install planning and execution', () => {
       manager: 'git',
       action: 'create',
       hook: 'pre-push',
-      command: 'devai check --only forbidden-actions --strict',
+      command: './node_modules/.bin/devai check --only forbidden-actions --strict',
     });
     expect(gitPlan.content).toMatch(/^#!\/usr\/bin\/env sh\n/);
 

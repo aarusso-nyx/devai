@@ -20,9 +20,10 @@ checks affected by the change.
 
 PASS-only cache reuse is allowed when the task key and dependency closure are unchanged.
 Unknown changes widen to the full local closure. Clean affected and RC runs may emit an unsigned
-candidate receipt; signing and trust material remain outside the candidate repository. Remote CI
-validates the signed export and required-node closure without rerunning product tests, and it does
-not claim to prove local execution.
+candidate receipt; signing and trust material remain outside the candidate repository. The pinned
+external verifier validates the signed export without rerunning product tests and does not claim
+to prove local execution. Independent custody and verifier-side reconstruction of the candidate
+descriptor closure remain release gates.
 
 ## Runbooks
 
@@ -30,5 +31,7 @@ not claim to prove local execution.
 - [Worktrees](operations/worktree-runbook.md)
 - [Database isolation](operations/db-isolation.md)
 - [Evidence](operations/local-evidence-runbook.md)
+- [Release discipline](operations/release-discipline.md)
+- [rc.2 assessment convergence](operations/rc2-assessment-convergence.md)
 - [Incident response](operations/incident-playbook.md)
 - [Security](security/README.md)

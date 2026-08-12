@@ -174,6 +174,18 @@ describe('scanForbiddenActions', () => {
     return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
   }
 
+  it('does not self-match a newly materialized forbidden-action registry', () => {
+    writeContextAwareRegistry();
+    mkdirSync(join(dir, 'record/proofs'), { recursive: true });
+    mkdirSync(join(dir, 'record/derived/inventory'), { recursive: true });
+    writeFileSync(join(dir, 'record/proofs/README.md'), 'generated proof directory\n');
+    writeFileSync(join(dir, 'record/proofs/chain.json'), '{"events":[]}\n');
+    writeFileSync(join(dir, 'record/derived/inventory/README.md'), 'generated inventory\n');
+    seedRepository();
+
+    expect(scanForbiddenActions({ repoRoot: dir, maxCommits: 1 }).findings).toEqual([]);
+  });
+
   it('accepts a CI checker change with exact active ADR affected-rule coverage', () => {
     writeContextAwareRegistry();
     writeCiAdr();

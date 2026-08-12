@@ -17,6 +17,10 @@ export interface RecipeAdapterPlan {
   readonly files: readonly RecipeAdapterFile[];
 }
 
+export interface ResolvedRecipeAdapterFile extends RecipeAdapterFile {
+  readonly absolutePath: string;
+}
+
 function yamlString(value: string): string {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
@@ -105,9 +109,17 @@ export function installRecipeAdapters(opts: {
   readonly hosts?: readonly RecipeHost[];
 }): { readonly written: readonly string[]; readonly unchanged: readonly string[] } {
   const plan = buildRecipeAdapterPlan(opts.resourcesRoot, opts.hosts);
+  const resolved = preflightRecipeAdapterInstall(opts.repoRoot, plan);
+  return executeRecipeAdapterPlan(resolved);
+}
+
+export function preflightRecipeAdapterInstall(
+  repoRoot: string,
+  plan: RecipeAdapterPlan,
+): readonly ResolvedRecipeAdapterFile[] {
   const resolved = plan.files.map((file) => ({
     ...file,
-    absolutePath: assertSafeInstallPath(opts.repoRoot, file.path),
+    absolutePath: assertSafeInstallPath(repoRoot, file.path),
   }));
   const conflicts = resolved.filter(
     (file) =>
@@ -116,6 +128,13 @@ export function installRecipeAdapters(opts: {
   if (conflicts.length > 0) {
     throw new Error(`RECIPE_ADAPTER_CONFLICT: ${conflicts.map((file) => file.path).join(', ')}`);
   }
+  return resolved;
+}
+
+export function executeRecipeAdapterPlan(resolved: readonly ResolvedRecipeAdapterFile[]): {
+  readonly written: readonly string[];
+  readonly unchanged: readonly string[];
+} {
   const written: string[] = [];
   const unchanged: string[] = [];
   for (const file of resolved) {

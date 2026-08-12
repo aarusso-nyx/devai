@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   lstatSync,
@@ -10,17 +10,29 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const packageRoot = resolve(import.meta.dirname, '..');
+const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
 const smokeRoot = mkdtempSync(join(tmpdir(), 'devai-installed-tarball-smoke-'));
 const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
+const conflictRoot = join(smokeRoot, 'conflict-project');
 
 function run(command, args, cwd = projectRoot) {
   return execFileSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, NO_COLOR: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function runResult(command, args, cwd = projectRoot) {
+  return spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
     env: { ...process.env, NO_COLOR: '1' },
@@ -45,21 +57,51 @@ try {
   if (typeof tarball !== 'string') throw new Error('PACK_TARBALL_MISSING');
 
   run('pnpm', ['init'], projectRoot);
-  run('pnpm', ['add', '--offline', resolve(packageRoot, tarball)], projectRoot);
+  run('git', ['init', '-q'], projectRoot);
+  run('pnpm', ['add', '--prefer-offline', resolve(packageRoot, tarball)], projectRoot);
+  writeFileSync(join(projectRoot, '.gitignore'), 'node_modules/\n.devai/state/\nscratch/\n');
+  run('git', ['config', 'user.name', 'DEVAI smoke'], projectRoot);
+  run('git', ['config', 'user.email', 'smoke@example.invalid'], projectRoot);
+  run('git', ['add', 'package.json', 'pnpm-lock.yaml', '.gitignore'], projectRoot);
+  run('git', ['commit', '-qm', 'installed package fixture'], projectRoot);
   const binary = join(projectRoot, 'node_modules/.bin/devai');
   const installedPackage = join(projectRoot, 'node_modules/@aarusso-nyx/devai');
 
   const version = run(binary, ['--version']).trim();
-  if (!version.startsWith('devai/1.0.0-rc.2 ')) {
+  if (!version.startsWith(`devai/${packageVersion} `)) {
     throw new Error(`INSTALLED_VERSION_INVALID:${version}`);
   }
   const help = run(binary, ['--help']);
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
 
+  const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
+  if (unboundCatalog?.result?.value?.length !== 41) {
+    throw new Error('INSTALLED_UNBOUND_CATALOG_INVALID');
+  }
+  const unboundPlan = JSON.parse(
+    run(binary, ['init', 'plan', '--target', projectRoot, '--tier', 'tier1', '--format', 'json']),
+  );
+  if (unboundPlan?.result?.value?.summary?.create === undefined) {
+    throw new Error('INSTALLED_UNBOUND_PLAN_INVALID');
+  }
+  const unboundDoctor = runResult(binary, [
+    'doctor',
+    '--repo-root',
+    projectRoot,
+    '--format',
+    'json',
+  ]);
+  const doctorEnvelope = JSON.parse(String(unboundDoctor.stdout));
+  if (unboundDoctor.status !== 1 || doctorEnvelope?.result?.verdict !== 'review') {
+    throw new Error('INSTALLED_UNBOUND_DOCTOR_INVALID');
+  }
+
   run(binary, [
     'init',
     'bind',
     '--constitution',
+    '--tier',
+    'tier1',
     '--target',
     projectRoot,
     '--as-role',
@@ -68,6 +110,20 @@ try {
     '--format',
     'json',
   ]);
+  for (const contract of ['--operational-law', '--subprocess-effects']) {
+    run(binary, [
+      'init',
+      'bind',
+      contract,
+      '--target',
+      projectRoot,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ]);
+  }
   run(binary, [
     'init',
     'bind',
@@ -98,6 +154,23 @@ try {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
+  for (const segment of ['owner', 'architect']) {
+    run(binary, [
+      'init',
+      'apply',
+      segment,
+      '--tier',
+      'tier1',
+      '--target',
+      projectRoot,
+      '--as-role',
+      segment,
+      '--write',
+      '--format',
+      'json',
+    ]);
+  }
+
   const installArgs = [
     'init',
     'apply',
@@ -106,6 +179,8 @@ try {
     'skills',
     '--target',
     projectRoot,
+    '--tier',
+    'tier1',
     '--as-role',
     'architect',
     '--write',
@@ -123,6 +198,114 @@ try {
   if (firstSkills?.written?.length !== 49 || secondSkills?.unchanged?.length !== 49) {
     throw new Error('INSTALLED_RECIPE_ADAPTER_IDEMPOTENCE_INVALID');
   }
+
+  mkdirSync(conflictRoot, { recursive: true });
+  run('git', ['init', '-q'], conflictRoot);
+  run(binary, [
+    'init',
+    'bind',
+    '--constitution',
+    '--tier',
+    'tier1',
+    '--target',
+    conflictRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  run(binary, [
+    'init',
+    'bind',
+    '--target',
+    conflictRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  const conflictingSkill = join(conflictRoot, '.agents/skills/devai-assess/SKILL.md');
+  mkdirSync(join(conflictingSkill, '..'), { recursive: true });
+  writeFileSync(conflictingSkill, 'adopter-owned conflict\n');
+  const refusedApply = runResult(binary, [
+    'init',
+    'apply',
+    'harness',
+    '--tier',
+    'tier1',
+    '--include',
+    'skills',
+    '--target',
+    conflictRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  if (
+    refusedApply.status === 0 ||
+    existsSync(join(conflictRoot, '.gitignore')) ||
+    existsSync(join(conflictRoot, 'record/proofs/chain.json')) ||
+    readFileSync(conflictingSkill, 'utf8') !== 'adopter-owned conflict\n'
+  ) {
+    throw new Error('INSTALLED_APPLY_PREFLIGHT_ROLLBACK_INVALID');
+  }
+
+  const packagedCheck = JSON.parse(
+    run(binary, ['check', '--only', 'forbidden-actions', '--strict', '--format', 'json']),
+  );
+  if (packagedCheck?.result?.value?.ok !== true) {
+    throw new Error('INSTALLED_PACKAGED_CHECK_POLICY_INVALID');
+  }
+  const missingDescriptor = runResult(binary, [
+    'check',
+    '--affected',
+    '--task-plan',
+    '--base',
+    '0'.repeat(40),
+    '--format',
+    'json',
+  ]);
+  if (
+    missingDescriptor.status !== 5 ||
+    !String(missingDescriptor.stderr).includes('CHECK_TASK_DESCRIPTOR_MISSING')
+  ) {
+    throw new Error('INSTALLED_TASK_DESCRIPTOR_DIAGNOSTIC_INVALID');
+  }
+
+  run(binary, [
+    'init',
+    'apply',
+    'architect',
+    '--tier',
+    'tier1',
+    '--include',
+    'hooks',
+    '--target',
+    projectRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  const prePush = join(projectRoot, '.git/hooks/pre-push');
+  if (
+    !readFileSync(prePush, 'utf8').includes(
+      './node_modules/.bin/devai check --only forbidden-actions --strict',
+    )
+  ) {
+    throw new Error('INSTALLED_PROJECT_LOCAL_HOOK_INVALID');
+  }
+  run('git', ['add', '.agents', '.claude', '.devai', 'record'], projectRoot);
+  run('git', ['commit', '-qm', 'adopt DEVAI'], projectRoot);
+  const remoteRoot = join(smokeRoot, 'remote.git');
+  run('git', ['init', '--bare', '-q', remoteRoot], smokeRoot);
+  run('git', ['remote', 'add', 'origin', remoteRoot], projectRoot);
+  run('git', ['push', '-q', '-u', 'origin', 'HEAD:main'], projectRoot);
 
   const representatives = [
     ['catalog', 'actions'],
@@ -214,6 +397,26 @@ try {
   }
   if (requiredAssets.some((path) => !existsSync(join(installedPackage, path)))) {
     throw new Error('INSTALLED_RUNTIME_ASSET_MISSING');
+  }
+
+  for (const path of [
+    '.agents/skills',
+    '.claude/skills',
+    '.devai',
+    'record/proofs',
+    'record/derived/inventory',
+    'scratch/worktrees',
+    '.git/hooks/pre-push',
+  ]) {
+    rmSync(join(projectRoot, path), { recursive: true, force: true });
+  }
+  if (
+    existsSync(join(projectRoot, '.agents/skills/devai-assess')) ||
+    existsSync(join(projectRoot, '.devai')) ||
+    JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']))?.result?.value?.length !==
+      41
+  ) {
+    throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }
   const tarballPath = resolve(packageRoot, tarball);
   const installedFiles = filesUnder(installedPackage);

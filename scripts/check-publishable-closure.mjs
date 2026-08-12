@@ -7,7 +7,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PACKAGE_NAME = '@aarusso-nyx/devai';
-const PACKAGE_VERSION = '1.0.0-rc.2';
 const REPOSITORY = 'aarusso-nyx/devai';
 
 function fail(code, detail) {
@@ -47,7 +46,7 @@ function assertSensorPaths(value, owner, key = '') {
 
 const rootPackage = json('package.json');
 const cliPackage = json('packages/cli/package.json');
-if (cliPackage.name !== PACKAGE_NAME || cliPackage.version !== PACKAGE_VERSION) {
+if (cliPackage.name !== PACKAGE_NAME || !/^1\.0\.0-rc\.\d+$/u.test(cliPackage.version)) {
   fail('PUBLISHABLE_PACKAGE_IDENTITY_INVALID', `${cliPackage.name}@${cliPackage.version}`);
 }
 if (cliPackage.repository?.url !== `git+https://github.com/${REPOSITORY}.git`) {
@@ -171,7 +170,7 @@ const trackedPublicFiles = execFileSync('git', ['ls-files', '-z', 'docs', '.gith
   encoding: 'utf8',
 })
   .split('\0')
-  .filter(Boolean);
+  .filter((path) => path.length > 0 && existsSync(join(ROOT, path)));
 const publicFiles = [
   'README.md',
   'CHANGELOG.md',
@@ -199,5 +198,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${PACKAGE_VERSION}`, actions: 41, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 41, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1 })}\n`,
 );

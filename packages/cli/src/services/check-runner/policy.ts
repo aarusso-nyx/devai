@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, readlinkSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { sha256Hex } from './canonical.js';
@@ -257,10 +257,20 @@ function validateDescriptor(value: unknown): TaskDescriptor {
 }
 
 export function readTaskDescriptor(path: string): TaskDescriptor {
+  if (!existsSync(path)) {
+    throw new Error(
+      `CHECK_TASK_DESCRIPTOR_MISSING: adopter-owned test task descriptor not found at ${path}; create test-tasks.json from the documented schema and example before using --affected, --local, or --rc`,
+    );
+  }
   try {
     return validateDescriptor(JSON.parse(readFileSync(path, 'utf8')));
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('CHECK_RUNNER_DESCRIPTOR:')) throw error;
+    if (
+      error instanceof Error &&
+      (error.message.startsWith('CHECK_RUNNER_DESCRIPTOR:') ||
+        error.message.startsWith('CHECK_TASK_DESCRIPTOR_MISSING:'))
+    )
+      throw error;
     throw new Error(
       `CHECK_RUNNER_DESCRIPTOR: ${error instanceof Error ? error.message : String(error)}`,
     );

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+!docs/site/vendor/image-size/dist/
+!docs/site/vendor/image-size/dist/**
 *.tsbuildinfo
 *.log
 .DS_Store
@@ -9,5 +11,6 @@ scratch/*
 !.claude/settings.json
 .devai/state/*
 !.devai/state/.gitkeep
+.devai/config/authority-policy.json
 .devai/worktrees/*
 !.devai/worktrees/.gitkeep

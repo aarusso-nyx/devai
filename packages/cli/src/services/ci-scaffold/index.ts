@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from '@devai-nyx/authority';
-import { dirname, join } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, writeFileSync } from '@devai-nyx/authority';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 export interface CiScaffoldOptions {
   readonly targetRoot: string;
@@ -57,7 +57,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Check out pinned independent verifier
+      - name: Check out pinned external verifier
         uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
         with:
           repository: ${VERIFIER_REPOSITORY}
@@ -78,17 +78,23 @@ jobs:
           RESULTS_TGZ_B64: \${{ secrets.DEVAI_LEDGER_RESULTS_TGZ_B64 }}
           TASK_POLICY_B64: \${{ secrets.DEVAI_LEDGER_TASK_POLICY_B64 }}
           TRUST_STORE_B64: \${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
+          TOOLCHAIN_B64: \${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
+          ENVIRONMENT_B64: \${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 }}
         run: |
           set -euo pipefail
           test -n "$ENVELOPE_B64"
           test -n "$RESULTS_TGZ_B64"
           test -n "$TASK_POLICY_B64"
           test -n "$TRUST_STORE_B64"
+          test -n "$TOOLCHAIN_B64"
+          test -n "$ENVIRONMENT_B64"
           control="$RUNNER_TEMP/devai-ledger-control"
           mkdir -p "$control/results"
           printf '%s' "$ENVELOPE_B64" | base64 --decode > "$control/envelope.json"
           printf '%s' "$TASK_POLICY_B64" | base64 --decode > "$control/task-policy.json"
           printf '%s' "$TRUST_STORE_B64" | base64 --decode > "$control/trust-store.json"
+          printf '%s' "$TOOLCHAIN_B64" | base64 --decode > "$control/toolchain.json"
+          printf '%s' "$ENVIRONMENT_B64" | base64 --decode > "$control/environment.json"
           printf '%s' "$RESULTS_TGZ_B64" | base64 --decode > "$control/results.tgz"
           if tar -tzf "$control/results.tgz" | grep -Eq '(^/|(^|/)${backslash}.${backslash}.(/|$))'; then
             echo 'DEVAI_LEDGER_RESULTS_ARCHIVE_PATH_INVALID' >&2
@@ -104,18 +110,29 @@ jobs:
           test "$(git -C candidate rev-parse HEAD)" = "$CANDIDATE_SHA"
           echo "tree=$(git -C candidate rev-parse "\${CANDIDATE_SHA}^{tree}")" >> "$GITHUB_OUTPUT"
 
-      - name: Verify ledger only
+      - name: Reconstruct policy and verify ledger
         shell: bash
         env:
           POLICY_DIGEST: \${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
         run: |
           set -euo pipefail
           test "$POLICY_DIGEST" != ""
+          control="$RUNNER_TEMP/devai-ledger-control"
+          node .devai-verifier/src/build-policy-cli.js ${backslash}
+            --repo candidate ${backslash}
+            --descriptor candidate/test-tasks.json ${backslash}
+            --profile rc ${backslash}
+            --commit "$CANDIDATE_SHA" ${backslash}
+            --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
+            --toolchain "$control/toolchain.json" ${backslash}
+            --environment "$control/environment.json" ${backslash}
+            --output "$control/expected-task-policy.json"
+          cmp "$control/expected-task-policy.json" "$control/task-policy.json"
           node .devai-verifier/src/cli.js ${backslash}
-            --envelope "$RUNNER_TEMP/devai-ledger-control/envelope.json" ${backslash}
-            --results-dir "$RUNNER_TEMP/devai-ledger-control/results" ${backslash}
-            --task-policy "$RUNNER_TEMP/devai-ledger-control/task-policy.json" ${backslash}
-            --trust "$RUNNER_TEMP/devai-ledger-control/trust-store.json" ${backslash}
+            --envelope "$control/envelope.json" ${backslash}
+            --results-dir "$control/results" ${backslash}
+            --task-policy "$control/task-policy.json" ${backslash}
+            --trust "$control/trust-store.json" ${backslash}
             --repository "\${{ github.repository }}" ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
@@ -124,7 +141,22 @@ jobs:
 }
 
 export function buildCiScaffoldPlan(opts: CiScaffoldOptions): CiScaffoldPlan {
-  const path = opts.outputPath ?? join(opts.targetRoot, DEFAULT_OUTPUT_RELATIVE);
+  const root = resolve(opts.targetRoot);
+  const path = resolve(opts.outputPath ?? join(root, DEFAULT_OUTPUT_RELATIVE));
+  const fromRoot = relative(root, path);
+  if (fromRoot === '' || fromRoot === '..' || fromRoot.startsWith(`..${sep}`)) {
+    throw new Error(`CI_SCAFFOLD_PATH_ESCAPE:${path}`);
+  }
+  let cursor = root;
+  for (const segment of fromRoot.split(sep).slice(0, -1)) {
+    cursor = join(cursor, segment);
+    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+      throw new Error(`CI_SCAFFOLD_SYMLINK_REFUSED:${path}`);
+    }
+  }
+  if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
+    throw new Error(`CI_SCAFFOLD_SYMLINK_REFUSED:${path}`);
+  }
   return { path, content: ledgerVerificationWorkflow(), exists: existsSync(path) };
 }
 

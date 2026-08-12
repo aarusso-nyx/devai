@@ -521,7 +521,7 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'init apply architect',
       effect: 'local-write',
-      capabilities: ['fs:f5-config', 'fs:workspace'],
+      capabilities: ['fs:f5-config', 'fs:workspace', 'fs:worktree-admin'],
       subject: {
         kind: 'human',
         allowed_roles: ['architect'],
@@ -582,7 +582,14 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'init apply harness',
       effect: 'local-write',
-      capabilities: ['fs:f5-config', 'fs:workspace'],
+      capabilities: [
+        'fs:f5-config',
+        'fs:workspace',
+        'fs:proofs',
+        'fs:f5-state',
+        'fs:f4-inventory',
+        'fs:worktree-admin',
+      ],
       subject: {
         kind: 'derived-machine',
         actor: 'binding',

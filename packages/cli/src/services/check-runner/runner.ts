@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { CheckCache } from './cache.js';
@@ -206,6 +206,12 @@ function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[]
 }
 
 export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
+  const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
+  if (options.target === 'rc' && configuredDbTests !== '1') {
+    throw new Error(
+      'CHECK_RC_DB_TESTS_REQUIRED: the RC profile requires DEVAI_DB_TESTS=1 so database cases cannot silently skip',
+    );
+  }
   const cacheRoot = resolve(
     options.cacheRoot ?? join(options.repoRoot, '.devai/state/check-cache/v1'),
   );
@@ -213,7 +219,18 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
   const toolchain =
     options.toolchain ?? resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options));
   const environment: Record<string, string> = { ...(options.environment ?? {}) };
-  for (const key of requiredEnvironmentKeys(options)) {
+  const requiredEnvironment = requiredEnvironmentKeys(options);
+  const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
+  if (requiredEnvironment.includes(authorityDigestKey)) {
+    const authorityPolicyPath = join(options.repoRoot, '.devai/config/authority-policy.json');
+    if (!existsSync(authorityPolicyPath)) {
+      throw new Error(
+        'CHECK_AUTHORITY_POLICY_REQUIRED: materialize .devai/config/authority-policy.json before planning release evidence',
+      );
+    }
+    environment[authorityDigestKey] = sha256Hex(readFileSync(authorityPolicyPath));
+  }
+  for (const key of requiredEnvironment) {
     const inheritedValue = process.env[key];
     if (environment[key] === undefined && inheritedValue !== undefined) {
       environment[key] = inheritedValue;

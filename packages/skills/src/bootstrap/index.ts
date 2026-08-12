@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { getValidator } from '@devai-nyx/schemas';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildConstitutionBindingPlan } from '../constitution/index.js';
 
@@ -34,7 +34,14 @@ const POLICY_FILES = [
   'thresholds.json',
 ] as const;
 
+const _CANONICAL_POLICY_FILES = [
+  ...POLICY_FILES,
+  'check-suites.json',
+  'subprocess-effects.json',
+] as const;
+
 type BootstrapPolicyFile = (typeof POLICY_FILES)[number];
+export type CanonicalPolicyFile = (typeof _CANONICAL_POLICY_FILES)[number];
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -126,7 +133,7 @@ export function validateCanonicalPolicyContent(file: BootstrapPolicyFile, bytes:
   return bytes;
 }
 
-function canonicalPolicyContent(file: (typeof POLICY_FILES)[number]): string {
+export function resolveCanonicalPolicyContent(file: CanonicalPolicyFile): string {
   const candidates = [
     join(PACKAGE_ROOT, 'law/policy', file),
     join(PACKAGE_ROOT, 'dist/law/policy', file),
@@ -137,7 +144,11 @@ function canonicalPolicyContent(file: (typeof POLICY_FILES)[number]): string {
     throw new Error(`canonical policy source unavailable: law/policy/${file}`);
   }
   const bytes = readFileSync(source, 'utf8');
-  return validateCanonicalPolicyContent(file, bytes);
+  if ((POLICY_FILES as readonly string[]).includes(file)) {
+    return validateCanonicalPolicyContent(file as BootstrapPolicyFile, bytes);
+  }
+  JSON.parse(bytes);
+  return bytes;
 }
 
 /**
@@ -162,7 +173,7 @@ export function buildBootstrapPlan(opts: {
   const entries: BootstrapPlanEntry[] = [];
   const counters = JSON.stringify({ TASK: 0, RGR: 0, CTG: 0, ESC: 0 }, null, 2) + '\n';
   const policyContent = Object.fromEntries(
-    POLICY_FILES.map((file) => [file, canonicalPolicyContent(file)]),
+    POLICY_FILES.map((file) => [file, resolveCanonicalPolicyContent(file)]),
   ) as Record<(typeof POLICY_FILES)[number], string>;
   const emptyChain = JSON.stringify({ head: null, records: [] }, null, 2) + '\n';
   const canonicalGitignore = 'scratch/\n';
@@ -271,6 +282,27 @@ export function buildBootstrapPlan(opts: {
 
 export interface ExecuteOptions {
   readonly force?: boolean;
+}
+
+export function preflightBootstrapPlan(plan: BootstrapPlan): readonly string[] {
+  const root = resolve(plan.target_root);
+  return plan.entries.map((entry) => {
+    const target = resolve(root, entry.path);
+    if (target === root || !target.startsWith(`${root}${sep}`)) {
+      throw new Error(`BOOTSTRAP_PATH_ESCAPE:${entry.path}`);
+    }
+    let cursor = root;
+    for (const segment of entry.path.split('/').slice(0, -1)) {
+      cursor = join(cursor, segment);
+      if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+        throw new Error(`BOOTSTRAP_SYMLINK_REFUSED:${entry.path}`);
+      }
+    }
+    if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+      throw new Error(`BOOTSTRAP_SYMLINK_REFUSED:${entry.path}`);
+    }
+    return target;
+  });
 }
 
 export interface ExecuteResult {

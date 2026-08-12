@@ -9,6 +9,7 @@ export type {
   ExecutedTask,
   PlannedTask,
   TaskDescriptor,
+  TaskExecutionResult,
   TaskOperation,
   TaskPlan,
   TaskResult,

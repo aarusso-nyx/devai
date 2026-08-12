@@ -44,15 +44,48 @@ Treat missing, malformed, partial, or unknown evidence as a stop condition.
 
 ## Publish the public RC
 
-The repository workflow `.github/workflows/release-rc2.yml` is triggered only by the
-annotated `v1.0.0-rc.2` tag. It first verifies the protected ledger with the independently
-pinned verifier. A separately protected release job then installs frozen dependencies,
-builds the package and Docusaurus site once, checks the finite publishable closure, runs the
-installed-tarball smoke, and creates the tarball, CycloneDX SBOM, site archive, hashes, and
-release manifest.
+The parameterized `.github/workflows/release.yml` accepts a version tag only when it equals
+`v` plus the public package manifest version. The tag must be annotated and its signature
+must verify. The workflow uses the authentic immutable `pnpm/action-setup` v4.1.0 annotated
+tag object (`7088…`, peeled commit `a748…`) and lets the root `packageManager` field select
+the pnpm version.
 
-The exact tarball is published to GitHub Packages with dist-tag `next`. Finalization waits
-behind the `devai-rc-publication` environment so the Owner can confirm the new package is
-public before registry reinstallation, prerelease creation, and Pages deployment. A rerun
-skips an existing package version and repairs only missing Release or Pages phases; it never
-moves the tag or overwrites the package version.
+The protected ledger is checked by a pinned external verifier. Do not call that verifier
+independent until signing and verifier custody are organizationally separate. The build job
+installs frozen dependencies, builds the package and Docusaurus site, checks publishable
+closure, and creates a normalized public manifest with development workspace dependencies
+removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
+that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
+
+Release tags use SSH signatures. The public identity is supplied through the protected
+`DEVAI_RELEASE_SIGNERS_B64` environment secret and materialized as an OpenSSH allowed-signers
+file; candidate source does not choose its own tag signer. The verified signer-file digest is
+bound into the Release manifest.
+
+A failed rehearsal tag is never moved or deleted. Remediation advances the prerelease version and
+creates a new signed annotated tag so every attempted candidate remains auditable.
+
+The GitHub prerelease manifest and `SHA256SUMS` are the canonical release identity. Existing
+Release assets must match byte-for-byte; recovery is a no-op on a match and a hard refusal on
+any mismatch. Assets are never uploaded with `--clobber`. GitHub Packages is a convenience
+mirror: the workflow publishes the exact canonical tarball and downloads the registry copy to
+verify the same digest. Pages is deployed in GitHub Actions mode from the exact site archive
+named by the canonical manifest.
+
+Before publication, dispatch this same workflow with the signed annotated candidate tag in its
+`release_tag` input. The manual path runs protected-ledger verification, frozen installation,
+build, publishable-closure checks, deterministic double-pack, SBOM creation, site creation, and
+manifest assembly. It then verifies the uploaded workflow artifact and stops. The publication and
+Pages jobs are structurally restricted to a version-tag `push`; the manual rehearsal has read-only
+repository permission and no publication switch. Dispatching the rehearsal is still an external
+effect and requires the Owner's explicit authorization.
+
+The release build also runs `npm --prefix docs/site run security:check`. DEVAI temporarily vendors
+the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no patched npm release;
+the provenance is recorded beside the vendored package. Replace the vendor with the first upstream
+release containing both fixes, after the docs audit and build remain green.
+
+Repository settings are separate Owner-authorized effects: enable immutable Releases,
+prohibit update/deletion of `v*` tags, require signed annotated release tags, protect the
+release and Pages environments, and select GitHub Actions as the Pages source. None of those
+settings is changed by the source workflow itself.

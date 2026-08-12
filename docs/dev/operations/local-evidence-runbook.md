@@ -17,7 +17,7 @@ an **unsigned** receipt to
 
 ## Protected export and signing
 
-Signing is not a DEVAI CLI action. Use `src/export-cli.js` from the independent
+Signing is not a DEVAI CLI action. Use `src/export-cli.js` from the pinned external
 `devai-nyx/devai-verifier` checkout at the exact immutable commit pinned in
 `.github/workflows/devai-ledger-verify.yml`. Keep the verifier checkout, toolchain and environment
 maps, Ed25519 keys, signer ID, and output directory outside the candidate repository:
@@ -46,12 +46,15 @@ An absent allowlisted environment key is represented as `null`, not silently dro
 
 ## Remote boundary
 
-The GitHub workflow receives the envelope, result archive, task policy, and trust store through
-the protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy digest through
-`DEVAI_LEDGER_POLICY_DIGEST`. Candidate files do not control these inputs. CI checks out the exact
-candidate and the independent verifier at immutable commits, then verifies repository, commit,
-tree, policy, signer allowlist/revocation state, and required-node completeness. It does not run
-the product test commands.
+The GitHub workflow receives the envelope, result archive, task policy, trust store, toolchain map,
+and environment map through protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy
+digest through `DEVAI_LEDGER_POLICY_DIGEST`. The release workflow additionally receives the SSH
+tag trust root through `DEVAI_RELEASE_SIGNERS_B64`. Candidate files do not control these inputs. CI checks
+out the exact candidate and the pinned external verifier at immutable commits. The verifier parses
+the committed descriptor and Git tree, asserts profile `rc`, reconstructs the required-node closure
+and task keys from the protected maps, byte-compares the expected task policy, and then verifies
+repository, commit, tree, policy, signer allowlist/revocation state, and result completeness. It
+does not run product test commands.
 
 Trusted local attestation is deliberately limited: it makes tampering and identity mismatch
 detectable, but cannot prove that a trusted signer executed the commands. Failed or incomplete

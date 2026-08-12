@@ -89,10 +89,19 @@ function validatePayload(entry: RegistryEntry, payload: ReturnType<typeof payloa
   }
 }
 
-export function renderActionSuccess(entry: RegistryEntry, stdout: string): string {
+export function renderActionSuccess(
+  entry: RegistryEntry,
+  stdout: string,
+  verdict: 'pass' | 'review' = 'pass',
+): string {
   const result = payloadFrom(stdout);
   validatePayload(entry, result);
-  const envelope = { schemaVersion: '1.0.0', action_id: entry.name, ok: true, result };
+  const envelope = {
+    schemaVersion: '1.0.0',
+    action_id: entry.name,
+    ok: true,
+    result: { verdict, ...result },
+  };
   if (!validators.actionResult(envelope)) {
     throw new Error(`ACTION_RESULT_CONTRACT_VIOLATION:${entry.name}`);
   }
@@ -127,6 +136,11 @@ export function emitPreDispatchActionResult(
   if (result.exit === 0 && result.stderr.length === 0) {
     process.stdout.write(renderActionSuccess(entry, result.stdout));
     process.exitCode = 0;
+    return true;
+  }
+  if (result.exit === 1 && result.stderr.length === 0) {
+    process.stdout.write(renderActionSuccess(entry, result.stdout, 'review'));
+    process.exitCode = 1;
     return true;
   }
   process.stderr.write(
@@ -164,7 +178,6 @@ export function runCliStage<T>(
     const exit = usage ? 2 : 6;
     const message = error instanceof Error ? error.message : String(error);
     if (entry === undefined) {
-      if (!usage) throw error;
       process.stderr.write(`devai: ${message}\n`);
       process.exitCode = exit;
       return { ok: false, stage };
@@ -197,6 +210,11 @@ function restoreAndEmit(
   if (exit === 0 && stderr.length === 0) {
     originalStdout.call(process.stdout, renderActionSuccess(entry, stdout));
     process.exitCode = 0;
+    return;
+  }
+  if (exit === 1 && stderr.length === 0) {
+    originalStdout.call(process.stdout, renderActionSuccess(entry, stdout, 'review'));
+    process.exitCode = 1;
     return;
   }
   const effectiveExit = exit === 0 ? 7 : normalizeExit(exit);

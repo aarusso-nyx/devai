@@ -108,7 +108,7 @@ describe('adopter doctor report depth', () => {
 
   it('runs adopter checks and renders the declared profile for humans', async () => {
     const result = await run({ repoRoot: adopter, human: true });
-    expect(result.exit).toBe(2);
+    expect(result.exit).toBe(1);
     expect(result.stderr).toBe('');
     expect(result.stdout).toContain('devai doctor [profile=tier3]: FAIL');
     expect(result.stdout).toContain('f1-paths-present');

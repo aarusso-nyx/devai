@@ -66,13 +66,20 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'init apply architect',
     public_action_id: 'init apply architect',
     effect: 'local-write',
-    capabilities: ['fs:f5-config', 'fs:workspace'],
+    capabilities: ['fs:f5-config', 'fs:workspace', 'fs:worktree-admin'],
   },
   {
     action_id: 'init apply harness',
     public_action_id: 'init apply harness',
     effect: 'local-write',
-    capabilities: ['fs:f5-config', 'fs:workspace'],
+    capabilities: [
+      'fs:f5-config',
+      'fs:workspace',
+      'fs:proofs',
+      'fs:f5-state',
+      'fs:f4-inventory',
+      'fs:worktree-admin',
+    ],
   },
   {
     action_id: 'init apply owner',

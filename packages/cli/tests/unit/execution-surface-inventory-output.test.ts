@@ -181,4 +181,41 @@ describe('execution-surface action output totality', () => {
       }
     }
   });
+
+  it('transports REVIEW as a typed result at exit 1 for every current action', () => {
+    for (const entry of current) {
+      const review = emit(entry, {
+        exit: 1,
+        stdout: '',
+        stderr: '',
+      });
+      expect(review.stderr, entry.name).toBe('');
+      expect(review.exitCode, entry.name).toBe(1);
+      expect(parseEnvelope(review.stdout), entry.name).toMatchObject({
+        action_id: entry.name,
+        ok: true,
+        result: {
+          verdict: 'review',
+          media_type: 'none',
+          value: null,
+        },
+      });
+    }
+
+    const doctor = current.find((entry) => entry.name === 'doctor');
+    if (doctor === undefined) throw new Error('doctor action missing');
+    const typed = emit(doctor, {
+      exit: 1,
+      stdout: '{"ok":false,"checks":[]}',
+      stderr: '',
+    });
+    expect(parseEnvelope(typed.stdout)).toMatchObject({
+      ok: true,
+      result: {
+        verdict: 'review',
+        media_type: 'application/json',
+        value: { ok: false, checks: [] },
+      },
+    });
+  });
 });

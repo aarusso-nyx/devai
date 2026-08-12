@@ -46,21 +46,22 @@ function aggregate(children: readonly Child[]): Aggregate {
 
 const canonicalSenseRun = ACTION_REGISTRY.find((entry) => entry.action_id === 'sense run');
 if (canonicalSenseRun === undefined) throw new Error('SENSE_RUN_REGISTRY_ENTRY_MISSING');
+const canonicalStatus = canonicalSenseRun.status as RegistryEntry['status'];
 
 const senseRunEntry = {
   name: canonicalSenseRun.action_id,
   handler: canonicalSenseRun.handler,
   internal_name: canonicalSenseRun.handler.replaceAll(' ', '-'),
   path: canonicalSenseRun.path,
-  status: canonicalSenseRun.status,
-  lifecycle: canonicalSenseRun.status === 'preview' ? 'experimental' : 'supported',
+  status: canonicalStatus,
+  lifecycle: canonicalStatus === 'preview' ? 'experimental' : 'supported',
   lifecycle_reason:
-    canonicalSenseRun.status === 'preview'
+    canonicalStatus === 'preview'
       ? 'Preview action; contract may change before v1.0.'
       : 'Stable action.',
   promotion_criteria: [],
-  visibility: canonicalSenseRun.status === 'internal' ? 'maintainer' : 'standard',
-  tier: canonicalSenseRun.status === 'internal' ? 'plumbing' : 'porcelain',
+  visibility: canonicalStatus === 'internal' ? 'maintainer' : 'standard',
+  tier: canonicalStatus === 'internal' ? 'plumbing' : 'porcelain',
   profiles: canonicalSenseRun.profiles,
   effects: canonicalSenseRun.effect,
   authority: canonicalSenseRun.authority ?? 'mesh_controller',

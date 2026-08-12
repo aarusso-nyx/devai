@@ -66,10 +66,10 @@ describe('public read-action runtime seams', () => {
       action_id: 'catalog actions',
       ok: true,
       result: {
+        verdict: 'pass',
         media_type: 'application/json',
         value: expectedCatalog,
       },
     });
   }, 30_000);
-
 });

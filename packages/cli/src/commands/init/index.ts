@@ -1,13 +1,23 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from '@devai-nyx/authority';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  runAuthorityHostEffectsWithRollback,
+  writeFileSync,
+} from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import type { CAC } from 'cac';
 import {
   buildBootstrapPlan,
+  buildRecipeAdapterPlan,
   buildConstitutionBindingPlan,
+  executeRecipeAdapterPlan,
   executeBootstrapPlan,
   introspectRepo,
-  installRecipeAdapters,
+  preflightBootstrapPlan,
+  preflightRecipeAdapterInstall,
+  resolveCanonicalPolicyContent,
   resolveCanonicalConstitution,
   verifyConstitutionBinding,
 } from '@devai-nyx/skills';
@@ -21,6 +31,7 @@ import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
   HOOK_NAMES,
+  preflightHooksInstallPlan,
   type HookName,
 } from '../../services/hooks-install/index.js';
 
@@ -41,6 +52,16 @@ interface InitOptions {
   readonly hook?: string;
   readonly command?: string;
   readonly output?: string;
+  readonly human?: boolean;
+}
+
+interface InitBindOptions {
+  readonly target?: string;
+  readonly constitution?: boolean;
+  readonly subprocessEffects?: boolean;
+  readonly operationalLaw?: boolean;
+  readonly tier?: string;
+  readonly write?: boolean;
   readonly human?: boolean;
 }
 
@@ -147,27 +168,40 @@ function requestedIncludes(options: InitOptions, segment: InitSegment): readonly
   return includes as readonly InitInclude[];
 }
 
-function executeIncludedComponents(
+interface PreparedIncludedComponent {
+  readonly component: InitInclude;
+  readonly plan: Record<string, unknown>;
+  readonly targets: readonly string[];
+  readonly execute: () => Record<string, unknown>;
+}
+
+function prepareIncludedComponents(
   targetRoot: string,
   includes: readonly InitInclude[],
   force: boolean,
   options: InitOptions,
-): readonly Record<string, unknown>[] {
+): readonly PreparedIncludedComponent[] {
   return includes.map((component) => {
     if (component === 'ci') {
       const plan = buildCiScaffoldPlan({
         targetRoot,
         ...(options.output !== undefined && { outputPath: options.output }),
       });
-      const result = executeCiScaffoldPlan(plan, { force });
-      return { component, plan, result };
+      return {
+        component,
+        plan: plan as unknown as Record<string, unknown>,
+        targets: [plan.path],
+        execute: () => ({ ...executeCiScaffoldPlan(plan, { force }) }),
+      };
     }
     if (component === 'skills') {
-      const result = installRecipeAdapters({ repoRoot: targetRoot });
+      const adapterPlan = buildRecipeAdapterPlan();
+      const resolved = preflightRecipeAdapterInstall(targetRoot, adapterPlan);
       return {
         component,
         plan: { hosts: ['codex', 'claude'], recipes: 7 },
-        result,
+        targets: resolved.map((file) => file.absolutePath),
+        execute: () => ({ ...executeRecipeAdapterPlan(resolved) }),
       };
     }
     const plan = buildHooksInstallPlan({
@@ -176,9 +210,23 @@ function executeIncludedComponents(
       ...(options.hook !== undefined && { hook: options.hook as HookName }),
       ...(options.command !== undefined && { command: options.command }),
     });
-    executeHooksInstallPlan(plan);
-    return { component, plan, result: { executed: true } };
+    const targets = preflightHooksInstallPlan(plan);
+    return {
+      component,
+      plan: plan as unknown as Record<string, unknown>,
+      targets,
+      execute: () => {
+        executeHooksInstallPlan(plan);
+        return { executed: true };
+      },
+    };
   });
+}
+
+function executeIncludedComponents(
+  prepared: readonly PreparedIncludedComponent[],
+): readonly Record<string, unknown>[] {
+  return prepared.map(({ component, plan, execute }) => ({ component, plan, result: execute() }));
 }
 
 function addInitOptions(command: ReturnType<CAC['command']>, includeIntrospection: boolean) {
@@ -236,7 +284,7 @@ function initApplyDefinition(segment: InitSegment) {
           .option('--hook <name>', `${HOOK_NAMES.join(' | ')} (default: pre-push)`)
           .option(
             '--command <cmd>',
-            'Hook command (default: devai check --only forbidden-actions --strict)',
+            'Hook command (default: ./node_modules/.bin/devai check --only forbidden-actions --strict)',
           );
       } else if (segment === 'harness') {
         command
@@ -257,24 +305,31 @@ function initApplyDefinition(segment: InitSegment) {
         }
         const introspection = segment === 'harness' ? inspectForInit(options) : null;
         const plan = segmentedPlan(initPlanFor(options), segment);
-        const result =
-          includes.length === 0
-            ? executeBootstrapPlan(plan, { force: options.force === true })
-            : { created: [], overwritten: [], skipped: [], preserved: [] };
-        if (includes.length === 0 && segment === 'harness' && introspection !== null) {
-          const outPath = join(
-            resolve(options.target ?? DEFAULT_REPO_ROOT),
-            '.devai/state/init-introspection.json',
-          );
-          mkdirSync(dirname(outPath), { recursive: true });
-          writeFileSync(outPath, JSON.stringify(introspection, null, 2) + '\n');
-        }
-        const included = executeIncludedComponents(
-          options.target ?? DEFAULT_REPO_ROOT,
+        const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
+        const coreTargets = preflightBootstrapPlan(plan);
+        const preparedIncludes = prepareIncludedComponents(
+          targetRoot,
           includes,
           options.force === true,
           options,
         );
+        const introspectionPath = join(targetRoot, '.devai/state/init-introspection.json');
+        const transaction = runAuthorityHostEffectsWithRollback(
+          [
+            ...coreTargets,
+            ...(segment === 'harness' && introspection !== null ? [introspectionPath] : []),
+            ...preparedIncludes.flatMap((component) => component.targets),
+          ],
+          () => {
+            const result = executeBootstrapPlan(plan, { force: options.force === true });
+            if (segment === 'harness' && introspection !== null) {
+              mkdirSync(dirname(introspectionPath), { recursive: true });
+              writeFileSync(introspectionPath, JSON.stringify(introspection, null, 2) + '\n');
+            }
+            return { result, included: executeIncludedComponents(preparedIncludes) };
+          },
+        );
+        const { result, included } = transaction;
         const includedHuman = included.map((entry) => {
           const component = entry['component'];
           const componentPlan = entry['plan'] as Record<string, unknown>;
@@ -312,6 +367,7 @@ export const initBind = defineCommand({
     cli
       .command('init-bind', 'Plan package binding materialization (or apply with --write)')
       .option('--target <path>', `Target directory (default: ${DEFAULT_REPO_ROOT})`)
+      .option('--tier <tier>', 'Adoption tier persisted in project.json: tier1 | tier2 | tier3')
       .option('--constitution', 'Bind the installed Constitution text and digest pin.')
       .option(
         '--subprocess-effects',
@@ -323,200 +379,194 @@ export const initBind = defineCommand({
       )
       .option('--write', 'Materialize the selected binding.')
       .option('--human', 'Human-readable output')
-      .action(
-        (options: {
-          target?: string;
-          constitution?: boolean;
-          subprocessEffects?: boolean;
-          operationalLaw?: boolean;
-          write?: boolean;
-          human?: boolean;
-        }) => {
-          if (options.operationalLaw === true) {
-            const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
-            const files = [
-              'domains.json',
-              'forbidden-actions.json',
-              'glob-guards.json',
-              'scorecard-na.json',
-              'thresholds.json',
-            ] as const;
-            const materializations = files.map((file) => {
-              const sourcePath = join(targetRoot, 'law/policy', file);
-              if (!existsSync(sourcePath)) {
-                throw new Error(`canonical operational-law source is missing: ${sourcePath}`);
-              }
-              const bytes = readFileSync(sourcePath);
-              JSON.parse(bytes.toString('utf8'));
-              return {
-                source: `law/policy/${file}`,
-                target: `.devai/config/${file}`,
-                digest_sha256: createHash('sha256').update(bytes).digest('hex'),
-                byte_identity_required: true as const,
-                bytes,
-              };
-            });
-            const plan = materializations.map(({ bytes: _bytes, ...entry }) => entry);
-            if (options.write !== true) {
-              emit(
-                { plan },
-                options.human === true,
-                `init bind --operational-law (plan only): ${String(plan.length)} exact materializations`,
-              );
-              process.exitCode = EXIT_PASS;
-              return;
-            }
-            for (const entry of materializations) {
-              const targetPath = join(targetRoot, entry.target);
-              mkdirSync(dirname(targetPath), { recursive: true });
-              writeFileSync(targetPath, entry.bytes);
-            }
+      .action((options: InitBindOptions) => {
+        validateInitTier(options);
+        if (options.operationalLaw === true) {
+          const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
+          const files = [
+            'domains.json',
+            'forbidden-actions.json',
+            'glob-guards.json',
+            'scorecard-na.json',
+            'thresholds.json',
+          ] as const;
+          const materializations = files.map((file) => {
+            const content = resolveCanonicalPolicyContent(file);
+            const bytes = Buffer.from(content, 'utf8');
+            return {
+              source: `installed:law/policy/${file}`,
+              target: `.devai/config/${file}`,
+              digest_sha256: createHash('sha256').update(bytes).digest('hex'),
+              byte_identity_required: true as const,
+              bytes,
+            };
+          });
+          const plan = materializations.map(({ bytes: _bytes, ...entry }) => entry);
+          if (options.write !== true) {
             emit(
-              { materialized: plan },
+              { plan },
               options.human === true,
-              `init bind --operational-law: ${String(plan.length)} exact materializations`,
+              `init bind --operational-law (plan only): ${String(plan.length)} exact materializations`,
             );
             process.exitCode = EXIT_PASS;
             return;
           }
-          if (options.subprocessEffects === true) {
-            const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
-            const sourcePath = join(targetRoot, 'law/policy/subprocess-effects.json');
-            const targetPath = join(targetRoot, '.devai/config/subprocess-effects.json');
-            if (!existsSync(sourcePath)) {
-              process.stderr.write(
-                'devai init bind --subprocess-effects: canonical source is missing\n',
-              );
-              process.exitCode = EXIT_FAIL;
-              return;
-            }
-            const bytes = readFileSync(sourcePath);
-            let document: unknown;
-            try {
-              document = JSON.parse(bytes.toString('utf8')) as unknown;
-            } catch {
-              process.stderr.write(
-                'devai init bind --subprocess-effects: canonical source is not valid JSON\n',
-              );
-              process.exitCode = EXIT_FAIL;
-              return;
-            }
-            if (!validators.subprocessEffects(document)) {
-              process.stderr.write(
-                `devai init bind --subprocess-effects: canonical source fails schema validation: ${JSON.stringify(validators.subprocessEffects.errors)}\n`,
-              );
-              process.exitCode = EXIT_FAIL;
-              return;
-            }
-            const digestSha256 = createHash('sha256').update(bytes).digest('hex');
-            const plan = {
-              source: 'law/policy/subprocess-effects.json',
-              target: '.devai/config/subprocess-effects.json',
-              digest_sha256: digestSha256,
-              byte_identity_required: true,
-            };
-            if (options.write !== true) {
-              emit(
-                { plan },
-                options.human === true,
-                `init bind --subprocess-effects (plan only): ${plan.source} → ${plan.target} (${digestSha256})`,
-              );
-              process.exitCode = EXIT_PASS;
-              return;
-            }
+          for (const entry of materializations) {
+            const targetPath = join(targetRoot, entry.target);
             mkdirSync(dirname(targetPath), { recursive: true });
-            writeFileSync(targetPath, bytes);
-            emit(
-              { materialized: plan },
-              options.human === true,
-              `init bind --subprocess-effects: ${plan.target} (${digestSha256})`,
-            );
-            process.exitCode = EXIT_PASS;
-            return;
-          }
-          if (options.constitution === true) {
-            const targetRoot = options.target ?? DEFAULT_REPO_ROOT;
-            const canonical = resolveCanonicalConstitution();
-            if (canonical === null) {
-              process.stderr.write(
-                'devai init bind --constitution: no installed Constitution text could be resolved\n',
-              );
-              process.exit(EXIT_FAIL);
-            }
-            const before = verifyConstitutionBinding(targetRoot);
-            const toVersion = canonical.version ?? 'unknown';
-            const fromVersion = before.pin?.version ?? 'none';
-
-            if (options.write !== true) {
-              emit(
-                {
-                  from: fromVersion,
-                  to: toVersion,
-                  source: canonical.source,
-                  sha256: canonical.sha256,
-                },
-                options.human === true,
-                `init bind --constitution (plan only): ${fromVersion} → ${toVersion} (source: ${canonical.source})\n` +
-                  '  re-run with --write to refresh .devai/pin/constitution.md + the project.json pin',
-              );
-              process.exitCode = EXIT_PASS;
-              return;
-            }
-
-            const vendoredPath = join(targetRoot, '.devai/pin/constitution.md');
-            mkdirSync(dirname(vendoredPath), { recursive: true });
-            writeFileSync(vendoredPath, canonical.text);
-            const pointerPath = join(targetRoot, '.devai/constitution.md');
-            if (!existsSync(pointerPath)) {
-              const binding = buildConstitutionBindingPlan(targetRoot, resolveCliVersion());
-              writeFileSync(pointerPath, binding.pointerFile.content);
-            }
-
-            const configPath = join(targetRoot, '.devai/config/project.json');
-            const config = existsSync(configPath)
-              ? (JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>)
-              : {};
-            const pin =
-              canonical.version !== null
-                ? { version: canonical.version, sha256: canonical.sha256 }
-                : null;
-            if (pin !== null) {
-              mkdirSync(dirname(configPath), { recursive: true });
-              writeFileSync(
-                configPath,
-                JSON.stringify({ ...config, constitution: pin }, null, 2) + '\n',
-              );
-            }
-
-            emit(
-              { from: fromVersion, to: toVersion, source: canonical.source },
-              options.human === true,
-              `init bind --constitution: ${fromVersion} → ${toVersion} (source: ${canonical.source})`,
-            );
-            process.exitCode = EXIT_PASS;
-            return;
-          }
-          if (options.write === true) {
-            const artifact = executeAuthorityPolicyMaterialization() as {
-              path: string;
-              operation: string;
-              digest_sha256: string;
-            };
-            emit(
-              { artifact },
-              options.human === true,
-              `authority policy ${artifact.operation}: ${artifact.path} (${artifact.digest_sha256})`,
-            );
-            process.exitCode = EXIT_PASS;
-            return;
+            writeFileSync(targetPath, entry.bytes);
           }
           emit(
-            { plan: 'authority-policy' },
+            { materialized: plan },
             options.human === true,
-            'init bind (plan only): materialize the installed authority policy; re-run with --write',
+            `init bind --operational-law: ${String(plan.length)} exact materializations`,
           );
           process.exitCode = EXIT_PASS;
-        },
-      );
+          return;
+        }
+        if (options.subprocessEffects === true) {
+          const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
+          const targetPath = join(targetRoot, '.devai/config/subprocess-effects.json');
+          const bytes = Buffer.from(
+            resolveCanonicalPolicyContent('subprocess-effects.json'),
+            'utf8',
+          );
+          let document: unknown;
+          try {
+            document = JSON.parse(bytes.toString('utf8')) as unknown;
+          } catch {
+            process.stderr.write(
+              'devai init bind --subprocess-effects: canonical source is not valid JSON\n',
+            );
+            process.exitCode = EXIT_FAIL;
+            return;
+          }
+          if (!validators.subprocessEffects(document)) {
+            process.stderr.write(
+              `devai init bind --subprocess-effects: canonical source fails schema validation: ${JSON.stringify(validators.subprocessEffects.errors)}\n`,
+            );
+            process.exitCode = EXIT_FAIL;
+            return;
+          }
+          const digestSha256 = createHash('sha256').update(bytes).digest('hex');
+          const plan = {
+            source: 'installed:law/policy/subprocess-effects.json',
+            target: '.devai/config/subprocess-effects.json',
+            digest_sha256: digestSha256,
+            byte_identity_required: true,
+          };
+          if (options.write !== true) {
+            emit(
+              { plan },
+              options.human === true,
+              `init bind --subprocess-effects (plan only): ${plan.source} → ${plan.target} (${digestSha256})`,
+            );
+            process.exitCode = EXIT_PASS;
+            return;
+          }
+          mkdirSync(dirname(targetPath), { recursive: true });
+          writeFileSync(targetPath, bytes);
+          emit(
+            { materialized: plan },
+            options.human === true,
+            `init bind --subprocess-effects: ${plan.target} (${digestSha256})`,
+          );
+          process.exitCode = EXIT_PASS;
+          return;
+        }
+        if (options.constitution === true) {
+          const targetRoot = options.target ?? DEFAULT_REPO_ROOT;
+          const canonical = resolveCanonicalConstitution();
+          if (canonical === null) {
+            process.stderr.write(
+              'devai init bind --constitution: no installed Constitution text could be resolved\n',
+            );
+            process.exit(EXIT_FAIL);
+          }
+          const before = verifyConstitutionBinding(targetRoot);
+          const toVersion = canonical.version ?? 'unknown';
+          const fromVersion = before.pin?.version ?? 'none';
+
+          if (options.write !== true) {
+            emit(
+              {
+                from: fromVersion,
+                to: toVersion,
+                source: canonical.source,
+                sha256: canonical.sha256,
+              },
+              options.human === true,
+              `init bind --constitution (plan only): ${fromVersion} → ${toVersion} (source: ${canonical.source})\n` +
+                '  re-run with --write to refresh .devai/pin/constitution.md + the project.json pin',
+            );
+            process.exitCode = EXIT_PASS;
+            return;
+          }
+
+          const vendoredPath = join(targetRoot, '.devai/pin/constitution.md');
+          mkdirSync(dirname(vendoredPath), { recursive: true });
+          writeFileSync(vendoredPath, canonical.text);
+          const pointerPath = join(targetRoot, '.devai/constitution.md');
+          if (!existsSync(pointerPath)) {
+            const binding = buildConstitutionBindingPlan(targetRoot, resolveCliVersion());
+            writeFileSync(pointerPath, binding.pointerFile.content);
+          }
+
+          const configPath = join(targetRoot, '.devai/config/project.json');
+          const config = existsSync(configPath)
+            ? (JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>)
+            : {};
+          const pin =
+            canonical.version !== null
+              ? { version: canonical.version, sha256: canonical.sha256 }
+              : null;
+          if (pin !== null) {
+            mkdirSync(dirname(configPath), { recursive: true });
+            writeFileSync(
+              configPath,
+              JSON.stringify(
+                {
+                  ...config,
+                  ...(options.tier !== undefined && isAdoptionProfile(options.tier)
+                    ? { profile: options.tier }
+                    : {}),
+                  devai_version: resolveCliVersion(),
+                  constitution: pin,
+                },
+                null,
+                2,
+              ) + '\n',
+            );
+          }
+
+          emit(
+            { from: fromVersion, to: toVersion, source: canonical.source },
+            options.human === true,
+            `init bind --constitution: ${fromVersion} → ${toVersion} (source: ${canonical.source})`,
+          );
+          process.exitCode = EXIT_PASS;
+          return;
+        }
+        if (options.write === true) {
+          const artifact = executeAuthorityPolicyMaterialization() as {
+            path: string;
+            operation: string;
+            digest_sha256: string;
+          };
+          emit(
+            { artifact },
+            options.human === true,
+            `authority policy ${artifact.operation}: ${artifact.path} (${artifact.digest_sha256})`,
+          );
+          process.exitCode = EXIT_PASS;
+          return;
+        }
+        emit(
+          { plan: 'authority-policy' },
+          options.human === true,
+          'init bind (plan only): materialize the installed authority policy; re-run with --write',
+        );
+        process.exitCode = EXIT_PASS;
+      });
   },
 });

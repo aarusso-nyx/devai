@@ -31,22 +31,40 @@ unchanged throughout execution.
 ## Release-candidate gate
 
 ```bash
-devai check --rc --task-plan --format json
-devai check --rc --run --as-role inspector --write --format json
+pnpm run build
+pnpm run authority:materialize
+DEVAI_DB_TESTS=1 DEVAI_DB_URL=<reachable-test-database> \
+  devai check --rc --task-plan --format json
+DEVAI_DB_TESTS=1 DEVAI_DB_URL=<reachable-test-database> \
+  devai check --rc --run --as-role inspector --write --format json
 ```
 
+`authority:materialize` deterministically creates the ignored
+`.devai/config/authority-policy.json` from the bound Constitution. The RC task key binds its
+SHA-256 through the allowlisted `DEVAI_AUTHORITY_POLICY_SHA256` identity. This keeps the generated
+authority session out of Git while allowing the pinned external policy builder to reconstruct the
+same three-key task-policy schema. Missing materialization fails with
+`CHECK_AUTHORITY_POLICY_REQUIRED`; it must never be bypassed with a hand-authored policy.
+
 The fixed RC closure is three nodes: generation, build, then one `test:coverage:rc` node. That node
-collects the complete 104-file Vitest population exactly once and enforces coverage floors of 70%
+collects the complete Vitest population exactly once and enforces coverage floors of 70%
 statements, 60% branches, 70% functions, and 70% lines. The narrower database, E2E, performance,
 and containment scripts remain available as diagnostic slices; they are not additional required
-RC nodes. Real provider credentials are always explicit opt-in; ambient credentials must not
-create accidental cost or nondeterminism.
+RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The current rc.6
+candidate collects **106 files and 920 tests** via `vitest list --json`; release records must
+recount the exact publication candidate rather than copying this development census. RC planning and
+execution refuse unless `DEVAI_DB_TESTS=1`; its value and `DEVAI_DB_URL` are bound into the RC
+task key along with the authority-policy SHA-256. A reachable disposable database is required,
+and the release record must include the
+number of collected DB cases. The current DB-enabled rc.6 gate collected and passed **9 DB cases**
+inside the 920-test population. Real provider credentials are always explicit opt-in; ambient
+credentials must not create accidental cost or nondeterminism.
 
 ## Receipt verification
 
 A candidate-independent exporter validates the unsigned clean affected/RC receipt and exact result
 set before signing outside the candidate repository. The exported evidence is valid only for its
 exact repository, commit, tree, task-policy digest, required-node closure, signer, and revocation
-state. The independently pinned remote verifier rejects missing, stale, malformed, unknown, FAIL,
+state. The pinned external verifier rejects missing, stale, malformed, unknown, FAIL,
 or ABORTED nodes. A trusted signature proves integrity and signer identity, not that execution
 actually occurred.

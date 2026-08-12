@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
+
+if (process.env.DEVAI_DB_TESTS !== '1') {
+  throw new Error(
+    'CHECK_RC_DB_TESTS_REQUIRED: set DEVAI_DB_TESTS=1 and provide a reachable test database before running the RC gate',
+  );
+}
 import { LOCAL_INCLUDE } from './local.config.js';
 
 interface ThresholdPolicy {

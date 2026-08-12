@@ -28,10 +28,10 @@ describe('machine-proof path domain', () => {
         return calls.length;
       },
     };
-    const capabilities = createDbCapabilities(client as never);
+    const capabilities = createDbCapabilities(client);
 
-    expect(capabilities.read.query('read' as never)).toBe(1);
-    expect(capabilities.write.query('write' as never)).toBe(2);
+    expect(capabilities.read.query('read')).toBe(1);
+    expect(capabilities.write.query('write')).toBe(2);
     expect(calls).toEqual(['bound:read', 'bound:write']);
     expect(Object.isFrozen(capabilities)).toBe(true);
     expect(Object.isFrozen(capabilities.read)).toBe(true);

@@ -54,8 +54,11 @@
       "description": "A closed transport frame. JSON payload semantics remain governed by the action's payload schema when one is declared.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["media_type", "value"],
+      "required": ["verdict", "media_type", "value"],
       "properties": {
+        "verdict": {
+          "enum": ["pass", "review"]
+        },
         "media_type": {
           "enum": ["application/json", "text/plain", "none"]
         },
@@ -105,6 +108,7 @@
       "action_id": "catalog actions",
       "ok": true,
       "result": {
+        "verdict": "pass",
         "media_type": "application/json",
         "value": []
       }
