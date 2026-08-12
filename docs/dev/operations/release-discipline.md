@@ -77,13 +77,17 @@ without a SemVer prerelease component creates a normal GitHub Release and uses `
 manifest records the derived release type, prerelease boolean, and dist-tag; recovery verifies
 that the existing Release and registry tag match that identity.
 
-Before publication, dispatch this same workflow with the signed annotated candidate tag in its
-`release_tag` input. The manual path runs protected-ledger verification, frozen installation,
+Pushing the signed annotated version tag runs protected-ledger verification, frozen installation,
 build, publishable-closure checks, deterministic double-pack, SBOM creation, site creation, and
-manifest assembly. It then verifies the uploaded workflow artifact and stops. The publication and
-Pages jobs are structurally restricted to a version-tag `push`; the manual rehearsal has read-only
-repository permission and no publication switch. Dispatching the rehearsal is still an external
-effect and requires the Owner's explicit authorization.
+manifest assembly. The tag-push path verifies the uploaded workflow artifact and stops without
+publishing. A manual dispatch with the same exact `release_tag` and `publish: false` repeats that
+non-publishing rehearsal.
+
+After a green rehearsal and separate Owner authorization, a manual dispatch for the exact tag with
+`publish: true` is the only path that may create or verify the canonical Release, mirror the exact
+tarball to GitHub Packages, and deploy the manifest-bound Pages archive. The finalization and Pages
+jobs are structurally restricted to that explicit publishing dispatch. Both rehearsal and
+publication dispatches are external effects and require the Owner's exact authorization.
 
 The release build also runs `npm --prefix docs/site run security:check`. DEVAI temporarily vendors
 the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no patched npm release;
