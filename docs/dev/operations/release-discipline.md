@@ -57,6 +57,11 @@ closure, and creates a normalized public manifest with development workspace dep
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
 that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
 
+Release tags use SSH signatures. The public identity is supplied through the protected
+`DEVAI_RELEASE_SIGNERS_B64` environment secret and materialized as an OpenSSH allowed-signers
+file; candidate source does not choose its own tag signer. The verified signer-file digest is
+bound into the Release manifest.
+
 The GitHub prerelease manifest and `SHA256SUMS` are the canonical release identity. Existing
 Release assets must match byte-for-byte; recovery is a no-op on a match and a hard refusal on
 any mismatch. Assets are never uploaded with `--clobber`. GitHub Packages is a convenience

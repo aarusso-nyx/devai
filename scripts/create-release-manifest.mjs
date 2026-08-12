@@ -47,6 +47,7 @@ const manifest = {
     trust_store_sha256: required('LEDGER_TRUST_STORE_SHA256'),
     toolchain_sha256: required('LEDGER_TOOLCHAIN_SHA256'),
     environment_sha256: required('LEDGER_ENVIRONMENT_SHA256'),
+    release_signers_sha256: required('LEDGER_RELEASE_SIGNERS_SHA256'),
   },
   artifacts: {
     package: artifact(packageFile),

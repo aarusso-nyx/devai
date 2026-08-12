@@ -173,6 +173,12 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
     },
     {
+      name: 'missing protected tag signer trust',
+      mutate: (source: string) =>
+        source.replace('git -C candidate config gpg.format ssh', 'echo signer-trust-missing'),
+      diagnostic: 'RELEASE_TAG_TRUST_MISSING',
+    },
+    {
       name: 'redundant pnpm version input',
       mutate: (source: string) =>
         source.replace('run_install: false', 'version: 9.15.0\n          run_install: false'),

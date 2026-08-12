@@ -452,6 +452,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
+    'secrets.DEVAI_RELEASE_SIGNERS_B64',
     'pnpm install --frozen-lockfile',
     'pnpm run build',
     'pnpm run release:closure',
@@ -462,7 +463,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     '--tag next',
     'sha256sum --check SHA256SUMS',
     'gh release create',
-    'git verify-tag',
+    'git -C candidate verify-tag',
     'actions/deploy-pages@',
     'https://aarusso-nyx.github.io/devai/',
     'The exact release build and artifact assembly completed without publication.',
@@ -482,6 +483,18 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   }
   if (!source.includes('test "$(git cat-file -t "$RELEASE_TAG")" = tag')) {
     findings.push(finding('RELEASE_ANNOTATED_TAG_CHECK_MISSING', file, 'git cat-file -t'));
+  }
+  if (
+    !source.includes('git -C candidate config gpg.format ssh') ||
+    !source.includes('git -C candidate config gpg.ssh.allowedSignersFile')
+  ) {
+    findings.push(
+      finding(
+        'RELEASE_TAG_TRUST_MISSING',
+        file,
+        'signed tags must verify against protected SSH allowed signers',
+      ),
+    );
   }
   const pnpmStep = steps.find(({ step }) =>
     typeof step.uses === 'string' ? step.uses.startsWith('pnpm/action-setup@') : false,

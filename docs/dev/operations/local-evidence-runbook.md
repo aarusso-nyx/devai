@@ -48,7 +48,8 @@ An absent allowlisted environment key is represented as `null`, not silently dro
 
 The GitHub workflow receives the envelope, result archive, task policy, trust store, toolchain map,
 and environment map through protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy
-digest through `DEVAI_LEDGER_POLICY_DIGEST`. Candidate files do not control these inputs. CI checks
+digest through `DEVAI_LEDGER_POLICY_DIGEST`. The release workflow additionally receives the SSH
+tag trust root through `DEVAI_RELEASE_SIGNERS_B64`. Candidate files do not control these inputs. CI checks
 out the exact candidate and the pinned external verifier at immutable commits. The verifier parses
 the committed descriptor and Git tree, asserts profile `rc`, reconstructs the required-node closure
 and task keys from the protected maps, byte-compares the expected task policy, and then verifies
