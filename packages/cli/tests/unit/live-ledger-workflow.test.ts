@@ -139,9 +139,11 @@ describe('live ledger-verification workflow', () => {
     expect(result.stdout).toBe('workflow contract: PASS\n');
     expect(release).toContain("tags: ['v*']");
     expect(release).toContain('workflow_dispatch:');
-    expect(release).toContain("if: ${{ github.event_name == 'push' || inputs.publish }}");
     expect(release).toContain(
-      "if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}",
+      "if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}",
+    );
+    expect(release).toContain(
+      "if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}",
     );
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('pnpm run release:closure');
@@ -217,7 +219,10 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'rehearsal publication guard removal',
       mutate: (source: string) =>
-        source.replace("    if: ${{ github.event_name == 'push' || inputs.publish }}\n", ''),
+        source.replace(
+          "    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}\n",
+          '',
+        ),
       diagnostic: 'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
     },
     {

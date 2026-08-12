@@ -267,7 +267,7 @@ jobs:
   finalize-release:
     name: Create canonical Release and mirror exact package
     needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'push' || inputs.publish }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     environment: devai-rc-publication
     timeout-minutes: 10
@@ -377,7 +377,7 @@ jobs:
   deploy-pages:
     name: Deploy and verify GitHub Pages
     needs: finalize-release
-    if: ${{ github.event_name == 'push' || inputs.publish }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -428,7 +428,7 @@ jobs:
   rehearsal-summary:
     name: Verify non-publishing rehearsal assets
     needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
