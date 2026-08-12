@@ -6,7 +6,7 @@ Please report suspected vulnerabilities privately to the repository owner or sec
 
 ## Supported versions
 
-Only `1.0.0-rc.3` is supported after its separately authorized publication. Until then,
+Only `1.0.0-rc.4` is supported after its separately authorized publication. Until then,
 `1.0.0-rc.2` remains the only public candidate.
 
 ## Security boundary

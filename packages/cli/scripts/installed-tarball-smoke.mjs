@@ -58,7 +58,7 @@ try {
 
   run('pnpm', ['init'], projectRoot);
   run('git', ['init', '-q'], projectRoot);
-  run('pnpm', ['add', '--offline', resolve(packageRoot, tarball)], projectRoot);
+  run('pnpm', ['add', '--prefer-offline', resolve(packageRoot, tarball)], projectRoot);
   writeFileSync(join(projectRoot, '.gitignore'), 'node_modules/\n.devai/state/\nscratch/\n');
   run('git', ['config', 'user.name', 'DEVAI smoke'], projectRoot);
   run('git', ['config', 'user.email', 'smoke@example.invalid'], projectRoot);
