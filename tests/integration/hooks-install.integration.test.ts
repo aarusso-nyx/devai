@@ -150,6 +150,7 @@ describe('devai init apply architect --include hooks', () => {
       const hookPath = join(tempDir, '.git/hooks/pre-push');
       expect(existsSync(hookPath)).toBe(true);
       expect(readFileSync(hookPath, 'utf8')).toContain('devai check --only forbidden-actions');
+      expect(readFileSync(hookPath, 'utf8')).toContain('--since-ref "$devai_remote_sha"');
       expect(statSync(hookPath).mode & 0o777).toBe(0o755);
     },
     CLI_TIMEOUT_MS,

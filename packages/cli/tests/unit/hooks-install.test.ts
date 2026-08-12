@@ -1,5 +1,14 @@
 // Invariants: INV-DEVAI-013, INV-DEVAI-018
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -37,8 +46,10 @@ describe('hooks install planning and execution', () => {
       manager: 'git',
       action: 'create',
       hook: 'pre-push',
-      command: './node_modules/.bin/devai check --only forbidden-actions --strict',
     });
+    expect(gitPlan.command).toContain('--since-ref "$devai_remote_sha"');
+    expect(gitPlan.command).toContain('git rev-list --reverse');
+    expect(gitPlan.command).toContain('DEVAI_PRE_PUSH_REF_DELETION_REFUSED');
     expect(gitPlan.content).toMatch(/^#!\/usr\/bin\/env sh\n/);
 
     const huskyRepo = root();
@@ -90,6 +101,30 @@ describe('hooks install planning and execution', () => {
 
     await withAuthorityHostTestScope(() => executeHooksInstallPlan(updated));
     expect(readFileSync(hook, 'utf8')).toBe(updated.content);
+  });
+
+  it('passes the exact existing remote SHA as the forbidden-action lower bound', async () => {
+    const repo = root();
+    const fakeDevai = put(
+      repo,
+      'node_modules/.bin/devai',
+      '#!/usr/bin/env sh\nprintf "%s\\n" "$*" >> hook-args.txt\n',
+    );
+    chmodSync(fakeDevai, 0o755);
+    const plan = buildHooksInstallPlan({ targetRoot: repo, hook: 'pre-push' });
+    await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+    const remoteSha = 'a'.repeat(40);
+    const localSha = 'b'.repeat(40);
+    const invoked = spawnSync(plan.path, ['origin', 'https://example.invalid/repo.git'], {
+      cwd: repo,
+      encoding: 'utf8',
+      input: `refs/heads/feature ${localSha} refs/heads/feature ${remoteSha}\n`,
+    });
+
+    expect(invoked.status, invoked.stderr).toBe(0);
+    expect(readFileSync(join(repo, 'hook-args.txt'), 'utf8')).toBe(
+      `check --only forbidden-actions --strict --since-ref ${remoteSha}\n`,
+    );
   });
 
   it('fails closed until every post-merge adapter binding exists', async () => {

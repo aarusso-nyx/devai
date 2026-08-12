@@ -99,6 +99,31 @@ function postMergeCommand(targetRoot: string): string {
   return `node ${JSON.stringify(issuer)}\ndevai round close --post-merge-receipt --host-receipt ${JSON.stringify(receipt)}`;
 }
 
+function prePushCommand(): string {
+  return `devai_zero_sha=0000000000000000000000000000000000000000
+devai_seen_ref=0
+while read -r devai_local_ref devai_local_sha devai_remote_ref devai_remote_sha; do
+  devai_seen_ref=1
+  if [ "$devai_local_sha" = "$devai_zero_sha" ]; then
+    echo "DEVAI_PRE_PUSH_REF_DELETION_REFUSED:$devai_remote_ref" >&2
+    exit 1
+  fi
+  if [ "$devai_remote_sha" = "$devai_zero_sha" ]; then
+    devai_first_outgoing="$(git rev-list --reverse "$devai_local_sha" --not --remotes | sed -n '1p')"
+    if [ -n "$devai_first_outgoing" ] && devai_since_ref="$(git rev-parse "$devai_first_outgoing^" 2>/dev/null)"; then
+      ./node_modules/.bin/devai check --only forbidden-actions --strict --since-ref "$devai_since_ref" || exit $?
+    else
+      ./node_modules/.bin/devai check --only forbidden-actions --strict --max-commits 50 || exit $?
+    fi
+  else
+    ./node_modules/.bin/devai check --only forbidden-actions --strict --since-ref "$devai_remote_sha" || exit $?
+  fi
+done
+if [ "$devai_seen_ref" -eq 0 ]; then
+  ./node_modules/.bin/devai check --only forbidden-actions --strict --max-commits 50
+fi`;
+}
+
 function headAt(root: string): string {
   const head = readFileSync(join(root, '.git/HEAD'), 'utf8').trim();
   if (/^[0-9a-f]{40}$/u.test(head)) return head;
@@ -217,7 +242,9 @@ export function buildHooksInstallPlan(opts: HooksInstallOptions): HooksInstallPl
     opts.command ??
     (hook === 'post-merge'
       ? postMergeCommand(resolve(opts.targetRoot))
-      : './node_modules/.bin/devai check --only forbidden-actions --strict');
+      : hook === 'pre-push'
+        ? prePushCommand()
+        : './node_modules/.bin/devai check --only forbidden-actions --strict');
   const { path, manager } = resolveHookPath(opts.targetRoot, hook);
   const newBlock = block(command);
 
