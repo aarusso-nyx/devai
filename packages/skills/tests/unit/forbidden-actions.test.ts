@@ -382,6 +382,43 @@ describe('scanForbiddenActions', () => {
     );
   });
 
+  it('accepts an Architect-authored update to a materialized DEVAI policy', () => {
+    mkdirSync(join(dir, '.devai/config'), { recursive: true });
+    writeFileSync(
+      join(dir, '.devai/config/forbidden-actions.json'),
+      JSON.stringify({ schemaVersion: '1.0.0', actions: CANONICAL_FORBIDDEN_ACTIONS }),
+    );
+    writeFileSync(join(dir, '.devai/config/authority-policy.json'), '{"version":1}\n');
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', 'commit', '-qm', 'seed'],
+      { cwd: dir },
+    );
+    writeFileSync(join(dir, '.devai/config/authority-policy.json'), '{"version":2}\n');
+    execFileSync('git', ['add', '.devai/config/authority-policy.json'], { cwd: dir });
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=DEVAI Architect',
+        '-c',
+        'user.email=architect@example.com',
+        'commit',
+        '-qm',
+        'chore: refresh installed DEVAI policy',
+      ],
+      { cwd: dir },
+    );
+
+    expect(
+      scanForbiddenActions({ repoRoot: dir, maxCommits: 1 }).findings.filter(
+        (finding) => finding.forbidden_id === 'FORBID-MUTATE-INVARIANTS',
+      ),
+    ).toEqual([]);
+  });
+
   it('KR-R5-027 does not classify a nested record segment as the top-level record tree', () => {
     const source = join(dir, 'packages/cli/src/commands/record/run.ts');
     mkdirSync(join(dir, '.devai/config'), { recursive: true });
