@@ -1,7 +1,7 @@
 # Install and adopt
 
-DEVAI v1.0rc is distributed through GitHub Packages as one package:
-`@aarusso-nyx/devai`. Pin the exact RC version selected by your maintainers; do
+DEVAI 1.0 is distributed through GitHub Packages as one package:
+`@aarusso-nyx/devai`. Pin the exact version selected by your maintainers; do
 not rely on a moving dist-tag.
 
 Prerequisites are Node.js 24 or newer, Git, and a project-local package manager.
@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.0.0-rc.6
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.0.0
 pnpm exec devai catalog actions --format json
 ```
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/actions-list-output.schema.json",
   "title": "Actions List Output",
-  "description": "The JSON output of `devai catalog actions`: the current v1.0rc command catalog.",
+  "description": "The JSON output of `devai catalog actions`: the current v1.0 command catalog.",
   "type": "array",
   "items": {
     "type": "object",

@@ -1,6 +1,6 @@
 # Roles
 
-DEVAI v1.0rc keeps human authority explicit. The current practical references are:
+DEVAI 1.0 keeps human authority explicit. The current practical references are:
 
 - [Owner](owner.md)
 - [Engineer](engineer.md)

@@ -21,7 +21,7 @@ paths select the declared `test:local-full` fallback and therefore the complete 
 `devai check --local` selects that complete cheap closure directly. It consists of generation,
 the workspace build, the package and root test leaves, and the aggregate marker. Each unchanged
 PASS node can be served from the ignored content-addressed cache. The current closure is 14 nodes
-and its Vitest leaves collect 92 files.
+and its Vitest leaves collect 94 files.
 
 Never reuse FAIL, timeout, killed, aborted, malformed, or incomplete output. Dirty-tree runs are
 useful for iteration but cannot produce a candidate receipt. The local profile is deliberately
@@ -50,14 +50,14 @@ The fixed RC closure is three nodes: generation, build, then one `test:coverage:
 collects the complete Vitest population exactly once and enforces coverage floors of 70%
 statements, 60% branches, 70% functions, and 70% lines. The narrower database, E2E, performance,
 and containment scripts remain available as diagnostic slices; they are not additional required
-RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The current rc.6
-candidate collects **106 files and 920 tests** via `vitest list --json`; release records must
-recount the exact publication candidate rather than copying this development census. RC planning and
+RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The stable 1.0 candidate
+collects **106 files and 922 tests** via `vitest list --json`; release records must recount the
+exact publication candidate rather than copying this development census. RC planning and
 execution refuse unless `DEVAI_DB_TESTS=1`; its value and `DEVAI_DB_URL` are bound into the RC
 task key along with the authority-policy SHA-256. A reachable disposable database is required,
 and the release record must include the
-number of collected DB cases. The current DB-enabled rc.6 gate collected and passed **9 DB cases**
-inside the 920-test population. Real provider credentials are always explicit opt-in; ambient
+number of collected DB cases. The stable candidate collects **9 DB cases** inside the 922-test
+population. Real provider credentials are always explicit opt-in; ambient
 credentials must not create accidental cost or nondeterminism.
 
 ## Receipt verification

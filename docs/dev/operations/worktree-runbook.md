@@ -1,6 +1,6 @@
 # Worktree operations
 
-The v1.0rc CLI has no public worktree action. Use Git directly and keep every concurrent change
+The v1.0 CLI has no public worktree action. Use Git directly and keep every concurrent change
 in a dedicated worktree and branch:
 
 ```bash

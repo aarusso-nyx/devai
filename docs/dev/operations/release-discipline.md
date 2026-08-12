@@ -42,7 +42,7 @@ devai release drift --artifact <immutable-artifact-ref> \
 or auth charter. The operator owns credentials, target selection, deployment, and rollback.
 Treat missing, malformed, partial, or unknown evidence as a stop condition.
 
-## Publish the public RC
+## Publish a public release
 
 The parameterized `.github/workflows/release.yml` accepts a version tag only when it equals
 `v` plus the public package manifest version. The tag must be annotated and its signature
@@ -65,12 +65,17 @@ bound into the Release manifest.
 A failed rehearsal tag is never moved or deleted. Remediation advances the prerelease version and
 creates a new signed annotated tag so every attempted candidate remains auditable.
 
-The GitHub prerelease manifest and `SHA256SUMS` are the canonical release identity. Existing
+The GitHub Release manifest and `SHA256SUMS` are the canonical release identity. Existing
 Release assets must match byte-for-byte; recovery is a no-op on a match and a hard refusal on
 any mismatch. Assets are never uploaded with `--clobber`. GitHub Packages is a convenience
 mirror: the workflow publishes the exact canonical tarball and downloads the registry copy to
 verify the same digest. Pages is deployed in GitHub Actions mode from the exact site archive
 named by the canonical manifest.
+
+Prerelease versions create a GitHub prerelease and use the `next` package dist-tag. A version
+without a SemVer prerelease component creates a normal GitHub Release and uses `latest`. The
+manifest records the derived release type, prerelease boolean, and dist-tag; recovery verifies
+that the existing Release and registry tag match that identity.
 
 Before publication, dispatch this same workflow with the signed annotated candidate tag in its
 `release_tag` input. The manual path runs protected-ledger verification, frozen installation,

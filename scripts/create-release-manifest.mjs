@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { releaseChannel } from './release-channel.mjs';
 
 const required = (name) => {
   const value = process.env[name];
@@ -21,6 +22,7 @@ const outputFile = resolve(required('OUTPUT_FILE'));
 const packageManifest = JSON.parse(readFileSync('packages/cli/package.json', 'utf8'));
 const releaseTag = required('RELEASE_TAG');
 const packageName = required('PACKAGE_NAME');
+const channel = releaseChannel(packageManifest.version);
 
 const manifest = {
   schemaVersion: '1.0.0',
@@ -30,7 +32,9 @@ const manifest = {
     package: packageManifest.name,
     version: packageManifest.version,
     registry: 'https://npm.pkg.github.com',
-    dist_tag: 'next',
+    release_type: channel.release_type,
+    prerelease: channel.prerelease,
+    dist_tag: channel.dist_tag,
     pages: 'https://aarusso-nyx.github.io/devai/',
   },
   source: {

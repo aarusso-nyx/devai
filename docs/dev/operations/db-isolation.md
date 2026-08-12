@@ -1,6 +1,6 @@
 # Database isolation
 
-The v1.0rc CLI does not provision task databases. Create and destroy test databases with your
+The v1.0 CLI does not provision task databases. Create and destroy test databases with your
 database or container tooling, using a unique name per concurrent worktree. Keep credentials in
 the environment and never in committed configuration.
 

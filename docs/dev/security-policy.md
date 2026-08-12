@@ -9,7 +9,7 @@ evidence record.
 
 ## Supported version
 
-Security fixes target the current v1.0 release candidate.
+Security fixes target the current supported v1.0 line.
 
 ## Security boundary
 

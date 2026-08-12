@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.0 — 2026-08-12
+
+- Promotes the corrected 41-action, 59-sensor, seven-recipe surface to the stable 1.0 line.
+- Makes fresh-repository adoption, binding, role-separated apply, packaged checks, hooks,
+  recipes, recovery, and removal operational from the installed package boundary.
+- Requires DB-enabled exact-candidate evidence, pinned external policy reconstruction, signed
+  annotated tags, deterministic double-pack, SBOM validation, immutable Release assets, and
+  registry-to-Release digest equality.
+- Publishes stable packages through `latest` and keeps prerelease packages on `next`.
+
+## 1.0.0-rc.6 — 2026-08-12
+
+- Final public release candidate and installed-package adopter proof.
+- Corrects release recovery, deterministic staging, GitHub Packages publication, and Pages
+  deployment while preserving the canonical manifest identity.
+
 ## 1.0.0-rc.2 — 2026-08-11
 
 - First public DEVAI release candidate from the pristine `aarusso-nyx/devai` lineage.
