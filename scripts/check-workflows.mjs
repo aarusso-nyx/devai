@@ -465,6 +465,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'stage-release-package.mjs',
     'release-channel.mjs',
     'RELEASE_IS_PRERELEASE',
+    'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
     'cyclonedx-npm',
     'npm publish',
     '--tag "$PACKAGE_DIST_TAG"',
@@ -484,6 +485,15 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     if (source.includes(forbidden)) {
       findings.push(finding('RELEASE_TEST_REEXECUTION_FORBIDDEN', file, forbidden));
     }
+  }
+  if (source.includes('--package-lock-only')) {
+    findings.push(
+      finding(
+        'RELEASE_SBOM_LOCKFILE_ONLY_FORBIDDEN',
+        file,
+        'SBOM generation requires installed public runtime dependencies',
+      ),
+    );
   }
   const verifierCheckout = source.includes(`repository: ${VERIFIER_REPOSITORY}`);
   const verifierPin = source.includes(`ref: ${VERIFIER_COMMIT}`);
