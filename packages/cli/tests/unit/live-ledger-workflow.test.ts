@@ -134,6 +134,10 @@ describe('live ledger-verification workflow', () => {
 
   it('keeps publication explicit and rehearsal non-publishing, ledger-bound, and coverage-free', () => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const discipline = readFileSync(
+      join(ROOT, 'docs/dev/operations/release-discipline.md'),
+      'utf8',
+    );
     const result = check(fixture(release, 'release.yml'));
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('workflow contract: PASS\n');
@@ -156,6 +160,13 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('dist-tags.$PACKAGE_DIST_TAG');
     expect(release).not.toContain('npm publish "$source_tgz" --tag next');
     expect(release).not.toContain('test:coverage');
+    expect(discipline).toContain('The tag-push path verifies the uploaded workflow artifact');
+    expect(discipline).toContain(
+      '`publish: true` is the only path that may create or verify the canonical Release',
+    );
+    expect(discipline).not.toContain(
+      'publication and Pages jobs are structurally restricted to a version-tag `push`',
+    );
   });
 
   it('derives stable and prerelease channels from the exact package version', () => {
