@@ -324,21 +324,26 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const dispatch = object(triggers.workflow_dispatch);
   const dispatchInputs = object(dispatch.inputs);
   const releaseTagInput = object(dispatchInputs.release_tag);
+  const publishInput = object(dispatchInputs.publish);
   if (
     JSON.stringify(Object.keys(triggers).sort()) !==
       JSON.stringify(['push', 'workflow_dispatch']) ||
     !Array.isArray(push.tags) ||
     push.tags.length !== 1 ||
     push.tags[0] !== 'v*' ||
-    JSON.stringify(Object.keys(dispatchInputs)) !== JSON.stringify(['release_tag']) ||
+    JSON.stringify(Object.keys(dispatchInputs).sort()) !==
+      JSON.stringify(['publish', 'release_tag']) ||
     releaseTagInput.required !== true ||
-    releaseTagInput.type !== 'string'
+    releaseTagInput.type !== 'string' ||
+    publishInput.required !== false ||
+    publishInput.default !== false ||
+    publishInput.type !== 'boolean'
   ) {
     findings.push(
       finding(
         'RELEASE_TRIGGER_INVALID',
         file,
-        'release must accept version-tag publication and one release_tag rehearsal input only',
+        'release must accept version-tag publication plus exact-tag rehearsal/recovery inputs',
       ),
     );
   }
@@ -388,14 +393,14 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   if (object(pages.environment).name !== 'github-pages') {
     findings.push(finding('RELEASE_PAGES_ENVIRONMENT_INVALID', file, 'github-pages'));
   }
-  const publishCondition = "${{ github.event_name == 'push' }}";
-  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' }}";
+  const publishCondition = "${{ github.event_name == 'push' || inputs.publish }}";
+  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
   if (finalize.if !== publishCondition || pages.if !== publishCondition) {
     findings.push(
       finding(
         'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
         file,
-        'finalize-release and deploy-pages must be push-only',
+        'finalize-release and deploy-pages must require a tag push or explicit recovery input',
       ),
     );
   }
@@ -408,7 +413,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
       finding(
         'RELEASE_REHEARSAL_JOB_INVALID',
         file,
-        'workflow_dispatch must end in a read-only rehearsal summary after the exact build',
+        'non-publishing workflow_dispatch must end in a read-only rehearsal summary after the exact build',
       ),
     );
   }
