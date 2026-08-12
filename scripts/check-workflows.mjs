@@ -343,7 +343,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
       finding(
         'RELEASE_TRIGGER_INVALID',
         file,
-        'release must accept version-tag publication plus exact-tag rehearsal/recovery inputs',
+        'release must accept version-tag rehearsal plus exact-tag publication inputs',
       ),
     );
   }
@@ -393,14 +393,15 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   if (object(pages.environment).name !== 'github-pages') {
     findings.push(finding('RELEASE_PAGES_ENVIRONMENT_INVALID', file, 'github-pages'));
   }
-  const publishCondition = "${{ github.event_name == 'push' || inputs.publish }}";
-  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
+  const publishCondition = "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
+  const rehearsalCondition =
+    "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
   if (finalize.if !== publishCondition || pages.if !== publishCondition) {
     findings.push(
       finding(
         'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
         file,
-        'finalize-release and deploy-pages must require a tag push or explicit recovery input',
+        'finalize-release and deploy-pages must require an explicit publishing dispatch',
       ),
     );
   }
@@ -413,7 +414,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
       finding(
         'RELEASE_REHEARSAL_JOB_INVALID',
         file,
-        'non-publishing workflow_dispatch must end in a read-only rehearsal summary after the exact build',
+        'tag pushes and non-publishing dispatches must end in a read-only rehearsal summary after the exact build',
       ),
     );
   }
