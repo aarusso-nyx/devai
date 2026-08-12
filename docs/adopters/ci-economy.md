@@ -36,7 +36,7 @@ is unchanged before and after execution and the commit/tree binding is exact.
 ## RC gate
 
 `devai check --rc --task-plan` selects the fixed release-candidate closure. The RC profile
-runs one coverage node after generation and build. For the current rc.5 candidate that node
+runs one coverage node after generation and build. For the current rc.6 candidate that node
 collects 106 files and 918 tests exactly once, including database, E2E, performance, and
 containment tests, and
 enforces floors of 70% statements, 60% branches, 70% functions, and 70% lines. The narrower DB,
