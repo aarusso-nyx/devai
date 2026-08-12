@@ -6,9 +6,14 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Signed annotated version tag to rehearse without publishing
+        description: Signed annotated version tag to rehearse or recover
         required: true
         type: string
+      publish:
+        description: Run protected publication recovery for the exact tag
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -260,7 +265,7 @@ jobs:
   finalize-release:
     name: Create canonical Release and mirror exact package
     needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' || inputs.publish }}
     runs-on: ubuntu-latest
     environment: devai-rc-publication
     timeout-minutes: 10
@@ -334,7 +339,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          source_tgz="$(find release-assets -maxdepth 1 -name '*.tgz' -print -quit)"
+          source_tgz="$(realpath "$(find release-assets -maxdepth 1 -name '*.tgz' -print -quit)")"
           test -n "$source_tgz"
           if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
             test "$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
@@ -344,8 +349,7 @@ jobs:
           project="$RUNNER_TEMP/devai-registry-smoke"
           mkdir -p "$project/registry-pack"
           npm --prefix "$project" init --yes >/dev/null
-          npm --prefix "$project" install --save-exact "$PACKAGE_NAME@$PACKAGE_VERSION" \
-            --registry https://npm.pkg.github.com
+          npm --prefix "$project" install --save-exact "$PACKAGE_NAME@$PACKAGE_VERSION"
           binary="$project/node_modules/.bin/devai"
           test "$($binary --version | cut -d' ' -f1)" = "devai/$PACKAGE_VERSION"
           test "$("$binary" catalog actions --format json | node -e \
@@ -360,7 +364,7 @@ jobs:
   deploy-pages:
     name: Deploy and verify GitHub Pages
     needs: finalize-release
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' || inputs.publish }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -411,7 +415,7 @@ jobs:
   rehearsal-summary:
     name: Verify non-publishing rehearsal assets
     needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

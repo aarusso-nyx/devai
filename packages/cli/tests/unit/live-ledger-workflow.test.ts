@@ -132,14 +132,17 @@ describe('live ledger-verification workflow', () => {
     expect(result.stderr).toContain('CI_OBSOLETE_WORKFLOW_PRESENT');
   });
 
-  it('keeps publication tag-only and rehearsal non-publishing, ledger-bound, and coverage-free', () => {
+  it('keeps publication explicit and rehearsal non-publishing, ledger-bound, and coverage-free', () => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const result = check(fixture(release, 'release.yml'));
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('workflow contract: PASS\n');
     expect(release).toContain("tags: ['v*']");
     expect(release).toContain('workflow_dispatch:');
-    expect(release).toContain("if: ${{ github.event_name == 'workflow_dispatch' }}");
+    expect(release).toContain("if: ${{ github.event_name == 'push' || inputs.publish }}");
+    expect(release).toContain(
+      "if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}",
+    );
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('pnpm run release:closure');
     expect(release).not.toContain('test:coverage');
@@ -169,7 +172,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'rehearsal publication guard removal',
       mutate: (source: string) =>
-        source.replace("    if: ${{ github.event_name == 'push' }}\n", ''),
+        source.replace("    if: ${{ github.event_name == 'push' || inputs.publish }}\n", ''),
       diagnostic: 'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
     },
     {
