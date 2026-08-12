@@ -1,5 +1,5 @@
 ---
-title: DEVAI 1.0.0
+title: DEVAI 1.0.1
 slug: /
 ---
 
