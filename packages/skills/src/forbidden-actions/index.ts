@@ -620,7 +620,9 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
           if (path.startsWith('product/')) return author === 'DEVAI Owner';
           if (path.startsWith('work/audit/')) return author === 'DEVAI Auditor';
           if (path.startsWith('record/')) return author === 'DEVAI Machine';
-          if (path.startsWith('.devai/config/')) return author === 'DEVAI Engineer';
+          if (path.startsWith('.devai/config/')) {
+            return author === 'DEVAI Architect' || author === 'DEVAI Engineer';
+          }
           return false;
         })
       ) {
