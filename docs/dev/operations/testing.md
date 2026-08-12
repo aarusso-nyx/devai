@@ -51,12 +51,12 @@ collects the complete Vitest population exactly once and enforces coverage floor
 statements, 60% branches, 70% functions, and 70% lines. The narrower database, E2E, performance,
 and containment scripts remain available as diagnostic slices; they are not additional required
 RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The stable 1.0 candidate
-collects **106 files and 924 tests** via `vitest list --json`; release records must recount the
+collects **106 files and 926 tests** via `vitest list --json`; release records must recount the
 exact publication candidate rather than copying this development census. RC planning and
 execution refuse unless `DEVAI_DB_TESTS=1`; its value and `DEVAI_DB_URL` are bound into the RC
 task key along with the authority-policy SHA-256. A reachable disposable database is required,
 and the release record must include the
-number of collected DB cases. The stable candidate collects **9 DB cases** inside the 924-test
+number of collected DB cases. The stable candidate collects **9 DB cases** inside the 926-test
 population. Real provider credentials are always explicit opt-in; ambient
 credentials must not create accidental cost or nondeterminism.
 
