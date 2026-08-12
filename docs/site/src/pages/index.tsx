@@ -9,7 +9,7 @@ export default function Home(): React.JSX.Element {
         <h1>DEVAI</h1>
         <p>Human-supervised control for AI-assisted development.</p>
         <p>
-          <code>@aarusso-nyx/devai@1.0.0</code>. One CLI package. 41 actions. 59 sensors. 7 bounded
+          <code>@aarusso-nyx/devai@1.0.1</code>. One CLI package. 41 actions. 59 sensors. 7 bounded
           recipes.
         </p>
         <Link className="button button--primary" to="/docs/">

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 — 2026-08-12
+
+- Persists the effective adoption profile explicitly in `.devai/config/project.json`.
+- Reconciles a later explicit `--tier` across the bind and harness bootstrap writers while
+  preserving adopter-owned project declarations.
+- Completes partial project metadata with the required schema, project type, and authority mode.
+
 ## 1.0.0 — 2026-08-12
 
 - Promotes the corrected 41-action, 59-sensor, seven-recipe surface to the stable 1.0 line.

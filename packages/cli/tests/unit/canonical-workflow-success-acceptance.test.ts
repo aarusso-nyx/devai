@@ -133,6 +133,62 @@ describe('canonical workflow success acceptance', () => {
     expect(second.stdout).toContain('"written":[]');
   });
 
+  it('persists and reconciles the adoption profile across bind and harness writers', async () => {
+    const target = mkdtempSync(join(tmpdir(), 'devai-init-profile-reconciliation-'));
+    const projectPath = join(target, '.devai/config/project.json');
+    try {
+      const bindDefault = await invoke(initBind, [
+        'init-bind',
+        '--target',
+        target,
+        '--constitution',
+        '--write',
+      ]);
+      expect(bindDefault.exit, bindDefault.stderr).toBe(0);
+      const defaultConfig = JSON.parse(readFileSync(projectPath, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      expect(defaultConfig).toMatchObject({
+        schemaVersion: '1.0.0',
+        project_type: 'runtime-host',
+        authority_enforcement: { mode: 'cli-only' },
+        profile: 'tier3',
+      });
+
+      writeFileSync(projectPath, `${JSON.stringify({ ...defaultConfig, name: 'adopter-name' })}\n`);
+      const applyTier1 = await invoke(initApplyHarness, [
+        'init-apply-harness',
+        '--target',
+        target,
+        '--tier',
+        'tier1',
+      ]);
+      expect(applyTier1.exit, applyTier1.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(projectPath, 'utf8'))).toMatchObject({
+        profile: 'tier1',
+        name: 'adopter-name',
+      });
+
+      const bindTier2 = await invoke(initBind, [
+        'init-bind',
+        '--target',
+        target,
+        '--constitution',
+        '--tier',
+        'tier2',
+        '--write',
+      ]);
+      expect(bindTier2.exit, bindTier2.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(projectPath, 'utf8'))).toMatchObject({
+        profile: 'tier2',
+        name: 'adopter-name',
+      });
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
   it('preflights included-component conflicts before writing core bootstrap files', async () => {
     const target = mkdtempSync(join(tmpdir(), 'devai-init-preflight-conflict-'));
     try {
