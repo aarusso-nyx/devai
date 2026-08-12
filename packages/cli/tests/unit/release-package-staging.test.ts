@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -27,5 +27,49 @@ describe('normalized release package staging', () => {
     ) as Record<string, unknown>;
     expect(manifest).not.toHaveProperty('devDependencies');
     expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
+  });
+
+  it('records a stable Release and latest dist-tag for version 1.0.0', () => {
+    const packageTarball = join(output, 'package.tgz');
+    const siteArchive = join(output, 'site.tar.gz');
+    const sbom = join(output, 'sbom.json');
+    const manifest = join(output, 'release-manifest.json');
+    writeFileSync(packageTarball, 'package');
+    writeFileSync(siteArchive, 'site');
+    writeFileSync(sbom, '{}');
+    const digest = 'a'.repeat(64);
+    execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
+      cwd: root,
+      env: {
+        ...process.env,
+        PACKAGE_NAME: '@aarusso-nyx/devai',
+        RELEASE_TAG: 'v1.0.0',
+        PACKAGE_TARBALL: packageTarball,
+        SITE_ARCHIVE: siteArchive,
+        SBOM_FILE: sbom,
+        OUTPUT_FILE: manifest,
+        COMMIT_SHA: 'b'.repeat(40),
+        TREE_SHA: 'c'.repeat(40),
+        VERIFIER_COMMIT: 'd'.repeat(40),
+        LEDGER_POLICY_DIGEST: digest,
+        LEDGER_ENVELOPE_SHA256: digest,
+        LEDGER_RESULTS_SHA256: digest,
+        LEDGER_TASK_POLICY_SHA256: digest,
+        LEDGER_TRUST_STORE_SHA256: digest,
+        LEDGER_TOOLCHAIN_SHA256: digest,
+        LEDGER_ENVIRONMENT_SHA256: digest,
+        LEDGER_RELEASE_SIGNERS_SHA256: digest,
+      },
+    });
+    const value = JSON.parse(readFileSync(manifest, 'utf8')) as {
+      release: Record<string, unknown>;
+    };
+    expect(value.release).toMatchObject({
+      tag: 'v1.0.0',
+      version: '1.0.0',
+      release_type: 'stable',
+      prerelease: false,
+      dist_tag: 'latest',
+    });
   });
 });

@@ -1,6 +1,6 @@
 # Lock operations
 
-The v1.0rc public CLI has no general lock manager. Use the locking mechanism of the underlying
+The v1.0 public CLI has no general lock manager. Use the locking mechanism of the underlying
 tool or service, keep lock scope narrow, and make ownership and expiry observable. Never delete
 an unknown lock merely because it is old. First establish the owner, protected resource, and
 recovery procedure.

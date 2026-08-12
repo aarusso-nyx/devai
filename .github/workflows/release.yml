@@ -185,7 +185,10 @@ jobs:
           test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "${{ needs.verify-ledger.outputs.commit }}"
           test "$(git rev-parse "${{ needs.verify-ledger.outputs.commit }}^{tree}")" = "${{ needs.verify-ledger.outputs.tree }}"
           test "$(node -p "require('./packages/cli/package.json').name")" = "$PACKAGE_NAME"
+          channel="$(node scripts/release-channel.mjs "$package_version")"
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+          echo "PACKAGE_DIST_TAG=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")" >> "$GITHUB_ENV"
+          echo "RELEASE_IS_PRERELEASE=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.prerelease))' "$channel")" >> "$GITHUB_ENV"
           test -z "$(git status --porcelain --untracked-files=all)"
 
       - name: Install frozen dependencies
@@ -293,7 +296,10 @@ jobs:
           set -euo pipefail
           package_version="$(node -p "require('./packages/cli/package.json').version")"
           test "$RELEASE_TAG" = "v$package_version"
+          channel="$(node scripts/release-channel.mjs "$package_version")"
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+          echo "PACKAGE_DIST_TAG=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")" >> "$GITHUB_ENV"
+          echo "RELEASE_IS_PRERELEASE=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.prerelease))' "$channel")" >> "$GITHUB_ENV"
 
       - name: Download exact release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -305,7 +311,7 @@ jobs:
         shell: bash
         run: (cd release-assets && sha256sum --check SHA256SUMS)
 
-      - name: Create or verify immutable GitHub prerelease
+      - name: Create or verify immutable GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -313,6 +319,7 @@ jobs:
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" = "$RELEASE_IS_PRERELEASE"
             existing="$RUNNER_TEMP/existing-release"
             mkdir -p "$existing"
             gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$existing"
@@ -325,10 +332,12 @@ jobs:
             done
             echo 'Existing Release exactly matches; recovery is a no-op.'
           else
+            release_flags=()
+            if test "$RELEASE_IS_PRERELEASE" = true; then release_flags+=(--prerelease); fi
             gh release create "$RELEASE_TAG" "${assets[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
-              --prerelease \
+              "${release_flags[@]}" \
               --title "DEVAI $PACKAGE_VERSION" \
               --notes-file CHANGELOG.md
           fi
@@ -344,7 +353,7 @@ jobs:
           if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
             test "$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
           else
-            npm publish "$source_tgz" --tag next --registry https://npm.pkg.github.com
+            npm publish "$source_tgz" --tag "$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com
           fi
           project="$RUNNER_TEMP/devai-registry-smoke"
           mkdir -p "$project/registry-pack"
@@ -360,6 +369,11 @@ jobs:
           registry_tgz="$(find "$project/registry-pack" -maxdepth 1 -name '*.tgz' -print -quit)"
           test -n "$registry_tgz"
           test "$(sha256sum "$source_tgz" | cut -d' ' -f1)" = "$(sha256sum "$registry_tgz" | cut -d' ' -f1)"
+          current_dist_version="$(npm view "$PACKAGE_NAME" "dist-tags.$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com 2>/dev/null || true)"
+          if test "$current_dist_version" != "$PACKAGE_VERSION"; then
+            npm dist-tag add "$PACKAGE_NAME@$PACKAGE_VERSION" "$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com
+          fi
+          test "$(npm view "$PACKAGE_NAME" "dist-tags.$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
 
   deploy-pages:
     name: Deploy and verify GitHub Pages

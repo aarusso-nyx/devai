@@ -1,6 +1,6 @@
 # Recipes
 
-DEVAI v1.0rc ships seven host-invoked recipes. Recipes are prompt-and-permission
+DEVAI 1.0 ships seven host-invoked recipes. Recipes are prompt-and-permission
 contracts for Codex and Claude; they are not CLI actions and cannot launch nested
 models, publish artifacts, or widen their declared write scope.
 

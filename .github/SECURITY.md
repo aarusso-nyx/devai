@@ -6,14 +6,14 @@ Please report suspected vulnerabilities privately to the repository owner or sec
 
 ## Supported versions
 
-Only `1.0.0-rc.6` is supported after its separately authorized publication. Until then,
-`1.0.0-rc.2` remains the only public candidate.
+`1.0.0` is the supported stable line after its separately authorized publication. Until that
+publication occurs, `1.0.0-rc.6` remains the supported public candidate.
 
 ## Security boundary
 
 DEVAI mechanically enforces authority, lifecycle, consent, and path policies for operations executed through its CLI/runtime. Arbitrary shell commands, editors, and host-agent file tools are outside that guarantee unless the adopter declares `authority_enforcement.mode: "host-integrated"` and supplies a verified adapter that intercepts those operations.
 
-The round and task loop is preview functionality. Local mutation requires declared authority and explicit `--write` consent. The RC CLI has no publication action and does not push or merge source.
+The round and task loop is preview functionality. Local mutation requires declared authority and explicit `--write` consent. The CLI has no publication action and does not push or merge source.
 
 ## Secret handling
 

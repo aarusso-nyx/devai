@@ -145,7 +145,34 @@ describe('live ledger-verification workflow', () => {
     );
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('pnpm run release:closure');
+    expect(release).toContain('--tag "$PACKAGE_DIST_TAG"');
+    expect(release).toContain('if test "$RELEASE_IS_PRERELEASE" = true');
+    expect(release).toContain('dist-tags.$PACKAGE_DIST_TAG');
+    expect(release).not.toContain('npm publish "$source_tgz" --tag next');
     expect(release).not.toContain('test:coverage');
+  });
+
+  it('derives stable and prerelease channels from the exact package version', () => {
+    const script = join(ROOT, 'scripts/release-channel.mjs');
+    const stable = JSON.parse(
+      execFileSync(process.execPath, [script, '1.0.0'], { encoding: 'utf8' }),
+    ) as Record<string, unknown>;
+    const candidate = JSON.parse(
+      execFileSync(process.execPath, [script, '1.0.0-rc.7'], { encoding: 'utf8' }),
+    ) as Record<string, unknown>;
+
+    expect(stable).toMatchObject({
+      version: '1.0.0',
+      prerelease: false,
+      release_type: 'stable',
+      dist_tag: 'latest',
+    });
+    expect(candidate).toMatchObject({
+      version: '1.0.0-rc.7',
+      prerelease: true,
+      release_type: 'prerelease',
+      dist_tag: 'next',
+    });
   });
 
   it.each([
@@ -163,6 +190,11 @@ describe('live ledger-verification workflow', () => {
       mutate: (source: string) =>
         source.replace('pnpm run release:closure', 'pnpm run test:coverage:rc'),
       diagnostic: 'RELEASE_TEST_REEXECUTION_FORBIDDEN',
+    },
+    {
+      name: 'prerelease-only registry channel',
+      mutate: (source: string) => source.replace('--tag "$PACKAGE_DIST_TAG"', '--tag next'),
+      diagnostic: 'RELEASE_CONTROL_MISSING',
     },
     {
       name: 'non-version trigger',

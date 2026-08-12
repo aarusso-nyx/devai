@@ -12,7 +12,7 @@ authority: Architect
 ## Action identity
 
 `law/policy/action-registry.json` is the sole authority for current action paths,
-handlers, status, effect, profiles, and authority contracts. The v1.0rc catalog is a
+handlers, status, effect, profiles, and authority contracts. The v1.0 catalog is a
 current-state list: it contains no compatibility aliases or historical dispositions.
 
 The CLI, effects checker, sensors, generated documentation, and contract tests consume
