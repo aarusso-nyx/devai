@@ -300,6 +300,12 @@ try {
   ) {
     throw new Error('INSTALLED_PROJECT_LOCAL_HOOK_INVALID');
   }
+  run('git', ['add', '.agents', '.claude', '.devai', 'record'], projectRoot);
+  run('git', ['commit', '-qm', 'adopt DEVAI'], projectRoot);
+  const remoteRoot = join(smokeRoot, 'remote.git');
+  run('git', ['init', '--bare', '-q', remoteRoot], smokeRoot);
+  run('git', ['remote', 'add', 'origin', remoteRoot], projectRoot);
+  run('git', ['push', '-q', '-u', 'origin', 'HEAD:main'], projectRoot);
 
   const representatives = [
     ['catalog', 'actions'],

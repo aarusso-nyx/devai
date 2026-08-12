@@ -481,8 +481,9 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       .filter(Boolean);
     const body = c.slice(parentsEnd + 1);
     let operations: string;
-    let patch: string;
+    let semanticPatch: string;
     let changedPaths: string[];
+    let addedPaths: Set<string>;
     try {
       let treeIdenticalToParent = false;
       if (parents.length > 1) {
@@ -505,7 +506,8 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       if (treeIdenticalToParent) {
         changedPaths = [];
         operations = '';
-        patch = '';
+        semanticPatch = '';
+        addedPaths = new Set();
       } else {
         const nameStatus = execFileSync(
           'git',
@@ -521,6 +523,13 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
           .split('\n')
           .filter(Boolean)
           .flatMap((line) => line.split('\t').slice(1));
+        addedPaths = new Set(
+          nameStatus
+            .split('\n')
+            .filter(Boolean)
+            .filter((line) => line.split('\t')[0] === 'A')
+            .map((line) => line.split('\t').at(-1) ?? ''),
+        );
         operations = nameStatus
           .split('\n')
           .filter(Boolean)
@@ -533,7 +542,7 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             return `${status.startsWith('D') ? 'git rm' : 'git add'} ${path}\n${line}`;
           })
           .join('\n');
-        patch = execFileSync(
+        semanticPatch = execFileSync(
           'git',
           [
             'diff-tree',
@@ -544,6 +553,10 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             '-p',
             '-m',
             sha,
+            '--',
+            '.',
+            ':(exclude)law/policy/forbidden-actions.json',
+            ':(exclude).devai/config/forbidden-actions.json',
           ],
           {
             cwd: opts.repoRoot,
@@ -564,9 +577,20 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       continue;
     }
     for (const entry of compiled) {
-      const protectedPaths = changedPaths.filter((path) =>
-        /^(?:law\/|product\/|work\/(?:rounds|audit)\/|record\/|\.devai\/config\/)/u.test(path),
-      );
+      const protectedPaths = changedPaths.filter((path) => {
+        const bootstrapMaterialization =
+          addedPaths.has(path) &&
+          (path.startsWith('.devai/config/') ||
+            [
+              'record/proofs/README.md',
+              'record/proofs/chain.json',
+              'record/derived/inventory/README.md',
+            ].includes(path));
+        return (
+          /^(?:law\/|product\/|work\/(?:rounds|audit)\/|record\/|\.devai\/config\/)/u.test(path) &&
+          !bootstrapMaterialization
+        );
+      });
       const inspectorTestOnly =
         author === 'DEVAI Inspector' &&
         changedPaths.length > 0 &&
@@ -628,7 +652,9 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
         'FORBID-MUTATE-INVARIANTS',
         'FORBID-CI-WITHOUT-ADR',
       ]);
-      const changeEvidence = pathEvidenceIds.has(entry.id) ? operations : `${operations}\n${patch}`;
+      const changeEvidence = pathEvidenceIds.has(entry.id)
+        ? operations
+        : `${operations}\n${semanticPatch}`;
       for (const re of entry.patterns) {
         const messageMatch = re.exec(body);
         re.lastIndex = 0;

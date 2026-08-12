@@ -50,13 +50,13 @@ The fixed RC closure is three nodes: generation, build, then one `test:coverage:
 collects the complete Vitest population exactly once and enforces coverage floors of 70%
 statements, 60% branches, 70% functions, and 70% lines. The narrower database, E2E, performance,
 and containment scripts remain available as diagnostic slices; they are not additional required
-RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The current rc.4
+RC nodes. The rc.2 baseline was 104 files and 899 Vitest-collected tests. The current rc.5
 candidate collects **106 files and 918 tests** via `vitest list --json`; release records must
 recount the exact publication candidate rather than copying this development census. RC planning and
 execution refuse unless `DEVAI_DB_TESTS=1`; its value and `DEVAI_DB_URL` are bound into the RC
 task key along with the authority-policy SHA-256. A reachable disposable database is required,
 and the release record must include the
-number of collected DB cases. The current DB-enabled rc.4 gate collected and passed **9 DB cases**
+number of collected DB cases. The current DB-enabled rc.5 gate collected and passed **9 DB cases**
 inside the 918-test population. Real provider credentials are always explicit opt-in; ambient
 credentials must not create accidental cost or nondeterminism.
 
