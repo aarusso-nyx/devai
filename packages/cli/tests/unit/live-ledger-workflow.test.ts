@@ -145,6 +145,10 @@ describe('live ledger-verification workflow', () => {
     );
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('pnpm run release:closure');
+    expect(release).toContain(
+      'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
+    );
+    expect(release).not.toContain('--package-lock-only');
     expect(release).toContain('--tag "$PACKAGE_DIST_TAG"');
     expect(release).toContain('if test "$RELEASE_IS_PRERELEASE" = true');
     expect(release).toContain('dist-tags.$PACKAGE_DIST_TAG');
@@ -190,6 +194,15 @@ describe('live ledger-verification workflow', () => {
       mutate: (source: string) =>
         source.replace('pnpm run release:closure', 'pnpm run test:coverage:rc'),
       diagnostic: 'RELEASE_TEST_REEXECUTION_FORBIDDEN',
+    },
+    {
+      name: 'lockfile-only SBOM dependency preparation',
+      mutate: (source: string) =>
+        source.replace(
+          'install --omit=dev --ignore-scripts',
+          'install --package-lock-only --ignore-scripts',
+        ),
+      diagnostic: 'RELEASE_SBOM_LOCKFILE_ONLY_FORBIDDEN',
     },
     {
       name: 'prerelease-only registry channel',

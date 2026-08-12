@@ -230,10 +230,9 @@ jobs:
           sbom_root="$RUNNER_TEMP/devai-sbom"
           mkdir -p "$sbom_root"
           tar -xzf "$tarball" -C "$sbom_root"
-          npm --prefix "$sbom_root/package" install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund
           sbom="$release_dir/devai-$PACKAGE_VERSION.cdx.json"
           pnpm exec cyclonedx-npm \
-            --package-lock-only \
             --omit dev \
             --output-reproducible \
             --validate \
