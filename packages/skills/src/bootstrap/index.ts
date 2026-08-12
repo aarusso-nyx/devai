@@ -3,6 +3,8 @@ import { getValidator } from '@devai-nyx/schemas';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
+import { isAdoptionProfile, type AdoptionProfile } from '@devai-nyx/utils';
 import { buildConstitutionBindingPlan } from '../constitution/index.js';
 
 export interface BootstrapPlanEntry {
@@ -43,8 +45,49 @@ const _CANONICAL_POLICY_FILES = [
 type BootstrapPolicyFile = (typeof POLICY_FILES)[number];
 export type CanonicalPolicyFile = (typeof _CANONICAL_POLICY_FILES)[number];
 
+export interface ProjectConfigReconciliationOptions {
+  readonly version: string;
+  readonly profile?: AdoptionProfile;
+  readonly constitution?: object;
+}
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Reconcile framework-managed project metadata without discarding adopter-owned
+ * declarations. An absent profile is materialized as the schema's strict tier3
+ * default so the effective adoption decision is always explicit on disk.
+ */
+export function reconcileProjectConfig(
+  current: unknown,
+  options: ProjectConfigReconciliationOptions,
+): Record<string, unknown> {
+  if (!isPlainRecord(current)) {
+    throw new Error('PROJECT_CONFIG_INVALID: expected a JSON object');
+  }
+  const {
+    schemaVersion,
+    project_type: projectType,
+    authority_enforcement: authorityEnforcement,
+    profile: currentProfile,
+    constitution: currentConstitution,
+    devai_version: _currentVersion,
+    ...adopterDeclarations
+  } = current;
+  const profile = options.profile ?? (isAdoptionProfile(currentProfile) ? currentProfile : 'tier3');
+  const constitution = options.constitution ?? currentConstitution;
+
+  return {
+    schemaVersion: schemaVersion ?? '1.0.0',
+    project_type: projectType ?? 'runtime-host',
+    authority_enforcement: authorityEnforcement ?? { mode: 'cli-only' },
+    profile,
+    ...(constitution !== undefined && { constitution }),
+    devai_version: options.version,
+    ...adopterDeclarations,
+  };
 }
 
 function validStringRoster(value: unknown): boolean {
@@ -183,24 +226,18 @@ export function buildBootstrapPlan(opts: {
   // has law/constitution.md.
   const constitutionBinding = buildConstitutionBindingPlan(opts.targetRoot, version);
 
-  // The deterministic seed omits timestamps so repeated plans produce
-  // byte-identical project.json output.
-  const projectConfig =
-    JSON.stringify(
-      {
-        schemaVersion: '1.0.0',
-        project_type: 'runtime-host',
-        // Bootstrap starts in the posture DEVAI can guarantee without a
-        // verified host adapter.
-        authority_enforcement: { mode: 'cli-only' },
-        // An omitted profile uses the schema default.
-        ...(opts.profile !== undefined && { profile: opts.profile }),
-        constitution: constitutionBinding.pin,
-        devai_version: version,
-      },
-      null,
-      2,
-    ) + '\n';
+  const projectConfigPath = join(opts.targetRoot, '.devai/config/project.json');
+  const existingProjectConfig = existsSync(projectConfigPath)
+    ? (JSON.parse(readFileSync(projectConfigPath, 'utf8')) as unknown)
+    : {};
+  // The deterministic reconciliation omits timestamps, preserves adopter
+  // declarations, and records the effective profile explicitly.
+  const reconciledProjectConfig = reconcileProjectConfig(existingProjectConfig, {
+    version,
+    ...(opts.profile !== undefined && { profile: opts.profile }),
+    constitution: constitutionBinding.pin,
+  });
+  const projectConfig = JSON.stringify(reconciledProjectConfig, null, 2) + '\n';
 
   interface PlanItem {
     readonly path: string;
@@ -247,11 +284,25 @@ export function buildBootstrapPlan(opts: {
   }
 
   let create = 0;
+  let overwrite = 0;
   let skip = 0;
   for (const item of plan) {
     const abs = join(opts.targetRoot, item.path);
     const exists = existsSync(abs);
     if (exists) {
+      if (
+        item.path === '.devai/config/project.json' &&
+        !isDeepStrictEqual(existingProjectConfig, reconciledProjectConfig)
+      ) {
+        entries.push({
+          path: item.path,
+          action: 'overwrite',
+          content: item.content,
+          bytes: Buffer.byteLength(item.content, 'utf8'),
+        });
+        overwrite++;
+        continue;
+      }
       // Carry the fresh content so `executeBootstrapPlan(plan, { force: true })`
       // has something to write. Without this, `--force` would silently be a
       // no-op for existing files (the previous bug).
@@ -276,7 +327,7 @@ export function buildBootstrapPlan(opts: {
     target_root: opts.targetRoot,
     devai_version: version,
     entries,
-    summary: { create, overwrite: 0, skip },
+    summary: { create, overwrite, skip },
   };
 }
 
@@ -400,7 +451,8 @@ export function executeBootstrapPlan(
     if (entry.content === null) continue;
     mkdirSync(dir, { recursive: true });
     writeFileSync(abs, entry.content);
-    created.push(entry.path);
+    if (entry.action === 'overwrite') overwritten.push(entry.path);
+    else created.push(entry.path);
   }
 
   return {

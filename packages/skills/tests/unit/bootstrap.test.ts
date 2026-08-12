@@ -152,6 +152,60 @@ describe('buildBootstrapPlan: adopter constitution binding', () => {
     expect(entry?.content).toContain('devai init bind --constitution --write');
     expect(entry?.content).not.toContain('<unresolved>');
   });
+
+  it('records the strict tier3 default when no profile is supplied', () => {
+    const plan = buildBootstrapPlan({ targetRoot: dir, version: '1.0.0' });
+    const project = plan.entries.find((entry) => entry.path === '.devai/config/project.json');
+    expect(JSON.parse(project?.content ?? '{}')).toMatchObject({
+      schemaVersion: '1.0.0',
+      project_type: 'runtime-host',
+      authority_enforcement: { mode: 'cli-only' },
+      profile: 'tier3',
+      devai_version: '1.0.0',
+    });
+  });
+
+  it('reconciles a later explicit profile while preserving adopter declarations', () => {
+    mkdirSync(join(dir, '.devai/config'), { recursive: true });
+    const projectPath = join(dir, '.devai/config/project.json');
+    writeFileSync(
+      projectPath,
+      `${JSON.stringify({
+        devai_version: '1.0.0',
+        constitution: { version: '1.0.0', sha256: 'a'.repeat(64) },
+        name: 'adopter-owned-name',
+        profile: 'tier3',
+      })}\n`,
+    );
+
+    const plan = buildBootstrapPlan({ targetRoot: dir, version: '1.0.0', profile: 'tier1' });
+    const project = plan.entries.find((entry) => entry.path === '.devai/config/project.json');
+    expect(project?.action).toBe('overwrite');
+    expect(plan.summary.overwrite).toBe(1);
+
+    const result = executeBootstrapPlan(plan);
+    expect(result.overwritten).toContain('.devai/config/project.json');
+    expect(JSON.parse(readFileSync(projectPath, 'utf8'))).toMatchObject({
+      schemaVersion: '1.0.0',
+      project_type: 'runtime-host',
+      authority_enforcement: { mode: 'cli-only' },
+      profile: 'tier1',
+      devai_version: '1.0.0',
+      name: 'adopter-owned-name',
+    });
+  });
+
+  it('keeps an existing explicit profile when a later invocation omits --tier', () => {
+    const first = buildBootstrapPlan({ targetRoot: dir, version: '1.0.0', profile: 'tier1' });
+    executeBootstrapPlan(first);
+
+    const second = buildBootstrapPlan({ targetRoot: dir, version: '1.0.0' });
+    const project = second.entries.find((entry) => entry.path === '.devai/config/project.json');
+    expect(project?.action).toBe('skip-exists');
+    expect(JSON.parse(readFileSync(join(dir, '.devai/config/project.json'), 'utf8')).profile).toBe(
+      'tier1',
+    );
+  });
 });
 
 describe('executeBootstrapPlan: writes the adopter constitution binding', () => {

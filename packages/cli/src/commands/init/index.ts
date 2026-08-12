@@ -17,6 +17,7 @@ import {
   introspectRepo,
   preflightBootstrapPlan,
   preflightRecipeAdapterInstall,
+  reconcileProjectConfig,
   resolveCanonicalPolicyContent,
   resolveCanonicalConstitution,
   verifyConstitutionBinding,
@@ -525,14 +526,13 @@ export const initBind = defineCommand({
             writeFileSync(
               configPath,
               JSON.stringify(
-                {
-                  ...config,
+                reconcileProjectConfig(config, {
+                  version: resolveCliVersion(),
                   ...(options.tier !== undefined && isAdoptionProfile(options.tier)
                     ? { profile: options.tier }
                     : {}),
-                  devai_version: resolveCliVersion(),
                   constitution: pin,
-                },
+                }),
                 null,
                 2,
               ) + '\n',
