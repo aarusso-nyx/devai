@@ -21,6 +21,7 @@ import {
   resumeTaskFromRgr,
   saveTask,
   spawnTask,
+  validateTaskRecord,
   validateTaskRound,
   type SpawnResult,
   type TaskRecord,
@@ -77,7 +78,18 @@ function roundBoundTask(options: {
   readonly operation: string;
 }): Readonly<{ roundId: string; task: TaskRecord }> {
   const roundId = requireActiveTaskRound(options);
-  const task = loadTask(options.repoRoot, options.taskId);
+  let task: TaskRecord;
+  try {
+    task = loadTask(options.repoRoot, options.taskId);
+  } catch (error) {
+    const code =
+      error instanceof Error && error.message.startsWith('task ')
+        ? 'TASK_NOT_FOUND'
+        : error instanceof Error && error.message !== ''
+          ? error.message
+          : 'TASK_NOT_FOUND';
+    fail(code);
+  }
   const validation = validateTaskRound({
     operation: options.operation,
     requested_round_id: roundId,
@@ -114,6 +126,87 @@ export function addRoundQueueEntry(options: AddRoundQueueEntryOptions): BacklogE
       target_substrates: options.targetSubstrates,
     }),
   });
+}
+
+export interface MaterializeRoundQueueTaskOptions {
+  readonly repoRoot: string;
+  readonly round?: string;
+  readonly task: TaskRecord;
+}
+
+export interface MaterializedRoundQueueTask {
+  readonly entry: BacklogEntry;
+  readonly task: TaskRecord;
+}
+
+/**
+ * Validate and persist an Architect-declared task through the queue action.
+ * An earlier title-only queue entry may be enriched by the same task identity;
+ * its immutable title, priority, description, and creation time must agree.
+ */
+export function materializeRoundQueueTask(
+  options: MaterializeRoundQueueTaskOptions,
+): MaterializedRoundQueueTask {
+  const roundId = requireActiveTaskRound(options);
+  let task: TaskRecord;
+  try {
+    task = validateTaskRecord(options.task);
+  } catch {
+    fail('TASK_RECORD_INVALID', EXIT_USAGE);
+  }
+  if (task.round_id !== roundId) fail('TASK_ROUND_MISMATCH');
+  if (task.status !== 'queued') fail('TASK_QUEUE_STATUS_INVALID', EXIT_USAGE);
+
+  const priority = task.priority ?? 50;
+  const existingEntry = readBacklog(options.repoRoot).find((entry) => entry.id === task.id);
+  if (
+    existingEntry !== undefined &&
+    (existingEntry.round_id !== task.round_id ||
+      existingEntry.title !== task.title ||
+      existingEntry.priority !== priority ||
+      existingEntry.description !== task.description ||
+      existingEntry.created_at !== task.created_at)
+  ) {
+    fail('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+  }
+
+  const existingTask = listTasks(options.repoRoot).find((candidate) => candidate.id === task.id);
+  if (existingTask !== undefined && JSON.stringify(existingTask) !== JSON.stringify(task)) {
+    fail('TASK_RECORD_CONFLICT');
+  }
+  if (
+    existingTask !== undefined &&
+    existingEntry !== undefined &&
+    existingEntry.status === 'queued' &&
+    existingEntry.discipline === task.discipline &&
+    JSON.stringify(existingEntry.target_modules) === JSON.stringify(task.target_modules) &&
+    JSON.stringify(existingEntry.target_substrates) === JSON.stringify(task.target_substrates) &&
+    existingEntry.db_isolation === task.db_isolation &&
+    existingEntry.lifecycle === task.lifecycle &&
+    JSON.stringify(existingEntry.acceptance_commands) === JSON.stringify(task.acceptance_commands)
+  ) {
+    return { entry: existingEntry, task: existingTask };
+  }
+
+  const entry = appendBacklog(options.repoRoot, {
+    id: task.id,
+    round_id: task.round_id,
+    title: task.title,
+    priority,
+    status: 'queued',
+    created_at: task.created_at,
+    discipline: task.discipline,
+    target_modules: task.target_modules,
+    target_substrates: task.target_substrates,
+    db_isolation: task.db_isolation,
+    ...(task.description !== undefined && { description: task.description }),
+    ...(task.lifecycle !== undefined && { lifecycle: task.lifecycle }),
+    ...(task.acceptance_commands !== undefined && {
+      acceptance_commands: task.acceptance_commands,
+    }),
+  });
+  saveTask(options.repoRoot, task);
+  return { entry, task };
 }
 
 export function listRoundQueue(options: {

@@ -1,11 +1,14 @@
 import type { CAC } from 'cac';
+import { readFileSync } from '@devai-nyx/authority';
 import { EXIT_USAGE } from '@devai-nyx/utils';
+import { relative, resolve, sep } from 'node:path';
 import {
   addRoundQueueEntry,
   completeRoundQueueEntry,
   escalateRoundTask,
   finishRoundTask,
   listRoundQueue,
+  materializeRoundQueueTask,
   nextRoundQueueEntry,
   pauseRoundTask,
   resumeRoundTask,
@@ -13,6 +16,7 @@ import {
   roundTaskResourceStatus,
   startRoundTask,
   TaskServiceError,
+  type TaskRecord,
 } from '#runtime-core';
 import { defineCommand } from '../../define-command.js';
 
@@ -31,6 +35,19 @@ interface TaskOptions extends CommonOptions {
   readonly evidence?: string | string[];
   readonly completedByRole?: 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
   readonly containerName?: string;
+}
+
+function loadQueueTask(root: string, input: string): TaskRecord {
+  const inputPath = resolve(root, input);
+  const inputRelative = relative(resolve(root), inputPath);
+  if (inputRelative === '..' || inputRelative.startsWith(`..${sep}`)) {
+    throw new TaskServiceError('TASK_QUEUE_INPUT_ESCAPE', EXIT_USAGE);
+  }
+  try {
+    return JSON.parse(readFileSync(inputPath, 'utf8')) as TaskRecord;
+  } catch {
+    throw new TaskServiceError('TASK_RECORD_INVALID', EXIT_USAGE);
+  }
 }
 
 function repoRoot(options: CommonOptions): string {
@@ -72,11 +89,40 @@ export const taskQueueAdd = defineCommand({
       .option('--title <text>', 'Queue item title')
       .option('--priority <number>', 'Priority (default: 50)')
       .option('--description <text>', 'Queue item description')
+      .option('--input <path>', 'Schema-valid queued task JSON under the repository')
       .action(
-        (options: CommonOptions & { title?: string; priority?: number; description?: string }) => {
+        (
+          options: CommonOptions & {
+            title?: string;
+            priority?: number;
+            description?: string;
+            input?: string;
+          },
+        ) => {
           try {
             if (options.round === undefined)
               throw new TaskServiceError('TASK_ROUND_REQUIRED', EXIT_USAGE);
+            if (
+              options.input !== undefined &&
+              (options.title !== undefined ||
+                options.priority !== undefined ||
+                options.description !== undefined)
+            ) {
+              throw new TaskServiceError('TASK_QUEUE_INPUT_CONFLICT', EXIT_USAGE);
+            }
+            if (options.input !== undefined) {
+              const result = materializeRoundQueueTask({
+                repoRoot: repoRoot(options),
+                round: options.round,
+                task: loadQueueTask(repoRoot(options), options.input),
+              });
+              emit(
+                result,
+                options.human === true,
+                `task queue add: ${result.entry.id} materialized`,
+              );
+              return;
+            }
             if (options.title === undefined)
               throw new TaskServiceError('TASK_QUEUE_TITLE_REQUIRED', EXIT_USAGE);
             const entry = addRoundQueueEntry({

@@ -39,6 +39,24 @@ Use tasks for independently evidenced units of work. If work crosses authority p
 coupled role-pure tasks in the policy-declared order rather than one mixed-role task. A role change
 requires a new session and commit boundary.
 
+The Architect declares a complete task as schema-valid JSON under the governed round. The Engineer
+materializes it through the queue boundary before starting it:
+
+```sh
+devai task queue add --round R-1000 \
+  --input work/rounds/R-1000/inputs/TASK-7001.json \
+  --repo-root . --as-role engineer --write --format json
+
+devai task start --round R-1000 --task TASK-7001 --with-worktree \
+  --repo-root . --as-role engineer --write --format json
+```
+
+`--input` is mutually exclusive with the legacy title, priority, and description flags. The input
+must stay under the repository, validate against `task.schema.json`, belong to the requested active
+round, and begin in `queued`. If a title-only queue item with the same ID already exists, the input
+may enrich it only when title, priority, description, and creation time agree. Replaying identical
+materialization returns the same task; conflicting queue or task bytes fail closed.
+
 ## Selection and dependency closure
 
 `round run` accepts either the default all-ready selection or one or more explicit task IDs. In

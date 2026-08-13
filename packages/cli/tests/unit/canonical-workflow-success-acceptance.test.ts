@@ -16,6 +16,7 @@ import {
   initPlan,
 } from '../../src/commands/init/index.js';
 import { executeInventorySlice } from '../../src/commands/sense/inventory.js';
+import { taskQueueAdd, taskStart } from '../../src/commands/task/index.js';
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
   cac: (name?: string) => CAC;
@@ -75,6 +76,74 @@ async function invoke(definition: { register(cli: CAC): void }, argv: readonly s
 }
 
 describe('canonical workflow success acceptance', () => {
+  it('materializes and starts a queued task through the CLI facade', async () => {
+    const target = mkdtempSync(join(tmpdir(), 'devai-task-queue-materialization-'));
+    try {
+      const roundDir = join(target, 'work/rounds/R-0007');
+      const inputPath = join(roundDir, 'inputs/task.json');
+      mkdirSync(join(roundDir, 'inputs'), { recursive: true });
+      writeFileSync(
+        join(roundDir, 'AUTHORIZATION.md'),
+        '# Authorization\n\nstatus: active\n\nGRANTED\n',
+      );
+      writeFileSync(
+        inputPath,
+        `${JSON.stringify({
+          schemaVersion: '2.0.0',
+          id: 'TASK-0001',
+          round_id: 'R-0007',
+          status: 'queued',
+          discipline: 'engineer',
+          title: 'CLI materialization',
+          target_modules: [],
+          target_substrates: ['F2'],
+          created_at: '2026-08-13T00:00:00.000Z',
+          db_isolation: 'database',
+          iteration_count: 0,
+          executor: {
+            kind: 'routine',
+            argv: ['node', '--version'],
+            cwd: '.',
+            inputs: [],
+            outputs: [],
+            effects: ['read'],
+            timeout_ms: 10_000,
+            authority_checks: ['action-registry-effect-and-consent'],
+          },
+        })}\n`,
+      );
+
+      const queued = await invoke(taskQueueAdd, [
+        'task-queue-add',
+        '--repo-root',
+        target,
+        '--round',
+        'R-0007',
+        '--input',
+        'work/rounds/R-0007/inputs/task.json',
+      ]);
+      expect(queued.exit, queued.stderr).toBe(0);
+      expect(JSON.parse(queued.stdout)).toMatchObject({
+        entry: { id: 'TASK-0001', status: 'queued' },
+        task: { id: 'TASK-0001', status: 'queued' },
+      });
+
+      const started = await invoke(taskStart, [
+        'task-start',
+        '--repo-root',
+        target,
+        '--round',
+        'R-0007',
+        '--task',
+        'TASK-0001',
+      ]);
+      expect(started.exit, started.stderr).toBe(0);
+      expect(JSON.parse(started.stdout)).toMatchObject({ task: { status: 'ready' } });
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
   it('executes every canonical inventory slice without implicit persistence', async () => {
     const output = await withAuthorityHostTestScope(() =>
       executeInventorySlice('all', { repoRoot: ROOT, adopterRoot: ROOT }),
