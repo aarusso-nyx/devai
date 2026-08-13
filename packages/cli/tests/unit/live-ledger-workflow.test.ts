@@ -150,6 +150,7 @@ describe('live ledger-verification workflow', () => {
       "if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}",
     );
     expect(release).toContain('environment: devai-rc-publication');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 43');
     expect(release).toContain('pnpm run release:closure');
     expect(release).toContain(
       'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
@@ -221,6 +222,11 @@ describe('live ledger-verification workflow', () => {
       name: 'prerelease-only registry channel',
       mutate: (source: string) => source.replace('--tag "$PACKAGE_DIST_TAG"', '--tag next'),
       diagnostic: 'RELEASE_CONTROL_MISSING',
+    },
+    {
+      name: 'stale installed action count',
+      mutate: (source: string) => source.replace('EXPECTED_ACTION_COUNT: 43', 'EXPECTED_ACTION_COUNT: 41'),
+      diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {
       name: 'non-version trigger',
