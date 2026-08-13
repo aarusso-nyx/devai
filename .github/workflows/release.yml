@@ -24,6 +24,7 @@ concurrency:
 
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
+  EXPECTED_ACTION_COUNT: 43
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   VERIFIER_COMMIT: 2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c
 
@@ -361,7 +362,7 @@ jobs:
           binary="$project/node_modules/.bin/devai"
           test "$($binary --version | cut -d' ' -f1)" = "devai/$PACKAGE_VERSION"
           test "$("$binary" catalog actions --format json | node -e \
-            'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).result.value.length)))')" = 41
+            'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).result.value.length)))')" = "$EXPECTED_ACTION_COUNT"
           npm pack "$PACKAGE_NAME@$PACKAGE_VERSION" \
             --registry https://npm.pkg.github.com \
             --pack-destination "$project/registry-pack" >/dev/null

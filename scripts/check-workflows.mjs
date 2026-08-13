@@ -356,11 +356,14 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
+    environment.EXPECTED_ACTION_COUNT !== 43 ||
     environment.PACKAGE_VERSION !== undefined ||
     environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION ||
     environment.VERIFIER_COMMIT !== VERIFIER_COMMIT
   ) {
-    findings.push(finding('RELEASE_IDENTITY_INVALID', file, 'package, tag, or verifier drift'));
+    findings.push(
+      finding('RELEASE_IDENTITY_INVALID', file, 'package, action catalog, tag, or verifier drift'),
+    );
   }
 
   const jobs = object(workflow.jobs);
