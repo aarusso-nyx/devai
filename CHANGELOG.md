@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 — 2026-08-13
+
+- Includes `rgr.schema.json` in the packaged runtime validator roster so installed adopters can
+  create and resolve governed reference gaps.
+- Exercises the installed-package RGR create/resolve loop in the release smoke test.
+
 ## 1.1.1 — 2026-08-13
 
 - Adds schema-valid task materialization to `task queue add --input`, closing the missing
