@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.3 — 2026-08-13
+
+- Authorizes only the exact routine declared by the selected in-progress task when `round run`
+  crosses the local process boundary.
+- Executes managed tasks inside their registered contained worktrees and leaves successful
+  routines in `merging` for an explicit, evidence-bound `task finish` transition.
+- Keeps resource-provisioned tasks `ready` until the round runner begins execution, and reports
+  stable task dispatch errors without hiding their cause.
+- Exercises the full managed-worktree start, run, evidence, finish, and cleanup loop from a packed
+  installed package.
+
 ## 1.1.2 — 2026-08-13
 
 - Includes `rgr.schema.json` in the packaged runtime validator roster so installed adopters can
