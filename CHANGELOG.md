@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0-rc.4 — 2026-08-13
+
+- Fixed generated GitHub Actions observation workflow YAML by preserving the shell `printf` newline escape.
+- Added pre-mutation and `doctor` validation of the generated workflow's YAML syntax.
+
 ## 1.1.0-rc.3 — 2026-08-13
 
 - Fixed GitHub Actions adapter origin binding in linked Git worktrees.

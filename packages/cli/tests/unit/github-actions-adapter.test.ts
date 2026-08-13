@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { parseDocument } from 'yaml';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   buildGithubActionsAdapterPlan,
@@ -51,6 +52,8 @@ describe('GitHub Actions main-observation adapter', () => {
 
     expect(verifyGithubActionsAdapter(root, '1.1.0-rc.1')).toMatchObject({ ok: true });
     const workflow = readFileSync(plan.workflowPath, 'utf8');
+    expect(parseDocument(workflow).errors).toEqual([]);
+    expect(workflow).toContain(`"attestation_url":"%s"}\\n' "$GITHUB_REPOSITORY"`);
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).toContain('--at "$GITHUB_SHA"');
     expect(workflow).toContain('id-token: write');
@@ -69,9 +72,12 @@ describe('GitHub Actions main-observation adapter', () => {
 
   it('binds the common origin configuration from a linked Git worktree', async () => {
     const root = linkedWorktreeRepository();
-    const plan = buildGithubActionsAdapterPlan(root, '1.1.0-rc.3');
+    const plan = buildGithubActionsAdapterPlan(root, '1.1.0-rc.4');
     await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
-    expect(verifyGithubActionsAdapter(root, '1.1.0-rc.3')).toMatchObject({ ok: true });
+    expect(verifyGithubActionsAdapter(root, '1.1.0-rc.4')).toMatchObject({
+      ok: true,
+      facts: { workflow_syntax_valid: true },
+    });
     expect(JSON.parse(readFileSync(plan.configPath, 'utf8'))).toMatchObject({
       repository: 'example/linked-adopter',
     });

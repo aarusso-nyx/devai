@@ -14,6 +14,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { parseDocument } from 'yaml';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
@@ -310,6 +311,13 @@ try {
       'json',
     ]);
   }
+  const githubWorkflow = readFileSync(
+    join(projectRoot, '.github/workflows/devai-main-observation.yml'),
+    'utf8',
+  );
+  if (parseDocument(githubWorkflow).errors.length > 0) {
+    throw new Error('INSTALLED_GITHUB_ACTIONS_WORKFLOW_SYNTAX_INVALID');
+  }
   const adapterDoctor = runResult(binary, [
     'doctor',
     '--repo-root',
@@ -326,6 +334,7 @@ try {
     authorityCheck?.info?.selected_adapter_policy_bound !== true ||
     authorityCheck?.info?.local_post_merge_enforced !== true ||
     authorityCheck?.info?.github_actions_enforced !== true ||
+    authorityCheck?.info?.github_actions_facts?.workflow_syntax_valid !== true ||
     authorityCheck?.info?.arbitrary_host_tools_enforced !== false
   ) {
     throw new Error('INSTALLED_HOST_ADAPTER_DIAGNOSIS_INVALID');

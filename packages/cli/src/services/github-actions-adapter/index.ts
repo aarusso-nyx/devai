@@ -1,12 +1,23 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from '@devai-nyx/authority';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
+import { parseDocument } from 'yaml';
 
 const WORKFLOW_PATH = '.github/workflows/devai-main-observation.yml';
 const CONFIG_PATH = '.devai/config/github-actions-host-adapter.json';
 
 function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function workflowSyntaxValid(bytes: string): boolean {
+  return parseDocument(bytes).errors.length === 0;
 }
 
 function gitCommonConfig(root: string): string {
@@ -94,9 +105,7 @@ jobs:
           observation_repo="$RUNNER_TEMP/devai-observation"
           mkdir -p "$observation_repo/work/audit/post-merge/$GITHUB_SHA"
           cp .devai/state/audit-observations/$GITHUB_SHA/*.json "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"
-          printf '{"repository":"%s","workflow":"%s","ref":"%s","sha":"%s","run_id":"%s","attestation_url":"%s"}\n' \
-            "$GITHUB_REPOSITORY" "$GITHUB_WORKFLOW_REF" "$GITHUB_REF" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$DEVAI_ATTESTATION_URL" \
-            > "$observation_repo/work/audit/post-merge/$GITHUB_SHA/github-oidc-receipt.json"
+          printf '{"repository":"%s","workflow":"%s","ref":"%s","sha":"%s","run_id":"%s","attestation_url":"%s"}\\n' "$GITHUB_REPOSITORY" "$GITHUB_WORKFLOW_REF" "$GITHUB_REF" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$DEVAI_ATTESTATION_URL" > "$observation_repo/work/audit/post-merge/$GITHUB_SHA/github-oidc-receipt.json"
           git -C "$observation_repo" init -b audit
           git -C "$observation_repo" config user.name 'DEVAI Auditor'
           git -C "$observation_repo" config user.email 'aarusso@nyxk.com.br'
@@ -119,6 +128,8 @@ export function buildGithubActionsAdapterPlan(
 ): GithubActionsAdapterPlan {
   const root = resolve(targetRoot);
   const workflowBytes = workflow();
+  if (!workflowSyntaxValid(workflowBytes))
+    throw new Error('GITHUB_ACTIONS_ADAPTER_WORKFLOW_SYNTAX_INVALID');
   const repository = repositorySlug(root);
   const config = {
     schemaVersion: '1.0.0',
@@ -168,6 +179,7 @@ export function verifyGithubActionsAdapter(
     if (!facts['workflow_present'] || !facts['config_present']) return { ok: false, facts, errors };
     const bytes = readFileSync(workflowPath, 'utf8');
     const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+    facts['workflow_syntax_valid'] = workflowSyntaxValid(bytes);
     facts['workflow_bound'] = config['workflow_digest_sha256'] === sha256(bytes);
     facts['repository_bound'] = config['repository'] === repositorySlug(root);
     facts['main_bound'] =
