@@ -12,6 +12,7 @@ afterEach(() => {
 });
 
 const DEFAULT_DOMAINS = [
+  'audit',
   'init',
   'doctor',
   'check',
@@ -19,6 +20,7 @@ const DEFAULT_DOMAINS = [
   'round',
   'evidence',
   'release',
+  'triage',
 ] as const;
 
 async function rootHelp(flag = '--help'): Promise<string> {
@@ -49,7 +51,7 @@ function helpDomains(help: string): readonly string[] {
 }
 
 describe('public CLI bootstrap', () => {
-  it('renders exactly seven porcelain domains in default root help', async () => {
+  it('renders exactly nine porcelain domains in default root help', async () => {
     const help = await rootHelp();
     expect(help).toContain('Usage: devai <command> [options]');
     expect(helpDomains(help)).toEqual(DEFAULT_DOMAINS);

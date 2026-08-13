@@ -153,6 +153,7 @@
                 "prefixItems": [
                   {
                     "enum": [
+                      "audit",
                       "init",
                       "doctor",
                       "check",
@@ -161,7 +162,8 @@
                       "evidence",
                       "release",
                       "task",
-                      "catalog"
+                      "catalog",
+                      "triage"
                     ]
                   }
                 ]

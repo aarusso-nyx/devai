@@ -55,8 +55,8 @@ const expectedCatalog = ACTION_REGISTRY.map((entry) => ({
 }));
 
 describe('public read-action runtime seams', () => {
-  it('catalog actions returns the exact 41 current actions in canonical registry order', async () => {
-    expect(ACTION_REGISTRY).toHaveLength(41);
+  it('catalog actions returns the exact 43 current actions in canonical registry order', async () => {
+    expect(ACTION_REGISTRY).toHaveLength(43);
 
     const result = await run(['catalog', 'actions']);
     expect(result.exit, result.stderr).toBe(0);

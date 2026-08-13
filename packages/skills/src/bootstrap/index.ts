@@ -178,8 +178,10 @@ export function validateCanonicalPolicyContent(file: BootstrapPolicyFile, bytes:
 
 export function resolveCanonicalPolicyContent(file: CanonicalPolicyFile): string {
   const candidates = [
+    join(PACKAGE_ROOT, 'law/policy/adopter-defaults', file),
     join(PACKAGE_ROOT, 'law/policy', file),
     join(PACKAGE_ROOT, 'dist/law/policy', file),
+    join(PACKAGE_ROOT, '../../law/policy/adopter-defaults', file),
     join(PACKAGE_ROOT, '../../law/policy', file),
   ];
   const source = candidates.find((candidate) => existsSync(candidate));

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "SR-0123456789abcdef",
+  "sensor": { "name": "trace", "kind": "trace_resolution", "version": "1.0.0" },
+  "timestamp": "2026-08-13T00:00:00.000Z",
+  "status": "fail",
+  "deterministic": true,
+  "command": "devai check --only trace",
+  "command_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "exit_code": 1,
+  "findings": [
+    {
+      "severity": "error",
+      "code": "unresolved_invariant",
+      "message": "Missing specification authority for the discovered behavior",
+      "invariant_id": "INV-FLOW-001"
+    }
+  ]
+}

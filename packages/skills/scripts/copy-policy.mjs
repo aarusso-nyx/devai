@@ -17,7 +17,8 @@ const files = [
 
 mkdirSync(targetRoot, { recursive: true });
 for (const file of files) {
-  const source = join(sourceRoot, file);
+  const adopterSource = join(sourceRoot, 'adopter-defaults', file);
+  const source = existsSync(adopterSource) ? adopterSource : join(sourceRoot, file);
   if (!existsSync(source)) {
     console.error(`copy-policy: source missing: ${source}`);
     process.exit(1);

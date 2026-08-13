@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/triage-classify-result.schema.json",
+  "title": "Triage Classify Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "artifact", "evidence_ref"],
+  "properties": {
+    "verdict": { "$ref": "triage.schema.json" },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "kind"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "kind": { "const": "triage" }
+      }
+    },
+    "evidence_ref": { "type": "string", "pattern": "^EV-[a-f0-9]{16}$" }
+  }
+}

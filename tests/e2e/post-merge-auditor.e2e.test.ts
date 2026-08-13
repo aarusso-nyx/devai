@@ -29,7 +29,6 @@ const gitEnv: NodeJS.ProcessEnv = {
 };
 
 let repo = '';
-let shimDir = '';
 
 function git(args: readonly string[], env = gitEnv) {
   return spawnSync('git', args, { cwd: repo, env, encoding: 'utf8' });
@@ -108,23 +107,24 @@ function install() {
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), 'devai-r21-post-merge-e2e-'));
   expect(git(['init', '-b', 'main']).status).toBe(0);
-  writeFileSync(join(repo, '.gitignore'), '.devai/state/\n.devai/worktrees/\nscratch/worktrees/\n');
+  writeFileSync(
+    join(repo, '.gitignore'),
+    '.devai/state/\n.devai/worktrees/\nscratch/worktrees/\nnode_modules/\n',
+  );
   mkdirSync(join(repo, 'law'), { recursive: true });
   writeFileSync(join(repo, 'law', 'constitution.md'), readFileSync(CONSTITUTION, 'utf8'));
   commitFile('README.md', 'initial\n');
   commitFile('law/constitution.md', readFileSync(CONSTITUTION, 'utf8'));
   expect(git(['add', '.gitignore']).status).toBe(0);
   expect(git(['commit', '-m', 'test: ignore runtime state']).status).toBe(0);
-  shimDir = mkdtempSync(join(tmpdir(), 'devai-r21-bin-'));
-  const shim = join(shimDir, 'devai');
+  const shim = join(repo, 'node_modules/.bin/devai');
+  mkdirSync(dirname(shim), { recursive: true });
   writeFileSync(shim, `#!/bin/sh\nexec node ${JSON.stringify(REAL_BIN)} "$@"\n`);
   chmodSync(shim, 0o755);
-  gitEnv.PATH = `${shimDir}:${process.env.PATH ?? ''}`;
 });
 
 afterEach(() => {
   rmSync(repo, { recursive: true, force: true });
-  rmSync(shimDir, { recursive: true, force: true });
 });
 
 function runHookAsync(): Promise<{ status: number | null; stderr: string }> {

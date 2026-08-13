@@ -5,6 +5,8 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  statSync,
+  spawnSync,
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
@@ -69,14 +71,91 @@ function sha256(value: string | Buffer): string {
 function installedConstitution(root: string): string {
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const candidates = [
-    join(root, 'law/constitution.md'),
     join(root, '.devai/pin/constitution.md'),
+    join(root, 'law/constitution.md'),
     join(root, '.devai/constitution.md'),
     join(packageRoot, 'dist/law/constitution.md'),
   ];
   const path = candidates.find((candidate) => existsSync(candidate));
   if (path === undefined) throw new Error('POST_MERGE_ADAPTER_CONSTITUTION_MISSING');
   return readFileSync(path, 'utf8');
+}
+
+export interface PostMergeAdapterVerification {
+  readonly ok: boolean;
+  readonly facts: Readonly<Record<string, boolean>>;
+  readonly errors: readonly string[];
+}
+
+export function verifyInstalledPostMergeAdapter(
+  targetRoot: string,
+  devaiVersion: string,
+): PostMergeAdapterVerification {
+  const root = realpathSync(resolve(targetRoot));
+  const hookPath = join(root, '.git/hooks/post-merge');
+  const keyPath = join(root, '.git/devai/post-merge.key');
+  const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
+  const policyPath = join(root, '.devai/config/authority-policy.json');
+  const errors: string[] = [];
+  const facts: Record<string, boolean> = {};
+  try {
+    facts['hook_present'] = existsSync(hookPath);
+    facts['key_present'] = existsSync(keyPath);
+    facts['attestation_present'] = existsSync(attestationPath);
+    facts['policy_present'] = existsSync(policyPath);
+    if (Object.values(facts).some((value) => !value)) {
+      errors.push('POST_MERGE_ADAPTER_BINDING_MISSING');
+      return { ok: false, facts, errors };
+    }
+    const hook = readFileSync(hookPath, 'utf8');
+    const key = readFileSync(keyPath);
+    const attestation = JSON.parse(readFileSync(attestationPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const { signature_hmac_sha256: signature, ...unsigned } = attestation;
+    const localBinary = join(root, 'node_modules/.bin/devai');
+    facts['hook_local_binary'] = hook.includes('./node_modules/.bin/devai round close');
+    facts['local_binary_present'] = existsSync(localBinary);
+    const localVersion = facts['local_binary_present']
+      ? spawnSync(localBinary, ['--version'], { cwd: root, encoding: 'utf8' })
+      : null;
+    facts['local_binary_version'] =
+      localVersion?.status === 0 && localVersion.stdout.trim().startsWith(`devai/${devaiVersion}`);
+    facts['key_private'] = (statSync(keyPath).mode & 0o077) === 0;
+    facts['signature_valid'] =
+      typeof signature === 'string' &&
+      createHmac('sha256', key).update(JSON.stringify(unsigned)).digest('hex') === signature;
+    facts['repository_bound'] =
+      typeof attestation['repository'] === 'string' &&
+      realpathSync(resolve(String(attestation['repository']))) === root;
+    facts['hook_bound'] = attestation['hook_digest_sha256'] === sha256(hook);
+    facts['key_bound'] = attestation['key_digest_sha256'] === sha256(key);
+    facts['policy_bound'] =
+      attestation['policy_digest_sha256'] === sha256(readFileSync(policyPath));
+    facts['constitution_bound'] =
+      attestation['constitution_digest_sha256'] === sha256(installedConstitution(root));
+    const packageBinding = attestation['package_binding'] as Record<string, unknown> | undefined;
+    facts['package_bound'] =
+      packageBinding?.['name'] === '@aarusso-nyx/devai' &&
+      packageBinding['version'] === devaiVersion;
+    const installedHead = attestation['installed_at_head'];
+    const headCheck =
+      typeof installedHead === 'string'
+        ? spawnSync('git', ['cat-file', '-e', `${installedHead}^{commit}`], {
+            cwd: root,
+            encoding: 'utf8',
+          })
+        : null;
+    facts['installed_head_bound'] = headCheck?.status === 0;
+    for (const [name, value] of Object.entries(facts)) {
+      if (!value) errors.push(`POST_MERGE_ADAPTER_${name.toUpperCase()}_INVALID`);
+    }
+    return { ok: errors.length === 0, facts, errors };
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    return { ok: false, facts, errors };
+  }
 }
 
 function validatePostMergeAdapterInputs(plan: HooksInstallPlan): void {
@@ -96,7 +175,7 @@ function validatePostMergeAdapterInputs(plan: HooksInstallPlan): void {
 function postMergeCommand(targetRoot: string): string {
   const issuer = join(targetRoot, '.git/devai/issue-post-merge-receipt.cjs');
   const receipt = join(targetRoot, '.git/devai/post-merge-receipt.json');
-  return `node ${JSON.stringify(issuer)}\ndevai round close --post-merge-receipt --host-receipt ${JSON.stringify(receipt)}`;
+  return `node ${JSON.stringify(issuer)}\n./node_modules/.bin/devai round close --post-merge-receipt --host-receipt ${JSON.stringify(receipt)}`;
 }
 
 function prePushCommand(): string {

@@ -2,11 +2,12 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   runAuthorityHostEffectsWithRollback,
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { CAC } from 'cac';
 import {
   buildBootstrapPlan,
@@ -21,8 +22,9 @@ import {
   resolveCanonicalPolicyContent,
   resolveCanonicalConstitution,
   verifyConstitutionBinding,
+  validateCanonicalPolicyContent,
 } from '@devai-nyx/skills';
-import { validators } from '@devai-nyx/schemas';
+import { getValidator, validators } from '@devai-nyx/schemas';
 import { isAdoptionProfile, EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 import { executeAuthorityPolicyMaterialization } from '../../authority/command-capabilities.js';
@@ -33,8 +35,14 @@ import {
   executeHooksInstallPlan,
   HOOK_NAMES,
   preflightHooksInstallPlan,
+  verifyInstalledPostMergeAdapter,
   type HookName,
 } from '../../services/hooks-install/index.js';
+import {
+  buildGithubActionsAdapterPlan,
+  executeGithubActionsAdapterPlan,
+  verifyGithubActionsAdapter,
+} from '../../services/github-actions-adapter/index.js';
 
 const DEFAULT_REPO_ROOT = '.';
 
@@ -61,9 +69,125 @@ interface InitBindOptions {
   readonly constitution?: boolean;
   readonly subprocessEffects?: boolean;
   readonly operationalLaw?: boolean;
+  readonly adopterPolicy?: string;
+  readonly hostAdapter?: string;
   readonly tier?: string;
   readonly write?: boolean;
   readonly human?: boolean;
+}
+
+type JsonObject = Record<string, unknown>;
+
+function isObject(value: unknown): value is JsonObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sha256Bytes(value: string | Buffer): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function deepMerge(base: unknown, override: unknown): unknown {
+  if (!isObject(base) || !isObject(override)) return override;
+  const result: JsonObject = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    result[key] = key in result ? deepMerge(result[key], value) : value;
+  }
+  return result;
+}
+
+function jsonBytes(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
+  const lawPolicyRoot = realpathSync(resolve(targetRoot, 'law/policy'));
+  const sourcePath = realpathSync(resolve(targetRoot, sourceArgument));
+  const sourceRelative = relative(lawPolicyRoot, sourcePath);
+  if (
+    sourceRelative.length === 0 ||
+    sourceRelative === '..' ||
+    sourceRelative.startsWith(`..${sep}`)
+  ) {
+    throw new Error('ADOPTER_POLICY_SOURCE_OUTSIDE_LAW_POLICY');
+  }
+  const sourceBytes = readFileSync(sourcePath, 'utf8');
+  const policy: unknown = JSON.parse(sourceBytes);
+  const validatePolicy = getValidator('adopter-policy.schema.json');
+  if (!validatePolicy(policy)) {
+    throw new Error(`ADOPTER_POLICY_INVALID:${JSON.stringify(validatePolicy.errors)}`);
+  }
+  const document = policy as JsonObject;
+  const defaults = (
+    file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
+  ) => JSON.parse(resolveCanonicalPolicyContent(file)) as JsonObject;
+  const domainDefaults = defaults('domains.json');
+  const domainConfig = isObject(document['domains']) ? document['domains'] : {};
+  const requestedDomains = Array.isArray(domainConfig['client'])
+    ? domainConfig['client'].map(String)
+    : [];
+  const immutableDomains = [
+    ...(domainDefaults['core'] as string[]),
+    ...(domainDefaults['framework'] as string[]),
+  ];
+  const collision = requestedDomains.find((domain) => immutableDomains.includes(domain));
+  if (collision !== undefined) throw new Error(`ADOPTER_POLICY_DOMAIN_COLLISION:${collision}`);
+  const domains = {
+    ...domainDefaults,
+    client: [...new Set([...(domainDefaults['client'] as string[]), ...requestedDomains])].sort(),
+  };
+  const thresholds = deepMerge(
+    defaults('thresholds.json'),
+    document['thresholds'] ?? {},
+  ) as JsonObject;
+  const scorecardNa = document['scorecard_na'] ?? defaults('scorecard-na.json');
+  const globGuards = document['glob_guards'] ?? defaults('glob-guards.json');
+  validateCanonicalPolicyContent('domains.json', jsonBytes(domains));
+  validateCanonicalPolicyContent('thresholds.json', jsonBytes(thresholds));
+  validateCanonicalPolicyContent('scorecard-na.json', jsonBytes(scorecardNa));
+  validateCanonicalPolicyContent('glob-guards.json', jsonBytes(globGuards));
+
+  const projectPath = join(targetRoot, '.devai/config/project.json');
+  const currentProject = existsSync(projectPath)
+    ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject)
+    : {};
+  const projectOverrides = isObject(document['project']) ? document['project'] : {};
+  const project = {
+    ...(deepMerge(currentProject, projectOverrides) as JsonObject),
+    devai_version: resolveCliVersion(),
+  };
+  const validateProject = getValidator('project-config.schema.json');
+  if (!validateProject(project)) {
+    throw new Error(`ADOPTER_POLICY_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
+  }
+  const outputs = new Map<string, string>([
+    [projectPath, jsonBytes(project)],
+    [join(targetRoot, '.devai/config/domains.json'), jsonBytes(domains)],
+    [join(targetRoot, '.devai/config/thresholds.json'), jsonBytes(thresholds)],
+    [join(targetRoot, '.devai/config/scorecard-na.json'), jsonBytes(scorecardNa)],
+    [join(targetRoot, '.devai/config/glob-guards.json'), jsonBytes(globGuards)],
+  ]);
+  const receiptPath = join(targetRoot, '.devai/config/adopter-policy-binding.json');
+  const receipt = {
+    schemaVersion: '1.0.0',
+    policy_id: document['policy_id'],
+    policy_version: document['policy_version'],
+    source_path: relative(targetRoot, sourcePath).split(sep).join('/'),
+    source_digest_sha256: sha256Bytes(sourceBytes),
+    materialized: Object.fromEntries(
+      [...outputs].map(([path, bytes]) => [
+        relative(targetRoot, path).split(sep).join('/'),
+        sha256Bytes(bytes),
+      ]),
+    ),
+  };
+  outputs.set(receiptPath, jsonBytes(receipt));
+  runAuthorityHostEffectsWithRollback([...outputs.keys()], () => {
+    for (const [path, bytes] of outputs) {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes);
+    }
+  });
+  return { receipt_path: relative(targetRoot, receiptPath).split(sep).join('/'), receipt };
 }
 
 type InitSegment = 'owner' | 'architect' | 'harness';
@@ -378,10 +502,191 @@ export const initBind = defineCommand({
         '--operational-law',
         'Bind current operational policies into .devai/config with byte identity.',
       )
+      .option(
+        '--adopter-policy <path>',
+        'Validate and bind an Architect-owned policy source under law/policy.',
+      )
+      .option(
+        '--host-adapter <adapter>',
+        'Bind a verified host adapter: post-merge | github-actions',
+      )
       .option('--write', 'Materialize the selected binding.')
       .option('--human', 'Human-readable output')
       .action((options: InitBindOptions) => {
         validateInitTier(options);
+        const modes = [
+          options.operationalLaw === true,
+          options.subprocessEffects === true,
+          options.constitution === true,
+          options.adopterPolicy !== undefined,
+          options.hostAdapter !== undefined,
+        ].filter(Boolean).length;
+        if (modes > 1) {
+          process.stderr.write('devai init bind: binding selectors are mutually exclusive\n');
+          process.exitCode = EXIT_USAGE;
+          return;
+        }
+        if (options.adopterPolicy !== undefined) {
+          const targetRoot = realpathSync(resolve(options.target ?? DEFAULT_REPO_ROOT));
+          if (options.write !== true) {
+            emit(
+              { plan: { source: options.adopterPolicy, target: '.devai/config' } },
+              options.human === true,
+              `init bind --adopter-policy (plan only): ${options.adopterPolicy} → .devai/config`,
+            );
+            process.exitCode = EXIT_PASS;
+            return;
+          }
+          try {
+            const result = materializeAdopterPolicy(targetRoot, options.adopterPolicy);
+            const artifact = executeAuthorityPolicyMaterialization();
+            emit(
+              { ...result, authority_policy: artifact },
+              options.human === true,
+              `init bind --adopter-policy: ${result.receipt_path}`,
+            );
+            process.exitCode = EXIT_PASS;
+          } catch (error) {
+            process.stderr.write(
+              `devai init bind --adopter-policy: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+            process.exitCode = EXIT_FAIL;
+          }
+          return;
+        }
+        if (options.hostAdapter !== undefined) {
+          if (!['post-merge', 'github-actions'].includes(options.hostAdapter)) {
+            process.stderr.write(
+              'devai init bind --host-adapter: expected post-merge or github-actions\n',
+            );
+            process.exitCode = EXIT_USAGE;
+            return;
+          }
+          const targetRoot = realpathSync(resolve(options.target ?? DEFAULT_REPO_ROOT));
+          if (options.hostAdapter === 'github-actions') {
+            try {
+              const plan = buildGithubActionsAdapterPlan(targetRoot, resolveCliVersion());
+              if (options.write !== true) {
+                emit(
+                  {
+                    plan: {
+                      workflow: relative(targetRoot, plan.workflowPath).split(sep).join('/'),
+                      config: relative(targetRoot, plan.configPath).split(sep).join('/'),
+                    },
+                  },
+                  options.human === true,
+                  'init bind --host-adapter github-actions (plan only)',
+                );
+                process.exitCode = EXIT_PASS;
+                return;
+              }
+              const projectPath = join(targetRoot, '.devai/config/project.json');
+              const authorityPolicyPath = join(targetRoot, '.devai/config/authority-policy.json');
+              const project = JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject;
+              const nextProject = {
+                ...project,
+                authority_enforcement: {
+                  mode: 'host-integrated',
+                  adapter_config: '.devai/config/github-actions-host-adapter.json',
+                },
+              };
+              const validateProject = getValidator('project-config.schema.json');
+              if (!validateProject(nextProject)) {
+                throw new Error(
+                  `HOST_ADAPTER_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`,
+                );
+              }
+              const result = runAuthorityHostEffectsWithRollback(
+                [plan.workflowPath, plan.configPath, projectPath, authorityPolicyPath],
+                () => {
+                  writeFileSync(projectPath, jsonBytes(nextProject));
+                  executeGithubActionsAdapterPlan(plan);
+                  const verification = verifyGithubActionsAdapter(targetRoot, resolveCliVersion());
+                  if (!verification.ok) {
+                    throw new Error(
+                      `GITHUB_ACTIONS_ADAPTER_INVALID:${verification.errors.join(',')}`,
+                    );
+                  }
+                  const authorityPolicy = executeAuthorityPolicyMaterialization();
+                  return { authorityPolicy, verification };
+                },
+              );
+              emit(
+                { plan: { workflow: plan.workflowPath, config: plan.configPath }, ...result },
+                options.human === true,
+                `init bind --host-adapter github-actions: ${plan.workflowPath}`,
+              );
+              process.exitCode = EXIT_PASS;
+            } catch (error) {
+              process.stderr.write(
+                `devai init bind --host-adapter github-actions: ${error instanceof Error ? error.message : String(error)}\n`,
+              );
+              process.exitCode = EXIT_FAIL;
+            }
+            return;
+          }
+          const plan = buildHooksInstallPlan({
+            targetRoot,
+            hook: 'post-merge',
+            devaiVersion: resolveCliVersion(),
+          });
+          if (options.write !== true) {
+            emit(
+              { plan },
+              options.human === true,
+              `init bind --host-adapter post-merge (plan only): ${plan.action} ${plan.path}`,
+            );
+            process.exitCode = EXIT_PASS;
+            return;
+          }
+          try {
+            const adapterTargets = preflightHooksInstallPlan(plan);
+            const projectPath = join(targetRoot, '.devai/config/project.json');
+            const authorityPolicyPath = join(targetRoot, '.devai/config/authority-policy.json');
+            const project = JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject;
+            const nextProject = {
+              ...project,
+              authority_enforcement: {
+                mode: 'host-integrated',
+                adapter_config: '.devai/config/post-merge-host-adapter.json',
+              },
+            };
+            const validateProject = getValidator('project-config.schema.json');
+            if (!validateProject(nextProject)) {
+              throw new Error(
+                `HOST_ADAPTER_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`,
+              );
+            }
+            const result = runAuthorityHostEffectsWithRollback(
+              [...adapterTargets, projectPath, authorityPolicyPath],
+              () => {
+                writeFileSync(projectPath, jsonBytes(nextProject));
+                const authorityPolicy = executeAuthorityPolicyMaterialization();
+                executeHooksInstallPlan(plan);
+                const verification = verifyInstalledPostMergeAdapter(
+                  targetRoot,
+                  resolveCliVersion(),
+                );
+                if (!verification.ok) {
+                  throw new Error(`POST_MERGE_ADAPTER_INVALID:${verification.errors.join(',')}`);
+                }
+                return { authorityPolicy, verification };
+              },
+            );
+            emit(
+              { plan, ...result },
+              options.human === true,
+              `init bind --host-adapter post-merge: ${plan.path}`,
+            );
+            process.exitCode = EXIT_PASS;
+          } catch (error) {
+            process.stderr.write(
+              `devai init bind --host-adapter: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+            process.exitCode = EXIT_FAIL;
+          }
+          return;
+        }
         if (options.operationalLaw === true) {
           const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
           const files = [

@@ -75,7 +75,7 @@ try {
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
 
   const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
-  if (unboundCatalog?.result?.value?.length !== 41) {
+  if (unboundCatalog?.result?.value?.length !== 43) {
     throw new Error('INSTALLED_UNBOUND_CATALOG_INVALID');
   }
   const unboundPlan = JSON.parse(
@@ -148,9 +148,49 @@ try {
     throw new Error('INSTALLED_CONSTITUTION_POINTER_SYMLINK');
   }
 
+  const authorityPolicyPath = join(projectRoot, '.devai/config/authority-policy.json');
+  const initialPolicyDigest = JSON.parse(
+    readFileSync(authorityPolicyPath, 'utf8'),
+  ).resolved_digest_sha256;
+  run(binary, ['--help']);
+  for (const domain of [
+    'audit',
+    'catalog',
+    'check',
+    'doctor',
+    'evidence',
+    'init',
+    'release',
+    'round',
+    'sense',
+    'task',
+    'triage',
+  ]) {
+    run(binary, [domain, '--help']);
+  }
+  run(binary, ['--help', '--all']);
+  runResult(binary, ['doctor', '--repo-root', projectRoot, '--format', 'json']);
+  run(binary, [
+    'init',
+    'bind',
+    '--target',
+    projectRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  const reboundPolicyDigest = JSON.parse(
+    readFileSync(authorityPolicyPath, 'utf8'),
+  ).resolved_digest_sha256;
+  if (reboundPolicyDigest !== initialPolicyDigest) {
+    throw new Error('INSTALLED_POLICY_DIGEST_INVOCATION_DRIFT');
+  }
+
   const envelope = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
   const actions = envelope?.result?.value;
-  if (!Array.isArray(actions) || actions.length !== 41) {
+  if (!Array.isArray(actions) || actions.length !== 43) {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
@@ -169,6 +209,113 @@ try {
       '--format',
       'json',
     ]);
+  }
+
+  const adopterPolicyPath = join(projectRoot, 'law/policy/adopter-policy.json');
+  mkdirSync(join(projectRoot, 'law/policy'), { recursive: true });
+  const validAdopterPolicyBytes = `${JSON.stringify(
+    {
+      schemaVersion: '1.0.0',
+      policy_id: 'installed-smoke',
+      policy_version: '1.0.0',
+      domains: { client: ['COVERAGE'] },
+      thresholds: { coverage: { lines: 91 } },
+    },
+    null,
+    2,
+  )}\n`;
+  writeFileSync(adopterPolicyPath, validAdopterPolicyBytes);
+  run(binary, [
+    'init',
+    'bind',
+    '--adopter-policy',
+    'law/policy/adopter-policy.json',
+    '--target',
+    projectRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  const adopterTargets = [
+    '.devai/config/project.json',
+    '.devai/config/domains.json',
+    '.devai/config/thresholds.json',
+    '.devai/config/scorecard-na.json',
+    '.devai/config/glob-guards.json',
+    '.devai/config/adopter-policy-binding.json',
+  ];
+  const adopterSnapshot = new Map(
+    adopterTargets.map((path) => [path, readFileSync(join(projectRoot, path), 'utf8')]),
+  );
+  writeFileSync(
+    adopterPolicyPath,
+    `${JSON.stringify({
+      schemaVersion: '1.0.0',
+      policy_id: 'installed-smoke',
+      policy_version: '1.0.1',
+      domains: { client: ['CORE'] },
+    })}\n`,
+  );
+  const refusedAdopterPolicy = runResult(binary, [
+    'init',
+    'bind',
+    '--adopter-policy',
+    'law/policy/adopter-policy.json',
+    '--target',
+    projectRoot,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  if (
+    refusedAdopterPolicy.status === 0 ||
+    adopterTargets.some(
+      (path) => readFileSync(join(projectRoot, path), 'utf8') !== adopterSnapshot.get(path),
+    )
+  ) {
+    throw new Error('INSTALLED_ADOPTER_POLICY_ROLLBACK_INVALID');
+  }
+  writeFileSync(adopterPolicyPath, validAdopterPolicyBytes);
+
+  run('git', ['remote', 'add', 'origin', 'https://github.com/example/adopter.git']);
+  for (const adapter of ['github-actions', 'post-merge']) {
+    run(binary, [
+      'init',
+      'bind',
+      '--host-adapter',
+      adapter,
+      '--target',
+      projectRoot,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ]);
+  }
+  const adapterDoctor = runResult(binary, [
+    'doctor',
+    '--repo-root',
+    projectRoot,
+    '--format',
+    'json',
+  ]);
+  const authorityCheck = JSON.parse(String(adapterDoctor.stdout))?.result?.value?.checks?.find(
+    (check) => check.name === 'authority-enforcement',
+  );
+  if (
+    ![0, 1].includes(adapterDoctor.status) ||
+    authorityCheck?.ok !== true ||
+    authorityCheck?.info?.selected_adapter_policy_bound !== true ||
+    authorityCheck?.info?.local_post_merge_enforced !== true ||
+    authorityCheck?.info?.github_actions_enforced !== true ||
+    authorityCheck?.info?.arbitrary_host_tools_enforced !== false
+  ) {
+    throw new Error('INSTALLED_HOST_ADAPTER_DIAGNOSIS_INVALID');
   }
 
   const installArgs = [
@@ -304,7 +451,7 @@ try {
   run('git', ['commit', '-qm', 'adopt DEVAI'], projectRoot);
   const remoteRoot = join(smokeRoot, 'remote.git');
   run('git', ['init', '--bare', '-q', remoteRoot], smokeRoot);
-  run('git', ['remote', 'add', 'origin', remoteRoot], projectRoot);
+  run('git', ['remote', 'set-url', 'origin', remoteRoot], projectRoot);
   run('git', ['push', '-q', '-u', 'origin', 'HEAD:main'], projectRoot);
 
   const representatives = [
@@ -414,7 +561,7 @@ try {
     existsSync(join(projectRoot, '.agents/skills/devai-assess')) ||
     existsSync(join(projectRoot, '.devai')) ||
     JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']))?.result?.value?.length !==
-      41
+      43
   ) {
     throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }

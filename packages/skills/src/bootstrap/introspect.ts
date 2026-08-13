@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
+import { minimatch } from 'minimatch';
+import { parse as parseYaml } from 'yaml';
 
 /**
  * Repo introspection for `devai init --introspect` (Phase 11.D, D-39).
@@ -135,6 +137,9 @@ interface ScanResult {
   readonly hasUnderscoreTests: boolean;
   readonly hasSpecFiles: boolean;
   readonly hasTestFiles: boolean;
+  readonly manifestPaths: string[];
+  readonly sourceRoots: Set<string>;
+  readonly testRoots: Set<string>;
 }
 
 function walk(
@@ -151,6 +156,9 @@ function walk(
     hasUnderscoreTests: boolean;
     hasSpecFiles: boolean;
     hasTestFiles: boolean;
+    manifestPaths: string[];
+    sourceRoots: Set<string>;
+    testRoots: Set<string>;
   },
   current: string,
   depth: number,
@@ -173,6 +181,14 @@ function walk(
     }
     if (stat.isDirectory()) {
       const rel = relative(root, full).replace(/\\/g, '/');
+      if (['src', 'lib', 'bin'].includes(name) && depth <= 4) state.sourceRoots.add(rel);
+      if (
+        ['test', 'tests', 'testing', '__tests__'].includes(name) &&
+        depth <= 4 &&
+        (name !== 'testing' || depth >= 2)
+      ) {
+        state.testRoots.add(rel);
+      }
       if (name === 'src' && depth === 0) state.hasSrc = true;
       if (rel.match(/^packages\/[^/]+\/src$/)) state.hasPackagesSrc = true;
       if (rel.match(/^apps\/[^/]+\/src$/)) state.hasAppsSrc = true;
@@ -182,6 +198,9 @@ function walk(
       if (name === '__tests__') state.hasUnderscoreTests = true;
       walk(root, state, full, depth + 1);
     } else if (stat.isFile()) {
+      if (name === 'package.json') {
+        state.manifestPaths.push(relative(root, full).replace(/\\/g, '/'));
+      }
       const ext = extname(name);
       const lang = LANG_EXT[ext];
       if (lang !== undefined) {
@@ -208,47 +227,60 @@ function detectPackageManager(root: string): RepoIntrospection['package_manager'
   return 'unknown';
 }
 
-function detectFrameworks(root: string): IntrospectionFramework[] {
-  const found: IntrospectionFramework[] = [];
-  const pkgPath = join(root, 'package.json');
-  if (!existsSync(pkgPath)) return found;
+function workspacePatterns(root: string): readonly string[] {
+  const path = join(root, 'pnpm-workspace.yaml');
+  if (!existsSync(path)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-    };
-    const deps = {
-      ...(parsed.dependencies ?? {}),
-      ...(parsed.devDependencies ?? {}),
-      ...(parsed.peerDependencies ?? {}),
-    };
-    const seen = new Set<IntrospectionFramework['name']>();
-    for (const [dep, fwName] of Object.entries(FRAMEWORK_DEPS)) {
-      if (deps[dep] !== undefined && !seen.has(fwName)) {
-        found.push({ name: fwName, evidence: `package.json dep: ${dep}` });
-        seen.add(fwName);
-      }
-    }
+    const parsed = parseYaml(readFileSync(path, 'utf8')) as { packages?: unknown };
+    return Array.isArray(parsed.packages)
+      ? parsed.packages.filter((entry): entry is string => typeof entry === 'string')
+      : [];
   } catch {
-    // unparseable package.json — leave frameworks empty
+    return [];
   }
-  return found;
+}
+
+function detectFrameworks(
+  root: string,
+  manifestPaths: readonly string[],
+): IntrospectionFramework[] {
+  const evidence = new Map<IntrospectionFramework['name'], string[]>();
+  for (const manifestPath of manifestPaths) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(root, manifestPath), 'utf8')) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+        peerDependencies?: Record<string, string>;
+      };
+      const deps = {
+        ...(parsed.dependencies ?? {}),
+        ...(parsed.devDependencies ?? {}),
+        ...(parsed.peerDependencies ?? {}),
+      };
+      for (const [dep, fwName] of Object.entries(FRAMEWORK_DEPS)) {
+        if (deps[dep] !== undefined) {
+          const entries = evidence.get(fwName) ?? [];
+          entries.push(`${manifestPath} dep: ${dep}`);
+          evidence.set(fwName, entries);
+        }
+      }
+    } catch {
+      // Unparseable manifests are surfaced through notes by the caller.
+    }
+  }
+  return [...evidence.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, entries]) => ({ name, evidence: [...new Set(entries)].sort().join('; ') }));
 }
 
 function inferSourceGlobs(state: ScanResult): string[] {
-  const out: string[] = [];
-  if (state.hasPackagesSrc) out.push('packages/*/src/**');
-  if (state.hasAppsSrc) out.push('apps/*/src/**');
-  if (state.hasSrc) out.push('src/**');
-  if (state.hasAppFolder) out.push('app/**');
+  const out = [...state.sourceRoots].sort().map((path) => `${path}/**`);
+  if (state.hasAppFolder && !out.includes('app/**')) out.push('app/**');
   return out.length > 0 ? out : ['src/**'];
 }
 
 function inferTestGlobs(state: ScanResult): string[] {
-  const out: string[] = [];
-  if (state.hasTestFolder) out.push('test/**');
-  if (state.hasTestsFolder) out.push('tests/**');
+  const out = [...state.testRoots].sort().map((path) => `${path}/**`);
   if (state.hasUnderscoreTests) out.push('**/__tests__/**');
   if (state.hasSpecFiles) out.push('**/*.spec.*');
   if (state.hasTestFiles) out.push('**/*.test.*');
@@ -291,11 +323,16 @@ export function introspectRepo(opts: IntrospectOptions): RepoIntrospection {
     hasUnderscoreTests: false,
     hasSpecFiles: false,
     hasTestFiles: false,
+    manifestPaths: [],
+    sourceRoots: new Set(),
+    testRoots: new Set(),
   };
   walk(root, state, root, 0);
 
   const pkgManager = detectPackageManager(root);
-  const frameworks = detectFrameworks(root);
+  const patterns = workspacePatterns(root);
+  const manifests = [...new Set(state.manifestPaths)].sort();
+  const frameworks = detectFrameworks(root, manifests);
   const langs: IntrospectionLanguage[] = Array.from(state.langCounts.entries())
     .map(([name, file_count]) => ({ name, file_count }))
     .sort((a, b) => b.file_count - a.file_count);
@@ -303,7 +340,7 @@ export function introspectRepo(opts: IntrospectOptions): RepoIntrospection {
   const notes: string[] = [];
   if (frameworks.length === 0 && pkgManager !== 'unknown') {
     notes.push(
-      'No recognized framework dependency in package.json; project_type may be platform-package or framework',
+      'No recognized framework dependency in any discovered package manifest; project_type may be platform-package or framework',
     );
   }
   if (frameworks.length > 1) {
@@ -315,6 +352,23 @@ export function introspectRepo(opts: IntrospectOptions): RepoIntrospection {
     notes.push(
       'Both packages/*/src and apps/*/src detected — monorepo with apps; source_globs covers both',
     );
+  }
+  if (patterns.length > 0) {
+    const manifestRoots = manifests.map((path) => path.replace(/\/package\.json$/u, ''));
+    const matched = manifestRoots.filter((path) =>
+      patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
+    );
+    const outside = manifestRoots.filter(
+      (path) => path !== '' && !patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
+    );
+    notes.push(
+      `Parsed pnpm-workspace.yaml: ${String(patterns.length)} pattern(s), ${String(matched.length)} matching manifest(s)`,
+    );
+    if (outside.length > 0) {
+      notes.push(
+        `Discovered ${String(outside.length)} package manifest(s) outside pnpm workspace patterns; retained their source/test roots as repository evidence`,
+      );
+    }
   }
 
   const proposed = proposeProjectType(frameworks, pkgManager, state.hasSrc || state.hasPackagesSrc);
