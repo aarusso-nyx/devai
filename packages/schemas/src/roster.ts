@@ -26,6 +26,7 @@ export const ROSTER = [
   'record-meta.schema.json',
   'release-control.schema.json',
   'repo-introspection.schema.json',
+  'rgr.schema.json',
   'round-execution.schema.json',
   'runtime-charter.schema.json',
   'scorecard-na-config.schema.json',
