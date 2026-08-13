@@ -1,7 +1,7 @@
 # CLI overview
 
-DEVAI presents 41 actions: 20 stable public actions, 10 preview round actions, and 11
-internal plumbing actions. Seven workflow domains organize the public surface. Choose the domain from the outcome you need;
+DEVAI presents 43 actions: 22 stable public actions, 10 preview round actions, and 11
+internal plumbing actions. Nine workflow domains organize the public surface. Choose the domain from the outcome you need;
 then choose one leaf action, suite, preset, kind, slice, tier, round, or task selection inside
 that domain. The hidden `task` and `catalog` surfaces are plumbing, not additional workflows.
 
@@ -19,11 +19,13 @@ does not by itself establish release, deployment, or readiness.
 | plan, inspect, run, or close governed work                                | `round`    | `devai round status --round R-1000 --repo-root . --format json`               |
 | collect, record, render, redact, or verify evidence                       | `evidence` | `devai evidence verify --scope chain --show-head --repo-root . --format json` |
 | inspect release control or enter a separately authorized release ceremony | `release`  | `devai release status --repo-root . --format json`                            |
+| create an exact non-promoting observation                                 | `audit`    | `devai audit observe --at <full-sha> --as-role auditor --write`               |
+| classify a sensor failure before remediation                              | `triage`   | `devai triage classify --input <reading.json> --as-role inspector --write`    |
 
 The examples above use only the current grammar. They are read-only or dry-run selections;
 replace the example identifiers with identifiers that exist in the target repository.
 
-## Contract shared by all seven workflows
+## Contract shared by all nine workflows
 
 For workflow identifier `W`, its exact population is the ordered projection of entries in the
 [action registry](../../../law/policy/action-registry.json) whose status is `stable` or `preview`
@@ -70,8 +72,9 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
 - **Prerequisites, tools, inputs, and defaults:** a target repository is required; `--target`
   defaults to the current directory. A tier may be selected explicitly. `init plan` needs no write
   authority; an apply needs the role that owns the projected paths. Binding follows the exact
-  contract shown by `devai init bind --help`. Selected includes such as hooks or CI can require
-  their host tools.
+  contract shown by `devai init bind --help`. `--adopter-policy` accepts only a validated source
+  under `law/policy`; `--host-adapter` binds `github-actions` or `post-merge` as a verified
+  transaction. Selected includes such as hooks or CI can require their host tools.
 - **Output and verdict:** plans report the exact projected operations; applies report bounded
   writes through the shared action envelope. Schema, target, authority, or write failures refuse
   the operation; planning is not an apply verdict.

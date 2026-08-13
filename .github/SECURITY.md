@@ -6,7 +6,8 @@ Please report suspected vulnerabilities privately to the repository owner or sec
 
 ## Supported versions
 
-`1.0.1` is the supported stable line after its separately authorized publication. Until that
+`1.1.0-rc.1` is a release candidate and does not replace the supported `1.0.1` stable line. Until an
+exact candidate is separately authorized and published, that
 publication occurs, `1.0.0-rc.6` remains the supported public candidate.
 
 ## Security boundary
