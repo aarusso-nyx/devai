@@ -31,6 +31,7 @@ import { resolveCanonicalConstitution } from '@devai-nyx/skills';
 import { validators } from '@devai-nyx/schemas';
 import type { RegistryEntry } from '../define-command.js';
 import { matchDeclaredCheckTaskProcess } from '../services/check-runner/authority-process.js';
+import { matchDeclaredRoundTaskProcess } from '../services/round-run/authority-process.js';
 import {
   buildTrustedAuthoritySources,
   canonicalBytes,
@@ -509,6 +510,20 @@ function processTarget(
     }
   }
 
+  if (actionName === 'round run') {
+    const task = matchDeclaredRoundTaskProcess(root, invocationArgv, request);
+    if (task !== undefined) {
+      return {
+        kind: 'remote',
+        id: `remote:local-command:routine-executor:${task.taskId}`,
+        system_id: 'local-command',
+        endpoint_id: 'routine-executor',
+        operation_id: 'invoke',
+        publication: false,
+      };
+    }
+  }
+
   if (
     executable === 'psql' &&
     ['check', 'sense migrate', 'task finish', 'task start'].includes(actionName)
@@ -772,6 +787,17 @@ function boundedSelectors(kind: string, repositoryId: string, actionName: string
         kind: 'remote',
         system_id: 'local-command',
         endpoint_ids: ['test-runner'],
+        operation_ids: ['invoke'],
+        publication: false,
+      },
+    ];
+  }
+  if (actionName === 'round run' && kind === 'remote') {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'local-command',
+        endpoint_ids: ['routine-executor'],
         operation_ids: ['invoke'],
         publication: false,
       },

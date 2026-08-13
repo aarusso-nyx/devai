@@ -309,16 +309,14 @@ export function spawnTask(opts: SpawnTaskOptions): SpawnResult {
   }
 
   // All steps succeeded — record final state.
-  const composed = opts.withWorktree === true || opts.withDb === true;
   const task: TaskRecord = {
     schemaVersion: '2.0.0',
     ...requested,
-    // If we composed a full environment, the task is in_progress (ready
-    // to run). Otherwise it's just 'ready' awaiting environment.
-    status: composed ? 'in_progress' : 'ready',
+    // Resource composition prepares execution; only the round runner may
+    // perform the ready -> in_progress transition.
+    status: 'ready',
     iteration_count: requested.iteration_count ?? 0,
     created_at: createdAt,
-    ...(composed && { spawned_at: new Date().toISOString() }),
     ...(worktreePath !== null && { worktree_id: worktreeId, branch: requested.id }),
   };
   saveTask(opts.repoRoot, task);

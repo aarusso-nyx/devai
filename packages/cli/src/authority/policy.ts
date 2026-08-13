@@ -671,6 +671,21 @@ export function buildTrustedAuthoritySources(
       rationale: 'Typed remote authority for sense run.',
     }),
     rule({
+      id: 'adopter-remote-round-run-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['round run'],
+      selector: {
+        kind: 'remote',
+        system_id: 'local-command',
+        endpoint_ids: ['routine-executor'],
+        operation_ids: ['invoke'],
+        publication: false,
+      },
+      subjects: [machineSubject('harness')],
+      rationale: 'Typed remote authority for the exact task routine selected by the round runner.',
+    }),
+    rule({
       id: 'adopter-db-task-finish-1',
       origin: 'additive-extension',
       precedence: 500,

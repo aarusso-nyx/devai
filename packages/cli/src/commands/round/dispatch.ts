@@ -7,16 +7,31 @@ import {
   type TaskExecutionEvidence,
 } from '@devai-nyx/evidence';
 import {
-  completeTask,
   escalateTask,
   executeRoutineExecutor,
+  listWorktrees,
   saveTask,
   type RoundTaskDispatchResult,
   type TaskRecord,
 } from '@devai-nyx/loop';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+
+function taskExecutionRoot(repoRoot: string, task: TaskRecord): string {
+  if (task.worktree_id === undefined) return repoRoot;
+  const worktree = listWorktrees({ repoRoot }).find(
+    (candidate) => candidate.id === task.worktree_id && candidate.task_id === task.id,
+  );
+  if (worktree === undefined) throw new Error('TASK_WORKTREE_REGISTRY_MISMATCH');
+  const managedRoot = resolve(repoRoot, '.devai/worktrees');
+  const candidate = resolve(worktree.path);
+  const relativePath = relative(managedRoot, candidate);
+  if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    throw new Error('TASK_WORKTREE_PATH_ESCAPE');
+  }
+  return candidate;
+}
 
 function candidateSha(repoRoot: string): string {
   return execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -62,6 +77,7 @@ async function dispatchRoutine(
     spawned_at: new Date().toISOString(),
   };
   saveTask(repoRoot, running);
+  const executionRoot = taskExecutionRoot(repoRoot, running);
   const startedAt = new Date().toISOString();
   const result = await executeRoutineExecutor({
     executor,
@@ -73,7 +89,7 @@ async function dispatchRoutine(
     },
     runArgv: (argv, options) => {
       const executed = spawnSync(argv[0] ?? '', argv.slice(1), {
-        cwd: resolve(repoRoot, options.cwd),
+        cwd: resolve(executionRoot, options.cwd),
         shell: false,
         timeout: options.timeout,
         encoding: 'utf8',
@@ -86,7 +102,7 @@ async function dispatchRoutine(
     },
   });
   const completedAt = new Date().toISOString();
-  const candidate = candidateSha(repoRoot);
+  const candidate = candidateSha(executionRoot);
   const id = evidenceId(running, startedAt, completedAt);
   const succeeded = result.ok;
   const resolvedArgv = result.ok ? (result.resolved.argv ?? []) : (executor.argv ?? []);
@@ -103,8 +119,8 @@ async function dispatchRoutine(
     },
     adapter_versions: [{ id: '@devai-nyx/loop:routine-executor', version: '1.0.0' }],
     tool_versions: [],
-    input_digests: digestPaths(repoRoot, executor.inputs),
-    output_digests: digestPaths(repoRoot, executor.outputs),
+    input_digests: digestPaths(executionRoot, executor.inputs),
+    output_digests: digestPaths(executionRoot, executor.outputs),
     selection: {
       mode: 'not-applicable',
       considered_registry_ids: [],
@@ -143,7 +159,6 @@ async function dispatchRoutine(
   if (succeeded) {
     saveTask(repoRoot, { ...running, status: 'pre_merge' });
     saveTask(repoRoot, { ...running, status: 'merging' });
-    completeTask({ repoRoot, taskId: running.id });
   } else {
     escalateTask({ repoRoot, taskId: running.id });
   }

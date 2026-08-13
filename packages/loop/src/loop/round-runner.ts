@@ -263,8 +263,12 @@ export async function runRoundTasks(options: RunRoundTasksOptions): Promise<RunR
     let result: RoundTaskDispatchResult;
     try {
       result = await options.dispatch(running);
-    } catch {
-      result = { ok: false, code: 'TASK_EXECUTOR_DISPATCH_FAILED' };
+    } catch (error) {
+      const code =
+        error instanceof Error && /^TASK_[A-Z0-9_]+$/u.test(error.message)
+          ? error.message
+          : 'TASK_EXECUTOR_DISPATCH_FAILED';
+      result = { ok: false, code };
     }
     if (!result.ok && loadTask(options.repoRoot, task.id).status === 'in_progress') {
       escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: task.id });

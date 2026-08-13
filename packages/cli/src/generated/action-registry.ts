@@ -1549,7 +1549,7 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'round run',
       effect: 'harness-write',
-      capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin'],
+      capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin', 'proc:dynamic'],
       subject: {
         kind: 'derived-machine',
         actor: 'harness',
@@ -1567,7 +1567,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'round-run-bounded-plan',
-        target_kinds: ['fs', 'git-ref'],
+        target_kinds: ['fs', 'git-ref', 'remote'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -1577,7 +1577,11 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary', 'git-ref-authority-boundary'],
+        adapter_ids: [
+          'fs-authority-boundary',
+          'git-ref-authority-boundary',
+          'remote-authority-boundary',
+        ],
         final_reverification: true,
       },
       readiness: {
