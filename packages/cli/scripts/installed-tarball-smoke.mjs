@@ -55,6 +55,19 @@ try {
   );
   const tarball = packed?.filename;
   if (typeof tarball !== 'string') throw new Error('PACK_TARBALL_MISSING');
+  const unexpectedPackedFiles = (packed.files ?? [])
+    .map((file) => file.path)
+    .filter(
+      (path) =>
+        path !== 'LICENSE' &&
+        path !== 'package.json' &&
+        !path.startsWith('dist/runtime/') &&
+        !path.startsWith('dist/law/') &&
+        !path.startsWith('dist/resources/'),
+    );
+  if (unexpectedPackedFiles.length > 0) {
+    throw new Error(`PACK_DIST_CONTAMINATED:${unexpectedPackedFiles.slice(0, 10).join(',')}`);
+  }
 
   run('pnpm', ['init'], projectRoot);
   run('git', ['init', '-q'], projectRoot);

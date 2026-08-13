@@ -9,11 +9,12 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,6 +41,26 @@ function normalizedManifest() {
     throw new Error('RELEASE_PUBLIC_MANIFEST_PRIVATE_DEPENDENCY');
   }
   return manifest;
+}
+
+function filesUnder(root) {
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(root, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
+  });
+}
+
+function validateAssembledDist() {
+  const dist = join(packageRoot, 'dist');
+  const unexpected = filesUnder(dist)
+    .map((path) => relative(dist, path).replaceAll('\\', '/'))
+    .filter(
+      (path) =>
+        !path.startsWith('runtime/') && !path.startsWith('law/') && !path.startsWith('resources/'),
+    );
+  if (unexpected.length > 0) {
+    throw new Error(`RELEASE_PACKAGE_DIST_CONTAMINATED:${unexpected.slice(0, 10).join(',')}`);
+  }
 }
 
 function packOnce(ordinal, manifest) {
@@ -69,6 +90,7 @@ try {
   if (!existsSync(join(packageRoot, 'dist/runtime/index/bin.js'))) {
     throw new Error('RELEASE_PACKAGE_BUILD_MISSING');
   }
+  validateAssembledDist();
   const manifest = normalizedManifest();
   const first = packOnce(1, manifest);
   const second = packOnce(2, manifest);
