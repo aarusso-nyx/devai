@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0-rc.1 — 2026-08-13
+
+- Fixes lazy-registry policy provenance so normal invocation, help, doctor, and binding use the
+  same complete action catalog.
+- Adds adopter-owned policy binding, workspace-aware introspection, verified local post-merge
+  binding, and honest per-host enforcement reporting.
+- Adds `audit observe` and `triage classify`, expanding the contract surface to 43 actions.
+
 ## 1.0.1 — 2026-08-12
 
 - Persists the effective adoption profile explicitly in `.devai/config/project.json`.

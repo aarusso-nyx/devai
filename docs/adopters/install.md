@@ -1,6 +1,6 @@
 # Install and adopt
 
-DEVAI 1.0 is distributed through GitHub Packages as one package:
+DEVAI 1.1 is distributed through GitHub Packages as one package:
 `@aarusso-nyx/devai`. Pin the exact version selected by your maintainers; do
 not rely on a moving dist-tag.
 
@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.0.1
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.1.0-rc.1
 pnpm exec devai catalog actions --format json
 ```
 
@@ -56,6 +56,22 @@ pnpm exec devai init bind --target . --subprocess-effects --as-role architect --
 pnpm exec devai init bind --target . --as-role architect --write
 ```
 
+An adopter may own one validated policy source under `law/policy`. The source can add client
+domains, partially override thresholds, and declare exact scorecard N/A cells and glob guards;
+it cannot replace core or framework domains. Binding records the source path and digest and
+updates the resolved configuration atomically:
+
+```bash
+pnpm exec devai init bind \
+  --target . \
+  --adopter-policy law/policy/devai-adoption.json \
+  --as-role architect \
+  --write
+```
+
+Invalid schemas, source paths outside `law/policy`, immutable-domain collisions, or incomplete
+writes leave the prior resolved configuration unchanged.
+
 ## 3. Apply role-owned segments
 
 Run only the segments your reviewed plan calls for. Each mutation requires its
@@ -72,6 +88,20 @@ Optional hook material is selected explicitly with `--include hooks` and the
 corresponding hook/command options shown by `--help`. The default hook invokes the
 project-local `./node_modules/.bin/devai`, never a presumed global executable.
 
+After the package and policy are bound, install each selected host adapter through the binding
+facade. Bind GitHub Actions before the local post-merge adapter when both are required so the
+selected host-policy identity is the local adapter while `doctor` continues to verify both:
+
+```bash
+pnpm exec devai init bind --target . --host-adapter github-actions --as-role architect --write
+pnpm exec devai init bind --target . --host-adapter post-merge --as-role architect --write
+```
+
+The GitHub adapter authenticates exact-main observations with GitHub OIDC. Its workflow may write
+only `refs/devai/post-merge/<sha>`, and only after both the dispatch input and repository consent
+variable authorize publication. Neither adapter claims control over arbitrary editors or shell
+commands.
+
 Core files and requested includes are preflighted before the first write and applied
 as one rollback-capable transaction. A preflight conflict writes nothing. If the
 process is forcibly terminated, inspect the fresh `init plan`, remove only files that
@@ -86,6 +116,15 @@ pnpm exec devai sense inventory --slice pack --repo-root . --adopter-root . --fo
 
 Diagnosis and inventory are observations. A PASS applies only to the exact inputs
 and freshness bound represented by its result.
+
+For one exact commit, the Auditor facade regenerates the complete non-promoting observation in
+one operation. Deterministic triage accepts one schema-valid SensorReading and records its route;
+an inconclusive reading always escalates to a human.
+
+```bash
+pnpm exec devai audit observe --repo-root . --at <full-sha> --as-role auditor --write --format json
+pnpm exec devai triage classify --repo-root . --input <reading.json> --as-role inspector --write --format json
+```
 
 ## 5. Declare the adopter test DAG
 
