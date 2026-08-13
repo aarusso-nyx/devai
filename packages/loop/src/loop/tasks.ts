@@ -95,8 +95,12 @@ function taskPath(repoRoot: string, id: string): string {
 
 export function saveTask(repoRoot: string, task: TaskRecord): void {
   mkdirSync(tasksDir(repoRoot), { recursive: true });
-  const validated = parsers.task.parse(task);
+  const validated = validateTaskRecord(task);
   writeFileSync(taskPath(repoRoot, task.id), JSON.stringify(validated, null, 2) + '\n');
+}
+
+export function validateTaskRecord(task: TaskRecord): TaskRecord {
+  return parsers.task.parse<TaskRecord>(task);
 }
 
 export function readTaskRecord(repoRoot: string, id: string): TaskRecordClassification {

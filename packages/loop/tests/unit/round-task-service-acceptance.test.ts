@@ -13,6 +13,7 @@ import {
   escalateRoundTask,
   finishRoundTask,
   listRoundQueue,
+  materializeRoundQueueTask,
   nextRoundQueueEntry,
   pauseRoundTask,
   requireActiveTaskRound,
@@ -84,6 +85,54 @@ function errorCode(callback: () => unknown): string | undefined {
 }
 
 describe('round task service acceptance', () => {
+  it('materializes a schema-valid queued task and enriches an existing title-only entry', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(() => {
+      const queued = addRoundQueueEntry({
+        repoRoot: root,
+        round: 'R-0007',
+        title: 'materialize me',
+        priority: 80,
+        description: 'existing queue identity',
+      });
+      const declared = routineTask(queued.id, {
+        status: 'queued',
+        title: queued.title,
+        priority: queued.priority,
+        description: queued.description,
+        created_at: queued.created_at,
+      });
+
+      const materialized = materializeRoundQueueTask({
+        repoRoot: root,
+        round: 'R-0007',
+        task: declared,
+      });
+      expect(materialized.entry).toMatchObject({
+        id: queued.id,
+        discipline: 'engineer',
+        target_substrates: ['F2'],
+      });
+      expect(loadTask(root, queued.id)).toEqual(declared);
+      expect(
+        materializeRoundQueueTask({ repoRoot: root, round: 'R-0007', task: declared }),
+      ).toEqual(materialized);
+      expect(
+        startRoundTask({ repoRoot: root, round: 'R-0007', taskId: queued.id }).task.status,
+      ).toBe('ready');
+
+      expect(
+        errorCode(() =>
+          materializeRoundQueueTask({
+            repoRoot: root,
+            round: 'R-0007',
+            task: { ...declared, title: 'conflicting title' },
+          }),
+        ),
+      ).toBe('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+    });
+  });
+
   it('enforces active round ownership across queue, task, and resource projections', async () => {
     const root = repository();
     await withAuthorityHostTestScope(() => {
