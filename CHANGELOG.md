@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0-rc.3 — 2026-08-13
+
+- Fixed GitHub Actions adapter origin binding in linked Git worktrees.
+- Resolved the repository slug from the exact common Git configuration without assuming `.git` is a directory.
+
 ## 1.1.0-rc.2 — 2026-08-13
 
 - Fixed local hook installation and verification in linked Git worktrees.

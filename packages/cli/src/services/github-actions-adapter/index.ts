@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from '@devai-nyx/authority';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 
@@ -9,8 +9,23 @@ function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function gitCommonConfig(root: string): string {
+  const marker = join(root, '.git');
+  if (!existsSync(marker)) throw new Error('GITHUB_ACTIONS_ADAPTER_GIT_UNAVAILABLE');
+  if (lstatSync(marker).isDirectory()) return join(marker, 'config');
+  if (!lstatSync(marker).isFile()) throw new Error('GITHUB_ACTIONS_ADAPTER_GIT_UNAVAILABLE');
+  const pointer = /^gitdir:\s*(.+)\s*$/u.exec(readFileSync(marker, 'utf8').trim())?.[1];
+  if (pointer === undefined) throw new Error('GITHUB_ACTIONS_ADAPTER_GIT_UNAVAILABLE');
+  const adminRoot = resolve(root, pointer);
+  const commonMarker = join(adminRoot, 'commondir');
+  const commonRoot = existsSync(commonMarker)
+    ? resolve(adminRoot, readFileSync(commonMarker, 'utf8').trim())
+    : adminRoot;
+  return join(commonRoot, 'config');
+}
+
 function repositorySlug(root: string): string {
-  const config = readFileSync(join(root, '.git/config'), 'utf8');
+  const config = readFileSync(gitCommonConfig(root), 'utf8');
   const remote = /\[remote "origin"\][\s\S]*?\n\s*url\s*=\s*([^\n]+)/u.exec(config)?.[1]?.trim();
   const match = remote?.match(/github\.com[/:]([^/\s]+\/[^/\s]+?)(?:\.git)?$/u);
   if (match?.[1] === undefined) throw new Error('GITHUB_ACTIONS_ADAPTER_ORIGIN_UNAVAILABLE');
