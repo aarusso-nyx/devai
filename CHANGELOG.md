@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0-rc.5 — 2026-08-13
+
+- Fixed post-merge receipt verification in linked Git worktrees by resolving the exact Git administration directory.
+- Added a real Git-pointer checkout fixture that verifies an exact signed merge receipt outside `repo/.git`.
+
 ## 1.1.0-rc.4 — 2026-08-13
 
 - Fixed generated GitHub Actions observation workflow YAML by preserving the shell `printf` newline escape.

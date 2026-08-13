@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validators } from '@devai-nyx/schemas';
@@ -206,6 +206,16 @@ function exactRepository(value: unknown, repoRoot: string): boolean {
   return typeof value === 'string' && resolve(value) === realpathSync(repoRoot);
 }
 
+function gitAdministrationRoot(repoRoot: string): string {
+  const marker = join(repoRoot, '.git');
+  if (!existsSync(marker)) throw new Error('HOST_RECEIPT_UNVERIFIED');
+  if (lstatSync(marker).isDirectory()) return realpathSync(marker);
+  if (!lstatSync(marker).isFile()) throw new Error('HOST_RECEIPT_UNVERIFIED');
+  const pointer = /^gitdir:\s*(.+)\s*$/u.exec(readFileSync(marker, 'utf8').trim())?.[1];
+  if (pointer === undefined) throw new Error('HOST_RECEIPT_UNVERIFIED');
+  return realpathSync(resolve(repoRoot, pointer));
+}
+
 export interface VerifiedPostMergeHostReceipt {
   readonly mergeSha: string;
   readonly baselineSha: string;
@@ -218,7 +228,8 @@ export function verifyPostMergeHostReceipt(
   if (!opts.hostReceiptPath) throw new Error('HOST_RECEIPT_MISSING');
   if (!existsSync(opts.hostReceiptPath)) throw new Error('HOST_RECEIPT_MISSING');
   const { value: receipt } = readJson(opts.hostReceiptPath, 'HOST_RECEIPT_INVALID');
-  const runtimeRoot = join(root, '.git/devai');
+  const gitAdminRoot = gitAdministrationRoot(root);
+  const runtimeRoot = join(gitAdminRoot, 'devai');
   const keyPath = join(runtimeRoot, 'post-merge.key');
   const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
   if (!existsSync(keyPath) || !existsSync(attestationPath)) {

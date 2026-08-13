@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -189,6 +190,27 @@ describe('post-merge host receipt verification', () => {
       expect(verify(fx)).toEqual({
         mergeSha: fx.mergeSha,
         baselineSha: fx.baselineSha,
+      });
+    });
+  });
+
+  it('accepts a receipt from a checkout whose .git entry points at an external admin directory', async () => {
+    const original = fixture();
+    const adminRoot = `${original.root}.git-admin`;
+    renameSync(join(original.root, '.git'), adminRoot);
+    roots.push(adminRoot);
+    writeFileSync(join(original.root, '.git'), `gitdir: ${adminRoot}\n`);
+    const linked = {
+      ...original,
+      keyPath: join(adminRoot, 'devai/post-merge.key'),
+      hookPath: join(adminRoot, 'hooks/post-merge'),
+      receiptPath: join(adminRoot, 'devai/post-merge-receipt.json'),
+    };
+    rewrite(linked, (value) => ({ ...value, hook_path: linked.hookPath }));
+    await withAuthorityHostTestScope(() => {
+      expect(verify(linked)).toEqual({
+        mergeSha: linked.mergeSha,
+        baselineSha: linked.baselineSha,
       });
     });
   });
