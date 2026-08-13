@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
+  verifyInstalledPostMergeAdapter,
 } from '../../src/services/hooks-install/index.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 
@@ -179,6 +180,83 @@ describe('hooks install planning and execution', () => {
     await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
     expect(JSON.parse(readFileSync(attestationPath, 'utf8'))).toMatchObject({
       installed_at_head: 'a'.repeat(40),
+    });
+  });
+
+  it('installs and verifies the post-merge adapter from a linked Husky worktree', async () => {
+    const container = mkdtempSync(join(tmpdir(), 'devai-linked-worktree-'));
+    roots.push(container);
+    const primary = join(container, 'primary');
+    const linked = join(container, 'linked');
+    mkdirSync(primary);
+    expect(spawnSync('git', ['init', '--quiet'], { cwd: primary }).status).toBe(0);
+    put(primary, 'README.md', '# fixture\n');
+    expect(spawnSync('git', ['add', 'README.md'], { cwd: primary }).status).toBe(0);
+    expect(
+      spawnSync(
+        'git',
+        [
+          '-c',
+          'user.name=DEVAI Test',
+          '-c',
+          'user.email=devai@example.invalid',
+          'commit',
+          '--quiet',
+          '-m',
+          'fixture',
+        ],
+        { cwd: primary },
+      ).status,
+    ).toBe(0);
+    expect(
+      spawnSync('git', ['worktree', 'add', '--quiet', '-b', 'linked-trial', linked], {
+        cwd: primary,
+      }).status,
+    ).toBe(0);
+    mkdirSync(join(linked, '.husky'));
+    put(linked, '.devai/config/authority-policy.json', '{"schemaVersion":"1.0.0"}\n');
+    put(linked, '.devai/pin/constitution.md', '# Pinned constitution\n');
+    const binary = put(
+      linked,
+      'node_modules/.bin/devai',
+      '#!/usr/bin/env sh\nif [ "$1" = "--version" ]; then echo "devai/1.1.0-rc.2"; fi\nexit 0\n',
+    );
+    chmodSync(binary, 0o755);
+
+    const plan = buildHooksInstallPlan({
+      targetRoot: linked,
+      hook: 'post-merge',
+      devaiVersion: '1.1.0-rc.2',
+    });
+    expect(plan).toMatchObject({
+      manager: 'husky',
+      path: join(linked, '.husky/post-merge'),
+      hook: 'post-merge',
+    });
+
+    await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+    const adminRoot = spawnSync('git', ['rev-parse', '--absolute-git-dir'], {
+      cwd: linked,
+      encoding: 'utf8',
+    }).stdout.trim();
+    expect(statSync(join(adminRoot, 'devai/post-merge.key')).mode & 0o077).toBe(0);
+    expect(spawnSync('sh', [plan.path], { cwd: linked, encoding: 'utf8' }).status).toBe(0);
+    expect(readFileSync(join(adminRoot, 'devai/post-merge-receipt.json'), 'utf8')).toContain(
+      '"merge_sha"',
+    );
+    expect(
+      await withAuthorityHostTestScope(() =>
+        verifyInstalledPostMergeAdapter(linked, '1.1.0-rc.2'),
+      ),
+    ).toMatchObject({
+      ok: true,
+      errors: [],
+      facts: {
+        hook_present: true,
+        key_present: true,
+        hook_local_binary: true,
+        installed_head_bound: true,
+      },
     });
   });
 

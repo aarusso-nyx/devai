@@ -1,6 +1,6 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -40,6 +40,27 @@ function broker(name: string, role: Role, argv: readonly string[], bootstrapPoli
     role,
     declaration: { as_role: role },
     repository_root: ROOT,
+    package_version: resolveCliVersion(),
+    bootstrap_policy: bootstrapPolicy,
+  });
+}
+
+function brokerAt(
+  root: string,
+  name: string,
+  role: Role,
+  argv: readonly string[],
+  bootstrapPolicy = true,
+) {
+  const entry = entries.find((candidate) => candidate.name === name);
+  if (entry === undefined) throw new Error(`missing action ${name}`);
+  return createAuthorityHostBroker({
+    entry,
+    entries,
+    argv,
+    role,
+    declaration: { as_role: role },
+    repository_root: root,
     package_version: resolveCliVersion(),
     bootstrap_policy: bootstrapPolicy,
   });
@@ -571,6 +592,72 @@ describe('authority broker production boundary depth', () => {
       );
     } finally {
       host.dispose();
+    }
+  });
+
+  it('maps only exact linked-worktree Git metadata namespaces into authority paths', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'devai-authority-linked-worktree-'));
+    const root = join(fixture, 'checkout');
+    const common = join(fixture, 'common.git');
+    const admin = join(common, 'worktrees', 'checkout');
+    mkdirSync(root, { recursive: true });
+    mkdirSync(join(root, '.devai/pin'), { recursive: true });
+    mkdirSync(join(common, 'hooks'), { recursive: true });
+    mkdirSync(join(admin, 'devai'), { recursive: true });
+    writeFileSync(join(root, '.git'), `gitdir: ${admin}\n`);
+    writeFileSync(
+      join(root, '.devai/pin/constitution.md'),
+      readFileSync(join(ROOT, 'law/constitution.md')),
+    );
+    writeFileSync(join(admin, 'commondir'), '../..\n');
+    writeFileSync(join(admin, 'HEAD'), `${'a'.repeat(40)}\n`);
+    const argv = [
+      process.execPath,
+      'devai',
+      'init',
+      'apply',
+      'architect',
+      '--target',
+      root,
+      '--tier',
+      'tier1',
+      '--include',
+      'hooks',
+      '--hook',
+      'post-merge',
+      '--as-role',
+      'architect',
+      '--write',
+    ] as const;
+    const host = brokerAt(root, 'init apply architect', 'architect', argv);
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect('writeFileSync', [join(admin, 'devai/post-merge.key'), 'key']),
+          () => 'admin-allowed',
+        ),
+      ).toBe('admin-allowed');
+      expect(
+        host.scope.apply_effect(
+          effect('writeFileSync', [join(common, 'hooks/post-merge'), 'hook']),
+          () => 'common-allowed',
+        ),
+      ).toBe('common-allowed');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('writeFileSync', [join(admin, 'objects/escape'), 'forbidden']),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_FS_SYMLINK_ESCAPE');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('writeFileSync', [join(common, 'config'), 'forbidden']),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_FS_SYMLINK_ESCAPE');
+    } finally {
+      host.dispose();
+      rmSync(fixture, { recursive: true, force: true });
     }
   });
 });
