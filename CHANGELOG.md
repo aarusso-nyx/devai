@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 — 2026-08-13
+
+- Promoted the RC7 functional contracts unchanged after exact installed-package STYNX validation.
+- Ships the 43-action control-loop facade, adopter policy binding, workspace introspection, and
+  verified local/GitHub host adapters with explicit host-boundary reporting.
+
 ## 1.1.0-rc.7 — 2026-08-13
 
 - Prevented Git hook-local environment variables from redirecting auditor commands back into the

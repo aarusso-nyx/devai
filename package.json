@@ -1,7 +1,7 @@
 {
   "name": "devai",
   "private": true,
-  "version": "1.1.0-rc.7",
+  "version": "1.1.0",
   "type": "module",
   "description": "DEVAI 1.0 developer-acceleration CLI for focused automation and trustworthy evidence.",
   "license": "Apache-2.0",
