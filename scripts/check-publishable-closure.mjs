@@ -46,7 +46,7 @@ function assertSensorPaths(value, owner, key = '') {
 
 const rootPackage = json('package.json');
 const cliPackage = json('packages/cli/package.json');
-if (cliPackage.name !== PACKAGE_NAME || !/^1\.0\.\d+(?:-rc\.\d+)?$/u.test(cliPackage.version)) {
+if (cliPackage.name !== PACKAGE_NAME || !/^1\.1\.0(?:-rc\.\d+)?$/u.test(cliPackage.version)) {
   fail('PUBLISHABLE_PACKAGE_IDENTITY_INVALID', `${cliPackage.name}@${cliPackage.version}`);
 }
 if (cliPackage.repository?.url !== `git+https://github.com/${REPOSITORY}.git`) {
@@ -72,11 +72,11 @@ if (publishable.length !== 1 || publishable[0]?.name !== PACKAGE_NAME) {
 }
 
 const actions = json('law/policy/action-registry.json');
-if (actions.entries?.length !== 41 || actions.counts?.total !== 41) {
+if (actions.entries?.length !== 43 || actions.counts?.total !== 43) {
   fail('PUBLISHABLE_ACTION_COUNT_INVALID', String(actions.entries?.length));
 }
 const actionIds = actions.entries.map((entry) => entry.action_id);
-if (new Set(actionIds).size !== 41) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
+if (new Set(actionIds).size !== 43) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
 for (const entry of actions.entries) {
   for (const forbidden of ['previous_name', 'lifecycle', 'migration', 'disposition']) {
     if (Object.hasOwn(entry, forbidden))
@@ -198,5 +198,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 41, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 43, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1 })}\n`,
 );

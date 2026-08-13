@@ -12,6 +12,7 @@ function wantsJson(args: readonly string[]): boolean {
 }
 
 const DOMAIN_SUMMARIES: Readonly<Record<string, string>> = {
+  audit: 'Create exact, non-promoting Auditor observations.',
   catalog: 'Inspect the live action catalog.',
   check: 'Run governed validation suites and checks.',
   doctor: 'Diagnose the declared adoption posture.',
@@ -21,9 +22,11 @@ const DOMAIN_SUMMARIES: Readonly<Record<string, string>> = {
   round: 'Plan, run, assess, and close governed rounds.',
   sense: 'Observe repository and runtime state through sensors.',
   task: 'Operate round-bound task plumbing.',
+  triage: 'Classify sensor failures before remediation.',
 };
 
 const DEFAULT_DOMAIN_ORDER = [
+  'audit',
   'init',
   'doctor',
   'check',
@@ -31,6 +34,7 @@ const DEFAULT_DOMAIN_ORDER = [
   'round',
   'evidence',
   'release',
+  'triage',
 ] as const;
 
 const EXPANDED_DOMAIN_ORDER = [...DEFAULT_DOMAIN_ORDER, 'task', 'catalog'] as const;

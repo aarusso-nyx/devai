@@ -119,6 +119,24 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
       ),
     ).toThrow(/forbidden-actions\.json.*schema/i);
   });
+
+  it('seeds adopter-safe empty guards and scorecard N/A declarations', () => {
+    const plan = buildBootstrapPlan({ targetRoot: dir });
+    const globGuards = plan.entries.find(
+      (entry) => entry.path === '.devai/config/glob-guards.json',
+    );
+    const scorecardNa = plan.entries.find(
+      (entry) => entry.path === '.devai/config/scorecard-na.json',
+    );
+    expect(JSON.parse(globGuards?.content ?? '{}')).toEqual({
+      schemaVersion: '1.0.0',
+      guards: [],
+    });
+    expect(JSON.parse(scorecardNa?.content ?? '{}')).toEqual({
+      schemaVersion: '1.0.0',
+      cells: [],
+    });
+  });
 });
 
 describe('buildBootstrapPlan: adopter constitution binding', () => {

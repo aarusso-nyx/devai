@@ -115,6 +115,7 @@ const READ_ONLY_PROCESS_COMMANDS: Readonly<Record<string, readonly string[]>> = 
     'merge-base',
     'rev-list',
     'rev-parse',
+    'show',
     'status',
   ],
   which: ['mmdc'],
@@ -1427,6 +1428,15 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   const policyMaterialization =
     input.entry.name === 'init bind'
       ? () => {
+          // Binding inputs may themselves have been atomically updated by the
+          // current init-bind invocation (for example adopter policy or a host
+          // adapter declaration). Re-read every trusted source at commit time
+          // so the materialized policy cannot lag the bytes just bound.
+          const currentSources = buildTrustedAuthoritySources(
+            input.entries,
+            repositoryRoot,
+            input.package_version,
+          );
           const policyPath = resolve(repositoryRoot, POLICY_PATH);
           // The existing policy is never an authority for its own replacement.
           // An explicit Architect invocation authorizes the binding machine to
@@ -1437,10 +1447,10 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           const targetOperation = existsSync(policyPath) ? 'update' : 'create';
           const declarationDependencies = {
             actionContracts: contracts,
-            repository_id: sources.repository_id,
-            policy_binding: sources.provenance,
-            constitution_binding: sources.constitution_binding,
-            package_binding: sources.package_binding,
+            repository_id: currentSources.repository_id,
+            policy_binding: currentSources.provenance,
+            constitution_binding: currentSources.constitution_binding,
+            package_binding: currentSources.package_binding,
             now: new Date().toISOString(),
             readSession: (sessionId: string) => {
               const path = resolve(
@@ -1486,8 +1496,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
                       ? { kind: 'direct-cli', invocation_id: invocationId }
                       : { kind: 'interactive-session', session_id: declaredSessionId },
                 },
-                immutableCore: sources.immutableCore,
-                additiveExtensions: sources.additiveExtensions,
+                immutableCore: currentSources.immutableCore,
+                additiveExtensions: currentSources.additiveExtensions,
               },
             ),
           );
@@ -1495,17 +1505,42 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             materializeAuthorityPolicy(
               {
                 authorization,
-                repository_id: sources.repository_id,
+                repository_id: currentSources.repository_id,
                 target_operation: targetOperation,
                 enforcement: { mode: 'binding' },
-                host_enforcement: { mode: 'cli-only' },
+                host_enforcement: (() => {
+                  try {
+                    const project = JSON.parse(
+                      readFileSync(resolve(repositoryRoot, '.devai/config/project.json'), 'utf8'),
+                    ) as JsonRecord;
+                    const declaration = project['authority_enforcement'];
+                    const adapterConfig = isRecord(declaration)
+                      ? declaration['adapter_config']
+                      : undefined;
+                    const adapterId =
+                      adapterConfig === '.devai/config/github-actions-host-adapter.json'
+                        ? 'github-actions-main-observation'
+                        : 'post-merge-host-adapter';
+                    return isRecord(declaration) && declaration['mode'] === 'host-integrated'
+                      ? {
+                          mode: 'host-integrated' as const,
+                          adapter: {
+                            adapter_id: adapterId,
+                            adapter_version: input.package_version,
+                          },
+                        }
+                      : { mode: 'cli-only' as const };
+                  } catch {
+                    return { mode: 'cli-only' as const };
+                  }
+                })(),
               },
               {
                 receiptStore: issuer,
-                package_binding: sources.package_binding,
-                constitution_binding: sources.constitution_binding,
-                immutableCore: sources.immutableCore,
-                additiveExtensions: sources.additiveExtensions,
+                package_binding: currentSources.package_binding,
+                constitution_binding: currentSources.constitution_binding,
+                immutableCore: currentSources.immutableCore,
+                additiveExtensions: currentSources.additiveExtensions,
                 canonicalBytes,
                 canonicalSha256,
                 sha256Bytes,

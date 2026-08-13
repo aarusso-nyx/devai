@@ -40,6 +40,14 @@ export interface PostMergeAuditorResult {
   };
 }
 
+export interface AuditObservationResult {
+  readonly status: 'completed' | 'replayed';
+  readonly at: string;
+  readonly readiness_promoting: false;
+  readonly observation_root: string;
+  readonly artifacts: readonly Readonly<{ path: string; sha256: string }>[];
+}
+
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 const RECEIPT_MAX_AGE_MS = 5 * 60 * 1000;
 
@@ -54,8 +62,8 @@ function sha256(value: string | Buffer): string {
 function installedConstitution(root: string): string {
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const path = [
-    join(root, 'law/constitution.md'),
     join(root, '.devai/pin/constitution.md'),
+    join(root, 'law/constitution.md'),
     join(root, '.devai/constitution.md'),
     join(packageRoot, 'dist/law/constitution.md'),
   ].find((candidate) => existsSync(candidate));
@@ -75,6 +83,80 @@ function canonicalSha256(value: unknown): string {
     return JSON.stringify(input);
   };
   return sha256(canonical(value));
+}
+
+/**
+ * Run the post-merge observation engine against the repository's exact current
+ * HEAD without requiring a host receipt. This is the explicit Auditor facade;
+ * it never promotes readiness and refuses an abbreviated or non-current SHA.
+ */
+export async function runAuditObservation(opts: {
+  readonly repoRoot: string;
+  readonly at: string;
+}): Promise<AuditObservationResult> {
+  const repoRoot = realpathSync(resolve(opts.repoRoot));
+  if (!FULL_SHA.test(opts.at)) throw new Error('AUDIT_OBSERVE_FULL_SHA_REQUIRED');
+  const head = gitText(repoRoot, ['rev-parse', 'HEAD'], 'AUDIT_OBSERVE_HEAD_UNAVAILABLE');
+  if (head !== opts.at) throw new Error('AUDIT_OBSERVE_EXACT_HEAD_REQUIRED');
+  const timestamp = gitText(
+    repoRoot,
+    ['show', '-s', '--format=%cI', opts.at],
+    'AUDIT_OBSERVE_TIMESTAMP_UNAVAILABLE',
+  );
+  const stateRoot = join(repoRoot, '.devai/state/audit-observations');
+  const targetRoot = join(stateRoot, opts.at);
+  const stagingRoot = join(stateRoot, `${opts.at}.tmp-${process.pid.toString()}`);
+  rmSync(stagingRoot, { recursive: true, force: true });
+  await writeBundle(
+    repoRoot,
+    stateRoot,
+    opts.at,
+    timestamp,
+    null,
+    null,
+    false,
+    `${opts.at}.tmp-${process.pid.toString()}`,
+  );
+  const generatedRoot = stagingRoot;
+  const generatedDigest = canonicalSha256(
+    Object.fromEntries(
+      [...OBSERVATION_ARTIFACT_NAMES, 'status'].map((name) => [
+        name,
+        JSON.parse(readFileSync(join(generatedRoot, `${name}.json`), 'utf8')) as unknown,
+      ]),
+    ),
+  );
+  let status: 'completed' | 'replayed' = 'completed';
+  if (existsSync(targetRoot)) {
+    const existingDigest = canonicalSha256(
+      Object.fromEntries(
+        [...OBSERVATION_ARTIFACT_NAMES, 'status'].map((name) => [
+          name,
+          JSON.parse(readFileSync(join(targetRoot, `${name}.json`), 'utf8')) as unknown,
+        ]),
+      ),
+    );
+    rmSync(generatedRoot, { recursive: true, force: true });
+    if (existingDigest !== generatedDigest) throw new Error('AUDIT_OBSERVE_REPLAY_DRIFT');
+    status = 'replayed';
+  } else {
+    mkdirSync(dirname(targetRoot), { recursive: true });
+    renameSync(generatedRoot, targetRoot);
+  }
+  const artifacts = [...OBSERVATION_ARTIFACT_NAMES, 'status'].map((name) => {
+    const path = join(targetRoot, `${name}.json`);
+    return {
+      path: relative(repoRoot, path).split(sep).join('/'),
+      sha256: sha256(readFileSync(path)),
+    };
+  });
+  return {
+    status,
+    at: opts.at,
+    readiness_promoting: false,
+    observation_root: relative(repoRoot, targetRoot).split(sep).join('/'),
+    artifacts,
+  };
 }
 
 function hmacValid(value: JsonRecord, key: Buffer): boolean {
@@ -440,8 +522,9 @@ async function writeBundle(
   previousMergeSha: string | null,
   previousDigest: string | null,
   injectFailure: boolean,
+  bundleKey = mergeSha,
 ): Promise<string> {
-  const bundleRoot = join(stateRoot, mergeSha);
+  const bundleRoot = join(stateRoot, bundleKey);
   mkdirSync(bundleRoot, { recursive: true });
   try {
     if (injectFailure) throw new Error('POST_MERGE_OBSERVATION_INJECTED_FAILURE');

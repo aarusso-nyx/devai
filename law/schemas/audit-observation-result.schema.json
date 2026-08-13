@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/audit-observation-result.schema.json",
+  "title": "Audit Observation Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "at",
+    "readiness_promoting",
+    "observation_root",
+    "artifacts",
+    "evidence_ref"
+  ],
+  "properties": {
+    "status": { "enum": ["completed", "replayed"] },
+    "at": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "readiness_promoting": { "const": false },
+    "observation_root": { "type": "string", "minLength": 1 },
+    "artifacts": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "evidence_ref": { "type": "string", "pattern": "^EV-[a-f0-9]{16}$" }
+  }
+}

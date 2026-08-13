@@ -73,6 +73,22 @@ function ensureSchemaReferences(name: SchemaName): void {
   if (name === 'action-result.schema.json' && ajv.getSchema('error.schema.json') === undefined) {
     ajv.addSchema(loadSchema('error.schema.json'), 'error.schema.json');
   }
+  if (name === 'adopter-policy.schema.json') {
+    for (const dependency of [
+      'glob-guards.schema.json',
+      'scorecard-na-config.schema.json',
+    ] as const) {
+      if (ajv.getSchema(dependency) === undefined) {
+        ajv.addSchema(loadSchema(dependency), dependency);
+      }
+    }
+  }
+  if (
+    name === 'triage-classify-result.schema.json' &&
+    ajv.getSchema('triage.schema.json') === undefined
+  ) {
+    ajv.addSchema(loadSchema('triage.schema.json'), 'triage.schema.json');
+  }
 }
 
 const compiled = new Map<SchemaName, ReturnType<typeof ajv.compile>>();

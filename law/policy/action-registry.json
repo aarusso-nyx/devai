@@ -10,12 +10,63 @@
     "packages/sensors/src/generated/action-kinds.ts"
   ],
   "counts": {
-    "stable": 20,
+    "stable": 22,
     "preview": 10,
     "internal": 11,
-    "total": 41
+    "total": 43
   },
   "entries": [
+    {
+      "action_id": "audit observe",
+      "handler": "audit observe",
+      "path": ["audit", "observe"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Regenerate inventory, scorecard, assessment, and backlog for one exact commit as non-promoting Auditor evidence.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/audit-observation-result.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "audit observe",
+        "effect": "harness-write",
+        "capabilities": ["fs:f4-inventory", "fs:f5-state", "fs:proofs", "proc:git"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": { "allowed_roles": ["auditor"], "preserve_in_context": true }
+        },
+        "consent": { "write": true, "allow_publish": false, "experimental": false },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "audit-observe-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": { "max_batches": 128, "max_targets_per_batch": 64, "max_total_targets": 8192 },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": { "requires_binding": true, "independent_acceptance_required": true }
+      }
+    },
     {
       "action_id": "catalog actions",
       "handler": "catalog actions",
@@ -724,7 +775,7 @@
         "schemaVersion": "1.0.0",
         "action_id": "init bind",
         "effect": "local-write",
-        "capabilities": ["fs:f5-config"],
+        "capabilities": ["fs:f5-config", "fs:workspace", "proc:dynamic", "proc:git"],
         "subject": {
           "kind": "derived-machine",
           "actor": "binding",
@@ -2494,6 +2545,60 @@
           "requires_binding": false,
           "independent_acceptance_required": true
         }
+      }
+    },
+    {
+      "action_id": "triage classify",
+      "handler": "triage classify",
+      "path": ["triage", "classify"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "mesh_controller",
+      "description": "Deterministically classify one SensorReading and record its route; inconclusive always escalates to a human.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/triage-classify-result.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "triage classify",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": { "write": true, "allow_publish": false, "experimental": false },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "triage-classify-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": { "max_batches": 8, "max_targets_per_batch": 16, "max_total_targets": 128 },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": { "requires_binding": true, "independent_acceptance_required": true }
       }
     }
   ]

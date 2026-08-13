@@ -3,6 +3,7 @@ import { cac } from 'cac';
 import { routeArgv } from './command-router.js';
 import {
   attachRuntimeContracts,
+  canonicalRegistry,
   getFullRegistry,
   type CommandDefinition,
   type RegistryEntry,
@@ -21,7 +22,6 @@ import {
   publicActionForArgv,
   runCliStage,
 } from './action-output.js';
-import { ACTION_REGISTRY } from './generated/action-registry.js';
 
 const pkgVersion = resolveCliVersion();
 
@@ -30,6 +30,7 @@ cli.version(pkgVersion);
 cli.help();
 
 const DOMAIN_ORDER = [
+  'audit',
   'catalog',
   'check',
   'doctor',
@@ -39,45 +40,9 @@ const DOMAIN_ORDER = [
   'round',
   'sense',
   'task',
+  'triage',
 ] as const;
 type CommandDomain = (typeof DOMAIN_ORDER)[number];
-
-function publicText(value: string): string {
-  return value
-    .replaceAll(process.cwd(), '<repo-root>')
-    .replaceAll('--execute', '--write')
-    .replaceAll('--apply', '--write')
-    .replaceAll('--human', '--format human');
-}
-
-function canonicalRegistry(): readonly RegistryEntry[] {
-  return ACTION_REGISTRY.map(
-    (entry) =>
-      ({
-        name: entry.action_id,
-        handler: entry.handler,
-        internal_name: entry.handler.replaceAll(' ', '-'),
-        path: entry.path,
-        status: entry.status,
-        description: publicText(entry.description),
-        authority: entry.authority ?? 'mesh_controller',
-        lifecycle: entry.status === 'preview' ? 'experimental' : 'supported',
-        lifecycle_reason:
-          entry.status === 'preview'
-            ? 'Preview action; contract may change before v1.0.'
-            : 'Stable action.',
-        promotion_criteria: [],
-        visibility: entry.status === 'internal' ? 'maintainer' : 'standard',
-        tier: entry.status === 'internal' ? 'plumbing' : 'porcelain',
-        profiles: entry.profiles,
-        effects: entry.effect,
-        authority_contract_version: entry.authority_contract_version,
-        authority_contract: entry.authority_contract,
-        output_contract: entry.output_contract,
-        error_contract: entry.error_contract,
-      }) as RegistryEntry,
-  );
-}
 
 function invocationActionForArgv(
   argv: readonly string[],
@@ -101,6 +66,10 @@ function needsRuntimeMetadata(argv: readonly string[]): boolean {
 
 async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefinition[]> {
   switch (domain) {
+    case 'audit': {
+      const { auditObserve } = await import('./commands/audit/observe.js');
+      return [auditObserve];
+    }
     case 'catalog': {
       const { actionsList } = await import('./commands/actions-list.js');
       return [actionsList];
@@ -189,6 +158,10 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         taskStart,
         taskStatus,
       ];
+    }
+    case 'triage': {
+      const { triageClassify } = await import('./commands/triage/classify.js');
+      return [triageClassify];
     }
   }
 }

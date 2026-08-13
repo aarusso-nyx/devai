@@ -60,6 +60,35 @@ describe('introspectRepo', () => {
     expect(names).toContain('angular');
   });
 
+  it('detects frameworks and concrete roots across a pnpm workspace', () => {
+    writeFileSync(join(dir, 'pnpm-lock.yaml'), '');
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ private: true }));
+    writeFileSync(
+      join(dir, 'pnpm-workspace.yaml'),
+      "packages:\n  - 'modules/*'\n  - 'clients/*'\n",
+    );
+    mkdirSync(join(dir, 'modules/server/src'), { recursive: true });
+    mkdirSync(join(dir, 'modules/server/test'), { recursive: true });
+    writeFileSync(
+      join(dir, 'modules/server/package.json'),
+      JSON.stringify({ dependencies: { '@nestjs/core': '^11' } }),
+    );
+    mkdirSync(join(dir, 'clients/browser/src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'clients/browser/package.json'),
+      JSON.stringify({ peerDependencies: { '@angular/core': '^20' } }),
+    );
+
+    const out = introspectRepo({ targetRoot: dir, now: '2026-08-13T00:00:00.000Z' });
+    expect(out.frameworks).toEqual([
+      { name: 'angular', evidence: 'clients/browser/package.json dep: @angular/core' },
+      { name: 'nestjs', evidence: 'modules/server/package.json dep: @nestjs/core' },
+    ]);
+    expect(out.source_globs).toEqual(['clients/browser/src/**', 'modules/server/src/**']);
+    expect(out.test_globs).toContain('modules/server/test/**');
+    expect(out.notes).toContain('Parsed pnpm-workspace.yaml: 2 pattern(s), 2 matching manifest(s)');
+  });
+
   it('detects TypeScript files via extension', () => {
     writeFileSync(join(dir, 'package.json'), '{}');
     mkdirSync(join(dir, 'src'));
@@ -121,7 +150,9 @@ describe('introspectRepo', () => {
     const out = introspectRepo({ targetRoot: REPO_ROOT });
     expect(out.package_manager).toBe('pnpm');
     expect(out.languages.find((l) => l.name === 'typescript')?.file_count).toBeGreaterThan(50);
-    expect(out.source_globs).toContain('packages/*/src/**');
+    expect(
+      out.source_globs.some((glob) => glob.startsWith('packages/') && glob.endsWith('/src/**')),
+    ).toBe(true);
   });
 
   // Quiet the unused-import warning when REPO_ROOT happens to be skipped.

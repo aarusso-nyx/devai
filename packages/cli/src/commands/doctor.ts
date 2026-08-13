@@ -13,10 +13,12 @@ import {
   EXIT_USAGE,
   type AdoptionProfile,
 } from '@devai-nyx/utils';
-import { defineCommand, getFullRegistry } from '../define-command.js';
+import { canonicalRegistry, defineCommand } from '../define-command.js';
 import { buildTrustedAuthoritySources, canonicalSha256 } from '../authority/policy.js';
 import { checkDocsGovernance } from './check/docs-governance.js';
 import { resolveCliProvenance, resolveCliVersion } from '../version.js';
+import { verifyInstalledPostMergeAdapter } from '../services/hooks-install/index.js';
+import { verifyGithubActionsAdapter } from '../services/github-actions-adapter/index.js';
 
 const DEFAULT_REPO_ROOT = '.';
 const DEFAULT_CHAIN_RELATIVE = 'record/proofs/chain.json';
@@ -296,7 +298,7 @@ function checkAuthorityEnforcement(repoRoot: string): CheckResult {
       };
     }
     const expected = buildTrustedAuthoritySources(
-      getFullRegistry(),
+      canonicalRegistry(),
       repoRoot,
       resolveCliVersion(),
     ).provenance;
@@ -310,17 +312,31 @@ function checkAuthorityEnforcement(repoRoot: string): CheckResult {
         canonicalSha256(expected.additive_extensions) &&
       policy['resolved_digest_sha256'] === expected.resolved_digest_sha256;
     const enforcement = policy['enforcement'] as { mode?: string } | undefined;
-    const host = policy['host_enforcement'] as { mode?: string } | undefined;
+    const host = policy['host_enforcement'] as
+      { mode?: string; adapter?: { adapter_id?: string } } | undefined;
     const declaredMode = project.authority_enforcement?.mode;
+    const adapterConfig = project.authority_enforcement?.adapter_config;
+    const selectedAdapterBound =
+      declaredMode !== 'host-integrated' ||
+      (adapterConfig === '.devai/config/post-merge-host-adapter.json' &&
+        host?.adapter?.adapter_id === 'post-merge-host-adapter') ||
+      (adapterConfig === '.devai/config/github-actions-host-adapter.json' &&
+        host?.adapter?.adapter_id === 'github-actions-main-observation');
+    const localPostMerge =
+      declaredMode === 'host-integrated'
+        ? verifyInstalledPostMergeAdapter(repoRoot, resolveCliVersion())
+        : { ok: false, facts: {}, errors: [] as readonly string[] };
+    const githubActions = verifyGithubActionsAdapter(repoRoot, resolveCliVersion());
     const adapterDeclared =
       declaredMode !== 'host-integrated' ||
-      (typeof project.authority_enforcement?.adapter_config === 'string' &&
-        project.authority_enforcement.adapter_config.length > 0);
+      (adapterConfig === '.devai/config/post-merge-host-adapter.json' && localPostMerge.ok) ||
+      (adapterConfig === '.devai/config/github-actions-host-adapter.json' && githubActions.ok);
     const ok =
       bindingMatches &&
       enforcement?.mode === 'binding' &&
       host?.mode === declaredMode &&
       ['cli-only', 'host-integrated'].includes(declaredMode ?? '') &&
+      selectedAdapterBound &&
       adapterDeclared;
     return {
       name: 'authority-enforcement',
@@ -330,12 +346,21 @@ function checkAuthorityEnforcement(repoRoot: string): CheckResult {
         host_mode: host?.mode ?? 'unknown',
         declared_mode: declaredMode ?? 'unknown',
         policy_binding: bindingMatches ? 'current' : 'mismatch',
+        selected_adapter_policy_bound: selectedAdapterBound,
         cli_runtime_enforced: bindingMatches && enforcement?.mode === 'binding',
-        arbitrary_host_tools_enforced: declaredMode === 'host-integrated' && adapterDeclared,
+        local_post_merge_enforced: bindingMatches && localPostMerge.ok,
+        local_post_merge_facts: localPostMerge.facts,
+        github_actions_enforced: bindingMatches && githubActions.ok,
+        github_actions_facts: githubActions.facts,
+        arbitrary_host_tools_enforced: false,
       },
       ...(!ok && {
         errors: [
           'authority posture is missing, stale, non-binding, or inconsistent; re-materialize with `devai init bind --as-role architect --write`',
+          ...localPostMerge.errors,
+          ...(adapterConfig === '.devai/config/github-actions-host-adapter.json'
+            ? githubActions.errors
+            : []),
         ],
       }),
     };

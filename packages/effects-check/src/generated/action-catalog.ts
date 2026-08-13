@@ -3,6 +3,12 @@
 
 export const ACTION_EFFECT_CONTRACTS = [
   {
+    action_id: 'audit observe',
+    public_action_id: 'audit observe',
+    effect: 'harness-write',
+    capabilities: ['fs:f4-inventory', 'fs:f5-state', 'fs:proofs', 'proc:git'],
+  },
+  {
     action_id: 'catalog actions',
     public_action_id: 'catalog actions',
     effect: 'read',
@@ -91,7 +97,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'init bind',
     public_action_id: 'init bind',
     effect: 'local-write',
-    capabilities: ['fs:f5-config'],
+    capabilities: ['fs:f5-config', 'fs:workspace', 'proc:dynamic', 'proc:git'],
   },
   {
     action_id: 'init plan',
@@ -283,5 +289,11 @@ export const ACTION_EFFECT_CONTRACTS = [
     public_action_id: 'task status',
     effect: 'read',
     capabilities: [],
+  },
+  {
+    action_id: 'triage classify',
+    public_action_id: 'triage classify',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state', 'fs:proofs'],
   },
 ] as const;

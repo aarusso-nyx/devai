@@ -41,7 +41,8 @@
     "@devai-nyx/spec": "workspace:*",
     "@devai-nyx/utils": "workspace:*",
     "minimatch": "^9.0.0",
-    "openai": "^4.65.0"
+    "openai": "^4.65.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

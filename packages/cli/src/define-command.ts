@@ -106,6 +106,43 @@ function publicText(value: string): string {
     .replaceAll('--human', '--format human');
 }
 
+/**
+ * Build the complete immutable public registry from the generated contract.
+ *
+ * This constructor deliberately does not depend on which command modules have
+ * been lazily imported for the current invocation.  Authority provenance and
+ * routing therefore see the same catalog for a normal leaf invocation,
+ * `--help`, documentation generation, and policy materialization.
+ */
+export function canonicalRegistry(): readonly RegistryEntry[] {
+  return ACTION_REGISTRY.map(
+    (entry) =>
+      ({
+        name: entry.action_id,
+        handler: entry.handler,
+        internal_name: entry.handler.replaceAll(' ', '-'),
+        path: entry.path,
+        status: entry.status,
+        description: publicText(entry.description),
+        authority: entry.authority ?? 'mesh_controller',
+        lifecycle: entry.status === 'preview' ? 'experimental' : 'supported',
+        lifecycle_reason:
+          entry.status === 'preview'
+            ? 'Preview action; contract may change before a stable release.'
+            : 'Stable action.',
+        promotion_criteria: [],
+        visibility: entry.status === 'internal' ? 'maintainer' : 'standard',
+        tier: entry.status === 'internal' ? 'plumbing' : 'porcelain',
+        profiles: entry.profiles,
+        effects: entry.effect,
+        authority_contract_version: entry.authority_contract_version,
+        authority_contract: entry.authority_contract,
+        output_contract: entry.output_contract,
+        error_contract: entry.error_contract,
+      }) as RegistryEntry,
+  );
+}
+
 export function defineCommand(definition: CommandDefinition): CommandDefinition {
   const current = ACTION_REGISTRY.find((entry) => entry.handler === definition.name);
   if (current === undefined) return definition;
