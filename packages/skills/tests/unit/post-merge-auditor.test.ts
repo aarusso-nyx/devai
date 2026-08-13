@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash, createHmac } from 'node:crypto';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -467,5 +468,46 @@ describe('post-merge authority host scope', () => {
       merge_sha: fx.mergeSha,
       processed: [],
     });
+  });
+
+  it('processes and stores observations through an external Git administration directory', async () => {
+    const original = fixture();
+    const adminRoot = `${original.root}.git-admin`;
+    renameSync(join(original.root, '.git'), adminRoot);
+    roots.push(adminRoot);
+    writeFileSync(join(original.root, '.git'), `gitdir: ${adminRoot}\n`);
+    const linked = {
+      ...original,
+      keyPath: join(adminRoot, 'devai/post-merge.key'),
+      hookPath: join(adminRoot, 'hooks/post-merge'),
+      receiptPath: join(adminRoot, 'devai/post-merge-receipt.json'),
+    };
+    rewrite(linked, (value) => ({ ...value, hook_path: linked.hookPath }));
+
+    const host = createPostMergeHostScope(linked.root, linked.mergeSha);
+    try {
+      await expect(
+        runWithAuthorityHostEffects(host.scope, () =>
+          runPostMergeAuditor({
+            repoRoot: linked.root,
+            hostReceiptPath: linked.receiptPath,
+            now: NOW,
+            devaiVersion: VERSION,
+          }),
+        ),
+      ).resolves.toMatchObject({ status: 'completed', processed: [linked.mergeSha] });
+    } finally {
+      host.dispose();
+    }
+
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(adminRoot, 'devai/post-merge-observations', linked.mergeSha, 'status.json'),
+          'utf8',
+        ),
+      ),
+    ).toMatchObject({ status: 'completed', readiness_promoting: false });
+    expect(existsSync(join(adminRoot, 'devai/post-merge.lock'))).toBe(false);
   });
 });

@@ -333,7 +333,7 @@ export function createPostMergeHostScope(
   });
   const worktreeRoot = join(repoRoot, '.devai/worktrees/auditor-post-merge');
   const worktreesRoot = dirname(worktreeRoot);
-  const runtimeRoot = join(repoRoot, '.git/devai');
+  const runtimeRoot = join(gitAdministrationRoot(repoRoot), 'devai');
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     if (request.kind === 'filesystem') {
       const candidates =
@@ -647,8 +647,9 @@ export async function runPostMergeAuditor(
   const repoRoot = realpathSync(resolve(opts.repoRoot));
   const verified = verifyPostMergeHostReceipt({ ...opts, repoRoot });
   const worktreeRoot = join(repoRoot, '.devai/worktrees/auditor-post-merge');
-  const stateRoot = join(repoRoot, '.git/devai/post-merge-observations');
-  const lockPath = join(repoRoot, '.git/devai/post-merge.lock');
+  const runtimeRoot = join(gitAdministrationRoot(repoRoot), 'devai');
+  const stateRoot = join(runtimeRoot, 'post-merge-observations');
+  const lockPath = join(runtimeRoot, 'post-merge.lock');
   return (async () => {
     try {
       mkdirSync(lockPath);
