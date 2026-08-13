@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0-rc.7 — 2026-08-13
+
+- Prevented Git hook-local environment variables from redirecting auditor commands back into the
+  adopter checkout.
+- Proved that linked-worktree observation commits leave the adopter branch and worktree unchanged.
+
 ## 1.1.0-rc.6 — 2026-08-13
 
 - Fixed post-merge lock, observation, and authority containment paths in linked Git worktrees.

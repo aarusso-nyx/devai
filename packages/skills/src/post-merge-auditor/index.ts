@@ -182,12 +182,20 @@ function readJson(
 }
 
 function git(repoRoot: string, args: readonly string[]) {
+  const environment = { ...process.env };
+  delete environment.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+  delete environment.GIT_COMMON_DIR;
+  delete environment.GIT_DIR;
+  delete environment.GIT_INDEX_FILE;
+  delete environment.GIT_OBJECT_DIRECTORY;
+  delete environment.GIT_PREFIX;
+  delete environment.GIT_WORK_TREE;
   return spawnSync('git', [...args], {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
-      ...process.env,
+      ...environment,
       GIT_AUTHOR_NAME: 'DEVAI Auditor',
       GIT_AUTHOR_EMAIL: 'aarusso@nyxk.com.br',
       GIT_COMMITTER_NAME: 'DEVAI Auditor',

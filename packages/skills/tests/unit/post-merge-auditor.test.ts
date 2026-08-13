@@ -484,6 +484,10 @@ describe('post-merge authority host scope', () => {
     };
     rewrite(linked, (value) => ({ ...value, hook_path: linked.hookPath }));
 
+    const inheritedGitDir = process.env['GIT_DIR'];
+    const inheritedGitWorkTree = process.env['GIT_WORK_TREE'];
+    process.env['GIT_DIR'] = adminRoot;
+    process.env['GIT_WORK_TREE'] = linked.root;
     const host = createPostMergeHostScope(linked.root, linked.mergeSha);
     try {
       await expect(
@@ -498,6 +502,10 @@ describe('post-merge authority host scope', () => {
       ).resolves.toMatchObject({ status: 'completed', processed: [linked.mergeSha] });
     } finally {
       host.dispose();
+      if (inheritedGitDir === undefined) delete process.env['GIT_DIR'];
+      else process.env['GIT_DIR'] = inheritedGitDir;
+      if (inheritedGitWorkTree === undefined) delete process.env['GIT_WORK_TREE'];
+      else process.env['GIT_WORK_TREE'] = inheritedGitWorkTree;
     }
 
     expect(
@@ -509,5 +517,9 @@ describe('post-merge authority host scope', () => {
       ),
     ).toMatchObject({ status: 'completed', readiness_promoting: false });
     expect(existsSync(join(adminRoot, 'devai/post-merge.lock'))).toBe(false);
+    expect(git(linked.root, ['rev-parse', 'HEAD'])).toBe(linked.mergeSha);
+    expect(git(linked.root, ['rev-parse', `refs/devai/post-merge/${linked.mergeSha}`])).not.toBe(
+      linked.mergeSha,
+    );
   });
 });
