@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1 — 2026-08-13
+
+- Adds schema-valid task materialization to `task queue add --input`, closing the missing
+  queue-to-start transition discovered by the installed-package STYNX governed pilot.
+- Preserves existing queue identity during enrichment, makes replay idempotent, rejects
+  conflicting task records, and reports a precise `TASK_NOT_FOUND` start failure.
+- Keeps the public contract surface at exactly 43 actions; no effect or authority scope widens.
+
 ## 1.1.0 — 2026-08-13
 
 - Promoted the RC7 functional contracts unchanged after exact installed-package STYNX validation.

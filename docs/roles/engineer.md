@@ -13,9 +13,12 @@ documentation while acting in this role.
    devai task status --round R-1000 --task TASK-1000 --repo-root . --format json
    ```
 
-2. Start the task with explicit Engineer authority.
+2. Materialize the Architect-declared task, then start it with explicit Engineer authority.
 
    ```bash
+   devai task queue add --round R-1000 \
+     --input work/rounds/R-1000/inputs/TASK-1000.json --repo-root . \
+     --as-role engineer --write --format json
    devai task start --round R-1000 --task TASK-1000 --repo-root . \
      --as-role engineer --write --format json
    ```
