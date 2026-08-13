@@ -208,6 +208,105 @@ try {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
+  mkdirSync(join(projectRoot, 'work/rounds/R-0001'), { recursive: true });
+  writeFileSync(
+    join(projectRoot, 'work/rounds/R-0001/record.md'),
+    `---\nschemaVersion: '1.0.0'\nid: 'R-0001'\ntitle: 'Installed package RGR smoke'\ntype: 'validation'\nkind: 'validation'\nstatus: 'active'\ndate: '2026-08-13'\nauthority: 'Architect'\ngoal: 'Exercise the installed RGR control loop.'\ndeclared_by: 'installed-smoke'\nisolation:\n  kind: 'managed-worktree'\n  branch: 'installed-smoke'\n  base_sha: '${run('git', ['rev-parse', 'HEAD']).trim()}'\nwaves: []\ngates: []\norchestrator_prompt: 'record.md'\nplan_path: 'record.md'\n---\n`,
+  );
+  writeFileSync(
+    join(projectRoot, 'work/rounds/R-0001/AUTHORIZATION.md'),
+    `---\nschemaVersion: '1.0.0'\nround_id: 'R-0001'\nstatus: active\ndecision: GRANTED\nauthorized_by_role: Owner\nauthorized_at: '2026-08-13'\n---\n`,
+  );
+  mkdirSync(join(projectRoot, '.devai/state/tasks'), { recursive: true });
+  writeFileSync(
+    join(projectRoot, '.devai/state/tasks/TASK-0001.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: '2.0.0',
+        id: 'TASK-0001',
+        round_id: 'R-0001',
+        status: 'in_progress',
+        discipline: 'engineer',
+        title: 'Installed RGR smoke task',
+        target_modules: [],
+        target_substrates: ['F2'],
+        created_at: '2026-08-13T00:00:00.000Z',
+        spawned_at: '2026-08-13T00:01:00.000Z',
+        db_isolation: 'database',
+        iteration_count: 0,
+        executor: {
+          kind: 'routine',
+          argv: ['node', '--version'],
+          cwd: '.',
+          inputs: ['package.json'],
+          outputs: [],
+          effects: ['read'],
+          timeout_ms: 10000,
+          authority_checks: ['installed-package-rgr'],
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const gap = JSON.parse(
+    run(binary, [
+      'round',
+      'gap',
+      'create',
+      '--repo-root',
+      projectRoot,
+      '--round',
+      'R-0001',
+      '--task',
+      'TASK-0001',
+      '--discipline',
+      'inspector',
+      '--summary',
+      'Installed package RGR smoke',
+      '--ambiguity',
+      'Verify the packaged RGR validator is callable.',
+      '--evidence',
+      'EV-INSTALLED-RGR-SMOKE',
+      '--as-role',
+      'inspector',
+      '--write',
+      '--format',
+      'json',
+    ]),
+  );
+  const gapId = gap?.result?.value?.id;
+  if (
+    typeof gapId !== 'string' ||
+    !existsSync(join(projectRoot, `.devai/state/rgr/${gapId}.json`))
+  ) {
+    throw new Error('INSTALLED_RGR_CREATE_INVALID');
+  }
+  const resolvedGap = JSON.parse(
+    run(binary, [
+      'round',
+      'gap',
+      'resolve',
+      gapId,
+      '--repo-root',
+      projectRoot,
+      '--round',
+      'R-0001',
+      '--resolver',
+      'installed-smoke-architect',
+      '--status',
+      'resolved',
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ]),
+  );
+  if (resolvedGap?.result?.value?.status !== 'resolved') {
+    throw new Error('INSTALLED_RGR_RESOLVE_INVALID');
+  }
+
   for (const segment of ['owner', 'architect']) {
     run(binary, [
       'init',
