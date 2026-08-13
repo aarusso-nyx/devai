@@ -26,6 +26,38 @@ const MARKER_START = '# >>> devai hooks install >>>';
 const MARKER_END = '# <<< devai hooks install <<<';
 const MARKER_BLOCK_RE = new RegExp(`${MARKER_START}[\\s\\S]*?${MARKER_END}`);
 
+function gitAdminRoot(root: string): string {
+  const dotGit = join(root, '.git');
+  if (existsSync(dotGit) && lstatSync(dotGit).isDirectory()) return dotGit;
+  if (existsSync(dotGit) && lstatSync(dotGit).isFile()) {
+    const pointer = /^gitdir:\s*(.+)$/u.exec(readFileSync(dotGit, 'utf8').trim())?.[1];
+    if (pointer !== undefined) {
+      const resolved = resolve(root, pointer);
+      if (existsSync(resolved) && lstatSync(resolved).isDirectory()) return resolved;
+    }
+  }
+  throw new Error('HOOK_INSTALL_GIT_ADMIN_UNAVAILABLE');
+}
+
+function gitCommonRoot(root: string): string {
+  const adminRoot = gitAdminRoot(root);
+  const commonPointer = join(adminRoot, 'commondir');
+  if (!existsSync(commonPointer)) return adminRoot;
+  const common = readFileSync(commonPointer, 'utf8').trim();
+  return common === '' ? adminRoot : resolve(adminRoot, common);
+}
+
+function gitHookPath(root: string, hook: HookName): string {
+  try {
+    return join(gitCommonRoot(root), 'hooks', hook);
+  } catch {
+    // Preserve dry bootstrap planning for repositories that have not yet run
+    // `git init`. Post-merge installation remains strict because its input
+    // validation requires a real repository and an exact HEAD binding.
+    return join(root, '.git', 'hooks', hook);
+  }
+}
+
 export interface HooksInstallOptions {
   readonly targetRoot: string;
   readonly hook?: HookName;
@@ -51,13 +83,10 @@ function resolveHookPath(
   hook: HookName,
 ): { path: string; manager: 'husky' | 'git' } {
   const huskyDir = join(targetRoot, '.husky');
-  if (hook === 'post-merge') {
-    return { path: join(targetRoot, '.git/hooks', hook), manager: 'git' };
-  }
   if (existsSync(huskyDir)) {
     return { path: join(huskyDir, hook), manager: 'husky' };
   }
-  return { path: join(targetRoot, '.git/hooks', hook), manager: 'git' };
+  return { path: gitHookPath(targetRoot, hook), manager: 'git' };
 }
 
 function block(command: string): string {
@@ -92,8 +121,8 @@ export function verifyInstalledPostMergeAdapter(
   devaiVersion: string,
 ): PostMergeAdapterVerification {
   const root = realpathSync(resolve(targetRoot));
-  const hookPath = join(root, '.git/hooks/post-merge');
-  const keyPath = join(root, '.git/devai/post-merge.key');
+  const hookPath = resolveHookPath(root, 'post-merge').path;
+  const keyPath = join(gitAdminRoot(root), 'devai/post-merge.key');
   const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
   const policyPath = join(root, '.devai/config/authority-policy.json');
   const errors: string[] = [];
@@ -172,10 +201,8 @@ function validatePostMergeAdapterInputs(plan: HooksInstallPlan): void {
   }
 }
 
-function postMergeCommand(targetRoot: string): string {
-  const issuer = join(targetRoot, '.git/devai/issue-post-merge-receipt.cjs');
-  const receipt = join(targetRoot, '.git/devai/post-merge-receipt.json');
-  return `node ${JSON.stringify(issuer)}\n./node_modules/.bin/devai round close --post-merge-receipt --host-receipt ${JSON.stringify(receipt)}`;
+function postMergeCommand(): string {
+  return `devai_git_dir="$(git rev-parse --absolute-git-dir)" || exit $?\nnode "$devai_git_dir/devai/issue-post-merge-receipt.cjs"\n./node_modules/.bin/devai round close --post-merge-receipt --host-receipt "$devai_git_dir/devai/post-merge-receipt.json"`;
 }
 
 function prePushCommand(): string {
@@ -204,13 +231,21 @@ fi`;
 }
 
 function headAt(root: string): string {
-  const head = readFileSync(join(root, '.git/HEAD'), 'utf8').trim();
+  const resolved = spawnSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  if (resolved.status === 0 && /^[0-9a-f]{40}$/u.test(resolved.stdout.trim())) {
+    return resolved.stdout.trim();
+  }
+  const adminRoot = gitAdminRoot(root);
+  const head = readFileSync(join(adminRoot, 'HEAD'), 'utf8').trim();
   if (/^[0-9a-f]{40}$/u.test(head)) return head;
   const ref = /^ref:\s+(.+)$/u.exec(head)?.[1];
   if (ref !== undefined) {
-    const loose = join(root, '.git', ref);
+    const loose = join(adminRoot, ref);
     if (existsSync(loose)) return readFileSync(loose, 'utf8').trim();
-    const packed = join(root, '.git/packed-refs');
+    const packed = join(gitCommonRoot(root), 'packed-refs');
     if (existsSync(packed)) {
       const match = readFileSync(packed, 'utf8')
         .split(/\r?\n/u)
@@ -226,8 +261,8 @@ function receiptIssuerSource(): string {
 const { createHash, createHmac, randomBytes } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { readFileSync, realpathSync, writeFileSync } = require('node:fs');
-const { join, resolve } = require('node:path');
-const repository = realpathSync(resolve(__dirname, '../..'));
+const { join } = require('node:path');
+const repository = realpathSync(execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim());
 const key = readFileSync(join(__dirname, 'post-merge.key'));
 const attestationPath = join(repository, '.devai/config/post-merge-host-adapter.json');
 const attestationBytes = readFileSync(attestationPath);
@@ -251,7 +286,7 @@ writeFileSync(join(__dirname, 'post-merge-receipt.json'), JSON.stringify({ ...un
 
 function executePostMergeAdapter(plan: HooksInstallPlan): void {
   const root = realpathSync(resolve(plan.targetRoot));
-  const runtimeRoot = join(root, '.git/devai');
+  const runtimeRoot = join(gitAdminRoot(root), 'devai');
   const configRoot = join(root, '.devai/config');
   const keyPath = join(runtimeRoot, 'post-merge.key');
   const issuerPath = join(runtimeRoot, 'issue-post-merge-receipt.cjs');
@@ -320,7 +355,7 @@ export function buildHooksInstallPlan(opts: HooksInstallOptions): HooksInstallPl
   const command =
     opts.command ??
     (hook === 'post-merge'
-      ? postMergeCommand(resolve(opts.targetRoot))
+      ? postMergeCommand()
       : hook === 'pre-push'
         ? prePushCommand()
         : './node_modules/.bin/devai check --only forbidden-actions --strict');
@@ -382,19 +417,33 @@ export function preflightHooksInstallPlan(plan: HooksInstallPlan): readonly stri
   const targets = [plan.path];
   if (plan.hook === 'post-merge') {
     validatePostMergeAdapterInputs(plan);
+    const runtimeRoot = join(gitAdminRoot(root), 'devai');
     targets.push(
-      join(root, '.git/devai/post-merge.key'),
-      join(root, '.git/devai/issue-post-merge-receipt.cjs'),
+      join(runtimeRoot, 'post-merge.key'),
+      join(runtimeRoot, 'issue-post-merge-receipt.cjs'),
       join(root, '.devai/config/post-merge-host-adapter.json'),
     );
   }
+  const trustedRoots = [root];
+  try {
+    trustedRoots.push(gitAdminRoot(root), gitCommonRoot(root));
+  } catch {
+    if (plan.hook === 'post-merge') throw new Error('HOOK_INSTALL_GIT_ADMIN_UNAVAILABLE');
+  }
   for (const target of targets) {
-    const fromRoot = relative(root, resolve(target));
-    if (fromRoot === '' || fromRoot === '..' || fromRoot.startsWith(`..${sep}`)) {
+    const absoluteTarget = resolve(target);
+    const trustedRoot = trustedRoots
+      .filter((candidate) => {
+        const path = relative(candidate, absoluteTarget);
+        return path !== '' && path !== '..' && !path.startsWith(`..${sep}`);
+      })
+      .sort((left, right) => right.length - left.length)[0];
+    if (trustedRoot === undefined) {
       throw new Error(`HOOK_INSTALL_PATH_ESCAPE:${target}`);
     }
-    let cursor = root;
-    for (const segment of fromRoot.split(sep).slice(0, -1)) {
+    const fromTrustedRoot = relative(trustedRoot, absoluteTarget);
+    let cursor = trustedRoot;
+    for (const segment of fromTrustedRoot.split(sep).slice(0, -1)) {
       cursor = join(cursor, segment);
       if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
         throw new Error(`HOOK_INSTALL_SYMLINK_REFUSED:${target}`);

@@ -183,6 +183,15 @@
       "owner": "architect"
     },
     {
+      "template_id": "git-verify-head-commit",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "--verify", "HEAD^{commit}"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Host-adapter installation binds its attestation to the exact current commit in both primary and linked worktrees.",
+      "owner": "architect"
+    },
+    {
       "template_id": "git-head",
       "executable": "git",
       "argv_shape": ["rev-parse", "HEAD"],

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   authorizePolicyMaterialization,
@@ -243,6 +243,75 @@ function existingRealpath(path: string): string {
   return resolve(realpathSync(cursor), ...suffix);
 }
 
+interface GitMetadataLayout {
+  readonly admin_root: string;
+  readonly common_root: string;
+}
+
+function gitMetadataLayout(root: string): GitMetadataLayout | undefined {
+  const marker = resolve(root, '.git');
+  if (!existsSync(marker)) return undefined;
+  const markerStat = statSync(marker);
+  let adminRoot: string;
+  if (markerStat.isDirectory()) {
+    adminRoot = realpathSync(marker);
+  } else if (markerStat.isFile()) {
+    const match = /^gitdir:\s*(.+)\s*$/u.exec(readFileSync(marker, 'utf8').trim());
+    if (!match?.[1]) return undefined;
+    adminRoot = realpathSync(resolve(root, match[1]));
+  } else {
+    return undefined;
+  }
+  const commonMarker = resolve(adminRoot, 'commondir');
+  const commonRoot = existsSync(commonMarker)
+    ? realpathSync(resolve(adminRoot, readFileSync(commonMarker, 'utf8').trim()))
+    : adminRoot;
+  return { admin_root: adminRoot, common_root: commonRoot };
+}
+
+function within(root: string, candidate: string): boolean {
+  return candidate === root || candidate.startsWith(`${root}${sep}`);
+}
+
+function gitMetadataLogicalPath(root: string, canonical: string): string | undefined {
+  const layout = gitMetadataLayout(root);
+  if (!layout) return undefined;
+  const namespaces = [
+    { physical: resolve(layout.admin_root, 'devai'), logical: '.git/devai' },
+    { physical: resolve(layout.common_root, 'hooks'), logical: '.git/hooks' },
+  ] as const;
+  for (const namespace of namespaces) {
+    if (!within(namespace.physical, canonical)) continue;
+    const suffix = relative(namespace.physical, canonical).split(sep).join('/');
+    return suffix.length === 0 ? namespace.logical : `${namespace.logical}/${suffix}`;
+  }
+  return undefined;
+}
+
+function physicalCanonicalPath(root: string, canonicalRelativePath: string): string {
+  const layout = gitMetadataLayout(root);
+  if (layout) {
+    const namespaces = [
+      { logical: '.git/devai', physical: resolve(layout.admin_root, 'devai') },
+      { logical: '.git/hooks', physical: resolve(layout.common_root, 'hooks') },
+    ] as const;
+    for (const namespace of namespaces) {
+      if (
+        canonicalRelativePath === namespace.logical ||
+        canonicalRelativePath.startsWith(`${namespace.logical}/`)
+      ) {
+        const suffix = canonicalRelativePath.slice(namespace.logical.length).replace(/^\//u, '');
+        const candidate = resolve(namespace.physical, suffix);
+        if (!within(namespace.physical, candidate)) {
+          throw new Error('AUTHORITY_FS_SYMLINK_ESCAPE');
+        }
+        return candidate;
+      }
+    }
+  }
+  return resolve(root, canonicalRelativePath);
+}
+
 function canonicalRelativePath(root: string, value: unknown): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error('AUTHORITY_FS_TARGET_INVALID');
@@ -256,6 +325,8 @@ function canonicalRelativePath(root: string, value: unknown): string {
   const canonical = existingRealpath(absolute);
   const canonicalRoot = realpathSync(root);
   if (canonical !== canonicalRoot && !canonical.startsWith(`${canonicalRoot}${sep}`)) {
+    const metadataPath = gitMetadataLogicalPath(root, canonical);
+    if (metadataPath) return metadataPath;
     throw new Error('AUTHORITY_FS_SYMLINK_ESCAPE');
   }
   const result = relative(canonicalRoot, canonical).split(sep).join('/');
@@ -755,7 +826,7 @@ function makeEnvelope(input: {
 }
 
 function snapshot(root: string, relativePath: string): unknown {
-  const path = resolve(root, relativePath);
+  const path = physicalCanonicalPath(root, relativePath);
   if (!existsSync(path)) return undefined;
   const stat = lstatSync(path);
   return {
@@ -803,7 +874,15 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     canonicalSha256,
     repository_root: repositoryRoot,
     fs: {
-      realpath: (path: string) => existingRealpath(resolve(repositoryRoot, path)),
+      realpath: (path: string) => {
+        const physical = existingRealpath(physicalCanonicalPath(repositoryRoot, path));
+        const metadataPath = gitMetadataLogicalPath(repositoryRoot, physical);
+        // The broker has already admitted only the two exact Git metadata
+        // namespaces above. Present their stable logical repository names to
+        // the generic boundary while snapshots continue to inspect the real
+        // physical files.
+        return metadataPath ? resolve(repositoryRoot, metadataPath) : physical;
+      },
       lstat: (path: string) => snapshot(repositoryRoot, path),
       writeAtomic: () => {
         if (!effectApply) throw new Error('AUTHORITY_EFFECT_APPLY_MISSING');

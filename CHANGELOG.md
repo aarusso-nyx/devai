@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0-rc.2 — 2026-08-13
+
+- Fixed local hook installation and verification in linked Git worktrees.
+- Bound post-merge keys and receipt issuers to the exact per-worktree Git administration directory.
+- Preserved repository-local hook execution and strict authority containment for all other host paths.
+
 ## 1.1.0-rc.1 — 2026-08-13
 
 - Fixes lazy-registry policy provenance so normal invocation, help, doctor, and binding use the
