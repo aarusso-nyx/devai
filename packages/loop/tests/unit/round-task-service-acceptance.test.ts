@@ -299,9 +299,11 @@ describe('round runner acceptance', () => {
       saveTask(root, routineTask('TASK-7802', { upstream_task_id: 'TASK-7801' }));
       saveTask(root, routineTask('TASK-7803', { iteration_count: 1, max_iterations: 1 }));
       saveTask(root, routineTask('TASK-7804'));
+      saveTask(root, routineTask('TASK-7805'));
       const dispatch = vi.fn((task: TaskRecord) => {
         if (task.id === 'TASK-7801') return { ok: false, code: 'FIXTURE_FAIL' };
-        if (task.id === 'TASK-7804') throw new Error('fixture crash');
+        if (task.id === 'TASK-7804') throw new Error('TASK_WORKTREE_REGISTRY_MISMATCH');
+        if (task.id === 'TASK-7805') throw new Error('fixture crash');
         return { ok: true };
       });
       const result = await runRoundTasks({ repoRoot: root, round: 'R-0007', dispatch });
@@ -311,12 +313,14 @@ describe('round runner acceptance', () => {
           { task_id: 'TASK-7801', ok: false, code: 'FIXTURE_FAIL' },
           { task_id: 'TASK-7802', ok: false, code: 'TASK_DEPENDENCY_FAILED' },
           { task_id: 'TASK-7803', ok: false, code: 'TASK_MAX_ITERATIONS_EXCEEDED' },
-          { task_id: 'TASK-7804', ok: false, code: 'TASK_EXECUTOR_DISPATCH_FAILED' },
+          { task_id: 'TASK-7804', ok: false, code: 'TASK_WORKTREE_REGISTRY_MISMATCH' },
+          { task_id: 'TASK-7805', ok: false, code: 'TASK_EXECUTOR_DISPATCH_FAILED' },
         ]),
       );
       expect(loadTask(root, 'TASK-7801').status).toBe('escalated');
       expect(loadTask(root, 'TASK-7803').status).toBe('escalated');
       expect(loadTask(root, 'TASK-7804').status).toBe('escalated');
+      expect(loadTask(root, 'TASK-7805').status).toBe('escalated');
     });
   });
 

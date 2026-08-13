@@ -88,6 +88,38 @@ function withBoundHostAuthority<T>(callback: () => T): T {
 }
 
 describe('task resource boundaries', () => {
+  it('leaves a successfully provisioned managed task ready for the round runner', () => {
+    const root = repository();
+    const taskId = 'TASK-8401';
+    const result = withBoundHostAuthority(() =>
+      spawnTask({
+        repoRoot: root,
+        task: {
+          id: taskId,
+          round_id: 'R-1234',
+          discipline: 'engineer',
+          title: 'Prepared managed routine',
+          target_modules: ['MOD-READY'],
+          target_substrates: ['F2'],
+          db_isolation: 'database',
+          executor: routineExecutor(),
+        },
+        withWorktree: true,
+      }),
+    );
+
+    expect(result).toMatchObject({
+      task: { id: taskId, status: 'ready', worktree_id: `WT-${taskId}` },
+      lock_denied: [],
+      database: null,
+      rollback_reason: null,
+    });
+    expect(result.task.spawned_at).toBeUndefined();
+    expect(result.worktree_path).not.toBeNull();
+    expect(existsSync(result.worktree_path ?? '')).toBe(true);
+    expect(listWorktrees({ repoRoot: root })).toHaveLength(1);
+  });
+
   it('rolls back every acquired task resource when downstream DB provisioning fails', () => {
     const root = repository();
     const taskId = 'TASK-8402';

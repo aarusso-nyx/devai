@@ -182,7 +182,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'round run',
     public_action_id: 'round run',
     effect: 'harness-write',
-    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin'],
+    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin', 'proc:dynamic'],
   },
   {
     action_id: 'round seal',

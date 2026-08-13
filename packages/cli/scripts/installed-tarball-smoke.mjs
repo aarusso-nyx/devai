@@ -225,13 +225,12 @@ try {
         schemaVersion: '2.0.0',
         id: 'TASK-0001',
         round_id: 'R-0001',
-        status: 'in_progress',
+        status: 'queued',
         discipline: 'engineer',
         title: 'Installed RGR smoke task',
         target_modules: [],
         target_substrates: ['F2'],
         created_at: '2026-08-13T00:00:00.000Z',
-        spawned_at: '2026-08-13T00:01:00.000Z',
         db_isolation: 'database',
         iteration_count: 0,
         executor: {
@@ -305,6 +304,83 @@ try {
   );
   if (resolvedGap?.result?.value?.status !== 'resolved') {
     throw new Error('INSTALLED_RGR_RESOLVE_INVALID');
+  }
+  run(binary, [
+    'task',
+    'start',
+    '--repo-root',
+    projectRoot,
+    '--round',
+    'R-0001',
+    '--task',
+    'TASK-0001',
+    '--with-worktree',
+    '--base-ref',
+    'HEAD',
+    '--as-role',
+    'engineer',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  const roundRun = JSON.parse(
+    run(binary, [
+      'round',
+      'run',
+      '--repo-root',
+      projectRoot,
+      '--round',
+      'R-0001',
+      '--task',
+      'TASK-0001',
+      '--as-role',
+      'engineer',
+      '--write',
+      '--format',
+      'json',
+    ]),
+  );
+  const taskExecutionId = roundRun?.result?.value?.results?.[0]?.evidence_id;
+  if (
+    roundRun?.result?.value?.ok !== true ||
+    typeof taskExecutionId !== 'string' ||
+    !existsSync(
+      join(projectRoot, `.devai/state/round-runs/R-0001/task-executions/${taskExecutionId}.json`),
+    ) ||
+    JSON.parse(readFileSync(join(projectRoot, '.devai/state/tasks/TASK-0001.json'), 'utf8'))
+      .status !== 'merging'
+  ) {
+    throw new Error('INSTALLED_ROUND_RUN_INVALID');
+  }
+  const finishedTask = JSON.parse(
+    run(binary, [
+      'task',
+      'finish',
+      '--repo-root',
+      projectRoot,
+      '--round',
+      'R-0001',
+      '--task',
+      'TASK-0001',
+      '--destroy-worktree',
+      '--evidence',
+      taskExecutionId,
+      '--completed-by-role',
+      'engineer',
+      '--as-role',
+      'engineer',
+      '--write',
+      '--format',
+      'json',
+    ]),
+  );
+  if (
+    finishedTask?.result?.value?.status !== 'completed' ||
+    JSON.parse(readFileSync(join(projectRoot, '.devai/state/worktrees.json'), 'utf8')).worktrees
+      .length !== 0 ||
+    existsSync(join(projectRoot, '.devai/worktrees/WT-TASK-0001'))
+  ) {
+    throw new Error('INSTALLED_ROUND_FINISH_INVALID');
   }
 
   for (const segment of ['owner', 'architect']) {

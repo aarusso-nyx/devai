@@ -271,6 +271,67 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
+  it('authorizes only the exact selected round routine through the local-command adapter', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-round-broker-'));
+    mkdirSync(join(root, '.devai/state/tasks'), { recursive: true });
+    mkdirSync(join(root, '.devai/pin'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/pin/constitution.md'),
+      readFileSync(join(ROOT, 'law/constitution.md')),
+    );
+    writeFileSync(
+      join(root, '.devai/state/tasks/TASK-7001.json'),
+      `${JSON.stringify({
+        schemaVersion: '2.0.0',
+        id: 'TASK-7001',
+        round_id: 'R-0007',
+        status: 'in_progress',
+        discipline: 'engineer',
+        title: 'Exact broker routine',
+        target_modules: [],
+        target_substrates: ['F2'],
+        created_at: '2026-08-13T00:00:00.000Z',
+        db_isolation: 'database',
+        iteration_count: 1,
+        executor: {
+          kind: 'routine',
+          argv: ['pnpm', 'run', 'verify'],
+          cwd: '.',
+          inputs: [],
+          outputs: [],
+          effects: ['read'],
+          timeout_ms: 12_000,
+        },
+      })}\n`,
+    );
+    const host = brokerAt(root, 'round run', 'engineer', roundRunArgv());
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'verify'], { cwd: root, shell: false, timeout: 12_000 }],
+            'process',
+          ),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'other'], { cwd: root, shell: false, timeout: 12_000 }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('applies bounded-batch effects immediately and refuses unadapted processes', () => {
     const host = broker(
       'init apply owner',
