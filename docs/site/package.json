@@ -62,7 +62,7 @@
     "http-proxy-middleware": "2.0.10",
     "joi": "17.13.4",
     "launch-editor": "2.14.1",
-    "nanoid@3.x": "3.3.17",
+    "nanoid@3.x": "3.3.18",
     "postcss": "8.5.26",
     "serialize-javascript": "7.0.5",
     "uuid": "11.1.1",
