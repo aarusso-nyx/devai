@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0-rc.6 — 2026-08-13
+
+- Fixed post-merge lock, observation, and authority containment paths in linked Git worktrees.
+- Added a full linked-worktree auditor fixture that proves observation completion and cleanup in
+  the external Git administration directory.
+
 ## 1.1.0-rc.5 — 2026-08-13
 
 - Fixed post-merge receipt verification in linked Git worktrees by resolving the exact Git administration directory.
