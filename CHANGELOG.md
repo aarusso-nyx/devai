@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.6 — 2026-08-14
+
+- Generates a digest-bound GitHub Actions adapter that uses the optional read-only
+  `DEVAI_REPO_TOKEN` for cross-repository DEVAI package installation and otherwise falls back to
+  the repository-scoped `GITHUB_TOKEN`.
+- Verifies the authentication fallback as an explicit adapter fact so credential-routing drift
+  fails `doctor` instead of silently invalidating installed-package observation.
+
 ## 1.1.5 — 2026-08-14
 
 - Adds fail-closed Owner authorization receipts for exact forbidden-action IDs at exact commits,
