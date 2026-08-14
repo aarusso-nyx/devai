@@ -140,6 +140,50 @@ describe('scanForbiddenActions', () => {
     );
   }
 
+  function commitForbiddenFixture(content = 'git push --force\n'): string {
+    writeFileSync(join(dir, 'unsafe.txt'), content);
+    execFileSync('git', ['add', 'unsafe.txt'], { cwd: dir });
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-qm',
+        'fixture unsafe evidence',
+      ],
+      { cwd: dir },
+    );
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+  }
+
+  function writeAuthorizationReceipts(authorizations: readonly Record<string, unknown>[]): void {
+    mkdirSync(join(dir, 'law/policy'), { recursive: true });
+    writeFileSync(
+      join(dir, 'law/policy/forbidden-action-authorizations.json'),
+      JSON.stringify({ schemaVersion: '1.0.0', authorizations }, null, 2),
+    );
+  }
+
+  function commitAuthorizationReceipts(): void {
+    execFileSync('git', ['add', 'law/policy/forbidden-action-authorizations.json'], { cwd: dir });
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=DEVAI Architect',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-qm',
+        'docs: authorize exact forbidden-action finding',
+      ],
+      { cwd: dir },
+    );
+  }
+
   function writeCiAdr(options?: {
     readonly status?: 'active' | 'superseded';
     readonly affectedRule?: string;
@@ -247,6 +291,161 @@ describe('scanForbiddenActions', () => {
         (finding) => finding.forbidden_id === 'FORBID-FORCE-PUSH',
       ),
     ).toBe(true);
+  });
+
+  it('suppresses only an exact action and commit with a committed human authorization receipt', () => {
+    writeContextAwareRegistry();
+    seedRepository();
+    const unsafeCommit = commitForbiddenFixture();
+    writeAuthorizationReceipts([
+      {
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        commit: unsafeCommit,
+        authorized_by: 'Owner',
+        reason: 'Owner approved this exact fixture commit for governed publication.',
+      },
+    ]);
+    commitAuthorizationReceipts();
+
+    const result = scanForbiddenActions({ repoRoot: dir, maxCommits: 2 });
+    expect(
+      result.findings.filter((finding) => finding.forbidden_id === 'FORBID-FORCE-PUSH'),
+    ).toEqual([]);
+    expect(result.authorization_receipts).toEqual(
+      expect.objectContaining({
+        declared: 1,
+        applied: [`FORBID-FORCE-PUSH@${unsafeCommit}`],
+        unused: [],
+      }),
+    );
+  });
+
+  it.each([
+    [
+      'different commit',
+      (unsafeCommit: string) => ({
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        commit: unsafeCommit.replace(/^./u, unsafeCommit.startsWith('0') ? '1' : '0'),
+        authorized_by: 'Owner',
+        reason: 'Owner approved a different exact commit, not the unsafe commit.',
+      }),
+    ],
+    [
+      'different action',
+      (unsafeCommit: string) => ({
+        forbidden_id: 'FORBID-PUBLISH',
+        commit: unsafeCommit,
+        authorized_by: 'Owner',
+        reason: 'Owner approved publication semantics, not a force push.',
+      }),
+    ],
+  ])('does not apply an authorization receipt for a %s', (_label, receiptFor) => {
+    writeContextAwareRegistry();
+    seedRepository();
+    const unsafeCommit = commitForbiddenFixture();
+    writeAuthorizationReceipts([receiptFor(unsafeCommit)]);
+    commitAuthorizationReceipts();
+
+    const result = scanForbiddenActions({ repoRoot: dir, maxCommits: 2 });
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        ref: unsafeCommit,
+      }),
+    );
+    expect(result.authorization_receipts?.applied).toEqual([]);
+    expect(result.authorization_receipts?.unused).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'unknown action',
+      {
+        forbidden_id: 'FORBID-NOT-REAL',
+        commit: 'a'.repeat(40),
+        authorized_by: 'Owner',
+        reason: 'Unknown actions must fail closed.',
+      },
+    ],
+    [
+      'partial commit',
+      {
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        commit: 'a'.repeat(12),
+        authorized_by: 'Owner',
+        reason: 'Partial commit identities are ambiguous.',
+      },
+    ],
+    [
+      'invalid authority',
+      {
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        commit: 'a'.repeat(40),
+        authorized_by: 'Architect',
+        reason: 'Only the Owner can grant this authorization.',
+      },
+    ],
+    [
+      'short reason',
+      {
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        commit: 'a'.repeat(40),
+        authorized_by: 'Owner',
+        reason: 'short',
+      },
+    ],
+    [
+      'unknown field',
+      {
+        forbidden_id: 'FORBID-FORCE-PUSH',
+        commit: 'a'.repeat(40),
+        authorized_by: 'Owner',
+        reason: 'Unknown fields must fail closed.',
+        wildcard: true,
+      },
+    ],
+  ])('fails closed for an authorization receipt with %s', (_label, receipt) => {
+    writeContextAwareRegistry();
+    writeAuthorizationReceipts([receipt]);
+    seedRepository();
+
+    expect(scanForbiddenActions({ repoRoot: dir, maxCommits: 1 }).findings).toContainEqual(
+      expect.objectContaining({ forbidden_id: 'FORBIDDEN-AUTHORIZATION-INVALID' }),
+    );
+  });
+
+  it('fails closed for duplicate and malformed authorization receipt bytes', () => {
+    writeContextAwareRegistry();
+    const receipt = {
+      forbidden_id: 'FORBID-FORCE-PUSH',
+      commit: 'a'.repeat(40),
+      authorized_by: 'Owner',
+      reason: 'Duplicate exact receipts are ambiguous and invalid.',
+    };
+    writeAuthorizationReceipts([receipt, receipt]);
+    seedRepository();
+    expect(scanForbiddenActions({ repoRoot: dir, maxCommits: 1 }).findings).toContainEqual(
+      expect.objectContaining({ forbidden_id: 'FORBIDDEN-AUTHORIZATION-INVALID' }),
+    );
+
+    writeFileSync(join(dir, 'law/policy/forbidden-action-authorizations.json'), '{ malformed');
+    expect(scanForbiddenActions({ repoRoot: dir, maxCommits: 1 }).findings).toContainEqual(
+      expect.objectContaining({ forbidden_id: 'FORBIDDEN-AUTHORIZATION-INVALID' }),
+    );
+  });
+
+  it('fails closed for unknown authorization root fields', () => {
+    writeContextAwareRegistry();
+    mkdirSync(join(dir, 'law/policy'), { recursive: true });
+    writeFileSync(
+      join(dir, 'law/policy/forbidden-action-authorizations.json'),
+      JSON.stringify({ schemaVersion: '1.0.0', authorizations: [], wildcard: true }),
+    );
+    seedRepository();
+
+    expect(scanForbiddenActions({ repoRoot: dir, maxCommits: 1 }).findings).toContainEqual(
+      expect.objectContaining({ forbidden_id: 'FORBIDDEN-AUTHORIZATION-INVALID' }),
+    );
   });
 
   it.each([

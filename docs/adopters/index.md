@@ -6,6 +6,7 @@ role-owned segment you authorize. Use `devai doctor`, `devai check`, and `devai 
 to inspect the resulting repository.
 
 - [Install and adopt](install.md)
+- [Exact forbidden-action authorizations](forbidden-action-authorizations.md)
 - [Stack-pack inventory](pack-resolution.md)
 - [Recipe reference](../reference/recipes/README.md)
 - [CLI reference](../reference/cli/index.md)

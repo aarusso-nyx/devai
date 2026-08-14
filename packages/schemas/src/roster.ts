@@ -12,6 +12,7 @@ export const ROSTER = [
   'common-defs.schema.json',
   'error.schema.json',
   'evidence.schema.json',
+  'forbidden-action-authorizations.schema.json',
   'forbidden-actions.schema.json',
   'glob-guards.schema.json',
   'invariant.schema.json',

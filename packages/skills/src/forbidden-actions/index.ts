@@ -30,6 +30,20 @@ export interface ForbiddenActionWaiver {
   readonly reason: string;
 }
 
+export interface ForbiddenActionAuthorization {
+  readonly forbidden_id: string;
+  readonly commit: string;
+  readonly authorized_by: 'Owner';
+  readonly reason: string;
+}
+
+export interface ForbiddenActionAuthorizationSummary {
+  readonly path: string;
+  readonly declared: number;
+  readonly applied: readonly string[];
+  readonly unused: readonly string[];
+}
+
 /**
  * D-123 (item 6): the single source of truth for the canonical
  * 16-entry registry. `buildBootstrapPlan` (packages/skills/src/bootstrap/index.ts)
@@ -196,14 +210,92 @@ export interface ScanForbiddenOptions {
   readonly sinceRef?: string;
   /** Override the registry path. */
   readonly registryPath?: string;
+  /** Override the exact-commit authorization receipt path. */
+  readonly authorizationPath?: string;
 }
 
 export interface ScanForbiddenResult {
   readonly registry_entries: number;
   readonly findings: readonly ForbiddenActionFinding[];
+  readonly authorization_receipts?: ForbiddenActionAuthorizationSummary;
 }
 
 const GIT_INSPECTION_MAX_BUFFER = 16 * 1024 * 1024;
+const FORBIDDEN_AUTHORIZATION_PATH = 'law/policy/forbidden-action-authorizations.json';
+
+type AuthorizationLoadResult =
+  | { readonly ok: true; readonly receipts: readonly ForbiddenActionAuthorization[] }
+  | { readonly ok: false; readonly message: string };
+
+function loadForbiddenAuthorizations(
+  path: string,
+  validIds: ReadonlySet<string>,
+): AuthorizationLoadResult {
+  if (!existsSync(path)) return { ok: true, receipts: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return { ok: false, message: 'authorization receipt bytes are malformed' };
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { ok: false, message: 'authorization receipt root must be an object' };
+  }
+  const root = parsed as Record<string, unknown>;
+  const allowedRootKeys = new Set(['$schema', 'schemaVersion', 'authorizations']);
+  if (
+    Object.keys(root).some((key) => !allowedRootKeys.has(key)) ||
+    (root.$schema !== undefined && typeof root.$schema !== 'string')
+  ) {
+    return { ok: false, message: 'authorization receipt root contains an unknown field' };
+  }
+  if (root.schemaVersion !== '1.0.0' || !Array.isArray(root.authorizations)) {
+    return {
+      ok: false,
+      message: 'authorization receipts require schemaVersion 1.0.0 and an authorizations array',
+    };
+  }
+  const receipts: ForbiddenActionAuthorization[] = [];
+  const keys = new Set<string>();
+  for (const value of root.authorizations) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return { ok: false, message: 'every authorization receipt must be an object' };
+    }
+    const receipt = value as Record<string, unknown>;
+    const allowedKeys = new Set(['forbidden_id', 'commit', 'authorized_by', 'reason']);
+    if (Object.keys(receipt).some((key) => !allowedKeys.has(key))) {
+      return { ok: false, message: 'authorization receipts contain an unknown field' };
+    }
+    const forbiddenId = receipt.forbidden_id;
+    const commit = receipt.commit;
+    const authorizedBy = receipt.authorized_by;
+    const reason = receipt.reason;
+    if (typeof forbiddenId !== 'string' || !validIds.has(forbiddenId)) {
+      return { ok: false, message: 'authorization receipt names an unknown forbidden action' };
+    }
+    if (typeof commit !== 'string' || !/^[0-9a-f]{40}$/u.test(commit)) {
+      return { ok: false, message: 'authorization receipt commit must be a full lowercase SHA' };
+    }
+    if (authorizedBy !== 'Owner') {
+      return { ok: false, message: 'authorization receipt has an invalid human authority' };
+    }
+    if (typeof reason !== 'string' || reason.trim().length < 8) {
+      return { ok: false, message: 'authorization receipt reason is missing or too short' };
+    }
+    const key = `${forbiddenId}@${commit}`;
+    if (keys.has(key)) {
+      return { ok: false, message: 'authorization receipts contain a duplicate action and commit' };
+    }
+    keys.add(key);
+    receipts.push({
+      forbidden_id: forbiddenId,
+      commit,
+      authorized_by: authorizedBy,
+      reason,
+    });
+  }
+  return { ok: true, receipts };
+}
 
 function activeAdrAffectedRules(repoRoot: string): ReadonlySet<string> {
   const adrDir = join(repoRoot, 'law', 'adr');
@@ -429,6 +521,31 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
     };
   }
 
+  const authorizationPath =
+    opts.authorizationPath ?? join(opts.repoRoot, FORBIDDEN_AUTHORIZATION_PATH);
+  const authorizationLoad = loadForbiddenAuthorizations(
+    authorizationPath,
+    new Set(registry.map((entry) => entry.id)),
+  );
+  if (!authorizationLoad.ok) {
+    return {
+      registry_entries: registry.length,
+      findings: [
+        {
+          forbidden_id: 'FORBIDDEN-AUTHORIZATION-INVALID',
+          source: 'commit-change',
+          ref: authorizationPath,
+          matched: '',
+          message: authorizationLoad.message,
+        },
+      ],
+    };
+  }
+  const authorizationKeys = new Set(
+    authorizationLoad.receipts.map((receipt) => `${receipt.forbidden_id}@${receipt.commit}`),
+  );
+  const appliedAuthorizationKeys = new Set<string>();
+
   // Read either the explicitly bounded range or the recent commit log via git.
   let log: string;
   try {
@@ -556,6 +673,7 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             '--',
             '.',
             ':(exclude)law/policy/forbidden-actions.json',
+            `:(exclude)${FORBIDDEN_AUTHORIZATION_PATH}`,
             ':(exclude).devai/config/forbidden-actions.json',
           ],
           {
@@ -666,6 +784,11 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             : null;
         const m = messageMatch ?? changeMatch;
         if (m === null) continue;
+        const authorizationKey = `${entry.id}@${sha}`;
+        if (authorizationKeys.has(authorizationKey)) {
+          appliedAuthorizationKeys.add(authorizationKey);
+          break;
+        }
         findings.push({
           forbidden_id: entry.id,
           source: messageMatch === null ? 'commit-change' : 'commit-message',
@@ -678,7 +801,16 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       }
     }
   }
-  return { registry_entries: registry.length, findings };
+  return {
+    registry_entries: registry.length,
+    findings,
+    authorization_receipts: {
+      path: authorizationPath,
+      declared: authorizationKeys.size,
+      applied: [...appliedAuthorizationKeys].sort(),
+      unused: [...authorizationKeys].filter((key) => !appliedAuthorizationKeys.has(key)).sort(),
+    },
+  };
 }
 
 function firstUnallowedChangeMatch(

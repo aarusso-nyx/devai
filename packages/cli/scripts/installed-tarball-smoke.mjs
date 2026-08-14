@@ -22,6 +22,7 @@ const smokeRoot = mkdtempSync(join(tmpdir(), 'devai-installed-tarball-smoke-'));
 const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
+const authorizationRoot = join(smokeRoot, 'authorization-project');
 
 function run(command, args, cwd = projectRoot) {
   return execFileSync(command, args, {
@@ -603,6 +604,108 @@ try {
   );
   if (packagedCheck?.result?.value?.ok !== true) {
     throw new Error('INSTALLED_PACKAGED_CHECK_POLICY_INVALID');
+  }
+  mkdirSync(authorizationRoot, { recursive: true });
+  run('git', ['init', '-q'], authorizationRoot);
+  run('git', ['config', 'user.email', 'smoke@example.invalid'], authorizationRoot);
+  run(
+    binary,
+    [
+      'init',
+      'bind',
+      '--constitution',
+      '--tier',
+      'tier1',
+      '--target',
+      authorizationRoot,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ],
+    authorizationRoot,
+  );
+  run(
+    binary,
+    [
+      'init',
+      'bind',
+      '--target',
+      authorizationRoot,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ],
+    authorizationRoot,
+  );
+  writeFileSync(
+    join(authorizationRoot, '.devai/config/forbidden-actions.json'),
+    readFileSync(join(installedPackage, 'dist/law/policy/forbidden-actions.json')),
+  );
+  run('git', ['add', '.devai'], authorizationRoot);
+  run(
+    'git',
+    ['-c', 'user.name=DEVAI Architect', 'commit', '-qm', 'seed forbidden policy'],
+    authorizationRoot,
+  );
+  writeFileSync(join(authorizationRoot, 'unsafe.txt'), 'git push --force\n');
+  run('git', ['add', 'unsafe.txt'], authorizationRoot);
+  run(
+    'git',
+    ['-c', 'user.name=Fixture', 'commit', '-qm', 'fixture unsafe evidence'],
+    authorizationRoot,
+  );
+  const authorizedCommit = run('git', ['rev-parse', 'HEAD'], authorizationRoot).trim();
+  mkdirSync(join(authorizationRoot, 'law/policy'), { recursive: true });
+  writeFileSync(
+    join(authorizationRoot, 'law/policy/forbidden-action-authorizations.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: '1.0.0',
+        authorizations: [
+          {
+            forbidden_id: 'FORBID-FORCE-PUSH',
+            commit: authorizedCommit,
+            authorized_by: 'Owner',
+            reason: 'Owner approved this exact installed-package fixture commit.',
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  run('git', ['add', 'law/policy/forbidden-action-authorizations.json'], authorizationRoot);
+  run(
+    'git',
+    ['-c', 'user.name=DEVAI Architect', 'commit', '-qm', 'record exact authorization'],
+    authorizationRoot,
+  );
+  const authorizedCheck = JSON.parse(
+    run(
+      binary,
+      [
+        'check',
+        '--only',
+        'forbidden-actions',
+        '--strict',
+        '--max-commits',
+        '2',
+        '--format',
+        'json',
+      ],
+      authorizationRoot,
+    ),
+  );
+  if (
+    authorizedCheck?.result?.value?.ok !== true ||
+    authorizedCheck?.result?.value?.authorization_receipts?.applied?.[0] !==
+      `FORBID-FORCE-PUSH@${authorizedCommit}`
+  ) {
+    throw new Error('INSTALLED_EXACT_FORBIDDEN_AUTHORIZATION_INVALID');
   }
   const missingDescriptor = runResult(binary, [
     'check',
