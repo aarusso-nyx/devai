@@ -104,7 +104,7 @@ jobs:
         run: |
           observation_repo="$RUNNER_TEMP/devai-observation"
           mkdir -p "$observation_repo/work/audit/post-merge/$GITHUB_SHA"
-          cp .devai/state/audit-observations/$GITHUB_SHA/*.json "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"
+          cp ".devai/state/audit-observations/$GITHUB_SHA/"*.json "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"
           printf '{"repository":"%s","workflow":"%s","ref":"%s","sha":"%s","run_id":"%s","attestation_url":"%s"}\\n' "$GITHUB_REPOSITORY" "$GITHUB_WORKFLOW_REF" "$GITHUB_REF" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$DEVAI_ATTESTATION_URL" > "$observation_repo/work/audit/post-merge/$GITHUB_SHA/github-oidc-receipt.json"
           git -C "$observation_repo" init -b audit
           git -C "$observation_repo" config user.name 'DEVAI Auditor'

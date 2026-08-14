@@ -62,6 +62,9 @@ describe('GitHub Actions main-observation adapter', () => {
       'NODE_AUTH_TOKEN: ${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
     );
     expect(workflow).toContain('refs/devai/post-merge/$GITHUB_SHA');
+    expect(workflow).toContain(
+      'cp ".devai/state/audit-observations/$GITHUB_SHA/"*.json "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"',
+    );
     expect(workflow).not.toContain('HEAD:refs/heads/main');
   });
 
