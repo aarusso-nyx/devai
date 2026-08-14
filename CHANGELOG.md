@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.7 — 2026-08-14
+
+- Quotes the exact main-observation artifact directory before expanding the JSON roster so the
+  generated GitHub Actions adapter passes shell analysis without changing its authenticated
+  audit-ref boundary.
+
 ## 1.1.6 — 2026-08-14
 
 - Generates a digest-bound GitHub Actions adapter that uses the optional read-only
