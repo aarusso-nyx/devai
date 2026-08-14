@@ -29,7 +29,7 @@ describe('normalized release package staging', () => {
     expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
   });
 
-  it('records a stable Release and latest dist-tag for version 1.1.3', () => {
+  it('records a stable Release and latest dist-tag for version 1.1.4', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -43,7 +43,7 @@ describe('normalized release package staging', () => {
       env: {
         ...process.env,
         PACKAGE_NAME: '@aarusso-nyx/devai',
-        RELEASE_TAG: 'v1.1.3',
+        RELEASE_TAG: 'v1.1.4',
         PACKAGE_TARBALL: packageTarball,
         SITE_ARCHIVE: siteArchive,
         SBOM_FILE: sbom,
@@ -65,8 +65,8 @@ describe('normalized release package staging', () => {
       release: Record<string, unknown>;
     };
     expect(value.release).toMatchObject({
-      tag: 'v1.1.3',
-      version: '1.1.3',
+      tag: 'v1.1.4',
+      version: '1.1.4',
       release_type: 'stable',
       prerelease: false,
       dist_tag: 'latest',
