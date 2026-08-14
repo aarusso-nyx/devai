@@ -436,8 +436,31 @@ describe('content-addressed check runner', () => {
     }
   });
 
-  it('refuses RC planning when database tests are disabled', () => {
+  it('does not impose the DEVAI source sentinel on adopter RC profiles', () => {
     const state = repository();
+    expect(() =>
+      withRunnerScope(() =>
+        runCheckTasks({
+          repoRoot: state.root,
+          target: 'rc',
+          operation: 'plan',
+          toolchain: TOOLCHAIN,
+          environment: {},
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('refuses RC planning when a descriptor-declared database sentinel is disabled', () => {
+    const state = repository();
+    const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
+      tasks: Array<{ nodeId: string; allowlistedEnv: string[] }>;
+    };
+    const rcTask = declared.tasks.find((task) => task.nodeId === 'test:rc');
+    if (rcTask === undefined) throw new Error('test fixture is missing test:rc');
+    rcTask.allowlistedEnv.push('DEVAI_DB_TESTS');
+    writeFileSync(join(state.root, 'test-tasks.json'), `${JSON.stringify(declared, null, 2)}\n`);
+
     expect(() =>
       withRunnerScope(() =>
         runCheckTasks({

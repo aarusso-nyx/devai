@@ -206,8 +206,13 @@ function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[]
 }
 
 export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
+  const requiredEnvironment = requiredEnvironmentKeys(options);
   const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
-  if (options.target === 'rc' && configuredDbTests !== '1') {
+  if (
+    options.target === 'rc' &&
+    requiredEnvironment.includes('DEVAI_DB_TESTS') &&
+    configuredDbTests !== '1'
+  ) {
     throw new Error(
       'CHECK_RC_DB_TESTS_REQUIRED: the RC profile requires DEVAI_DB_TESTS=1 so database cases cannot silently skip',
     );
@@ -219,7 +224,6 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
   const toolchain =
     options.toolchain ?? resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options));
   const environment: Record<string, string> = { ...(options.environment ?? {}) };
-  const requiredEnvironment = requiredEnvironmentKeys(options);
   const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
   if (requiredEnvironment.includes(authorityDigestKey)) {
     const authorityPolicyPath = join(options.repoRoot, '.devai/config/authority-policy.json');
