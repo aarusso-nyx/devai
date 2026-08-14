@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.4 — 2026-08-13
+
+- Scopes the `DEVAI_DB_TESTS` RC sentinel to task descriptors that explicitly declare it, keeping
+  DEVAI's own release floor fail-closed without imposing a source-repository-only switch on
+  adopters.
+- Allows adopter RC graphs to bind and execute their real database URL and test-harness variables
+  without adding an unused DEVAI-specific environment flag.
+
 ## 1.1.3 — 2026-08-13
 
 - Authorizes only the exact routine declared by the selected in-progress task when `round run`
