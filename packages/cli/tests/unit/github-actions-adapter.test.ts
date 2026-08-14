@@ -58,6 +58,9 @@ describe('GitHub Actions main-observation adapter', () => {
     expect(workflow).toContain('--at "$GITHUB_SHA"');
     expect(workflow).toContain('id-token: write');
     expect(workflow).toContain('packages: read');
+    expect(workflow).toContain(
+      'NODE_AUTH_TOKEN: ${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
+    );
     expect(workflow).toContain('refs/devai/post-merge/$GITHUB_SHA');
     expect(workflow).not.toContain('HEAD:refs/heads/main');
   });
@@ -68,6 +71,23 @@ describe('GitHub Actions main-observation adapter', () => {
     await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
     writeFileSync(plan.workflowPath, `${readFileSync(plan.workflowPath, 'utf8')}# drift\n`);
     expect(verifyGithubActionsAdapter(root, '1.1.0-rc.1').ok).toBe(false);
+  });
+
+  it('rejects a workflow that loses cross-repository package authentication', async () => {
+    const root = repository();
+    const plan = buildGithubActionsAdapterPlan(root, '1.1.6');
+    await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
+    writeFileSync(
+      plan.workflowPath,
+      readFileSync(plan.workflowPath, 'utf8').replace(
+        '${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
+        '${{ secrets.GITHUB_TOKEN }}',
+      ),
+    );
+    expect(verifyGithubActionsAdapter(root, '1.1.6')).toMatchObject({
+      ok: false,
+      facts: { package_auth_fallback_bound: false },
+    });
   });
 
   it('binds the common origin configuration from a linked Git worktree', async () => {

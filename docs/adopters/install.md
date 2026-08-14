@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.1.5
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.1.6
 pnpm exec devai catalog actions --format json
 ```
 
@@ -100,7 +100,10 @@ pnpm exec devai init bind --target . --host-adapter post-merge --as-role archite
 The GitHub adapter authenticates exact-main observations with GitHub OIDC. Its workflow may write
 only `refs/devai/post-merge/<sha>`, and only after both the dispatch input and repository consent
 variable authorize publication. Neither adapter claims control over arbitrary editors or shell
-commands.
+commands. When DEVAI and the adopter are owned by different GitHub accounts, configure the adopter
+repository secret `DEVAI_REPO_TOKEN` with read-only access to the DEVAI package. The generated,
+digest-bound workflow uses that secret for package installation when present and otherwise falls
+back to the repository-scoped `GITHUB_TOKEN`; credentials remain environment-only.
 
 Core files and requested includes are preflighted before the first write and applied
 as one rollback-capable transaction. A preflight conflict writes nothing. If the
