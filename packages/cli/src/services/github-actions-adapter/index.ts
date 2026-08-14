@@ -78,7 +78,7 @@ jobs:
           registry-url: https://npm.pkg.github.com
       - name: Install exact workspace
         env:
-          NODE_AUTH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: \${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           corepack enable
           corepack pnpm install --frozen-lockfile
@@ -185,6 +185,9 @@ export function verifyGithubActionsAdapter(
     facts['main_bound'] =
       config['branch'] === 'main' && bytes.includes("github.ref == 'refs/heads/main'");
     facts['exact_sha_bound'] = bytes.includes('--at "$GITHUB_SHA"');
+    facts['package_auth_fallback_bound'] = bytes.includes(
+      'NODE_AUTH_TOKEN: ${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
+    );
     facts['oidc_enabled'] =
       bytes.includes('id-token: write') && bytes.includes('attest-build-provenance@');
     facts['audit_ref_only'] =
