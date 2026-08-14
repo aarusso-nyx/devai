@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.5 — 2026-08-14
+
+- Adds fail-closed Owner authorization receipts for exact forbidden-action IDs at exact commits,
+  allowing governed repositories to preserve reviewed history without broad waivers or hook bypasses.
+- Rejects unknown actions, partial SHAs, non-Owner declarations, duplicate entries, and malformed
+  receipt bytes while reporting applied and unused authorizations for auditability.
+
 ## 1.1.4 — 2026-08-13
 
 - Scopes the `DEVAI_DB_TESTS` RC sentinel to task descriptors that explicitly declare it, keeping
