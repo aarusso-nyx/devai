@@ -1,6 +1,7 @@
 import { spawnSync } from '@devai-nyx/authority';
 import { existsSync, lstatSync, readFileSync, readlinkSync, statSync } from '@devai-nyx/authority';
 import { dirname, join, resolve } from 'node:path';
+import { readdirSync } from 'node:fs';
 import type { CAC } from 'cac';
 import { validators } from '@devai-nyx/schemas';
 import { verifyConstitutionBinding } from '@devai-nyx/skills';
@@ -19,6 +20,14 @@ import { checkDocsGovernance } from './check/docs-governance.js';
 import { resolveCliProvenance, resolveCliVersion } from '../version.js';
 import { verifyInstalledPostMergeAdapter } from '../services/hooks-install/index.js';
 import { verifyGithubActionsAdapter } from '../services/github-actions-adapter/index.js';
+import {
+  inspectRemoteLocalOnlyNodes,
+  readAttestedRcConfig,
+} from './check/ci-local-only.js';
+import {
+  ATTESTED_RC_WORKFLOW_FILE,
+  attestedRcVerificationWorkflow,
+} from '../services/ci-scaffold/index.js';
 
 const DEFAULT_REPO_ROOT = '.';
 const DEFAULT_CHAIN_RELATIVE = 'record/proofs/chain.json';
@@ -373,6 +382,115 @@ function checkAuthorityEnforcement(repoRoot: string): CheckResult {
   }
 }
 
+export function checkTrustedLocalRcBoundary(repoRoot: string): CheckResult {
+  const loaded = readAttestedRcConfig(repoRoot);
+  if (loaded.config === undefined) {
+    return {
+      name: 'trusted-local-rc-boundary',
+      ok: loaded.errors.length === 0,
+      info: {
+        configured: false,
+        local_rc_execution_configured: false,
+        remote_receipt_verification_configured: false,
+        proof_transport_configured: false,
+        exact_tree_binding_configured: false,
+        signer_trust_configured: false,
+        remote_workflow_can_execute_local_only_node: false,
+      },
+      ...(loaded.errors.length > 0 && { errors: loaded.errors }),
+    };
+  }
+  const workflowDirectory = join(repoRoot, '.github/workflows');
+  const workflows = existsSync(workflowDirectory)
+    ? readdirSync(workflowDirectory)
+        .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
+        .sort()
+        .map((file) => ({ file, text: readFileSync(join(workflowDirectory, file), 'utf8') }))
+    : [];
+  const inspection = inspectRemoteLocalOnlyNodes(repoRoot, workflows);
+  const workflowPath = join(workflowDirectory, ATTESTED_RC_WORKFLOW_FILE);
+  const workflowCurrent =
+    existsSync(workflowPath) &&
+    readFileSync(workflowPath, 'utf8') === attestedRcVerificationWorkflow();
+  let scripts: Record<string, string> = {};
+  try {
+    scripts =
+      (JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
+        scripts?: Record<string, string>;
+      }).scripts ?? {};
+  } catch {
+    scripts = {};
+  }
+  const localRcExecution =
+    inspection.errors.length === 0 &&
+    typeof scripts['devai:rc:prepare'] === 'string' &&
+    typeof scripts['devai:rc:publish'] === 'string';
+  const trustPath = join(repoRoot, '.devai/control/local-rc-trust-store.json');
+  let signerTrust = false;
+  let signerCount = 0;
+  try {
+    const trust = JSON.parse(readFileSync(trustPath, 'utf8')) as {
+      schemaVersion?: string;
+      trustedSigners?: Array<{ signerId?: string; publicKeyPem?: string }>;
+      revokedSignerIds?: string[];
+    };
+    const signers = trust.trustedSigners ?? [];
+    const revoked = new Set(trust.revokedSignerIds ?? []);
+    signerCount = signers.filter((signer) => !revoked.has(signer.signerId ?? '')).length;
+    signerTrust =
+      trust.schemaVersion === '1.0.0' &&
+      signerCount > 0 &&
+      signers.every(
+        (signer) =>
+          typeof signer.signerId === 'string' &&
+          typeof signer.publicKeyPem === 'string' &&
+          signer.publicKeyPem.includes('BEGIN PUBLIC KEY') &&
+          !signer.publicKeyPem.includes('PRIVATE'),
+      );
+  } catch {
+    signerTrust = false;
+  }
+  const protectedControls =
+    existsSync(join(repoRoot, '.devai/control/local-rc-toolchain.json')) &&
+    existsSync(join(repoRoot, '.devai/control/local-rc-environment.json'));
+  const proofTransport =
+    loaded.config.transport === 'protected-tag-v1' &&
+    loaded.config.tag_prefix.startsWith('devai-local-evidence/') &&
+    workflowCurrent;
+  const exactTreeBinding =
+    loaded.config.binding === 'exact-tree' &&
+    workflowCurrent &&
+    readFileSync(workflowPath, 'utf8').includes('binding=exact-tree');
+  const remoteVerification = workflowCurrent && protectedControls && signerTrust;
+  const remoteCanExecuteLocalOnly = inspection.violations.length > 0;
+  const errors = [
+    ...inspection.errors,
+    ...inspection.violations,
+    ...(!localRcExecution ? ['devai:rc:prepare and devai:rc:publish are not both configured'] : []),
+    ...(!workflowCurrent ? ['generated trusted local RC verifier workflow is missing or stale'] : []),
+    ...(!protectedControls ? ['protected local RC toolchain or environment control is missing'] : []),
+    ...(!signerTrust ? ['approved non-revoked local RC signer trust is missing'] : []),
+  ];
+  return {
+    name: 'trusted-local-rc-boundary',
+    ok: errors.length === 0,
+    info: {
+      configured: true,
+      local_rc_execution_configured: localRcExecution,
+      remote_receipt_verification_configured: remoteVerification,
+      proof_transport_configured: proofTransport,
+      exact_tree_binding_configured: exactTreeBinding,
+      signer_trust_configured: signerTrust,
+      approved_non_revoked_signers: signerCount,
+      remote_workflow_can_execute_local_only_node: remoteCanExecuteLocalOnly,
+      remote_mutation_fallback_configured: false,
+      attestation_boundary:
+        'trusted signer identity and byte integrity; workstation execution is not independently reproduced by GitHub',
+    },
+    ...(errors.length > 0 && { errors }),
+  };
+}
+
 /**
  * D-119: verifies the canonical constitution-binding shape — a
  * vendored `.devai/pin/constitution.md` plus a {version, sha256} pin
@@ -625,6 +743,11 @@ const CHECK_SPECS: readonly CheckSpec[] = [
     name: 'constitution-binding',
     minProfile: 'tier3',
     run: (repoRoot) => checkConstitutionBinding(repoRoot),
+  },
+  {
+    name: 'trusted-local-rc-boundary',
+    minProfile: 'tier3',
+    run: (repoRoot) => checkTrustedLocalRcBoundary(repoRoot),
   },
 ];
 

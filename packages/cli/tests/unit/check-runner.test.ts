@@ -635,7 +635,7 @@ describe('content-addressed check runner', () => {
     });
     expect(report.receiptRefusal).toBeUndefined();
     expect(report.receipt?.value).toMatchObject({
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       profile: 'affected',
       repository: {
         id: 'example/repo',

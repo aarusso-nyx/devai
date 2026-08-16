@@ -595,12 +595,13 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       return { ...planned, ...options.cacheState(planned) };
     });
   const taskPolicy: TaskPolicy = {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
     repositoryId: descriptor.repositoryId,
-    requiredNodes: tasks.map(({ nodeId, taskKey, dependencies }) => ({
+    requiredNodes: tasks.map(({ nodeId, taskKey, dependencies, outputContract }) => ({
       nodeId,
       taskKey,
       dependencies,
+      outputContract,
     })),
   };
   return {
