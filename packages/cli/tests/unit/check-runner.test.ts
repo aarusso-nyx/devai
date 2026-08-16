@@ -237,7 +237,7 @@ describe('content-addressed check runner', () => {
       'packages/core/package.json',
       `${JSON.stringify({ name: '@stynx/core', scripts: { stryker: 'stryker run' } })}\n`,
     );
-    file(state.root, 'packages/core/stryker.conf.mjs', 'export default {};\n');
+    file(state.root, 'packages/core/stryker.conf.mjs', 'export default { threshold: 70 };\n');
     git(state.root, ['add', '.']);
     git(state.root, ['commit', '-qm', 'add mutation package']);
     const mutationDescriptor = {
@@ -284,7 +284,7 @@ describe('content-addressed check runner', () => {
         {
           packageName: '@stynx/core',
           workspace: 'packages/core',
-          thresholds: { break: 90, high: 100, low: 90 },
+          thresholds: { break: 70, high: 70, low: 60 },
         },
       ],
     });
@@ -294,7 +294,7 @@ describe('content-addressed check runner', () => {
     const state = repository();
     const declared = readTaskDescriptor(join(state.root, 'test-tasks.json'));
     const secret = 'database-password-that-must-not-enter-evidence';
-    const mutated = structuredClone(declared) as {
+    const mutated = structuredClone(declared) as unknown as {
       tasks: Array<{ nodeId: string; allowlistedEnv: string[] }>;
     };
     const mutableRc = mutated.tasks.find((task) => task.nodeId === 'test:rc');

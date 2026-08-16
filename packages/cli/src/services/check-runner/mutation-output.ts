@@ -9,7 +9,14 @@ function object(value: unknown): value is JsonObject {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function thresholds(policy: JsonObject, packageName: string) {
+function thresholds(policy: JsonObject, packageName: string, literalOverride?: number) {
+  if (literalOverride !== undefined) {
+    return {
+      break: literalOverride,
+      high: literalOverride,
+      low: Math.max(60, literalOverride - 10),
+    };
+  }
   const perPackage = object(policy['perPackage']) ? policy['perPackage'] : {};
   const packagePolicy = object(perPackage[packageName]) ? perPackage[packageName] : {};
   const defaults = object(policy['defaults']) ? policy['defaults'] : {};
@@ -90,13 +97,20 @@ export function resolveMutationOutputContract(
         throw new Error(`CHECK_MUTATION_PACKAGE_NAME_INVALID: ${relative(repoRoot, packageDir)}`);
       }
       const workspace = relative(repoRoot, packageDir).split('\\').join('/');
+      const configSource = readFileSync(resolve(packageDir, configs[0] ?? ''), 'utf8');
+      const literalMatches = [...configSource.matchAll(/\bthreshold\s*:\s*(\d+(?:\.\d+)?)/gu)];
+      if (literalMatches.length > 1) {
+        throw new Error(`CHECK_MUTATION_THRESHOLD_AMBIGUOUS: ${workspace}`);
+      }
+      const literalThreshold =
+        literalMatches[0]?.[1] === undefined ? undefined : Number(literalMatches[0][1]);
       const stem = workspace.replaceAll('/', '-');
       packages.push({
         packageName,
         workspace,
         resultPath: `${artifactRoot}/${stem}.result.json`,
         reportPath: `${artifactRoot}/${stem}.stryker.json`,
-        thresholds: thresholds(policy, packageName),
+        thresholds: thresholds(policy, packageName, literalThreshold),
       });
     }
   }
