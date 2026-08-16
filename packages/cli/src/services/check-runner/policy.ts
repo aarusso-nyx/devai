@@ -11,6 +11,7 @@ import type {
   TaskPolicy,
   TaskTarget,
 } from './types.js';
+import { resolveMutationOutputContract } from './mutation-output.js';
 
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
@@ -529,12 +530,18 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   const selected = selectedNodeIds(descriptor, target, changes);
   const entries = clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot);
   const descriptorDigest = sha256Hex(descriptor);
+  const ordered = topologicalTasks(descriptor);
+  const outputContracts = new Map(
+    ordered.map((task) => [
+      task.nodeId,
+      resolveMutationOutputContract(repoRoot, task.outputContract),
+    ]),
+  );
   const taskKeys = new Map<string, string>();
   const plannedById = new Map<
     string,
     Omit<PlannedTask, 'cacheState' | 'reason' | 'cachedResultDigest'>
   >();
-  const ordered = topologicalTasks(descriptor);
   for (const task of ordered) {
     if (!selected.has(task.nodeId)) continue;
     const selectedToolchain: Record<string, string> = {};
@@ -545,7 +552,10 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     }
     const selectedEnvironment: Record<string, string | null> = {};
     for (const key of [...task.allowlistedEnv].sort()) {
-      selectedEnvironment[key] = environment[key] ?? null;
+      selectedEnvironment[key] =
+        environment[key] === undefined
+          ? null
+          : `sha256:${sha256Hex(Buffer.from(environment[key], 'utf8'))}`;
     }
     const inputs = entries.filter((entry) =>
       task.inputSelectors.some((selector) => selectorMatches(selector, entry.path)),
@@ -564,7 +574,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       runner: task.runner,
       toolchain: selectedToolchain,
       environment: selectedEnvironment,
-      outputContract: task.outputContract,
+      outputContract: outputContracts.get(task.nodeId),
       inputs,
       dependencies,
     });
@@ -584,7 +594,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       matchedChangedPaths: changes.filter((path) =>
         task.inputSelectors.some((selector) => selectorMatches(selector, path)),
       ),
-      outputContract: task.outputContract,
+      outputContract: outputContracts.get(task.nodeId) ?? task.outputContract,
     });
   }
   const tasks = ordered

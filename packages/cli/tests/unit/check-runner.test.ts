@@ -222,6 +222,110 @@ afterEach(() => {
 });
 
 describe('content-addressed check runner', () => {
+  it('derives mutation outputs from the exact workspace roster', () => {
+    const state = repository();
+    file(
+      state.root,
+      'tools/repo-config/test-policy.json',
+      `${JSON.stringify({
+        policies: { mutation: { tier3: { break: 90, high: 100, low: 90 } } },
+        defaults: { mutation: 'tier3' },
+      })}\n`,
+    );
+    file(
+      state.root,
+      'packages/core/package.json',
+      `${JSON.stringify({ name: '@stynx/core', scripts: { stryker: 'stryker run' } })}\n`,
+    );
+    file(state.root, 'packages/core/stryker.conf.mjs', 'export default {};\n');
+    git(state.root, ['add', '.']);
+    git(state.root, ['commit', '-qm', 'add mutation package']);
+    const mutationDescriptor = {
+      schemaVersion: '1.0.0',
+      descriptorVersion: 'mutation-v1',
+      repositoryId: 'example/repo',
+      fallbackNodeId: null,
+      dynamicFallbackSelectors: [],
+      tasks: [
+        {
+          nodeId: 'test:mutation',
+          dependencies: [],
+          argv: ['pnpm', 'test:mutation'],
+          cwd: '.',
+          runner: 'stryker-v1',
+          inputSelectors: [{ kind: 'prefix', pattern: 'packages/' }],
+          toolchainKeys: ['node'],
+          allowlistedEnv: [],
+          outputContract: {
+            kind: 'mutation-report-set-discovery-v1',
+            workspaceRoots: ['packages'],
+            testPolicyPath: 'tools/repo-config/test-policy.json',
+            artifactRoot: '.devai/state/check-cache/v1/artifacts/mutation',
+            summaryPath: '.devai/state/check-cache/v1/artifacts/mutation/summary.json',
+          },
+        },
+      ],
+      profiles: [{ profileId: 'rc', mode: 'fixed', requiredNodes: ['test:mutation'] }],
+    } as const;
+    const report = withRunnerScope(() =>
+      buildTaskPlan({
+        repoRoot: state.root,
+        descriptor: mutationDescriptor,
+        target: 'rc',
+        toolchain: TOOLCHAIN,
+        environment: {},
+        cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
+      }),
+    );
+    expect(report.tasks[0]?.outputContract).toMatchObject({
+      kind: 'mutation-report-set-v1',
+      expectedPackageCount: 1,
+      packages: [
+        {
+          packageName: '@stynx/core',
+          workspace: 'packages/core',
+          thresholds: { break: 90, high: 100, low: 90 },
+        },
+      ],
+    });
+  });
+
+  it('binds environment identities without exposing local values', () => {
+    const state = repository();
+    const declared = readTaskDescriptor(join(state.root, 'test-tasks.json'));
+    const secret = 'database-password-that-must-not-enter-evidence';
+    const mutated = structuredClone(declared) as {
+      tasks: Array<{ nodeId: string; allowlistedEnv: string[] }>;
+    };
+    const mutableRc = mutated.tasks.find((task) => task.nodeId === 'test:rc');
+    if (mutableRc === undefined) throw new Error('test fixture is missing mutable test:rc');
+    mutableRc.allowlistedEnv.push('DATABASE_PASSWORD');
+    const report = withRunnerScope(() =>
+      buildTaskPlan({
+        repoRoot: state.root,
+        descriptor: mutated as unknown as ReturnType<typeof readTaskDescriptor>,
+        target: 'rc',
+        toolchain: TOOLCHAIN,
+        environment: { DATABASE_PASSWORD: secret },
+        cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
+      }),
+    );
+    const serialized = JSON.stringify(report);
+    expect(serialized).not.toContain(secret);
+    const changed = withRunnerScope(() =>
+      buildTaskPlan({
+        repoRoot: state.root,
+        descriptor: mutated as unknown as ReturnType<typeof readTaskDescriptor>,
+        target: 'rc',
+        toolchain: TOOLCHAIN,
+        environment: { DATABASE_PASSWORD: `${secret}-changed` },
+        cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
+      }),
+    );
+    expect(changed.tasks.at(-1)?.taskKey).not.toBe(report.tasks.at(-1)?.taskKey);
+    expect(JSON.stringify(changed)).not.toContain(`${secret}-changed`);
+  });
+
   it('builds the runtime before every local lane that executes built artifacts', () => {
     const actual = readTaskDescriptor(
       fileURLToPath(new URL('../../../../test-tasks.json', import.meta.url)),
