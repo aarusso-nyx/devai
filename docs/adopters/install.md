@@ -1,6 +1,6 @@
 # Install and adopt
 
-DEVAI 1.1 is distributed through GitHub Packages as one package:
+DEVAI 1.2 is distributed through GitHub Packages as one package:
 `@aarusso-nyx/devai`. Pin the exact version selected by your maintainers; do
 not rely on a moving dist-tag.
 
@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.1.7
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.0-rc.1
 pnpm exec devai catalog actions --format json
 ```
 

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 
 const CONFIG_PATTERN = /^stryker\.(?:conf|config)\.(?:cjs|js|json|mjs|ts)$/u;
 
