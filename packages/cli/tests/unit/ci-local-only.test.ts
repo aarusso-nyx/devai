@@ -13,7 +13,10 @@ afterEach(() => {
 function put(root: string, path: string, value: unknown): void {
   const absolute = join(root, path);
   mkdirSync(dirname(absolute), { recursive: true });
-  writeFileSync(absolute, typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`);
+  writeFileSync(
+    absolute,
+    typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`,
+  );
 }
 
 function fixture(): string {
@@ -59,9 +62,7 @@ describe('attested RC local-only workflow inspection', () => {
     const indirect = inspectRemoteLocalOnlyNodes(root, [
       { file: 'audit.yml', text: 'run: pnpm run ci:stynx:full\n' },
     ]);
-    expect(indirect.violations).toContain(
-      'audit.yml: reaches local-only script ci:stynx:full',
-    );
+    expect(indirect.violations).toContain('audit.yml: reaches local-only script ci:stynx:full');
 
     const direct = inspectRemoteLocalOnlyNodes(root, [
       { file: 'hardening.yml', text: 'run: pnpm exec stryker run\n' },
@@ -69,11 +70,23 @@ describe('attested RC local-only workflow inspection', () => {
     expect(direct.violations).toContain('hardening.yml: direct Stryker invocation');
   });
 
+  it('inspects only executable run bodies, not action metadata or inputs', () => {
+    const root = fixture();
+    const result = inspectRemoteLocalOnlyNodes(root, [
+      {
+        file: 'ci.yml',
+        text: `jobs:\n  test:\n    steps:\n      - uses: pnpm/action-setup@immutable\n        with:\n          version: 9\n      - uses: actions/setup-node@immutable\n        with:\n          cache-dependency-path: pnpm-lock.yaml\n      - run: pnpm audit --prod\n      - run: pnpm version --json\n      - run: pnpm run ci:remote\n`,
+      },
+    ]);
+    expect(result.errors).toEqual([]);
+    expect(result.violations).toEqual([]);
+  });
+
   it('fails closed for missing nodes and unresolvable script chains', () => {
     const root = fixture();
-    const project = JSON.parse(
-      readFileSync(join(root, '.devai/config/project.json'), 'utf8'),
-    ) as { ci_economy: { attested_rc: { local_only_nodes: string[] } } };
+    const project = JSON.parse(readFileSync(join(root, '.devai/config/project.json'), 'utf8')) as {
+      ci_economy: { attested_rc: { local_only_nodes: string[] } };
+    };
     project.ci_economy.attested_rc.local_only_nodes = ['test:missing'];
     put(root, '.devai/config/project.json', project);
     const result = inspectRemoteLocalOnlyNodes(root, [

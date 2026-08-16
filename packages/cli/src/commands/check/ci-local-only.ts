@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 export interface AttestedRcConfig {
   readonly profile: 'rc';
@@ -19,6 +20,37 @@ export interface LocalOnlyInspection {
   readonly forbiddenScripts: readonly string[];
 }
 
+const PACKAGE_MANAGER_COMMANDS = new Set([
+  'add',
+  'audit',
+  'bin',
+  'ci',
+  'config',
+  'deploy',
+  'dlx',
+  'env',
+  'exec',
+  'fetch',
+  'import',
+  'install',
+  'licenses',
+  'link',
+  'list',
+  'outdated',
+  'pack',
+  'prune',
+  'publish',
+  'rebuild',
+  'remove',
+  'root',
+  'setup',
+  'store',
+  'unlink',
+  'update',
+  'version',
+  'why',
+]);
+
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -35,7 +67,11 @@ export function readAttestedRcConfig(repoRoot: string): {
   } catch {
     return { errors: ['.devai/config/project.json is not valid JSON'] };
   }
-  if (!object(parsed) || !object(parsed.ci_economy) || parsed.ci_economy.attested_rc === undefined) {
+  if (
+    !object(parsed) ||
+    !object(parsed.ci_economy) ||
+    parsed.ci_economy.attested_rc === undefined
+  ) {
     return { errors: [] };
   }
   const value = parsed.ci_economy.attested_rc;
@@ -111,7 +147,33 @@ function tokenPresent(text: string, token: string): boolean {
   return new RegExp(`(^|[^A-Za-z0-9:_-])${escaped}(?=$|[^A-Za-z0-9:_-])`, 'u').test(text);
 }
 
-function forbiddenScriptClosure(scripts: Map<string, string[]>, seeds: readonly string[]): string[] {
+function workflowRunBodies(text: string): { bodies: string[]; error?: string } {
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(text) as unknown;
+  } catch {
+    return { bodies: [], error: 'workflow YAML cannot be parsed' };
+  }
+  const bodies: string[] = [];
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const child of value) visit(child);
+      return;
+    }
+    if (!object(value)) return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key === 'run' && typeof child === 'string') bodies.push(child);
+      else visit(child);
+    }
+  };
+  visit(parsed);
+  return { bodies };
+}
+
+function forbiddenScriptClosure(
+  scripts: Map<string, string[]>,
+  seeds: readonly string[],
+): string[] {
   const forbidden = new Set(seeds);
   let changed = true;
   while (changed) {
@@ -133,7 +195,10 @@ function forbiddenScriptClosure(scripts: Map<string, string[]>, seeds: readonly 
   return [...forbidden].sort();
 }
 
-function descriptorLocalNodes(repoRoot: string, ids: readonly string[]): { scripts: string[]; errors: string[] } {
+function descriptorLocalNodes(
+  repoRoot: string,
+  ids: readonly string[],
+): { scripts: string[]; errors: string[] } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(join(repoRoot, 'test-tasks.json'), 'utf8')) as unknown;
@@ -148,15 +213,21 @@ function descriptorLocalNodes(repoRoot: string, ids: readonly string[]): { scrip
   const errors: string[] = [];
   for (const id of ids) {
     const task = tasks.find((entry) => entry.nodeId === id);
-    if (task === undefined || !Array.isArray(task.argv) || task.argv.some((arg) => typeof arg !== 'string')) {
+    if (
+      task === undefined ||
+      !Array.isArray(task.argv) ||
+      task.argv.some((arg) => typeof arg !== 'string')
+    ) {
       errors.push(`local-only node ${id} is absent or malformed in test-tasks.json`);
       continue;
     }
     scripts.push(id);
     const argv = task.argv as string[];
     const runIndex = argv.indexOf('run');
-    if (runIndex >= 0 && argv[runIndex + 1] !== undefined) scripts.push(argv[runIndex + 1] as string);
-    else if (argv[0] === 'pnpm' && argv[1] !== undefined && !argv[1]?.startsWith('-')) scripts.push(argv[1]);
+    if (runIndex >= 0 && argv[runIndex + 1] !== undefined)
+      scripts.push(argv[runIndex + 1] as string);
+    else if (argv[0] === 'pnpm' && argv[1] !== undefined && !argv[1]?.startsWith('-'))
+      scripts.push(argv[1]);
   }
   return { scripts, errors };
 }
@@ -175,16 +246,29 @@ export function inspectRemoteLocalOnlyNodes(
   const violations: string[] = [];
   const invokedScripts = new Set(scripts.keys());
   for (const workflow of workflows) {
-    if (/\bstryker\b/u.test(workflow.text)) violations.push(`${workflow.file}: direct Stryker invocation`);
-    for (const name of forbidden) {
-      if (tokenPresent(workflow.text, name)) {
-        violations.push(`${workflow.file}: reaches local-only script ${name}`);
-      }
+    const commands = workflowRunBodies(workflow.text);
+    if (commands.error !== undefined) {
+      violations.push(`${workflow.file}: ${commands.error}`);
+      continue;
     }
-    for (const match of workflow.text.matchAll(/\b(?:pnpm|npm|yarn)\s+(?:run\s+)?([A-Za-z][A-Za-z0-9:_-]*)/gu)) {
-      const name = match[1];
-      if (name !== undefined && !['exec', 'install', 'ci', 'dlx'].includes(name) && !invokedScripts.has(name)) {
-        violations.push(`${workflow.file}: script chain ${name} cannot be resolved`);
+    for (const body of commands.bodies) {
+      if (/\bstryker\b/u.test(body)) violations.push(`${workflow.file}: direct Stryker invocation`);
+      for (const name of forbidden) {
+        if (tokenPresent(body, name)) {
+          violations.push(`${workflow.file}: reaches local-only script ${name}`);
+        }
+      }
+      for (const match of body.matchAll(
+        /\b(?:pnpm|npm|yarn)\s+(?:run\s+)?([A-Za-z][A-Za-z0-9:_-]*)/gu,
+      )) {
+        const name = match[1];
+        if (
+          name !== undefined &&
+          !PACKAGE_MANAGER_COMMANDS.has(name) &&
+          !invokedScripts.has(name)
+        ) {
+          violations.push(`${workflow.file}: script chain ${name} cannot be resolved`);
+        }
       }
     }
   }
