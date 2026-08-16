@@ -410,6 +410,17 @@ try {
       policy_version: '1.0.0',
       domains: { client: ['COVERAGE'] },
       thresholds: { coverage: { lines: 91 } },
+      ci_economy: {
+        attested_rc: {
+          profile: 'rc',
+          transport: 'protected-tag-v1',
+          tag_prefix: 'devai-local-evidence/',
+          binding: 'exact-tree',
+          required_check: 'verified-local-rc',
+          failure_mode: 'fail-closed',
+          local_only_nodes: ['test:mutation'],
+        },
+      },
     },
     null,
     2,
@@ -439,6 +450,15 @@ try {
   const adopterSnapshot = new Map(
     adopterTargets.map((path) => [path, readFileSync(join(projectRoot, path), 'utf8')]),
   );
+  const boundProject = JSON.parse(
+    readFileSync(join(projectRoot, '.devai/config/project.json'), 'utf8'),
+  );
+  if (
+    boundProject.ci_economy?.attested_rc?.required_check !== 'verified-local-rc' ||
+    boundProject.ci_economy?.attested_rc?.local_only_nodes?.join(',') !== 'test:mutation'
+  ) {
+    throw new Error('INSTALLED_ADOPTER_POLICY_ATTESTED_RC_INVALID');
+  }
   writeFileSync(
     adopterPolicyPath,
     `${JSON.stringify({

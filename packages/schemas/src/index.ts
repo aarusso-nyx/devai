@@ -76,6 +76,7 @@ function ensureSchemaReferences(name: SchemaName): void {
   if (name === 'adopter-policy.schema.json') {
     for (const dependency of [
       'glob-guards.schema.json',
+      'project-config.schema.json',
       'scorecard-na-config.schema.json',
     ] as const) {
       if (ajv.getSchema(dependency) === undefined) {

@@ -30,6 +30,10 @@
         }
       }
     },
+    "ci_economy": {
+      "$ref": "project-config.schema.json#/properties/ci_economy",
+      "description": "Optional CI-economy policy materialized into the adopter project configuration."
+    },
     "domains": {
       "type": "object",
       "additionalProperties": false,
