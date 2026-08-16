@@ -50,7 +50,7 @@ describe('attested RC workflow scaffold', () => {
     expect(plan.content).toContain(`ref: ${ATTESTED_RC_VERIFIER_COMMIT}`);
     expect(plan.content).toContain('name: verified-local-rc');
     expect(plan.content).toContain('--binding "${{ steps.identity.outputs.binding }}"');
-    expect(plan.content).toContain('control/.devai/control/local-rc-trust-store.json');
+    expect(plan.content).toContain('control/law/policy/devai-local-rc-trust-store.json');
     expect(plan.content).not.toMatch(/pnpm (?:run|exec|test)|\bstryker\b/u);
     expect(plan.content).not.toContain('NODE_AUTH_TOKEN');
   });

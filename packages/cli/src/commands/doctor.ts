@@ -425,7 +425,7 @@ export function checkTrustedLocalRcBoundary(repoRoot: string): CheckResult {
     inspection.errors.length === 0 &&
     typeof scripts['devai:rc:prepare'] === 'string' &&
     typeof scripts['devai:rc:publish'] === 'string';
-  const trustPath = join(repoRoot, '.devai/control/local-rc-trust-store.json');
+  const trustPath = join(repoRoot, 'law/policy/devai-local-rc-trust-store.json');
   let signerTrust = false;
   let signerCount = 0;
   try {
@@ -451,8 +451,8 @@ export function checkTrustedLocalRcBoundary(repoRoot: string): CheckResult {
     signerTrust = false;
   }
   const protectedControls =
-    existsSync(join(repoRoot, '.devai/control/local-rc-toolchain.json')) &&
-    existsSync(join(repoRoot, '.devai/control/local-rc-environment.json'));
+    existsSync(join(repoRoot, 'law/policy/devai-local-rc-toolchain.json')) &&
+    existsSync(join(repoRoot, 'law/policy/devai-local-rc-environment.json'));
   const proofTransport =
     loaded.config.transport === 'protected-tag-v1' &&
     loaded.config.tag_prefix.startsWith('devai-local-evidence/') &&

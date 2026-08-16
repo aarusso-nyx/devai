@@ -47,7 +47,7 @@ function fixture(): string {
     tasks: [{ nodeId: 'test:mutation', argv: ['pnpm', 'run', 'test:mutation'] }],
   });
   const keys = generateKeyPairSync('ed25519');
-  put(root, '.devai/control/local-rc-trust-store.json', {
+  put(root, 'law/policy/devai-local-rc-trust-store.json', {
     schemaVersion: '1.0.0',
     trustedSigners: [
       {
@@ -57,8 +57,8 @@ function fixture(): string {
     ],
     revokedSignerIds: [],
   });
-  put(root, '.devai/control/local-rc-toolchain.json', { node: '24.15.0', pnpm: '9.15.0' });
-  put(root, '.devai/control/local-rc-environment.json', {});
+  put(root, 'law/policy/devai-local-rc-toolchain.json', { node: '24.15.0', pnpm: '9.15.0' });
+  put(root, 'law/policy/devai-local-rc-environment.json', {});
   const plan = buildCiScaffoldPlan({ targetRoot: root });
   mkdirSync(dirname(plan.path), { recursive: true });
   writeFileSync(plan.path, plan.content);

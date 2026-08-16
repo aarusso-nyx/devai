@@ -130,8 +130,8 @@ jobs:
             --profile rc ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.identity.outputs.tree }}" ${backslash}
-            --toolchain control/.devai/control/local-rc-toolchain.json ${backslash}
-            --environment control/.devai/control/local-rc-environment.json ${backslash}
+            --toolchain control/law/policy/devai-local-rc-toolchain.json ${backslash}
+            --environment control/law/policy/devai-local-rc-environment.json ${backslash}
             --schema-version 1.1.0 ${backslash}
             --output "$RUNNER_TEMP/devai-local-rc/expected-task-policy.json" ${backslash}
             > "$RUNNER_TEMP/devai-local-rc/policy-result.json"
@@ -147,7 +147,7 @@ jobs:
           set -euo pipefail
           node .devai-verifier/src/bundle-cli.js ${backslash}
             --bundle evidence ${backslash}
-            --trust control/.devai/control/local-rc-trust-store.json ${backslash}
+            --trust control/law/policy/devai-local-rc-trust-store.json ${backslash}
             --repository "$GITHUB_REPOSITORY" ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.identity.outputs.tree }}" ${backslash}
