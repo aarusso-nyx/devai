@@ -101,14 +101,16 @@ jobs:
           tag_sha="\${tag_object#*:}"
           proof_commit="$(gh api "repos/\${GITHUB_REPOSITORY}/git/tags/$tag_sha" --jq 'select(.object.type == "commit") | .object.sha')"
           test -n "$proof_commit"
-          echo "tree=$tree" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "proof_commit=$proof_commit" >> "$GITHUB_OUTPUT"
-          if test "$GITHUB_EVENT_NAME" = push; then
-            echo "binding=exact-tree" >> "$GITHUB_OUTPUT"
-          else
-            echo "binding=exact-commit" >> "$GITHUB_OUTPUT"
-          fi
+          {
+            echo "tree=$tree"
+            echo "tag=$tag"
+            echo "proof_commit=$proof_commit"
+            if test "$GITHUB_EVENT_NAME" = push; then
+              echo "binding=exact-tree"
+            else
+              echo "binding=exact-commit"
+            fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Check out immutable proof commit
         uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
@@ -343,7 +345,8 @@ jobs:
 export function buildCiScaffoldPlan(opts: CiScaffoldOptions): CiScaffoldPlan {
   const root = resolve(opts.targetRoot);
   const attested = readAttestedRcConfig(root);
-  if (attested.errors.length > 0) throw new Error(`CI_SCAFFOLD_ATTESTED_RC_INVALID:${attested.errors.join(';')}`);
+  if (attested.errors.length > 0)
+    throw new Error(`CI_SCAFFOLD_ATTESTED_RC_INVALID:${attested.errors.join(';')}`);
   const defaultRelative =
     attested.config === undefined
       ? DEFAULT_OUTPUT_RELATIVE
@@ -366,7 +369,9 @@ export function buildCiScaffoldPlan(opts: CiScaffoldOptions): CiScaffoldPlan {
   return {
     path,
     content:
-      attested.config === undefined ? ledgerVerificationWorkflow() : attestedRcVerificationWorkflow(),
+      attested.config === undefined
+        ? ledgerVerificationWorkflow()
+        : attestedRcVerificationWorkflow(),
     exists: existsSync(path),
   };
 }
