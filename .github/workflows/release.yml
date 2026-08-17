@@ -26,7 +26,7 @@ env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
   EXPECTED_ACTION_COUNT: 43
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
-  VERIFIER_COMMIT: 0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77
+  VERIFIER_COMMIT: 5f71d43a3d55b07fe866ea2df139dfaacc84f7db
 
 jobs:
   verify-ledger:
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: devai-nyx/devai-verifier
-          ref: 0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77
+          ref: 5f71d43a3d55b07fe866ea2df139dfaacc84f7db
           path: .devai-verifier
           fetch-depth: 1
           persist-credentials: false
