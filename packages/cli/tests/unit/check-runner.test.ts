@@ -326,6 +326,89 @@ describe('content-addressed check runner', () => {
     expect(JSON.stringify(changed)).not.toContain(`${secret}-changed`);
   });
 
+  it('delivers only each task own allowlisted environment at runtime', () => {
+    const state = repository();
+    const environmentKey = 'DEVAI_CHECK_RUNNER_SECRET_FIXTURE';
+    const secret = 'task-scoped-secret-value';
+    const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
+      tasks: Array<{
+        nodeId: string;
+        argv: string[];
+        allowlistedEnv: string[];
+      }>;
+    };
+    const unit = declared.tasks.find((task) => task.nodeId === 'test:unit');
+    const rc = declared.tasks.find((task) => task.nodeId === 'test:rc');
+    if (unit === undefined || rc === undefined) throw new Error('test fixture tasks are missing');
+    unit.allowlistedEnv = [environmentKey];
+    rc.allowlistedEnv = [];
+    file(state.root, 'test-tasks.json', `${JSON.stringify(declared, null, 2)}\n`);
+
+    const observed = new Map<string, Readonly<Record<string, string>>>();
+    const first = run(state.root, {
+      target: 'rc',
+      environment: { [environmentKey]: secret, UNDECLARED_SECRET: 'never-selected' },
+      executeTask: (argv, _cwd, _timeoutMs, environment) => {
+        observed.set(argv.join(' '), environment);
+        return PASS;
+      },
+    });
+
+    expect(first.exitCode).toBe(0);
+    expect([...observed.values()]).toContainEqual({ [environmentKey]: secret });
+    expect([...observed.values()].filter((value) => environmentKey in value)).toHaveLength(1);
+    expect([...observed.values()].every((value) => !('UNDECLARED_SECRET' in value))).toBe(true);
+    expect(JSON.stringify(first)).not.toContain(secret);
+    expect(JSON.stringify(first)).not.toContain('never-selected');
+
+    const changed = run(state.root, {
+      target: 'rc',
+      operation: 'plan',
+      cacheRoot: join(state.root, '.devai/state/changed-environment-cache'),
+      environment: { [environmentKey]: `${secret}-changed` },
+    });
+    const firstById = new Map(first.plan.tasks.map((task) => [task.nodeId, task.taskKey]));
+    const changedById = new Map(changed.plan.tasks.map((task) => [task.nodeId, task.taskKey]));
+    expect(changedById.get('test:unit')).not.toBe(firstById.get('test:unit'));
+    expect(changedById.get('test:rc')).not.toBe(firstById.get('test:rc'));
+    expect(changedById.get('generate')).toBe(firstById.get('generate'));
+  });
+
+  it('does not expose a sibling task credential through the default process runner', () => {
+    const state = repository();
+    const environmentKey = 'DEVAI_CHECK_RUNNER_SECRET_FIXTURE';
+    const secret = 'sibling-only-secret';
+    const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
+      tasks: Array<{
+        nodeId: string;
+        argv: string[];
+        allowlistedEnv: string[];
+      }>;
+    };
+    const unit = declared.tasks.find((task) => task.nodeId === 'test:unit');
+    const rc = declared.tasks.find((task) => task.nodeId === 'test:rc');
+    if (unit === undefined || rc === undefined) throw new Error('test fixture tasks are missing');
+    unit.allowlistedEnv = [environmentKey];
+    unit.argv = ['node', '-e', `process.exit(process.env.${environmentKey} !== undefined ? 0 : 8)`];
+    rc.allowlistedEnv = [];
+    rc.argv = ['node', '-e', `process.exit(process.env.${environmentKey} === undefined ? 0 : 7)`];
+    file(state.root, 'test-tasks.json', `${JSON.stringify(declared, null, 2)}\n`);
+
+    const report = withRunnerScope(() =>
+      runCheckTasks({
+        repoRoot: state.root,
+        target: 'rc',
+        operation: 'run',
+        toolchain: TOOLCHAIN,
+        environment: { [environmentKey]: secret },
+        now: () => '2026-08-10T00:00:00.000Z',
+      }),
+    );
+    expect(report.exitCode).toBe(0);
+    expect(report.execution?.every((task) => task.outcome === 'PASS')).toBe(true);
+    expect(JSON.stringify(report)).not.toContain(secret);
+  });
+
   it('builds the runtime before every local lane that executes built artifacts', () => {
     const actual = readTaskDescriptor(
       fileURLToPath(new URL('../../../../test-tasks.json', import.meta.url)),

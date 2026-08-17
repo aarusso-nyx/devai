@@ -50,4 +50,8 @@ Minimal example:
 Use `devai check --affected --task-plan --base <exact-commit> --format json` to
 inspect selection before execution. Environment variables affect a task key only when
 the node explicitly names them in `allowlistedEnv`; absence and an empty value are
-different identities.
+different identities. At execution time DEVAI gives each task only its own allowlisted
+values, plus the fixed process-bootstrap environment required to launch the command.
+An environment variable declared by one selected node is never inherited by a sibling
+node merely because both belong to the same affected or RC graph. Dependency task keys
+still propagate normally to downstream nodes.

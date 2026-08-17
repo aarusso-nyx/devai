@@ -205,6 +205,18 @@ function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[]
   return requiredTaskNodes(options).flatMap((task) => task.allowlistedEnv);
 }
 
+function taskEnvironment(
+  task: TaskDescriptorNode,
+  environment: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  const selected: Record<string, string> = {};
+  for (const key of task.allowlistedEnv) {
+    const value = environment[key];
+    if (value !== undefined) selected[key] = value;
+  }
+  return selected;
+}
+
 export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
   const requiredEnvironment = requiredEnvironmentKeys(options);
   const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
@@ -245,10 +257,11 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
     return { schemaVersion: '1.0.0', operation: options.operation, plan, exitCode: 0 };
   }
 
-  const execute =
-    options.executeTask ??
-    ((argv: readonly string[], cwd: string, selectedTimeoutMs: number) =>
-      defaultExecute(argv, cwd, selectedTimeoutMs, environment));
+  const execute = options.executeTask ?? defaultExecute;
+  const descriptor = readTaskDescriptor(
+    resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
+  );
+  const descriptorById = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new Error('CHECK_RUNNER_TIMEOUT: timeout must be a positive integer');
@@ -296,7 +309,16 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
 
     const startedAt = now();
     const started = Date.now();
-    const result = execute(task.argv, resolve(options.repoRoot, task.cwd), timeoutMs);
+    const descriptorTask = descriptorById.get(task.nodeId);
+    if (descriptorTask === undefined) {
+      throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
+    }
+    const result = execute(
+      task.argv,
+      resolve(options.repoRoot, task.cwd),
+      timeoutMs,
+      taskEnvironment(descriptorTask, environment),
+    );
     const durationMs = Math.max(0, Date.now() - started);
     const finishedAt = now();
     const outcome = executionOutcome(result);
