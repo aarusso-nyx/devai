@@ -115,7 +115,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'legacy task-policy reconstruction',
       mutate: (source: string) =>
-        source.replace('--schema-version 1.1.0', '--schema-version 1.0.0'),
+        source.replace('--schema-version "$POLICY_SCHEMA_VERSION"', '--schema-version 1.0.0'),
       diagnostic: 'CI_EXPECTED_POLICY_BINDING_MISSING',
     },
     {

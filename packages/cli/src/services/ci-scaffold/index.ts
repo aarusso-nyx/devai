@@ -122,15 +122,17 @@ jobs:
         shell: bash
         env:
           POLICY_DIGEST: \${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
+          POLICY_SCHEMA_VERSION: \${{ vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION }}
         run: |
           set -euo pipefail
           test "$POLICY_DIGEST" != ""
+          test "$POLICY_SCHEMA_VERSION" = 1.0.0 -o "$POLICY_SCHEMA_VERSION" = 1.1.0
           control="$RUNNER_TEMP/devai-ledger-control"
           node .devai-verifier/src/build-policy-cli.js ${backslash}
             --repo candidate ${backslash}
             --descriptor candidate/test-tasks.json ${backslash}
             --profile rc ${backslash}
-            --schema-version 1.1.0 ${backslash}
+            --schema-version "$POLICY_SCHEMA_VERSION" ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
             --toolchain "$control/toolchain.json" ${backslash}
