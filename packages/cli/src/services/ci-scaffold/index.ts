@@ -14,7 +14,7 @@ export interface CiScaffoldPlan {
 
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const VERIFIER_REPOSITORY = 'devai-nyx/devai-verifier';
-export const VERIFIER_COMMIT = '2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c';
+export const VERIFIER_COMMIT = '0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -76,6 +76,7 @@ jobs:
         env:
           ENVELOPE_B64: \${{ secrets.DEVAI_LEDGER_ENVELOPE_B64 }}
           RESULTS_TGZ_B64: \${{ secrets.DEVAI_LEDGER_RESULTS_TGZ_B64 }}
+          ARTIFACTS_TGZ_B64: \${{ secrets.DEVAI_LEDGER_ARTIFACTS_TGZ_B64 }}
           TASK_POLICY_B64: \${{ secrets.DEVAI_LEDGER_TASK_POLICY_B64 }}
           TRUST_STORE_B64: \${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
           TOOLCHAIN_B64: \${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
@@ -84,23 +85,30 @@ jobs:
           set -euo pipefail
           test -n "$ENVELOPE_B64"
           test -n "$RESULTS_TGZ_B64"
+          test -n "$ARTIFACTS_TGZ_B64"
           test -n "$TASK_POLICY_B64"
           test -n "$TRUST_STORE_B64"
           test -n "$TOOLCHAIN_B64"
           test -n "$ENVIRONMENT_B64"
           control="$RUNNER_TEMP/devai-ledger-control"
-          mkdir -p "$control/results"
+          mkdir -p "$control/results" "$control/artifacts"
           printf '%s' "$ENVELOPE_B64" | base64 --decode > "$control/envelope.json"
           printf '%s' "$TASK_POLICY_B64" | base64 --decode > "$control/task-policy.json"
           printf '%s' "$TRUST_STORE_B64" | base64 --decode > "$control/trust-store.json"
           printf '%s' "$TOOLCHAIN_B64" | base64 --decode > "$control/toolchain.json"
           printf '%s' "$ENVIRONMENT_B64" | base64 --decode > "$control/environment.json"
           printf '%s' "$RESULTS_TGZ_B64" | base64 --decode > "$control/results.tgz"
+          printf '%s' "$ARTIFACTS_TGZ_B64" | base64 --decode > "$control/artifacts.tgz"
           if tar -tzf "$control/results.tgz" | grep -Eq '(^/|(^|/)${backslash}.${backslash}.(/|$))'; then
             echo 'DEVAI_LEDGER_RESULTS_ARCHIVE_PATH_INVALID' >&2
             exit 2
           fi
           tar -xzf "$control/results.tgz" -C "$control/results"
+          if tar -tzf "$control/artifacts.tgz" | grep -Eq '(^/|(^|/)${backslash}.${backslash}.(/|$))'; then
+            echo 'DEVAI_LEDGER_ARTIFACTS_ARCHIVE_PATH_INVALID' >&2
+            exit 2
+          fi
+          tar -xzf "$control/artifacts.tgz" -C "$control/artifacts"
 
       - name: Bind exact candidate identity
         id: candidate
@@ -114,14 +122,17 @@ jobs:
         shell: bash
         env:
           POLICY_DIGEST: \${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
+          POLICY_SCHEMA_VERSION: \${{ vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION }}
         run: |
           set -euo pipefail
           test "$POLICY_DIGEST" != ""
+          test "$POLICY_SCHEMA_VERSION" = 1.0.0 -o "$POLICY_SCHEMA_VERSION" = 1.1.0
           control="$RUNNER_TEMP/devai-ledger-control"
           node .devai-verifier/src/build-policy-cli.js ${backslash}
             --repo candidate ${backslash}
             --descriptor candidate/test-tasks.json ${backslash}
             --profile rc ${backslash}
+            --schema-version "$POLICY_SCHEMA_VERSION" ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
             --toolchain "$control/toolchain.json" ${backslash}
@@ -131,6 +142,7 @@ jobs:
           node .devai-verifier/src/cli.js ${backslash}
             --envelope "$control/envelope.json" ${backslash}
             --results-dir "$control/results" ${backslash}
+            --artifacts-dir "$control/artifacts" ${backslash}
             --task-policy "$control/task-policy.json" ${backslash}
             --trust "$control/trust-store.json" ${backslash}
             --repository "\${{ github.repository }}" ${backslash}

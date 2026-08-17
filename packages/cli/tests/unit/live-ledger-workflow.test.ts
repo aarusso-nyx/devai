@@ -79,6 +79,15 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_LEDGER_ENVIRONMENT_MISSING',
     },
     {
+      name: 'missing protected artifact archive',
+      mutate: (source: string) =>
+        source.replaceAll(
+          'secrets.DEVAI_LEDGER_ARTIFACTS_TGZ_B64',
+          'secrets.DEVAI_LEDGER_ARTIFACTS_REMOVED_B64',
+        ),
+      diagnostic: 'CI_EXTERNAL_CONTROL_INPUT_MISSING',
+    },
+    {
       name: 'mutable verifier ref',
       mutate: (source: string) => source.replace(VERIFIER_COMMIT, 'main'),
       diagnostic: 'CI_VERIFIER_REF_MUTABLE',
@@ -102,6 +111,12 @@ describe('live ledger-verification workflow', () => {
       mutate: (source: string) =>
         source.replace('node .devai-verifier/src/build-policy-cli.js', 'node -e "process.exit(0)"'),
       diagnostic: 'CI_EXPECTED_POLICY_RECONSTRUCTION_MISSING',
+    },
+    {
+      name: 'legacy task-policy reconstruction',
+      mutate: (source: string) =>
+        source.replace('--schema-version "$POLICY_SCHEMA_VERSION"', '--schema-version 1.0.0'),
+      diagnostic: 'CI_EXPECTED_POLICY_BINDING_MISSING',
     },
     {
       name: 'remote product tests',
@@ -225,7 +240,8 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'stale installed action count',
-      mutate: (source: string) => source.replace('EXPECTED_ACTION_COUNT: 43', 'EXPECTED_ACTION_COUNT: 41'),
+      mutate: (source: string) =>
+        source.replace('EXPECTED_ACTION_COUNT: 43', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {

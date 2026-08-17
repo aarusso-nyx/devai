@@ -8,7 +8,7 @@ import { parseDocument } from 'yaml';
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
 export const VERIFIER_REPOSITORY = 'devai-nyx/devai-verifier';
-export const VERIFIER_COMMIT = '2c6e5acaade7aae65d23f86fc7f6fdf7e56d945c';
+export const VERIFIER_COMMIT = '0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -245,11 +245,13 @@ function checkWorkflow(file, source, findings) {
   const externalInputs = [
     'secrets.DEVAI_LEDGER_ENVELOPE_B64',
     'secrets.DEVAI_LEDGER_RESULTS_TGZ_B64',
+    'secrets.DEVAI_LEDGER_ARTIFACTS_TGZ_B64',
     'secrets.DEVAI_LEDGER_TASK_POLICY_B64',
     'secrets.DEVAI_LEDGER_TRUST_STORE_B64',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
     'vars.DEVAI_LEDGER_POLICY_DIGEST',
+    'vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION',
   ];
   for (const input of externalInputs) {
     if (!serialized.includes(input)) {
@@ -283,6 +285,7 @@ function checkWorkflow(file, source, findings) {
       '--commit "$CANDIDATE_SHA"',
       '--tree "${{ steps.candidate.outputs.tree }}"',
       '--policy-digest "$POLICY_DIGEST"',
+      '--artifacts-dir "$control/artifacts"',
     ]) {
       if (!verifierRun.includes(binding)) {
         findings.push(finding('CI_VERIFIER_BINDING_MISSING', file, binding));
@@ -305,6 +308,7 @@ function checkWorkflow(file, source, findings) {
       '--repo candidate',
       '--descriptor candidate/test-tasks.json',
       '--profile rc',
+      '--schema-version "$POLICY_SCHEMA_VERSION"',
       '--commit "$CANDIDATE_SHA"',
       '--tree "${{ steps.candidate.outputs.tree }}"',
       '--toolchain "$control/toolchain.json"',
@@ -458,9 +462,12 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const requiredMarkers = [
     'node .devai-verifier/src/cli.js',
     'node .devai-verifier/src/build-policy-cli.js',
+    '--schema-version "$POLICY_SCHEMA_VERSION"',
+    'vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION',
     'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
+    'secrets.DEVAI_LEDGER_ARTIFACTS_TGZ_B64',
     'secrets.DEVAI_RELEASE_SIGNERS_B64',
     'pnpm install --frozen-lockfile',
     'pnpm run build',

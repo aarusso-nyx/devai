@@ -41,14 +41,17 @@ node src/export-cli.js \
 For an affected-profile receipt, use `--profile affected --base <exact-ancestor-commit>`. The
 exporter independently rebuilds the committed `test-tasks.json` selection, verifies the unsigned
 receipt and exact digest-named results, and only then signs. It atomically produces
-`envelope.json`, `task-policy.json`, `trust-store.json`, `manifest.json`, and `results/*.json`.
+`envelope.json`, `task-policy.json`, `trust-store.json`, `manifest.json`, `results/*.json`, and the
+exact declared `artifacts/` population.
 An absent allowlisted environment key is represented as `null`, not silently dropped.
 
 ## Remote boundary
 
-The GitHub workflow receives the envelope, result archive, task policy, trust store, toolchain map,
-and environment map through protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy
-digest through `DEVAI_LEDGER_POLICY_DIGEST`. The release workflow additionally receives the SSH
+The GitHub workflow receives the envelope, result archive, declared-artifact archive, task policy,
+trust store, toolchain map, and environment map through protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy
+digest through `DEVAI_LEDGER_POLICY_DIGEST`. During the schema 1.0 to 1.1 cutover, the protected
+`DEVAI_LEDGER_POLICY_SCHEMA_VERSION` variable selects exactly one supported policy schema; candidate
+bytes cannot select it. The release workflow additionally receives the SSH
 tag trust root through `DEVAI_RELEASE_SIGNERS_B64`. Candidate files do not control these inputs. CI checks
 out the exact candidate and the pinned external verifier at immutable commits. The verifier parses
 the committed descriptor and Git tree, asserts profile `rc`, reconstructs the required-node closure

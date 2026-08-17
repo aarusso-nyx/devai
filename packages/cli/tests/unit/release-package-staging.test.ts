@@ -54,6 +54,7 @@ describe('normalized release package staging', () => {
         LEDGER_POLICY_DIGEST: digest,
         LEDGER_ENVELOPE_SHA256: digest,
         LEDGER_RESULTS_SHA256: digest,
+        LEDGER_ARTIFACTS_SHA256: digest,
         LEDGER_TASK_POLICY_SHA256: digest,
         LEDGER_TRUST_STORE_SHA256: digest,
         LEDGER_TOOLCHAIN_SHA256: digest,
