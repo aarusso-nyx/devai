@@ -131,6 +131,7 @@ jobs:
             --repo candidate \
             --descriptor candidate/test-tasks.json \
             --profile rc \
+            --schema-version 1.1.0 \
             --commit "$commit" \
             --tree "$tree" \
             --toolchain "$control/toolchain.json" \

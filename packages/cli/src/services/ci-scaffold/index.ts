@@ -130,6 +130,7 @@ jobs:
             --repo candidate ${backslash}
             --descriptor candidate/test-tasks.json ${backslash}
             --profile rc ${backslash}
+            --schema-version 1.1.0 ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
             --toolchain "$control/toolchain.json" ${backslash}

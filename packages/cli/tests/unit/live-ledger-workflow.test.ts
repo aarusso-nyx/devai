@@ -113,6 +113,12 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_EXPECTED_POLICY_RECONSTRUCTION_MISSING',
     },
     {
+      name: 'legacy task-policy reconstruction',
+      mutate: (source: string) =>
+        source.replace('--schema-version 1.1.0', '--schema-version 1.0.0'),
+      diagnostic: 'CI_EXPECTED_POLICY_BINDING_MISSING',
+    },
+    {
       name: 'remote product tests',
       mutate: (source: string) => source.replace('test "$POLICY_DIGEST" != ""', 'pnpm vitest run'),
       diagnostic: 'CI_PRODUCT_EXECUTION_FORBIDDEN',
@@ -234,7 +240,8 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'stale installed action count',
-      mutate: (source: string) => source.replace('EXPECTED_ACTION_COUNT: 43', 'EXPECTED_ACTION_COUNT: 41'),
+      mutate: (source: string) =>
+        source.replace('EXPECTED_ACTION_COUNT: 43', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {
