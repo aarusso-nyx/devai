@@ -150,7 +150,10 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   const currentProject = existsSync(projectPath)
     ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject)
     : {};
-  const projectOverrides = isObject(document['project']) ? document['project'] : {};
+  const projectOverrides = isObject(document['project']) ? { ...document['project'] } : {};
+  if (isObject(document['ci_economy'])) {
+    projectOverrides['ci_economy'] = document['ci_economy'];
+  }
   const project = {
     ...(deepMerge(currentProject, projectOverrides) as JsonObject),
     devai_version: resolveCliVersion(),

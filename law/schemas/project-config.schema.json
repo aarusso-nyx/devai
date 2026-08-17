@@ -226,6 +226,37 @@
               "description": "When true, verification requires observed docker version evidence in the manifest. Default false (not every adopter's local CI is containerized)."
             }
           }
+        },
+        "attested_rc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "transport",
+            "tag_prefix",
+            "binding",
+            "required_check",
+            "failure_mode",
+            "local_only_nodes"
+          ],
+          "description": "Trusted local RC evidence policy. When present, local-only nodes execute under Inspector authority and GitHub verifies the protected-tag attestation without executing candidate product commands.",
+          "properties": {
+            "profile": { "const": "rc" },
+            "transport": { "const": "protected-tag-v1" },
+            "tag_prefix": {
+              "type": "string",
+              "pattern": "^devai-local-evidence/[A-Za-z0-9._/-]*$"
+            },
+            "binding": { "const": "exact-tree" },
+            "required_check": { "const": "verified-local-rc" },
+            "failure_mode": { "const": "fail-closed" },
+            "local_only_nodes": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
         }
       }
     }

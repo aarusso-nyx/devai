@@ -38,10 +38,11 @@ export interface TaskPolicyNode {
   readonly nodeId: string;
   readonly taskKey: string;
   readonly dependencies: readonly string[];
+  readonly outputContract: Readonly<Record<string, unknown>>;
 }
 
 export interface TaskPolicy {
-  readonly schemaVersion: '1.0.0';
+  readonly schemaVersion: '1.1.0';
   readonly repositoryId: string;
   readonly requiredNodes: readonly TaskPolicyNode[];
 }
@@ -84,7 +85,7 @@ export interface TaskResult {
 }
 
 export interface CandidateReceipt {
-  readonly schemaVersion: '1.0.0';
+  readonly schemaVersion: '1.1.0';
   readonly repository: Readonly<{ id: string; commit: string; tree: string }>;
   readonly profile: 'affected' | 'rc';
   readonly taskPolicyDigest: string;

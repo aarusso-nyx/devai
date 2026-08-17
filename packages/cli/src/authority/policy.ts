@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { basename, join, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { parseConstitutionVersion } from '@devai-nyx/skills';
 import type { RegistryEntry } from '../define-command.js';
@@ -157,7 +159,22 @@ function harnessSubject(allowedRoles: readonly string[]) {
 
 export function repositoryIdFor(root: string): string {
   const absolute = resolve(root);
-  return basename(absolute).replaceAll(/[^A-Za-z0-9._-]/gu, '-') || 'adopter-repository';
+  let repositoryRoot = absolute;
+  try {
+    const commonGitDirectory = execFileSync(
+      'git',
+      ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      {
+        cwd: absolute,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    ).trim();
+    if (commonGitDirectory !== '') repositoryRoot = dirname(commonGitDirectory);
+  } catch {
+    // Fresh adopters may bind before Git exists; retain the established directory fallback.
+  }
+  return basename(repositoryRoot).replaceAll(/[^A-Za-z0-9._-]/gu, '-') || 'adopter-repository';
 }
 
 export function authorityBindings(

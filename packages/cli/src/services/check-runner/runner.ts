@@ -389,7 +389,7 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
     receiptRefusal = 'repository-changed-during-run';
   } else {
     const candidateReceipt: CandidateReceipt = {
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       repository: plan.repository,
       profile: options.target,
       taskPolicyDigest: plan.taskPolicyDigest,

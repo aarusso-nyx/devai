@@ -116,11 +116,9 @@ jobs:
         shell: bash
         env:
           POLICY_DIGEST: ${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
-          POLICY_SCHEMA_VERSION: ${{ vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION }}
         run: |
           set -euo pipefail
           test -n "$POLICY_DIGEST"
-          test "$POLICY_SCHEMA_VERSION" = 1.0.0 -o "$POLICY_SCHEMA_VERSION" = 1.1.0
           test "$(git -C candidate cat-file -t "$RELEASE_TAG")" = tag
           control="$RUNNER_TEMP/devai-ledger-control"
           git -C candidate config gpg.format ssh
@@ -133,7 +131,7 @@ jobs:
             --repo candidate \
             --descriptor candidate/test-tasks.json \
             --profile rc \
-            --schema-version "$POLICY_SCHEMA_VERSION" \
+            --schema-version 1.1.0 \
             --commit "$commit" \
             --tree "$tree" \
             --toolchain "$control/toolchain.json" \

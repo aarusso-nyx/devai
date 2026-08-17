@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { readAttestedRcConfig } from '../../commands/check/ci-local-only.js';
 
 export interface CiScaffoldOptions {
   readonly targetRoot: string;
@@ -13,13 +14,214 @@ export interface CiScaffoldPlan {
 }
 
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
+export const ATTESTED_RC_WORKFLOW_FILE = 'devai-local-rc-verify.yml';
 export const VERIFIER_REPOSITORY = 'devai-nyx/devai-verifier';
 export const VERIFIER_COMMIT = '0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77';
+export const ATTESTED_RC_VERIFIER_COMMIT = '0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
 
 const DEFAULT_OUTPUT_RELATIVE = `.github/workflows/${LEDGER_WORKFLOW_FILE}`;
+
+export function attestedRcVerificationWorkflow(): string {
+  const backslash = '\\';
+  return `name: DEVAI trusted local RC verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact candidate commit carrying published local RC evidence
+        required: true
+        type: string
+
+concurrency:
+  group: devai-local-rc-verify-\${{ inputs.candidate_sha || github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  CANDIDATE_SHA: \${{ inputs.candidate_sha || github.sha }}
+
+jobs:
+  verify-attested-rc:
+    name: Verify trusted local RC evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out candidate as inert data
+        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
+        with:
+          ref: \${{ env.CANDIDATE_SHA }}
+          path: candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out default-branch controls
+        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
+        with:
+          ref: main
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pinned independent verifier
+        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
+        with:
+          repository: ${VERIFIER_REPOSITORY}
+          ref: ${ATTESTED_RC_VERIFIER_COMMIT}
+          path: .devai-verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up verifier runtime
+        uses: actions/setup-node@${SETUP_NODE_COMMIT} # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Bind candidate and protected evidence tag
+        id: identity
+        shell: bash
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "\${#CANDIDATE_SHA}" = 40 -o "\${#CANDIDATE_SHA}" = 64
+          test "$(git -C candidate rev-parse HEAD)" = "$CANDIDATE_SHA"
+          tree="$(git -C candidate rev-parse "\${CANDIDATE_SHA}^{tree}")"
+          tag="devai-local-evidence/$tree"
+          tag_object="$(gh api "repos/\${GITHUB_REPOSITORY}/git/ref/tags/$tag" --jq '.object.type + ":" + .object.sha')"
+          test "\${tag_object%%:*}" = tag
+          tag_sha="\${tag_object#*:}"
+          proof_commit="$(gh api "repos/\${GITHUB_REPOSITORY}/git/tags/$tag_sha" --jq 'select(.object.type == "commit") | .object.sha')"
+          test -n "$proof_commit"
+          {
+            echo "tree=$tree"
+            echo "tag=$tag"
+            echo "proof_commit=$proof_commit"
+            if test "$GITHUB_EVENT_NAME" = push; then
+              echo "binding=exact-tree"
+            else
+              echo "binding=exact-commit"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out immutable proof commit
+        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
+        with:
+          ref: \${{ steps.identity.outputs.proof_commit }}
+          path: evidence
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Reconstruct exact RC task policy
+        id: policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/devai-local-rc"
+          node .devai-verifier/src/build-policy-cli.js ${backslash}
+            --repo candidate ${backslash}
+            --descriptor control/test-tasks.json ${backslash}
+            --profile rc ${backslash}
+            --commit "$CANDIDATE_SHA" ${backslash}
+            --tree "\${{ steps.identity.outputs.tree }}" ${backslash}
+            --toolchain control/law/policy/devai-local-rc-toolchain.json ${backslash}
+            --environment control/law/policy/devai-local-rc-environment.json ${backslash}
+            --schema-version 1.1.0 ${backslash}
+            --output "$RUNNER_TEMP/devai-local-rc/expected-task-policy.json" ${backslash}
+            > "$RUNNER_TEMP/devai-local-rc/policy-result.json"
+          cmp "$RUNNER_TEMP/devai-local-rc/expected-task-policy.json" evidence/task-policy.json
+          digest="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(x.taskPolicyDigest)' "$RUNNER_TEMP/devai-local-rc/policy-result.json")"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Verify complete trusted local RC bundle
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .devai-verifier/src/bundle-cli.js ${backslash}
+            --bundle evidence ${backslash}
+            --trust control/law/policy/devai-local-rc-trust-store.json ${backslash}
+            --repository "$GITHUB_REPOSITORY" ${backslash}
+            --commit "$CANDIDATE_SHA" ${backslash}
+            --tree "\${{ steps.identity.outputs.tree }}" ${backslash}
+            --policy-digest "\${{ steps.policy.outputs.digest }}" ${backslash}
+            --binding "\${{ steps.identity.outputs.binding }}" ${backslash}
+            > "$RUNNER_TEMP/devai-local-rc/verified.json"
+
+      - name: Build concise verification artifact
+        if: always()
+        shell: bash
+        env:
+          VERIFY_OUTCOME: \${{ steps.verify.outcome }}
+          CANDIDATE_TREE: \${{ steps.identity.outputs.tree }}
+          BINDING: \${{ steps.identity.outputs.binding }}
+          POLICY_DIGEST: \${{ steps.policy.outputs.digest }}
+        run: |
+          set -euo pipefail
+          node - "$RUNNER_TEMP/devai-local-rc/verified.json" "$RUNNER_TEMP/devai-local-rc/verification-summary.json" <<'NODE'
+          const fs = require('node:fs');
+          const [input, output] = process.argv.slice(2);
+          const verified = fs.existsSync(input) ? JSON.parse(fs.readFileSync(input, 'utf8')) : {};
+          const mutation = Array.isArray(verified.verifiedMutation) ? verified.verifiedMutation : [];
+          const summary = {
+            schemaVersion: '1.0.0',
+            verdict: process.env.VERIFY_OUTCOME === 'success' ? 'pass' : 'fail',
+            signer: verified.signerId ?? null,
+            evidenceCommit: verified.evidenceCommit ?? null,
+            candidateCommit: process.env.CANDIDATE_SHA,
+            tree: process.env.CANDIDATE_TREE,
+            binding: process.env.BINDING,
+            policyDigest: process.env.POLICY_DIGEST,
+            rosterCount: mutation.reduce((count, entry) => count + Number(entry.packageCount ?? 0), 0),
+          };
+          fs.writeFileSync(output, JSON.stringify(summary) + '\\n');
+          NODE
+
+      - name: Upload verification summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verified-local-rc-\${{ env.CANDIDATE_SHA }}
+          path: \${{ runner.temp }}/devai-local-rc/verification-summary.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish candidate check
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: \${{ github.token }}
+          VERIFY_OUTCOME: \${{ steps.verify.outcome }}
+        run: |
+          set -euo pipefail
+          conclusion=failure
+          test "$VERIFY_OUTCOME" != success || conclusion=success
+          jq -n ${backslash}
+            --arg name verified-local-rc ${backslash}
+            --arg head_sha "$CANDIDATE_SHA" ${backslash}
+            --arg conclusion "$conclusion" ${backslash}
+            --arg title "Trusted local RC attestation" ${backslash}
+            --arg summary "Binding: \${{ steps.identity.outputs.binding }}; tree: \${{ steps.identity.outputs.tree }}; tag: \${{ steps.identity.outputs.tag }}" ${backslash}
+            '{name:$name,head_sha:$head_sha,status:"completed",conclusion:$conclusion,output:{title:$title,summary:$summary}}' ${backslash}
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input -
+
+      - name: Enforce verification result
+        if: always()
+        shell: bash
+        env:
+          VERIFY_OUTCOME: \${{ steps.verify.outcome }}
+        run: test "$VERIFY_OUTCOME" = success
+`;
+}
 
 export function ledgerVerificationWorkflow(): string {
   const backslash = '\\';
@@ -122,17 +324,15 @@ jobs:
         shell: bash
         env:
           POLICY_DIGEST: \${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
-          POLICY_SCHEMA_VERSION: \${{ vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION }}
         run: |
           set -euo pipefail
           test "$POLICY_DIGEST" != ""
-          test "$POLICY_SCHEMA_VERSION" = 1.0.0 -o "$POLICY_SCHEMA_VERSION" = 1.1.0
           control="$RUNNER_TEMP/devai-ledger-control"
           node .devai-verifier/src/build-policy-cli.js ${backslash}
             --repo candidate ${backslash}
             --descriptor candidate/test-tasks.json ${backslash}
             --profile rc ${backslash}
-            --schema-version "$POLICY_SCHEMA_VERSION" ${backslash}
+            --schema-version 1.1.0 ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
             --toolchain "$control/toolchain.json" ${backslash}
@@ -154,7 +354,14 @@ jobs:
 
 export function buildCiScaffoldPlan(opts: CiScaffoldOptions): CiScaffoldPlan {
   const root = resolve(opts.targetRoot);
-  const path = resolve(opts.outputPath ?? join(root, DEFAULT_OUTPUT_RELATIVE));
+  const attested = readAttestedRcConfig(root);
+  if (attested.errors.length > 0)
+    throw new Error(`CI_SCAFFOLD_ATTESTED_RC_INVALID:${attested.errors.join(';')}`);
+  const defaultRelative =
+    attested.config === undefined
+      ? DEFAULT_OUTPUT_RELATIVE
+      : `.github/workflows/${ATTESTED_RC_WORKFLOW_FILE}`;
+  const path = resolve(opts.outputPath ?? join(root, defaultRelative));
   const fromRoot = relative(root, path);
   if (fromRoot === '' || fromRoot === '..' || fromRoot.startsWith(`..${sep}`)) {
     throw new Error(`CI_SCAFFOLD_PATH_ESCAPE:${path}`);
@@ -169,7 +376,14 @@ export function buildCiScaffoldPlan(opts: CiScaffoldOptions): CiScaffoldPlan {
   if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
     throw new Error(`CI_SCAFFOLD_SYMLINK_REFUSED:${path}`);
   }
-  return { path, content: ledgerVerificationWorkflow(), exists: existsSync(path) };
+  return {
+    path,
+    content:
+      attested.config === undefined
+        ? ledgerVerificationWorkflow()
+        : attestedRcVerificationWorkflow(),
+    exists: existsSync(path),
+  };
 }
 
 export interface CiScaffoldResult {

@@ -251,7 +251,6 @@ function checkWorkflow(file, source, findings) {
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
     'vars.DEVAI_LEDGER_POLICY_DIGEST',
-    'vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION',
   ];
   for (const input of externalInputs) {
     if (!serialized.includes(input)) {
@@ -308,7 +307,7 @@ function checkWorkflow(file, source, findings) {
       '--repo candidate',
       '--descriptor candidate/test-tasks.json',
       '--profile rc',
-      '--schema-version "$POLICY_SCHEMA_VERSION"',
+      '--schema-version 1.1.0',
       '--commit "$CANDIDATE_SHA"',
       '--tree "${{ steps.candidate.outputs.tree }}"',
       '--toolchain "$control/toolchain.json"',
@@ -462,8 +461,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const requiredMarkers = [
     'node .devai-verifier/src/cli.js',
     'node .devai-verifier/src/build-policy-cli.js',
-    '--schema-version "$POLICY_SCHEMA_VERSION"',
-    'vars.DEVAI_LEDGER_POLICY_SCHEMA_VERSION',
+    '--schema-version 1.1.0',
     'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',

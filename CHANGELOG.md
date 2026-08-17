@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0-rc.1 — 2026-08-16
+
+- Adds fail-closed trusted local RC evidence over immutable protected tags while preserving the
+  exact 43-action public catalog and legacy schema 1.0 ledger verification.
+- Binds every selected task, dependency result, declared output artifact, toolchain identity,
+  environment identity, exact commit, and exact Git tree into portable schema 1.1 evidence.
+- Independently derives and verifies adopter mutation rosters and thresholds; STYNX currently
+  resolves to 32 packages without hard-coding that count.
+- Generates a five-minute GitHub verifier that executes no candidate product command and reports
+  exact-commit PR or byte-identical tree-equivalent main verification.
+- Fails CI economy checks when a workflow directly or transitively reaches a configured local-only
+  task, including bounded package-script aliases, while ignoring non-executable action metadata.
+- Stabilizes authority-policy repository identity across linked worktrees.
+
 ## 1.1.7 — 2026-08-14
 
 - Quotes the exact main-observation artifact directory before expanding the JSON roster so the

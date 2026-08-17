@@ -3,6 +3,11 @@ import { join } from 'node:path';
 import type { CAC } from 'cac';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
+import {
+  ATTESTED_RC_VERIFIER_COMMIT,
+  VERIFIER_COMMIT,
+} from '../../services/ci-scaffold/index.js';
+import { inspectRemoteLocalOnlyNodes } from './ci-local-only.js';
 
 /**
  * CI-economy check behind the canonical `check` facade.
@@ -80,6 +85,7 @@ interface WorkflowFacts {
   readonly referencesMacos: boolean;
   readonly hasPostgresService: boolean;
   readonly hasEvidenceMarker: boolean;
+  readonly text: string;
 }
 
 /** Trigger keys recognized at the top level of an `on:` block. */
@@ -120,8 +126,10 @@ export function readCiEconomyProfile(repoRoot: string): CiEconomyProfile {
 }
 
 const VERIFIER_REPOSITORY = /repository:\s*devai-nyx\/devai-verifier/u;
-const VERIFIER_PIN = /ref:\s*0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77/u;
-const VERIFIER_INVOCATION = /node\s+\.devai-verifier\/src\/cli\.js/u;
+const LEGACY_VERIFIER_PIN = new RegExp(`ref:\\s*${VERIFIER_COMMIT}`, 'u');
+const ATTESTED_VERIFIER_PIN = new RegExp(`ref:\\s*${ATTESTED_RC_VERIFIER_COMMIT}`, 'u');
+const LEGACY_VERIFIER_INVOCATION = /node\s+\.devai-verifier\/src\/cli\.js/u;
+const ATTESTED_VERIFIER_INVOCATION = /node\s+\.devai-verifier\/src\/bundle-cli\.js/u;
 
 /**
  * Extract the trigger set from a workflow file. Handles the three
@@ -177,6 +185,7 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
   }
   return {
     file,
+    text,
     triggers,
     crons,
     hasConcurrencyKey: /^concurrency:/m.test(text),
@@ -185,7 +194,9 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
     referencesMacos: /\bmacos-/i.test(text) || /runs-on:.*macos/i.test(text),
     hasPostgresService: /image:\s*['"]?postgres/.test(text),
     hasEvidenceMarker:
-      VERIFIER_REPOSITORY.test(text) && VERIFIER_PIN.test(text) && VERIFIER_INVOCATION.test(text),
+      VERIFIER_REPOSITORY.test(text) &&
+      ((LEGACY_VERIFIER_PIN.test(text) && LEGACY_VERIFIER_INVOCATION.test(text)) ||
+        (ATTESTED_VERIFIER_PIN.test(text) && ATTESTED_VERIFIER_INVOCATION.test(text))),
   };
 }
 
@@ -215,6 +226,10 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
   }
 
   const facts = files.map((f) => collectFacts(workflowsDir, f));
+  const localOnly = inspectRemoteLocalOnlyNodes(
+    opts.repoRoot,
+    facts.map(({ file, text }) => ({ file, text })),
+  );
 
   // ── Rule 1 — ci-economy.concurrency-cancel (hard) ────────────────────
   const missingConcurrency = facts.filter(
@@ -316,6 +331,26 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
     );
   }
 
+  if (localOnly.enabled || localOnly.errors.length > 0) {
+    const failures = [...localOnly.errors, ...localOnly.violations];
+    findings.push(
+      failures.length === 0
+        ? {
+            ruleId: 'ci-economy.local-only-nodes',
+            severity: 'pass',
+            message: 'no GitHub workflow directly or transitively reaches an attested-RC local-only node',
+          }
+        : {
+            ruleId: 'ci-economy.local-only-nodes',
+            severity: 'fail',
+            message: `${String(failures.length)} attested-RC local-only violation(s) found`,
+            remediation:
+              'Remove the local-only command or alias from every GitHub workflow. Missing local evidence must fail closed; remote execution is not a fallback.',
+            locations: failures,
+          },
+    );
+  }
+
   // ── Advisory — ci-economy.path-filters ───────────────────────────────
   const unfiltered = facts.filter(
     (f) =>
@@ -378,7 +413,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
 
   return {
     verdict: failCount > 0 ? 'fail' : warnCount > 0 ? 'warn' : 'pass',
-    rules_checked: 4,
+    rules_checked: localOnly.enabled || localOnly.errors.length > 0 ? 5 : 4,
     workflows_scanned: files.length,
     ci_economy_profile: profile,
     findings,
