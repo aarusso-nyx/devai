@@ -79,6 +79,15 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_LEDGER_ENVIRONMENT_MISSING',
     },
     {
+      name: 'missing protected artifact archive',
+      mutate: (source: string) =>
+        source.replaceAll(
+          'secrets.DEVAI_LEDGER_ARTIFACTS_TGZ_B64',
+          'secrets.DEVAI_LEDGER_ARTIFACTS_REMOVED_B64',
+        ),
+      diagnostic: 'CI_EXTERNAL_CONTROL_INPUT_MISSING',
+    },
+    {
       name: 'mutable verifier ref',
       mutate: (source: string) => source.replace(VERIFIER_COMMIT, 'main'),
       diagnostic: 'CI_VERIFIER_REF_MUTABLE',
