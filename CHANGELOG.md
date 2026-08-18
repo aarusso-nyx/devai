@@ -6,6 +6,8 @@
   allowlist instead of the graph-wide union, while preserving task-key and dependency identity.
 - Pins the independent verifier that rejects credential-shaped evidence and workstation-specific
   absolute paths during export, bundle verification, publication, and remote verification.
+- Verifies pull requests by exact commit and merged main or release tags by explicit byte-identical
+  tree binding, with workflow, documentation, and release-script inputs bound into the RC task key.
 - Preserves the exact 43-action catalog and schema 1.0/1.1 compatibility.
 
 ## 1.2.0-rc.1 — 2026-08-16

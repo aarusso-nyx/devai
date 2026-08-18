@@ -319,6 +319,11 @@ jobs:
           set -euo pipefail
           test "$(git -C candidate rev-parse HEAD)" = "$CANDIDATE_SHA"
           echo "tree=$(git -C candidate rev-parse "\${CANDIDATE_SHA}^{tree}")" >> "$GITHUB_OUTPUT"
+          if test "\${{ github.event_name }}" = push; then
+            echo "binding=exact-tree" >> "$GITHUB_OUTPUT"
+          else
+            echo "binding=exact-commit" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Reconstruct policy and verify ledger
         shell: bash
@@ -348,7 +353,8 @@ jobs:
             --repository "\${{ github.repository }}" ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.candidate.outputs.tree }}" ${backslash}
-            --policy-digest "$POLICY_DIGEST"
+            --policy-digest "$POLICY_DIGEST" ${backslash}
+            --binding "\${{ steps.candidate.outputs.binding }}"
 `;
 }
 

@@ -132,6 +132,12 @@ describe('live ledger-verification workflow', () => {
         ),
       diagnostic: 'CI_CANDIDATE_SHA_UNBOUND',
     },
+    {
+      name: 'main tree-equivalent binding removed',
+      mutate: (source: string) =>
+        source.replace('echo "binding=exact-tree"', 'echo "binding=exact-commit"'),
+      diagnostic: 'CI_VERIFIER_BINDING_MODE_INVALID',
+    },
   ])('rejects $name', ({ mutate, diagnostic }) => {
     const result = check(fixture(mutate(ledgerVerificationWorkflow())));
     expect(result.status).toBe(1);
@@ -167,6 +173,7 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 43');
     expect(release).toContain('pnpm run release:closure');
+    expect(release).toContain('--binding exact-tree');
     expect(release).toContain(
       'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
     );
@@ -182,6 +189,23 @@ describe('live ledger-verification workflow', () => {
     );
     expect(discipline).not.toContain(
       'publication and Pages jobs are structurally restricted to a version-tag `push`',
+    );
+  });
+
+  it('binds workflow, documentation, and release scripts into the RC task key', () => {
+    const descriptor = JSON.parse(readFileSync(join(ROOT, 'test-tasks.json'), 'utf8')) as {
+      tasks: Array<{
+        nodeId: string;
+        inputSelectors: Array<{ kind: string; pattern: string }>;
+      }>;
+    };
+    const rc = descriptor.tasks.find((task) => task.nodeId === 'test:coverage:rc');
+    expect(rc?.inputSelectors).toEqual(
+      expect.arrayContaining([
+        { kind: 'prefix', pattern: '.github/' },
+        { kind: 'prefix', pattern: 'docs/' },
+        { kind: 'prefix', pattern: 'scripts/' },
+      ]),
     );
   });
 
@@ -287,6 +311,11 @@ describe('live ledger-verification workflow', () => {
           'gh release upload --clobber\n            gh release create',
         ),
       diagnostic: 'RELEASE_ASSET_CLOBBER_FORBIDDEN',
+    },
+    {
+      name: 'release tree-equivalent binding removed',
+      mutate: (source: string) => source.replace('--binding exact-tree', '--binding exact-commit'),
+      diagnostic: 'RELEASE_CONTROL_MISSING',
     },
   ])('rejects $name', ({ mutate, diagnostic }) => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
