@@ -613,7 +613,19 @@
       "inputSelectors": [
         {
           "kind": "prefix",
+          "pattern": ".github/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "prefix",
           "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
         },
         {
           "kind": "prefix",

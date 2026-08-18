@@ -57,6 +57,10 @@ closure, and creates a normalized public manifest with development workspace dep
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
 that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
 
+The pull-request gate uses exact-commit binding. GitHub-created main merge commits and the signed
+release tag use explicit `exact-tree` binding, which accepts the PR receipt only when the checked
+tree is byte-identical. Commit mismatch without tree equality remains a hard failure.
+
 Release tags use SSH signatures. The public identity is supplied through the protected
 `DEVAI_RELEASE_SIGNERS_B64` environment secret and materialized as an OpenSSH allowed-signers
 file; candidate source does not choose its own tag signer. The verified signer-file digest is

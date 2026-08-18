@@ -68,3 +68,8 @@ exact repository, commit, tree, task-policy digest, required-node closure, signe
 state. The pinned external verifier rejects missing, stale, malformed, unknown, FAIL,
 or ABORTED nodes. A trusted signature proves integrity and signer identity, not that execution
 actually occurred.
+
+Pull-request verification requires the exact signed commit. After GitHub creates a merge commit,
+main verification may reuse that receipt only in explicit `exact-tree` mode and only when the
+merged tree is byte-identical. Release-tag verification uses the same exact-tree rule; any changed
+byte requires a new local RC receipt.

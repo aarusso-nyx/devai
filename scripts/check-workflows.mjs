@@ -285,9 +285,15 @@ function checkWorkflow(file, source, findings) {
       '--tree "${{ steps.candidate.outputs.tree }}"',
       '--policy-digest "$POLICY_DIGEST"',
       '--artifacts-dir "$control/artifacts"',
+      '--binding "${{ steps.candidate.outputs.binding }}"',
     ]) {
       if (!verifierRun.includes(binding)) {
         findings.push(finding('CI_VERIFIER_BINDING_MISSING', file, binding));
+      }
+    }
+    for (const bindingMode of ['echo "binding=exact-tree"', 'echo "binding=exact-commit"']) {
+      if (!source.includes(bindingMode)) {
+        findings.push(finding('CI_VERIFIER_BINDING_MODE_INVALID', file, bindingMode));
       }
     }
   }
@@ -483,6 +489,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'sha256sum --check SHA256SUMS',
     'gh release create',
     'git -C candidate verify-tag',
+    '--binding exact-tree',
     'actions/deploy-pages@',
     'https://aarusso-nyx.github.io/devai/',
     'The exact release build and artifact assembly completed without publication.',

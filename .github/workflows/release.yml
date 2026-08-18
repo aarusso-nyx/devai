@@ -147,7 +147,8 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --commit "$commit" \
             --tree "$tree" \
-            --policy-digest "$POLICY_DIGEST"
+            --policy-digest "$POLICY_DIGEST" \
+            --binding exact-tree
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "tree=$tree" >> "$GITHUB_OUTPUT"
           echo "envelope_sha256=$(sha256sum "$control/envelope.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
