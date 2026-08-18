@@ -44,6 +44,11 @@ receipt and exact digest-named results, and only then signs. It atomically produ
 `envelope.json`, `task-policy.json`, `trust-store.json`, `manifest.json`, `results/*.json`, and the
 exact declared `artifacts/` population.
 An absent allowlisted environment key is represented as `null`, not silently dropped.
+The runner passes each task only the environment keys declared by that task; another selected
+node's credentials are never added merely because both tasks share a graph. The pinned verifier
+then performs bounded content-safety checks over every declared text and JSON artifact. It rejects
+credential-shaped material and workstation-specific absolute paths before the atomic export is
+made visible, and repeats the same checks during bundle verification and publication.
 
 ## Remote boundary
 

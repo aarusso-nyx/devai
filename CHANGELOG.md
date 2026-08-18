@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0-rc.2 — 2026-08-17
+
+- Isolates runtime task environments so each check node receives only its own declared
+  allowlist instead of the graph-wide union, while preserving task-key and dependency identity.
+- Pins the independent verifier that rejects credential-shaped evidence and workstation-specific
+  absolute paths during export, bundle verification, publication, and remote verification.
+- Preserves the exact 43-action catalog and schema 1.0/1.1 compatibility.
+
 ## 1.2.0-rc.1 — 2026-08-16
 
 - Adds fail-closed trusted local RC evidence over immutable protected tags while preserving the

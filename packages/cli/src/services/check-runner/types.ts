@@ -142,6 +142,7 @@ export interface CheckRunnerOptions {
     argv: readonly string[],
     cwd: string,
     timeoutMs: number,
+    environment: Readonly<Record<string, string>>,
   ) => TaskExecutionResult;
   readonly now?: () => string;
 }

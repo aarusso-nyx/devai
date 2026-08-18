@@ -8,7 +8,7 @@ import { parseDocument } from 'yaml';
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
 export const VERIFIER_REPOSITORY = 'devai-nyx/devai-verifier';
-export const VERIFIER_COMMIT = '0b75ede0ae97d88b6fc0babcd6f5197eb33b9f77';
+export const VERIFIER_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
