@@ -712,6 +712,39 @@ describe('content-addressed check runner', () => {
     });
   });
 
+  it('reuses a persisted multi-dependency result regardless of dependency declaration order', () => {
+    const state = repository();
+    const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
+      tasks: Array<{ nodeId: string; dependencies: string[] }>;
+    };
+    const localFull = declared.tasks.find((task) => task.nodeId === 'test:local-full');
+    if (localFull === undefined) throw new Error('test fixture is missing test:local-full');
+    localFull.dependencies = ['test:unit', 'generate'];
+    writeFileSync(join(state.root, 'test-tasks.json'), `${JSON.stringify(declared, null, 2)}\n`);
+
+    const first = run(state.root);
+    const localFullResult = first.execution?.find((task) => task.nodeId === 'test:local-full');
+    expect(localFullResult).toMatchObject({ disposition: 'executed', outcome: 'PASS' });
+    const stored = JSON.parse(
+      readFileSync(
+        join(
+          state.root,
+          '.devai/state/check-cache/v1/results',
+          `${String(localFullResult?.resultDigest)}.json`,
+        ),
+        'utf8',
+      ),
+    ) as { dependencyResultDigests: Record<string, string> };
+    expect(Object.keys(stored.dependencyResultDigests)).toEqual(['generate', 'test:unit']);
+
+    const second = run(state.root);
+    expect(second.execution?.find((task) => task.nodeId === 'test:local-full')).toMatchObject({
+      disposition: 'reused',
+      outcome: 'PASS',
+      reason: 'fresh-pass',
+    });
+  });
+
   it('binds declared generated artifacts for non-file-specific output contracts', () => {
     const state = repository();
     const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {

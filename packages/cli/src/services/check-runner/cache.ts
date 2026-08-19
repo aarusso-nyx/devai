@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { chmodSync, mkdirSync, writeFileSync } from '@devai-nyx/authority';
-import { canonicalBytes, sha256Hex } from './canonical.js';
+import { canonicalBytes, canonicalize, sha256Hex } from './canonical.js';
 import type {
   CandidateReceipt,
   PlannedTask,
@@ -146,9 +146,7 @@ export class CheckCache {
     ) {
       return { cacheState: 'stale', reason: 'cached-result-invalid' };
     }
-    if (
-      JSON.stringify(result.dependencyResultDigests) !== JSON.stringify(dependencyResultDigests)
-    ) {
+    if (canonicalize(result.dependencyResultDigests) !== canonicalize(dependencyResultDigests)) {
       return { cacheState: 'stale', reason: 'dependency-result-changed' };
     }
     if (!outputFilesMatch(this.#repoRoot, task, result)) {
