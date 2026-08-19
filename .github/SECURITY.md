@@ -6,9 +6,8 @@ Please report suspected vulnerabilities privately to the repository owner or sec
 
 ## Supported versions
 
-`1.1.0-rc.1` is a release candidate and does not replace the supported `1.0.1` stable line. Until an
-exact candidate is separately authorized and published, that
-publication occurs, `1.0.0-rc.6` remains the supported public candidate.
+`1.2.0` is the supported stable line. Earlier release candidates remain immutable audit history;
+they are not supported stable releases.
 
 ## Security boundary
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 — 2026-08-19
+
+- Promotes the RC.3 functional contracts unchanged after an installed-package STYNX trial
+  completed one Inspector-signed local RC closure with the exact discovered 32-package mutation
+  roster and an independently verified protected evidence tag.
+- Keeps mutation execution local while the default-branch verifier reconstructs task policy,
+  validates exact candidate and tree identity, and posts `verified-local-rc` without executing
+  adopter product commands.
+- Preserves the exact 43-action catalog, schema 1.0/1.1 compatibility, task-scoped environment
+  isolation, portable evidence checks, immutable release assets, and explicit host-boundary
+  reporting.
+
 ## 1.2.0-rc.3 — 2026-08-19
 
 - Compares persisted dependency-result identities canonically so unchanged multi-dependency tasks
