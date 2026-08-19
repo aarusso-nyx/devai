@@ -29,7 +29,7 @@ describe('normalized release package staging', () => {
     expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
   });
 
-  it('records a prerelease and next dist-tag for version 1.2.0-rc.3', () => {
+  it('records a stable release and latest dist-tag for version 1.2.0', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -43,7 +43,7 @@ describe('normalized release package staging', () => {
       env: {
         ...process.env,
         PACKAGE_NAME: '@aarusso-nyx/devai',
-        RELEASE_TAG: 'v1.2.0-rc.3',
+        RELEASE_TAG: 'v1.2.0',
         PACKAGE_TARBALL: packageTarball,
         SITE_ARCHIVE: siteArchive,
         SBOM_FILE: sbom,
@@ -66,11 +66,11 @@ describe('normalized release package staging', () => {
       release: Record<string, unknown>;
     };
     expect(value.release).toMatchObject({
-      tag: 'v1.2.0-rc.3',
-      version: '1.2.0-rc.3',
-      release_type: 'prerelease',
-      prerelease: true,
-      dist_tag: 'next',
+      tag: 'v1.2.0',
+      version: '1.2.0',
+      release_type: 'stable',
+      prerelease: false,
+      dist_tag: 'latest',
     });
   });
 });
