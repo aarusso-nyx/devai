@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0-rc.3 — 2026-08-19
+
+- Compares persisted dependency-result identities canonically so unchanged multi-dependency tasks
+  remain reusable after their canonical cache records are reloaded from disk.
+- Adds adversarial coverage for dependency declaration order while preserving exact task keys,
+  dependency closure, the 43-action catalog, and schema 1.0/1.1 compatibility.
+
 ## 1.2.0-rc.2 — 2026-08-17
 
 - Isolates runtime task environments so each check node receives only its own declared
