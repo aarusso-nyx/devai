@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   copyFileSync,
@@ -8,11 +9,12 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rolldown } from 'rolldown';
 import { ROSTER as schemaRoots } from '../../schemas/dist/roster.js';
@@ -23,6 +25,15 @@ const distRoot = join(packageRoot, 'dist');
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-cli-assembly-'));
 const bundlePath = join(temporaryRoot, 'bin.js');
 const scaffoldModule = join(repositoryRoot, 'packages/skills/dist/operations/scaffold/index.js');
+const verifierSourceRoot = join(packageRoot, 'vendor/evidence-verification');
+const verifierRuntimeRoot = join(distRoot, 'runtime/evidence-verification');
+const verifierBins = [
+  'build-policy-cli.js',
+  'cli.js',
+  'bundle-cli.js',
+  'export-cli.js',
+  'publish-cli.js',
+];
 
 const policyFiles = [
   'action-registry.json',
@@ -73,12 +84,71 @@ function copyFiles(sourceRoot, targetRoot, names) {
   for (const name of names) copyFileSync(join(sourceRoot, name), join(targetRoot, name));
 }
 
+function filesUnder(root, current = root) {
+  return readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(current, entry.name);
+    return entry.isDirectory()
+      ? filesUnder(root, path)
+      : [relative(root, path).split(sep).join('/')];
+  });
+}
+
+function sha256(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function validateVerifierAssets() {
+  const provenancePath = join(verifierSourceRoot, 'provenance.json');
+  const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
+  if (
+    provenance.schemaVersion !== '1.0.0' ||
+    provenance.sourceCommit !== '5f71d43a3d55b07fe866ea2df139dfaacc84f7db' ||
+    !Array.isArray(provenance.files)
+  ) {
+    throw new Error('PACKAGE_VERIFIER_PROVENANCE_INVALID');
+  }
+  const declared = provenance.files.map((entry) => entry.path);
+  const expectedPopulation = ['provenance.json', ...declared].sort();
+  const actualPopulation = filesUnder(verifierSourceRoot).sort();
+  if (
+    declared.length !== 21 ||
+    new Set(declared).size !== declared.length ||
+    JSON.stringify(actualPopulation) !== JSON.stringify(expectedPopulation)
+  ) {
+    throw new Error('PACKAGE_VERIFIER_POPULATION_INVALID');
+  }
+  for (const entry of provenance.files) {
+    if (
+      !/^[0-9a-f]{64}$/u.test(entry.sha256) ||
+      sha256(join(verifierSourceRoot, entry.path)) !== entry.sha256
+    ) {
+      throw new Error(`PACKAGE_VERIFIER_DIGEST_INVALID:${String(entry.path)}`);
+    }
+  }
+  for (const sourcePath of declared.filter((path) => path.startsWith('src/'))) {
+    const source = readFileSync(join(verifierSourceRoot, sourcePath), 'utf8');
+    for (const match of source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/gu)) {
+      const specifier = match[1];
+      if (specifier.startsWith('node:')) continue;
+      if (!specifier.startsWith('./'))
+        throw new Error(`PACKAGE_VERIFIER_IMPORT_INVALID:${sourcePath}:${specifier}`);
+      const dependency = resolve(dirname(join(verifierSourceRoot, sourcePath)), specifier);
+      const fromRoot = relative(verifierSourceRoot, dependency);
+      if (fromRoot.startsWith(`..${sep}`) || fromRoot === '..' || !existsSync(dependency)) {
+        throw new Error(`PACKAGE_VERIFIER_IMPORT_MISSING:${sourcePath}:${specifier}`);
+      }
+    }
+  }
+  return provenance;
+}
+
 const workspacePackage = /^@devai-nyx\//u;
 const external = (id) =>
   id.startsWith('node:') ||
   (!id.startsWith('.') && !id.startsWith('/') && !id.startsWith('#') && !workspacePackage.test(id));
 
 try {
+  validateVerifierAssets();
   const bundle = await rolldown({
     input: join(distRoot, 'bin.js'),
     external,
@@ -140,6 +210,8 @@ try {
     join(runtimeRoot, 'package.json'),
     JSON.stringify({ type: 'module', version: manifest.version }, null, 2) + '\n',
   );
+  cpSync(verifierSourceRoot, verifierRuntimeRoot, { recursive: true });
+  for (const name of verifierBins) chmodSync(join(verifierRuntimeRoot, 'src', name), 0o755);
 
   const packagedSchemas = schemaClosure(schemaRoots);
   copyFiles(join(repositoryRoot, 'law/schemas'), join(runtimeIndex, 'schemas'), packagedSchemas);
@@ -164,6 +236,9 @@ try {
     join(runtimeIndex, 'sensor-registry.json'),
     join(runtimeIndex, 'round-execution.json'),
     join(runtimeIndex, 'sense-presets.json'),
+    ...verifierBins.map((name) => join(verifierRuntimeRoot, 'src', name)),
+    join(verifierRuntimeRoot, 'schemas/task-descriptor.schema.json'),
+    join(verifierRuntimeRoot, 'provenance.json'),
     join(distRoot, 'law/constitution.md'),
     join(distRoot, 'resources/recipes/devai-round/SKILL.md'),
     join(distRoot, 'resources/operations/scaffold/templates/db/migration.sql.tpl'),

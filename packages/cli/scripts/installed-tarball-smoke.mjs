@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -23,6 +24,13 @@ const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
 const authorizationRoot = join(smokeRoot, 'authorization-project');
+const secondaryBins = [
+  'devai-evidence-policy',
+  'devai-evidence-verify',
+  'devai-evidence-bundle-verify',
+  'devai-evidence-export',
+  'devai-evidence-publish',
+];
 
 // Package-only acceptance invokes ['audit', 'scorecard'] and ['evidence', 'record'] below.
 
@@ -49,6 +57,10 @@ function filesUnder(root) {
     const path = join(root, entry.name);
     return entry.isDirectory() ? filesUnder(path) : [path];
   });
+}
+
+function digest(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 try {
@@ -83,6 +95,18 @@ try {
   run('git', ['commit', '-qm', 'installed package fixture'], projectRoot);
   const binary = join(projectRoot, 'node_modules/.bin/devai');
   const installedPackage = join(projectRoot, 'node_modules/@aarusso-nyx/devai');
+  for (const name of secondaryBins) {
+    const result = runResult(join(projectRoot, 'node_modules/.bin', name), []);
+    let error;
+    try {
+      error = JSON.parse(String(result.stderr));
+    } catch {
+      throw new Error(`INSTALLED_SECONDARY_BIN_OUTPUT_INVALID:${name}`);
+    }
+    if (result.status !== 64 || error?.ok !== false || error?.code !== 'USAGE') {
+      throw new Error(`INSTALLED_SECONDARY_BIN_EXIT_INVALID:${name}:${String(result.status)}`);
+    }
+  }
 
   const version = run(binary, ['--version']).trim();
   if (!version.startsWith(`devai/${packageVersion} `)) {
@@ -987,6 +1011,25 @@ try {
     join(installedPackage, 'dist/resources/operations/scaffold/templates'),
   );
   const schemas = filesUnder(join(installedPackage, 'dist/runtime/index/schemas'));
+  const verifierRoot = join(installedPackage, 'dist/runtime/evidence-verification');
+  const verifierProvenance = JSON.parse(
+    readFileSync(join(verifierRoot, 'provenance.json'), 'utf8'),
+  );
+  const verifierFiles = filesUnder(verifierRoot)
+    .filter((path) => !path.endsWith('/provenance.json'))
+    .sort();
+  if (
+    verifierProvenance.sourceCommit !== '5f71d43a3d55b07fe866ea2df139dfaacc84f7db' ||
+    verifierProvenance.files?.length !== 21 ||
+    verifierFiles.length !== 21
+  ) {
+    throw new Error('INSTALLED_VERIFIER_POPULATION_INVALID');
+  }
+  for (const entry of verifierProvenance.files) {
+    if (digest(join(verifierRoot, entry.path)) !== entry.sha256) {
+      throw new Error(`INSTALLED_VERIFIER_DIGEST_INVALID:${String(entry.path)}`);
+    }
+  }
   const requiredAssets = [
     'dist/law/policy/action-registry.json',
     'dist/law/policy/sensor-registry.json',
@@ -1072,6 +1115,7 @@ try {
     JSON.stringify({
       tarball: tarballPath,
       tarball_bytes: statSync(tarballPath).size,
+      tarball_sha256: digest(tarballPath),
       packed_files: packed.files?.length,
       installed_bytes: installedFiles.reduce((total, path) => total + statSync(path).size, 0),
       version,
@@ -1080,6 +1124,8 @@ try {
       recipes: recipes.length,
       templates: templates.length,
       schemas: schemas.length,
+      verifier_files: verifierFiles.length,
+      secondary_bins: secondaryBins.length,
       runtime_dependencies: dependencyNames.sort(),
     }) + '\n',
   );
