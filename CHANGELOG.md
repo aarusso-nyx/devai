@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.1 — 2026-08-22
+
+- Completes the installed-adopter schema boundary: the module-blueprint validator is generated,
+  exported, and packaged, while `check --only schemas` validates adopter bindings without requiring
+  DEVAI source-canon paths. DEVAI source-canon validation remains strict and unchanged.
+- Makes bootstrap plan and reviewed apply materialize `law/policy/mutation-strength.json`, preserve
+  explicit adopter overrides, and remain byte-idempotent. Documentation policy binding now accepts
+  `docs.publish_target` and `docs.gh_pages_branch` without erasing unrelated adopter configuration.
+- Adds the stable, deterministic, read-only `audit scorecard` facade. The public catalog is now
+  exactly 44 actions: 23 stable, 10 preview, and 11 internal.
+- Supports fresh `record/proofs/chain.json` genesis, append, verification, and doctor acceptance
+  through package entry points; no legacy evidence-chain migration or fallback is introduced.
+- Adds fail-closed native local evidence for exact commit and tree identity, `darwin/arm64`, named
+  trusted actors, required unit, API, DB/PostGIS, browser E2E, mutation, and coverage jobs, a 24-hour
+  maximum age, and forbidden policy-path mutation rejection. Wildcard trusted actors are rejected.
+- Replaces live `devai-nyx/devai-verifier` reliance with an immutable package-owned verifier whose
+  provenance digest is an externally protected trust input. CI scaffolds, workflow checks, release
+  manifests, installed-package tests, and package assembly preserve the independent ledger proof.
+- Updates only vulnerable compatible transitives: `fast-uri` 3.1.4 to 3.1.5;
+  `brace-expansion` 1.1.16, 2.1.2, and 5.0.8 to 1.1.18, 2.1.4, and 5.0.9; `js-yaml` 4.3.0 to 4.3.1;
+  `nanoid` 3.3.16 to 3.3.18; and `postcss` 8.5.22 to 8.5.23.
+
 ## 1.2.0 — 2026-08-19
 
 - Promotes the RC.3 functional contracts unchanged after an installed-package STYNX trial
