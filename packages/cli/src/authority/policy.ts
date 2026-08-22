@@ -703,6 +703,21 @@ export function buildTrustedAuthoritySources(
       rationale: 'Typed remote authority for the exact task routine selected by the round runner.',
     }),
     rule({
+      id: 'adopter-remote-evidence-record-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['evidence record'],
+      selector: {
+        kind: 'remote',
+        system_id: 'local-command',
+        endpoint_ids: ['test-runner'],
+        operation_ids: ['invoke'],
+        publication: false,
+      },
+      subjects: [machineSubject('harness')],
+      rationale: 'Typed remote authority for the exact test command declared by evidence record.',
+    }),
+    rule({
       id: 'adopter-db-task-finish-1',
       origin: 'additive-extension',
       precedence: 500,

@@ -409,7 +409,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'evidence-record-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'remote'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -419,7 +419,7 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: ['fs-authority-boundary', 'remote-authority-boundary'],
         final_reverification: true,
       },
       readiness: {
