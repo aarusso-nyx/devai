@@ -479,6 +479,51 @@ describe('adopter-safe check and binding contracts', () => {
         jobs.map((job) => [job, { result: 'success', metadata: { job, actor: 'aarusso' } }]),
       ),
     });
+
+    const verifyContract = ACTION_REGISTRY.find((entry) => entry.action_id === 'evidence verify');
+    expect(verifyContract).toMatchObject({
+      effect: 'read',
+      authority_contract: {
+        capabilities: ['proc:git'],
+        subject: { kind: 'none' },
+        consent: { write: false, allow_publish: false },
+      },
+    });
+    put(repo, '.artifacts/changed-files.txt', '');
+    const verified = await expectCliPass([
+      'evidence',
+      'verify',
+      '--scope',
+      'local',
+      '--mode',
+      'gate',
+      '--repo-root',
+      repo,
+      '--actor',
+      'aarusso',
+      '--trusted-actors',
+      'aarusso',
+      '--event-name',
+      'push',
+      '--ref',
+      'refs/heads/main',
+      '--head-message',
+      `bound installed adopter\n\nLocal-CI-Evidence: ${envelope.result.value.output}`,
+      '--changed-files',
+      '.artifacts/changed-files.txt',
+    ]);
+    expect(JSON.parse(verified.stdout)).toMatchObject({
+      action: 'evidence verify',
+      result: {
+        value: {
+          scope: 'local',
+          mode: 'gate',
+          evidenceMode: true,
+          outcome: 'evidence-valid',
+          manifestPath: envelope.result.value.output,
+        },
+      },
+    });
   }, 30_000);
 
   it('fails local receipt collection closed when the bound adopter has no origin', async () => {
