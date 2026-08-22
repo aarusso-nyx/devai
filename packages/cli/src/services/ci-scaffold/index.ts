@@ -15,14 +15,92 @@ export interface CiScaffoldPlan {
 
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const ATTESTED_RC_WORKFLOW_FILE = 'devai-local-rc-verify.yml';
-export const VERIFIER_REPOSITORY = 'devai-nyx/devai-verifier';
-export const VERIFIER_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
-export const ATTESTED_RC_VERIFIER_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
+export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
+export const VERIFIER_SOURCE_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
 
 const DEFAULT_OUTPUT_RELATIVE = `.github/workflows/${LEDGER_WORKFLOW_FILE}`;
+
+function protectedVerifierPackageStep(name: string): string {
+  return `      - name: ${name}
+        id: verifier-package
+        shell: bash
+        env:
+          VERIFIER_PACKAGE_TGZ_B64: \${{ secrets.DEVAI_LEDGER_PACKAGE_TGZ_B64 }}
+          VERIFIER_PACKAGE_SHA256: \${{ vars.DEVAI_LEDGER_PACKAGE_SHA256 }}
+        run: |
+          set -euo pipefail
+          test -n "$VERIFIER_PACKAGE_TGZ_B64"
+          test "$VERIFIER_PACKAGE_SHA256" != ""
+          test "\${#VERIFIER_PACKAGE_SHA256}" = 64
+          control="$RUNNER_TEMP/devai-verifier-package"
+          archive="$control/devai-package.tgz"
+          root="$control/root"
+          mkdir -p "$root"
+          printf '%s' "$VERIFIER_PACKAGE_TGZ_B64" | base64 --decode > "$archive"
+          actual_sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
+          test "$actual_sha256" = "$VERIFIER_PACKAGE_SHA256"
+          if tar -tzf "$archive" | grep -Eq '(^/|(^|/)\\.\\.(/|$))'; then
+            echo 'DEVAI_VERIFIER_PACKAGE_ARCHIVE_PATH_INVALID' >&2
+            exit 2
+          fi
+          if tar -tvzf "$archive" | awk '$1 ~ /^[lh]/ { found=1 } END { exit !found }'; then
+            echo 'DEVAI_VERIFIER_PACKAGE_ARCHIVE_LINK_INVALID' >&2
+            exit 2
+          fi
+          tar -xzf "$archive" --no-same-owner --no-same-permissions -C "$root"
+          package_root="$root/package"
+          verifier_root="$package_root/dist/runtime/evidence-verification"
+          node - "$package_root" "$verifier_root" <<'NODE'
+          const { createHash } = require('node:crypto');
+          const { existsSync, readFileSync, readdirSync } = require('node:fs');
+          const { join, relative } = require('node:path');
+          const [packageRoot, verifierRoot] = process.argv.slice(2);
+          const expectedBins = {
+            'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+            'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+            'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+            'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+            'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+          };
+          const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+          if (manifest.name !== '${VERIFIER_PACKAGE}') throw new Error('DEVAI_VERIFIER_PACKAGE_IDENTITY_INVALID');
+          for (const [name, path] of Object.entries(expectedBins)) {
+            if (manifest.bin?.[name] !== path) throw new Error('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:' + name);
+          }
+          const provenancePath = join(verifierRoot, 'provenance.json');
+          const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
+          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}') {
+            throw new Error('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
+          }
+          const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));
+          const walk = (root, directory = root) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+            const path = join(directory, entry.name);
+            return entry.isDirectory() ? walk(root, path) : [relative(root, path)];
+          });
+          const actual = walk(verifierRoot).filter((path) => path !== 'provenance.json').sort();
+          if (JSON.stringify(actual) !== JSON.stringify([...listed.keys()].sort())) {
+            throw new Error('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
+          }
+          for (const [path, expected] of listed) {
+            const file = join(verifierRoot, path);
+            if (!existsSync(file)) throw new Error('DEVAI_VERIFIER_PACKAGE_FILE_MISSING:' + path);
+            const actualDigest = createHash('sha256').update(readFileSync(file)).digest('hex');
+            if (actualDigest !== expected) throw new Error('DEVAI_VERIFIER_PACKAGE_FILE_DIGEST_INVALID:' + path);
+          }
+          NODE
+          {
+            echo "DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js"
+            echo "DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js"
+            echo "DEVAI_EVIDENCE_BUNDLE_VERIFY=$verifier_root/src/bundle-cli.js"
+          } >> "$GITHUB_ENV"
+          echo "sha256=$actual_sha256" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p \\"require('$package_root/package.json').version\\")" >> "$GITHUB_OUTPUT"
+          echo "provenance_sha256=$(sha256sum "$verifier_root/provenance.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+`.trimEnd();
+}
 
 export function attestedRcVerificationWorkflow(): string {
   const backslash = '\\';
@@ -71,19 +149,12 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Check out pinned independent verifier
-        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
-        with:
-          repository: ${VERIFIER_REPOSITORY}
-          ref: ${ATTESTED_RC_VERIFIER_COMMIT}
-          path: .devai-verifier
-          fetch-depth: 1
-          persist-credentials: false
-
       - name: Set up verifier runtime
         uses: actions/setup-node@${SETUP_NODE_COMMIT} # v7.0.0
         with:
           node-version: 24
+
+${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
 
       - name: Bind candidate and protected evidence tag
         id: identity
@@ -126,7 +197,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/devai-local-rc"
-          node .devai-verifier/src/build-policy-cli.js ${backslash}
+          node "$DEVAI_EVIDENCE_POLICY" ${backslash}
             --repo candidate ${backslash}
             --descriptor control/test-tasks.json ${backslash}
             --profile rc ${backslash}
@@ -147,7 +218,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node .devai-verifier/src/bundle-cli.js ${backslash}
+          node "$DEVAI_EVIDENCE_BUNDLE_VERIFY" ${backslash}
             --bundle evidence ${backslash}
             --trust control/law/policy/devai-local-rc-trust-store.json ${backslash}
             --repository "$GITHUB_REPOSITORY" ${backslash}
@@ -259,19 +330,12 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Check out pinned external verifier
-        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
-        with:
-          repository: ${VERIFIER_REPOSITORY}
-          ref: ${VERIFIER_COMMIT}
-          path: .devai-verifier
-          fetch-depth: 1
-          persist-credentials: false
-
       - name: Set up verifier runtime
         uses: actions/setup-node@${SETUP_NODE_COMMIT} # v7.0.0
         with:
           node-version: 24
+
+${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
 
       - name: Materialize externally controlled verification inputs
         shell: bash
@@ -333,7 +397,7 @@ jobs:
           set -euo pipefail
           test "$POLICY_DIGEST" != ""
           control="$RUNNER_TEMP/devai-ledger-control"
-          node .devai-verifier/src/build-policy-cli.js ${backslash}
+          node "$DEVAI_EVIDENCE_POLICY" ${backslash}
             --repo candidate ${backslash}
             --descriptor candidate/test-tasks.json ${backslash}
             --profile rc ${backslash}
@@ -344,7 +408,7 @@ jobs:
             --environment "$control/environment.json" ${backslash}
             --output "$control/expected-task-policy.json"
           cmp "$control/expected-task-policy.json" "$control/task-policy.json"
-          node .devai-verifier/src/cli.js ${backslash}
+          node "$DEVAI_EVIDENCE_VERIFY" ${backslash}
             --envelope "$control/envelope.json" ${backslash}
             --results-dir "$control/results" ${backslash}
             --artifacts-dir "$control/artifacts" ${backslash}
