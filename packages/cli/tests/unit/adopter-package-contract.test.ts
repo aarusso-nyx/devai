@@ -13,6 +13,7 @@ import type { ResolvedCheckMember } from '../../src/commands/check/contracts.js'
 import { doctor } from '../../src/commands/doctor.js';
 import { evidenceRecord } from '../../src/commands/evidence/facade.js';
 import { initBind } from '../../src/commands/init/index.js';
+import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
 import { runWithAuthorityPolicyMaterialization } from '../../src/authority/command-capabilities.js';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { createRequire } from 'node:module';
@@ -377,6 +378,156 @@ describe('adopter-safe check and binding contracts', () => {
     expect(result.status).toBe('pass');
     expect(readFileSync(join(repo, 'law/policy/mutation-strength.json'))).toEqual(before);
   });
+
+  it('collects an exact native local receipt through the bound adopter CLI without a source sibling', async () => {
+    const repo = root('devai-installed-local-evidence-');
+    expect(repo.startsWith(ROOT)).toBe(false);
+    expect(existsSync(join(dirname(repo), 'devai', 'package.json'))).toBe(false);
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    execFileSync('git', ['config', 'user.name', 'Inspector Fixture'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'inspector@example.invalid'], { cwd: repo });
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/example/teat-installed.git'],
+      { cwd: repo },
+    );
+    await establishTier3Binding(repo);
+    const projectPath = join(repo, '.devai/config/project.json');
+    const project = JSON.parse(readFileSync(projectPath, 'utf8')) as Record<string, unknown>;
+    put(repo, '.devai/config/project.json', {
+      ...project,
+      ci_economy: {
+        local_evidence: {
+          max_age_hours: 24,
+          required_jobs: ['unit', 'api', 'db-postgis', 'browser-e2e', 'mutation', 'coverage'],
+          allowed_platforms: ['darwin/arm64'],
+        },
+      },
+    });
+    await expectCliPass([
+      'init',
+      'bind',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'bound installed adopter'], { cwd: repo });
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+    const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+    const jobs = ['unit', 'api', 'db-postgis', 'browser-e2e', 'mutation', 'coverage'] as const;
+    for (const job of jobs) {
+      put(
+        repo,
+        `.artifacts/${job}/metadata.txt`,
+        `job=${job}\nplatform=darwin/arm64\nactor=aarusso\nnode=${process.version}\n`,
+      );
+      put(repo, `.artifacts/${job}/result.txt`, 'success\n');
+    }
+
+    const contract = ACTION_REGISTRY.find((entry) => entry.action_id === 'evidence collect');
+    expect(contract).toMatchObject({
+      effect: 'harness-write',
+      authority_contract: {
+        capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+        subject: {
+          kind: 'derived-machine',
+          actor: 'harness',
+          transition: 'harness-write',
+          initiator: { allowed_roles: ['owner', 'architect', 'inspector', 'engineer', 'auditor'] },
+        },
+        consent: { write: true, allow_publish: false },
+      },
+    });
+
+    const result = await expectCliPass([
+      'evidence',
+      'collect',
+      '--source',
+      'local',
+      '--repo-root',
+      repo,
+      ...jobs.flatMap((job) => ['--job', `${job}:.artifacts/${job}`]),
+      '--as-role',
+      'inspector',
+      '--write',
+    ]);
+    const envelope = JSON.parse(result.stdout) as {
+      result: { value: { output: string } };
+    };
+    const receipt = JSON.parse(
+      readFileSync(join(repo, envelope.result.value.output), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(receipt).toMatchObject({
+      subject: {
+        repository: 'example/teat-installed',
+        commitSha: commit,
+        tree: { value: tree },
+      },
+      policy: {
+        maxAgeHours: 24,
+        requiredJobs: jobs,
+        allowedPlatforms: ['darwin/arm64'],
+      },
+      platforms: ['darwin/arm64'],
+      jobs: Object.fromEntries(
+        jobs.map((job) => [job, { result: 'success', metadata: { job, actor: 'aarusso' } }]),
+      ),
+    });
+  }, 30_000);
+
+  it('fails local receipt collection closed when the bound adopter has no origin', async () => {
+    const repo = root('devai-local-evidence-no-origin-');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    execFileSync('git', ['config', 'user.name', 'Inspector Fixture'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'inspector@example.invalid'], { cwd: repo });
+    await establishTier3Binding(repo);
+    const projectPath = join(repo, '.devai/config/project.json');
+    const project = JSON.parse(readFileSync(projectPath, 'utf8')) as Record<string, unknown>;
+    put(repo, '.devai/config/project.json', {
+      ...project,
+      ci_economy: {
+        local_evidence: {
+          required_jobs: ['unit'],
+          allowed_platforms: ['darwin/arm64'],
+        },
+      },
+    });
+    await expectCliPass([
+      'init',
+      'bind',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'bound adopter without origin'], { cwd: repo });
+    put(repo, '.artifacts/unit/metadata.txt', 'job=unit\nplatform=darwin/arm64\n');
+    put(repo, '.artifacts/unit/result.txt', 'success\n');
+    const result = await runCli([
+      'evidence',
+      'collect',
+      '--source',
+      'local',
+      '--repo-root',
+      repo,
+      '--job',
+      'unit:.artifacts/unit',
+      '--as-role',
+      'inspector',
+      '--write',
+    ]);
+    expect(result.exit).not.toBe(0);
+    expect(result.stderr).toMatch(/remote\.origin\.url|repository identity|failed/u);
+    expect(existsSync(join(repo, 'record/proofs/work/local-evidence/local-ci.json'))).toBe(false);
+  }, 30_000);
 });
 
 describe('stable scorecard facade contract', () => {
