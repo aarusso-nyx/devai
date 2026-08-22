@@ -34,7 +34,7 @@ describe('normalized release package staging', () => {
     expect(packagePopulation).not.toContain('package/dist/runtime/evidence-verification/test/');
   });
 
-  it('records a stable release and latest dist-tag for version 1.2.1', () => {
+  it('records a stable release and latest dist-tag for version 1.2.2', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -48,14 +48,14 @@ describe('normalized release package staging', () => {
       env: {
         ...process.env,
         PACKAGE_NAME: '@aarusso-nyx/devai',
-        RELEASE_TAG: 'v1.2.1',
+        RELEASE_TAG: 'v1.2.2',
         PACKAGE_TARBALL: packageTarball,
         SITE_ARCHIVE: siteArchive,
         SBOM_FILE: sbom,
         OUTPUT_FILE: manifest,
         COMMIT_SHA: 'b'.repeat(40),
         TREE_SHA: 'c'.repeat(40),
-        LEDGER_VERIFIER_PACKAGE_VERSION: '1.2.1',
+        LEDGER_VERIFIER_PACKAGE_VERSION: '1.2.2',
         LEDGER_VERIFIER_PROVENANCE_SHA256: digest,
         LEDGER_POLICY_DIGEST: digest,
         LEDGER_ENVELOPE_SHA256: digest,
@@ -73,15 +73,15 @@ describe('normalized release package staging', () => {
       ledger: Record<string, unknown>;
     };
     expect(value.release).toMatchObject({
-      tag: 'v1.2.1',
-      version: '1.2.1',
+      tag: 'v1.2.2',
+      version: '1.2.2',
       release_type: 'stable',
       prerelease: false,
       dist_tag: 'latest',
     });
     expect(value.ledger).toMatchObject({
       verifier_package: '@aarusso-nyx/devai',
-      verifier_package_version: '1.2.1',
+      verifier_package_version: '1.2.2',
       verifier_provenance_sha256: digest,
       verifier_source_commit: '5f71d43a3d55b07fe866ea2df139dfaacc84f7db',
     });
