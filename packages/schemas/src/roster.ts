@@ -20,6 +20,7 @@ export const ROSTER = [
   'local-evidence-manifest.schema.json',
   'meta.schema.json',
   'model-runtime-registry.schema.json',
+  'module-blueprint.schema.json',
   'mutation-scenario.schema.json',
   'phase-closure.schema.json',
   'proof-epoch.schema.json',
