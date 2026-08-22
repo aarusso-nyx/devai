@@ -27,6 +27,11 @@ describe('normalized release package staging', () => {
     ) as Record<string, unknown>;
     expect(manifest).not.toHaveProperty('devDependencies');
     expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
+    const packagePopulation = execFileSync('tar', ['-tzf', staged.tarball], {
+      encoding: 'utf8',
+    });
+    expect(packagePopulation).toContain('package/dist/runtime/evidence-verification/src/cli.js');
+    expect(packagePopulation).not.toContain('package/dist/runtime/evidence-verification/test/');
   });
 
   it('records a stable release and latest dist-tag for version 1.2.0', () => {
@@ -50,7 +55,8 @@ describe('normalized release package staging', () => {
         OUTPUT_FILE: manifest,
         COMMIT_SHA: 'b'.repeat(40),
         TREE_SHA: 'c'.repeat(40),
-        VERIFIER_COMMIT: 'd'.repeat(40),
+        LEDGER_VERIFIER_PACKAGE_VERSION: '1.2.0',
+        LEDGER_VERIFIER_PROVENANCE_SHA256: digest,
         LEDGER_POLICY_DIGEST: digest,
         LEDGER_ENVELOPE_SHA256: digest,
         LEDGER_RESULTS_SHA256: digest,
@@ -64,6 +70,7 @@ describe('normalized release package staging', () => {
     });
     const value = JSON.parse(readFileSync(manifest, 'utf8')) as {
       release: Record<string, unknown>;
+      ledger: Record<string, unknown>;
     };
     expect(value.release).toMatchObject({
       tag: 'v1.2.0',
@@ -71,6 +78,12 @@ describe('normalized release package staging', () => {
       release_type: 'stable',
       prerelease: false,
       dist_tag: 'latest',
+    });
+    expect(value.ledger).toMatchObject({
+      verifier_package: '@aarusso-nyx/devai',
+      verifier_package_version: '1.2.0',
+      verifier_provenance_sha256: digest,
+      verifier_source_commit: '5f71d43a3d55b07fe866ea2df139dfaacc84f7db',
     });
   });
 });
