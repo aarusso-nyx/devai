@@ -128,7 +128,9 @@ function replaceResult(state, nodeId, nextResult) {
   const previous = join(state.resultsDir, `${task.resultDigest}.json`);
   try {
     unlinkSync(previous);
-  } catch {}
+  } catch {
+    // The prior result may already be absent in adversarial fixture mutations.
+  }
   task.resultDigest = sha256Hex(nextResult);
   writeFileSync(join(state.resultsDir, `${task.resultDigest}.json`), JSON.stringify(nextResult));
   const dependent = state.receipt.tasks.find((entry) => entry.nodeId === 'contract:cli');
