@@ -3,11 +3,8 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  ROSTER as PACKAGED_SCHEMA_ROSTER,
-  validators as packagedValidators,
-} from '../../packages/schemas/dist/index.js';
 import { subprocessCoverageEnvironment } from '../helpers/subprocess-coverage.js';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -40,14 +37,36 @@ afterEach(() => {
 
 describe('installed inventory_api sensor', () => {
   it('packages every advertised compatibility validator used by runtime consumers', () => {
+    const packagedRegistryUrl = pathToFileURL(join(ROOT, 'packages/schemas/dist/index.js')).href;
+    const inspection = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `const { ROSTER, validators } = await import(${JSON.stringify(packagedRegistryUrl)});
+         const callable = Object.keys(validators).filter((key) => typeof validators[key] === 'function');
+         process.stdout.write(JSON.stringify({ roster: ROSTER, callable }));`,
+      ],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: subprocessCoverageEnvironment(),
+      },
+    );
+    expect(inspection.status, inspection.stderr).toBe(0);
+    const packaged = JSON.parse(inspection.stdout) as {
+      roster: readonly string[];
+      callable: readonly string[];
+    };
+
     for (const [key, schema] of Object.entries(COMPATIBILITY_VALIDATORS)) {
-      expect(PACKAGED_SCHEMA_ROSTER, `${key} schema is absent from the packaged roster`).toContain(
+      expect(packaged.roster, `${key} schema is absent from the packaged roster`).toContain(
         schema,
       );
       expect(
-        typeof (packagedValidators as unknown as Record<string, unknown>)[key],
+        packaged.callable,
         `${key} validator is not callable from the packaged registry`,
-      ).toBe('function');
+      ).toContain(key);
     }
   });
 
