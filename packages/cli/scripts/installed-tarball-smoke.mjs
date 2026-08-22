@@ -24,6 +24,8 @@ const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
 const authorizationRoot = join(smokeRoot, 'authorization-project');
 
+// Package-only acceptance invokes ['audit', 'scorecard'] and ['evidence', 'record'] below.
+
 function run(command, args, cwd = projectRoot) {
   return execFileSync(command, args, {
     cwd,
@@ -90,7 +92,7 @@ try {
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
 
   const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
-  if (unboundCatalog?.result?.value?.length !== 43) {
+  if (unboundCatalog?.result?.value?.length !== 44) {
     throw new Error('INSTALLED_UNBOUND_CATALOG_INVALID');
   }
   const unboundPlan = JSON.parse(
@@ -98,6 +100,13 @@ try {
   );
   if (unboundPlan?.result?.value?.summary?.create === undefined) {
     throw new Error('INSTALLED_UNBOUND_PLAN_INVALID');
+  }
+  if (
+    !unboundPlan?.result?.value?.entries?.some(
+      (entry) => entry.path === 'law/policy/mutation-strength.json',
+    )
+  ) {
+    throw new Error('INSTALLED_MUTATION_POLICY_PLAN_MISSING');
   }
   const unboundDoctor = runResult(binary, [
     'doctor',
@@ -205,7 +214,7 @@ try {
 
   const envelope = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
   const actions = envelope?.result?.value;
-  if (!Array.isArray(actions) || actions.length !== 43) {
+  if (!Array.isArray(actions) || actions.length !== 44) {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
@@ -403,6 +412,20 @@ try {
 
   const adopterPolicyPath = join(projectRoot, 'law/policy/adopter-policy.json');
   mkdirSync(join(projectRoot, 'law/policy'), { recursive: true });
+  const projectPath = join(projectRoot, '.devai/config/project.json');
+  const projectBeforeDocs = JSON.parse(readFileSync(projectPath, 'utf8'));
+  writeFileSync(
+    projectPath,
+    `${JSON.stringify(
+      {
+        ...projectBeforeDocs,
+        feature_flags: { adopter_owned_toggle: true },
+        docs: { builder: 'docusaurus', output_dir: 'site/build' },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   const validAdopterPolicyBytes = `${JSON.stringify(
     {
       schemaVersion: '1.0.0',
@@ -410,6 +433,13 @@ try {
       policy_version: '1.0.0',
       domains: { client: ['COVERAGE'] },
       thresholds: { coverage: { lines: 91 } },
+      project: {
+        docs: {
+          builder: 'docusaurus',
+          publish_target: 'gh-pages',
+          gh_pages_branch: 'gh-pages',
+        },
+      },
       ci_economy: {
         attested_rc: {
           profile: 'rc',
@@ -455,7 +485,11 @@ try {
   );
   if (
     boundProject.ci_economy?.attested_rc?.required_check !== 'verified-local-rc' ||
-    boundProject.ci_economy?.attested_rc?.local_only_nodes?.join(',') !== 'test:mutation'
+    boundProject.ci_economy?.attested_rc?.local_only_nodes?.join(',') !== 'test:mutation' ||
+    boundProject.feature_flags?.adopter_owned_toggle !== true ||
+    boundProject.docs?.output_dir !== 'site/build' ||
+    boundProject.docs?.publish_target !== 'gh-pages' ||
+    boundProject.docs?.gh_pages_branch !== 'gh-pages'
   ) {
     throw new Error('INSTALLED_ADOPTER_POLICY_ATTESTED_RC_INVALID');
   }
@@ -562,6 +596,127 @@ try {
   )?.result;
   if (firstSkills?.written?.length !== 49 || secondSkills?.unchanged?.length !== 49) {
     throw new Error('INSTALLED_RECIPE_ADAPTER_IDEMPOTENCE_INVALID');
+  }
+
+  const blueprintPath = join(projectRoot, 'module-blueprint.json');
+  writeFileSync(
+    blueprintPath,
+    `${JSON.stringify(
+      {
+        schemaVersion: '1.0.0',
+        id: 'BP-TEAT-001',
+        module: { name: 'Teat', namespace: 'teat', version: '1.0.0' },
+        database: {
+          entities: [{ name: 'Receipt', fields: [{ name: 'id', type: 'uuid' }] }],
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const blueprintCheck = JSON.parse(
+    run(binary, [
+      'check',
+      '--only',
+      'blueprint',
+      '--file',
+      blueprintPath,
+      '--repo-root',
+      projectRoot,
+      '--format',
+      'json',
+    ]),
+  );
+  if (blueprintCheck?.result?.value?.ok !== true) {
+    throw new Error('INSTALLED_BLUEPRINT_CHECK_INVALID');
+  }
+  const schemaCheck = JSON.parse(
+    run(binary, ['check', '--only', 'schemas', '--repo-root', projectRoot, '--format', 'json']),
+  );
+  if (
+    schemaCheck?.result?.value?.mode !== 'adopter-binding' ||
+    schemaCheck?.result?.value?.ok !== true
+  ) {
+    throw new Error('INSTALLED_ADOPTER_SCHEMA_CHECK_INVALID');
+  }
+  if (!existsSync(join(projectRoot, 'law/policy/mutation-strength.json'))) {
+    throw new Error('INSTALLED_MUTATION_POLICY_MISSING');
+  }
+  mkdirSync(join(projectRoot, 'law/invariants'), { recursive: true });
+  mkdirSync(join(projectRoot, '.devai/state/mutation'), { recursive: true });
+  writeFileSync(
+    join(projectRoot, 'law/invariants/INV-TEAT-001.json'),
+    `${JSON.stringify({ id: 'INV-TEAT-001', verification: { strategy: 'mutation' } })}\n`,
+  );
+  writeFileSync(
+    join(projectRoot, '.devai/state/mutation/current.json'),
+    `${JSON.stringify({ mutation_score: 100, survived: 0 })}\n`,
+  );
+  const mutationCheck = JSON.parse(
+    run(binary, ['check', '--only', 'mutation', '--repo-root', projectRoot, '--format', 'json']),
+  );
+  if (mutationCheck?.result?.value?.ok !== true) {
+    throw new Error('INSTALLED_MUTATION_CHECK_INVALID');
+  }
+  run(binary, [
+    'evidence',
+    'record',
+    '--kind',
+    'generic',
+    '--round',
+    'R-0013',
+    '--repo-root',
+    projectRoot,
+    '--payload',
+    '{"installed":true}',
+    '--as-role',
+    'auditor',
+    '--write',
+    '--format',
+    'json',
+  ]);
+  const chain = JSON.parse(readFileSync(join(projectRoot, 'record/proofs/chain.json'), 'utf8'));
+  if (chain?.records?.length !== 1 || chain.records[0]?.previous_hash !== 'GENESIS') {
+    throw new Error('INSTALLED_FRESH_CHAIN_GENESIS_INVALID');
+  }
+  const chainVerification = JSON.parse(
+    run(binary, [
+      'evidence',
+      'verify',
+      '--scope',
+      'chain',
+      '--repo-root',
+      projectRoot,
+      '--format',
+      'json',
+    ]),
+  );
+  if (chainVerification?.result?.value?.valid !== true) {
+    throw new Error('INSTALLED_FRESH_CHAIN_VERIFY_INVALID');
+  }
+  const scorecardHead = run('git', ['rev-parse', 'HEAD']).trim();
+  const scorecardFirst = run(binary, [
+    'audit',
+    'scorecard',
+    '--repo-root',
+    projectRoot,
+    '--at',
+    scorecardHead,
+    '--format',
+    'json',
+  ]);
+  const scorecardSecond = run(binary, [
+    'audit',
+    'scorecard',
+    '--repo-root',
+    projectRoot,
+    '--at',
+    scorecardHead,
+    '--format',
+    'json',
+  ]);
+  if (scorecardFirst !== scorecardSecond) {
+    throw new Error('INSTALLED_SCORECARD_NONDETERMINISTIC');
   }
 
   mkdirSync(conflictRoot, { recursive: true });
@@ -769,6 +924,31 @@ try {
   }
   run('git', ['add', '.agents', '.claude', '.devai', 'record'], projectRoot);
   run('git', ['commit', '-qm', 'adopt DEVAI'], projectRoot);
+  const adoptionCommit = run('git', ['rev-parse', 'HEAD'], projectRoot).trim();
+  writeFileSync(
+    join(projectRoot, 'law/policy/forbidden-action-authorizations.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: '1.0.0',
+        authorizations: [
+          {
+            forbidden_id: 'FORBID-MUTATE-INVARIANTS',
+            commit: adoptionCommit,
+            authorized_by: 'Owner',
+            reason: 'Fixture Owner authorizes this exact installed-package materialization commit.',
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  run('git', ['add', 'law/policy/forbidden-action-authorizations.json'], projectRoot);
+  run(
+    'git',
+    ['-c', 'user.name=DEVAI Architect', 'commit', '-qm', 'authorize adoption materialization'],
+    projectRoot,
+  );
   const remoteRoot = join(smokeRoot, 'remote.git');
   run('git', ['init', '--bare', '-q', remoteRoot], smokeRoot);
   run('git', ['remote', 'set-url', 'origin', remoteRoot], projectRoot);
@@ -798,7 +978,7 @@ try {
     throw new Error('INSTALLED_DEVAI_RUNTIME_DEPENDENCY');
   }
   if (JSON.stringify(packageJson).includes('workspace:*')) {
-    throw new Error('INSTALLED_WORKSPACE_PROTOCOL');
+    throw new Error('SOURCE_BOUNDARY: workspace protocol forbidden');
   }
 
   const recipeRoot = join(installedPackage, 'dist/resources/recipes');
@@ -881,7 +1061,7 @@ try {
     existsSync(join(projectRoot, '.agents/skills/devai-assess')) ||
     existsSync(join(projectRoot, '.devai')) ||
     JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']))?.result?.value?.length !==
-      43
+      44
   ) {
     throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }

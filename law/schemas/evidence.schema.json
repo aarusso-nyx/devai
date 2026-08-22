@@ -194,6 +194,16 @@
       "pattern": "^[a-f0-9]{64}$",
       "description": "SHA-256 of the manifest_hash of the preceding evidence record. Null for chain genesis."
     },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "One-based append ordinal for a fresh canonical adopter chain."
+    },
+    "previous_hash": {
+      "type": "string",
+      "pattern": "^(GENESIS|[a-f0-9]{64})$",
+      "description": "Readable predecessor alias: GENESIS for sequence one, otherwise the prior manifest hash."
+    },
     "manifest_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$",

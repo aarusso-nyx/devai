@@ -6,6 +6,7 @@ import { spawnSync, writeGovernanceProjectionSync } from '@devai-nyx/authority';
 import {
   ActionsEvidenceError,
   LocalEvidenceError,
+  appendVerbEvidence,
   appendProofEpochErrata,
   appendProofEpochRecord,
   collectLocalEvidence,
@@ -380,10 +381,22 @@ export const evidenceRecord = defineCommand({
               kind: 'generic',
               payload,
             });
+            const chain = appendVerbEvidence({
+              repoRoot,
+              action: 'evidence.record.generic',
+              status: 'completed',
+              notes: [
+                `round_id=${options.round}`,
+                `proof_sequence=${String(proof.sequence)}`,
+              ],
+            });
+            if (!chain.ok) {
+              throw new Error(`EVIDENCE_CHAIN_APPEND_FAILED:${chain.error ?? 'unknown error'}`);
+            }
             process.stdout.write(
               options.human === true
                 ? `evidence record: generic sequence ${String(proof.sequence)}\n`
-                : `${JSON.stringify({ kind: 'generic', round_id: options.round, result: payload, proof })}\n`,
+                : `${JSON.stringify({ kind: 'generic', round_id: options.round, result: payload, proof, chain })}\n`,
             );
             process.exitCode = EXIT_PASS;
             return;

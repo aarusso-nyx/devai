@@ -9,6 +9,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: ['fs:f4-inventory', 'fs:f5-state', 'fs:proofs', 'proc:git'],
   },
   {
+    action_id: 'audit scorecard',
+    public_action_id: 'audit scorecard',
+    effect: 'read',
+    capabilities: ['proc:git'],
+  },
+  {
     action_id: 'catalog actions',
     public_action_id: 'catalog actions',
     effect: 'read',

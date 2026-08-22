@@ -52,7 +52,7 @@ import { checkCiEconomy } from './ci-economy.js';
 import { checkDependencies } from './dependencies.js';
 import { checkDocsGovernance } from './docs-governance.js';
 import { checkGlobGuards } from './glob-guards.js';
-import { checkSchemaCanon } from './schemas.js';
+import { checkSchemasForRepository } from './schemas.js';
 import { checkSensorIntegrity } from './sensor-integrity.js';
 import { buildCanonicalDescriptorHandoffReport } from './documentation-report.js';
 import type {
@@ -585,7 +585,7 @@ async function directService(
       return fromValue(senseTest({ cwd: repoRoot, suite: 'unit' }));
     case 'schema-config-load':
     case 'schemas':
-      return fromValue(checkSchemaCanon(repoRoot));
+      return fromValue(checkSchemasForRepository(repoRoot));
     case 'invariant-validation':
     case 'invariants':
       return fromValue(invariantReport(repoRoot));

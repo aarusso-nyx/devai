@@ -23,6 +23,13 @@ export interface SchemaCanonReport {
   readonly findings: readonly SchemaCanonFinding[];
 }
 
+export interface AdopterSchemaReport {
+  readonly ok: boolean;
+  readonly mode: 'adopter-binding';
+  readonly checked: readonly string[];
+  readonly findings: readonly SchemaCanonFinding[];
+}
+
 const RULES = [
   'recursive-closed-complete-objects',
   'predicate-fragments-valid',
@@ -109,6 +116,73 @@ export function checkSchemaCanon(repoRoot: string): SchemaCanonReport {
     rules: RULES,
     findings,
   };
+}
+
+function isDevaiSourceRepository(root: string): boolean {
+  try {
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+      readonly name?: unknown;
+      readonly private?: unknown;
+    };
+    return (
+      manifest.name === 'devai' &&
+      manifest.private === true &&
+      existsSync(join(root, 'law/schemas')) &&
+      existsSync(join(root, 'packages/schemas/src/roster.ts'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+const ADOPTER_SCHEMA_BINDINGS = [
+  ['.devai/config/project.json', 'project-config.schema.json'],
+  ['.devai/config/scorecard-na.json', 'scorecard-na-config.schema.json'],
+  ['.devai/config/glob-guards.json', 'glob-guards.schema.json'],
+  ['.devai/config/forbidden-actions.json', 'forbidden-actions.schema.json'],
+  ['.devai/config/authority-policy.json', 'authority-policy.schema.json'],
+  ['law/policy/adopter-policy.json', 'adopter-policy.schema.json'],
+] as const;
+
+export function checkAdopterSchemas(repoRoot: string): AdopterSchemaReport {
+  const root = resolve(repoRoot);
+  const checked: string[] = [];
+  const findings: SchemaCanonFinding[] = [];
+  for (const [relative, schema] of ADOPTER_SCHEMA_BINDINGS) {
+    const path = join(root, relative);
+    if (!existsSync(path)) continue;
+    checked.push(relative);
+    try {
+      const value = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+      const validate = getValidator(schema);
+      if (!validate(value)) {
+        findings.push({
+          rule: 'adopter-binding-schema',
+          path: relative,
+          message: JSON.stringify(validate.errors ?? []),
+        });
+      }
+    } catch (error) {
+      findings.push({
+        rule: 'adopter-binding-schema',
+        path: relative,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  if (!checked.includes('.devai/config/project.json')) {
+    findings.push({
+      rule: 'adopter-binding-schema',
+      path: '.devai/config/project.json',
+      message: 'Bound adopter project configuration is absent.',
+    });
+  }
+  return { ok: findings.length === 0, mode: 'adopter-binding', checked, findings };
+}
+
+export function checkSchemasForRepository(repoRoot: string): SchemaCanonReport | AdopterSchemaReport {
+  const root = resolve(repoRoot);
+  return isDevaiSourceRepository(root) ? checkSchemaCanon(root) : checkAdopterSchemas(root);
 }
 
 export const checkSchemasCmd = defineCommand({

@@ -65,6 +65,7 @@ export function redactRecord(inputs: RedactRecordInputs): RedactRecordResult {
     const downstream = chain.records[i];
     if (!downstream) continue;
     downstream.previous_run_hash = prevHash;
+    if (downstream.previous_hash !== undefined) downstream.previous_hash = prevHash;
     const newHash = computeManifestHash(extractManifestInputs(downstream));
     downstream.manifest_hash = newHash;
     assertValidEvidence(downstream, `re-linked downstream ${downstream.id}`);

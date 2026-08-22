@@ -189,7 +189,12 @@ function isConstitutionBootstrap(input: BrokerInput): boolean {
   );
 }
 
-const SAFE_UNBOUND_READ_ACTIONS = new Set(['catalog actions', 'doctor', 'init plan']);
+const SAFE_UNBOUND_READ_ACTIONS = new Set([
+  'audit scorecard',
+  'catalog actions',
+  'doctor',
+  'init plan',
+]);
 
 function usesInstalledConstitution(input: BrokerInput): boolean {
   return isConstitutionBootstrap(input) || SAFE_UNBOUND_READ_ACTIONS.has(input.entry.name);

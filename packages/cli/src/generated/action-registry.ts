@@ -69,6 +69,56 @@ export const ACTION_REGISTRY = [
     },
   },
   {
+    action_id: 'audit scorecard',
+    handler: 'audit scorecard',
+    path: ['audit', 'scorecard'],
+    status: 'stable',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'read',
+    authority: 'mesh_controller',
+    description:
+      'Compute the deterministic scorecard for one exact current commit without persisting audit artifacts or evidence.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: 'law/schemas/scorecard.schema.json',
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'audit scorecard',
+      effect: 'read',
+      capabilities: ['proc:git'],
+      subject: {
+        kind: 'none',
+      },
+      consent: {
+        write: false,
+        allow_publish: false,
+        experimental: false,
+      },
+      planner: {
+        kind: 'none',
+      },
+      boundary: {
+        kind: 'none',
+      },
+      readiness: {
+        requires_binding: false,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
     action_id: 'catalog actions',
     handler: 'catalog actions',
     path: ['catalog', 'actions'],

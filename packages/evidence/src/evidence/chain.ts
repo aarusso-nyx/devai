@@ -49,6 +49,10 @@ export interface EvidenceRecord {
   notes?: string[];
   previous_run_hash: string | null;
   manifest_hash: string;
+  /** Canonical append ordinal for fresh adopter chains. */
+  sequence?: number;
+  /** Human-readable predecessor alias: GENESIS or the prior manifest hash. */
+  previous_hash?: string;
 }
 
 export interface DraftEvidence {
@@ -184,6 +188,8 @@ export function appendRecord(chainPath: string, draft: DraftEvidence): EvidenceR
     ...(draft.notes !== undefined && { notes: [...draft.notes] }),
     previous_run_hash,
     manifest_hash,
+    sequence: chain.records.length + 1,
+    previous_hash: previous_run_hash ?? DOMAIN_SEPARATOR,
   };
   const ok = validateEvidence(record);
   if (!ok) {
@@ -206,7 +212,18 @@ export function verifyChain(chainPath: string): VerifyResult {
   const chain = loadChain(chainPath);
   const errors: string[] = [];
   let prev: string | null = null;
-  for (const record of chain.records) {
+  for (const [index, record] of chain.records.entries()) {
+    if (record.sequence !== undefined && record.sequence !== index + 1) {
+      errors.push(
+        `record ${record.id}: sequence mismatch (expected ${String(index + 1)}, got ${String(record.sequence)})`,
+      );
+    }
+    const expectedPreviousHash = prev ?? DOMAIN_SEPARATOR;
+    if (record.previous_hash !== undefined && record.previous_hash !== expectedPreviousHash) {
+      errors.push(
+        `record ${record.id}: previous_hash mismatch (expected ${expectedPreviousHash}, got ${record.previous_hash})`,
+      );
+    }
     if (record.previous_run_hash !== prev) {
       errors.push(
         `record ${record.id}: previous_run_hash mismatch (expected ${prev ?? 'null'}, got ${record.previous_run_hash ?? 'null'})`,
