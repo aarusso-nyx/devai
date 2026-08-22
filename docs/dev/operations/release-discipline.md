@@ -50,8 +50,9 @@ must verify. The workflow uses the authentic immutable `pnpm/action-setup` v4.1.
 tag object (`7088…`, peeled commit `a748…`) and lets the root `packageManager` field select
 the pnpm version.
 
-The protected ledger is checked by a pinned external verifier. Do not call that verifier
-independent until signing and verifier custody are organizationally separate. The build job
+The protected ledger is checked by the immutable verifier shipped in the exact public DEVAI
+package, using protected trust inputs that candidate configuration cannot select. Do not call
+that verification independent until signing and verifier custody are organizationally separate. The build job
 installs frozen dependencies, builds the package and Docusaurus site, checks publishable
 closure, and creates a normalized public manifest with development workspace dependencies
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from

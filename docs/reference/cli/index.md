@@ -1,6 +1,6 @@
 # CLI overview
 
-DEVAI presents 43 actions: 22 stable public actions, 10 preview round actions, and 11
+DEVAI presents 44 actions: 23 stable public actions, 10 preview round actions, and 11
 internal plumbing actions. Nine workflow domains organize the public surface. Choose the domain from the outcome you need;
 then choose one leaf action, suite, preset, kind, slice, tier, round, or task selection inside
 that domain. The hidden `task` and `catalog` surfaces are plumbing, not additional workflows.
@@ -19,7 +19,7 @@ does not by itself establish release, deployment, or readiness.
 | plan, inspect, run, or close governed work                                | `round`    | `devai round status --round R-1000 --repo-root . --format json`               |
 | collect, record, render, redact, or verify evidence                       | `evidence` | `devai evidence verify --scope chain --show-head --repo-root . --format json` |
 | inspect release control or enter a separately authorized release ceremony | `release`  | `devai release status --repo-root . --format json`                            |
-| create an exact non-promoting observation                                 | `audit`    | `devai audit observe --at <full-sha> --as-role auditor --write`               |
+| compute a scorecard or create an exact non-promoting observation          | `audit`    | `devai audit scorecard --at <full-sha> --repo-root . --format json`           |
 | classify a sensor failure before remediation                              | `triage`   | `devai triage classify --input <reading.json> --as-role inspector --write`    |
 
 The examples above use only the current grammar. They are read-only or dry-run selections;

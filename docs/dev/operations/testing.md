@@ -65,7 +65,7 @@ credentials must not create accidental cost or nondeterminism.
 A candidate-independent exporter validates the unsigned clean affected/RC receipt and exact result
 set before signing outside the candidate repository. The exported evidence is valid only for its
 exact repository, commit, tree, task-policy digest, required-node closure, signer, and revocation
-state. The pinned external verifier rejects missing, stale, malformed, unknown, FAIL,
+state. The immutable package-owned verifier rejects missing, stale, malformed, unknown, FAIL,
 or ABORTED nodes. A trusted signature proves integrity and signer identity, not that execution
 actually occurred.
 

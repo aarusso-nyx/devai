@@ -1,7 +1,7 @@
 # Versioning policy
 
 The v1.0 line publishes one package, `@aarusso-nyx/devai`, and documents its current
-43-action surface.
+44-action surface.
 
 Pin adopter installations to an exact version. Any change to action identity, effect,
 authority, schema, configuration, receipt, or task-policy semantics requires explicit review and

@@ -46,7 +46,7 @@ E2E, performance, and containment scripts are diagnostic slices, not additional 
 
 Remote CI does not rerun product tests. A candidate-independent exporter first validates the
 clean local receipt and exact results, then signs the canonical receipt outside the candidate
-repository. CI checks that export with a pinned external verifier, an allowlisted,
+repository. CI checks that export with the immutable verifier in the exact installed DEVAI package, an allowlisted,
 non-revoked Ed25519 public key, the exact repository/commit/tree, the approved task-policy
 digest, and the complete required-node closure. Missing, stale, malformed, unknown, FAIL, or
 ABORTED nodes reject the receipt.

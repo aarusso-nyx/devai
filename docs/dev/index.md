@@ -20,8 +20,8 @@ checks affected by the change.
 
 PASS-only cache reuse is allowed when the task key and dependency closure are unchanged.
 Unknown changes widen to the full local closure. Clean affected and RC runs may emit an unsigned
-candidate receipt; signing and trust material remain outside the candidate repository. The pinned
-external verifier validates the signed export without rerunning product tests and does not claim
+candidate receipt; signing and trust material remain outside the candidate repository. The
+immutable package-owned verifier validates the signed export without rerunning product tests and does not claim
 to prove local execution. Independent custody and verifier-side reconstruction of the candidate
 descriptor closure remain release gates.
 

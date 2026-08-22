@@ -23,10 +23,8 @@
           "properties": { "kind": { "enum": ["library", "application"] } }
         },
         "docs": {
-          "type": "object",
-          "additionalProperties": true,
-          "required": ["builder"],
-          "properties": { "builder": { "enum": ["docusaurus", "jekyll"] } }
+          "$ref": "project-config.schema.json#/properties/docs",
+          "description": "Documentation configuration uses the same closed shape accepted by the resolved adopter project configuration."
         }
       }
     },

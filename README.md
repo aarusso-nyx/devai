@@ -5,7 +5,7 @@ It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
 The DEVAI 1.2 product is one publishable package,
-`@aarusso-nyx/devai`. Its current machine catalog contains **43 actions**, **59
+`@aarusso-nyx/devai`. Its current machine catalog contains **44 actions**, **59
 sensors**, and **7 host-invoked recipes**. The ordinary public CLI is organized
 into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
 `evidence`, `release`, and `triage`. `task` and `catalog` are internal plumbing exposed by
@@ -32,8 +32,8 @@ PASS results for unchanged inputs. The full coverage gate is the required RC nod
 the narrower DB, E2E, performance, and containment commands are diagnostic slices.
 A signed candidate receipt binds a clean Git
 tree and task-policy digest to trusted local attestations; it does **not** prove
-that the signer actually executed the tasks. The pinned external verifier validates
-that binding cheaply. Organizationally separate signing and verifier custody remain
+that the signer actually executed the tasks. The immutable package-owned verifier validates
+that binding cheaply from protected external trust inputs. Organizationally separate signing and verifier custody remain
 prerequisites for calling it independent.
 
 - [Start here](docs/start/index.md)
