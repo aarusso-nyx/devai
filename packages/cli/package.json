@@ -1,6 +1,6 @@
 {
   "name": "@aarusso-nyx/devai",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Human-supervised developer-acceleration CLI with bounded automation and trustworthy evidence.",
   "license": "Apache-2.0",
   "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
@@ -9,7 +9,12 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "devai": "./dist/runtime/index/bin.js"
+    "devai": "./dist/runtime/index/bin.js",
+    "devai-evidence-policy": "./dist/runtime/evidence-verification/src/build-policy-cli.js",
+    "devai-evidence-verify": "./dist/runtime/evidence-verification/src/cli.js",
+    "devai-evidence-bundle-verify": "./dist/runtime/evidence-verification/src/bundle-cli.js",
+    "devai-evidence-export": "./dist/runtime/evidence-verification/src/export-cli.js",
+    "devai-evidence-publish": "./dist/runtime/evidence-verification/src/publish-cli.js"
   },
   "files": [
     "dist"

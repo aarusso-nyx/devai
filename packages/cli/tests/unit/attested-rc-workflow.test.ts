@@ -4,8 +4,9 @@ import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  ATTESTED_RC_VERIFIER_COMMIT,
   ATTESTED_RC_WORKFLOW_FILE,
+  VERIFIER_PACKAGE,
+  VERIFIER_SOURCE_COMMIT,
   attestedRcVerificationWorkflow,
   buildCiScaffoldPlan,
 } from '../../src/services/ci-scaffold/index.js';
@@ -39,7 +40,7 @@ function project(root: string): void {
 }
 
 describe('attested RC workflow scaffold', () => {
-  it('selects the protected-tag verifier and never executes candidate product commands', () => {
+  it('selects the protected package verifier and never executes candidate product commands', () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-attested-workflow-'));
     roots.push(root);
     project(root);
@@ -47,12 +48,32 @@ describe('attested RC workflow scaffold', () => {
     expect(plan.path).toBe(join(root, '.github/workflows', ATTESTED_RC_WORKFLOW_FILE));
     expect(plan.content).toBe(attestedRcVerificationWorkflow());
     expect(() => parse(plan.content)).not.toThrow();
-    expect(plan.content).toContain(`ref: ${ATTESTED_RC_VERIFIER_COMMIT}`);
+    expect(plan.content).toContain('vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256');
+    expect(plan.content).toContain(
+      'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+    );
+    expect(plan.content).toContain(`manifest.name !== '${VERIFIER_PACKAGE}'`);
+    expect(plan.content).toContain(`provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`);
+    expect(plan.content).toContain('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:');
+    expect(plan.content).toContain('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
+    expect(plan.content).toContain('node "$DEVAI_EVIDENCE_BUNDLE_VERIFY"');
+    expect(plan.content).toContain('node "$DEVAI_EVIDENCE_POLICY"');
+    expect(
+      plan.content.indexOf(
+        'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+      ),
+    ).toBeLessThan(
+      plan.content.indexOf('cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"'),
+    );
     expect(plan.content).toContain('name: verified-local-rc');
     expect(plan.content).toContain('--binding "${{ steps.identity.outputs.binding }}"');
     expect(plan.content).toContain('control/law/policy/devai-local-rc-trust-store.json');
     expect(plan.content).not.toMatch(/pnpm (?:run|exec|test)|\bstryker\b/u);
     expect(plan.content).not.toContain('NODE_AUTH_TOKEN');
+    expect(plan.content).not.toContain('devai-nyx/devai-verifier');
+    expect(plan.content).not.toContain('DEVAI_LEDGER_PACKAGE_TGZ_B64');
+    expect(plan.content).not.toContain('DEVAI_LEDGER_PACKAGE_SHA256');
+    expect(plan.content).not.toMatch(/repository:\s+devai-nyx\/devai-verifier/u);
   });
 
   it('fails closed instead of generating from malformed attested-RC policy', () => {

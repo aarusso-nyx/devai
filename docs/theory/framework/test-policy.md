@@ -49,7 +49,7 @@ opt-in.
 
 An exporter outside the candidate first verifies the clean local receipt and result set, then
 signs the canonical receipt with protected trust material. Remote CI verifies that export against
-a pinned external verifier, the exact repository/commit/tree, the approved task-policy
+the immutable verifier in the exact installed DEVAI package, the exact repository/commit/tree, the approved task-policy
 digest, signer allowlist and revocation state, and the complete required-node closure. It does not
 rerun product tests.
 

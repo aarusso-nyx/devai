@@ -9,7 +9,8 @@ import {
   LEDGER_ENVIRONMENT,
   ledgerVerificationWorkflow,
   SETUP_NODE_COMMIT,
-  VERIFIER_COMMIT,
+  VERIFIER_PACKAGE,
+  VERIFIER_SOURCE_COMMIT,
 } from '../../src/services/ci-scaffold/index.js';
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
 
@@ -55,6 +56,21 @@ describe('live ledger-verification workflow', () => {
     expect(execFileSync(process.execPath, [CHECKER], { cwd: ROOT, encoding: 'utf8' })).toBe(
       'workflow contract: PASS\n',
     );
+    const digestCheck = checkedIn.indexOf(
+      'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+    );
+    const packageCopy = checkedIn.indexOf(
+      'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
+    );
+    const provenanceVerification = checkedIn.indexOf('const provenance = JSON.parse');
+    expect(digestCheck).toBeGreaterThan(-1);
+    expect(packageCopy).toBeGreaterThan(digestCheck);
+    expect(provenanceVerification).toBeGreaterThan(packageCopy);
+    expect(checkedIn).toContain("manifest.name !== '@aarusso-nyx/devai'");
+    expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:');
+    expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
+    expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
+    expect(checkedIn).not.toContain('devai-nyx/devai-verifier');
   });
 
   it.each([
@@ -88,20 +104,59 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_EXTERNAL_CONTROL_INPUT_MISSING',
     },
     {
-      name: 'mutable verifier ref',
-      mutate: (source: string) => source.replace(VERIFIER_COMMIT, 'main'),
-      diagnostic: 'CI_VERIFIER_REF_MUTABLE',
+      name: 'missing protected verifier provenance digest',
+      mutate: (source: string) =>
+        source.replaceAll(
+          'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
+          'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_REMOVED',
+        ),
+      diagnostic: 'CI_EXTERNAL_CONTROL_INPUT_MISSING',
     },
     {
-      name: 'wrong immutable verifier pin',
-      mutate: (source: string) => source.replace(VERIFIER_COMMIT, 'a'.repeat(40)),
-      diagnostic: 'CI_VERIFIER_PIN_MISMATCH',
+      name: 'verifier provenance digest mismatch accepted',
+      mutate: (source: string) =>
+        source.replace(
+          'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+          'test -n "$actual_provenance_sha256"',
+        ),
+      diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
+    },
+    {
+      name: 'unsafe verifier package subtree accepted',
+      mutate: (source: string) =>
+        source.replace('DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID', 'special-file-ignored'),
+      diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
+    },
+    {
+      name: 'verifier package population is not checked',
+      mutate: (source: string) =>
+        source.replace('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID', 'population-ignored'),
+      diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
+    },
+    {
+      name: 'verifier runtime population copy is bypassed',
+      mutate: (source: string) =>
+        source.replace(
+          'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
+          'cp -R "$source_root/test" "$verifier_root/"',
+        ),
+      diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
+    },
+    {
+      name: 'wrong package-owned verifier provenance',
+      mutate: (source: string) => source.replace(VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
+      diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
+    },
+    {
+      name: 'obsolete verifier repository identity',
+      mutate: (source: string) => source.replace(VERIFIER_PACKAGE, 'devai-nyx/devai-verifier'),
+      diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
       name: 'candidate-local verifier',
       mutate: (source: string) =>
         source.replace(
-          'node .devai-verifier/src/cli.js',
+          'node "$DEVAI_EVIDENCE_VERIFY"',
           'node candidate/scripts/verify-ledger.mjs',
         ),
       diagnostic: 'CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN',
@@ -109,7 +164,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'missing expected-policy reconstruction',
       mutate: (source: string) =>
-        source.replace('node .devai-verifier/src/build-policy-cli.js', 'node -e "process.exit(0)"'),
+        source.replace('node "$DEVAI_EVIDENCE_POLICY"', 'node -e "process.exit(0)"'),
       diagnostic: 'CI_EXPECTED_POLICY_RECONSTRUCTION_MISSING',
     },
     {
@@ -171,7 +226,7 @@ describe('live ledger-verification workflow', () => {
       "if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}",
     );
     expect(release).toContain('environment: devai-rc-publication');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 43');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 44');
     expect(release).toContain('pnpm run release:closure');
     expect(release).toContain('--binding exact-tree');
     expect(release).toContain(
@@ -265,7 +320,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 43', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 44', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {

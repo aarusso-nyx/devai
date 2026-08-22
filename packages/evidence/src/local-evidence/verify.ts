@@ -63,10 +63,14 @@ export function parseTrailerPath(message: string): string {
 }
 
 export function normalizeActorList(value: string): string[] {
-  return value
+  const actors = value
     .split(/[\s,;]+/u)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+  if (actors.some((actor) => actor === '*' || actor.includes('*'))) {
+    fail('trusted local-evidence actors must be explicit named actors; wildcards are forbidden');
+  }
+  return [...new Set(actors)];
 }
 
 function readManifest(absPath: string): LocalEvidenceManifest {
@@ -239,6 +243,9 @@ function validateJobs(manifest: LocalEvidenceManifest, policy: LocalEvidencePoli
 function validateTrustedActor(actor: string, trustedActors: readonly string[]): void {
   if (actor.length === 0) fail('evidence mode requires a GitHub actor');
   if (trustedActors.length === 0) fail('evidence mode requires a trusted-actor allowlist');
+  if (trustedActors.some((candidate) => candidate === '*' || candidate.includes('*'))) {
+    fail('trusted local-evidence actors must be explicit named actors; wildcards are forbidden');
+  }
   if (!trustedActors.includes(actor)) fail(`actor is not trusted for local evidence: ${actor}`);
 }
 

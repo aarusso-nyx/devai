@@ -67,8 +67,11 @@ function needsRuntimeMetadata(argv: readonly string[]): boolean {
 async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefinition[]> {
   switch (domain) {
     case 'audit': {
-      const { auditObserve } = await import('./commands/audit/observe.js');
-      return [auditObserve];
+      const [{ auditObserve }, { auditScorecard }] = await Promise.all([
+        import('./commands/audit/observe.js'),
+        import('./commands/audit/scorecard.js'),
+      ]);
+      return [auditObserve, auditScorecard];
     }
     case 'catalog': {
       const { actionsList } = await import('./commands/actions-list.js');

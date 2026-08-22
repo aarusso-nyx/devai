@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -8,6 +9,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PACKAGE_NAME = '@aarusso-nyx/devai';
 const REPOSITORY = 'aarusso-nyx/devai';
+const SECONDARY_BINS = {
+  'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+  'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+  'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+  'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+  'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+};
 
 function fail(code, detail) {
   throw new Error(`${code}:${detail}`);
@@ -23,6 +31,10 @@ function filesUnder(path) {
     const child = join(path, entry.name);
     return entry.isDirectory() ? filesUnder(child) : [child];
   });
+}
+
+function sha256(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 function assertPath(path, owner) {
@@ -59,6 +71,35 @@ if (
 ) {
   fail('PUBLISHABLE_RUNTIME_WORKSPACE_PROTOCOL', PACKAGE_NAME);
 }
+for (const [name, path] of Object.entries(SECONDARY_BINS)) {
+  if (cliPackage.bin?.[name] !== path || !existsSync(join(ROOT, 'packages/cli', path))) {
+    fail('PUBLISHABLE_SECONDARY_BIN_MISSING', name);
+  }
+}
+const verifierRoot = join(ROOT, 'packages/cli/dist/runtime/evidence-verification');
+const verifierProvenance = json('packages/cli/dist/runtime/evidence-verification/provenance.json');
+if (
+  verifierProvenance.sourceCommit !== '5f71d43a3d55b07fe866ea2df139dfaacc84f7db' ||
+  !Array.isArray(verifierProvenance.files) ||
+  verifierProvenance.files.length !== 21
+) {
+  fail('PUBLISHABLE_VERIFIER_PROVENANCE_INVALID', String(verifierProvenance.sourceCommit));
+}
+const verifierPopulation = filesUnder(verifierRoot)
+  .map((path) => relative(verifierRoot, path).replaceAll('\\', '/'))
+  .sort();
+const declaredVerifierPopulation = [
+  'provenance.json',
+  ...verifierProvenance.files.map((entry) => entry.path),
+].sort();
+if (JSON.stringify(verifierPopulation) !== JSON.stringify(declaredVerifierPopulation)) {
+  fail('PUBLISHABLE_VERIFIER_POPULATION_INVALID', String(verifierPopulation.length));
+}
+for (const entry of verifierProvenance.files) {
+  if (sha256(join(verifierRoot, entry.path)) !== entry.sha256) {
+    fail('PUBLISHABLE_VERIFIER_DIGEST_INVALID', String(entry.path));
+  }
+}
 
 const packageManifests = readdirSync(join(ROOT, 'packages'), { withFileTypes: true })
   .filter(
@@ -72,11 +113,11 @@ if (publishable.length !== 1 || publishable[0]?.name !== PACKAGE_NAME) {
 }
 
 const actions = json('law/policy/action-registry.json');
-if (actions.entries?.length !== 43 || actions.counts?.total !== 43) {
+if (actions.entries?.length !== 44 || actions.counts?.total !== 44) {
   fail('PUBLISHABLE_ACTION_COUNT_INVALID', String(actions.entries?.length));
 }
 const actionIds = actions.entries.map((entry) => entry.action_id);
-if (new Set(actionIds).size !== 43) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
+if (new Set(actionIds).size !== 44) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
 for (const entry of actions.entries) {
   for (const forbidden of ['previous_name', 'lifecycle', 'migration', 'disposition']) {
     if (Object.hasOwn(entry, forbidden))
@@ -198,5 +239,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 43, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 44, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, verifier_files: 21, secondary_bins: 5 })}\n`,
 );

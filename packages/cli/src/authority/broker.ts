@@ -179,6 +179,35 @@ function validatePolicySchema(value: unknown): AuthorityResult {
   });
 }
 
+function authorityPolicySemantics(value: JsonRecord): JsonRecord {
+  const { materialized_at: _materializedAt, materialization: _materialization, ...semantics } =
+    value;
+  return semantics;
+}
+
+function unchangedAuthorityPolicy(path: string, nextBytes: Uint8Array): Buffer | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const currentBytes = readFileSync(path);
+    const current = JSON.parse(currentBytes.toString('utf8')) as unknown;
+    const next = JSON.parse(Buffer.from(nextBytes).toString('utf8')) as unknown;
+    if (
+      !isRecord(current) ||
+      !isRecord(next) ||
+      !validators.authorityPolicy(current) ||
+      !validators.authorityPolicy(next)
+    ) {
+      return undefined;
+    }
+    return canonicalSha256(authorityPolicySemantics(current)) ===
+      canonicalSha256(authorityPolicySemantics(next))
+      ? currentBytes
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isConstitutionBootstrap(input: BrokerInput): boolean {
   return (
     input.bootstrap_policy &&
@@ -189,7 +218,12 @@ function isConstitutionBootstrap(input: BrokerInput): boolean {
   );
 }
 
-const SAFE_UNBOUND_READ_ACTIONS = new Set(['catalog actions', 'doctor', 'init plan']);
+const SAFE_UNBOUND_READ_ACTIONS = new Set([
+  'audit scorecard',
+  'catalog actions',
+  'doctor',
+  'init plan',
+]);
 
 function usesInstalledConstitution(input: BrokerInput): boolean {
   return isConstitutionBootstrap(input) || SAFE_UNBOUND_READ_ACTIONS.has(input.entry.name);
@@ -386,10 +420,24 @@ function fsTarget(
   };
 }
 
-function readOnlyProcess(request: AuthorityHostEffectRequest, parentAction?: string): boolean {
+function readOnlyProcess(
+  request: AuthorityHostEffectRequest,
+  parentAction?: string,
+  declaredCapabilities: readonly string[] = [],
+): boolean {
   const executable = request.arguments[0];
   const args = request.arguments[1];
   if (typeof executable !== 'string' || !Array.isArray(args)) return false;
+  if (
+    declaredCapabilities.includes('proc:git') &&
+    basename(executable) === 'git' &&
+    args.length === 3 &&
+    args[0] === 'config' &&
+    args[1] === '--get' &&
+    args[2] === 'remote.origin.url'
+  ) {
+    return true;
+  }
   if (
     parentAction === 'sense run' &&
     basename(executable) === 'npx' &&
@@ -1216,7 +1264,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     if (request.kind === 'process') {
-      if (readOnlyProcess(request, input.entry.name)) return apply();
+      if (readOnlyProcess(request, input.entry.name, input.entry.authority_contract.capabilities))
+        return apply();
       if (input.entry.effects === 'read')
         throw new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
       const target = processTarget(
@@ -1657,6 +1706,14 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           const artifact = materialized.artifact as JsonRecord;
           if (!(artifact.bytes instanceof Uint8Array)) {
             throw new Error('AUTHORITY_POLICY_ARTIFACT_INVALID');
+          }
+          const unchangedBytes = unchangedAuthorityPolicy(policyPath, artifact.bytes);
+          if (unchangedBytes !== undefined) {
+            return {
+              path: POLICY_PATH,
+              operation: 'unchanged',
+              digest_sha256: sha256Bytes(unchangedBytes),
+            };
           }
           mkdirSync(dirname(policyPath), { recursive: true });
           writeFileSync(policyPath, Buffer.from(artifact.bytes));

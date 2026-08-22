@@ -24,6 +24,13 @@ const outputRoot = resolve(
   argument >= 0 && process.argv[argument + 1] ? process.argv[argument + 1] : 'scratch/release',
 );
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-public-package-'));
+const secondaryBins = {
+  'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+  'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+  'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+  'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+  'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+};
 
 function digest(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -31,6 +38,11 @@ function digest(path) {
 
 function normalizedManifest() {
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+  for (const [name, path] of Object.entries(secondaryBins)) {
+    if (manifest.bin?.[name] !== path || !existsSync(join(packageRoot, path))) {
+      throw new Error(`RELEASE_PACKAGE_BIN_MISSING:${name}`);
+    }
+  }
   delete manifest.devDependencies;
   const privateReferences = JSON.stringify({
     dependencies: manifest.dependencies,
@@ -83,7 +95,11 @@ function packOnce(ordinal, manifest) {
   }
   const tarball = join(packed, basename(filename));
   if (!existsSync(tarball)) throw new Error('RELEASE_PACK_TARBALL_MISSING');
-  return { tarball, sha256: digest(tarball) };
+  return {
+    tarball,
+    sha256: digest(tarball),
+    files: (result[0]?.files ?? []).map((file) => file.path).sort(),
+  };
 }
 
 try {
@@ -97,6 +113,9 @@ try {
   if (first.sha256 !== second.sha256) {
     throw new Error(`RELEASE_PACK_NONDETERMINISTIC:${first.sha256}:${second.sha256}`);
   }
+  if (JSON.stringify(first.files) !== JSON.stringify(second.files)) {
+    throw new Error('RELEASE_PACK_POPULATION_NONDETERMINISTIC');
+  }
   mkdirSync(outputRoot, { recursive: true });
   const output = join(outputRoot, basename(first.tarball));
   copyFileSync(first.tarball, output);
@@ -107,6 +126,8 @@ try {
       version: manifest.version,
       tarball: output,
       sha256: first.sha256,
+      files: first.files.length,
+      secondary_bins: Object.keys(secondaryBins).sort(),
       reproductions: 2,
       public_manifest: { ...manifest, devDependencies: undefined },
     })}\n`,

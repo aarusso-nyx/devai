@@ -138,6 +138,15 @@
           "minLength": 1,
           "description": "Relative path from repo root to the build output directory."
         },
+        "publish_target": {
+          "enum": ["gh-pages"],
+          "description": "Reviewed documentation publication target. Publication remains a separately authorized external effect."
+        },
+        "gh_pages_branch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact branch inspected by documentation governance when publish_target is gh-pages."
+        },
         "custom_domain": {
           "type": ["string", "null"],
           "description": "Custom domain for the published docs site. null or empty string means no custom domain (no CNAME file written)."

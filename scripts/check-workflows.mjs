@@ -7,8 +7,8 @@ import { parseDocument } from 'yaml';
 
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
-export const VERIFIER_REPOSITORY = 'devai-nyx/devai-verifier';
-export const VERIFIER_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
+export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
+export const VERIFIER_SOURCE_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -185,11 +185,7 @@ function checkWorkflow(file, source, findings) {
         finding('CI_PRODUCT_EXECUTION_FORBIDDEN', file, `${location} runs product tooling`),
       );
     }
-    if (
-      /(?:scripts|packages|candidate)\/[A-Za-z0-9_./-]*(?:verify|verifier)/iu.test(run) ||
-      (/\bnode\s+[^\n]*(?:verify|verifier)/iu.test(run) &&
-        !run.includes('node .devai-verifier/src/cli.js'))
-    ) {
+    if (/(?:scripts|packages|candidate)\/[A-Za-z0-9_./-]*(?:verify|verifier)/iu.test(run)) {
       findings.push(
         finding('CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN', file, `${location} invokes local code`),
       );
@@ -210,35 +206,10 @@ function checkWorkflow(file, source, findings) {
       finding('CI_CANDIDATE_CHECKOUT_UNBOUND', file, 'candidate checkout must use exact SHA'),
     );
   }
-  const verifierCheckout = checkouts.find(
-    (step) => object(step.with).repository === VERIFIER_REPOSITORY,
-  );
-  if (verifierCheckout === undefined) {
+  if (checkouts.some((step) => object(step.with).repository !== undefined)) {
     findings.push(
-      finding('CI_VERIFIER_CHECKOUT_MISSING', file, `missing ${VERIFIER_REPOSITORY} checkout`),
+      finding('CI_EXTERNAL_VERIFIER_CHECKOUT_FORBIDDEN', file, 'only candidate checkout is allowed'),
     );
-  } else {
-    const withValues = object(verifierCheckout.with);
-    if (withValues.ref !== VERIFIER_COMMIT) {
-      findings.push(
-        finding(
-          /^[0-9a-f]{40}$/u.test(String(withValues.ref ?? ''))
-            ? 'CI_VERIFIER_PIN_MISMATCH'
-            : 'CI_VERIFIER_REF_MUTABLE',
-          file,
-          `verifier ref must be ${VERIFIER_COMMIT}`,
-        ),
-      );
-    }
-    if (withValues.path !== '.devai-verifier' || withValues['persist-credentials'] !== false) {
-      findings.push(
-        finding(
-          'CI_VERIFIER_CHECKOUT_INVALID',
-          file,
-          'verifier must use isolated credential-free path',
-        ),
-      );
-    }
   }
 
   const serialized = JSON.stringify(workflow);
@@ -250,11 +221,38 @@ function checkWorkflow(file, source, findings) {
     'secrets.DEVAI_LEDGER_TRUST_STORE_B64',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
+    'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
     'vars.DEVAI_LEDGER_POLICY_DIGEST',
   ];
   for (const input of externalInputs) {
     if (!serialized.includes(input)) {
       findings.push(finding('CI_EXTERNAL_CONTROL_INPUT_MISSING', file, input));
+    }
+  }
+  for (const marker of [
+    'package_root="candidate/packages/cli"',
+    'source_root="$package_root/vendor/evidence-verification"',
+    'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+    'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
+    'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
+    `manifest.name !== '${VERIFIER_PACKAGE}'`,
+    `provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`,
+    'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
+    'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
+    'DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js',
+    'DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js',
+  ]) {
+    if (!source.includes(marker)) {
+      findings.push(finding('CI_VERIFIER_PACKAGE_BINDING_MISSING', file, marker));
+    }
+  }
+  for (const forbidden of [
+    'DEVAI_LEDGER_PACKAGE_TGZ_B64',
+    'DEVAI_LEDGER_PACKAGE_SHA256',
+    'node candidate/packages/cli/vendor',
+  ]) {
+    if (source.includes(forbidden)) {
+      findings.push(finding('CI_VERIFIER_AUTHORITY_BYPASS_FORBIDDEN', file, forbidden));
     }
   }
   if (
@@ -273,10 +271,10 @@ function checkWorkflow(file, source, findings) {
 
   const verifierRun = steps
     .map((step) => (typeof step.run === 'string' ? step.run : ''))
-    .find((run) => run.includes('node .devai-verifier/src/cli.js'));
+    .find((run) => run.includes('node "$DEVAI_EVIDENCE_VERIFY"'));
   if (verifierRun === undefined) {
     findings.push(
-      finding('CI_VERIFIER_INVOCATION_MISSING', file, 'pinned verifier CLI is not invoked'),
+      finding('CI_VERIFIER_INVOCATION_MISSING', file, 'protected packaged verifier CLI is not invoked'),
     );
   } else {
     for (const binding of [
@@ -299,13 +297,13 @@ function checkWorkflow(file, source, findings) {
   }
   const policyBuilderRun = steps
     .map((step) => (typeof step.run === 'string' ? step.run : ''))
-    .find((run) => run.includes('node .devai-verifier/src/build-policy-cli.js'));
+    .find((run) => run.includes('node "$DEVAI_EVIDENCE_POLICY"'));
   if (policyBuilderRun === undefined) {
     findings.push(
       finding(
         'CI_EXPECTED_POLICY_RECONSTRUCTION_MISSING',
         file,
-        'pinned external policy builder is not invoked',
+        'protected packaged policy builder is not invoked',
       ),
     );
   } else {
@@ -365,10 +363,9 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
-    environment.EXPECTED_ACTION_COUNT !== 43 ||
+    environment.EXPECTED_ACTION_COUNT !== 44 ||
     environment.PACKAGE_VERSION !== undefined ||
-    environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION ||
-    environment.VERIFIER_COMMIT !== VERIFIER_COMMIT
+    environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION
   ) {
     findings.push(
       finding('RELEASE_IDENTITY_INVALID', file, 'package, action catalog, tag, or verifier drift'),
@@ -465,8 +462,18 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   }
 
   const requiredMarkers = [
-    'node .devai-verifier/src/cli.js',
-    'node .devai-verifier/src/build-policy-cli.js',
+    'node "$DEVAI_EVIDENCE_VERIFY"',
+    'node "$DEVAI_EVIDENCE_POLICY"',
+    'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
+    'package_root="candidate/packages/cli"',
+    'source_root="$package_root/vendor/evidence-verification"',
+    'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+    'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
+    'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
+    `manifest.name !== '${VERIFIER_PACKAGE}'`,
+    `provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`,
+    'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
+    'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
     '--schema-version 1.1.0',
     'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
@@ -497,6 +504,15 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   for (const marker of requiredMarkers) {
     if (!source.includes(marker)) findings.push(finding('RELEASE_CONTROL_MISSING', file, marker));
   }
+  for (const forbidden of [
+    'DEVAI_LEDGER_PACKAGE_TGZ_B64',
+    'DEVAI_LEDGER_PACKAGE_SHA256',
+    'node candidate/packages/cli/vendor',
+  ]) {
+    if (source.includes(forbidden)) {
+      findings.push(finding('RELEASE_VERIFIER_AUTHORITY_BYPASS_FORBIDDEN', file, forbidden));
+    }
+  }
   for (const forbidden of ['test:coverage', 'vitest run', 'pnpm test', 'npm test']) {
     if (source.includes(forbidden)) {
       findings.push(finding('RELEASE_TEST_REEXECUTION_FORBIDDEN', file, forbidden));
@@ -510,11 +526,6 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
         'SBOM generation requires installed public runtime dependencies',
       ),
     );
-  }
-  const verifierCheckout = source.includes(`repository: ${VERIFIER_REPOSITORY}`);
-  const verifierPin = source.includes(`ref: ${VERIFIER_COMMIT}`);
-  if (!verifierCheckout || !verifierPin) {
-    findings.push(finding('RELEASE_VERIFIER_BINDING_INVALID', file, VERIFIER_COMMIT));
   }
   if (!source.includes('test "$(git cat-file -t "$RELEASE_TAG")" = tag')) {
     findings.push(finding('RELEASE_ANNOTATED_TAG_CHECK_MISSING', file, 'git cat-file -t'));

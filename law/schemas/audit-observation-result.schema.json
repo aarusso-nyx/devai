@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/audit-observation-result.schema.json",
   "title": "Audit Observation Result",
+  "description": "Non-promoting result for an exact-commit audit observation, including the five generated artifact identities and appended evidence reference.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -32,5 +33,37 @@
       }
     },
     "evidence_ref": { "type": "string", "pattern": "^EV-[a-f0-9]{16}$" }
-  }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "status": "completed",
+      "at": "0123456789abcdef0123456789abcdef01234567",
+      "readiness_promoting": false,
+      "observation_root": ".devai/state/audit-observations/0123456789abcdef0123456789abcdef01234567",
+      "artifacts": [
+        {
+          "path": ".devai/state/audit-observations/0123456789abcdef0123456789abcdef01234567/inventory.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": ".devai/state/audit-observations/0123456789abcdef0123456789abcdef01234567/scorecard.json",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "path": ".devai/state/audit-observations/0123456789abcdef0123456789abcdef01234567/assessment.json",
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        {
+          "path": ".devai/state/audit-observations/0123456789abcdef0123456789abcdef01234567/backlog.json",
+          "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "path": ".devai/state/audit-observations/0123456789abcdef0123456789abcdef01234567/status.json",
+          "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ],
+      "evidence_ref": "EV-0123456789abcdef"
+    }
+  ]
 }

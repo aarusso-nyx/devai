@@ -12,7 +12,7 @@ support.
 
 ## Local-attestation trust
 
-The pinned external verifier proves receipt integrity, signer identity, candidate binding,
+The immutable package-owned verifier proves receipt integrity, signer identity, candidate binding,
 policy binding, and required-node completeness. It cannot prove local execution. Stronger proof
 would require a separately designed trusted-execution or remote-execution substrate. Until then,
 documentation and UI must preserve the honest trusted-signer boundary.

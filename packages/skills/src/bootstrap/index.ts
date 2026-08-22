@@ -35,10 +35,12 @@ const POLICY_FILES = [
   'scorecard-na.json',
   'thresholds.json',
 ] as const;
+const ADOPTER_LAW_POLICY_FILES = ['mutation-strength.json'] as const;
 
 const _CANONICAL_POLICY_FILES = [
   ...POLICY_FILES,
   'check-suites.json',
+  ...ADOPTER_LAW_POLICY_FILES,
   'subprocess-effects.json',
 ] as const;
 
@@ -220,6 +222,9 @@ export function buildBootstrapPlan(opts: {
   const policyContent = Object.fromEntries(
     POLICY_FILES.map((file) => [file, resolveCanonicalPolicyContent(file)]),
   ) as Record<(typeof POLICY_FILES)[number], string>;
+  const adopterLawPolicyContent = Object.fromEntries(
+    ADOPTER_LAW_POLICY_FILES.map((file) => [file, resolveCanonicalPolicyContent(file)]),
+  ) as Record<(typeof ADOPTER_LAW_POLICY_FILES)[number], string>;
   const emptyChain = JSON.stringify({ head: null, records: [] }, null, 2) + '\n';
   const canonicalGitignore = 'scratch/\n';
 
@@ -253,6 +258,10 @@ export function buildBootstrapPlan(opts: {
     ...POLICY_FILES.map((file) => ({
       path: `.devai/config/${file}`,
       content: policyContent[file],
+    })),
+    ...ADOPTER_LAW_POLICY_FILES.map((file) => ({
+      path: `law/policy/${file}`,
+      content: adopterLawPolicyContent[file],
     })),
     { path: '.devai/config/project.json', content: projectConfig },
     constitutionBinding.pointerFile,

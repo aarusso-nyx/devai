@@ -11,6 +11,7 @@ const files = [
   'domains.json',
   'forbidden-actions.json',
   'glob-guards.json',
+  'mutation-strength.json',
   'scorecard-na.json',
   'thresholds.json',
 ];

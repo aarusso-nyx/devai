@@ -51,7 +51,7 @@ function expectCode(result: ReturnType<typeof refusal>, code: string): void {
 
 describe('canonical production authority refusal acceptance', () => {
   it('requires no declaration for reads and a declaration for every write-capable action', () => {
-    expect(current).toHaveLength(43);
+    expect(current).toHaveLength(44);
     for (const format of ['human', 'json'] as const) {
       for (const entry of current) {
         const result =

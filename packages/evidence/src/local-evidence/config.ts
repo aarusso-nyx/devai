@@ -31,7 +31,11 @@ export const DEFAULT_ALLOWED_PLATFORMS: readonly string[] = ['linux/arm64', 'lin
  * mode, regardless of declared config. Declared `forbidden_paths`
  * entries extend this set; they can never shrink it.
  */
-export const BUILT_IN_FORBIDDEN_PATHS: readonly string[] = ['.github/workflows/', '.devai/config/'];
+export const BUILT_IN_FORBIDDEN_PATHS: readonly string[] = [
+  '.github/workflows/',
+  '.devai/config/',
+  'law/policy/',
+];
 
 interface RawLocalEvidenceConfig {
   readonly manifest_path?: string;

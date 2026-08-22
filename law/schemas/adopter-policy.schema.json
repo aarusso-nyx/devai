@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/adopter-policy.schema.json",
   "title": "DEVAI Adopter Policy",
+  "description": "Validated adopter-owned policy source merged into DEVAI's resolved project configuration without replacing core policy domains.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "policy_id", "policy_version"],
@@ -23,10 +24,8 @@
           "properties": { "kind": { "enum": ["library", "application"] } }
         },
         "docs": {
-          "type": "object",
-          "additionalProperties": true,
-          "required": ["builder"],
-          "properties": { "builder": { "enum": ["docusaurus", "jekyll"] } }
+          "$ref": "project-config.schema.json#/properties/docs",
+          "description": "Documentation configuration uses the same closed shape accepted by the resolved adopter project configuration."
         }
       }
     },
@@ -49,5 +48,13 @@
     "thresholds": { "type": "object", "additionalProperties": true },
     "scorecard_na": { "$ref": "scorecard-na-config.schema.json" },
     "glob_guards": { "$ref": "glob-guards.schema.json" }
-  }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "policy_id": "teat.devai-adoption",
+      "policy_version": "1.0.0"
+    }
+  ]
 }

@@ -17,13 +17,12 @@ an **unsigned** receipt to
 
 ## Protected export and signing
 
-Signing is not a DEVAI CLI action. Use `src/export-cli.js` from the pinned external
-`devai-nyx/devai-verifier` checkout at the exact immutable commit pinned in
-`.github/workflows/devai-ledger-verify.yml`. Keep the verifier checkout, toolchain and environment
-maps, Ed25519 keys, signer ID, and output directory outside the candidate repository:
+Signing is not a DEVAI CLI action. Use the package-owned export entry point from the exact
+assembled DEVAI package. Keep the package identity, toolchain and environment maps, Ed25519 keys,
+signer ID, and output directory outside the candidate repository:
 
 ```text
-node src/export-cli.js \
+pnpm exec devai-evidence-export \
   --repo /exact/candidate \
   --receipt /exact/candidate/.devai/state/check-cache/v1/receipts/<digest>.json \
   --results-dir /exact/candidate/.devai/state/check-cache/v1/results \
@@ -45,7 +44,7 @@ receipt and exact digest-named results, and only then signs. It atomically produ
 exact declared `artifacts/` population.
 An absent allowlisted environment key is represented as `null`, not silently dropped.
 The runner passes each task only the environment keys declared by that task; another selected
-node's credentials are never added merely because both tasks share a graph. The pinned verifier
+node's credentials are never added merely because both tasks share a graph. The package-owned verifier
 then performs bounded content-safety checks over every declared text and JSON artifact. It rejects
 credential-shaped material and workstation-specific absolute paths before the atomic export is
 made visible, and repeats the same checks during bundle verification and publication.
@@ -56,7 +55,8 @@ The GitHub workflow receives the envelope, result archive, declared-artifact arc
 trust store, toolchain map, and environment map through protected `DEVAI_LEDGER_*_B64` secrets and receives the expected policy
 digest through `DEVAI_LEDGER_POLICY_DIGEST`. The release workflow additionally receives the SSH
 tag trust root through `DEVAI_RELEASE_SIGNERS_B64`. Candidate files do not control these inputs. CI checks
-out the exact candidate and the pinned external verifier at immutable commits. The verifier parses
+out the exact candidate and installs the immutable DEVAI package identity declared by protected
+workflow configuration. Its verifier parses
 the committed descriptor and Git tree, asserts profile `rc`, reconstructs the required-node closure
 and task keys from the protected maps, byte-compares the expected task policy, and then verifies
 repository, commit, tree, policy, signer allowlist/revocation state, and result completeness. It

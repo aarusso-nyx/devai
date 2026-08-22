@@ -394,6 +394,119 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
+  it('allows the declared evidence collection subject lookup, not general git config', () => {
+    const host = broker('evidence collect', 'inspector', [
+      process.execPath,
+      'devai',
+      'evidence',
+      'collect',
+      '--source',
+      'local',
+      '--repo-root',
+      '.',
+      '--job',
+      'unit:.artifacts/unit',
+      '--as-role',
+      'inspector',
+      '--write',
+    ]);
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect('spawnSync', ['git', ['config', '--get', 'remote.origin.url']], 'process'),
+          () => 'origin',
+        ),
+      ).toBe('origin');
+      for (const args of [
+        ['config', 'user.name', 'attacker'],
+        ['config', '--global', 'user.name', 'attacker'],
+        ['config', '--unset', 'remote.origin.url'],
+      ]) {
+        expect(() =>
+          host.scope.apply_effect(
+            effect('spawnSync', ['git', args], 'process'),
+            () => 'forbidden',
+          ),
+        ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      }
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('allows the same exact subject lookup for evidence verification with proc:git', () => {
+    const host = broker('evidence verify', 'auditor', [
+      process.execPath,
+      'devai',
+      'evidence',
+      'verify',
+      '--scope',
+      'local',
+      '--mode',
+      'gate',
+      '--repo-root',
+      '.',
+    ]);
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect('spawnSync', ['git', ['config', '--get', 'remote.origin.url']], 'process'),
+          () => 'origin',
+        ),
+      ).toBe('origin');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('refuses git config mutation and exact subject reads without proc:git authority', () => {
+    const verify = broker('evidence verify', 'auditor', [
+      process.execPath,
+      'devai',
+      'evidence',
+      'verify',
+      '--scope',
+      'local',
+      '--mode',
+      'gate',
+      '--repo-root',
+      '.',
+    ]);
+    try {
+      for (const args of [
+        ['config', 'user.name', 'attacker'],
+        ['config', '--global', 'user.name', 'attacker'],
+        ['config', '--unset', 'remote.origin.url'],
+      ]) {
+        expect(() =>
+          verify.scope.apply_effect(
+            effect('spawnSync', ['git', args], 'process'),
+            () => 'forbidden',
+          ),
+        ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      }
+    } finally {
+      verify.dispose();
+    }
+
+    const catalog = broker('catalog actions', 'auditor', [
+      process.execPath,
+      'devai',
+      'catalog',
+      'actions',
+    ]);
+    try {
+      expect(() =>
+        catalog.scope.apply_effect(
+          effect('spawnSync', ['git', ['config', '--get', 'remote.origin.url']], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      catalog.dispose();
+    }
+  });
+
   it('keeps task action scopes bounded', () => {
     expect(
       routeArgv(
