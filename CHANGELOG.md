@@ -8,6 +8,9 @@
 - Makes bootstrap plan and reviewed apply materialize `law/policy/mutation-strength.json`, preserve
   explicit adopter overrides, and remain byte-idempotent. Documentation policy binding now accepts
   `docs.publish_target` and `docs.gh_pages_branch` without erasing unrelated adopter configuration.
+- Preserves resolved authority-policy bytes and first-materialization provenance across repeated
+  identical `init bind` calls. Tier3 Owner apply now honors the already-declared joint
+  `law/glossary/**` Owner/Architect authority without widening any other permission or path.
 - Adds the stable, deterministic, read-only `audit scorecard` facade. The public catalog is now
   exactly 44 actions: 23 stable, 10 preview, and 11 internal.
 - Supports fresh `record/proofs/chain.json` genesis, append, verification, and doctor acceptance
