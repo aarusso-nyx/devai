@@ -420,12 +420,16 @@ function fsTarget(
   };
 }
 
-function readOnlyProcess(request: AuthorityHostEffectRequest, parentAction?: string): boolean {
+function readOnlyProcess(
+  request: AuthorityHostEffectRequest,
+  parentAction?: string,
+  declaredCapabilities: readonly string[] = [],
+): boolean {
   const executable = request.arguments[0];
   const args = request.arguments[1];
   if (typeof executable !== 'string' || !Array.isArray(args)) return false;
   if (
-    parentAction === 'evidence collect' &&
+    declaredCapabilities.includes('proc:git') &&
     basename(executable) === 'git' &&
     args.length === 3 &&
     args[0] === 'config' &&
@@ -1260,7 +1264,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     if (request.kind === 'process') {
-      if (readOnlyProcess(request, input.entry.name)) return apply();
+      if (readOnlyProcess(request, input.entry.name, input.entry.authority_contract.capabilities))
+        return apply();
       if (input.entry.effects === 'read')
         throw new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
       const target = processTarget(
