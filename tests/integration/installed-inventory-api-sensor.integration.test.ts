@@ -40,15 +40,15 @@ afterEach(() => {
 
 describe('installed inventory_api sensor', () => {
   it('packages every advertised compatibility validator used by runtime consumers', () => {
-    const unavailable = Object.entries(COMPATIBILITY_VALIDATORS).flatMap(
-      ([key, schema]) =>
-        (PACKAGED_SCHEMA_ROSTER as readonly string[]).includes(schema) &&
-        typeof (packagedValidators as unknown as Record<string, unknown>)[key] === 'function'
-          ? []
-          : [`${key}:${schema}`],
-    );
-
-    expect(unavailable).toEqual([]);
+    for (const [key, schema] of Object.entries(COMPATIBILITY_VALIDATORS)) {
+      expect(PACKAGED_SCHEMA_ROSTER, `${key} schema is absent from the packaged roster`).toContain(
+        schema,
+      );
+      expect(
+        typeof (packagedValidators as unknown as Record<string, unknown>)[key],
+        `${key} validator is not callable from the packaged registry`,
+      ).toBe('function');
+    }
   });
 
   it('returns a valid SensorReading through the assembled public sense facade', () => {
