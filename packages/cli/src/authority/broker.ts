@@ -425,6 +425,16 @@ function readOnlyProcess(request: AuthorityHostEffectRequest, parentAction?: str
   const args = request.arguments[1];
   if (typeof executable !== 'string' || !Array.isArray(args)) return false;
   if (
+    parentAction === 'evidence collect' &&
+    basename(executable) === 'git' &&
+    args.length === 3 &&
+    args[0] === 'config' &&
+    args[1] === '--get' &&
+    args[2] === 'remote.origin.url'
+  ) {
+    return true;
+  }
+  if (
     parentAction === 'sense run' &&
     basename(executable) === 'npx' &&
     args.length === 3 &&
