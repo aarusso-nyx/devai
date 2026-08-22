@@ -157,8 +157,25 @@ function harnessSubject(allowedRoles: readonly string[]) {
   };
 }
 
+function normalizedRepositoryId(value: string): string | undefined {
+  const normalized = value.trim().replaceAll(/[^A-Za-z0-9._-]/gu, '-');
+  return normalized === '' ? undefined : normalized;
+}
+
 export function repositoryIdFor(root: string): string {
   const absolute = resolve(root);
+  const projectConfigPath = join(absolute, '.devai/config/project.json');
+  if (existsSync(projectConfigPath)) {
+    try {
+      const projectConfig = JSON.parse(readFileSync(projectConfigPath, 'utf8')) as JsonRecord;
+      if (typeof projectConfig.name === 'string') {
+        const declaredRepositoryId = normalizedRepositoryId(projectConfig.name);
+        if (declaredRepositoryId !== undefined) return declaredRepositoryId;
+      }
+    } catch {
+      // Project-config validation reports malformed adopter configuration separately.
+    }
+  }
   let repositoryRoot = absolute;
   try {
     const commonGitDirectory = execFileSync(
@@ -174,7 +191,7 @@ export function repositoryIdFor(root: string): string {
   } catch {
     // Fresh adopters may bind before Git exists; retain the established directory fallback.
   }
-  return basename(repositoryRoot).replaceAll(/[^A-Za-z0-9._-]/gu, '-') || 'adopter-repository';
+  return normalizedRepositoryId(basename(repositoryRoot)) ?? 'adopter-repository';
 }
 
 export function authorityBindings(

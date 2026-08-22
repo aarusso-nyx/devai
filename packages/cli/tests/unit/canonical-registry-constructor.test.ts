@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -53,5 +53,33 @@ describe('canonical action registry constructor', () => {
 
     expect(repositoryIdFor(repositoryRoot)).toBe('canonical-repository');
     expect(repositoryIdFor(linkedWorktree)).toBe('canonical-repository');
+  });
+
+  it('uses the declared project name across different checkout directory names', () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-authority-checkouts-'));
+    temporaryRoots.push(temporaryRoot);
+    const firstCheckout = join(temporaryRoot, 'developer-checkout');
+    const secondCheckout = join(temporaryRoot, 'github-runner-checkout');
+
+    for (const checkout of [firstCheckout, secondCheckout]) {
+      mkdirSync(join(checkout, '.devai/config'), { recursive: true });
+      writeFileSync(
+        join(checkout, '.devai/config/project.json'),
+        `${JSON.stringify({ schemaVersion: '1.0.0', project_type: 'runtime-host', name: 'teat' })}\n`,
+      );
+    }
+
+    expect(repositoryIdFor(firstCheckout)).toBe('teat');
+    expect(repositoryIdFor(secondCheckout)).toBe('teat');
+  });
+
+  it('retains the directory fallback when the declared project name is unavailable', () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-authority-fallback-'));
+    temporaryRoots.push(temporaryRoot);
+    const repositoryRoot = join(temporaryRoot, 'fallback-repository');
+    mkdirSync(join(repositoryRoot, '.devai/config'), { recursive: true });
+    writeFileSync(join(repositoryRoot, '.devai/config/project.json'), '{not-json}\n');
+
+    expect(repositoryIdFor(repositoryRoot)).toBe('fallback-repository');
   });
 });

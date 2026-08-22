@@ -6,7 +6,7 @@ Please report suspected vulnerabilities privately to the repository owner or sec
 
 ## Supported versions
 
-`1.2.3` is the supported stable line. Earlier release candidates remain immutable audit history;
+`1.2.4` is the supported stable line. Earlier release candidates remain immutable audit history;
 they are not supported stable releases.
 
 ## Security boundary

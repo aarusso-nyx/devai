@@ -702,14 +702,14 @@ describe('targeted dependency security floor', () => {
   it('resolves reviewed compatible transitive versions', () => {
     const lock = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8');
     const resolvedPackages = lock.slice(lock.indexOf('\npackages:\n'));
-    expect(resolvedPackages).not.toMatch(/^  fast-uri@3\.1\.[0-4]:/mu);
-    expect(resolvedPackages).not.toMatch(/^  brace-expansion@2\.1\.[0-3]:/mu);
-    expect(resolvedPackages).toMatch(/^  fast-uri@3\.1\.5:/mu);
-    expect(resolvedPackages).toMatch(/^  brace-expansion@1\.1\.18:/mu);
-    expect(resolvedPackages).toMatch(/^  brace-expansion@2\.1\.4:/mu);
-    expect(resolvedPackages).toMatch(/^  brace-expansion@5\.0\.9:/mu);
-    expect(resolvedPackages).toMatch(/^  js-yaml@4\.3\.1:/mu);
-    expect(resolvedPackages).toMatch(/^  nanoid@3\.3\.18:/mu);
-    expect(resolvedPackages).toMatch(/^  postcss@8\.5\.23:/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}fast-uri@3\.1\.[0-4]:/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}brace-expansion@2\.1\.[0-3]:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}fast-uri@3\.1\.5:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}brace-expansion@1\.1\.18:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}brace-expansion@2\.1\.4:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}brace-expansion@5\.0\.9:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}js-yaml@4\.3\.1:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}nanoid@3\.3\.18:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}postcss@8\.5\.23:/mu);
   });
 });

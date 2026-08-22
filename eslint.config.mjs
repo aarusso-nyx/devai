@@ -14,6 +14,7 @@ export default tseslint.config(
       '.claude/**',
       'scratch/**',
       'examples/**',
+      'packages/cli/vendor/evidence-verification/test/**',
     ],
   },
   js.configs.recommended,

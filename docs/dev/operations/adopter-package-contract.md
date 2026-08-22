@@ -1,6 +1,6 @@
-# DEVAI 1.2.3 adopter-package contract
+# DEVAI 1.2.4 adopter-package contract
 
-DEVAI 1.2.3 closes the adopter boundary at the installed public package. The package is the
+DEVAI 1.2.4 closes the adopter boundary at the installed public package. The package is the
 only DEVAI runtime dependency an adopter needs; a sibling source checkout, workspace link,
 local tarball override, private workspace package, or source-repository import is not part of
 the supported contract.
@@ -38,6 +38,12 @@ configuration is retained. The `project.docs` source and resolved `docs` target 
 schema. In particular, `builder: docusaurus`, `publish_target: gh-pages`, and
 `gh_pages_branch: gh-pages` bind and replay idempotently. Binding documentation configuration
 does not authorize a branch write or site publication.
+
+Authority binds to the schema-valid project `name` declared in `.devai/config/project.json`.
+Developer worktrees, CI checkout directories, container mount points, and disposable clones
+therefore reconstruct identical `repository_id` values. Repositories that have not yet declared a
+project name retain the canonical Git-root directory fallback until initialization materializes
+that declaration.
 
 ## Source canon versus adopter validation
 
@@ -87,7 +93,7 @@ append and hash-link without rewriting prior bytes. Verification and `doctor` ac
 chain and reject malformed, truncated, reordered, or digest-mismatched records.
 
 There is no discovery, migration, or fallback for `.devai/state/evidence-chain.json`. That legacy
-path is outside the 1.2.3 contract.
+path is outside the 1.2.4 contract.
 
 For test evidence, the stable facade executes only the exact command declared by `--cmd`. The
 authority broker classifies that invocation as a non-publishing local test-runner operation; a
@@ -128,7 +134,7 @@ The exact candidate is accepted only after source gates and a package-only dispo
 both pass without interrupted or composite evidence. Package contents and integrity, action and
 schema populations, test census, mutation thresholds, audit findings, proof-chain behavior,
 idempotence, lockfile stability, and the absence of obsolete verifier reliance must all be
-reconciled. For 1.2.3, this includes rerunning TEAT's governed package-only evidence recording
+reconciled. For 1.2.4, this includes rerunning TEAT's governed package-only evidence recording
 against the exact packed candidate before publication; source-repository tests do not replace that
 adopter proof.
 Packaging, checking, and rehearsal do not authorize push, PR creation, merge, tag, GitHub Release,

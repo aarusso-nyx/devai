@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.4 — 2026-08-22
+
+- Stabilizes adopter authority across developer, CI, container, and disposable-checkout paths by
+  deriving `repository_id` from the schema-valid project `name` before using the Git directory
+  fallback. Moving or independently cloning a bound adopter no longer changes its authority bytes.
+- Adds checkout-path regression coverage and requires the exact packed candidate to pass TEAT's
+  governed `R-0013` unit-evidence command from a differently named disposable checkout before
+  publication.
+
 ## 1.2.3 — 2026-08-22
 
 - Repairs the stable `evidence record --kind test` authority path so the installed package can
