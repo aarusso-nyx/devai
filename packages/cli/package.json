@@ -1,6 +1,6 @@
 {
   "name": "@aarusso-nyx/devai",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Human-supervised developer-acceleration CLI with bounded automation and trustworthy evidence.",
   "license": "Apache-2.0",
   "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
