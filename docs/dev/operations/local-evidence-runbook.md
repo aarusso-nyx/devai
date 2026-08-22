@@ -22,7 +22,7 @@ assembled DEVAI package. Keep the package identity, toolchain and environment ma
 signer ID, and output directory outside the candidate repository:
 
 ```text
-node <exact-installed-devai-package>/ledger/export-cli.js \
+pnpm exec devai-evidence-export \
   --repo /exact/candidate \
   --receipt /exact/candidate/.devai/state/check-cache/v1/receipts/<digest>.json \
   --results-dir /exact/candidate/.devai/state/check-cache/v1/results \
@@ -44,7 +44,7 @@ receipt and exact digest-named results, and only then signs. It atomically produ
 exact declared `artifacts/` population.
 An absent allowlisted environment key is represented as `null`, not silently dropped.
 The runner passes each task only the environment keys declared by that task; another selected
-node's credentials are never added merely because both tasks share a graph. The pinned verifier
+node's credentials are never added merely because both tasks share a graph. The package-owned verifier
 then performs bounded content-safety checks over every declared text and JSON artifact. It rejects
 credential-shaped material and workstation-specific absolute paths before the atomic export is
 made visible, and repeats the same checks during bundle verification and publication.

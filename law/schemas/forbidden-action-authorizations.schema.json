@@ -38,5 +38,13 @@
         }
       }
     }
-  }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "$schema": "https://devai.nyxk.com.br/schemas/forbidden-action-authorizations.schema.json",
+      "schemaVersion": "1.0.0",
+      "authorizations": []
+    }
+  ]
 }

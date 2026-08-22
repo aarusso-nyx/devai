@@ -42,7 +42,7 @@ DEVAI_DB_TESTS=1 DEVAI_DB_URL=<reachable-test-database> \
 `authority:materialize` deterministically creates the ignored
 `.devai/config/authority-policy.json` from the bound Constitution. The RC task key binds its
 SHA-256 through the allowlisted `DEVAI_AUTHORITY_POLICY_SHA256` identity. This keeps the generated
-authority session out of Git while allowing the pinned external policy builder to reconstruct the
+authority session out of Git while allowing the package-owned `devai-evidence-policy` entry point to reconstruct the
 same three-key task-policy schema. Missing materialization fails with
 `CHECK_AUTHORITY_POLICY_REQUIRED`; it must never be bypassed with a hand-authored policy.
 
@@ -62,8 +62,9 @@ credentials must not create accidental cost or nondeterminism.
 
 ## Receipt verification
 
-A candidate-independent exporter validates the unsigned clean affected/RC receipt and exact result
-set before signing outside the candidate repository. The exported evidence is valid only for its
+The package-owned `devai-evidence-export` entry point validates the unsigned clean affected/RC
+receipt and exact result set when invoked from the protected signing environment outside the
+candidate repository. The exported evidence is valid only for its
 exact repository, commit, tree, task-policy digest, required-node closure, signer, and revocation
 state. The immutable package-owned verifier rejects missing, stale, malformed, unknown, FAIL,
 or ABORTED nodes. A trusted signature proves integrity and signer identity, not that execution
