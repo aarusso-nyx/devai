@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -137,6 +138,33 @@ async function runCli(args: readonly string[]) {
   }
 }
 
+async function expectCliPass(args: readonly string[]) {
+  const result = await runCli(args);
+  expect(result.exit, `${args.join(' ')}\n${result.stderr}`).toBe(0);
+  return result;
+}
+
+async function establishTier3Binding(repo: string): Promise<void> {
+  for (const selector of [['--constitution'], ['--operational-law'], ['--subprocess-effects'], []]) {
+    await expectCliPass([
+      'init',
+      'bind',
+      ...selector,
+      '--tier',
+      'tier3',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+  }
+}
+
+function digest(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
 describe('adopter-safe check and binding contracts', () => {
   it('returns structured blueprint findings without source-tree fallback', async () => {
     const repo = root();
@@ -229,6 +257,101 @@ describe('adopter-safe check and binding contracts', () => {
     expect(second.exit, second.stderr).toBe(0);
     expect(readFileSync(projectPath)).toEqual(firstBytes);
   });
+
+  it('does not rewrite authority or adopter bytes when an identical bound policy is replayed', async () => {
+    const repo = root('devai-adopter-authority-idempotence-');
+    await establishTier3Binding(repo);
+    put(repo, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
+    put(repo, 'law/policy/adopter-policy.json', {
+      schemaVersion: '1.0.0',
+      policy_id: 'teat.devai-adoption',
+      policy_version: '1.2.1',
+      domains: { client: ['COVERAGE'] },
+      thresholds: { coverage: { lines: 91 } },
+      project: {
+        docs: {
+          builder: 'docusaurus',
+          publish_target: 'gh-pages',
+          gh_pages_branch: 'gh-pages',
+        },
+      },
+    });
+    const argv = [
+      'init',
+      'bind',
+      '--adopter-policy',
+      'law/policy/adopter-policy.json',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ] as const;
+    await expectCliPass(argv);
+
+    const relevant = [
+      'law/policy/adopter-policy.json',
+      'pnpm-lock.yaml',
+      '.devai/config/adopter-policy-binding.json',
+      '.devai/config/authority-policy.json',
+      '.devai/config/domains.json',
+      '.devai/config/glob-guards.json',
+      '.devai/config/project.json',
+      '.devai/config/scorecard-na.json',
+      '.devai/config/thresholds.json',
+    ] as const;
+    const firstBytes = new Map(
+      relevant.map((path) => [path, readFileSync(join(repo, path))] as const),
+    );
+    const firstDigests = new Map(relevant.map((path) => [path, digest(join(repo, path))] as const));
+    const firstAuthority = JSON.parse(
+      readFileSync(join(repo, '.devai/config/authority-policy.json'), 'utf8'),
+    ) as { materialized_at: string; materialization: { invocation_id: string } };
+
+    const replay = await expectCliPass(argv);
+    const secondAuthority = JSON.parse(
+      readFileSync(join(repo, '.devai/config/authority-policy.json'), 'utf8'),
+    ) as { materialized_at: string; materialization: { invocation_id: string } };
+    expect.soft(secondAuthority.materialized_at).toBe(firstAuthority.materialized_at);
+    expect.soft(secondAuthority.materialization.invocation_id).toBe(
+      firstAuthority.materialization.invocation_id,
+    );
+    expect
+      .soft(new Map(relevant.map((path) => [path, readFileSync(join(repo, path))] as const)))
+      .toEqual(firstBytes);
+    expect
+      .soft(new Map(relevant.map((path) => [path, digest(join(repo, path))] as const)))
+      .toEqual(firstDigests);
+    expect.soft(JSON.parse(replay.stdout)).toMatchObject({
+      result: { value: { authority_policy: { operation: 'unchanged' } } },
+    });
+  }, 30_000);
+
+  it('executes the declared tier3 plan and role-separated apply sequence after binding', async () => {
+    const repo = root('devai-tier3-role-sequence-');
+    await expectCliPass(['init', 'plan', '--target', repo, '--tier', 'tier3']);
+    await establishTier3Binding(repo);
+    for (const [segment, role] of [
+      ['owner', 'owner'],
+      ['architect', 'architect'],
+      ['harness', 'architect'],
+    ] as const) {
+      await expectCliPass([
+        'init',
+        'apply',
+        segment,
+        '--tier',
+        'tier3',
+        '--target',
+        repo,
+        '--as-role',
+        role,
+        '--write',
+      ]);
+    }
+    expect(readFileSync(join(repo, 'product/README.md'), 'utf8')).not.toBe('');
+    expect(readFileSync(join(repo, 'law/glossary/README.md'), 'utf8')).not.toBe('');
+  }, 30_000);
 
   it('checks mutation from adopter-owned policy and thresholds without rewriting overrides', async () => {
     const repo = root();
