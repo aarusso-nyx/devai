@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2 — 2026-08-22
+
+- Completes the packaged runtime-validator roster for every compatibility validator advertised by
+  `@aarusso-nyx/devai`, so installed `sense run inventory_api` execution no longer depends on
+  validator bytes that were present only in the DEVAI source checkout.
+- Adds installed-package regression coverage for the public inventory sensor path. Before
+  publication, the exact packed candidate must also pass TEAT's package-only verification; source
+  tests or sibling-checkout resolution are not substitutes for that adopter proof.
+
 ## 1.2.1 — 2026-08-22
 
 - Completes the installed-adopter schema boundary: the module-blueprint validator is generated,
