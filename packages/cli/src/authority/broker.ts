@@ -736,10 +736,14 @@ function processTarget(
   }
 
   if (
-    actionName === 'evidence test record' &&
+    actionName === 'evidence record' &&
+    request.symbol === 'spawnSync' &&
     executable === 'sh' &&
+    flagValue(invocationArgv, '--kind') === 'test' &&
     args[0] === '-c' &&
-    typeof args[1] === 'string'
+    args.length === 2 &&
+    typeof args[1] === 'string' &&
+    args[1] === flagValue(invocationArgv, '--cmd')
   ) {
     return {
       kind: 'remote',
@@ -829,7 +833,7 @@ function boundedSelectors(kind: string, repositoryId: string, actionName: string
       },
     ];
   }
-  if (actionName === 'evidence test record') {
+  if (actionName === 'evidence record') {
     return [
       {
         kind: 'remote',

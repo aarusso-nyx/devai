@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3 — 2026-08-22
+
+- Repairs the stable `evidence record --kind test` authority path so the installed package can
+  execute and record the exact caller-declared `--cmd` through the non-publishing local test-runner
+  boundary. Commands that differ from the declared argument remain refused.
+- Adds positive and fail-closed authority coverage, and requires the exact packed candidate to pass
+  TEAT's governed `R-0013` unit-evidence command before publication.
+
 ## 1.2.2 — 2026-08-22
 
 - Completes the packaged runtime-validator roster for every compatibility validator advertised by

@@ -560,6 +560,8 @@ describe('authority broker production boundary depth', () => {
       'test',
       '--round',
       'R-0007',
+      '--cmd',
+      'pnpm test',
       '--as-role',
       'auditor',
       '--write',
@@ -691,6 +693,47 @@ describe('authority broker production boundary depth', () => {
       }
     }
     expect(classified).toBe(cases.length);
+  });
+
+  it('authorizes only the exact test command declared by evidence record', () => {
+    const argv = [
+      process.execPath,
+      'devai',
+      'evidence',
+      'record',
+      '--kind',
+      'test',
+      '--round',
+      'R-0007',
+      '--cmd',
+      'pnpm test',
+      '--as-role',
+      'auditor',
+      '--write',
+    ] as const;
+    const host = broker('evidence record', 'auditor', argv);
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect('spawnSync', ['sh', ['-c', 'pnpm test'], { cwd: ROOT }], 'process'),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('spawnSync', ['sh', ['-c', 'pnpm publish'], { cwd: ROOT }], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('execSync', ['sh', ['-c', 'pnpm test'], { cwd: ROOT }], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
   });
 
   it('admits only exact read-only subprocess shapes for sensor actions', () => {
