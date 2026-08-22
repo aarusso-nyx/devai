@@ -1,8 +1,10 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import {
   buildCiScaffoldPlan,
   CHECKOUT_COMMIT,
@@ -34,6 +36,18 @@ function fixture(source = ledgerVerificationWorkflow(), file = 'devai-ledger-ver
 
 function check(root: string) {
   return spawnSync(process.execPath, [CHECKER], { cwd: root, encoding: 'utf8' });
+}
+
+function verifierMaterializationScript(source: string): string {
+  const workflow = parse(source) as {
+    jobs?: Record<string, { steps?: Array<{ name?: string; run?: string }> }>;
+  };
+  const steps = Object.values(workflow.jobs ?? {}).flatMap((job) => job.steps ?? []);
+  const materialize = steps.find(
+    (step) => step.name === 'Materialize protected DEVAI verifier package',
+  );
+  expect(materialize?.run).toBeTypeOf('string');
+  return materialize?.run ?? '';
 }
 
 afterEach(() => {
@@ -71,6 +85,70 @@ describe('live ledger-verification workflow', () => {
     expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
     expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
     expect(checkedIn).not.toContain('devai-nyx/devai-verifier');
+  });
+
+  it.each([
+    { name: 'ledger workflow', source: ledgerVerificationWorkflow() },
+    {
+      name: 'release workflow',
+      source: readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8'),
+    },
+  ])('executes protected verifier materialization in the $name', ({ source }) => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-verifier-materialization-'));
+    roots.push(root);
+    const packageRoot = join(root, 'candidate/packages/cli');
+    const sourceRoot = join(packageRoot, 'vendor/evidence-verification');
+    const runnerTemp = join(root, 'runner-temp');
+    const githubEnv = join(root, 'github-env');
+    const githubOutput = join(root, 'github-output');
+    const fixtureVersion = '9.8.7-materialization-fixture';
+    mkdirSync(join(packageRoot, 'vendor'), { recursive: true });
+    mkdirSync(runnerTemp, { recursive: true });
+    cpSync(join(ROOT, 'packages/cli/vendor/evidence-verification'), sourceRoot, {
+      recursive: true,
+    });
+    writeFileSync(
+      join(packageRoot, 'package.json'),
+      `${JSON.stringify({
+        name: '@aarusso-nyx/devai',
+        version: fixtureVersion,
+        bin: {
+          'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+          'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+          'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+          'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+          'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+        },
+      })}\n`,
+    );
+    writeFileSync(githubEnv, '');
+    writeFileSync(githubOutput, '');
+    const provenance = readFileSync(join(sourceRoot, 'provenance.json'));
+    const provenanceDigest = createHash('sha256').update(provenance).digest('hex');
+
+    const result = spawnSync('bash', ['-c', verifierMaterializationScript(source)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        RUNNER_TEMP: runnerTemp,
+        GITHUB_ENV: githubEnv,
+        GITHUB_OUTPUT: githubOutput,
+        VERIFIER_PROVENANCE_SHA256: provenanceDigest,
+      },
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(readFileSync(githubOutput, 'utf8').trim().split('\n')).toEqual([
+      `version=${fixtureVersion}`,
+      `provenance_sha256=${provenanceDigest}`,
+    ]);
+    expect(readFileSync(githubEnv, 'utf8').trim().split('\n')).toEqual([
+      `DEVAI_EVIDENCE_POLICY=${runnerTemp}/devai-verifier-package/evidence-verification/src/build-policy-cli.js`,
+      `DEVAI_EVIDENCE_VERIFY=${runnerTemp}/devai-verifier-package/evidence-verification/src/cli.js`,
+      `DEVAI_EVIDENCE_BUNDLE_VERIFY=${runnerTemp}/devai-verifier-package/evidence-verification/src/bundle-cli.js`,
+    ]);
   });
 
   it.each([
@@ -155,10 +233,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'candidate-local verifier',
       mutate: (source: string) =>
-        source.replace(
-          'node "$DEVAI_EVIDENCE_VERIFY"',
-          'node candidate/scripts/verify-ledger.mjs',
-        ),
+        source.replace('node "$DEVAI_EVIDENCE_VERIFY"', 'node candidate/scripts/verify-ledger.mjs'),
       diagnostic: 'CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN',
     },
     {

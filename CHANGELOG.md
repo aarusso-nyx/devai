@@ -21,6 +21,9 @@
 - Replaces live `devai-nyx/devai-verifier` reliance with an immutable package-owned verifier whose
   provenance digest is an externally protected trust input. CI scaffolds, workflow checks, release
   manifests, installed-package tests, and package assembly preserve the independent ledger proof.
+- Executes the protected verifier materialization shell in regression tests for both ledger and
+  release workflows, and resolves the installed candidate package version without invalid nested
+  Bash quoting or a source-repository import fallback.
 - Updates only vulnerable compatible transitives: `fast-uri` 3.1.4 to 3.1.5;
   `brace-expansion` 1.1.16, 2.1.2, and 5.0.8 to 1.1.18, 2.1.4, and 5.0.9; `js-yaml` 4.3.0 to 4.3.1;
   `nanoid` 3.3.16 to 3.3.18; and `postcss` 8.5.22 to 8.5.23.
