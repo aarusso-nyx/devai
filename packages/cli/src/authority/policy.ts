@@ -238,7 +238,7 @@ export function buildTrustedAuthoritySources(
     rule({
       id: 'core-joint-glossary-root',
       origin: 'immutable-core',
-      precedence: 700,
+      precedence: 800,
       actionIds: [...new Set([...groups.owner, ...groups.architect])].sort(),
       selector: fsSelector(repositoryId, 'law/glossary'),
       subjects: joint,
@@ -247,7 +247,7 @@ export function buildTrustedAuthoritySources(
     rule({
       id: 'core-joint-glossary',
       origin: 'immutable-core',
-      precedence: 700,
+      precedence: 800,
       actionIds: [...new Set([...groups.owner, ...groups.architect])].sort(),
       selector: fsSelector(repositoryId, 'law/glossary/**'),
       subjects: joint,

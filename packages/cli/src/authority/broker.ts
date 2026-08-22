@@ -179,6 +179,35 @@ function validatePolicySchema(value: unknown): AuthorityResult {
   });
 }
 
+function authorityPolicySemantics(value: JsonRecord): JsonRecord {
+  const { materialized_at: _materializedAt, materialization: _materialization, ...semantics } =
+    value;
+  return semantics;
+}
+
+function unchangedAuthorityPolicy(path: string, nextBytes: Uint8Array): Buffer | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const currentBytes = readFileSync(path);
+    const current = JSON.parse(currentBytes.toString('utf8')) as unknown;
+    const next = JSON.parse(Buffer.from(nextBytes).toString('utf8')) as unknown;
+    if (
+      !isRecord(current) ||
+      !isRecord(next) ||
+      !validators.authorityPolicy(current) ||
+      !validators.authorityPolicy(next)
+    ) {
+      return undefined;
+    }
+    return canonicalSha256(authorityPolicySemantics(current)) ===
+      canonicalSha256(authorityPolicySemantics(next))
+      ? currentBytes
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isConstitutionBootstrap(input: BrokerInput): boolean {
   return (
     input.bootstrap_policy &&
@@ -1662,6 +1691,14 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           const artifact = materialized.artifact as JsonRecord;
           if (!(artifact.bytes instanceof Uint8Array)) {
             throw new Error('AUTHORITY_POLICY_ARTIFACT_INVALID');
+          }
+          const unchangedBytes = unchangedAuthorityPolicy(policyPath, artifact.bytes);
+          if (unchangedBytes !== undefined) {
+            return {
+              path: POLICY_PATH,
+              operation: 'unchanged',
+              digest_sha256: sha256Bytes(unchangedBytes),
+            };
           }
           mkdirSync(dirname(policyPath), { recursive: true });
           writeFileSync(policyPath, Buffer.from(artifact.bytes));
