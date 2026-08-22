@@ -20,7 +20,7 @@ import { inspectRemoteLocalOnlyNodes } from './ci-local-only.js';
  *      of pull_request + push + schedule. The single remote verifier has
  *      no scheduled product-validation lane.
  *   4. ci-economy.evidence-gate-wired — at least one workflow invokes the
- *      verifier from a protected digest-bound DEVAI package. Severity is
+ *      verifier from a protected provenance-bound DEVAI package. Severity is
  *      profile-conditioned (Decision 8 as amended by D-116): hard under
  *      the default `full` CI-economy profile; ADVISORY when the target
  *      repo's `.devai/config/project.json` declares
@@ -121,9 +121,11 @@ export function readCiEconomyProfile(repoRoot: string): CiEconomyProfile {
   }
 }
 
-const PROTECTED_PACKAGE_BYTES = /secrets\.DEVAI_LEDGER_PACKAGE_TGZ_B64/u;
-const PROTECTED_PACKAGE_DIGEST = /vars\.DEVAI_LEDGER_PACKAGE_SHA256/u;
-const PACKAGE_DIGEST_BINDING = /test\s+"\$actual_sha256"\s*=\s*"\$VERIFIER_PACKAGE_SHA256"/u;
+const PROTECTED_PROVENANCE_DIGEST = /vars\.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256/u;
+const PROVENANCE_DIGEST_BINDING =
+  /test\s+"\$actual_provenance_sha256"\s*=\s*"\$VERIFIER_PROVENANCE_SHA256"/u;
+const RUNNER_TEMP_COPY =
+  /cp\s+-R\s+"\$source_root\/schemas"\s+"\$source_root\/src"\s+"\$verifier_root\/"/u;
 const PACKAGE_VERIFIER_INVOCATION =
   /node\s+"\$DEVAI_EVIDENCE_(?:VERIFY|BUNDLE_VERIFY)"/u;
 
@@ -193,9 +195,9 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
     referencesMacos: /\bmacos-/i.test(text) || /runs-on:.*macos/i.test(text),
     hasPostgresService: /image:\s*['"]?postgres/.test(text),
     hasEvidenceMarker:
-      PROTECTED_PACKAGE_BYTES.test(text) &&
-      PROTECTED_PACKAGE_DIGEST.test(text) &&
-      PACKAGE_DIGEST_BINDING.test(text) &&
+      PROTECTED_PROVENANCE_DIGEST.test(text) &&
+      PROVENANCE_DIGEST_BINDING.test(text) &&
+      RUNNER_TEMP_COPY.test(text) &&
       PACKAGE_VERIFIER_INVOCATION.test(text),
   };
 }
@@ -311,7 +313,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
     const notWiredMessage =
       files.length === 0
         ? `no workflow files found under ${opts.workflowsDir ?? DEFAULT_WORKFLOWS_DIR}`
-        : 'no workflow invokes the verifier from a protected digest-bound DEVAI package';
+        : 'no workflow invokes the verifier from a protected provenance-bound DEVAI package';
     findings.push(
       profile === 'gate-staged'
         ? {
@@ -319,14 +321,14 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
             severity: 'warn',
             message: `${notWiredMessage} — ADVISORY, not FAIL: ci_economy.profile = "gate-staged" declared in .devai/config/project.json`,
             remediation:
-              'Wire the protected DEVAI package bytes, immutable SHA-256 binding, and packaged verifier invocation, then graduate ci_economy.profile to "full".',
+              'Wire the protected verifier-provenance SHA-256, runner-temp copy, and packaged verifier invocation, then graduate ci_economy.profile to "full".',
           }
         : {
             ruleId: 'ci-economy.evidence-gate-wired',
             severity: 'fail',
             message: notWiredMessage,
             remediation:
-              'Add the single ledger-verification workflow with protected DEVAI package bytes and an immutable SHA-256 binding. Incremental adopters may declare ci_economy.profile: "gate-staged" until that verifier is wired.',
+              'Add the single ledger-verification workflow with a protected verifier-provenance SHA-256 and runner-temp execution boundary. Incremental adopters may declare ci_economy.profile: "gate-staged" until that verifier is wired.',
           },
     );
   }
@@ -425,7 +427,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
 export const checkCiEconomyCmd = defineCommand({
   name: 'check ci-economy',
   description:
-    'Validate .github/workflows/ against the cheap remote ledger-verification contract: cancel-in-progress concurrency on PR workflows, no macOS on pull_request, no pull_request+push+schedule triple triggers, and a protected digest-bound DEVAI package verifier. Rules 1-3 always hard-fail; rule 4 is hard under the default "full" profile and advisory under an explicit "gate-staged" profile. Path-filter, cron, macOS-cost, and DB-isolation findings remain advisory.',
+    'Validate .github/workflows/ against the cheap remote ledger-verification contract: cancel-in-progress concurrency on PR workflows, no macOS on pull_request, no pull_request+push+schedule triple triggers, and a protected provenance-bound DEVAI package verifier. Rules 1-3 always hard-fail; rule 4 is hard under the default "full" profile and advisory under an explicit "gate-staged" profile. Path-filter, cron, macOS-cost, and DB-isolation findings remain advisory.',
   authority: 'policy_firewall',
   register(cli: CAC): void {
     cli

@@ -41,34 +41,24 @@ jobs:
         id: verifier-package
         shell: bash
         env:
-          VERIFIER_PACKAGE_TGZ_B64: ${{ secrets.DEVAI_LEDGER_PACKAGE_TGZ_B64 }}
-          VERIFIER_PACKAGE_SHA256: ${{ vars.DEVAI_LEDGER_PACKAGE_SHA256 }}
+          VERIFIER_PROVENANCE_SHA256: ${{ vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 }}
         run: |
           set -euo pipefail
-          test -n "$VERIFIER_PACKAGE_TGZ_B64"
-          test "$VERIFIER_PACKAGE_SHA256" != ""
-          test "${#VERIFIER_PACKAGE_SHA256}" = 64
+          test "$VERIFIER_PROVENANCE_SHA256" != ""
+          test "${#VERIFIER_PROVENANCE_SHA256}" = 64
           control="$RUNNER_TEMP/devai-verifier-package"
-          archive="$control/devai-package.tgz"
-          root="$control/root"
-          mkdir -p "$root"
-          printf '%s' "$VERIFIER_PACKAGE_TGZ_B64" | base64 --decode > "$archive"
-          actual_sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
-          test "$actual_sha256" = "$VERIFIER_PACKAGE_SHA256"
-          if tar -tzf "$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
-            echo 'DEVAI_VERIFIER_PACKAGE_ARCHIVE_PATH_INVALID' >&2
-            exit 2
-          fi
-          if tar -tvzf "$archive" | awk '$1 ~ /^[lh]/ { found=1 } END { exit !found }'; then
-            echo 'DEVAI_VERIFIER_PACKAGE_ARCHIVE_LINK_INVALID' >&2
-            exit 2
-          fi
-          tar -xzf "$archive" --no-same-owner --no-same-permissions -C "$root"
-          package_root="$root/package"
-          verifier_root="$package_root/dist/runtime/evidence-verification"
+          package_root="candidate/packages/cli"
+          source_root="$package_root/vendor/evidence-verification"
+          provenance="$source_root/provenance.json"
+          actual_provenance_sha256="$(sha256sum "$provenance" | cut -d' ' -f1)"
+          test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"
+          verifier_root="$control/evidence-verification"
+          mkdir -p "$verifier_root"
+          cp "$source_root/provenance.json" "$verifier_root/provenance.json"
+          cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"
           node - "$package_root" "$verifier_root" <<'NODE'
           const { createHash } = require('node:crypto');
-          const { existsSync, readFileSync, readdirSync } = require('node:fs');
+          const { readFileSync, readdirSync } = require('node:fs');
           const { join, relative } = require('node:path');
           const [packageRoot, verifierRoot] = process.argv.slice(2);
           const expectedBins = {
@@ -91,6 +81,9 @@ jobs:
           const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));
           const walk = (root, directory = root) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
             const path = join(directory, entry.name);
+            if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) {
+              throw new Error('DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID:' + relative(root, path));
+            }
             return entry.isDirectory() ? walk(root, path) : [relative(root, path)];
           });
           const actual = walk(verifierRoot).filter((path) => path !== 'provenance.json').sort();
@@ -99,7 +92,6 @@ jobs:
           }
           for (const [path, expected] of listed) {
             const file = join(verifierRoot, path);
-            if (!existsSync(file)) throw new Error('DEVAI_VERIFIER_PACKAGE_FILE_MISSING:' + path);
             const actualDigest = createHash('sha256').update(readFileSync(file)).digest('hex');
             if (actualDigest !== expected) throw new Error('DEVAI_VERIFIER_PACKAGE_FILE_DIGEST_INVALID:' + path);
           }
@@ -109,9 +101,8 @@ jobs:
             echo "DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js"
             echo "DEVAI_EVIDENCE_BUNDLE_VERIFY=$verifier_root/src/bundle-cli.js"
           } >> "$GITHUB_ENV"
-          echo "sha256=$actual_sha256" >> "$GITHUB_OUTPUT"
           echo "version=$(node -p \"require('$package_root/package.json').version\")" >> "$GITHUB_OUTPUT"
-          echo "provenance_sha256=$(sha256sum "$verifier_root/provenance.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Materialize externally controlled verification inputs
         shell: bash

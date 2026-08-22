@@ -221,8 +221,7 @@ function checkWorkflow(file, source, findings) {
     'secrets.DEVAI_LEDGER_TRUST_STORE_B64',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
-    'secrets.DEVAI_LEDGER_PACKAGE_TGZ_B64',
-    'vars.DEVAI_LEDGER_PACKAGE_SHA256',
+    'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
     'vars.DEVAI_LEDGER_POLICY_DIGEST',
   ];
   for (const input of externalInputs) {
@@ -231,17 +230,29 @@ function checkWorkflow(file, source, findings) {
     }
   }
   for (const marker of [
-    'test "$actual_sha256" = "$VERIFIER_PACKAGE_SHA256"',
-    'DEVAI_VERIFIER_PACKAGE_ARCHIVE_PATH_INVALID',
-    'DEVAI_VERIFIER_PACKAGE_ARCHIVE_LINK_INVALID',
+    'package_root="candidate/packages/cli"',
+    'source_root="$package_root/vendor/evidence-verification"',
+    'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+    'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
+    'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
     `manifest.name !== '${VERIFIER_PACKAGE}'`,
     `provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
-    'DEVAI_EVIDENCE_POLICY=',
-    'DEVAI_EVIDENCE_VERIFY=',
+    'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
+    'DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js',
+    'DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js',
   ]) {
     if (!source.includes(marker)) {
       findings.push(finding('CI_VERIFIER_PACKAGE_BINDING_MISSING', file, marker));
+    }
+  }
+  for (const forbidden of [
+    'DEVAI_LEDGER_PACKAGE_TGZ_B64',
+    'DEVAI_LEDGER_PACKAGE_SHA256',
+    'node candidate/packages/cli/vendor',
+  ]) {
+    if (source.includes(forbidden)) {
+      findings.push(finding('CI_VERIFIER_AUTHORITY_BYPASS_FORBIDDEN', file, forbidden));
     }
   }
   if (
@@ -352,7 +363,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
-    environment.EXPECTED_ACTION_COUNT !== 43 ||
+    environment.EXPECTED_ACTION_COUNT !== 44 ||
     environment.PACKAGE_VERSION !== undefined ||
     environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION
   ) {
@@ -453,14 +464,16 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const requiredMarkers = [
     'node "$DEVAI_EVIDENCE_VERIFY"',
     'node "$DEVAI_EVIDENCE_POLICY"',
-    'secrets.DEVAI_LEDGER_PACKAGE_TGZ_B64',
-    'vars.DEVAI_LEDGER_PACKAGE_SHA256',
-    'test "$actual_sha256" = "$VERIFIER_PACKAGE_SHA256"',
-    'DEVAI_VERIFIER_PACKAGE_ARCHIVE_PATH_INVALID',
-    'DEVAI_VERIFIER_PACKAGE_ARCHIVE_LINK_INVALID',
+    'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
+    'package_root="candidate/packages/cli"',
+    'source_root="$package_root/vendor/evidence-verification"',
+    'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
+    'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
+    'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
     `manifest.name !== '${VERIFIER_PACKAGE}'`,
     `provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
+    'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
     '--schema-version 1.1.0',
     'cmp "$control/expected-task-policy.json" "$control/task-policy.json"',
     'secrets.DEVAI_LEDGER_TOOLCHAIN_B64',
@@ -472,7 +485,6 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'pnpm run release:closure',
     'run pack:smoke',
     'stage-release-package.mjs',
-    'test "$(sha256sum "$tarball" | cut -d\' \' -f1)" = "$LEDGER_VERIFIER_PACKAGE_SHA256"',
     'release-channel.mjs',
     'RELEASE_IS_PRERELEASE',
     'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
@@ -491,6 +503,15 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   ];
   for (const marker of requiredMarkers) {
     if (!source.includes(marker)) findings.push(finding('RELEASE_CONTROL_MISSING', file, marker));
+  }
+  for (const forbidden of [
+    'DEVAI_LEDGER_PACKAGE_TGZ_B64',
+    'DEVAI_LEDGER_PACKAGE_SHA256',
+    'node candidate/packages/cli/vendor',
+  ]) {
+    if (source.includes(forbidden)) {
+      findings.push(finding('RELEASE_VERIFIER_AUTHORITY_BYPASS_FORBIDDEN', file, forbidden));
+    }
   }
   for (const forbidden of ['test:coverage', 'vitest run', 'pnpm test', 'npm test']) {
     if (source.includes(forbidden)) {

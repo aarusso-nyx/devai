@@ -110,10 +110,16 @@ function validateVerifierAssets() {
   const declared = provenance.files.map((entry) => entry.path);
   const expectedPopulation = ['provenance.json', ...declared].sort();
   const actualPopulation = filesUnder(verifierSourceRoot).sort();
+  // Upstream verifier tests remain source-owned regression assets. They are
+  // deliberately outside the provenance-declared runtime and npm package.
+  const sourceOnlyTests = actualPopulation.filter((path) => path.startsWith('test/'));
+  const runtimePopulation = actualPopulation.filter((path) => !path.startsWith('test/'));
   if (
     declared.length !== 21 ||
     new Set(declared).size !== declared.length ||
-    JSON.stringify(actualPopulation) !== JSON.stringify(expectedPopulation)
+    sourceOnlyTests.some((path) => !/^test\/[a-z0-9-]+\.test\.js$/u.test(path)) ||
+    declared.some((path) => path.startsWith('test/')) ||
+    JSON.stringify(runtimePopulation) !== JSON.stringify(expectedPopulation)
   ) {
     throw new Error('PACKAGE_VERIFIER_POPULATION_INVALID');
   }
@@ -148,7 +154,7 @@ const external = (id) =>
   (!id.startsWith('.') && !id.startsWith('/') && !id.startsWith('#') && !workspacePackage.test(id));
 
 try {
-  validateVerifierAssets();
+  const verifierProvenance = validateVerifierAssets();
   const bundle = await rolldown({
     input: join(distRoot, 'bin.js'),
     external,
@@ -210,7 +216,16 @@ try {
     join(runtimeRoot, 'package.json'),
     JSON.stringify({ type: 'module', version: manifest.version }, null, 2) + '\n',
   );
-  cpSync(verifierSourceRoot, verifierRuntimeRoot, { recursive: true });
+  mkdirSync(verifierRuntimeRoot, { recursive: true });
+  copyFileSync(
+    join(verifierSourceRoot, 'provenance.json'),
+    join(verifierRuntimeRoot, 'provenance.json'),
+  );
+  for (const entry of verifierProvenance.files) {
+    const target = join(verifierRuntimeRoot, entry.path);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(join(verifierSourceRoot, entry.path), target);
+  }
   for (const name of verifierBins) chmodSync(join(verifierRuntimeRoot, 'src', name), 0o755);
 
   const packagedSchemas = schemaClosure(schemaRoots);
