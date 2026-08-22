@@ -87,7 +87,13 @@ describe('live ledger-verification workflow', () => {
     expect(checkedIn).not.toContain('devai-nyx/devai-verifier');
   });
 
-  it('executes protected verifier materialization and resolves the candidate package version', () => {
+  it.each([
+    { name: 'ledger workflow', source: ledgerVerificationWorkflow() },
+    {
+      name: 'release workflow',
+      source: readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8'),
+    },
+  ])('executes protected verifier materialization in the $name', ({ source }) => {
     const root = mkdtempSync(join(tmpdir(), 'devai-verifier-materialization-'));
     roots.push(root);
     const packageRoot = join(root, 'candidate/packages/cli');
@@ -120,21 +126,17 @@ describe('live ledger-verification workflow', () => {
     const provenance = readFileSync(join(sourceRoot, 'provenance.json'));
     const provenanceDigest = createHash('sha256').update(provenance).digest('hex');
 
-    const result = spawnSync(
-      'bash',
-      ['-c', verifierMaterializationScript(ledgerVerificationWorkflow())],
-      {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          RUNNER_TEMP: runnerTemp,
-          GITHUB_ENV: githubEnv,
-          GITHUB_OUTPUT: githubOutput,
-          VERIFIER_PROVENANCE_SHA256: provenanceDigest,
-        },
+    const result = spawnSync('bash', ['-c', verifierMaterializationScript(source)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        RUNNER_TEMP: runnerTemp,
+        GITHUB_ENV: githubEnv,
+        GITHUB_OUTPUT: githubOutput,
+        VERIFIER_PROVENANCE_SHA256: provenanceDigest,
       },
-    );
+    });
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toBe('');

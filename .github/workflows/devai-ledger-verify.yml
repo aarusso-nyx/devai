@@ -101,7 +101,8 @@ jobs:
             echo "DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js"
             echo "DEVAI_EVIDENCE_BUNDLE_VERIFY=$verifier_root/src/bundle-cli.js"
           } >> "$GITHUB_ENV"
-          echo "version=$(node -p \"require('$package_root/package.json').version\")" >> "$GITHUB_OUTPUT"
+          package_version="$(node -e 'process.stdout.write(require("./" + process.argv[1] + "/package.json").version)' "$package_root")"
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Materialize externally controlled verification inputs
