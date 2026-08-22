@@ -391,6 +391,12 @@ describe('adopter-safe check and binding contracts', () => {
       ['remote', 'add', 'origin', 'https://github.com/example/teat-installed.git'],
       { cwd: repo },
     );
+    put(repo, 'package.json', {
+      name: 'teat-installed',
+      private: true,
+      packageManager: 'pnpm@9.15.0',
+      engines: { node: '>=24' },
+    });
     await establishTier3Binding(repo);
     const projectPath = join(repo, '.devai/config/project.json');
     const project = JSON.parse(readFileSync(projectPath, 'utf8')) as Record<string, unknown>;
@@ -425,7 +431,7 @@ describe('adopter-safe check and binding contracts', () => {
       put(
         repo,
         `.artifacts/${job}/metadata.txt`,
-        `job=${job}\nplatform=darwin/arm64\nactor=aarusso\nnode=${process.version}\n`,
+        `job=${job}\nplatform=darwin/arm64\nactor=aarusso\nnode=${process.version}\npnpm=9.15.0\n`,
       );
       put(repo, `.artifacts/${job}/result.txt`, 'success\n');
     }
@@ -513,7 +519,7 @@ describe('adopter-safe check and binding contracts', () => {
       '.artifacts/changed-files.txt',
     ]);
     expect(JSON.parse(verified.stdout)).toMatchObject({
-      action: 'evidence verify',
+      action_id: 'evidence verify',
       result: {
         value: {
           scope: 'local',
