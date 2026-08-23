@@ -599,6 +599,11 @@ try {
     authorityCheck?.info?.local_post_merge_enforced !== true ||
     authorityCheck?.info?.github_actions_enforced !== true ||
     authorityCheck?.info?.github_actions_facts?.workflow_syntax_valid !== true ||
+    authorityCheck?.info?.github_actions_facts?.provenance_capability_bound !== true ||
+    authorityCheck?.info?.github_actions_facts?.private_user_artifact_digest_bound !== true ||
+    authorityCheck?.info?.github_actions_facts?.attestation_fail_closed_when_required !== true ||
+    authorityCheck?.info?.github_actions_facts?.immutable_artifact_digest_bound !== true ||
+    authorityCheck?.info?.github_actions_facts?.explicit_unavailable_receipt_bound !== true ||
     authorityCheck?.info?.arbitrary_host_tools_enforced !== false
   ) {
     throw new Error('INSTALLED_HOST_ADAPTER_DIAGNOSIS_INVALID');

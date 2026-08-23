@@ -50,6 +50,14 @@ The generated GitHub Actions main-observation adapter binds package installation
 absent and never substitutes `GITHUB_TOKEN` for GitHub Packages access. The repository-scoped
 token remains separately bounded to the consent-gated audit-ref publication operation.
 
+The adapter selects provenance by a closed repository-capability rule. GitHub attestation remains
+mandatory wherever the workflow selects it, and any missing attestation fails the job. For the
+documented GitHub limitation on user-owned private repositories, the adapter instead binds the
+exact observation files to an immutable Actions artifact, validates the service-provided SHA-256
+digest, and uploads a separate receipt that records both the artifact identity and the explicit
+`unavailable` attestation status. That exception is not a successful GitHub attestation and cannot
+be selected for public or organization-owned repositories.
+
 ## Source canon versus adopter validation
 
 The schema checker has two distinct populations:

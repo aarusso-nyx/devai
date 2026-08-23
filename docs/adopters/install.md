@@ -106,6 +106,13 @@ workflow requires that secret for package installation and fails before installa
 absent. It never falls back to the repository-scoped `GITHUB_TOKEN`; credentials remain
 environment-only.
 
+GitHub artifact attestations are unavailable for user-owned private repositories outside their
+supported plan boundary. For that exact repository shape, the generated workflow records the
+limitation explicitly and preserves provenance through the immutable Actions artifact ID, URL and
+service-provided SHA-256 digest, plus a separately uploaded receipt. Other repository shapes keep
+GitHub attestation mandatory and fail closed if it is not produced. An artifact-digest receipt
+never claims that GitHub attestation succeeded.
+
 Core files and requested includes are preflighted before the first write and applied
 as one rollback-capable transaction. A preflight conflict writes nothing. If the
 process is forcibly terminated, inspect the fresh `init plan`, remove only files that
