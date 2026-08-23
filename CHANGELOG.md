@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.6 — 2026-08-22
+
+- Preserves exact-main observation provenance for user-owned private repositories through the
+  immutable GitHub Actions artifact digest and an explicit capability receipt, without claiming
+  that unavailable GitHub artifact attestation succeeded. Eligible repositories continue to
+  require GitHub attestation and fail closed when it is missing.
+
 ## 1.2.5 — 2026-08-22
 
 - Requires the protected adopter `PACKAGES_READ_TOKEN` secret for generated exact-main GitHub

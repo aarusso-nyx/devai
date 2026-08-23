@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.5
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.6
 pnpm exec devai catalog actions --format json
 ```
 
@@ -105,6 +105,13 @@ commands. Configure the adopter repository or protected environment secret
 workflow requires that secret for package installation and fails before installation when it is
 absent. It never falls back to the repository-scoped `GITHUB_TOKEN`; credentials remain
 environment-only.
+
+GitHub artifact attestations are unavailable for user-owned private repositories outside their
+supported plan boundary. For that exact repository shape, the generated workflow records the
+limitation explicitly and preserves provenance through the immutable Actions artifact ID, URL and
+service-provided SHA-256 digest, plus a separately uploaded receipt. Other repository shapes keep
+GitHub attestation mandatory and fail closed if it is not produced. An artifact-digest receipt
+never claims that GitHub attestation succeeded.
 
 Core files and requested includes are preflighted before the first write and applied
 as one rollback-capable transaction. A preflight conflict writes nothing. If the

@@ -90,26 +90,132 @@ jobs:
         run: corepack pnpm exec devai doctor --repo-root . --format json
       - name: Observe exact main SHA
         run: corepack pnpm exec devai audit observe --repo-root . --at "$GITHUB_SHA" --as-role auditor --write --format json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - id: provenance-mode
+        name: Select supported provenance mode
+        env:
+          DEVAI_REPOSITORY_PRIVATE: \${{ github.event.repository.private }}
+          DEVAI_REPOSITORY_OWNER_TYPE: \${{ github.event.repository.owner.type }}
+        run: |
+          if [ "$DEVAI_REPOSITORY_PRIVATE" = 'true' ] && [ "$DEVAI_REPOSITORY_OWNER_TYPE" = 'User' ]; then
+            echo 'mode=github-artifact-digest' >> "$GITHUB_OUTPUT"
+            echo 'GitHub artifact attestations are unavailable for user-owned private repositories; binding provenance to the immutable Actions artifact digest.'
+          else
+            echo 'mode=github-attestation' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Prepare exact observation provenance
+        env:
+          DEVAI_PROVENANCE_MODE: \${{ steps.provenance-mode.outputs.mode }}
+        run: |
+          observation_root=".devai/state/audit-observations/$GITHUB_SHA"
+          test -d "$observation_root"
+          node <<'NODE'
+          const { createHash } = require('node:crypto');
+          const { readdirSync, readFileSync, writeFileSync } = require('node:fs');
+          const { join } = require('node:path');
+          const root = join('.devai/state/audit-observations', process.env.GITHUB_SHA);
+          const files = readdirSync(root)
+            .filter((name) => name.endsWith('.json') && name !== 'github-provenance.json')
+            .sort()
+            .map((name) => ({
+              path: name,
+              sha256: createHash('sha256').update(readFileSync(join(root, name))).digest('hex'),
+            }));
+          if (files.length === 0) throw new Error('DEVAI_OBSERVATION_FILES_MISSING');
+          const document = {
+            schemaVersion: '1.0.0',
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW_REF,
+            ref: process.env.GITHUB_REF,
+            sha: process.env.GITHUB_SHA,
+            run_id: process.env.GITHUB_RUN_ID,
+            run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+            provenance_mode: process.env.DEVAI_PROVENANCE_MODE,
+            files,
+          };
+          writeFileSync(join(root, 'github-provenance.json'), JSON.stringify(document, null, 2) + '\\n');
+          NODE
+      - id: observation-artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: devai-main-observation-\${{ github.sha }}
           path: .devai/state/audit-observations/\${{ github.sha }}/
           if-no-files-found: error
           retention-days: 90
+      - name: Verify immutable observation artifact binding
+        env:
+          DEVAI_ARTIFACT_ID: \${{ steps.observation-artifact.outputs.artifact-id }}
+          DEVAI_ARTIFACT_URL: \${{ steps.observation-artifact.outputs.artifact-url }}
+          DEVAI_ARTIFACT_DIGEST: \${{ steps.observation-artifact.outputs.artifact-digest }}
+        run: |
+          test -n "$DEVAI_ARTIFACT_ID"
+          test -n "$DEVAI_ARTIFACT_URL"
+          node -e "if (!/^[0-9a-f]{64}$/u.test(process.env.DEVAI_ARTIFACT_DIGEST ?? '')) { console.error('immutable observation artifact digest is missing or invalid'); process.exit(1); }"
       - id: attest
+        if: steps.provenance-mode.outputs.mode == 'github-attestation'
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
         with:
           subject-path: .devai/state/audit-observations/\${{ github.sha }}/*
+      - name: Record explicit provenance result
+        env:
+          DEVAI_PROVENANCE_MODE: \${{ steps.provenance-mode.outputs.mode }}
+          DEVAI_ARTIFACT_ID: \${{ steps.observation-artifact.outputs.artifact-id }}
+          DEVAI_ARTIFACT_URL: \${{ steps.observation-artifact.outputs.artifact-url }}
+          DEVAI_ARTIFACT_DIGEST: \${{ steps.observation-artifact.outputs.artifact-digest }}
+          DEVAI_ATTESTATION_URL: \${{ steps.attest.outputs.attestation-url }}
+        run: |
+          receipt_root=".devai/state/audit-receipts/$GITHUB_SHA"
+          mkdir -p "$receipt_root"
+          node <<'NODE'
+          const { writeFileSync } = require('node:fs');
+          const { join } = require('node:path');
+          const mode = process.env.DEVAI_PROVENANCE_MODE;
+          const attestationUrl = process.env.DEVAI_ATTESTATION_URL ?? '';
+          if (mode === 'github-attestation' && attestationUrl.length === 0)
+            throw new Error('DEVAI_GITHUB_ATTESTATION_REQUIRED');
+          if (mode === 'github-artifact-digest' && attestationUrl.length !== 0)
+            throw new Error('DEVAI_UNEXPECTED_GITHUB_ATTESTATION');
+          if (!/^[0-9a-f]{64}$/u.test(process.env.DEVAI_ARTIFACT_DIGEST ?? ''))
+            throw new Error('DEVAI_ARTIFACT_DIGEST_INVALID');
+          const document = {
+            schemaVersion: '1.0.0',
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW_REF,
+            ref: process.env.GITHUB_REF,
+            sha: process.env.GITHUB_SHA,
+            run_id: process.env.GITHUB_RUN_ID,
+            run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+            provenance_mode: mode,
+            artifact: {
+              id: process.env.DEVAI_ARTIFACT_ID,
+              url: process.env.DEVAI_ARTIFACT_URL,
+              digest_sha256: process.env.DEVAI_ARTIFACT_DIGEST,
+              immutable: true,
+            },
+            github_attestation:
+              mode === 'github-attestation'
+                ? { status: 'created', url: attestationUrl }
+                : {
+                    status: 'unavailable',
+                    reason: 'github-artifact-attestations-unavailable-for-user-owned-private-repository',
+                  },
+          };
+          writeFileSync(join('.devai/state/audit-receipts', process.env.GITHUB_SHA, 'github-provenance-receipt.json'), JSON.stringify(document, null, 2) + '\\n');
+          NODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-main-observation-receipt-\${{ github.sha }}
+          path: .devai/state/audit-receipts/\${{ github.sha }}/github-provenance-receipt.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Publish dedicated audit ref with explicit consent
         if: github.event_name == 'workflow_dispatch' && inputs.publish_observation && vars.DEVAI_ALLOW_OBSERVATION_PUBLICATION == 'true'
         env:
           GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          DEVAI_ATTESTATION_URL: \${{ steps.attest.outputs.attestation-url }}
         run: |
           observation_repo="$RUNNER_TEMP/devai-observation"
           mkdir -p "$observation_repo/work/audit/post-merge/$GITHUB_SHA"
           cp ".devai/state/audit-observations/$GITHUB_SHA/"*.json "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"
-          printf '{"repository":"%s","workflow":"%s","ref":"%s","sha":"%s","run_id":"%s","attestation_url":"%s"}\\n' "$GITHUB_REPOSITORY" "$GITHUB_WORKFLOW_REF" "$GITHUB_REF" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$DEVAI_ATTESTATION_URL" > "$observation_repo/work/audit/post-merge/$GITHUB_SHA/github-oidc-receipt.json"
+          cp ".devai/state/audit-receipts/$GITHUB_SHA/github-provenance-receipt.json" "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"
           git -C "$observation_repo" init -b audit
           git -C "$observation_repo" config user.name 'DEVAI Auditor'
           git -C "$observation_repo" config user.email 'aarusso@nyxk.com.br'
@@ -144,7 +250,17 @@ export function buildGithubActionsAdapterPlan(
     workflow_digest_sha256: sha256(workflowBytes),
     branch: 'main',
     ref_prefix: 'refs/devai/post-merge/',
-    oidc_audience: 'github-attestations',
+    provenance: {
+      primary: 'github-attestation',
+      capability_exception: {
+        repository_visibility: 'private',
+        repository_owner_type: 'User',
+        mode: 'github-artifact-digest',
+        attestation_status: 'unavailable',
+      },
+      artifact_immutability: 'actions-upload-artifact-v4',
+      receipt_path: 'github-provenance-receipt.json',
+    },
     publication_consent_variable: 'DEVAI_ALLOW_OBSERVATION_PUBLICATION',
     package_binding: { name: '@aarusso-nyx/devai', version: devaiVersion },
   };
@@ -200,6 +316,32 @@ export function verifyGithubActionsAdapter(
       !/NODE_AUTH_TOKEN:.*secrets\.GITHUB_TOKEN/u.test(bytes);
     facts['oidc_enabled'] =
       bytes.includes('id-token: write') && bytes.includes('attest-build-provenance@');
+    const provenance = config['provenance'] as Record<string, unknown> | undefined;
+    const capability = provenance?.['capability_exception'] as Record<string, unknown> | undefined;
+    facts['provenance_capability_bound'] =
+      provenance?.['primary'] === 'github-attestation' &&
+      capability?.['repository_visibility'] === 'private' &&
+      capability?.['repository_owner_type'] === 'User' &&
+      capability?.['mode'] === 'github-artifact-digest' &&
+      capability?.['attestation_status'] === 'unavailable';
+    facts['private_user_artifact_digest_bound'] =
+      bytes.includes('[ "$DEVAI_REPOSITORY_PRIVATE" = \'true\' ]') &&
+      bytes.includes('[ "$DEVAI_REPOSITORY_OWNER_TYPE" = \'User\' ]') &&
+      bytes.includes('echo \'mode=github-artifact-digest\' >> "$GITHUB_OUTPUT"') &&
+      bytes.includes("if: steps.provenance-mode.outputs.mode == 'github-attestation'");
+    facts['attestation_fail_closed_when_required'] =
+      !bytes.includes('continue-on-error: true') &&
+      bytes.includes("throw new Error('DEVAI_GITHUB_ATTESTATION_REQUIRED')");
+    facts['immutable_artifact_digest_bound'] =
+      bytes.includes('steps.observation-artifact.outputs.artifact-digest') &&
+      bytes.includes("throw new Error('DEVAI_ARTIFACT_DIGEST_INVALID')") &&
+      bytes.includes('immutable: true');
+    facts['explicit_unavailable_receipt_bound'] =
+      bytes.includes("status: 'unavailable'") &&
+      bytes.includes(
+        "reason: 'github-artifact-attestations-unavailable-for-user-owned-private-repository'",
+      ) &&
+      bytes.includes('github-provenance-receipt.json');
     facts['audit_ref_only'] =
       bytes.includes('refs/devai/post-merge/$GITHUB_SHA') &&
       !bytes.includes('HEAD:refs/heads/main');
