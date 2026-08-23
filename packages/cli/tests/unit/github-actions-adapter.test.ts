@@ -161,6 +161,32 @@ describe('GitHub Actions main-observation adapter', () => {
     });
   });
 
+  it('accepts the exact upload-artifact SHA-256 output and rejects malformed digests', async () => {
+    const root = repository();
+    const plan = buildGithubActionsAdapterPlan(root, '1.2.6');
+    const document = parseDocument(plan.workflowBytes).toJS() as {
+      jobs: { observe: { steps: Array<Record<string, unknown>> } };
+    };
+    const step = document.jobs.observe.steps.find(
+      (entry) => entry['name'] === 'Verify immutable observation artifact binding',
+    );
+    const execute = (digest: string) =>
+      spawnSync('bash', ['-euo', 'pipefail', '-c', String(step?.['run'])], {
+        env: {
+          ...process.env,
+          DEVAI_ARTIFACT_ID: '9485713510',
+          DEVAI_ARTIFACT_URL:
+            'https://github.com/example/adopter/actions/runs/32611725469/artifacts/9485713510',
+          DEVAI_ARTIFACT_DIGEST: digest,
+        },
+        encoding: 'utf8',
+      });
+    expect(execute('2f0fd477e3913500caa533d93431a4cb86ce295b01cd076eefeb85e8490e1fb3').status).toBe(
+      0,
+    );
+    expect(execute('not-a-digest').status).not.toBe(0);
+  });
+
   it('fails closed when an eligible repository does not produce a GitHub attestation', async () => {
     const root = repository();
     const plan = buildGithubActionsAdapterPlan(root, '1.2.6');

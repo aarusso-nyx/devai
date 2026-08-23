@@ -149,10 +149,7 @@ jobs:
         run: |
           test -n "$DEVAI_ARTIFACT_ID"
           test -n "$DEVAI_ARTIFACT_URL"
-          case "$DEVAI_ARTIFACT_DIGEST" in
-            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-            *) echo '::error::immutable observation artifact digest is missing or invalid' >&2; exit 1 ;;
-          esac
+          node -e "if (!/^[0-9a-f]{64}$/u.test(process.env.DEVAI_ARTIFACT_DIGEST ?? '')) { console.error('immutable observation artifact digest is missing or invalid'); process.exit(1); }"
       - id: attest
         if: steps.provenance-mode.outputs.mode == 'github-attestation'
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
