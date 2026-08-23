@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.5 — 2026-08-22
 
 - Requires the protected adopter `PACKAGES_READ_TOKEN` secret for generated exact-main GitHub
   Packages installation, with an explicit missing-secret failure and no package-authentication
