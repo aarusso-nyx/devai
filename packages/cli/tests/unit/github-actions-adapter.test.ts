@@ -58,9 +58,12 @@ describe('GitHub Actions main-observation adapter', () => {
     expect(workflow).toContain('--at "$GITHUB_SHA"');
     expect(workflow).toContain('id-token: write');
     expect(workflow).toContain('packages: read');
-    expect(workflow).toContain(
+    expect(workflow).toContain('NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}');
+    expect(workflow).toContain('if [ -z "${NODE_AUTH_TOKEN:-}" ]; then');
+    expect(workflow).not.toContain(
       'NODE_AUTH_TOKEN: ${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
     );
+    expect(workflow).not.toContain('NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
     expect(workflow).toContain('refs/devai/post-merge/$GITHUB_SHA');
     expect(workflow).toContain(
       'cp ".devai/state/audit-observations/$GITHUB_SHA/"*.json "$observation_repo/work/audit/post-merge/$GITHUB_SHA/"',
@@ -76,20 +79,54 @@ describe('GitHub Actions main-observation adapter', () => {
     expect(verifyGithubActionsAdapter(root, '1.1.0-rc.1').ok).toBe(false);
   });
 
-  it('rejects a workflow that loses cross-repository package authentication', async () => {
+  it('rejects a workflow that falls back to the repository-scoped token for package access', async () => {
     const root = repository();
     const plan = buildGithubActionsAdapterPlan(root, '1.1.6');
     await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
     writeFileSync(
       plan.workflowPath,
       readFileSync(plan.workflowPath, 'utf8').replace(
-        '${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
+        '${{ secrets.PACKAGES_READ_TOKEN }}',
         '${{ secrets.GITHUB_TOKEN }}',
       ),
     );
     expect(verifyGithubActionsAdapter(root, '1.1.6')).toMatchObject({
       ok: false,
-      facts: { package_auth_fallback_bound: false },
+      facts: {
+        package_auth_secret_bound: false,
+        package_auth_no_repository_token_fallback: false,
+      },
+    });
+  });
+
+  it('rejects the legacy optional package-token fallback even when the protected secret remains', async () => {
+    const root = repository();
+    const plan = buildGithubActionsAdapterPlan(root, '1.1.6');
+    await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
+    writeFileSync(
+      plan.workflowPath,
+      `${readFileSync(plan.workflowPath, 'utf8')}# \${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}\n`,
+    );
+    expect(verifyGithubActionsAdapter(root, '1.1.6')).toMatchObject({
+      ok: false,
+      facts: { package_auth_no_repository_token_fallback: false },
+    });
+  });
+
+  it('rejects a workflow that does not fail closed when package credentials are absent', async () => {
+    const root = repository();
+    const plan = buildGithubActionsAdapterPlan(root, '1.1.6');
+    await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
+    writeFileSync(
+      plan.workflowPath,
+      readFileSync(plan.workflowPath, 'utf8').replace(
+        'if [ -z "${NODE_AUTH_TOKEN:-}" ]; then',
+        'if false; then',
+      ),
+    );
+    expect(verifyGithubActionsAdapter(root, '1.1.6')).toMatchObject({
+      ok: false,
+      facts: { package_auth_fail_closed: false },
     });
   });
 
