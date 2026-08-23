@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Requires the protected adopter `PACKAGES_READ_TOKEN` secret for generated exact-main GitHub
+  Packages installation, with an explicit missing-secret failure and no package-authentication
+  fallback to the repository-scoped `GITHUB_TOKEN`.
+
 ## 1.2.4 — 2026-08-22
 
 - Stabilizes adopter authority across developer, CI, container, and disposable-checkout paths by

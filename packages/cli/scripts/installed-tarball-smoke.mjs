@@ -572,6 +572,16 @@ try {
   if (parseDocument(githubWorkflow).errors.length > 0) {
     throw new Error('INSTALLED_GITHUB_ACTIONS_WORKFLOW_SYNTAX_INVALID');
   }
+  if (
+    !githubWorkflow.includes('NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}') ||
+    !githubWorkflow.includes('if [ -z "${NODE_AUTH_TOKEN:-}" ]; then') ||
+    githubWorkflow.includes(
+      'NODE_AUTH_TOKEN: ${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
+    ) ||
+    githubWorkflow.includes('NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}')
+  ) {
+    throw new Error('INSTALLED_GITHUB_ACTIONS_PACKAGE_AUTH_INVALID');
+  }
   const adapterDoctor = runResult(binary, [
     'doctor',
     '--repo-root',

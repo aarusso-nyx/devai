@@ -78,8 +78,12 @@ jobs:
           registry-url: https://npm.pkg.github.com
       - name: Install exact workspace
         env:
-          NODE_AUTH_TOKEN: \${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: \${{ secrets.PACKAGES_READ_TOKEN }}
         run: |
+          if [ -z "\${NODE_AUTH_TOKEN:-}" ]; then
+            echo '::error::PACKAGES_READ_TOKEN is required for GitHub Packages access' >&2
+            exit 1
+          fi
           corepack enable
           corepack pnpm install --frozen-lockfile
       - name: Verify bound posture
@@ -185,9 +189,15 @@ export function verifyGithubActionsAdapter(
     facts['main_bound'] =
       config['branch'] === 'main' && bytes.includes("github.ref == 'refs/heads/main'");
     facts['exact_sha_bound'] = bytes.includes('--at "$GITHUB_SHA"');
-    facts['package_auth_fallback_bound'] = bytes.includes(
-      'NODE_AUTH_TOKEN: ${{ secrets.DEVAI_REPO_TOKEN || secrets.GITHUB_TOKEN }}',
+    facts['package_auth_secret_bound'] = bytes.includes(
+      'NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}',
     );
+    facts['package_auth_fail_closed'] =
+      bytes.includes('if [ -z "${NODE_AUTH_TOKEN:-}" ]; then') &&
+      bytes.includes('PACKAGES_READ_TOKEN is required for GitHub Packages access');
+    facts['package_auth_no_repository_token_fallback'] =
+      !bytes.includes('secrets.DEVAI_REPO_TOKEN') &&
+      !/NODE_AUTH_TOKEN:.*secrets\.GITHUB_TOKEN/u.test(bytes);
     facts['oidc_enabled'] =
       bytes.includes('id-token: write') && bytes.includes('attest-build-provenance@');
     facts['audit_ref_only'] =

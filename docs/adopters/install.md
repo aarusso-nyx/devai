@@ -100,10 +100,11 @@ pnpm exec devai init bind --target . --host-adapter post-merge --as-role archite
 The GitHub adapter authenticates exact-main observations with GitHub OIDC. Its workflow may write
 only `refs/devai/post-merge/<sha>`, and only after both the dispatch input and repository consent
 variable authorize publication. Neither adapter claims control over arbitrary editors or shell
-commands. When DEVAI and the adopter are owned by different GitHub accounts, configure the adopter
-repository secret `DEVAI_REPO_TOKEN` with read-only access to the DEVAI package. The generated,
-digest-bound workflow uses that secret for package installation when present and otherwise falls
-back to the repository-scoped `GITHUB_TOKEN`; credentials remain environment-only.
+commands. Configure the adopter repository or protected environment secret
+`PACKAGES_READ_TOKEN` with read-only access to the DEVAI package. The generated, digest-bound
+workflow requires that secret for package installation and fails before installation when it is
+absent. It never falls back to the repository-scoped `GITHUB_TOKEN`; credentials remain
+environment-only.
 
 Core files and requested includes are preflighted before the first write and applied
 as one rollback-capable transaction. A preflight conflict writes nothing. If the
