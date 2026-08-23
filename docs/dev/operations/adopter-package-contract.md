@@ -1,6 +1,6 @@
-# DEVAI 1.2.5 adopter-package contract
+# DEVAI 1.2.6 adopter-package contract
 
-DEVAI 1.2.5 closes the adopter boundary at the installed public package. The package is the
+DEVAI 1.2.6 closes the adopter boundary at the installed public package. The package is the
 only DEVAI runtime dependency an adopter needs; a sibling source checkout, workspace link,
 local tarball override, private workspace package, or source-repository import is not part of
 the supported contract.
@@ -106,7 +106,7 @@ append and hash-link without rewriting prior bytes. Verification and `doctor` ac
 chain and reject malformed, truncated, reordered, or digest-mismatched records.
 
 There is no discovery, migration, or fallback for `.devai/state/evidence-chain.json`. That legacy
-path is outside the 1.2.5 contract.
+path is outside the 1.2.6 contract.
 
 For test evidence, the stable facade executes only the exact command declared by `--cmd`. The
 authority broker classifies that invocation as a non-publishing local test-runner operation; a
@@ -147,7 +147,7 @@ The exact candidate is accepted only after source gates and a package-only dispo
 both pass without interrupted or composite evidence. Package contents and integrity, action and
 schema populations, test census, mutation thresholds, audit findings, proof-chain behavior,
 idempotence, lockfile stability, and the absence of obsolete verifier reliance must all be
-reconciled. For 1.2.5, this includes rerunning TEAT's governed package-only evidence recording
+reconciled. For 1.2.6, this includes rerunning TEAT's governed package-only evidence recording
 against the exact packed candidate before publication; source-repository tests do not replace that
 adopter proof.
 Packaging, checking, and rehearsal do not authorize push, PR creation, merge, tag, GitHub Release,
