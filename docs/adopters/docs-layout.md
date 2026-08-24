@@ -50,3 +50,40 @@ mapping under `docs.ia.path_overrides` rather than maintaining a parallel tree.
 The documentation publication branch is inspected as repository state. A CI
 workflow must not publish documentation: publishing is an explicitly authorized
 local external effect. Build and link checks do not grant publication authority.
+
+## Upstream decision records
+
+The following references preserve the provenance of rules that DEVAI inherited. They
+are not live links or substitutes for the current product contracts: the historical
+ADR files predate this repository and were not carried forward. The enforceable
+behavior is documented on this page, in [CI economy](./ci-economy.md), and in the
+package-owned checks.
+
+| Current contract | Upstream provenance |
+| --- | --- |
+| `repo.kind` | `ADR-DOCS-GOVERNANCE` Decision 1 |
+| `docs.builder`, including the Docusaurus requirement for libraries | `ADR-DOCS-GOVERNANCE` Decisions 2 and 4 |
+| `docs/site/` | `ADR-DOCS-GOVERNANCE` Decision 5 |
+| Documentation-governance authority | `ADR-DOCS-GOVERNANCE` Decision 6 |
+| Publishing the Constitution in the documentation projection | `ADR-DOCS-IA` Decisions 4 and 8 |
+| `docs.ia.collapsed_sections` | `ADR-DOCS-IA` Decision 11 |
+| CI must not publish documentation | `ADR-LOCAL-PUBLISH-WORKFLOW` section 10 |
+| Local CI evidence | `ADR-CI-ECONOMY` Decisions 1-3 and 8 |
+
+## Documentation-governance rules
+
+The package-owned documentation-governance check evaluates these nine rules. The
+severity below is the rule's failure severity; successful evaluation is reported as
+`pass`.
+
+| Rule | Requirement | Severity |
+| --- | --- | --- |
+| `docs-governance.classification` | `repo.kind` is `library` or `application` | `fail` |
+| `docs-governance.builder-declared` | `docs.builder` is `docusaurus` or `jekyll` | `fail` |
+| `docs-governance.library-docusaurus-required` | Libraries use Docusaurus | `fail` |
+| `docs-governance.opt-out-adr-required` | An application using Jekyll supplies the required opt-out ADR | `fail` |
+| `docs-governance.site-dir-shape` | `docs/site/` has the files required by the selected builder | `fail` |
+| `docs-governance.build-toolchain` | The configured documentation build command dry-validates | `warn` |
+| `docs-governance.gh-pages-branch` | The configured publication branch exists on `origin` | `warn` |
+| `docs-governance.no-ci-publish` | No GitHub Actions workflow publishes documentation | `fail` |
+| `docs-governance.config-not-placeholder` | Docusaurus configuration has no scaffold or placeholder values | `fail` |
