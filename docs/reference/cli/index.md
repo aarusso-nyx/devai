@@ -213,6 +213,44 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   [authority/effects](./authority-effects.md); consume `check` and `evidence` results only under
   the separately governed release contract.
 
+### `audit` — Exact-commit audit
+
+- **Stable identifier and label:** `audit`; “Exact-commit audit.”
+- **Purpose and exact projection:** compute a deterministic scorecard or record a non-promoting
+  observation for one exact commit. Its exact leaves are the registry projection with `W = audit`.
+- **Prerequisites, tools, inputs, and defaults:** select an exact commit with `--at` and point
+  `--repo-root` at the repository. Observation also requires the declared evidence inputs and
+  tools shown by leaf help.
+- **Output and verdict:** scorecard returns a read-only calculation; observation records bounded
+  inventory, assessment, and backlog evidence. Neither output promotes readiness or authorizes a
+  release.
+- **Effect, consent, and cost:** `audit scorecard` is read-only. `audit observe` writes harness
+  evidence and requires the Auditor role plus `--write`. Cost is leaf-dependent and can be
+  external-dependent when an observation invokes external tooling.
+- **Use / do not use:** use for reproducible exact-commit assessment. Do not use an audit artifact
+  as authority to merge, publish, or close a round.
+- **Example:** `devai audit scorecard --at <full-sha> --repo-root . --format json`.
+- **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json);
+  persist or inspect related proof through `evidence`.
+
+### `triage` — Sensor-failure classification
+
+- **Stable identifier and label:** `triage`; “Sensor-failure classification.”
+- **Purpose and exact projection:** deterministically classify one SensorReading and record its
+  remediation route. Its exact leaf is the registry projection with `W = triage`.
+- **Prerequisites, tools, inputs, and defaults:** provide one schema-valid reading with `--input`.
+  The selected repository must provide the bound harness state required by leaf help.
+- **Output and verdict:** returns the classification and recorded route; inconclusive input always
+  escalates to a human and never becomes a positive claim.
+- **Effect, consent, and cost:** declared `harness-write`; requires the Inspector role and
+  `--write`. The deterministic classification is fast, while the resulting remediation work has
+  its own separately declared cost and authority.
+- **Use / do not use:** use after a sensor failure to choose a route. Do not use classification as
+  proof that remediation succeeded or as permission to mutate product code.
+- **Example:** `devai triage classify --input <reading.json> --as-role inspector --write`.
+- **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json);
+  return to `sense` for new observations and `check` for governed validation.
+
 ## Typical adoption-to-release journey
 
 This is a selection journey, not proof that any step has passed or that publication is

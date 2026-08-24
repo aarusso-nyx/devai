@@ -54,12 +54,10 @@ const GOVERNANCE_PROJECTION_EXCEPTION = 'writeGovernanceProjectionSync';
 const GOVERNANCE_PROJECTION_OWNER = 'packages/cli/src/commands/docs/governance-render.ts';
 const HOST_EFFECTS_MODULE = '@devai-nyx/authority';
 const CANONICAL_SOURCE_ROOTS = [
-  'packages/adapters/src',
   'packages/authority/src',
   'packages/cli/src',
   'packages/effects-check/src',
   'packages/evidence/src',
-  'packages/examples/src',
   'packages/loop/src',
   'packages/sensors/src',
   'packages/skills/src',

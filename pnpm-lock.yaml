@@ -60,8 +60,6 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
 
-  packages/adapters: {}
-
   packages/authority:
     dependencies:
       '@devai-nyx/utils':
@@ -173,8 +171,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
-
-  packages/examples: {}
 
   packages/loop:
     dependencies:
@@ -2446,7 +2442,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+      vitest: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(vite@8.1.5(@types/node@24.13.3)(yaml@2.9.0))
 
   '@vitest/expect@4.1.10':
     dependencies:

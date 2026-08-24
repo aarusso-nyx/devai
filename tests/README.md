@@ -11,7 +11,7 @@ None of them prepares or builds the workspace implicitly.
 
 The RC profile prepares and builds once, then executes one coverage node over
 the complete RC population: package, contract, integration, PostgreSQL, E2E,
-performance, soak, and containment tests. Every test is collected once by
+performance, and containment tests. Every test is collected once by
 `test:coverage:rc`; the narrower `test:db:rc`, `test:e2e:rc`,
 `test:performance:rc`, and `test:containment:rc` commands are diagnostic slices,
 not additional RC-profile work.
