@@ -132,6 +132,19 @@ function authorityRemediation(code: string, context: JsonRecord): string {
     return 'Add --write and --publish after reviewing the remote effect.';
   }
   if (code === 'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') {
+    const reason = String(context.reason ?? '');
+    if (reason === 'cwd escapes the repository') {
+      return 'The declared cwd must resolve inside the repository.';
+    }
+    if (reason === 'cwd does not exist') {
+      return 'The declared cwd must exist before the task can run.';
+    }
+    if (reason === 'cwd must be declared') {
+      return 'Declare the task cwd in the adopter-owned task descriptor.';
+    }
+    if (reason === 'shell must be false') {
+      return 'Declare an argv-based task with shell disabled.';
+    }
     const executable = String(context.executable ?? '<unknown>');
     const argv = Array.isArray(context.argv) ? JSON.stringify(context.argv) : '[]';
     const descriptor = String(context.descriptor_path ?? '<unknown>');
@@ -153,6 +166,8 @@ function authorityErrorCode(error: unknown): string | undefined {
 
 function authorityErrorContext(error: unknown): JsonRecord | undefined {
   if (!(error instanceof Error)) return undefined;
+  const attached = (error as Error & { readonly context?: unknown }).context;
+  if (isRecord(attached)) return attached;
   const separator = error.message.indexOf(':');
   if (separator < 0) return undefined;
   try {
@@ -352,10 +367,7 @@ function actionId(argv: readonly string[]): string {
 function targetFor(action: string): JsonRecord {
   return {
     kind: 'fs',
-    id:
-      action === 'init bind'
-        ? 'fs:.devai/config/authority-policy.json'
-        : 'fs:docs/reference/cli',
+    id: action === 'init bind' ? 'fs:.devai/config/authority-policy.json' : 'fs:docs/reference/cli',
     repository_id: 'adopter-repository',
     canonical_relative_path:
       action === 'init bind'

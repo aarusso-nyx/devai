@@ -183,8 +183,11 @@ function validatePolicySchema(value: unknown): AuthorityResult {
 }
 
 function authorityPolicySemantics(value: JsonRecord): JsonRecord {
-  const { materialized_at: _materializedAt, materialization: _materialization, ...semantics } =
-    value;
+  const {
+    materialized_at: _materializedAt,
+    materialization: _materialization,
+    ...semantics
+  } = value;
   return semantics;
 }
 
@@ -1287,9 +1290,11 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           input.entry.name === 'check'
             ? describeDeclaredCheckTaskRefusal(repositoryRoot, request)
             : undefined;
-        throw new Error(
-          `AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED${context === undefined ? '' : `:${JSON.stringify(context)}`}`,
-        );
+        const error = new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') as Error & {
+          context?: Readonly<Record<string, unknown>>;
+        };
+        if (context !== undefined) error.context = context;
+        throw error;
       }
       if (actionPlanner.kind === 'exact-plan') {
         throw new Error('AUTHORITY_EXACT_PROCESS_ADAPTER_REQUIRED');
