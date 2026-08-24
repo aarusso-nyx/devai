@@ -1,6 +1,13 @@
 import { spawnSync } from '@devai-nyx/authority';
-import { existsSync, lstatSync, readFileSync, readlinkSync, statSync } from '@devai-nyx/authority';
-import { dirname, join, resolve } from 'node:path';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+} from '@devai-nyx/authority';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import type { CAC } from 'cac';
@@ -30,6 +37,12 @@ import {
   ATTESTED_RC_WORKFLOW_FILE,
   attestedRcVerificationWorkflow,
 } from '../services/ci-scaffold/index.js';
+import {
+  ADOPTER_POLICY_TARGETS,
+  isJsonObject,
+  resolveAdopterPolicyMaterialization,
+  type JsonObject,
+} from '../services/adopter-policy.js';
 
 const DEFAULT_REPO_ROOT = '.';
 const DEFAULT_CHAIN_RELATIVE = 'record/proofs/chain.json';
@@ -142,6 +155,10 @@ function checkF1Paths(repoRoot: string): CheckResult {
 }
 
 function checkPolicyMaterializationCurrent(repoRoot: string): CheckResult {
+  const bindingRelative = '.devai/config/adopter-policy-binding.json';
+  const bindingPath = join(repoRoot, bindingRelative);
+  if (existsSync(bindingPath)) return checkAdopterPolicyMaterialization(repoRoot, bindingPath);
+
   const mismatches: Array<Record<string, string>> = [];
   for (const file of MATERIALIZED_POLICY_FILES) {
     const target = join(repoRoot, '.devai/config', file);
@@ -174,6 +191,296 @@ function checkPolicyMaterializationCurrent(repoRoot: string): CheckResult {
       ],
     }),
   };
+}
+
+interface AdopterPolicyBinding {
+  readonly schemaVersion: '1.0.0';
+  readonly policy_id: string;
+  readonly policy_version: string;
+  readonly source_path: string;
+  readonly source_digest_sha256: string;
+  readonly materialized: Readonly<Record<string, string>>;
+}
+
+function policyReasonId(words: string): string {
+  return words.toUpperCase().replaceAll('-', '_');
+}
+
+function parseAdopterPolicyBinding(
+  bytes: string,
+):
+  | { readonly binding: AdopterPolicyBinding }
+  | { readonly reason: 'BINDING_MALFORMED' | 'BINDING_VERSION_UNSUPPORTED' } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bytes);
+  } catch {
+    return { reason: 'BINDING_MALFORMED' };
+  }
+  if (!isJsonObject(parsed)) return { reason: 'BINDING_MALFORMED' };
+  if (parsed['schemaVersion'] !== '1.0.0') return { reason: 'BINDING_VERSION_UNSUPPORTED' };
+  const materialized = parsed['materialized'];
+  const digest = /^[a-f0-9]{64}$/u;
+  if (
+    typeof parsed['policy_id'] !== 'string' ||
+    parsed['policy_id'].length === 0 ||
+    typeof parsed['policy_version'] !== 'string' ||
+    parsed['policy_version'].length === 0 ||
+    typeof parsed['source_path'] !== 'string' ||
+    parsed['source_path'].length === 0 ||
+    typeof parsed['source_digest_sha256'] !== 'string' ||
+    !digest.test(parsed['source_digest_sha256']) ||
+    !isJsonObject(materialized) ||
+    !Object.values(materialized).every((value) => typeof value === 'string' && digest.test(value))
+  ) {
+    return { reason: 'BINDING_MALFORMED' };
+  }
+  return { binding: parsed as unknown as AdopterPolicyBinding };
+}
+
+function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string): CheckResult {
+  const reasons: string[] = [];
+  const errors: string[] = [];
+  const mismatches: Array<Record<string, string>> = [];
+  const addReason = (reason: string, message: string): void => {
+    if (!reasons.includes(reason)) reasons.push(reason);
+    errors.push(message);
+  };
+  const result = (source?: string): CheckResult => {
+    const remediationCommands =
+      source === undefined
+        ? []
+        : [`devai init bind --target . --adopter-policy ${source} --as-role architect --write`];
+    return {
+      name: 'policy-materialization-current',
+      ok: reasons.length === 0,
+      info: {
+        binding: '.devai/config/adopter-policy-binding.json',
+        reason_ids: reasons,
+        mismatches,
+        remediation_commands: remediationCommands,
+      },
+      ...(errors.length > 0 && { errors }),
+    };
+  };
+
+  let parsedBinding: ReturnType<typeof parseAdopterPolicyBinding>;
+  try {
+    if (lstatSync(bindingPath).isSymbolicLink() || !lstatSync(bindingPath).isFile()) {
+      throw new Error('binding must be a regular file');
+    }
+    parsedBinding = parseAdopterPolicyBinding(readFileSync(bindingPath, 'utf8'));
+  } catch {
+    addReason('BINDING_MALFORMED', 'adopter-policy binding cannot be read');
+    return result();
+  }
+  if ('reason' in parsedBinding) {
+    addReason(parsedBinding.reason, `adopter-policy binding rejected: ${parsedBinding.reason}`);
+    return result();
+  }
+  const binding = parsedBinding.binding;
+
+  const expectedTargets = [...ADOPTER_POLICY_TARGETS];
+  const receiptTargets = Object.keys(binding.materialized).sort();
+  if (
+    receiptTargets.length !== expectedTargets.length ||
+    expectedTargets.some((target) => !receiptTargets.includes(target))
+  ) {
+    addReason(
+      'TARGET_SET_MISMATCH',
+      'adopter-policy binding must contain the exact complete materialized target set',
+    );
+  }
+
+  const sourceLexical = binding.source_path;
+  const normalizedSource = sourceLexical.split('/').join(sep);
+  const sourceCandidate = resolve(repoRoot, normalizedSource);
+  const lawPolicyCandidate = resolve(repoRoot, 'law/policy');
+  const lexicalRelative = relative(lawPolicyCandidate, sourceCandidate);
+  if (
+    sourceLexical.startsWith('/') ||
+    lexicalRelative.length === 0 ||
+    lexicalRelative === '..' ||
+    lexicalRelative.startsWith(`..${sep}`)
+  ) {
+    addReason(
+      'SOURCE_PATH_OUTSIDE_LAW_POLICY',
+      'adopter-policy binding source must be a file beneath law/policy',
+    );
+    return result();
+  }
+
+  if (!existsSync(sourceCandidate)) {
+    addReason('SOURCE_MISSING', `adopter-policy source is missing: ${sourceLexical}`);
+    return result(sourceLexical);
+  }
+  try {
+    const lawPolicyRoot = realpathSync(lawPolicyCandidate);
+    const sourcePath = realpathSync(sourceCandidate);
+    const sourceRelative = relative(lawPolicyRoot, sourcePath);
+    if (
+      sourceRelative.length === 0 ||
+      sourceRelative === '..' ||
+      sourceRelative.startsWith(`..${sep}`)
+    ) {
+      addReason(
+        'SOURCE_PATH_OUTSIDE_LAW_POLICY',
+        'adopter-policy binding source resolves outside law/policy',
+      );
+      return result();
+    }
+  } catch {
+    addReason('SOURCE_MISSING', `adopter-policy source cannot be resolved: ${sourceLexical}`);
+    return result(sourceLexical);
+  }
+  let sourceBytes: string;
+  try {
+    if (!lstatSync(sourceCandidate).isFile()) throw new Error('source must be a file');
+    sourceBytes = readFileSync(sourceCandidate, 'utf8');
+  } catch {
+    addReason(
+      'SOURCE_POLICY_INVALID',
+      `adopter-policy source is not a regular file: ${sourceLexical}`,
+    );
+    return result(sourceLexical);
+  }
+  const actualSourceDigest = createHash('sha256').update(sourceBytes).digest('hex');
+  if (actualSourceDigest !== binding.source_digest_sha256) {
+    addReason('SOURCE_DIGEST_MISMATCH', `adopter-policy source digest differs: ${sourceLexical}`);
+    return result(sourceLexical);
+  }
+
+  let policy: unknown;
+  try {
+    policy = JSON.parse(sourceBytes);
+    const validatePolicy = validators.adopterPolicy;
+    if (!validatePolicy(policy)) throw new Error('schema');
+  } catch {
+    addReason('SOURCE_POLICY_INVALID', `adopter-policy source is invalid: ${sourceLexical}`);
+    return result(sourceLexical);
+  }
+  const policyDocument = policy as JsonObject;
+  if (
+    policyDocument['policy_id'] !== binding.policy_id ||
+    policyDocument['policy_version'] !== binding.policy_version
+  ) {
+    addReason(
+      policyReasonId('policy-identity-mismatch'),
+      'adopter-policy source identity differs from the binding receipt',
+    );
+  }
+
+  const projectRelative = '.devai/config/project.json';
+  const projectPath = join(repoRoot, projectRelative);
+  let currentProject: unknown = {};
+  const projectExists = existsSync(projectPath);
+  if (projectExists) {
+    try {
+      currentProject = JSON.parse(readFileSync(projectPath, 'utf8'));
+    } catch {
+      addReason('TARGET_BYTES_MISMATCH', `materialized target is invalid: ${projectRelative}`);
+    }
+  } else {
+    addReason('TARGET_MISSING', `materialized target is missing: ${projectRelative}`);
+    mismatches.push({
+      file: projectRelative,
+      actual_sha256: 'missing',
+      expected_sha256: 'unknown',
+    });
+  }
+  const boundVersion = isJsonObject(currentProject) ? currentProject['devai_version'] : undefined;
+  const installedVersion = resolveCliVersion();
+  if (boundVersion !== installedVersion) {
+    addReason(
+      'FRAMEWORK_VERSION_MISMATCH',
+      `bound DEVAI version ${String(boundVersion ?? 'missing')} differs from installed DEVAI version ${installedVersion}`,
+    );
+  }
+
+  let expected: ReadonlyMap<string, string>;
+  try {
+    expected = resolveAdopterPolicyMaterialization({
+      policy,
+      currentProject,
+      frameworkVersion: installedVersion,
+    });
+  } catch {
+    if (!projectExists) return result(sourceLexical);
+    addReason(
+      'SOURCE_POLICY_INVALID',
+      `adopter-policy source cannot be materialized: ${sourceLexical}`,
+    );
+    return result(sourceLexical);
+  }
+
+  for (const targetRelative of ADOPTER_POLICY_TARGETS) {
+    const expectedBytes = expected.get(targetRelative);
+    if (expectedBytes === undefined) continue;
+    const expectedDigest = createHash('sha256').update(expectedBytes).digest('hex');
+    const receiptDigest = binding.materialized[targetRelative];
+    if (receiptDigest !== expectedDigest) {
+      addReason(
+        policyReasonId('receipt-hash-mismatch'),
+        `binding receipt hash differs from recomputed materialization: ${targetRelative}`,
+      );
+    }
+    const targetPath = join(repoRoot, targetRelative);
+    if (!existsSync(targetPath)) {
+      addReason('TARGET_MISSING', `materialized target is missing: ${targetRelative}`);
+      mismatches.push({
+        file: targetRelative,
+        actual_sha256: 'missing',
+        expected_sha256: expectedDigest,
+      });
+      continue;
+    }
+    let actual: Buffer;
+    try {
+      if (!lstatSync(targetPath).isFile()) throw new Error('target must be a file');
+      actual = readFileSync(targetPath);
+    } catch {
+      addReason(
+        'TARGET_BYTES_MISMATCH',
+        `materialized target is not a regular file: ${targetRelative}`,
+      );
+      mismatches.push({
+        file: targetRelative,
+        actual_sha256: 'unreadable',
+        expected_sha256: expectedDigest,
+      });
+      continue;
+    }
+    const actualDigest = createHash('sha256').update(actual).digest('hex');
+    if (
+      lstatSync(targetPath).isSymbolicLink() ||
+      !actual.equals(Buffer.from(expectedBytes, 'utf8'))
+    ) {
+      addReason('TARGET_BYTES_MISMATCH', `materialized target differs: ${targetRelative}`);
+      mismatches.push({
+        file: targetRelative,
+        actual_sha256: actualDigest,
+        expected_sha256: expectedDigest,
+      });
+    }
+  }
+
+  for (const file of ['forbidden-actions.json', 'subprocess-effects.json'] as const) {
+    const targetRelative = `.devai/config/${file}`;
+    const targetPath = join(repoRoot, targetRelative);
+    const installed = Buffer.from(resolveCanonicalPolicyContent(file), 'utf8');
+    const actual = existsSync(targetPath) ? readFileSync(targetPath) : undefined;
+    if (actual === undefined) {
+      addReason('TARGET_MISSING', `materialized target is missing: ${targetRelative}`);
+    } else if (lstatSync(targetPath).isSymbolicLink() || !actual.equals(installed)) {
+      addReason('TARGET_BYTES_MISMATCH', `materialized target differs: ${targetRelative}`);
+      mismatches.push({
+        file: targetRelative,
+        actual_sha256: createHash('sha256').update(actual).digest('hex'),
+        expected_sha256: createHash('sha256').update(installed).digest('hex'),
+      });
+    }
+  }
+  return result(sourceLexical);
 }
 
 function checkEvidenceChain(chainPath: string): CheckResult {
