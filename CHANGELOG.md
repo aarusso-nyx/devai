@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.9 — 2026-08-24
+
+- Corrects the published landing-page package version and binds it to the package manifest with a
+  regression test.
+- Makes the post-deployment Pages check retry successful-but-stale responses with cache-busting
+  requests before accepting the live release.
+
 ## 1.2.8 — 2026-08-24
 
 - Requires Git work-tree targets for initialization without adding a Git subprocess capability,

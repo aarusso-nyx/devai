@@ -497,8 +497,19 @@ jobs:
         run: |
           set -euo pipefail
           root='https://aarusso-nyx.github.io/devai/'
-          home="$(curl --fail --location --retry 8 --retry-delay 5 "$root")"
-          grep -F "@aarusso-nyx/devai@${RELEASE_TAG#v}" <<<"$home"
+          expected="@aarusso-nyx/devai@${RELEASE_TAG#v}"
+          for attempt in {1..12}; do
+            if home="$(curl --fail --location --silent --show-error "${root}?release=${RELEASE_TAG#v}&attempt=$attempt")" &&
+              grep -Fq "$expected" <<<"$home"; then
+              printf '%s\n' "$expected"
+              break
+            fi
+            if test "$attempt" -eq 12; then
+              echo "Published documentation did not expose $expected after 12 attempts." >&2
+              exit 1
+            fi
+            sleep 5
+          done
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/adopters/install" >/dev/null
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/reference/cli" >/dev/null
 

@@ -328,6 +328,9 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('dist-tags.$PACKAGE_DIST_TAG');
     expect(release).not.toContain('npm publish "$source_tgz" --tag next');
     expect(release).not.toContain('test:coverage');
+    expect(release).toContain('for attempt in {1..12}');
+    expect(release).toContain('grep -Fq "$expected"');
+    expect(release).toContain('?release=${RELEASE_TAG#v}&attempt=$attempt');
     expect(discipline).toContain('The tag-push path verifies the uploaded workflow artifact');
     expect(discipline).toContain(
       '`publish: true` is the only path that may create or verify the canonical Release',
