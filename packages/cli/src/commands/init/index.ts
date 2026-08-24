@@ -234,12 +234,16 @@ function segmentedPlan(plan: ReturnType<typeof buildBootstrapPlan>, segment: Ini
     }
     if (segment === 'architect') {
       return (
+        entry.path === 'AGENTS.md' ||
+        entry.path === 'CLAUDE.md' ||
         entry.path.startsWith('docs/') ||
         entry.path.startsWith('work/') ||
         (entry.path.startsWith('law/') && !entry.path.startsWith('law/glossary/'))
       );
     }
     return (
+      entry.path !== 'AGENTS.md' &&
+      entry.path !== 'CLAUDE.md' &&
       !entry.path.startsWith('product/') &&
       !entry.path.startsWith('docs/') &&
       !entry.path.startsWith('work/') &&

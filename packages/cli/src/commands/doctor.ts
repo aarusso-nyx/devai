@@ -700,6 +700,7 @@ interface CheckSpec {
 const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'f1-paths-present',
+    minProfile: 'tier3',
     run: (repoRoot) => checkF1Paths(repoRoot),
   },
   {
@@ -708,6 +709,7 @@ const CHECK_SPECS: readonly CheckSpec[] = [
   },
   {
     name: 'agents-claude-sync',
+    minProfile: 'tier3',
     run: (repoRoot) => checkAgentsClaudeSync(repoRoot),
   },
   {

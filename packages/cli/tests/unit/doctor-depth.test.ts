@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { CAC } from 'cac';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
+import { buildBootstrapPlan, executeBootstrapPlan } from '../../../skills/src/bootstrap/index.js';
 import { doctor } from '../../src/commands/doctor.js';
 
 const originalExit = process.exit;
@@ -123,5 +124,30 @@ describe('adopter doctor report depth', () => {
     expect(names).not.toContain('schemas-loadable');
     expect(names).not.toContain('test-trace');
     expect(names).toContain('authority-enforcement');
+  });
+});
+
+describe('tier1 adoption doctor regression', () => {
+  const roots: string[] = [];
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reports green after materializing the documented tier1 bootstrap', async () => {
+    const adopter = mkdtempSync(join(tmpdir(), 'devai-doctor-tier1-'));
+    roots.push(adopter);
+    await withAuthorityHostTestScope(() =>
+      executeBootstrapPlan(
+        buildBootstrapPlan({ targetRoot: adopter, version: '1.2.6', profile: 'tier1' }),
+      ),
+    );
+
+    const result = await run({ repoRoot: adopter, human: true });
+    expect(result.exit).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('devai doctor [profile=tier1]: OK');
+    expect(result.stdout).toContain('f1-paths-present (advisory: above declared profile)');
+    expect(result.stdout).toContain('agents-claude-sync (advisory: above declared profile)');
   });
 });
