@@ -224,6 +224,12 @@ function isConstitutionBootstrap(input: BrokerInput): boolean {
   );
 }
 
+function isFullBindingBootstrap(input: BrokerInput): boolean {
+  return (
+    input.bootstrap_policy && input.entry.name === 'init bind' && input.argv.includes('--full')
+  );
+}
+
 const SAFE_UNBOUND_READ_ACTIONS = new Set([
   'audit scorecard',
   'catalog actions',
@@ -232,7 +238,11 @@ const SAFE_UNBOUND_READ_ACTIONS = new Set([
 ]);
 
 function usesInstalledConstitution(input: BrokerInput): boolean {
-  return isConstitutionBootstrap(input) || SAFE_UNBOUND_READ_ACTIONS.has(input.entry.name);
+  return (
+    isConstitutionBootstrap(input) ||
+    isFullBindingBootstrap(input) ||
+    SAFE_UNBOUND_READ_ACTIONS.has(input.entry.name)
+  );
 }
 
 function policyFor(input: BrokerInput, now: string) {

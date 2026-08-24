@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.9
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.10
 pnpm exec devai catalog actions --format json
 ```
 
@@ -48,6 +48,17 @@ Planning does not authorize an apply.
 Bind the installed package contracts before applying the projection. These commands
 resolve canonical sources from the installed package, persist `profile` and
 `devai_version`, and materialize the runtime authority policy explicitly.
+
+```bash
+pnpm exec devai init bind --full --target . --tier tier1 --as-role architect --write
+```
+
+`--full` is the blessed fresh-repository bootstrap. Under one Architect declaration and one
+write consent it performs the same four binding segments in order and emits a result for each:
+Constitution, operational law, subprocess effects, then the derived authority policy. It does
+not run any `init apply` projection.
+
+For stepwise diagnosis or recovery, the equivalent sequence is:
 
 ```bash
 pnpm exec devai init bind --target . --tier tier1 --constitution --as-role architect --write

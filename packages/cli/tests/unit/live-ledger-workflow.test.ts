@@ -298,7 +298,7 @@ describe('live ledger-verification workflow', () => {
     expect(result.stderr).toContain('CI_OBSOLETE_WORKFLOW_PRESENT');
   });
 
-  it('keeps publication explicit and rehearsal non-publishing, ledger-bound, and coverage-free', () => {
+  it('keeps tag publication single-triggered and recovery idempotent, ledger-bound, and coverage-free', () => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const discipline = readFileSync(
       join(ROOT, 'docs/dev/operations/release-discipline.md'),
@@ -310,18 +310,18 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain("tags: ['v*']");
     expect(release).toContain('workflow_dispatch:');
     expect(release).toContain(
-      "if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}",
+      "if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}",
     );
     expect(release).toContain(
-      "if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}",
+      "if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}",
     );
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 44');
     expect(release).toContain('pnpm run release:closure');
     expect(release).toContain('--binding exact-tree');
-    expect(release).toContain(
-      'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
-    );
+    expect(release).toContain('sbom_subject_sha256');
+    expect(release).toContain('Verify npm adopter quickstart on Linux');
+    expect(release).toContain("task.disposition === 'reused'");
     expect(release).not.toContain('--package-lock-only');
     expect(release).toContain('--tag "$PACKAGE_DIST_TAG"');
     expect(release).toContain('if test "$RELEASE_IS_PRERELEASE" = true');
@@ -331,13 +331,8 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('for attempt in {1..12}');
     expect(release).toContain('grep -Fq "$expected"');
     expect(release).toContain('?release=${RELEASE_TAG#v}&attempt=$attempt');
-    expect(discipline).toContain('The tag-push path verifies the uploaded workflow artifact');
-    expect(discipline).toContain(
-      '`publish: true` is the only path that may create or verify the canonical Release',
-    );
-    expect(discipline).not.toContain(
-      'publication and Pages jobs are structurally restricted to a version-tag `push`',
-    );
+    expect(discipline).toContain('signed annotated version tag is the normal single trigger');
+    expect(discipline).toContain('`workflow_dispatch` is an idempotent recovery entry point');
   });
 
   it('binds workflow, documentation, and release scripts into the RC task key', () => {
@@ -398,11 +393,7 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'lockfile-only SBOM dependency preparation',
-      mutate: (source: string) =>
-        source.replace(
-          'install --omit=dev --ignore-scripts',
-          'install --package-lock-only --ignore-scripts',
-        ),
+      mutate: (source: string) => source.replace('sbom_subject_sha256', '--package-lock-only'),
       diagnostic: 'RELEASE_SBOM_LOCKFILE_ONLY_FORBIDDEN',
     },
     {
@@ -425,7 +416,7 @@ describe('live ledger-verification workflow', () => {
       name: 'rehearsal publication guard removal',
       mutate: (source: string) =>
         source.replace(
-          "    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}\n",
+          "    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}\n",
           '',
         ),
       diagnostic: 'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',

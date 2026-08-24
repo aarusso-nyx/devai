@@ -264,6 +264,44 @@ const CURRENT_ONLY_SELECTORS = new Set([
   'translation',
 ]);
 
+export function knownCheckMembers(repoRoot: string): readonly string[] {
+  return [
+    ...new Set([
+      ...loadCheckSuitePolicy(repoRoot).member_definitions.map((member) => member.id),
+      ...CURRENT_ONLY_SELECTORS,
+    ]),
+  ].sort();
+}
+
+function editDistance(left: string, right: string): number {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let previous = row[0] ?? 0;
+    row[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const saved = row[rightIndex] ?? 0;
+      row[rightIndex] = Math.min(
+        (row[rightIndex] ?? 0) + 1,
+        (row[rightIndex - 1] ?? 0) + 1,
+        previous + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+      previous = saved;
+    }
+  }
+  return row[right.length] ?? Math.max(left.length, right.length);
+}
+
+export function suggestCheckMembers(repoRoot: string, input: string): readonly string[] {
+  return knownCheckMembers(repoRoot)
+    .map((member) => ({ member, distance: editDistance(input, member) }))
+    .filter(({ distance }) => distance <= 2)
+    .sort(
+      (left, right) => left.distance - right.distance || left.member.localeCompare(right.member),
+    )
+    .slice(0, 3)
+    .map(({ member }) => member);
+}
+
 function maximumEffect(members: readonly CheckMemberDefinition[]): ExecutorEffect {
   return members.reduce<ExecutorEffect>(
     (current, member) =>

@@ -123,7 +123,11 @@ function authorityRemediation(code: string, context: JsonRecord): string {
       : `This action's effect is '${String(context.effect ?? 'read')}'; remove the authority declaration.`;
   }
   if (code === 'AUTHORITY_POLICY_MISSING') {
-    return `Run: ${String(context.command ?? 'devai init bind --target <repo> --as-role architect --write')}`;
+    const commands = Array.isArray(context.commands) ? context.commands.map(String) : [];
+    if (commands.length > 1) {
+      return `Run in order:\n${commands.map((command, index) => `${String(index + 1)}. ${command}`).join('\n')}`;
+    }
+    return `Run: ${String(commands[0] ?? context.command ?? 'devai init bind --target <repo> --as-role architect --write')}`;
   }
   if (code === 'AUTHORITY_WRITE_CONSENT_REQUIRED') {
     return 'Add --write after reviewing the action plan.';
@@ -445,10 +449,20 @@ function taggedAuthorityFailure(
 ): TaggedFailure {
   if (code === 'AUTHORITY_POLICY_MISSING') {
     const repositoryRoot = targetRoot(entry, argv);
+    const plainBind = `devai init bind --target ${repositoryRoot} --as-role architect --write`;
+    const commands = existsSync(resolve(repositoryRoot, '.devai/pin/constitution.md'))
+      ? [plainBind]
+      : [
+          `devai init bind --target ${repositoryRoot} --tier tier1 --constitution --as-role architect --write`,
+          `devai init bind --target ${repositoryRoot} --operational-law --as-role architect --write`,
+          `devai init bind --target ${repositoryRoot} --subprocess-effects --as-role architect --write`,
+          plainBind,
+        ];
     return taggedFailure(category, code, {
       action_id: entry.name,
       repository_root: repositoryRoot,
-      command: `devai init bind --target ${repositoryRoot} --as-role architect --write`,
+      command: commands[0],
+      commands,
     });
   }
   return taggedFailure(category, code, { action_id: entry.name });

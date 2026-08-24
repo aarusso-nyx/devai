@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.10 — 2026-08-24
+
+- Excludes `.devai/state/`, `record/`, and `scratch/` at the task-snapshot boundary so glob
+  selectors never consume harness writes, while source and `.devai/config/` changes still
+  invalidate cached results.
+- Makes missing-policy remediation sequence-aware, adds the explicit `init bind --full`
+  bootstrap, rejects stray `check` positionals, and suggests nearby canonical member names.
+- Documents scoped cache selectors, the reserved `test:local-full` closure root, and the RC
+  database prerequisite; local-root refusals now link directly to that contract.
+- Generates a drift-checked error-code reference from runtime diagnostic and exit-taxonomy
+  sources.
+- Stages a CycloneDX SBOM with every deterministic package pair and binds its subject SHA-256 to
+  the tarball, makes an authorized signed tag the end-to-end publication trigger with manual
+  dispatch retained for idempotent recovery, and gates publication on a fresh npm adopter run on
+  Ubuntu.
+
 ## 1.2.9 — 2026-08-24
 
 - Corrects the published landing-page package version and binds it to the package manifest with a

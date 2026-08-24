@@ -1,7 +1,7 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: every current action reaches the production authority
 // pre-dispatch boundary and exposes its required refusal in both output formats.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -93,11 +93,49 @@ describe('canonical production authority refusal acceptance', () => {
         current,
       );
       expect(missing).toBeDefined();
-      expect(JSON.parse(missing?.stderr ?? '{}')).toMatchObject({
+      const missingEnvelope = JSON.parse(missing?.stderr ?? '{}') as {
+        remediation: string;
+        context: { commands: string[] };
+      };
+      expect(missingEnvelope).toMatchObject({
+        code: 'AUTHORITY_POLICY_MISSING',
+        refs: { doc: 'docs/adopters/install.md' },
+        context: {
+          repository_root: unbound,
+          commands: [
+            `devai init bind --target ${unbound} --tier tier1 --constitution --as-role architect --write`,
+            `devai init bind --target ${unbound} --operational-law --as-role architect --write`,
+            `devai init bind --target ${unbound} --subprocess-effects --as-role architect --write`,
+            `devai init bind --target ${unbound} --as-role architect --write`,
+          ],
+        },
+      });
+      expect(missingEnvelope.remediation).toContain(
+        `1. devai init bind --target ${unbound} --tier tier1 --constitution`,
+      );
+
+      mkdirSync(join(unbound, '.devai/pin'), { recursive: true });
+      writeFileSync(join(unbound, '.devai/pin/constitution.md'), '# bound\n', 'utf8');
+      const policyOnly = authorizeCliArgv(
+        [
+          process.execPath,
+          'devai',
+          'check',
+          '--suite',
+          'standard',
+          '--repo-root',
+          unbound,
+          '--format',
+          'json',
+        ],
+        current,
+      );
+      expect(JSON.parse(policyOnly?.stderr ?? '{}')).toMatchObject({
         code: 'AUTHORITY_POLICY_MISSING',
         remediation: `Run: devai init bind --target ${unbound} --as-role architect --write`,
-        refs: { doc: 'docs/adopters/install.md' },
-        context: { repository_root: unbound },
+        context: {
+          commands: [`devai init bind --target ${unbound} --as-role architect --write`],
+        },
       });
     } finally {
       rmSync(unbound, { recursive: true, force: true });

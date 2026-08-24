@@ -1,8 +1,10 @@
 import type { RegistryEntry } from './define-command.js';
+import { resolve } from 'node:path';
 import { isSensorKind } from '@devai-nyx/sensors/registry';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import { cliError, renderCliError } from './cli-error.js';
 import { resolveInvocationEntry } from './authority/sense-selection.js';
+import { knownCheckMembers, suggestCheckMembers } from './commands/check/contracts.js';
 
 export { EXIT_USAGE };
 
@@ -170,6 +172,25 @@ function flagValue(args: readonly string[], flag: string): string | undefined {
   return value === undefined || value.startsWith('-') ? undefined : value;
 }
 
+function positionalArguments(args: readonly string[], entry: RegistryEntry): readonly string[] {
+  const valueOptions = new Set(
+    (entry.runtime_options ?? [])
+      .filter((option) => /[<[]/u.test(option.flags))
+      .map((option) => option.flags.split(/\s/u)[0]),
+  );
+  const positionals: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index] ?? '';
+    if (argument.startsWith('-')) {
+      const flag = argument.split('=')[0];
+      if (!argument.includes('=') && flag !== undefined && valueOptions.has(flag)) index += 1;
+      continue;
+    }
+    positionals.push(argument);
+  }
+  return positionals;
+}
+
 function usageRefusal(
   args: readonly string[],
   code: string,
@@ -283,6 +304,40 @@ export function routeArgv(
         exitCode: 0,
       };
     }
+    const leadingPositionals = words.slice(exact.path.length);
+    const unexpectedPositionals =
+      leadingPositionals.length > 0
+        ? leadingPositionals
+        : exact.runtime_options === undefined
+          ? []
+          : positionalArguments(remaining, exact);
+    if (
+      unexpectedPositionals.length > 0 &&
+      (exact.runtime_args ?? '') === '' &&
+      exact.name !== 'sense run'
+    ) {
+      const argument = unexpectedPositionals[0] ?? '';
+      if (exact.name === 'check') {
+        const repoRoot = resolve(flagValue(remaining, '--repo-root') ?? '.');
+        const knownMember = knownCheckMembers(repoRoot).includes(argument);
+        return usageRefusal(
+          args,
+          'CHECK_SELECTION_INVALID',
+          `Check selection is invalid: unexpected argument "${argument}".`,
+          knownMember
+            ? `Use --only ${argument} to run one member, or --suite <name> for a suite.`
+            : 'Use --only <member> to run one member, or --suite <name> for a suite.',
+          { argument, known_member: knownMember },
+        );
+      }
+      return usageRefusal(
+        args,
+        'ROUTE_UNEXPECTED_ARGUMENT',
+        `${exact.name} does not accept positional argument "${argument}".`,
+        `Run devai ${exact.name} --help and pass named options only.`,
+        { action_id: exact.name, argument },
+      );
+    }
     if (exact.path[0] === 'task' && flagValue(remaining, '--round') === undefined) {
       return {
         kind: 'output',
@@ -362,15 +417,18 @@ export function routeArgv(
       );
     }
     if (exact.internal_name === 'init-bind') {
-      const selectors = ['--constitution', '--subprocess-effects', '--operational-law'].filter(
-        (selector) => remaining.includes(selector),
-      );
+      const selectors = [
+        '--full',
+        '--constitution',
+        '--subprocess-effects',
+        '--operational-law',
+      ].filter((selector) => remaining.includes(selector));
       if (selectors.length > 1) {
         return usageRefusal(
           args,
           'INIT_BIND_SELECTION_INVALID',
           'init bind accepts only one binding selector per invocation.',
-          'Choose one of --constitution, --subprocess-effects, or --operational-law.',
+          'Choose one of --full, --constitution, --subprocess-effects, or --operational-law.',
           { selectors },
         );
       }
@@ -380,18 +438,39 @@ export function routeArgv(
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const check = exact.name === 'check';
+      const unknownMember = check ? /^CHECK_MEMBER_UNKNOWN:(.+)$/u.exec(detail)?.[1] : undefined;
+      const suggestions =
+        unknownMember === undefined
+          ? []
+          : suggestCheckMembers(resolve(flagValue(remaining, '--repo-root') ?? '.'), unknownMember);
       const refusal = cliError({
-        code: check ? 'CHECK_SELECTION_INVALID' : 'SENSE_SELECTION_INVALID',
+        code:
+          unknownMember !== undefined
+            ? 'CHECK_MEMBER_UNKNOWN'
+            : check
+              ? 'CHECK_SELECTION_INVALID'
+              : 'SENSE_SELECTION_INVALID',
         class: 'routing-authority',
         exit: EXIT_USAGE,
-        message: `${check ? 'Check' : 'Sense'} selection is invalid: ${detail}.`,
-        remediation: check
-          ? 'Choose one canonical suite or member, then retry.'
-          : 'Choose one registered kind or one canonical --preset, then retry.',
+        message:
+          unknownMember === undefined
+            ? `${check ? 'Check' : 'Sense'} selection is invalid: ${detail}.`
+            : `Check member is unknown: "${unknownMember}".`,
+        remediation:
+          unknownMember !== undefined
+            ? suggestions.length > 0
+              ? `Did you mean ${suggestions.map((member) => `--only ${member}`).join(', ')}?`
+              : 'Run devai check --help and choose a canonical member.'
+            : check
+              ? 'Choose one canonical suite or member, then retry.'
+              : 'Choose one registered kind or one canonical --preset, then retry.',
         refs: {
           doc: check ? 'law/policy/check-suites.json' : 'law/policy/sense-presets.json',
         },
-        context: { detail },
+        context: {
+          detail,
+          ...(unknownMember !== undefined && { member: unknownMember, suggestions }),
+        },
       });
       return {
         kind: 'output',

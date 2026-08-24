@@ -202,6 +202,24 @@ export const checkCmd = defineCommand({
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (
+            message.startsWith(
+              'CHECK_RUNNER_DESCRIPTOR: local target requires a node named test:local-full',
+            )
+          ) {
+            const diagnostic = cliError({
+              code: 'CHECK_RUNNER_DESCRIPTOR',
+              class: 'precondition',
+              exit: EXIT_PRECONDITION,
+              message: message.replace(/^CHECK_RUNNER_DESCRIPTOR:\s*/u, ''),
+              remediation:
+                'Declare test:local-full in test-tasks.json, or select --rc / --affected.',
+              refs: { doc: 'docs/adopters/test-tasks.md#local-closure-root' },
+            });
+            process.stderr.write(renderCliError(diagnostic, options.human !== true));
+            process.exitCode = EXIT_PRECONDITION;
+            return;
+          }
+          if (
             message.startsWith('CHECK_TASK_DESCRIPTOR_MISSING:') ||
             message.startsWith('CHECK_RC_DB_TESTS_REQUIRED:')
           ) {

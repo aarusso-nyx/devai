@@ -10,6 +10,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -119,6 +120,51 @@ try {
   mkdirSync(outputRoot, { recursive: true });
   const output = join(outputRoot, basename(first.tarball));
   copyFileSync(first.tarball, output);
+  const sbomRoot = join(temporaryRoot, 'sbom');
+  mkdirSync(sbomRoot, { recursive: true });
+  execFileSync('tar', ['-xzf', output, '-C', sbomRoot]);
+  const sbomPackageRoot = join(sbomRoot, 'package');
+  execFileSync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
+    cwd: sbomPackageRoot,
+    stdio: 'pipe',
+  });
+  const sbom = join(outputRoot, `devai-${manifest.version}.cdx.json`);
+  const npmExecPath = realpathSync(execFileSync('which', ['npm'], { encoding: 'utf8' }).trim());
+  execFileSync(
+    join(repositoryRoot, 'node_modules/.bin/cyclonedx-npm'),
+    [
+      '--omit',
+      'dev',
+      '--output-reproducible',
+      '--validate',
+      '--mc-type',
+      'application',
+      '--output-format',
+      'JSON',
+      '--output-file',
+      sbom,
+      join(sbomPackageRoot, 'package.json'),
+    ],
+    {
+      cwd: sbomPackageRoot,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        npm_execpath: npmExecPath,
+        npm_node_execpath: process.execPath,
+        npm_config_user_agent: 'npm',
+      },
+    },
+  );
+  const sbomDocument = JSON.parse(readFileSync(sbom, 'utf8'));
+  if (JSON.stringify(sbomDocument).includes('@devai-nyx/')) {
+    throw new Error('RELEASE_SBOM_PRIVATE_WORKSPACE_PACKAGE');
+  }
+  if (typeof sbomDocument.metadata?.component !== 'object') {
+    throw new Error('RELEASE_SBOM_SUBJECT_MISSING');
+  }
+  sbomDocument.metadata.component.hashes = [{ alg: 'SHA-256', content: first.sha256 }];
+  writeFileSync(sbom, `${JSON.stringify(sbomDocument, null, 2)}\n`);
   process.stdout.write(
     `${JSON.stringify({
       schemaVersion: '1.0.0',
@@ -126,6 +172,9 @@ try {
       version: manifest.version,
       tarball: output,
       sha256: first.sha256,
+      sbom,
+      sbom_sha256: digest(sbom),
+      sbom_subject_sha256: first.sha256,
       files: first.files.length,
       secondary_bins: Object.keys(secondaryBins).sort(),
       reproductions: 2,
