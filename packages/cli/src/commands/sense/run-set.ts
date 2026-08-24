@@ -189,6 +189,12 @@ export async function executeResolvedSenseSelection(
         na: status === 'skipped',
       });
     } catch (error) {
+      if (
+        error instanceof Error &&
+        /^OPTIONAL_DEPENDENCY_MISSING:[A-Za-z0-9@/._-]+$/u.test(error.message)
+      ) {
+        throw error;
+      }
       results.push({
         command: `devai sense run ${member.kind}`,
         processStatus: null,
@@ -260,6 +266,12 @@ export const senseRunSetCmd = defineCommand({
           }
           process.exitCode = aggregate.exit_code;
         } catch (error) {
+          if (
+            error instanceof Error &&
+            /^OPTIONAL_DEPENDENCY_MISSING:[A-Za-z0-9@/._-]+$/u.test(error.message)
+          ) {
+            throw error;
+          }
           process.stderr.write(
             `devai sense run: ${error instanceof Error ? error.message : String(error)}\n`,
           );

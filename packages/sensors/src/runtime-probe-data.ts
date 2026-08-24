@@ -1,4 +1,4 @@
-import { Client } from 'pg';
+import type { Client as PgClient } from 'pg';
 import type { ProbeOutcome, RuntimeProbeCharter, RuntimeProbeStep } from './runtime-probe.js';
 
 /**
@@ -77,7 +77,7 @@ function evaluateExpectations(step: RuntimeProbeStep, rows: readonly QueryRow[])
 }
 
 async function runOneDataProbe(
-  client: Client,
+  client: PgClient,
   charter: RuntimeProbeCharter,
   step: RuntimeProbeStep,
 ): Promise<ProbeOutcome> {
@@ -140,6 +140,15 @@ async function runOneDataProbe(
 export async function runDataProbeBatch(
   charter: RuntimeProbeCharter,
 ): Promise<readonly ProbeOutcome[]> {
+  let Client: (typeof import('pg'))['Client'];
+  try {
+    ({ Client } = await import('pg'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('OPTIONAL_DEPENDENCY_MISSING:pg');
+    }
+    throw error;
+  }
   // Resolve the connection string once. If multiple probes use
   // different credentials, the first probe's credential wins for
   // the shared connection. (Mixing creds inside one charter is

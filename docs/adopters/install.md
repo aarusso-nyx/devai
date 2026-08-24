@@ -85,6 +85,11 @@ Run `pnpm exec devai doctor`, review every reported digest change, and commit th
 materialization with the package update. Materialized policy is a versioned snapshot, not a link;
 installing a newer package does not silently rewrite adopter-owned repository files.
 
+The core CLI installs without model-provider or PostgreSQL clients. Install `openai` for the
+Codex API bridge, `@anthropic-ai/sdk` for the Claude API bridge, and `pg` for database-backed
+inventory, runtime probes, or translation-isolation checks. When one is absent, only the feature
+that needs it returns a typed precondition with the exact install command.
+
 ## 3. Apply role-owned segments
 
 Run only the segments your reviewed plan calls for. Each mutation requires its

@@ -71,6 +71,13 @@ if (
 ) {
   fail('PUBLISHABLE_RUNTIME_WORKSPACE_PROTOCOL', PACKAGE_NAME);
 }
+if (
+  Object.values(cliPackage.optionalDependencies ?? {}).some((value) =>
+    String(value).startsWith('workspace:'),
+  )
+) {
+  fail('PUBLISHABLE_OPTIONAL_RUNTIME_WORKSPACE_PROTOCOL', PACKAGE_NAME);
+}
 for (const [name, path] of Object.entries(SECONDARY_BINS)) {
   if (cliPackage.bin?.[name] !== path || !existsSync(join(ROOT, 'packages/cli', path))) {
     fail('PUBLISHABLE_SECONDARY_BIN_MISSING', name);
@@ -239,5 +246,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 44, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, verifier_files: 21, secondary_bins: 5 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 44, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: 21, secondary_bins: 5 })}\n`,
 );

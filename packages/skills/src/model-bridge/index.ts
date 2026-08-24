@@ -1,6 +1,15 @@
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
 import { spawnSync } from '@devai-nyx/authority';
+
+async function optionalModule<T>(name: string, load: () => Promise<T>): Promise<T> {
+  try {
+    return await load();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error(`OPTIONAL_DEPENDENCY_MISSING:${name}`);
+    }
+    throw error;
+  }
+}
 
 export type ModelProvider = 'claude' | 'codex' | 'claude-cli' | 'codex-cli';
 
@@ -145,6 +154,9 @@ export function createModelBridge(options: ModelBridgeOptions) {
       if (options.provider === 'claude') {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) throw new Error('MODEL_BRIDGE_ANTHROPIC_KEY_REQUIRED');
+        const { default: Anthropic } = await optionalModule('@anthropic-ai/sdk', () =>
+          import('@anthropic-ai/sdk'),
+        );
         const response = await new Anthropic({ apiKey }).messages.create(
           {
             model: options.model,
@@ -176,6 +188,7 @@ export function createModelBridge(options: ModelBridgeOptions) {
       }
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) throw new Error('MODEL_BRIDGE_OPENAI_KEY_REQUIRED');
+      const { default: OpenAI } = await optionalModule('openai', () => import('openai'));
       const response = await new OpenAI({ apiKey }).chat.completions.create(
         {
           model: options.model,
