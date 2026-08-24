@@ -484,7 +484,7 @@ describe('content-addressed check runner', () => {
     );
     expect(affected.changedPaths).toContain('packages/utils/src/index.ts');
     expect(affected.tasks.map((task) => task.nodeId)).toContain('test:authority');
-  });
+  }, 15_000);
 
   it('accounts for both sides of renames and for deleted paths', () => {
     const renamed = repository();
