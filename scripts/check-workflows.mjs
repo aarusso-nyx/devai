@@ -112,7 +112,7 @@ function checkWorkflow(file, source, findings) {
 
   const triggers = object(workflow.on);
   const triggerNames = Object.keys(triggers).sort();
-  const expectedTriggers = ['pull_request_target', 'push', 'workflow_dispatch'];
+  const expectedTriggers = ['pull_request', 'push', 'workflow_dispatch'];
   if (
     triggerNames.length !== expectedTriggers.length ||
     triggerNames.some((name, index) => name !== expectedTriggers[index])
@@ -121,7 +121,7 @@ function checkWorkflow(file, source, findings) {
       finding(
         'CI_WORKFLOW_TRUST_BOUNDARY_INVALID',
         file,
-        'workflow must use trusted-base pull_request_target, push, and workflow_dispatch only',
+        'workflow must use unprivileged pull_request preflight, push, and workflow_dispatch only',
       ),
     );
   }
@@ -143,12 +143,42 @@ function checkWorkflow(file, source, findings) {
   }
 
   const jobs = object(workflow.jobs);
-  if (Object.keys(jobs).length !== 1 || jobs['verify-ledger'] === undefined) {
+  if (
+    JSON.stringify(Object.keys(jobs).sort()) !==
+    JSON.stringify(['candidate-preflight', 'verify-ledger'])
+  ) {
     findings.push(
-      finding('CI_LEDGER_JOB_SET_INVALID', file, 'exactly one verify-ledger job is required'),
+      finding(
+        'CI_LEDGER_JOB_SET_INVALID',
+        file,
+        'candidate-preflight and verify-ledger jobs are required',
+      ),
     );
   }
+  const preflight = object(jobs['candidate-preflight']);
   const job = object(jobs['verify-ledger']);
+  if (
+    preflight.if !== "${{ github.event_name == 'pull_request' }}" ||
+    preflight.environment !== undefined ||
+    JSON.stringify(preflight).includes('secrets.')
+  ) {
+    findings.push(
+      finding(
+        'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
+        file,
+        'pull-request candidate preflight must have no environment or secrets',
+      ),
+    );
+  }
+  if (job.if !== "${{ github.event_name != 'pull_request' }}") {
+    findings.push(
+      finding(
+        'CI_LEDGER_TRUSTED_EVENT_GUARD_MISSING',
+        file,
+        'protected ledger verification must not run for pull_request events',
+      ),
+    );
+  }
   if (job.environment !== LEDGER_ENVIRONMENT) {
     findings.push(
       finding(
@@ -158,7 +188,9 @@ function checkWorkflow(file, source, findings) {
       ),
     );
   }
-  const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+  const privilegedSteps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+  const preflightSteps = Array.isArray(preflight.steps) ? preflight.steps.map(object) : [];
+  const steps = [...preflightSteps, ...privilegedSteps];
   if (steps.length === 0) {
     findings.push(finding('CI_LEDGER_STEPS_MISSING', file, 'verify-ledger has no steps'));
     return;
@@ -196,12 +228,15 @@ function checkWorkflow(file, source, findings) {
   const checkouts = steps.filter((step) =>
     typeof step.uses === 'string' ? step.uses.startsWith('actions/checkout@') : false,
   );
-  const candidateCheckout = checkouts.find((step) => object(step.with).path === 'candidate');
+  const candidateCheckouts = checkouts.filter((step) => object(step.with).path === 'candidate');
   if (
-    candidateCheckout === undefined ||
-    object(candidateCheckout.with).ref !== '${{ env.CANDIDATE_SHA }}' ||
-    object(candidateCheckout.with).repository !== undefined ||
-    object(candidateCheckout.with)['persist-credentials'] !== false
+    candidateCheckouts.length !== 2 ||
+    candidateCheckouts.some(
+      (candidateCheckout) =>
+        object(candidateCheckout.with).ref !== '${{ env.CANDIDATE_SHA }}' ||
+        object(candidateCheckout.with).repository !== undefined ||
+        object(candidateCheckout.with)['persist-credentials'] !== false,
+    )
   ) {
     findings.push(
       finding('CI_CANDIDATE_CHECKOUT_UNBOUND', file, 'candidate checkout must use exact SHA'),
@@ -274,7 +309,7 @@ function checkWorkflow(file, source, findings) {
     );
   }
 
-  const verifierRun = steps
+  const verifierRun = privilegedSteps
     .map((step) => (typeof step.run === 'string' ? step.run : ''))
     .find((run) => run.includes('node "$DEVAI_EVIDENCE_VERIFY"'));
   if (verifierRun === undefined) {
@@ -304,7 +339,7 @@ function checkWorkflow(file, source, findings) {
       }
     }
   }
-  const policyBuilderRun = steps
+  const policyBuilderRun = privilegedSteps
     .map((step) => (typeof step.run === 'string' ? step.run : ''))
     .find((run) => run.includes('node "$DEVAI_EVIDENCE_POLICY"'));
   if (policyBuilderRun === undefined) {
