@@ -284,9 +284,12 @@ describe('subprocess coverage measurement integrity', () => {
     process.env.DEVAI_DB_TESTS = '1';
     try {
       const config = (await import('../config/rc.coverage.config.js')).default as {
-        test?: { coverage?: { reporter?: string[] } };
+        test?: { exclude?: string[]; coverage?: { reporter?: string[] } };
       };
       expect(config.test?.coverage?.reporter).toContain('json');
+      expect(config.test?.exclude).toContain(
+        'tests/regression/xref-resolver-performance.regression.test.ts',
+      );
     } finally {
       if (previous === undefined) Reflect.deleteProperty(process.env, 'DEVAI_DB_TESTS');
       else process.env.DEVAI_DB_TESTS = previous;

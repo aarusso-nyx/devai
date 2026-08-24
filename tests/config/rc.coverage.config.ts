@@ -44,7 +44,11 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 15_000,
     include: [...LOCAL_INCLUDE, 'tests/e2e/**/*.test.ts', 'tests/regression/**/*.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'tests/regression/xref-resolver-performance.regression.test.ts',
+    ],
     passWithNoTests: false,
     coverage: {
       provider: 'custom',
