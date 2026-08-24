@@ -2,15 +2,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Local-CI-evidence policy resolution (D-117; ADR-CI-ECONOMY
- * Decisions 1-3 promoted from the stynx C-4 prototype).
+ * Local-CI-evidence policy resolution (D-117; see docs/adopters/ci-economy.md).
  *
  * The policy is declared in `.devai/config/project.json` under
  * `ci_economy.local_evidence` (project-config.schema.json). Absent
  * declaration means the repo does not accept local evidence: the
  * gate's fallback path always runs heavy tiers remotely, and a
  * manifest claimed via commit trailer against an undeclared policy
- * is a hard failure (never-silently-open, ADR-CI-ECONOMY Decision 2).
+ * is a hard failure (never silently open).
  */
 export interface LocalEvidencePolicy {
   readonly manifestPath: string;

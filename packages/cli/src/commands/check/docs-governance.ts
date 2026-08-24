@@ -8,7 +8,7 @@ import { defineCommand } from '../../define-command.js';
 /**
  * Documentation-governance check behind the canonical `check` facade.
  *
- * Enforces ADR-DOCS-GOVERNANCE (commit cf714e7). Nine rules:
+ * Enforces docs/adopters/docs-layout.md. Nine rules:
  *
  *   1. docs-governance.classification — repo.kind ∈ {library, application} (FAIL)
  *   2. docs-governance.builder-declared — docs.builder ∈ {docusaurus, jekyll} (FAIL)
@@ -21,7 +21,7 @@ import { defineCommand } from '../../define-command.js';
  *   9. docs-governance.config-not-placeholder — no scaffold/placeholder values in
  *      docusaurus.config.ts (url, organizationName) (FAIL)
  *
- * Authority: policy_firewall (ADR-DOCS-GOVERNANCE Decision 6).
+ * Authority: policy_firewall; see docs/adopters/docs-layout.md.
  */
 
 const VALID_KINDS = ['library', 'application'] as const;
@@ -95,7 +95,7 @@ function checkClassification(
         severity: 'fail',
         message: '.devai/config/project.json is missing or unreadable',
         remediation:
-          'Create .devai/config/project.json with repo.kind set to one of: library, application. See ADR-DOCS-GOVERNANCE Decision 1.',
+          'Create .devai/config/project.json with repo.kind set to one of: library, application. See docs/adopters/docs-layout.md#repository-classification-and-builder.',
         locations: ['.devai/config/project.json'],
       },
       kind: null,
@@ -109,7 +109,7 @@ function checkClassification(
         severity: 'fail',
         message: `repo.kind must be one of [${VALID_KINDS.join(', ')}]; got ${String(kindRaw ?? 'undefined')}`,
         remediation:
-          'Set repo.kind in .devai/config/project.json to "library" or "application". See ADR-DOCS-GOVERNANCE Decision 1.',
+          'Set repo.kind in .devai/config/project.json to "library" or "application". See docs/adopters/docs-layout.md#repository-classification-and-builder.',
         locations: ['.devai/config/project.json#/repo/kind'],
       },
       kind: null,
@@ -142,7 +142,7 @@ function checkBuilderDeclared(
         severity: 'fail',
         message: 'Cannot check docs.builder — .devai/config/project.json is missing',
         remediation:
-          'Add docs.builder to .devai/config/project.json. Allowed values: docusaurus, jekyll. See ADR-DOCS-GOVERNANCE Decision 2.',
+          'Add docs.builder to .devai/config/project.json. Allowed values: docusaurus, jekyll. See docs/adopters/docs-layout.md#repository-classification-and-builder.',
         locations: ['.devai/config/project.json'],
       },
       builder: null,
@@ -156,7 +156,7 @@ function checkBuilderDeclared(
         severity: 'fail',
         message: `docs.builder must be one of [${VALID_BUILDERS.join(', ')}]; got ${String(builderRaw ?? 'undefined')}`,
         remediation:
-          'Set docs.builder in .devai/config/project.json. For library repos: "docusaurus" (required). For application repos: "docusaurus" (default) or "jekyll" (requires opt-out ADR). See ADR-DOCS-GOVERNANCE Decision 2.',
+          'Set docs.builder in .devai/config/project.json. For library repos: "docusaurus" (required). For application repos: "docusaurus" (default) or "jekyll" (requires opt-out ADR). See docs/adopters/docs-layout.md#repository-classification-and-builder.',
         locations: ['.devai/config/project.json#/docs/builder'],
       },
       builder: null,
@@ -194,7 +194,7 @@ function checkLibraryDocusaurusRequired(
       severity: 'fail',
       message: `Library repos MUST use Docusaurus; got docs.builder = "${builder}"`,
       remediation:
-        'Change docs.builder to "docusaurus" in .devai/config/project.json. Library repos have no opt-out (ADR-DOCS-GOVERNANCE Decision 2 — the API-reference/search/versioning requirements are non-negotiable for library consumers).',
+        'Change docs.builder to "docusaurus" in .devai/config/project.json. Libraries have no opt-out because downstream consumers require searchable, versioned API documentation. See docs/adopters/docs-layout.md#repository-classification-and-builder.',
       locations: ['.devai/config/project.json#/docs/builder'],
     };
   }
@@ -239,7 +239,7 @@ function checkOptOutAdr(
       severity: 'fail',
       message: 'Application + jekyll requires law/adr/ADR-DOCS-BUILDER-OPT-OUT.md — file not found',
       remediation:
-        'Create law/adr/ADR-DOCS-BUILDER-OPT-OUT.md recording: rationale (why Docusaurus is wrong for this repo), reviewer (named human + date), sunset trigger (condition under which the decision will be revisited). See ADR-DOCS-GOVERNANCE Decision 3.',
+        'Create law/adr/ADR-DOCS-BUILDER-OPT-OUT.md recording: rationale (why Docusaurus is wrong for this repo), reviewer (named human + date), and sunset trigger. See docs/adopters/docs-layout.md#repository-classification-and-builder.',
       locations: ['law/adr/ADR-DOCS-BUILDER-OPT-OUT.md'],
     };
   }
@@ -267,7 +267,7 @@ function checkOptOutAdr(
       severity: 'fail',
       message: `law/adr/ADR-DOCS-BUILDER-OPT-OUT.md is missing required section(s): ${missingSections.join(', ')}`,
       remediation:
-        'Ensure the opt-out ADR includes: "rationale" section, "reviewer" (named person + date), "date", and "sunset" trigger. All four are required per ADR-DOCS-GOVERNANCE Decision 3.',
+        'Ensure the opt-out ADR includes: "rationale", "reviewer", "date", and "sunset" sections. See docs/adopters/docs-layout.md#repository-classification-and-builder.',
       locations: ['law/adr/ADR-DOCS-BUILDER-OPT-OUT.md'],
     };
   }
@@ -325,8 +325,8 @@ function checkSiteDirShape(repoRoot: string, builder: Builder | null): Governanc
       message: `docs/site/ is missing expected ${builder} file(s): ${missing.join(', ')}`,
       remediation:
         builder === 'docusaurus'
-          ? 'Scaffold a Docusaurus site under docs/site/ (npx create-docusaurus@latest docs/site classic --typescript). Required: docusaurus.config.ts, sidebars.ts, package.json. See ADR-DOCS-GOVERNANCE Decision 5.'
-          : 'Initialize a Jekyll site under docs/site/ (jekyll new docs/site). Required: _config.yml, Gemfile. See ADR-DOCS-GOVERNANCE Decision 5.',
+          ? 'Scaffold a Docusaurus site under docs/site/ (npx create-docusaurus@latest docs/site classic --typescript). Required: docusaurus.config.ts, sidebars.ts, package.json. See docs/adopters/docs-layout.md#repository-classification-and-builder.'
+          : 'Initialize a Jekyll site under docs/site/ (jekyll new docs/site). Required: _config.yml, Gemfile. See docs/adopters/docs-layout.md#repository-classification-and-builder.',
       locations: missing,
     };
   }
@@ -465,7 +465,7 @@ function checkGhPagesBranch(
 /**
  * Rule 8 — No GH Actions docs-publish workflow.
  * Grep .github/workflows/*.yml|.yaml for known documentation-deployment actions.
- * FAIL if found. Per ADR-LOCAL-PUBLISH-WORKFLOW §10.
+ * FAIL if found. See docs/adopters/docs-layout.md#publication-boundary.
  */
 const CI_PUBLISH_PATTERNS = [
   'peaceiris/actions-gh-pages',
@@ -515,7 +515,7 @@ function checkNoCiPublish(repoRoot: string): GovernanceFinding {
     return {
       ruleId: 'docs-governance.no-ci-publish',
       severity: 'fail',
-      message: `Found CI docs-publish workflow(s) — violates ADR-LOCAL-PUBLISH-WORKFLOW §10 (publish MUST be local-act, not CI-driven)`,
+      message: `Found CI docs-publish workflow(s) — documentation publishing must be an explicitly authorized local effect; see docs/adopters/docs-layout.md#publication-boundary`,
       remediation:
         'Remove or disable the GH Actions documentation-deployment workflow. CI validates freshness and does not publish the site.',
       locations: violations.map((v) => `.github/workflows/${v.split(':')[0] ?? v}`),
@@ -714,7 +714,7 @@ function checkDocsIaLandingExists(
       message:
         'No landing page found. Expected docs/start/index.md or docs/site/src/pages/index.tsx.',
       remediation:
-        'Author a landing page at docs/start/index.md (or docs/site/src/pages/index.tsx) per ADR-DOCS-IA Decision 1 §1.',
+        'Author a landing page at docs/start/index.md (or docs/site/src/pages/index.tsx). See docs/adopters/docs-layout.md#information-architecture.',
     };
   }
   return {
@@ -788,7 +788,7 @@ function checkDocsIaConstitutionPublished(
   return {
     ruleId: 'docs-ia.constitution-published',
     severity: 'pass',
-    message: 'Constitution published per ADR-DOCS-IA Decisions 4 + 8',
+    message: 'Constitution published per docs/adopters/docs-layout.md#information-architecture',
   };
 }
 
@@ -834,7 +834,7 @@ function checkDocsIaSidebarCurated(
       severity: 'fail',
       message: 'sidebars.ts appears to be fully autogenerated with no explicit category labels.',
       remediation:
-        'Author a curated sidebar with explicit `label:` fields per ADR-DOCS-IA Decision 5 §1.',
+        'Author a curated sidebar with explicit `label:` fields. See docs/adopters/docs-layout.md#information-architecture.',
     };
   }
   return {
@@ -928,7 +928,7 @@ function checkDocsIaDashboardCurrent(
       severity: 'warn',
       message: `Dashboards older than 30 days: ${stale.join('; ')}`,
       remediation:
-        'Run npm run sync-docs to regenerate (per ADR-DOCS-IA Decision 7 — frozen-at-build, refresh on publish).',
+        'Run npm run sync-docs to refresh build-frozen dashboards before publication. See docs/adopters/docs-layout.md#information-architecture.',
     };
   }
   return {
@@ -1006,11 +1006,11 @@ const DEFAULT_REPO_ROOT = process.cwd();
 export const checkDocsGovernanceCmd = defineCommand({
   name: 'check docs-governance',
   description:
-    'Validate repo against ADR-DOCS-GOVERNANCE: classification, builder choice, opt-out ADR, site-dir shape, build toolchain, gh-pages branch, and no-CI-publish rule. Hard-fail gate per ADR-DOCS-GOVERNANCE Decision 6.',
+    'Validate the documented repository classification, builder choice, opt-out ADR, site shape, build toolchain, publication branch, and no-CI-publish rule.',
   authority: 'policy_firewall',
   register(cli: CAC): void {
     cli
-      .command('check-docs-governance', 'Validate docs governance rules (ADR-DOCS-GOVERNANCE)')
+      .command('check-docs-governance', 'Validate the documented docs-governance rules')
       .option('--repo-root <path>', `Repo root (default: cwd)`)
       .option(
         '--skip-publish-check',

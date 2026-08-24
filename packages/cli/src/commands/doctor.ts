@@ -25,10 +25,7 @@ import { checkDocsGovernance } from './check/docs-governance.js';
 import { resolveCliProvenance, resolveCliVersion } from '../version.js';
 import { verifyInstalledPostMergeAdapter } from '../services/hooks-install/index.js';
 import { verifyGithubActionsAdapter } from '../services/github-actions-adapter/index.js';
-import {
-  inspectRemoteLocalOnlyNodes,
-  readAttestedRcConfig,
-} from './check/ci-local-only.js';
+import { inspectRemoteLocalOnlyNodes, readAttestedRcConfig } from './check/ci-local-only.js';
 import {
   ATTESTED_RC_WORKFLOW_FILE,
   attestedRcVerificationWorkflow,
@@ -81,9 +78,8 @@ interface Report {
 }
 
 /**
- * D-125: adopters whose docs substrate has legitimately relocated (e.g. per
- * a binding ADR reclassifying an F1 path, as ADR-DOCS-IA Decision 11's §6
- * criterion can require) declare the relocation in
+ * D-125: adopters whose docs substrate has legitimately relocated under a
+ * binding adopter ADR declare the relocation in
  * `.devai/config/project.json`'s `docs.ia.path_overrides` — a map from the
  * canonical F1/reading-order key (a `docs/`-rooted path with the `docs/`
  * prefix stripped, e.g. `"framework/contracts"`) to the adopter's actual
@@ -171,7 +167,9 @@ function checkPolicyMaterializationCurrent(repoRoot: string): CheckResult {
     info: { mismatches, remediation_commands: commands },
     ...(mismatches.length > 0 && {
       errors: [
-        ...mismatches.map(({ file }) => `materialized policy differs from installed policy: ${file}`),
+        ...mismatches.map(
+          ({ file }) => `materialized policy differs from installed policy: ${file}`,
+        ),
         ...commands.map((command) => `rebind with: ${command}`),
       ],
     }),
@@ -453,9 +451,11 @@ export function checkTrustedLocalRcBoundary(repoRoot: string): CheckResult {
   let scripts: Record<string, string> = {};
   try {
     scripts =
-      (JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
-        scripts?: Record<string, string>;
-      }).scripts ?? {};
+      (
+        JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
+          scripts?: Record<string, string>;
+        }
+      ).scripts ?? {};
   } catch {
     scripts = {};
   }
@@ -505,8 +505,12 @@ export function checkTrustedLocalRcBoundary(repoRoot: string): CheckResult {
     ...inspection.errors,
     ...inspection.violations,
     ...(!localRcExecution ? ['devai:rc:prepare and devai:rc:publish are not both configured'] : []),
-    ...(!workflowCurrent ? ['generated trusted local RC verifier workflow is missing or stale'] : []),
-    ...(!protectedControls ? ['protected local RC toolchain or environment control is missing'] : []),
+    ...(!workflowCurrent
+      ? ['generated trusted local RC verifier workflow is missing or stale']
+      : []),
+    ...(!protectedControls
+      ? ['protected local RC toolchain or environment control is missing']
+      : []),
     ...(!signerTrust ? ['approved non-revoked local RC signer trust is missing'] : []),
   ];
   return {
