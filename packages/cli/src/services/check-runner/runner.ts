@@ -56,6 +56,7 @@ export function resolveRunnerToolchain(
   for (const key of [...new Set(requiredKeys)].sort()) {
     if (key === 'node') resolved[key] = process.version;
     else if (key === 'pnpm') resolved[key] = commandVersion('pnpm', ['--version'], repoRoot);
+    else if (key === 'eslint') resolved[key] = packageVersion(repoRoot, 'eslint');
     else if (key === 'vitest') resolved[key] = packageVersion(repoRoot, 'vitest');
     else if (key === 'typescript') resolved[key] = packageVersion(repoRoot, 'typescript');
     else if (key === 'postgres') {
