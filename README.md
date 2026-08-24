@@ -15,7 +15,7 @@ into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.8
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.9
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
