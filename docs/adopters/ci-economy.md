@@ -56,3 +56,16 @@ This boundary is intentionally honest: a trusted local signature attests that th
 claims the bound tasks and results. Cryptography detects tampering and identity mismatch; it
 does **not** prove that the signer actually executed the commands. Trust in execution remains
 a human and signer-operational decision.
+
+## Remote workflow posture
+
+Pull-request workflows cancel superseded runs and use Linux runners. They do not
+combine pull-request, push, and scheduled product-validation triggers. Path filters
+are appropriate only for content the gate does not consume; tested documentation and
+policy inputs remain unfiltered. Concurrent suites that use PostgreSQL need isolated
+ephemeral databases or serialized database-heavy work rather than inflated timeouts.
+
+The `ci_economy` project configuration selects the full or staged enforcement profile.
+Its optional `local_evidence` declaration is fail-closed: a missing declaration never
+accepts claimed local evidence, and policy-sensitive changes always force the protected
+remote path.

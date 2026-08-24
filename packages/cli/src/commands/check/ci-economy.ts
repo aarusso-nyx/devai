@@ -8,20 +8,20 @@ import { inspectRemoteLocalOnlyNodes } from './ci-local-only.js';
 /**
  * CI-economy check behind the canonical `check` facade.
  *
- * Enforces ADR-CI-ECONOMY's mechanical rules against a repo's
+ * Enforces docs/adopters/ci-economy.md against a repo's
  * `.github/workflows/`. Mechanical rules (hard unless noted):
  *
  *   1. ci-economy.concurrency-cancel — every pull_request-triggered
  *      workflow declares `concurrency` with `cancel-in-progress: true`
- *      (Decision 5.2).
+ *      (remote workflow posture).
  *   2. ci-economy.no-macos-on-pr — no macOS runner reference in any
- *      pull_request-triggered workflow (Decision 5.1; macOS bills 10×).
+ *      pull_request-triggered workflow (macOS bills 10×).
  *   3. ci-economy.no-triple-trigger — no workflow triggered by all three
  *      of pull_request + push + schedule. The single remote verifier has
  *      no scheduled product-validation lane.
  *   4. ci-economy.evidence-gate-wired — at least one workflow invokes the
  *      verifier from a protected provenance-bound DEVAI package. Severity is
- *      profile-conditioned (Decision 8 as amended by D-116): hard under
+ *      profile-conditioned (D-116): hard under
  *      the default `full` CI-economy profile; ADVISORY when the target
  *      repo's `.devai/config/project.json` declares
  *      `ci_economy.profile: "gate-staged"` (incremental-adoption path —
@@ -30,7 +30,7 @@ import { inspectRemoteLocalOnlyNodes } from './ci-local-only.js';
  *
  * Judgment rules are emitted as ADVISORY findings (severity `warn`,
  * exit 0) because their correct resolution depends on what the repo's
- * gates consume (ADR-CI-ECONOMY Decision 8): path-filter opportunities,
+ * gates consume: path-filter opportunities,
  * cron cadence, macOS cost outside PR paths, scheduled-audit presence,
  * shared-Postgres DB-isolation heuristics.
  *
@@ -106,7 +106,7 @@ const KNOWN_TRIGGERS = new Set([
  * schema). Missing file, unparseable JSON, absent key, or any value
  * other than the exact staging declaration all resolve to `full` —
  * the strict default; staging is only ever an explicit declaration
- * (ADR-CI-ECONOMY Decision 8 as amended by D-116).
+ * (see docs/adopters/ci-economy.md).
  */
 export function readCiEconomyProfile(repoRoot: string): CiEconomyProfile {
   const cfgPath = join(repoRoot, '.devai/config/project.json');
@@ -126,8 +126,7 @@ const PROVENANCE_DIGEST_BINDING =
   /test\s+"\$actual_provenance_sha256"\s*=\s*"\$VERIFIER_PROVENANCE_SHA256"/u;
 const RUNNER_TEMP_COPY =
   /cp\s+-R\s+"\$source_root\/schemas"\s+"\$source_root\/src"\s+"\$verifier_root\/"/u;
-const PACKAGE_VERIFIER_INVOCATION =
-  /node\s+"\$DEVAI_EVIDENCE_(?:VERIFY|BUNDLE_VERIFY)"/u;
+const PACKAGE_VERIFIER_INVOCATION = /node\s+"\$DEVAI_EVIDENCE_(?:VERIFY|BUNDLE_VERIFY)"/u;
 
 /**
  * Extract the trigger set from a workflow file. Handles the three
@@ -250,7 +249,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
           severity: 'fail',
           message: `${String(missingConcurrency.length)} pull_request-triggered workflow(s) lack a concurrency block with cancel-in-progress: true`,
           remediation:
-            'Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }` (ADR-CI-ECONOMY Decision 5.2).',
+            'Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`; see docs/adopters/ci-economy.md#remote-workflow-posture.',
           locations: missingConcurrency.map((f) => f.file),
         },
   );
@@ -340,7 +339,8 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
         ? {
             ruleId: 'ci-economy.local-only-nodes',
             severity: 'pass',
-            message: 'no GitHub workflow directly or transitively reaches an attested-RC local-only node',
+            message:
+              'no GitHub workflow directly or transitively reaches an attested-RC local-only node',
           }
         : {
             ruleId: 'ci-economy.local-only-nodes',
@@ -366,7 +366,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
       severity: 'warn',
       message: `${String(unfiltered.length)} pull_request/push workflow(s) declare no paths/paths-ignore filters`,
       remediation:
-        'Advisory (judgment rule): add filters for content the gates do not consume — but never filter content a gate reads (ADR-CI-ECONOMY Decision 5.3; devai itself runs unfiltered because its Markdown is a tested artifact).',
+        'Advisory: add filters only for content the gates do not consume; DEVAI stays unfiltered because Markdown is tested. See docs/adopters/ci-economy.md#remote-workflow-posture.',
       locations: unfiltered.map((f) => f.file),
     });
   }
@@ -405,7 +405,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
       severity: 'warn',
       message: `${String(postgresWorkflows.length)} workflow(s) run a Postgres service container`,
       remediation:
-        'Advisory: if test suites execute concurrently against it, isolate them — per-package ephemeral databases or serialized DB-heavy suites; timeout inflation is not compliance (ADR-CI-ECONOMY Decision 6).',
+        'Advisory: isolate concurrent suites with per-package ephemeral databases or serialize DB-heavy suites; timeout inflation is not compliance. See docs/adopters/ci-economy.md#remote-workflow-posture.',
       locations: postgresWorkflows.map((f) => f.file),
     });
   }
@@ -431,7 +431,7 @@ export const checkCiEconomyCmd = defineCommand({
   authority: 'policy_firewall',
   register(cli: CAC): void {
     cli
-      .command('check-ci-economy', 'Validate CI-economy rules (ADR-CI-ECONOMY)')
+      .command('check-ci-economy', 'Validate the documented CI-economy rules')
       .option('--repo-root <path>', `Repo root (default: ${DEFAULT_REPO_ROOT})`)
       .option(
         '--workflows-dir <path>',

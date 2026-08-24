@@ -11,8 +11,8 @@ const DEFAULT_IGNORE = new Set([
   '.devai',
   'generated',
   'examples',
-  // R13 W05: docs/site/ is the canonical Docusaurus scaffold location per
-  // ADR-DOCS-GOVERNANCE Decision 5. Its TypeScript files (docusaurus.config.ts,
+  // R13 W05: docs/site/ is the documented Docusaurus scaffold location. Its
+  // TypeScript files (docusaurus.config.ts,
   // sidebars.ts, src/pages/*) are scaffold/config, not framework surfaces, and
   // wouldn't be claimed by any invariant.code_areas. Bare-name match because
   // the inventory walker traverses by directory name and the rest of

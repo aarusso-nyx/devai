@@ -12,7 +12,7 @@ const validateLocalEvidenceManifest = getValidator('local-evidence-manifest.sche
 /**
  * `devai evidence local verify` core (D-117): validate a
  * local-evidence manifest against the repo's declared policy.
- * Fail-closed throughout (ADR-CI-ECONOMY Decision 2): a claimed
+ * Fail-closed throughout (see docs/adopters/ci-economy.md): a claimed
  * manifest that is missing, stale, tree-mismatched, policy-laxer
  * than declared, untrusted, or accompanied by policy-sensitive file
  * changes throws LocalEvidenceError; only the *absence* of a claim
