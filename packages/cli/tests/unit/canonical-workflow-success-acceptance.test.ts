@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { afterAll, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
@@ -24,6 +25,9 @@ const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-com
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const TARGET = mkdtempSync(join(tmpdir(), 'devai-r0007-init-acceptance-'));
+if (spawnSync('git', ['init', '--quiet'], { cwd: TARGET }).status !== 0) {
+  throw new Error('test git init failed');
+}
 
 afterAll(() => {
   rmSync(TARGET, { recursive: true });

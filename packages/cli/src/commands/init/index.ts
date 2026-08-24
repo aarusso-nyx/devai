@@ -1,9 +1,11 @@
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   realpathSync,
   runAuthorityHostEffectsWithRollback,
+  spawnSync,
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
@@ -25,8 +27,15 @@ import {
   validateCanonicalPolicyContent,
 } from '@devai-nyx/skills';
 import { getValidator, validators } from '@devai-nyx/schemas';
-import { isAdoptionProfile, EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
+import {
+  isAdoptionProfile,
+  EXIT_FAIL,
+  EXIT_PASS,
+  EXIT_PRECONDITION,
+  EXIT_USAGE,
+} from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
+import { cliError, renderCliError } from '../../cli-error.js';
 import { executeAuthorityPolicyMaterialization } from '../../authority/command-capabilities.js';
 import { resolveCliVersion } from '../../version.js';
 import { buildCiScaffoldPlan, executeCiScaffoldPlan } from '../../services/ci-scaffold/index.js';
@@ -205,19 +214,53 @@ function validateInitTier(options: InitOptions): void {
   }
 }
 
-function initPlanFor(options: InitOptions) {
-  const targetRoot = options.target ?? DEFAULT_REPO_ROOT;
+interface ValidatedInitTarget {
+  readonly requested: string;
+  readonly resolved: string;
+}
+
+function initTargetError(path: string, message: string, human: boolean): void {
+  const error = cliError({
+    code: 'INIT_TARGET_PRECONDITION_UNSATISFIED',
+    class: 'precondition',
+    exit: 5,
+    message: `${message}: ${path}`,
+    remediation: 'Choose an existing directory inside a Git work tree and retry.',
+    context: { target_root: path },
+  });
+  process.stderr.write(renderCliError(error, !human));
+  process.exitCode = EXIT_PRECONDITION;
+}
+
+function validateInitTarget(options: InitOptions): ValidatedInitTarget | undefined {
+  const requested = options.target ?? DEFAULT_REPO_ROOT;
+  const path = resolve(requested);
+  if (!existsSync(path) || !lstatSync(path).isDirectory()) {
+    initTargetError(path, 'Init target must exist and be a directory', options.human === true);
+    return undefined;
+  }
+  const result = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+    cwd: path,
+    encoding: 'utf8',
+  });
+  if (result.status !== 0 || result.stdout.trim() !== 'true') {
+    initTargetError(path, 'Init target is not a Git repository', options.human === true);
+    return undefined;
+  }
+  return { requested, resolved: realpathSync(path) };
+}
+
+function initPlanFor(options: InitOptions, target: ValidatedInitTarget) {
   return buildBootstrapPlan({
-    targetRoot,
+    targetRoot: target.requested,
     version: options.stampVersion ?? resolveCliVersion(),
     ...(options.tier !== undefined && isAdoptionProfile(options.tier) && { profile: options.tier }),
   });
 }
 
-function inspectForInit(options: InitOptions) {
+function inspectForInit(options: InitOptions, target: ValidatedInitTarget) {
   if (options.introspect !== true) return null;
-  const targetRoot = options.target ?? DEFAULT_REPO_ROOT;
-  const introspection = introspectRepo({ targetRoot: resolve(targetRoot) });
+  const introspection = introspectRepo({ targetRoot: target.resolved });
   if (!validators.repoIntrospection(introspection)) {
     process.stderr.write(
       `devai init --introspect: introspection failed schema validation: ${JSON.stringify(validators.repoIntrospection.errors)}\n`,
@@ -261,8 +304,8 @@ function segmentedPlan(plan: ReturnType<typeof buildBootstrapPlan>, segment: Ini
   };
 }
 
-function canonicalInitPlanFor(options: InitOptions) {
-  const plan = initPlanFor(options);
+function canonicalInitPlanFor(options: InitOptions, target: ValidatedInitTarget) {
+  const plan = initPlanFor(options, target);
   const segments = (['owner', 'architect', 'harness'] as const).map((segment) => {
     const projection = segmentedPlan(plan, segment);
     return { segment, entries: projection.entries, summary: projection.summary };
@@ -381,8 +424,10 @@ export const initPlan = defineCommand({
       true,
     ).action((options: InitOptions) => {
       validateInitTier(options);
-      const introspection = inspectForInit(options);
-      const plan = canonicalInitPlanFor(options);
+      const target = validateInitTarget(options);
+      if (target === undefined) return;
+      const introspection = inspectForInit(options, target);
+      const plan = canonicalInitPlanFor(options, target);
       emit(
         introspection === null ? plan : { introspection, plan },
         options.human === true,
@@ -435,9 +480,20 @@ function initApplyDefinition(segment: InitSegment) {
           );
           process.exit(EXIT_USAGE);
         }
-        const introspection = segment === 'harness' ? inspectForInit(options) : null;
-        const plan = segmentedPlan(initPlanFor(options), segment);
-        const targetRoot = resolve(options.target ?? DEFAULT_REPO_ROOT);
+        const requestedTarget = options.target ?? DEFAULT_REPO_ROOT;
+        const target = {
+          requested: requestedTarget,
+          resolved: resolve(requestedTarget),
+        };
+        const introspectionTarget =
+          segment === 'harness' && options.introspect === true
+            ? validateInitTarget(options)
+            : target;
+        if (introspectionTarget === undefined) return;
+        const introspection =
+          segment === 'harness' ? inspectForInit(options, introspectionTarget) : null;
+        const plan = segmentedPlan(initPlanFor(options, target), segment);
+        const targetRoot = resolve(requestedTarget);
         const coreTargets = preflightBootstrapPlan(plan);
         const preparedIncludes = prepareIncludedComponents(
           targetRoot,
