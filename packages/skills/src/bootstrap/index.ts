@@ -37,6 +37,11 @@ const POLICY_FILES = [
 ] as const;
 const ADOPTER_LAW_POLICY_FILES = ['mutation-strength.json'] as const;
 
+export const MATERIALIZED_POLICY_FILES = [
+  ...POLICY_FILES,
+  'subprocess-effects.json',
+] as const;
+
 const _CANONICAL_POLICY_FILES = [
   ...POLICY_FILES,
   'check-suites.json',

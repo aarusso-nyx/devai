@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import type { CAC } from 'cac';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
-import { buildBootstrapPlan, executeBootstrapPlan } from '../../../skills/src/bootstrap/index.js';
+import {
+  buildBootstrapPlan,
+  executeBootstrapPlan,
+  resolveCanonicalPolicyContent,
+} from '../../../skills/src/bootstrap/index.js';
 import { doctor } from '../../src/commands/doctor.js';
 
 const originalExit = process.exit;
@@ -142,6 +146,10 @@ describe('tier1 adoption doctor regression', () => {
         buildBootstrapPlan({ targetRoot: adopter, version: '1.2.6', profile: 'tier1' }),
       ),
     );
+    writeFileSync(
+      join(adopter, '.devai/config/subprocess-effects.json'),
+      resolveCanonicalPolicyContent('subprocess-effects.json'),
+    );
 
     const result = await run({ repoRoot: adopter, human: true });
     expect(result.exit).toBe(0);
@@ -149,5 +157,26 @@ describe('tier1 adoption doctor regression', () => {
     expect(result.stdout).toContain('devai doctor [profile=tier1]: OK');
     expect(result.stdout).toContain('f1-paths-present (advisory: above declared profile)');
     expect(result.stdout).toContain('agents-claude-sync (advisory: above declared profile)');
+  });
+
+  it('reports materialized policy drift with exact rebind commands', async () => {
+    const adopter = mkdtempSync(join(tmpdir(), 'devai-doctor-policy-drift-'));
+    roots.push(adopter);
+    await withAuthorityHostTestScope(() =>
+      executeBootstrapPlan(
+        buildBootstrapPlan({ targetRoot: adopter, version: '1.2.6', profile: 'tier1' }),
+      ),
+    );
+    writeFileSync(join(adopter, '.devai/config/subprocess-effects.json'), '{}\n');
+
+    const result = await run({ repoRoot: adopter, human: true });
+    expect(result.exit).toBe(1);
+    expect(result.stdout).toContain('policy-materialization-current');
+    expect(result.stdout).toContain(
+      'devai init bind --target . --operational-law --as-role architect --write',
+    );
+    expect(result.stdout).toContain(
+      'devai init bind --target . --subprocess-effects --as-role architect --write',
+    );
   });
 });

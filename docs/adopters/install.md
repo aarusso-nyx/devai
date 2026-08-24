@@ -72,6 +72,19 @@ pnpm exec devai init bind \
 Invalid schemas, source paths outside `law/policy`, immutable-domain collisions, or incomplete
 writes leave the prior resolved configuration unchanged.
 
+### Upgrading DEVAI
+
+Bump the pinned package version, then re-run both policy binding commands:
+
+```bash
+pnpm exec devai init bind --target . --operational-law --as-role architect --write
+pnpm exec devai init bind --target . --subprocess-effects --as-role architect --write
+```
+
+Run `pnpm exec devai doctor`, review every reported digest change, and commit the refreshed
+materialization with the package update. Materialized policy is a versioned snapshot, not a link;
+installing a newer package does not silently rewrite adopter-owned repository files.
+
 ## 3. Apply role-owned segments
 
 Run only the segments your reviewed plan calls for. Each mutation requires its

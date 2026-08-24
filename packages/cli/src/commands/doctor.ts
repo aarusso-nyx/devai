@@ -1,10 +1,15 @@
 import { spawnSync } from '@devai-nyx/authority';
 import { existsSync, lstatSync, readFileSync, readlinkSync, statSync } from '@devai-nyx/authority';
 import { dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import type { CAC } from 'cac';
 import { validators } from '@devai-nyx/schemas';
-import { verifyConstitutionBinding } from '@devai-nyx/skills';
+import {
+  MATERIALIZED_POLICY_FILES,
+  resolveCanonicalPolicyContent,
+  verifyConstitutionBinding,
+} from '@devai-nyx/skills';
 import { verifyChain } from '@devai-nyx/evidence';
 import {
   readProfile,
@@ -137,6 +142,39 @@ function checkF1Paths(repoRoot: string): CheckResult {
       ...(Object.keys(overrides).length > 0 && { path_overrides: overrides }),
     },
     ...(missing.length > 0 && { errors: missing.map((p) => `missing F1 path: ${p}`) }),
+  };
+}
+
+function checkPolicyMaterializationCurrent(repoRoot: string): CheckResult {
+  const mismatches: Array<Record<string, string>> = [];
+  for (const file of MATERIALIZED_POLICY_FILES) {
+    const target = join(repoRoot, '.devai/config', file);
+    const installed = Buffer.from(resolveCanonicalPolicyContent(file), 'utf8');
+    const actual = existsSync(target) ? readFileSync(target) : undefined;
+    if (actual === undefined || !actual.equals(installed)) {
+      mismatches.push({
+        file,
+        target,
+        actual_sha256:
+          actual === undefined ? 'missing' : createHash('sha256').update(actual).digest('hex'),
+        installed_sha256: createHash('sha256').update(installed).digest('hex'),
+      });
+    }
+  }
+  const commands = [
+    'devai init bind --target . --operational-law --as-role architect --write',
+    'devai init bind --target . --subprocess-effects --as-role architect --write',
+  ];
+  return {
+    name: 'policy-materialization-current',
+    ok: mismatches.length === 0,
+    info: { mismatches, remediation_commands: commands },
+    ...(mismatches.length > 0 && {
+      errors: [
+        ...mismatches.map(({ file }) => `materialized policy differs from installed policy: ${file}`),
+        ...commands.map((command) => `rebind with: ${command}`),
+      ],
+    }),
   };
 }
 
@@ -706,6 +744,10 @@ const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'constitution-symlink',
     run: (repoRoot) => checkConstitutionSymlink(repoRoot),
+  },
+  {
+    name: 'policy-materialization-current',
+    run: (repoRoot) => checkPolicyMaterializationCurrent(repoRoot),
   },
   {
     name: 'agents-claude-sync',
