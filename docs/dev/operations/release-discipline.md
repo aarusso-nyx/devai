@@ -87,18 +87,17 @@ without a SemVer prerelease component creates a normal GitHub Release and uses `
 manifest records the derived release type, prerelease boolean, and dist-tag; recovery verifies
 that the existing Release and registry tag match that identity.
 
-Pushing the Owner-authorized signed annotated version tag is the normal single trigger. It runs
-protected-ledger verification, frozen installation, build, publishable-closure checks,
-deterministic double-pack, SBOM creation, site creation, and manifest assembly, then proceeds
-through the protected publication and Pages environments to create or verify the canonical
-Release, mirror the exact tarball to GitHub Packages, and deploy the manifest-bound site.
+A signed annotated version-tag push is a non-publishing rehearsal trigger. It runs protected-ledger
+verification, frozen installation, build, publishable-closure checks, deterministic double-pack,
+SBOM creation, the npm adopter check, site creation, and manifest assembly. The publication and
+Pages jobs are structurally skipped for the tag-push event.
 
-`workflow_dispatch` is an idempotent recovery entry point, not the normal publication path. Use
-the exact existing `release_tag` with `publish: false` to rebuild and inspect non-publishing
-rehearsal assets. Use `publish: true` only after an interrupted or failed tag-triggered publication
-has been diagnosed and the Owner authorizes recovery for that exact immutable tag. Recovery never
-moves a tag or replaces a mismatched asset; byte-identical existing effects are no-ops and any
-identity mismatch fails closed.
+A manual dispatch with the exact existing `release_tag` and `publish: false` repeats the same
+non-publishing rehearsal. Only an explicit `workflow_dispatch` with `publish: true` may finalize
+the canonical Release, mirror the exact tarball to GitHub Packages, and deploy the manifest-bound
+Pages archive after a successful rehearsal and separate Owner authorization. Publication and
+recovery never move a tag or replace a mismatched asset; byte-identical existing effects are
+no-ops and any identity mismatch fails closed.
 
 The release build also runs `npm --prefix docs/site run security:check`. DEVAI temporarily vendors
 the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no patched npm release;

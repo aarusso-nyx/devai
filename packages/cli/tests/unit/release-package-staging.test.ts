@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
+const SELECTED_RELEASE_VERSION = '1.2.12';
 
 afterAll(() => rmSync(output, { recursive: true, force: true }));
 
@@ -23,14 +24,18 @@ describe('normalized release package staging', () => {
       sbom: string;
       sbom_subject_sha256: string;
       reproductions: number;
+      version: string;
     };
     expect(staged.reproductions).toBe(2);
+    expect(staged.version).toBe(SELECTED_RELEASE_VERSION);
     expect(staged.sha256).toMatch(/^[0-9a-f]{64}$/u);
     expect(staged.sbom_subject_sha256).toBe(staged.sha256);
     const sbom = JSON.parse(readFileSync(staged.sbom, 'utf8')) as {
       metadata: { component: { hashes: Array<{ alg: string; content: string }> } };
     };
-    expect(staged.sbom).toMatch(/devai-\d+\.\d+\.\d+\.cdx\.json$/u);
+    expect(staged.sbom).toMatch(
+      new RegExp(`devai-${SELECTED_RELEASE_VERSION.replaceAll('.', '\\.')}\\.cdx\\.json$`, 'u'),
+    );
     expect(sbom.metadata.component.hashes).toContainEqual({
       alg: 'SHA-256',
       content: staged.sha256,
@@ -41,6 +46,10 @@ describe('normalized release package staging', () => {
         encoding: 'utf8',
       }),
     ) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      name: '@aarusso-nyx/devai',
+      version: SELECTED_RELEASE_VERSION,
+    });
     expect(manifest).not.toHaveProperty('devDependencies');
     expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
     const packagePopulation = execFileSync('tar', ['-tzf', staged.tarball], {
@@ -57,10 +66,11 @@ describe('normalized release package staging', () => {
       }
     ).version;
     const landingPage = readFileSync(join(root, 'docs/site/src/pages/index.tsx'), 'utf8');
-    expect(landingPage).toContain(`@aarusso-nyx/devai@${packageVersion}`);
+    expect(packageVersion).toBe(SELECTED_RELEASE_VERSION);
+    expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.2.11', () => {
+  it('records a stable release and latest dist-tag for version 1.2.12', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -74,14 +84,14 @@ describe('normalized release package staging', () => {
       env: {
         ...process.env,
         PACKAGE_NAME: '@aarusso-nyx/devai',
-        RELEASE_TAG: 'v1.2.11',
+        RELEASE_TAG: `v${SELECTED_RELEASE_VERSION}`,
         PACKAGE_TARBALL: packageTarball,
         SITE_ARCHIVE: siteArchive,
         SBOM_FILE: sbom,
         OUTPUT_FILE: manifest,
         COMMIT_SHA: 'b'.repeat(40),
         TREE_SHA: 'c'.repeat(40),
-        LEDGER_VERIFIER_PACKAGE_VERSION: '1.2.11',
+        LEDGER_VERIFIER_PACKAGE_VERSION: SELECTED_RELEASE_VERSION,
         LEDGER_VERIFIER_PROVENANCE_SHA256: digest,
         LEDGER_POLICY_DIGEST: digest,
         LEDGER_ENVELOPE_SHA256: digest,
@@ -99,15 +109,15 @@ describe('normalized release package staging', () => {
       ledger: Record<string, unknown>;
     };
     expect(value.release).toMatchObject({
-      tag: 'v1.2.11',
-      version: '1.2.11',
+      tag: `v${SELECTED_RELEASE_VERSION}`,
+      version: SELECTED_RELEASE_VERSION,
       release_type: 'stable',
       prerelease: false,
       dist_tag: 'latest',
     });
     expect(value.ledger).toMatchObject({
       verifier_package: '@aarusso-nyx/devai',
-      verifier_package_version: '1.2.11',
+      verifier_package_version: SELECTED_RELEASE_VERSION,
       verifier_provenance_sha256: digest,
       verifier_source_commit: '9e115014f8da5a16be526c7da5207bc0aae0801b',
     });

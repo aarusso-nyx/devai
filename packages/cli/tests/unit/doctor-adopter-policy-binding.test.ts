@@ -28,6 +28,7 @@ const roots: string[] = [];
 const SOURCE = 'law/policy/devai-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
 const CONFIG = '.devai/config';
+const SELECTED_RELEASE_VERSION = '1.2.12';
 const TARGETS = [
   '.devai/config/project.json',
   '.devai/config/domains.json',
@@ -124,7 +125,7 @@ async function canonicalRepo(): Promise<string> {
     schemaVersion: '1.0.0',
     project_type: 'runtime-host',
     profile: 'tier1',
-    devai_version: '1.2.11',
+    devai_version: SELECTED_RELEASE_VERSION,
   });
   for (const file of [
     'domains.json',
@@ -245,7 +246,7 @@ describe('Doctor adopter-policy binding regression', () => {
     expect(readJson(repo, `${CONFIG}/project.json`)).toMatchObject({
       project_type: 'runtime-host',
       repo: { kind: 'application' },
-      devai_version: '1.2.11',
+      devai_version: SELECTED_RELEASE_VERSION,
     });
   });
 
@@ -430,7 +431,7 @@ describe('Doctor adopter-policy binding regression', () => {
     expect(check.ok).toBe(false);
     expectReason(check, 'FRAMEWORK_VERSION_MISMATCH');
     expect(check.errors?.join('\n')).toContain('1.2.10');
-    expect(check.errors?.join('\n')).toContain('1.2.11');
+    expect(check.errors?.join('\n')).toContain(SELECTED_RELEASE_VERSION);
   });
 
   it('preserves the exact safe adopter-policy source in remediation', async () => {

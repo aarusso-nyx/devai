@@ -448,15 +448,15 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   if (object(pages.environment).name !== 'github-pages') {
     findings.push(finding('RELEASE_PAGES_ENVIRONMENT_INVALID', file, 'github-pages'));
   }
-  const publishCondition =
-    "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}";
-  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
+  const publishCondition = "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
+  const rehearsalCondition =
+    "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
   if (finalize.if !== publishCondition || pages.if !== publishCondition) {
     findings.push(
       finding(
         'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
         file,
-        'finalize-release and deploy-pages must accept tag publication or explicit recovery',
+        'finalize-release and deploy-pages require explicit publish:true workflow dispatch',
       ),
     );
   }
@@ -469,7 +469,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
       finding(
         'RELEASE_REHEARSAL_JOB_INVALID',
         file,
-        'only non-publishing dispatches end in a read-only rehearsal summary after the exact build',
+        'tag pushes and non-publishing dispatches end in a read-only rehearsal summary after the exact build',
       ),
     );
   }
