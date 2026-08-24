@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "references": [
+    { "path": "./packages/utils" },
+    { "path": "./packages/schemas" },
+    { "path": "./packages/authority" },
+    { "path": "./packages/evidence" },
+    { "path": "./packages/spec" },
+    { "path": "./packages/effects-check" },
+    { "path": "./packages/sensors" },
+    { "path": "./packages/loop" },
+    { "path": "./packages/skills" },
+    { "path": "./packages/cli/tsconfig.typecheck.json" }
+  ]
+}
