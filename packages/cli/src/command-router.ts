@@ -375,9 +375,8 @@ export function routeArgv(
         );
       }
     }
-    let routedEntry: RegistryEntry;
     try {
-      routedEntry = resolveInvocationEntry(exact, argv);
+      resolveInvocationEntry(exact, argv);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const check = exact.name === 'check';
@@ -397,29 +396,6 @@ export function routeArgv(
       return {
         kind: 'output',
         text: renderCliError(refusal, wantsJson(args)),
-        exitCode: EXIT_USAGE,
-      };
-    }
-    if (
-      (routedEntry.effects === 'harness-write' || routedEntry.effects === 'local-write') &&
-      !remaining.includes('--write') &&
-      !invocationIsNonMutating(routedEntry.internal_name, remaining)
-    ) {
-      return {
-        kind: 'output',
-        text: `devai ${exact.name}: local mutation requires --write\n`,
-        exitCode: EXIT_USAGE,
-      };
-    }
-    if (
-      routedEntry.effects === 'remote-write' &&
-      !remaining.includes('--dry-run') &&
-      !invocationIsNonMutating(routedEntry.internal_name, remaining) &&
-      (!remaining.includes('--write') || !remaining.includes('--publish'))
-    ) {
-      return {
-        kind: 'output',
-        text: `devai ${exact.name}: remote mutation requires --write --publish\n`,
         exitCode: EXIT_USAGE,
       };
     }

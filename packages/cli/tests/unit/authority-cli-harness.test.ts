@@ -44,6 +44,16 @@ function code(result: Awaited<ReturnType<typeof invoke>>): string | undefined {
   return source.length === 0 ? undefined : (JSON.parse(source) as { code?: string }).code;
 }
 
+function error(result: Awaited<ReturnType<typeof invoke>>): {
+  readonly remediation: string;
+  readonly context: Record<string, unknown>;
+} {
+  return JSON.parse(result.stderr || result.stdout) as {
+    remediation: string;
+    context: Record<string, unknown>;
+  };
+}
+
 describe('authority CLI harness branch matrix', () => {
   it('fails closed for absent, internal, declaration, consent, and session errors', async () => {
     const target = harness();
@@ -156,6 +166,33 @@ describe('authority CLI harness branch matrix', () => {
         ]),
       ),
     ).toBe('AUTHORITY_POLICY_BINDING_MISMATCH');
+  });
+
+  it('names the allowed role and over-declared consent in remediation', async () => {
+    const target = harness();
+    const denied = await invoke(target, [
+      'round',
+      'plan',
+      '--documents',
+      'cli',
+      '--as-role',
+      'engineer',
+      '--write',
+    ]);
+    expect(error(denied)).toMatchObject({
+      remediation: 'Declare one of: architect via --as-role.',
+      context: { allowed_roles: ['architect'], supplied_role: 'engineer' },
+    });
+
+    const overDeclared = await invoke(target, ['catalog', 'actions', '--write']);
+    expect(error(overDeclared)).toMatchObject({
+      remediation: "This action's effect is 'read'; remove --write.",
+      context: {
+        effect: 'read',
+        declared: { write: true, allow_publish: false },
+        required: { write: false, allow_publish: false, experimental: false },
+      },
+    });
   });
 
   it('allows read, dry-run, direct, and session-backed governed paths', async () => {

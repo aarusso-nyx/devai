@@ -1,6 +1,9 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: every current action reaches the production authority
 // pre-dispatch boundary and exposes its required refusal in both output formats.
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { authorizeCliArgv } from '../../src/authority/index.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
@@ -50,6 +53,57 @@ function expectCode(result: ReturnType<typeof refusal>, code: string): void {
 }
 
 describe('canonical production authority refusal acceptance', () => {
+  it('emits concrete remediation and structured context for common refusals', () => {
+    const check = current.find((entry) => entry.name === 'check');
+    const sense = current.find((entry) => entry.name === 'sense run');
+    if (check === undefined || sense === undefined) throw new Error('canonical actions missing');
+
+    const denied = refusal(check, ['--affected', '--run', '--as-role', 'architect'], 'json');
+    expect(JSON.parse(denied.stderr)).toMatchObject({
+      code: 'AUTHORITY_HUMAN_ROLE_DENIED',
+      remediation: 'Declare one of: inspector via --as-role.',
+      context: { allowed_roles: ['inspector'], supplied_role: 'architect' },
+    });
+
+    const overDeclared = authorizeCliArgv(
+      [process.execPath, 'devai', 'sense', 'run', 'lint', '--write', '--format', 'json'],
+      current,
+    );
+    expect(overDeclared).toBeDefined();
+    expect(JSON.parse(overDeclared?.stderr ?? '{}')).toMatchObject({
+      code: 'AUTHORITY_DECLARATION_NOT_APPLICABLE',
+      remediation: "This action's effect is 'read'; remove --write.",
+      context: { effect: 'read', declared: { write: true } },
+    });
+
+    const unbound = mkdtempSync(join(tmpdir(), 'devai-authority-unbound-'));
+    try {
+      const missing = authorizeCliArgv(
+        [
+          process.execPath,
+          'devai',
+          'check',
+          '--suite',
+          'standard',
+          '--repo-root',
+          unbound,
+          '--format',
+          'json',
+        ],
+        current,
+      );
+      expect(missing).toBeDefined();
+      expect(JSON.parse(missing?.stderr ?? '{}')).toMatchObject({
+        code: 'AUTHORITY_POLICY_MISSING',
+        remediation: `Run: devai init bind --target ${unbound} --as-role architect --write`,
+        refs: { doc: 'docs/adopters/install.md' },
+        context: { repository_root: unbound },
+      });
+    } finally {
+      rmSync(unbound, { recursive: true, force: true });
+    }
+  });
+
   it('requires no declaration for reads and a declaration for every write-capable action', () => {
     expect(current).toHaveLength(44);
     for (const format of ['human', 'json'] as const) {
@@ -62,7 +116,9 @@ describe('canonical production authority refusal acceptance', () => {
           result,
           entry.effects === 'read'
             ? 'AUTHORITY_DECLARATION_NOT_APPLICABLE'
-            : 'AUTHORITY_DECLARATION_MISSING',
+            : entry.name === 'check'
+              ? 'AUTHORITY_POLICY_MISSING'
+              : 'AUTHORITY_DECLARATION_MISSING',
         );
       }
     }

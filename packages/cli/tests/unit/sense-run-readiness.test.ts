@@ -134,9 +134,8 @@ describe('sense run readiness aggregation', () => {
 
     for (const kind of ['unit_test', 'build', 'inventory_regeneration']) {
       expect(routeSense([kind])).toMatchObject({
-        kind: 'output',
-        exitCode: 2,
-        text: expect.stringContaining('local mutation requires --write'),
+        kind: 'dispatch',
+        argv: ['node', '/cli.js', 'sense-run', kind],
       });
       expect(routeSense([kind, '--write'])).toMatchObject({
         kind: 'dispatch',
@@ -145,12 +144,11 @@ describe('sense run readiness aggregation', () => {
     }
 
     expect(routeSense(['llm_judge'])).toMatchObject({
-      kind: 'output',
-      exitCode: 2,
-      text: expect.stringContaining('remote mutation requires --write --publish'),
+      kind: 'dispatch',
+      argv: ['node', '/cli.js', 'sense-run', 'llm_judge'],
     });
-    expect(routeSense(['llm_judge', '--write'])).toMatchObject({ kind: 'output', exitCode: 2 });
-    expect(routeSense(['llm_judge', '--publish'])).toMatchObject({ kind: 'output', exitCode: 2 });
+    expect(routeSense(['llm_judge', '--write'])).toMatchObject({ kind: 'dispatch' });
+    expect(routeSense(['llm_judge', '--publish'])).toMatchObject({ kind: 'dispatch' });
     expect(routeSense(['llm_judge', '--write', '--publish'])).toMatchObject({
       kind: 'dispatch',
       argv: ['node', '/cli.js', 'sense-run', 'llm_judge'],
