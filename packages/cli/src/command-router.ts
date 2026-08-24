@@ -158,6 +158,8 @@ export type RouteResult =
       readonly bypassActionOutput?: true;
     };
 
+export const ROUTER_INTERNAL_NAMES = ['check', 'round-close', 'init-bind'] as const;
+
 function flagValue(args: readonly string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
   const value = index < 0 ? undefined : args[index + 1];
@@ -187,7 +189,6 @@ function usageRefusal(
 }
 
 export function invocationIsNonMutating(internalName: string, args: readonly string[]): boolean {
-  if (args.includes('--check')) return true;
   if (
     internalName === 'check' &&
     ['--task-plan', '--status', '--explain'].some((flag) => args.includes(flag))
@@ -195,12 +196,7 @@ export function invocationIsNonMutating(internalName: string, args: readonly str
     return true;
   }
   if (internalName === 'round-close' && args.includes('--post-merge-receipt')) return true;
-  if (internalName === 'mutation-verify' && !args.includes('--save-baseline')) return true;
-  return (
-    ['init', 'adopt', 'init-bind', 'ci-scaffold', 'hooks-install', 'state-prune'].includes(
-      internalName,
-    ) && !args.includes('--write')
-  );
+  return internalName === 'init-bind' && !args.includes('--write');
 }
 
 export function routeArgv(
@@ -403,8 +399,6 @@ export function routeArgv(
     if (exact.internal_name === 'init-bind' && remaining.includes('--write')) {
       translated = remaining.filter((arg) => arg !== '--publish');
     }
-    if (exact.internal_name === 'state-prune' && remaining.includes('--write'))
-      translated = [...translated, '--apply'];
     return {
       kind: 'dispatch',
       argv: [...argv.slice(0, 2), exact.internal_name, ...translated],
