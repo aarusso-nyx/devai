@@ -1291,7 +1291,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             ? describeDeclaredCheckTaskRefusal(repositoryRoot, request)
             : undefined;
         const error = new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') as Error & {
-          context?: Readonly<Record<string, unknown>>;
+          context?: object;
         };
         if (context !== undefined) error.context = context;
         throw error;
