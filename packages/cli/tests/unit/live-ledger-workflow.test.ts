@@ -163,9 +163,24 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_ACTION_PIN_MISMATCH',
     },
     {
-      name: 'candidate-controlled pull-request workflow',
-      mutate: (source: string) => source.replace('pull_request_target:', 'pull_request:'),
+      name: 'privileged pull-request-target workflow',
+      mutate: (source: string) => source.replace('pull_request:', 'pull_request_target:'),
       diagnostic: 'CI_WORKFLOW_TRUST_BOUNDARY_INVALID',
+    },
+    {
+      name: 'protected environment on untrusted preflight',
+      mutate: (source: string) =>
+        source.replace(
+          '    name: Validate candidate verifier without protected inputs\n',
+          `    name: Validate candidate verifier without protected inputs\n    environment: ${LEDGER_ENVIRONMENT}\n`,
+        ),
+      diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
+    },
+    {
+      name: 'protected verification pull-request guard removed',
+      mutate: (source: string) =>
+        source.replace("    if: ${{ github.event_name != 'pull_request' }}\n", ''),
+      diagnostic: 'CI_LEDGER_TRUSTED_EVENT_GUARD_MISSING',
     },
     {
       name: 'missing protected environment',
@@ -193,7 +208,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'verifier provenance digest mismatch accepted',
       mutate: (source: string) =>
-        source.replace(
+        source.replaceAll(
           'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
           'test -n "$actual_provenance_sha256"',
         ),
@@ -202,19 +217,19 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'unsafe verifier package subtree accepted',
       mutate: (source: string) =>
-        source.replace('DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID', 'special-file-ignored'),
+        source.replaceAll('DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID', 'special-file-ignored'),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
       name: 'verifier package population is not checked',
       mutate: (source: string) =>
-        source.replace('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID', 'population-ignored'),
+        source.replaceAll('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID', 'population-ignored'),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
       name: 'verifier runtime population copy is bypassed',
       mutate: (source: string) =>
-        source.replace(
+        source.replaceAll(
           'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
           'cp -R "$source_root/test" "$verifier_root/"',
         ),
@@ -222,12 +237,12 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'wrong package-owned verifier provenance',
-      mutate: (source: string) => source.replace(VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
+      mutate: (source: string) => source.replaceAll(VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
       name: 'obsolete verifier repository identity',
-      mutate: (source: string) => source.replace(VERIFIER_PACKAGE, 'devai-nyx/devai-verifier'),
+      mutate: (source: string) => source.replaceAll(VERIFIER_PACKAGE, 'devai-nyx/devai-verifier'),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {

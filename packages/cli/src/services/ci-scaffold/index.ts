@@ -292,7 +292,7 @@ export function ledgerVerificationWorkflow(): string {
   return `name: DEVAI ledger verification
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
@@ -300,7 +300,7 @@ on:
 
 concurrency:
   group: devai-ledger-verify-\${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: \${{ github.event_name == 'pull_request_target' }}
+  cancel-in-progress: \${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -309,8 +309,30 @@ env:
   CANDIDATE_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  candidate-preflight:
+    name: Validate candidate verifier without protected inputs
+    if: \${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@${CHECKOUT_COMMIT} # v7.0.1
+        with:
+          ref: \${{ env.CANDIDATE_SHA }}
+          path: candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up verifier runtime
+        uses: actions/setup-node@${SETUP_NODE_COMMIT} # v7.0.0
+        with:
+          node-version: 24
+
+${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
+
   verify-ledger:
     name: Verify externally attested local ledger
+    if: \${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     environment: ${LEDGER_ENVIRONMENT}
     timeout-minutes: 5
