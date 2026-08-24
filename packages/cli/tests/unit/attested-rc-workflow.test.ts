@@ -5,6 +5,7 @@ import { parse } from 'yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ATTESTED_RC_WORKFLOW_FILE,
+  NEXT_VERIFIER_SOURCE_COMMIT,
   VERIFIER_PACKAGE,
   VERIFIER_SOURCE_COMMIT,
   attestedRcVerificationWorkflow,
@@ -53,15 +54,15 @@ describe('attested RC workflow scaffold', () => {
       'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     );
     expect(plan.content).toContain(`manifest.name !== '${VERIFIER_PACKAGE}'`);
-    expect(plan.content).toContain(`provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`);
+    expect(plan.content).toContain(
+      `!['${VERIFIER_SOURCE_COMMIT}', '${NEXT_VERIFIER_SOURCE_COMMIT}'].includes(provenance.sourceCommit)`,
+    );
     expect(plan.content).toContain('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:');
     expect(plan.content).toContain('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
     expect(plan.content).toContain('node "$DEVAI_EVIDENCE_BUNDLE_VERIFY"');
     expect(plan.content).toContain('node "$DEVAI_EVIDENCE_POLICY"');
     expect(
-      plan.content.indexOf(
-        'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
-      ),
+      plan.content.indexOf('test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"'),
     ).toBeLessThan(
       plan.content.indexOf('cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"'),
     );
