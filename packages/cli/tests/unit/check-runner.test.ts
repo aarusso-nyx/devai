@@ -1003,6 +1003,18 @@ describe('content-addressed check runner', () => {
     expect(
       matchDeclaredCheckTaskProcess(
         state.root,
+        invocation,
+        request(
+          realpathSync(process.execPath),
+          ['-e', "process.stdout.write('local test dependency closure complete\\n')"],
+          state.root,
+          false,
+        ),
+      ),
+    ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredCheckTaskProcess(
+        state.root,
         ['node', 'devai', 'check', '--suite', 'quick', '--write'],
         request(
           'node',

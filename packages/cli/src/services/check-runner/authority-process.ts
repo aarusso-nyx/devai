@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { readTaskDescriptor } from './policy.js';
+import { resolveTaskExecutable } from './executable.js';
 
 export interface DeclaredCheckTaskProcess {
   readonly nodeId: string;
@@ -36,6 +37,15 @@ function distance(left: readonly string[], right: readonly string[]): number {
 function within(root: string, candidate: string): boolean {
   const path = relative(root, candidate);
   return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !isAbsolute(path));
+}
+
+function matchesDeclaredExecutable(root: string, declared: string, requested: string): boolean {
+  if (declared === requested) return true;
+  try {
+    return resolveTaskExecutable(root, declared).path === requested;
+  } catch {
+    return false;
+  }
 }
 
 export function matchDeclaredCheckTaskProcess(
@@ -79,7 +89,7 @@ export function matchDeclaredCheckTaskProcess(
   const descriptor = readTaskDescriptor(resolve(root, 'test-tasks.json'));
   const task = descriptor.tasks.find(
     (candidate) =>
-      candidate.argv[0] === executable &&
+      matchesDeclaredExecutable(root, candidate.argv[0] ?? '', executable) &&
       JSON.stringify(candidate.argv.slice(1)) === JSON.stringify(argv) &&
       existsSync(resolve(root, candidate.cwd)) &&
       realpathSync(resolve(root, candidate.cwd)) === cwd,
