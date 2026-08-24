@@ -146,7 +146,12 @@ async function expectCliPass(args: readonly string[]) {
 }
 
 async function establishTier3Binding(repo: string): Promise<void> {
-  for (const selector of [['--constitution'], ['--operational-law'], ['--subprocess-effects'], []]) {
+  for (const selector of [
+    ['--constitution'],
+    ['--operational-law'],
+    ['--subprocess-effects'],
+    [],
+  ]) {
     await expectCliPass([
       'init',
       'bind',
@@ -314,9 +319,9 @@ describe('adopter-safe check and binding contracts', () => {
       readFileSync(join(repo, '.devai/config/authority-policy.json'), 'utf8'),
     ) as { materialized_at: string; materialization: { invocation_id: string } };
     expect.soft(secondAuthority.materialized_at).toBe(firstAuthority.materialized_at);
-    expect.soft(secondAuthority.materialization.invocation_id).toBe(
-      firstAuthority.materialization.invocation_id,
-    );
+    expect
+      .soft(secondAuthority.materialization.invocation_id)
+      .toBe(firstAuthority.materialization.invocation_id);
     expect
       .soft(new Map(relevant.map((path) => [path, readFileSync(join(repo, path))] as const)))
       .toEqual(firstBytes);
@@ -330,6 +335,7 @@ describe('adopter-safe check and binding contracts', () => {
 
   it('executes the declared tier3 plan and role-separated apply sequence after binding', async () => {
     const repo = root('devai-tier3-role-sequence-');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
     await expectCliPass(['init', 'plan', '--target', repo, '--tier', 'tier3']);
     await establishTier3Binding(repo);
     for (const [segment, role] of [
@@ -410,18 +416,13 @@ describe('adopter-safe check and binding contracts', () => {
         },
       },
     });
-    await expectCliPass([
-      'init',
-      'bind',
-      '--target',
-      repo,
-      '--as-role',
-      'architect',
-      '--write',
-    ]);
+    await expectCliPass(['init', 'bind', '--target', repo, '--as-role', 'architect', '--write']);
     execFileSync('git', ['add', '.'], { cwd: repo });
     execFileSync('git', ['commit', '-qm', 'bound installed adopter'], { cwd: repo });
-    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
     const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {
       cwd: repo,
       encoding: 'utf8',
@@ -549,15 +550,7 @@ describe('adopter-safe check and binding contracts', () => {
         },
       },
     });
-    await expectCliPass([
-      'init',
-      'bind',
-      '--target',
-      repo,
-      '--as-role',
-      'architect',
-      '--write',
-    ]);
+    await expectCliPass(['init', 'bind', '--target', repo, '--as-role', 'architect', '--write']);
     execFileSync('git', ['add', '.'], { cwd: repo });
     execFileSync('git', ['commit', '-qm', 'bound adopter without origin'], { cwd: repo });
     put(repo, '.artifacts/unit/metadata.txt', 'job=unit\nplatform=darwin/arm64\n');
