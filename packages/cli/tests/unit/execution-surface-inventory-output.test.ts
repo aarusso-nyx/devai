@@ -121,6 +121,13 @@ describe('execution-surface inventory discovery', () => {
     for (const slice of INVENTORY_SLICES) expect(help, slice.name).toContain(slice.name);
     expect(help).toContain('without persistence');
   });
+
+  it('labels check task operations as mutually exclusive in help', () => {
+    const help = renderHelp(current, '1.2.8', ['check']);
+    for (const option of ['--task-plan', '--run', '--status', '--explain']) {
+      expect(help).toMatch(new RegExp(`${option}.*Task operation \\(choose one\\)`, 'u'));
+    }
+  });
 });
 
 describe('execution-surface action output totality', () => {

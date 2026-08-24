@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { canonicalRegistry, validateActionSurface } from '../../src/define-command.js';
 import { buildTrustedAuthoritySources, repositoryIdFor } from '../../src/authority/policy.js';
-import { invocationIsNonMutating, ROUTER_INTERNAL_NAMES } from '../../src/command-router.js';
+import {
+  invocationIsNonMutating,
+  routeArgv,
+  ROUTER_INTERNAL_NAMES,
+} from '../../src/command-router.js';
 
 const temporaryRoots: string[] = [];
 
@@ -42,6 +46,16 @@ describe('canonical action registry constructor', () => {
     expect(invocationIsNonMutating('init-bind', ['--write'])).toBe(false);
     expect(invocationIsNonMutating('docs-cli', ['--check'])).toBe(false);
     expect(invocationIsNonMutating('state-prune', [])).toBe(false);
+  });
+
+  it('suggests only commands with a meaningful edit-distance relationship', () => {
+    const registry = canonicalRegistry();
+    const unrelated = routeArgv(['node', 'devai', 'nosuchcommand'], registry, '1.2.8');
+    const typo = routeArgv(['node', 'devai', 'doctr'], registry, '1.2.8');
+    expect(unrelated).toMatchObject({ kind: 'output', exitCode: 2 });
+    expect(unrelated.kind === 'output' ? unrelated.text : '').toContain('Run devai --help.');
+    expect(unrelated.kind === 'output' ? unrelated.text : '').not.toContain('Did you mean');
+    expect(typo.kind === 'output' ? typo.text : '').toContain("Did you mean 'devai doctor'?");
   });
 
   it('derives identical policy provenance from repeated constructions', () => {

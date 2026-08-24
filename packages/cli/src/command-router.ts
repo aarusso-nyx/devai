@@ -144,9 +144,13 @@ function suggestion(
   entries: readonly RegistryEntry[],
 ): string | undefined {
   const wanted = input.join(' ');
-  return entries
+  const candidate = entries
     .map((entry) => entry.path.join(' '))
     .sort((a, b) => distance(wanted, a) - distance(wanted, b))[0];
+  if (candidate === undefined) return undefined;
+  const editDistance = distance(wanted, candidate);
+  const maximum = Math.max(1, Math.floor(Math.max(wanted.length, candidate.length) * 0.34));
+  return editDistance <= maximum ? candidate : undefined;
 }
 
 export type RouteResult =
