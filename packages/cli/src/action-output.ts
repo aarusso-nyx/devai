@@ -54,8 +54,10 @@ function normalizeExit(exit: number): 2 | 3 | 4 | 5 | 6 | 7 {
 
 function errorFrom(text: string, exit: number): CliError {
   const trimmed = text.trim();
+  let parsedPayload: unknown;
   try {
     const parsed = JSON.parse(trimmed) as unknown;
+    parsedPayload = parsed;
     if (validators.error(parsed)) return parsed as CliError;
     if (
       typeof parsed === 'object' &&
@@ -69,13 +71,21 @@ function errorFrom(text: string, exit: number): CliError {
     // Unstructured service output is normalized below.
   }
   const normalized = normalizeExit(exit);
-  const message = trimmed.replace(/^devai(?: [^:]+)?:\s*/u, '') || 'action failed';
+  const message =
+    parsedPayload === undefined
+      ? trimmed.replace(/^devai(?: [^:]+)?:\s*/u, '') || 'action failed'
+      : normalized === 3
+        ? 'The action completed with a failing gate outcome.'
+        : normalized === 5
+          ? 'The action precondition was not satisfied.'
+          : 'The action returned a structured failure payload.';
   return cliError({
     code: normalized === 7 ? 'ACTION_OUTPUT_CONTRACT_VIOLATION' : 'ACTION_INVOCATION_REFUSED',
     class: errorClass(normalized),
     exit: normalized,
     message,
     remediation: 'Correct the invocation or satisfy the reported precondition, then retry.',
+    ...(parsedPayload === undefined ? {} : { context: { payload: parsedPayload } }),
   });
 }
 
@@ -175,11 +185,32 @@ export function runCliStage<T>(
     return { ok: true, value: operation() };
   } catch (error) {
     const usage = error instanceof Error && error.name === 'CACError';
-    const exit = usage ? 2 : 6;
     const message = error instanceof Error ? error.message : String(error);
+    const optionalDependency = /^OPTIONAL_DEPENDENCY_MISSING:([A-Za-z0-9@/._-]+)$/u.exec(message);
+    const exit = usage ? 2 : optionalDependency === null ? 6 : 5;
     if (entry === undefined) {
       process.stderr.write(`devai: ${message}\n`);
       process.exitCode = exit;
+      return { ok: false, stage };
+    }
+    if (
+      optionalDependency !== null &&
+      entry !== undefined &&
+      emitPreDispatchActionResult(entry, {
+        exit,
+        stdout: '',
+        stderr: `${JSON.stringify(
+          cliError({
+            code: 'SENSOR_OPTIONAL_DEPENDENCY_MISSING',
+            class: 'precondition',
+            exit: 5,
+            message: `Optional dependency '${optionalDependency[1]}' is required for this feature.`,
+            remediation: `Install '${optionalDependency[1]}' to use this feature: pnpm add ${optionalDependency[1]}`,
+            context: { package: optionalDependency[1], stage },
+          }),
+        )}\n`,
+      })
+    ) {
       return { ok: false, stage };
     }
     if (
@@ -269,8 +300,23 @@ export function attachActionOutputBoundaries(
       };
       const fail = (error: unknown): void => {
         if (!(error instanceof CommandExit)) {
-          explicitExit = 6;
-          stderr = error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
+          const optionalDependency =
+            /^OPTIONAL_DEPENDENCY_MISSING:([A-Za-z0-9@/._-]+)$/u.exec(message);
+          explicitExit = optionalDependency === null ? 6 : 5;
+          stderr =
+            optionalDependency === null
+              ? message
+              : JSON.stringify(
+                  cliError({
+                    code: 'SENSOR_OPTIONAL_DEPENDENCY_MISSING',
+                    class: 'precondition',
+                    exit: 5,
+                    message: `Optional dependency '${optionalDependency[1]}' is required for this feature.`,
+                    remediation: `Install '${optionalDependency[1]}' to use this feature: pnpm add ${optionalDependency[1]}`,
+                    context: { package: optionalDependency[1], stage: 'handler-dispatch' },
+                  }),
+                );
         }
         finish();
       };

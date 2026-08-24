@@ -30,7 +30,10 @@ import {
 import { resolveCanonicalConstitution } from '@devai-nyx/skills';
 import { validators } from '@devai-nyx/schemas';
 import type { RegistryEntry } from '../define-command.js';
-import { matchDeclaredCheckTaskProcess } from '../services/check-runner/authority-process.js';
+import {
+  describeDeclaredCheckTaskRefusal,
+  matchDeclaredCheckTaskProcess,
+} from '../services/check-runner/authority-process.js';
 import { matchDeclaredRoundTaskProcess } from '../services/round-run/authority-process.js';
 import {
   buildTrustedAuthoritySources,
@@ -1279,7 +1282,15 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         sources.repository_id,
         input.argv,
       );
-      if (!target) throw new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      if (!target) {
+        const context =
+          input.entry.name === 'check'
+            ? describeDeclaredCheckTaskRefusal(repositoryRoot, request)
+            : undefined;
+        throw new Error(
+          `AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED${context === undefined ? '' : `:${JSON.stringify(context)}`}`,
+        );
+      }
       if (actionPlanner.kind === 'exact-plan') {
         throw new Error('AUTHORITY_EXACT_PROCESS_ADAPTER_REQUIRED');
       }

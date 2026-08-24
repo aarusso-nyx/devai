@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.6
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.7
 pnpm exec devai catalog actions --format json
 ```
 
@@ -71,6 +71,24 @@ pnpm exec devai init bind \
 
 Invalid schemas, source paths outside `law/policy`, immutable-domain collisions, or incomplete
 writes leave the prior resolved configuration unchanged.
+
+### Upgrading DEVAI
+
+Bump the pinned package version, then re-run both policy binding commands:
+
+```bash
+pnpm exec devai init bind --target . --operational-law --as-role architect --write
+pnpm exec devai init bind --target . --subprocess-effects --as-role architect --write
+```
+
+Run `pnpm exec devai doctor`, review every reported digest change, and commit the refreshed
+materialization with the package update. Materialized policy is a versioned snapshot, not a link;
+installing a newer package does not silently rewrite adopter-owned repository files.
+
+The core CLI installs without model-provider or PostgreSQL clients. Install `openai` for the
+Codex API bridge, `@anthropic-ai/sdk` for the Claude API bridge, and `pg` for database-backed
+inventory, runtime probes, or translation-isolation checks. When one is absent, only the feature
+that needs it returns a typed precondition with the exact install command.
 
 ## 3. Apply role-owned segments
 

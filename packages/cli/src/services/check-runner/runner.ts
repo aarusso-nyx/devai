@@ -4,6 +4,11 @@ import { spawnSync } from '@devai-nyx/authority';
 import { CheckCache } from './cache.js';
 import { sha256Hex } from './canonical.js';
 import { buildTaskPlan, currentRepositoryState, readTaskDescriptor } from './policy.js';
+import {
+  encodeTaskExecutable,
+  executableToolchainKey,
+  resolveTaskExecutable,
+} from './executable.js';
 import type {
   CandidateReceipt,
   CheckRunnerOptions,
@@ -201,6 +206,19 @@ function requiredToolchainKeys(options: CheckRunnerOptions): readonly string[] {
   return requiredTaskNodes(options).flatMap((task) => task.toolchainKeys);
 }
 
+function resolvedRunnerToolchain(options: CheckRunnerOptions): Readonly<Record<string, string>> {
+  const resolved: Record<string, string> = {
+    ...resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options)),
+  };
+  for (const task of requiredTaskNodes(options)) {
+    const executable = task.argv[0] ?? '';
+    resolved[executableToolchainKey(executable)] = encodeTaskExecutable(
+      resolveTaskExecutable(options.repoRoot, executable),
+    );
+  }
+  return resolved;
+}
+
 function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[] {
   return requiredTaskNodes(options).flatMap((task) => task.allowlistedEnv);
 }
@@ -233,8 +251,7 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
     options.cacheRoot ?? join(options.repoRoot, '.devai/state/check-cache/v1'),
   );
   const cache = new CheckCache(options.repoRoot, cacheRoot);
-  const toolchain =
-    options.toolchain ?? resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options));
+  const toolchain = options.toolchain ?? resolvedRunnerToolchain(options);
   const environment: Record<string, string> = { ...(options.environment ?? {}) };
   const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
   if (requiredEnvironment.includes(authorityDigestKey)) {
@@ -314,7 +331,7 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
       throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
     }
     const result = execute(
-      task.argv,
+      options.executeTask === undefined ? [task.executable.path, ...task.argv.slice(1)] : task.argv,
       resolve(options.repoRoot, task.cwd),
       timeoutMs,
       taskEnvironment(descriptorTask, environment),

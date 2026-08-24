@@ -138,6 +138,15 @@
       "owner": "architect"
     },
     {
+      "template_id": "git-cat-file-commit-exists",
+      "executable": "git",
+      "argv_shape": ["cat-file", "-e", "<dynamic>"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Host-adapter diagnosis verifies that the exact installation commit still exists in the bound repository.",
+      "owner": "architect"
+    },
+    {
       "template_id": "git-rev-list-parents",
       "executable": "git",
       "argv_shape": ["rev-list", "--parents", "-n", "1", "<dynamic>"],
@@ -171,6 +180,15 @@
       "capabilities": ["proc:git-read"],
       "effect": "read",
       "reason": "Round skill verifies a selected ref.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "git-verify-head-commit",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "--verify", "HEAD^{commit}"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "Host-adapter installation binds its attestation to the exact current commit in both primary and linked worktrees.",
       "owner": "architect"
     },
     {

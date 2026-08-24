@@ -120,7 +120,8 @@ describe('devai init apply architect --include hooks', () => {
         error: {
           class: 'routing-authority',
           exit: 2,
-          message: expect.stringContaining('local mutation requires --write'),
+          code: 'AUTHORITY_WRITE_CONSENT_REQUIRED',
+          remediation: expect.stringContaining('Add --write'),
         },
       });
       expect(existsSync(hookPath)).toBe(false);
@@ -193,7 +194,10 @@ describe('devai init apply architect --include hooks', () => {
       expect(envelope(r.stderr)).toMatchObject({
         action_id: 'init apply architect',
         ok: false,
-        error: { message: expect.stringContaining('local mutation requires --write') },
+        error: {
+          code: 'AUTHORITY_WRITE_CONSENT_REQUIRED',
+          remediation: expect.stringContaining('Add --write'),
+        },
       });
       expect(existsSync(hookPath)).toBe(false);
       expect(existsSync(join(tempDir, '.git/devai'))).toBe(false);

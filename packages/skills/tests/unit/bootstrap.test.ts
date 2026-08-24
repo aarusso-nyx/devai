@@ -183,6 +183,24 @@ describe('buildBootstrapPlan: adopter constitution binding', () => {
     });
   });
 
+  it('scaffolds the complete tier3 doctor substrate', () => {
+    const plan = buildBootstrapPlan({ targetRoot: dir, version: '1.0.0', profile: 'tier3' });
+    const paths = new Set(plan.entries.map((entry) => entry.path));
+    for (const path of [
+      'product/README.md',
+      'law/invariants/README.md',
+      'law/schemas/README.md',
+      'law/adr/README.md',
+      'law/glossary/README.md',
+      'docs/dev/operations/README.md',
+      'docs/dev/security/README.md',
+      'AGENTS.md',
+      'CLAUDE.md',
+    ]) {
+      expect(paths).toContain(path);
+    }
+  });
+
   it('reconciles a later explicit profile while preserving adopter declarations', () => {
     mkdirSync(join(dir, '.devai/config'), { recursive: true });
     const projectPath = join(dir, '.devai/config/project.json');

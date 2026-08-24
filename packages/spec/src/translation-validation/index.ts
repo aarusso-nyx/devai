@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { minimatch } from 'minimatch';
-import { Client } from 'pg';
 import { validators } from '@devai-nyx/schemas';
 
 export type TranslationStrategy =
@@ -1234,6 +1233,15 @@ export async function provisionValidationDatabase(input: {
   readonly database_url: string;
   readonly validation_id: string;
 }): Promise<{ readonly ok: boolean; readonly database?: string; readonly error?: string }> {
+  let Client: (typeof import('pg'))['Client'];
+  try {
+    ({ Client } = await import('pg'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('OPTIONAL_DEPENDENCY_MISSING:pg');
+    }
+    throw error;
+  }
   const database = validationDatabaseName(input.validation_id);
   const client = new Client({ connectionString: input.database_url });
   try {
@@ -1253,6 +1261,15 @@ export async function dropValidationDatabase(input: {
 }): Promise<{ readonly ok: boolean; readonly error?: string }> {
   if (!/^devai_task_TV_[a-f0-9]{16}$/u.test(input.database)) {
     return { ok: false, error: 'VALIDATION_DATABASE_INVALID' };
+  }
+  let Client: (typeof import('pg'))['Client'];
+  try {
+    ({ Client } = await import('pg'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('OPTIONAL_DEPENDENCY_MISSING:pg');
+    }
+    throw error;
   }
   const client = new Client({ connectionString: input.database_url });
   try {

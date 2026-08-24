@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../scratch/typecheck/cli",
+    "tsBuildInfoFile": "../../scratch/typecheck/cli.tsbuildinfo"
+  }
+}

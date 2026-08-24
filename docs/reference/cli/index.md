@@ -35,6 +35,8 @@ current stable, preview, and internal population.
 
 Machine output is one action-bound envelope. A successful transport contains a closed result
 frame with `verdict: "pass" | "review"`; REVIEW remains a typed result on stdout and exits `1`.
+Exit `3` is a `gate-fail` domain outcome; `2` remains a routing, usage, or authority refusal,
+while `5`, `6`, and `7` identify precondition, infrastructure, and contract failures.
 Routing, authority, infrastructure, input, and contract failures emit a structured error envelope
 on stderr and never stringify a valid domain payload into an error message. Human and JSON modes
 share the same exit taxonomy. A process exit is transport/control information, not a substitute

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from '@devai-nyx/authority';
-import { EXIT_USAGE } from '@devai-nyx/utils';
+import { EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
 import { join, resolve } from 'node:path';
 import { clusterStatus } from './db.js';
 import { completeHumanTask, type HumanExecutorRole } from './human-executor.js';
@@ -67,7 +67,7 @@ export function requireActiveTaskRound(options: {
 }): string {
   const roundId = requestedRound(options.round);
   const repoRoot = resolve(options.repoRoot);
-  if (!authorizationIsActive(repoRoot, roundId)) fail('TASK_ROUND_INACTIVE');
+  if (!authorizationIsActive(repoRoot, roundId)) fail('TASK_ROUND_INACTIVE', EXIT_PRECONDITION);
   return roundId;
 }
 

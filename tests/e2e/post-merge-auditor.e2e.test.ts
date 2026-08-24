@@ -211,7 +211,17 @@ describe('Article 34 post-merge Auditor composite', () => {
       expect(installed.status, installed.stderr).toBe(0);
       expect(existsSync(join(repo, '.git/hooks/post-merge'))).toBe(true);
       expect(
-        git(['add', '.devai/config', '.devai/pin', '.devai/constitution.md', 'law', 'work']).status,
+        git([
+          'add',
+          '.devai/config',
+          '.devai/pin',
+          '.devai/constitution.md',
+          'law',
+          'work',
+          'AGENTS.md',
+          'CLAUDE.md',
+          'docs',
+        ]).status,
       ).toBe(0);
       expect(git(['commit', '-m', 'test: authority and host adapter']).status).toBe(0);
 
@@ -253,7 +263,17 @@ describe('Article 34 post-merge Auditor composite', () => {
       materializeAuthorityPolicy();
       expect(install().status).toBe(0);
       expect(
-        git(['add', '.devai/config', '.devai/pin', '.devai/constitution.md', 'law', 'work']).status,
+        git([
+          'add',
+          '.devai/config',
+          '.devai/pin',
+          '.devai/constitution.md',
+          'law',
+          'work',
+          'AGENTS.md',
+          'CLAUDE.md',
+          'docs',
+        ]).status,
       ).toBe(0);
       expect(git(['commit', '-m', 'test: authority and host adapter']).status).toBe(0);
       expect(git(['checkout', '-b', 'feature-lock']).status).toBe(0);
@@ -302,7 +322,17 @@ describe('Article 34 post-merge Auditor composite', () => {
       materializeAuthorityPolicy();
       expect(install().status).toBe(0);
       expect(
-        git(['add', '.devai/config', '.devai/pin', '.devai/constitution.md', 'law', 'work']).status,
+        git([
+          'add',
+          '.devai/config',
+          '.devai/pin',
+          '.devai/constitution.md',
+          'law',
+          'work',
+          'AGENTS.md',
+          'CLAUDE.md',
+          'docs',
+        ]).status,
       ).toBe(0);
       expect(git(['commit', '-m', 'test: authority and host adapter']).status).toBe(0);
       expect(git(['checkout', '-b', 'feature-failure']).status).toBe(0);
@@ -344,7 +374,17 @@ describe('Article 34 post-merge Auditor composite', () => {
       materializeAuthorityPolicy();
       expect(install().status).toBe(0);
       expect(
-        git(['add', '.devai/config', '.devai/pin', '.devai/constitution.md', 'law', 'work']).status,
+        git([
+          'add',
+          '.devai/config',
+          '.devai/pin',
+          '.devai/constitution.md',
+          'law',
+          'work',
+          'AGENTS.md',
+          'CLAUDE.md',
+          'docs',
+        ]).status,
       ).toBe(0);
       expect(git(['commit', '-m', 'test: authority and host adapter']).status).toBe(0);
       expect(git(['checkout', '-b', 'feature-retry']).status).toBe(0);

@@ -1,8 +1,5 @@
-import pg from 'pg';
 import { createDbCapabilities } from '@devai-nyx/authority';
 import type { SchemaKind } from './schemas-discoverer.js';
-
-const { Client } = pg;
 
 export interface DbSchemaRecord {
   readonly kind: Extract<SchemaKind, 'db_table' | 'db_view'>;
@@ -40,6 +37,15 @@ export interface IntrospectDatabaseOptions {
 export async function introspectDatabase(
   opts: IntrospectDatabaseOptions,
 ): Promise<readonly DbSchemaRecord[]> {
+  let Client: (typeof import('pg'))['Client'];
+  try {
+    ({ Client } = await import('pg'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('OPTIONAL_DEPENDENCY_MISSING:pg');
+    }
+    throw error;
+  }
   const client = new Client({
     connectionString: opts.databaseUrl,
     connectionTimeoutMillis: opts.connectionTimeoutMs ?? 5000,

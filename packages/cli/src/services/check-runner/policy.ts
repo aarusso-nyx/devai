@@ -12,6 +12,11 @@ import type {
   TaskTarget,
 } from './types.js';
 import { resolveMutationOutputContract } from './mutation-output.js';
+import {
+  BARE_EXECUTABLE,
+  resolveTaskExecutable,
+  taskExecutableFromToolchain,
+} from './executable.js';
 
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
@@ -187,6 +192,8 @@ function validateDescriptor(value: unknown): TaskDescriptor {
       !Array.isArray(task.dependencies) ||
       !Array.isArray(task.argv) ||
       task.argv.length === 0 ||
+      task.argv.some((argument: unknown) => typeof argument !== 'string') ||
+      !BARE_EXECUTABLE.test(task.argv[0] ?? '') ||
       !Array.isArray(task.inputSelectors) ||
       task.inputSelectors.length === 0 ||
       !Array.isArray(task.toolchainKeys) ||
@@ -564,12 +571,17 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       nodeId,
       taskKey: taskKeys.get(nodeId),
     }));
+    const executableName = task.argv[0] ?? '';
+    const executable =
+      taskExecutableFromToolchain(toolchain, executableName) ??
+      resolveTaskExecutable(repoRoot, executableName);
     const taskKey = sha256Hex({
       schemaVersion: '1.0.0',
       descriptorDigest,
       descriptorVersion: descriptor.descriptorVersion,
       nodeId: task.nodeId,
       argv: task.argv,
+      executable,
       cwd: task.cwd,
       runner: task.runner,
       toolchain: selectedToolchain,
@@ -584,9 +596,11 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       taskKey,
       dependencies: [...task.dependencies],
       argv: [...task.argv],
+      executable,
       cwd: task.cwd,
       inputDigest: sha256Hex({
         inputs,
+        executable,
         toolchain: selectedToolchain,
         environment: selectedEnvironment,
       }),
