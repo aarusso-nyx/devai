@@ -459,6 +459,18 @@ describe('content-addressed check runner', () => {
     expect(actual.tasks.find((task) => task.nodeId === 'test:coverage:rc')?.dependencies).toEqual([
       'build',
     ]);
+    expect(actual.tasks.find((task) => task.nodeId === 'lint')?.dependencies).toEqual(['generate']);
+    expect(actual.tasks.find((task) => task.nodeId === 'typecheck')?.dependencies).toEqual([
+      'build',
+    ]);
+    expect(actual.tasks.find((task) => task.nodeId === 'test:local-full')?.dependencies).toEqual(
+      expect.arrayContaining(['lint', 'typecheck']),
+    );
+    expect(actual.profiles.find((profile) => profile.profileId === 'rc')?.requiredNodes).toEqual([
+      'lint',
+      'typecheck',
+      'test:coverage:rc',
+    ]);
   });
 
   it.each([
@@ -505,6 +517,7 @@ describe('content-addressed check runner', () => {
         toolchain: {
           node: 'v-test',
           pnpm: '9.15.0',
+          eslint: 'eslint@9.0.0',
           vitest: '4.1.10',
           typescript: '5.9.3',
           postgres: 'psql-test',

@@ -19,8 +19,8 @@ Known changed paths select matching leaf tasks and their dependent closure. Unkn
 paths select the declared `test:local-full` fallback and therefore the complete cheap closure.
 
 `devai check --local` selects that complete cheap closure directly. It consists of generation,
-the workspace build, the package and root test leaves, and the aggregate marker. Each unchanged
-PASS node can be served from the ignored content-addressed cache. The current closure is 14 nodes
+the workspace build, lint, typecheck, the package and root test leaves, and the aggregate marker.
+Each unchanged PASS node can be served from the ignored content-addressed cache. The current closure is 16 nodes
 and its Vitest leaves collect 94 files.
 
 Never reuse FAIL, timeout, killed, aborted, malformed, or incomplete output. Dirty-tree runs are
@@ -46,7 +46,9 @@ authority session out of Git while allowing the package-owned `devai-evidence-po
 same three-key task-policy schema. Missing materialization fails with
 `CHECK_AUTHORITY_POLICY_REQUIRED`; it must never be bypassed with a hand-authored policy.
 
-The fixed RC closure is three nodes: generation, build, then one `test:coverage:rc` node. That node
+The fixed RC closure has lint, typecheck, and `test:coverage:rc` as its three required
+sibling gates. Their generation and build dependencies are included transitively; coverage
+depends on build but does not own the lint or typecheck gates. The coverage node
 collects the complete Vitest population exactly once and enforces coverage floors of 70%
 statements, 60% branches, 70% functions, and 70% lines. The narrower database, E2E, performance,
 and containment scripts remain available as diagnostic slices; they are not additional required

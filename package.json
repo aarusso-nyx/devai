@@ -28,7 +28,7 @@
     "release:closure": "node scripts/check-publishable-closure.mjs",
     "authority:materialize": "node packages/cli/dist/runtime/index/bin.js init bind --target . --as-role architect --write --format json",
     "build": "pnpm run devai:prepare && pnpm -r build",
-    "lint": "eslint --format=json .",
+    "lint": "eslint --max-warnings=0 --format=json .",
     "typecheck": "tsc -b packages/cli/tsconfig.typecheck.json --force && tsc --noEmit -p tsconfig.typecheck.json",
     "test": "pnpm run test:local",
     "test:local": "vitest run --config tests/config/local.config.ts",

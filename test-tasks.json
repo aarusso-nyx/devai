@@ -550,7 +550,9 @@
         "test:skills",
         "test:spec",
         "test:utils",
-        "test:root"
+        "test:root",
+        "lint",
+        "typecheck"
       ],
       "argv": ["node", "-e", "process.stdout.write('local test dependency closure complete\\n')"],
       "cwd": ".",
@@ -602,6 +604,76 @@
         "kind": "workspace-build",
         "requiredResult": "pass",
         "paths": ["scratch/coverage/rc-reachable-sources.json"]
+      }
+    },
+    {
+      "nodeId": "lint",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "lint"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [
+        {
+          "kind": "prefix",
+          "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "tests/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "eslint.config.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        }
+      ],
+      "toolchainKeys": ["node", "pnpm", "eslint"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "typecheck",
+      "dependencies": ["build"],
+      "argv": ["pnpm", "run", "typecheck"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [
+        {
+          "kind": "prefix",
+          "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "tests/"
+        },
+        {
+          "kind": "glob",
+          "pattern": "tsconfig*.json"
+        },
+        {
+          "kind": "glob",
+          "pattern": "packages/*/tsconfig*.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        }
+      ],
+      "toolchainKeys": ["node", "pnpm", "typescript"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
       }
     },
     {
@@ -681,13 +753,15 @@
         "test:utils",
         "test:root",
         "test:local-full",
-        "build"
+        "build",
+        "lint",
+        "typecheck"
       ]
     },
     {
       "profileId": "rc",
       "mode": "fixed",
-      "requiredNodes": ["test:coverage:rc"]
+      "requiredNodes": ["lint", "typecheck", "test:coverage:rc"]
     }
   ]
 }

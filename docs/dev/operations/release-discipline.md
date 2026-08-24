@@ -3,6 +3,11 @@
 The release surface evaluates and records evidence; it does not grant publication authority.
 Human maintainers authorize package, tag, release, deployment, and rollback effects separately.
 
+DEVAI 1.2.8 changes the fixed RC task-policy digest by promoting lint and typecheck
+to required sibling gates alongside coverage. The protected-ledger attestation must
+therefore be re-issued for the exact 1.2.8 candidate policy digest; an attestation
+for an earlier digest cannot authorize the changed closure.
+
 ## Inspect
 
 ```bash
