@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Signed annotated version tag to rehearse or recover
+        description: Signed annotated version tag to rehearse or publish
         required: true
         type: string
       publish:
-        description: Run protected publication recovery for the exact tag
+        description: Finalize publication for the exact rehearsed tag
         required: false
         default: false
         type: boolean
@@ -424,7 +424,7 @@ jobs:
   finalize-release:
     name: Create canonical Release and mirror exact package
     needs: [verify-ledger, build-release, verify-linux-adopter]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     environment: devai-rc-publication
     timeout-minutes: 10
@@ -534,7 +534,7 @@ jobs:
   deploy-pages:
     name: Deploy and verify GitHub Pages
     needs: finalize-release
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -596,7 +596,7 @@ jobs:
   rehearsal-summary:
     name: Verify non-publishing rehearsal assets
     needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

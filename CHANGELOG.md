@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.12 — 2026-08-24
+
+- Makes Doctor validate adopter-policy binding receipts and deterministically reconstruct bound
+  policy materialization, while preserving canonical behavior for repositories without a binding
+  and failing closed on malformed, stale, forged, unsafe, or incomplete bindings.
+- Makes signed version-tag pushes non-publishing rehearsals and restricts Release finalization,
+  GitHub Packages publication, and Pages deployment to an explicit workflow dispatch with
+  `publish: true` for the exact rehearsed tag.
+
 ## 1.2.11 — 2026-08-24
 
 - Preserves the approved positional operands for `round gap show`, `round gap resolve`, and
