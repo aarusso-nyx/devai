@@ -7,7 +7,7 @@ import {
   realpathSync,
   statSync,
 } from '@devai-nyx/authority';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import type { CAC } from 'cac';
@@ -157,7 +157,14 @@ function checkF1Paths(repoRoot: string): CheckResult {
 function checkPolicyMaterializationCurrent(repoRoot: string): CheckResult {
   const bindingRelative = '.devai/config/adopter-policy-binding.json';
   const bindingPath = join(repoRoot, bindingRelative);
-  if (existsSync(bindingPath)) return checkAdopterPolicyMaterialization(repoRoot, bindingPath);
+  try {
+    lstatSync(bindingPath);
+    return checkAdopterPolicyMaterialization(repoRoot, bindingPath);
+  } catch (error) {
+    if (!isErrnoException(error) || error.code !== 'ENOENT') {
+      return checkAdopterPolicyMaterialization(repoRoot, bindingPath);
+    }
+  }
 
   const mismatches: Array<Record<string, string>> = [];
   for (const file of MATERIALIZED_POLICY_FILES) {
@@ -202,6 +209,10 @@ interface AdopterPolicyBinding {
   readonly materialized: Readonly<Record<string, string>>;
 }
 
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error;
+}
+
 function policyReasonId(words: string): string {
   return words.toUpperCase().replaceAll('-', '_');
 }
@@ -219,6 +230,20 @@ function parseAdopterPolicyBinding(
   }
   if (!isJsonObject(parsed)) return { reason: 'BINDING_MALFORMED' };
   if (parsed['schemaVersion'] !== '1.0.0') return { reason: 'BINDING_VERSION_UNSUPPORTED' };
+  const bindingKeys = [
+    'materialized',
+    'policy_id',
+    'policy_version',
+    'schemaVersion',
+    'source_digest_sha256',
+    'source_path',
+  ];
+  if (
+    Object.keys(parsed).length !== bindingKeys.length ||
+    bindingKeys.some((key) => !(key in parsed))
+  ) {
+    return { reason: 'BINDING_MALFORMED' };
+  }
   const materialized = parsed['materialized'];
   const digest = /^[a-f0-9]{64}$/u;
   if (
@@ -299,6 +324,8 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
   const lexicalRelative = relative(lawPolicyCandidate, sourceCandidate);
   if (
     sourceLexical.startsWith('/') ||
+    sourceLexical.includes('\\') ||
+    posix.normalize(sourceLexical) !== sourceLexical ||
     lexicalRelative.length === 0 ||
     lexicalRelative === '..' ||
     lexicalRelative.startsWith(`..${sep}`)
