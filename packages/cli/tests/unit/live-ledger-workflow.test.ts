@@ -19,6 +19,14 @@ import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CHECKER = join(ROOT, 'scripts/check-workflows.mjs');
 const roots: string[] = [];
+const EXPLICIT_PUBLISH_CONDITION =
+  "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
+const REHEARSAL_CONDITION =
+  "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
+const PERMISSIVE_PUSH_PUBLICATION_CONDITION =
+  "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}";
+const DISPATCH_ONLY_REHEARSAL_CONDITION =
+  "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
 
 function fixture(source = ledgerVerificationWorkflow(), file = 'devai-ledger-verify.yml') {
   const root = mkdtempSync(join(tmpdir(), 'devai-ledger-workflow-'));
@@ -298,7 +306,7 @@ describe('live ledger-verification workflow', () => {
     expect(result.stderr).toContain('CI_OBSOLETE_WORKFLOW_PRESENT');
   });
 
-  it('keeps tag publication single-triggered and recovery idempotent, ledger-bound, and coverage-free', () => {
+  it('keeps tag pushes rehearsal-only and publication explicit, ledger-bound, and coverage-free', () => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const discipline = readFileSync(
       join(ROOT, 'docs/dev/operations/release-discipline.md'),
@@ -309,12 +317,12 @@ describe('live ledger-verification workflow', () => {
     expect(result.stdout).toBe('workflow contract: PASS\n');
     expect(release).toContain("tags: ['v*']");
     expect(release).toContain('workflow_dispatch:');
-    expect(release).toContain(
-      "if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}",
-    );
-    expect(release).toContain(
-      "if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}",
-    );
+    const parsed = parse(release) as {
+      jobs?: Record<string, { if?: string }>;
+    };
+    expect(parsed.jobs?.['finalize-release']?.if).toBe(EXPLICIT_PUBLISH_CONDITION);
+    expect(parsed.jobs?.['deploy-pages']?.if).toBe(EXPLICIT_PUBLISH_CONDITION);
+    expect(parsed.jobs?.['rehearsal-summary']?.if).toBe(REHEARSAL_CONDITION);
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 44');
     expect(release).toContain('pnpm run release:closure');
@@ -331,8 +339,38 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('for attempt in {1..12}');
     expect(release).toContain('grep -Fq "$expected"');
     expect(release).toContain('?release=${RELEASE_TAG#v}&attempt=$attempt');
-    expect(discipline).toContain('signed annotated version tag is the normal single trigger');
-    expect(discipline).toContain('`workflow_dispatch` is an idempotent recovery entry point');
+    expect(discipline).toContain(
+      'A signed annotated version-tag push is a non-publishing rehearsal trigger.',
+    );
+    expect(discipline).toContain(
+      'Only an explicit `workflow_dispatch` with `publish: true` may finalize',
+    );
+  });
+
+  it('accepts only explicit dispatch publication and push-or-false-dispatch rehearsal guards', () => {
+    const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const intended = current
+      .replaceAll(PERMISSIVE_PUSH_PUBLICATION_CONDITION, EXPLICIT_PUBLISH_CONDITION)
+      .replace(DISPATCH_ONLY_REHEARSAL_CONDITION, REHEARSAL_CONDITION);
+    const accepted = check(fixture(intended, 'release.yml'));
+    expect(accepted.status, accepted.stderr).toBe(0);
+    expect(accepted.stdout).toBe('workflow contract: PASS\n');
+
+    const pushCanPublish = intended.replaceAll(
+      EXPLICIT_PUBLISH_CONDITION,
+      PERMISSIVE_PUSH_PUBLICATION_CONDITION,
+    );
+    const permissive = check(fixture(pushCanPublish, 'release.yml'));
+    expect(permissive.status).toBe(1);
+    expect(permissive.stderr).toContain('RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING');
+
+    const dispatchOnlyRehearsal = intended.replace(
+      REHEARSAL_CONDITION,
+      DISPATCH_ONLY_REHEARSAL_CONDITION,
+    );
+    const incompleteRehearsal = check(fixture(dispatchOnlyRehearsal, 'release.yml'));
+    expect(incompleteRehearsal.status).toBe(1);
+    expect(incompleteRehearsal.stderr).toContain('RELEASE_REHEARSAL_JOB_INVALID');
   });
 
   it('binds workflow, documentation, and release scripts into the RC task key', () => {
@@ -414,11 +452,7 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'rehearsal publication guard removal',
-      mutate: (source: string) =>
-        source.replace(
-          "    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}\n",
-          '',
-        ),
+      mutate: (source: string) => source.replace(`    if: ${EXPLICIT_PUBLISH_CONDITION}\n`, ''),
       diagnostic: 'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
     },
     {
