@@ -17,6 +17,7 @@ export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const ATTESTED_RC_WORKFLOW_FILE = 'devai-local-rc-verify.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
 export const VERIFIER_SOURCE_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '9e115014f8da5a16be526c7da5207bc0aae0801b';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -62,7 +63,7 @@ function protectedVerifierPackageStep(name: string): string {
           }
           const provenancePath = join(verifierRoot, 'provenance.json');
           const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
-          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}') {
+          if (provenance.schemaVersion !== '1.0.0' || !['${VERIFIER_SOURCE_COMMIT}', '${NEXT_VERIFIER_SOURCE_COMMIT}'].includes(provenance.sourceCommit)) {
             throw new Error('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
           }
           const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));

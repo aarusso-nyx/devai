@@ -9,6 +9,7 @@ export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
 export const VERIFIER_SOURCE_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '9e115014f8da5a16be526c7da5207bc0aae0801b';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -208,7 +209,11 @@ function checkWorkflow(file, source, findings) {
   }
   if (checkouts.some((step) => object(step.with).repository !== undefined)) {
     findings.push(
-      finding('CI_EXTERNAL_VERIFIER_CHECKOUT_FORBIDDEN', file, 'only candidate checkout is allowed'),
+      finding(
+        'CI_EXTERNAL_VERIFIER_CHECKOUT_FORBIDDEN',
+        file,
+        'only candidate checkout is allowed',
+      ),
     );
   }
 
@@ -236,7 +241,7 @@ function checkWorkflow(file, source, findings) {
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
     'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
     `manifest.name !== '${VERIFIER_PACKAGE}'`,
-    `provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`,
+    `!['${VERIFIER_SOURCE_COMMIT}', '${NEXT_VERIFIER_SOURCE_COMMIT}'].includes(provenance.sourceCommit)`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
     'DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js',
@@ -274,7 +279,11 @@ function checkWorkflow(file, source, findings) {
     .find((run) => run.includes('node "$DEVAI_EVIDENCE_VERIFY"'));
   if (verifierRun === undefined) {
     findings.push(
-      finding('CI_VERIFIER_INVOCATION_MISSING', file, 'protected packaged verifier CLI is not invoked'),
+      finding(
+        'CI_VERIFIER_INVOCATION_MISSING',
+        file,
+        'protected packaged verifier CLI is not invoked',
+      ),
     );
   } else {
     for (const binding of [
@@ -471,7 +480,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
     'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
     `manifest.name !== '${VERIFIER_PACKAGE}'`,
-    `provenance.sourceCommit !== '${VERIFIER_SOURCE_COMMIT}'`,
+    `!['${VERIFIER_SOURCE_COMMIT}', '${NEXT_VERIFIER_SOURCE_COMMIT}'].includes(provenance.sourceCommit)`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
     '--schema-version 1.1.0',
