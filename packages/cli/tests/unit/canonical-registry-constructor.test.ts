@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { canonicalRegistry, validateActionSurface } from '../../src/define-command.js';
 import { buildTrustedAuthoritySources, repositoryIdFor } from '../../src/authority/policy.js';
+import { invocationIsNonMutating, ROUTER_INTERNAL_NAMES } from '../../src/command-router.js';
 
 const temporaryRoots: string[] = [];
 
@@ -21,6 +22,26 @@ describe('canonical action registry constructor', () => {
     expect(first.map((entry) => entry.name)).toContain('triage classify');
     expect(second).toEqual(first);
     validateActionSurface(first);
+  });
+
+  it('keeps every router-specific internal name bound to a live registry action', () => {
+    const internalNames = new Set(canonicalRegistry().map((entry) => entry.internal_name));
+    expect(ROUTER_INTERNAL_NAMES.every((name) => internalNames.has(name))).toBe(true);
+    const source = readFileSync(join(process.cwd(), 'packages/cli/src/command-router.ts'), 'utf8');
+    const referenced = [
+      ...source.matchAll(/(?:internalName|internal_name) === '([a-z0-9-]+)'/gu),
+    ].map((match) => match[1]);
+    expect(referenced.length).toBeGreaterThan(0);
+    expect(referenced.every((name) => name !== undefined && internalNames.has(name))).toBe(true);
+  });
+
+  it('limits non-mutating routing exceptions to live, operation-specific cases', () => {
+    expect(invocationIsNonMutating('check', ['--task-plan'])).toBe(true);
+    expect(invocationIsNonMutating('round-close', ['--post-merge-receipt'])).toBe(true);
+    expect(invocationIsNonMutating('init-bind', [])).toBe(true);
+    expect(invocationIsNonMutating('init-bind', ['--write'])).toBe(false);
+    expect(invocationIsNonMutating('docs-cli', ['--check'])).toBe(false);
+    expect(invocationIsNonMutating('state-prune', [])).toBe(false);
   });
 
   it('derives identical policy provenance from repeated constructions', () => {
