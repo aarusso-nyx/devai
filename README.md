@@ -15,7 +15,7 @@ into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.7
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.8
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
@@ -28,7 +28,7 @@ their separately declared publication consent.
 
 Each adopter owns its `test-tasks.json` content-addressed task DAG; DEVAI never
 invents project commands. During development, run affected nodes and reuse fresh
-PASS results for unchanged inputs. The full coverage gate is the required RC node;
+PASS results for unchanged inputs. Lint, typecheck, and full coverage are independent required RC gates;
 the narrower DB, E2E, performance, and containment commands are diagnostic slices.
 A signed candidate receipt binds a clean Git
 tree and task-policy digest to trusted local attestations; it does **not** prove

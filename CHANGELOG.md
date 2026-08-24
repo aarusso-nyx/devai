@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.8 — 2026-08-24
+
+- Requires Git work-tree targets for initialization without adding a Git subprocess capability,
+  resolves adopter-owned build commands, and preserves linked-worktree `.git` files.
+- Makes lint and test-file typechecking independently attested RC gates alongside coverage,
+  enforces zero ESLint warnings, and changes the RC task-policy digest. The exact-candidate ledger
+  attestation must be re-issued before tagging.
+- Separates fork pull-request preflight from protected ledger secrets, gives check-task refusals
+  stable structured exit semantics, and removes stale task, containment, and stub-package drift.
+- Restores documentation-governance provenance in one adopter-facing location, documents all nine
+  rule identifiers and severities, and records the unavailable predecessor ADR corpus as known debt.
+
 ## 1.2.7 — 2026-08-23
 
 - Makes schema-valid adopter task descriptors the process authority while retaining exact argv,
