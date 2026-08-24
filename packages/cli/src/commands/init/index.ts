@@ -23,7 +23,6 @@ import {
   resolveCanonicalPolicyContent,
   resolveCanonicalConstitution,
   verifyConstitutionBinding,
-  validateCanonicalPolicyContent,
 } from '@devai-nyx/skills';
 import { getValidator, validators } from '@devai-nyx/schemas';
 import {
@@ -51,6 +50,11 @@ import {
   executeGithubActionsAdapterPlan,
   verifyGithubActionsAdapter,
 } from '../../services/github-actions-adapter/index.js';
+import {
+  jsonBytes,
+  resolveAdopterPolicyMaterialization,
+  type JsonObject,
+} from '../../services/adopter-policy.js';
 
 const DEFAULT_REPO_ROOT = '.';
 
@@ -85,27 +89,8 @@ interface InitBindOptions {
   readonly human?: boolean;
 }
 
-type JsonObject = Record<string, unknown>;
-
-function isObject(value: unknown): value is JsonObject {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function sha256Bytes(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
-}
-
-function deepMerge(base: unknown, override: unknown): unknown {
-  if (!isObject(base) || !isObject(override)) return override;
-  const result: JsonObject = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    result[key] = key in result ? deepMerge(result[key], value) : value;
-  }
-  return result;
-}
-
-function jsonBytes(value: unknown): string {
-  return `${JSON.stringify(value, null, 2)}\n`;
 }
 
 function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
@@ -121,63 +106,19 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   }
   const sourceBytes = readFileSync(sourcePath, 'utf8');
   const policy: unknown = JSON.parse(sourceBytes);
-  const validatePolicy = getValidator('adopter-policy.schema.json');
-  if (!validatePolicy(policy)) {
-    throw new Error(`ADOPTER_POLICY_INVALID:${JSON.stringify(validatePolicy.errors)}`);
-  }
   const document = policy as JsonObject;
-  const defaults = (
-    file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
-  ) => JSON.parse(resolveCanonicalPolicyContent(file)) as JsonObject;
-  const domainDefaults = defaults('domains.json');
-  const domainConfig = isObject(document['domains']) ? document['domains'] : {};
-  const requestedDomains = Array.isArray(domainConfig['client'])
-    ? domainConfig['client'].map(String)
-    : [];
-  const immutableDomains = [
-    ...(domainDefaults['core'] as string[]),
-    ...(domainDefaults['framework'] as string[]),
-  ];
-  const collision = requestedDomains.find((domain) => immutableDomains.includes(domain));
-  if (collision !== undefined) throw new Error(`ADOPTER_POLICY_DOMAIN_COLLISION:${collision}`);
-  const domains = {
-    ...domainDefaults,
-    client: [...new Set([...(domainDefaults['client'] as string[]), ...requestedDomains])].sort(),
-  };
-  const thresholds = deepMerge(
-    defaults('thresholds.json'),
-    document['thresholds'] ?? {},
-  ) as JsonObject;
-  const scorecardNa = document['scorecard_na'] ?? defaults('scorecard-na.json');
-  const globGuards = document['glob_guards'] ?? defaults('glob-guards.json');
-  validateCanonicalPolicyContent('domains.json', jsonBytes(domains));
-  validateCanonicalPolicyContent('thresholds.json', jsonBytes(thresholds));
-  validateCanonicalPolicyContent('scorecard-na.json', jsonBytes(scorecardNa));
-  validateCanonicalPolicyContent('glob-guards.json', jsonBytes(globGuards));
-
   const projectPath = join(targetRoot, '.devai/config/project.json');
   const currentProject = existsSync(projectPath)
     ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject)
     : {};
-  const projectOverrides = isObject(document['project']) ? { ...document['project'] } : {};
-  if (isObject(document['ci_economy'])) {
-    projectOverrides['ci_economy'] = document['ci_economy'];
-  }
-  const project = {
-    ...(deepMerge(currentProject, projectOverrides) as JsonObject),
-    devai_version: resolveCliVersion(),
-  };
-  const validateProject = getValidator('project-config.schema.json');
-  if (!validateProject(project)) {
-    throw new Error(`ADOPTER_POLICY_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
-  }
-  const outputs = new Map<string, string>([
-    [projectPath, jsonBytes(project)],
-    [join(targetRoot, '.devai/config/domains.json'), jsonBytes(domains)],
-    [join(targetRoot, '.devai/config/thresholds.json'), jsonBytes(thresholds)],
-    [join(targetRoot, '.devai/config/scorecard-na.json'), jsonBytes(scorecardNa)],
-    [join(targetRoot, '.devai/config/glob-guards.json'), jsonBytes(globGuards)],
-  ]);
+  const resolved = resolveAdopterPolicyMaterialization({
+    policy,
+    currentProject,
+    frameworkVersion: resolveCliVersion(),
+  });
+  const outputs = new Map<string, string>(
+    [...resolved].map(([path, bytes]) => [join(targetRoot, path), bytes]),
+  );
   const receiptPath = join(targetRoot, '.devai/config/adopter-policy-binding.json');
   const receipt = {
     schemaVersion: '1.0.0',

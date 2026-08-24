@@ -455,8 +455,30 @@ try {
       schemaVersion: '1.0.0',
       policy_id: 'installed-smoke',
       policy_version: '1.0.0',
-      domains: { client: ['COVERAGE'] },
-      thresholds: { coverage: { lines: 91 } },
+      domains: { client: ['COVERAGE', 'ERROR', 'FLOW', 'PRIVACY', 'RBAC'] },
+      thresholds: { coverage: { lines: 91 }, mutation: { score_min: 88 } },
+      scorecard_na: {
+        schemaVersion: '1.0.0',
+        cells: [
+          {
+            cell: 'F4:T5',
+            reason: 'Installed package fixture has no inventory idiomaticity surface.',
+            constitution_anchor: 'Article 5',
+          },
+        ],
+      },
+      glob_guards: {
+        schemaVersion: '1.0.0',
+        guards: [
+          {
+            id: 'INSTALLED_CLIENT_ROUTES',
+            pattern: 'src/**/*.ts',
+            min_matches: 2,
+            description: 'Installed package fixture client routes remain covered.',
+            source: '.github/workflows/ci.yml',
+          },
+        ],
+      },
       project: {
         docs: {
           builder: 'docusaurus',
@@ -516,6 +538,31 @@ try {
     boundProject.docs?.gh_pages_branch !== 'gh-pages'
   ) {
     throw new Error('INSTALLED_ADOPTER_POLICY_ATTESTED_RC_INVALID');
+  }
+  const installedAdopterDoctor = runResult(binary, [
+    'doctor',
+    '--repo-root',
+    projectRoot,
+    '--skip',
+    'docs-governance',
+    '--format',
+    'json',
+  ]);
+  const installedAdopterPolicyCheck = JSON.parse(
+    String(installedAdopterDoctor.stdout),
+  )?.result?.value?.checks?.find((check) => check.name === 'policy-materialization-current');
+  const installedDomains = JSON.parse(
+    readFileSync(join(projectRoot, '.devai/config/domains.json'), 'utf8'),
+  );
+  if (
+    ![0, 1].includes(installedAdopterDoctor.status) ||
+    installedAdopterPolicyCheck?.ok !== true ||
+    installedDomains.client?.join(',') !== 'COVERAGE,ERROR,FLOW,PRIVACY,RBAC' ||
+    JSON.stringify(installedAdopterPolicyCheck?.info?.remediation_commands ?? []).includes(
+      '--operational-law',
+    )
+  ) {
+    throw new Error('INSTALLED_ADOPTER_POLICY_DOCTOR_INVALID');
   }
   writeFileSync(
     adopterPolicyPath,
