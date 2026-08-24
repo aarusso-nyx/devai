@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.11 — 2026-08-24
+
+- Preserves the approved positional operands for `round gap show`, `round gap resolve`, and
+  `evidence redact` while retaining v1.2.10's fail-closed rejection of stray arguments on
+  option-only commands.
+- Restores the installed-tarball RGR smoke and advances the immutable release after the v1.2.10
+  tag-triggered build correctly failed before publication.
+
 ## 1.2.10 — 2026-08-24
 
 - Excludes `.devai/state/`, `record/`, and `scratch/` at the task-snapshot boundary so glob

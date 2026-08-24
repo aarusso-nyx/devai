@@ -110,6 +110,14 @@ describe('canonical action registry constructor', () => {
     expect(typo.kind === 'output' ? typo.text : '').toContain('--only schemas');
 
     for (const argv of [
+      ['node', 'devai', 'round', 'gap', 'show', 'RGR-0001'],
+      ['node', 'devai', 'round', 'gap', 'resolve', 'RGR-0001'],
+      ['node', 'devai', 'evidence', 'redact', '42'],
+    ]) {
+      expect(routeArgv(argv, registry, '1.2.11').kind).toBe('dispatch');
+    }
+
+    for (const argv of [
       ['node', 'devai', 'doctor', 'unexpected', '--format', 'json'],
       ['node', 'devai', 'catalog', 'actions', 'unexpected', '--format', 'json'],
     ]) {
