@@ -151,12 +151,27 @@ function authorityErrorCode(error: unknown): string | undefined {
   return error.message.startsWith('authority policy:') ? 'AUTHORITY_POLICY_MISSING' : undefined;
 }
 
+function authorityErrorContext(error: unknown): JsonRecord | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const separator = error.message.indexOf(':');
+  if (separator < 0) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(error.message.slice(separator + 1));
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function handleBoundaryError(error: unknown): undefined {
   const code = authorityErrorCode(error);
   if (code === undefined) throw error;
   const format = formatFor(process.argv);
   const category: FailureCategory = code.endsWith('_UNAVAILABLE') ? 'dependency-error' : 'refused';
-  const rendered = renderAuthorityResult(taggedFailure(category, code), format);
+  const rendered = renderAuthorityResult(
+    taggedFailure(category, code, authorityErrorContext(error)),
+    format,
+  );
   const stream = rendered.stdout.length > 0 ? process.stdout : process.stderr;
   stream.write(rendered.stdout.length > 0 ? rendered.stdout : rendered.stderr);
   process.exitCode = rendered.exit_code;

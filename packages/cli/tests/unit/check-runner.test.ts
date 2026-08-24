@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import {
   mkdtempSync,
   mkdirSync,
+  chmodSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -21,6 +22,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { invocationIsNonMutating } from '../../src/command-router.js';
 import {
   buildTaskPlan,
+  describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
   readTaskDescriptor,
   runCheckTasks,
@@ -222,6 +224,35 @@ afterEach(() => {
 });
 
 describe('content-addressed check runner', () => {
+  it('runs the documented pnpm test descriptor shape in a fresh repository', () => {
+    const state = repository();
+    file(
+      state.root,
+      'package.json',
+      `${JSON.stringify({
+        name: 'documented-example',
+        private: true,
+        scripts: { test: `node -e "process.stdout.write('docs example pass\\\\n')"` },
+      })}\n`,
+    );
+    const documentation = readFileSync(
+      join(REPOSITORY_ROOT, 'docs/adopters/test-tasks.md'),
+      'utf8',
+    );
+    const documented = /Minimal example:\n\n```json\n([\s\S]*?)\n```/u.exec(documentation)?.[1];
+    if (documented === undefined) throw new Error('documented descriptor example missing');
+    file(state.root, 'test-tasks.json', `${documented}\n`);
+    git(state.root, ['add', '.']);
+    git(state.root, ['commit', '-qm', 'documented example']);
+    const report = run(state.root, {
+      target: 'rc',
+      toolchain: { node: process.version, pnpm: 'acceptance' },
+      executeTask: undefined,
+    });
+    expect(report.exitCode).toBe(0);
+    expect(report.execution).toMatchObject([{ nodeId: 'test:project', outcome: 'PASS' }]);
+  });
+
   it('derives mutation outputs from the exact workspace roster', () => {
     const state = repository();
     file(
@@ -541,6 +572,21 @@ describe('content-addressed check runner', () => {
       initialUnit?.taskKey,
     );
     expect(restored.repository.commit).not.toBe(initial.repository.commit);
+  });
+
+  it('invalidates task keys when the resolved executable bytes change', () => {
+    const state = repository();
+    file(state.root, 'node_modules/.bin/node', '#!/bin/sh\nexit 0\n');
+    chmodSync(join(state.root, 'node_modules/.bin/node'), 0o755);
+    const first = plan(state.root, 'local');
+    file(state.root, 'node_modules/.bin/node', '#!/bin/sh\nexit 1\n');
+    const changed = plan(state.root, 'local');
+    expect(changed.tasks.map((task) => task.taskKey)).not.toEqual(
+      first.tasks.map((task) => task.taskKey),
+    );
+    expect(first.tasks[0]?.executable.path).toBe(
+      realpathSync(join(state.root, 'node_modules/.bin/node')),
+    );
   });
 
   it('does not require release-candidate toolchains for the cheap local closure', () => {
@@ -952,6 +998,17 @@ describe('content-addressed check runner', () => {
       allowlistedEnv: [],
       outputContract: { kind: 'build', requiredResult: 'pass' },
     });
+    declared.tasks.push({
+      nodeId: 'npm-test',
+      dependencies: [],
+      argv: ['npm', 'test', '--', '--runInBand'],
+      cwd: '.',
+      runner: 'npm-v1',
+      inputSelectors: [{ kind: 'prefix', pattern: 'src/' }],
+      toolchainKeys: [],
+      allowlistedEnv: [],
+      outputContract: { kind: 'test', requiredResult: 'pass' },
+    });
     writeFileSync(join(state.root, 'test-tasks.json'), `${JSON.stringify(declared, null, 2)}\n`);
     expect(
       matchDeclaredCheckTaskProcess(
@@ -964,9 +1021,28 @@ describe('content-addressed check runner', () => {
       matchDeclaredCheckTaskProcess(
         state.root,
         invocation,
+        request('npm', ['test', '--', '--runInBand'], state.root, false),
+      ),
+    ).toMatchObject({ nodeId: 'npm-test', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredCheckTaskProcess(
+        state.root,
+        invocation,
         request('sh', ['-c', 'node test'], state.root),
       ),
     ).toBeUndefined();
+    expect(
+      describeDeclaredCheckTaskRefusal(
+        state.root,
+        request('node', ['-e', 'process.stdout.write("different")'], state.root),
+      ),
+    ).toMatchObject({
+      executable: 'node',
+      argv: ['-e', 'process.stdout.write("different")'],
+      descriptor_path: join(realpathSync(state.root), 'test-tasks.json'),
+      closest_declared_node: 'generate',
+      reason: 'process is not an exact declared task',
+    });
     expect(
       matchDeclaredCheckTaskProcess(
         state.root,
@@ -997,6 +1073,19 @@ describe('content-addressed check runner', () => {
         ),
       ),
     ).toBeUndefined();
+  });
+
+  it('rejects path-shaped executables in task descriptors', () => {
+    const state = repository();
+    const descriptorPath = join(state.root, 'test-tasks.json');
+    const descriptor = JSON.parse(readFileSync(descriptorPath, 'utf8')) as {
+      tasks: Array<{ argv: unknown[] }>;
+    };
+    const firstTask = descriptor.tasks[0];
+    if (firstTask === undefined) throw new Error('test fixture task missing');
+    firstTask.argv[0] = '../bin/tool';
+    writeFileSync(descriptorPath, `${JSON.stringify(descriptor, null, 2)}\n`);
+    expect(() => readTaskDescriptor(descriptorPath)).toThrow('CHECK_RUNNER_DESCRIPTOR');
   });
 
   it('keeps planning/status/explain read-only while --run requires write consent', () => {

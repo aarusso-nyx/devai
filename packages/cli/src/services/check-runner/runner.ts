@@ -314,7 +314,7 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
       throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
     }
     const result = execute(
-      task.argv,
+      options.executeTask === undefined ? [task.executable.path, ...task.argv.slice(1)] : task.argv,
       resolve(options.repoRoot, task.cwd),
       timeoutMs,
       taskEnvironment(descriptorTask, environment),

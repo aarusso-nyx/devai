@@ -49,6 +49,7 @@ export interface TaskPolicy {
 
 export interface PlannedTask extends TaskPolicyNode {
   readonly argv: readonly string[];
+  readonly executable: Readonly<{ path: string; sha256: string }>;
   readonly cwd: string;
   readonly inputDigest: string;
   readonly inputPaths: readonly string[];

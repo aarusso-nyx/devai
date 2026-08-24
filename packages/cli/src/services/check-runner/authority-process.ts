@@ -8,6 +8,31 @@ export interface DeclaredCheckTaskProcess {
   readonly cwd: string;
 }
 
+export interface DeclaredCheckTaskRefusal {
+  readonly executable: string;
+  readonly argv: readonly string[];
+  readonly descriptor_path: string;
+  readonly closest_declared_node?: string;
+  readonly reason: string;
+}
+
+function distance(left: readonly string[], right: readonly string[]): number {
+  const width = right.length + 1;
+  let prior = Array.from({ length: width }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    const next = [row];
+    for (let column = 1; column < width; column += 1) {
+      next[column] = Math.min(
+        (prior[column] ?? 0) + 1,
+        (next[column - 1] ?? 0) + 1,
+        (prior[column - 1] ?? 0) + (left[row - 1] === right[column - 1] ? 0 : 1),
+      );
+    }
+    prior = next;
+  }
+  return prior[right.length] ?? Math.max(left.length, right.length);
+}
+
 function within(root: string, candidate: string): boolean {
   const path = relative(root, candidate);
   return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !isAbsolute(path));
@@ -44,26 +69,6 @@ export function matchDeclaredCheckTaskProcess(
   ) {
     return undefined;
   }
-  if (!['node', 'pnpm'].includes(executable)) return undefined;
-  if (
-    executable === 'node' &&
-    !(
-      argv.length === 2 &&
-      argv[0] === '-e' &&
-      argv[1] === "process.stdout.write('local test dependency closure complete\\n')"
-    )
-  ) {
-    return undefined;
-  }
-  if (
-    executable === 'pnpm' &&
-    !(
-      (argv.length === 2 && argv[0] === 'run' && typeof argv[1] === 'string') ||
-      (argv.length === 2 && argv[0] === '-r' && argv[1] === 'build')
-    )
-  ) {
-    return undefined;
-  }
   const options = rawOptions as Readonly<Record<string, unknown>>;
   if (options.shell !== undefined && options.shell !== false) return undefined;
   if (typeof options.cwd !== 'string') return undefined;
@@ -80,4 +85,40 @@ export function matchDeclaredCheckTaskProcess(
       realpathSync(resolve(root, candidate.cwd)) === cwd,
   );
   return task === undefined ? undefined : { nodeId: task.nodeId, cwd };
+}
+
+export function describeDeclaredCheckTaskRefusal(
+  repoRoot: string,
+  request: AuthorityHostEffectRequest,
+): DeclaredCheckTaskRefusal {
+  const descriptorPath = resolve(realpathSync(resolve(repoRoot)), 'test-tasks.json');
+  const executable = typeof request.arguments[0] === 'string' ? request.arguments[0] : '<invalid>';
+  const argv = Array.isArray(request.arguments[1]) ? request.arguments[1].map(String) : [];
+  const rawOptions = request.arguments[2];
+  const options =
+    rawOptions !== null && typeof rawOptions === 'object' && !Array.isArray(rawOptions)
+      ? (rawOptions as Readonly<Record<string, unknown>>)
+      : {};
+  let reason = 'process is not an exact declared task';
+  if (options.shell !== undefined && options.shell !== false) reason = 'shell must be false';
+  else if (typeof options.cwd !== 'string') reason = 'cwd must be declared';
+  else if (!existsSync(resolve(options.cwd))) reason = 'cwd does not exist';
+  else if (!within(realpathSync(resolve(repoRoot)), realpathSync(resolve(options.cwd))))
+    reason = 'cwd escapes the repository';
+  let closest: string | undefined;
+  try {
+    const requested = [executable, ...argv];
+    closest = [...readTaskDescriptor(descriptorPath).tasks].sort(
+      (left, right) => distance(requested, left.argv) - distance(requested, right.argv),
+    )[0]?.nodeId;
+  } catch {
+    // The descriptor loader reports malformed or absent descriptors elsewhere.
+  }
+  return {
+    executable,
+    argv,
+    descriptor_path: descriptorPath,
+    ...(closest === undefined ? {} : { closest_declared_node: closest }),
+    reason,
+  };
 }
