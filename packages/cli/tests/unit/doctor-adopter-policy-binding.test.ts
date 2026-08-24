@@ -348,6 +348,39 @@ describe('Doctor adopter-policy binding regression', () => {
     expectReason(await policyCheck(unsupportedRepo), 'BINDING_VERSION_UNSUPPORTED');
   });
 
+  it('treats a dangling binding-path symlink as malformed instead of canonical-unbound', async () => {
+    const repo = await boundRepo({
+      schemaVersion: '1.0.0',
+      policy_id: 'fixture.canonical-only',
+      policy_version: '1.0.0',
+    });
+    for (const file of [
+      'domains.json',
+      'forbidden-actions.json',
+      'glob-guards.json',
+      'scorecard-na.json',
+      'subprocess-effects.json',
+      'thresholds.json',
+    ] as const) {
+      put(repo, `${CONFIG}/${file}`, resolveCanonicalPolicyContent(file));
+    }
+    rmSync(join(repo, BINDING));
+    symlinkSync('missing-adopter-policy-binding.json', join(repo, BINDING));
+
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'BINDING_MALFORMED');
+  });
+
+  it('rejects unknown top-level binding receipt keys as a closed-shape violation', async () => {
+    const repo = await boundRepo();
+    put(repo, BINDING, { ...readJson(repo, BINDING), unexpected: 'not-authorized' });
+
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'BINDING_MALFORMED');
+  });
+
   it('rejects a source path outside law/policy', async () => {
     const repo = await boundRepo();
     put(repo, 'outside-policy.json', defaultPolicy());
@@ -370,6 +403,18 @@ describe('Doctor adopter-policy binding regression', () => {
     );
     put(symlinkRepo, BINDING, symlinkReceipt);
     expectReason(await policyCheck(symlinkRepo), 'SOURCE_PATH_OUTSIDE_LAW_POLICY');
+  });
+
+  it('rejects a lexically non-canonical source path without interpolating it', async () => {
+    const repo = await boundRepo();
+    const receipt = readJson(repo, BINDING);
+    receipt['source_path'] = 'law/policy/sub/../devai-adoption.json';
+    put(repo, BINDING, receipt);
+
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'SOURCE_PATH_OUTSIDE_LAW_POLICY');
+    expect(JSON.stringify(check.info['remediation_commands'] ?? [])).not.toContain('sub/../');
   });
 
   it('reports an actionable bound framework-version mismatch', async () => {
