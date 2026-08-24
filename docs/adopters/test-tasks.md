@@ -10,6 +10,11 @@ input selectors, toolchain identity, allowlisted environment, and output contrac
 affected profile must be dependency-closed. The RC profile is fixed and should name the
 adopter's complete release gate.
 
+RC planning and execution fail closed unless database cases are explicitly enabled with
+`DEVAI_DB_TESTS=1` and `DEVAI_DB_URL` names a reachable disposable PostgreSQL database.
+The RC environment hashes these allowlisted values into the task identity; never point the
+gate at production data. Local and affected targets do not impose this RC-only prerequisite.
+
 `argv` is an argument vector, never a shell command. It must contain only strings and
 its first item must be a bare executable name matching `^[A-Za-z0-9._-]+$`; absolute
 paths, path separators, and `..` are rejected. DEVAI resolves that name from the
@@ -35,7 +40,10 @@ Minimal example:
       "argv": ["pnpm", "test"],
       "cwd": ".",
       "runner": "project-test-v1",
-      "inputSelectors": [{ "kind": "glob", "pattern": "**" }],
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "src/" },
+        { "kind": "exact", "pattern": "package.json" }
+      ],
       "toolchainKeys": ["node", "pnpm"],
       "allowlistedEnv": [],
       "outputContract": { "kind": "command", "requiredResult": "pass" }
@@ -56,6 +64,38 @@ Minimal example:
   ]
 }
 ```
+
+The input universe is the repository snapshot seen by Git. DEVAI always excludes
+`.devai/state/`, `record/`, and `scratch/` before applying selectors because those
+paths contain cache state, harness-written evidence, and declared ephemeral work.
+Configuration under `.devai/config/` remains eligible and can invalidate a task.
+For cache economy, prefer scoped `prefix` and `exact` selectors; `glob` pattern `**`
+means the whole repository except the harness's own writes.
+
+## Local closure root
+
+`--local` selects the dependency closure of a required node named
+`test:local-full`. A descriptor that offers the local target must declare that
+reserved node id, typically as a cheap aggregate depending on every local suite:
+
+```json
+{
+  "nodeId": "test:local-full",
+  "dependencies": ["test:project"],
+  "argv": ["node", "-e", "process.stdout.write('local closure complete\\n')"],
+  "cwd": ".",
+  "runner": "local-closure-v1",
+  "inputSelectors": [{ "kind": "exact", "pattern": "package.json" }],
+  "toolchainKeys": ["node"],
+  "allowlistedEnv": [],
+  "outputContract": { "kind": "marker", "value": "local" }
+}
+```
+
+Add this object to `tasks`. It does not need to belong to the `affected` or `rc`
+profiles; `--local` selects it by its reserved name and includes its dependencies.
+Descriptors that do not need `--local` may omit it and continue to use `--rc` and
+`--affected`.
 
 Use `devai check --affected --task-plan --base <exact-commit> --format json` to
 inspect selection before execution. Environment variables affect a task key only when

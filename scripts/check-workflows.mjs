@@ -423,6 +423,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'finalize-release',
     'rehearsal-summary',
     'verify-ledger',
+    'verify-linux-adopter',
   ];
   if (JSON.stringify(Object.keys(jobs).sort()) !== JSON.stringify(expectedJobs)) {
     findings.push(finding('RELEASE_JOB_SET_INVALID', file, Object.keys(jobs).sort().join(',')));
@@ -432,6 +433,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const finalize = object(jobs['finalize-release']);
   const pages = object(jobs['deploy-pages']);
   const rehearsal = object(jobs['rehearsal-summary']);
+  const linuxAdopter = object(jobs['verify-linux-adopter']);
   if (verify.environment !== LEDGER_ENVIRONMENT) {
     findings.push(finding('RELEASE_LEDGER_ENVIRONMENT_INVALID', file, String(verify.environment)));
   }
@@ -446,15 +448,15 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   if (object(pages.environment).name !== 'github-pages') {
     findings.push(finding('RELEASE_PAGES_ENVIRONMENT_INVALID', file, 'github-pages'));
   }
-  const publishCondition = "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
-  const rehearsalCondition =
-    "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
+  const publishCondition =
+    "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}";
+  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
   if (finalize.if !== publishCondition || pages.if !== publishCondition) {
     findings.push(
       finding(
         'RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING',
         file,
-        'finalize-release and deploy-pages must require an explicit publishing dispatch',
+        'finalize-release and deploy-pages must accept tag publication or explicit recovery',
       ),
     );
   }
@@ -467,7 +469,22 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
       finding(
         'RELEASE_REHEARSAL_JOB_INVALID',
         file,
-        'tag pushes and non-publishing dispatches must end in a read-only rehearsal summary after the exact build',
+        'only non-publishing dispatches end in a read-only rehearsal summary after the exact build',
+      ),
+    );
+  }
+  if (
+    linuxAdopter['runs-on'] !== 'ubuntu-latest' ||
+    JSON.stringify(linuxAdopter.needs) !== JSON.stringify('build-release') ||
+    JSON.stringify(object(linuxAdopter.permissions)) !== JSON.stringify({ contents: 'read' }) ||
+    JSON.stringify(finalize.needs) !==
+      JSON.stringify(['verify-ledger', 'build-release', 'verify-linux-adopter'])
+  ) {
+    findings.push(
+      finding(
+        'RELEASE_LINUX_ADOPTER_JOB_INVALID',
+        file,
+        'publication must depend on the read-only ubuntu npm adopter quickstart',
       ),
     );
   }
@@ -531,8 +548,10 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'stage-release-package.mjs',
     'release-channel.mjs',
     'RELEASE_IS_PRERELEASE',
-    'npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund',
-    'cyclonedx-npm',
+    'sbom_subject_sha256',
+    'Verify npm adopter quickstart on Linux',
+    'init bind --target . --tier tier1 --constitution',
+    "task.disposition === 'reused'",
     'npm publish',
     '--tag "$PACKAGE_DIST_TAG"',
     'dist-tags.$PACKAGE_DIST_TAG',

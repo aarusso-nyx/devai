@@ -303,24 +303,10 @@ jobs:
           mkdir -p "$release_dir"
           stage_json="$(node scripts/stage-release-package.mjs --output "$release_dir")"
           tarball="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.tarball)' "$stage_json")"
+          sbom="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sbom)' "$stage_json")"
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(String(p.reproductions))' "$stage_json")" = 2
-          sbom_root="$RUNNER_TEMP/devai-sbom"
-          mkdir -p "$sbom_root"
-          tar -xzf "$tarball" -C "$sbom_root"
-          npm --prefix "$sbom_root/package" install --omit=dev --ignore-scripts --no-audit --no-fund
-          sbom="$release_dir/devai-$PACKAGE_VERSION.cdx.json"
-          pnpm exec cyclonedx-npm \
-            --omit dev \
-            --output-reproducible \
-            --validate \
-            --mc-type application \
-            --output-format JSON \
-            --output-file "$sbom" \
-            "$sbom_root/package/package.json"
-          if grep -F '@devai-nyx/' "$sbom"; then
-            echo 'RELEASE_SBOM_PRIVATE_WORKSPACE_PACKAGE' >&2
-            exit 2
-          fi
+          test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sbom_subject_sha256)' "$stage_json")" = \
+            "$(sha256sum "$tarball" | cut -d' ' -f1)"
           site="$release_dir/devai-site-$PACKAGE_VERSION.tar.gz"
           tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
             -czf "$site" -C docs/site/build .
@@ -341,10 +327,104 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  verify-linux-adopter:
+    name: Verify npm adopter quickstart on Linux
+    needs: build-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Download exact release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: devai-release-assets
+          path: release-assets
+
+      - name: Exercise fresh npm adoption, execution, and reuse
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd release-assets && sha256sum --check SHA256SUMS)
+          tarball="$(realpath "$(find release-assets -maxdepth 1 -name '*.tgz' -print -quit)")"
+          test -n "$tarball"
+          adopter="$RUNNER_TEMP/devai-linux-adopter"
+          mkdir -p "$adopter"
+          cd "$adopter"
+          git init --quiet
+          git config user.name 'DEVAI Linux Adopter Check'
+          git config user.email 'devai-linux@example.invalid'
+          npm init --yes >/dev/null
+          npm install --save-dev --save-exact "$tarball"
+          devai='./node_modules/.bin/devai'
+          "$devai" init bind --target . --tier tier1 --constitution --as-role architect --write --format json
+          "$devai" init bind --target . --operational-law --as-role architect --write --format json
+          "$devai" init bind --target . --subprocess-effects --as-role architect --write --format json
+          "$devai" init bind --target . --as-role architect --write --format json
+          "$devai" init apply architect --target . --tier tier1 --as-role architect --write --format json
+          "$devai" init apply owner --target . --tier tier1 --as-role owner --write --format json
+          "$devai" init apply harness --target . --tier tier1 --as-role architect --write --format json
+          doctor_json="$RUNNER_TEMP/devai-linux-doctor.json"
+          "$devai" doctor --repo-root . --format json > "$doctor_json"
+          node -e 'const x=require(process.argv[1]); if (!x.ok || !x.result.value.ok) process.exit(1)' "$doctor_json"
+          node - <<'NODE'
+          const { writeFileSync } = require('node:fs');
+          const descriptor = {
+            schemaVersion: '1.0.0',
+            descriptorVersion: 'linux-adopter-v1',
+            repositoryId: 'example/linux-adopter',
+            fallbackNodeId: 'test:local-full',
+            dynamicFallbackSelectors: [],
+            tasks: [
+              {
+                nodeId: 'test:project', dependencies: [],
+                argv: ['node', '-e', 'process.stdout.write("project pass\\n")'], cwd: '.',
+                runner: 'node-v1', inputSelectors: [{ kind: 'glob', pattern: '**' }],
+                toolchainKeys: ['node'], allowlistedEnv: [],
+                outputContract: { kind: 'test', requiredResult: 'pass' },
+              },
+              {
+                nodeId: 'test:local-full', dependencies: ['test:project'],
+                argv: ['node', '-e', 'process.stdout.write("local closure pass\\n")'], cwd: '.',
+                runner: 'node-v1', inputSelectors: [{ kind: 'exact', pattern: 'package.json' }],
+                toolchainKeys: ['node'], allowlistedEnv: [],
+                outputContract: { kind: 'marker', value: 'local' },
+              },
+            ],
+            profiles: [
+              { profileId: 'affected', mode: 'affected', requiredNodes: ['test:project'], eligibleNodes: ['test:project', 'test:local-full'] },
+              { profileId: 'rc', mode: 'fixed', requiredNodes: ['test:project'] },
+            ],
+          };
+          writeFileSync('test-tasks.json', `${JSON.stringify(descriptor, null, 2)}\n`);
+          NODE
+          mkdir -p src
+          printf '%s\n' 'export const value = 1;' > src/index.js
+          git add .
+          git commit --quiet -m 'adopt DEVAI'
+          plan_json="$RUNNER_TEMP/devai-linux-plan.json"
+          first_json="$RUNNER_TEMP/devai-linux-first.json"
+          second_json="$RUNNER_TEMP/devai-linux-second.json"
+          "$devai" check --local --task-plan --format json > "$plan_json"
+          "$devai" check --local --run --as-role inspector --write --format json > "$first_json"
+          "$devai" check --local --run --as-role inspector --write --format json > "$second_json"
+          node - "$first_json" "$second_json" <<'NODE'
+          const [firstPath, secondPath] = process.argv.slice(2);
+          const first = require(firstPath).result.value.execution;
+          const second = require(secondPath).result.value.execution;
+          if (!first.every((task) => task.disposition === 'executed')) process.exit(1);
+          if (!second.every((task) => task.disposition === 'reused')) process.exit(1);
+          NODE
+
   finalize-release:
     name: Create canonical Release and mirror exact package
-    needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: [verify-ledger, build-release, verify-linux-adopter]
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
     runs-on: ubuntu-latest
     environment: devai-rc-publication
     timeout-minutes: 10
@@ -454,7 +534,7 @@ jobs:
   deploy-pages:
     name: Deploy and verify GitHub Pages
     needs: finalize-release
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -516,7 +596,7 @@ jobs:
   rehearsal-summary:
     name: Verify non-publishing rehearsal assets
     needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

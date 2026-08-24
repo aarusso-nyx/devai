@@ -172,6 +172,133 @@ function digest(path: string): string {
 }
 
 describe('adopter-safe check and binding contracts', () => {
+  it('offers an executable first constitution bind when apply is attempted in a fresh repo', async () => {
+    const repo = root('devai-fresh-remediation-');
+    const refused = await runCli([
+      'init',
+      'apply',
+      'owner',
+      '--target',
+      repo,
+      '--tier',
+      'tier1',
+      '--as-role',
+      'owner',
+      '--write',
+    ]);
+    expect(refused.exit).toBe(2);
+    const response = JSON.parse(refused.stderr) as {
+      error?: unknown;
+    };
+    const envelope = (response.error ?? response) as {
+      code: string;
+      context: { commands: string[] };
+    };
+    expect(envelope.code).toBe('AUTHORITY_POLICY_MISSING');
+    expect(envelope.context.commands[0]).toContain('--constitution');
+    const firstCommand = envelope.context.commands[0]?.split(' ').slice(1) ?? [];
+    await expectCliPass(firstCommand);
+    expect(existsSync(join(repo, '.devai/pin/constitution.md'))).toBe(true);
+  });
+
+  it('bootstraps all four bind segments under one explicit full invocation', async () => {
+    const repo = root('devai-full-bind-');
+    const result = await expectCliPass([
+      'init',
+      'bind',
+      '--full',
+      '--target',
+      repo,
+      '--tier',
+      'tier1',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      result: {
+        value: {
+          segments: [
+            { segment: 'constitution' },
+            { segment: 'operational-law' },
+            { segment: 'subprocess-effects' },
+            { segment: 'authority-policy' },
+          ],
+        },
+      },
+    });
+    for (const path of [
+      '.devai/pin/constitution.md',
+      '.devai/config/domains.json',
+      '.devai/config/subprocess-effects.json',
+      '.devai/config/authority-policy.json',
+    ]) {
+      expect(existsSync(join(repo, path)), path).toBe(true);
+    }
+  });
+
+  it('returns the local-closure contract and documentation reference in its refusal', async () => {
+    const repo = root('devai-local-root-refusal-');
+    await expectCliPass([
+      'init',
+      'bind',
+      '--full',
+      '--target',
+      repo,
+      '--tier',
+      'tier1',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    put(repo, 'test-tasks.json', {
+      schemaVersion: '1.0.0',
+      descriptorVersion: 'missing-local-root-v1',
+      repositoryId: 'example/missing-local-root',
+      fallbackNodeId: 'test:project',
+      dynamicFallbackSelectors: [],
+      tasks: [
+        {
+          nodeId: 'test:project',
+          dependencies: [],
+          argv: ['node', '-e', 'process.exit(0)'],
+          cwd: '.',
+          runner: 'node-v1',
+          inputSelectors: [{ kind: 'prefix', pattern: 'src/' }],
+          toolchainKeys: ['node'],
+          allowlistedEnv: [],
+          outputContract: { kind: 'test', requiredResult: 'pass' },
+        },
+      ],
+      profiles: [
+        {
+          profileId: 'affected',
+          mode: 'affected',
+          requiredNodes: ['test:project'],
+          eligibleNodes: ['test:project'],
+        },
+        { profileId: 'rc', mode: 'fixed', requiredNodes: ['test:project'] },
+      ],
+    });
+    execFileSync('git', ['init', '--quiet'], { cwd: repo });
+    execFileSync('git', ['config', 'user.name', 'DEVAI Test'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'devai@example.invalid'], { cwd: repo });
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '--quiet', '-m', 'fixture'], { cwd: repo });
+
+    const refused = await runCli(['check', '--local', '--task-plan', '--repo-root', repo]);
+    expect(refused.exit).toBe(5);
+    const response = JSON.parse(refused.stderr) as {
+      error: { code: string; message: string; refs: { doc: string } };
+    };
+    expect(response.error).toMatchObject({
+      code: 'CHECK_RUNNER_DESCRIPTOR',
+      refs: { doc: 'docs/adopters/test-tasks.md#local-closure-root' },
+    });
+    expect(response.error.message).toContain('node named test:local-full');
+  });
+
   it('returns structured blueprint findings without source-tree fallback', async () => {
     const repo = root();
     const valid = put(

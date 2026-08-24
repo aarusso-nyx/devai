@@ -431,6 +431,12 @@ function changedPaths(
   return [...paths].sort();
 }
 
+const HARNESS_MUTATED_PREFIXES = ['.devai/state/', 'record/', 'scratch/'] as const;
+
+function isHarnessMutatedPath(path: string): boolean {
+  return HARNESS_MUTATED_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 function selectedNodeIds(
   descriptor: TaskDescriptor,
   target: TaskTarget,
@@ -440,7 +446,9 @@ function selectedNodeIds(
   const impacted = new Set<string>();
   if (target === 'local') {
     if (!descriptor.tasks.some((task) => task.nodeId === 'test:local-full')) {
-      throw new Error('CHECK_RUNNER_DESCRIPTOR: local target requires test:local-full');
+      throw new Error(
+        'CHECK_RUNNER_DESCRIPTOR: local target requires a node named test:local-full (the local-closure root); declare it in test-tasks.json or use --rc / --affected',
+      );
     }
     selected.add('test:local-full');
   } else {
@@ -534,8 +542,11 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   } else if (!clean) {
     changes = changedPaths(repoRoot, commit, commit, false);
   }
+  changes = changes.filter((path) => !isHarnessMutatedPath(path));
+  const entries = (clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot)).filter(
+    (entry) => !isHarnessMutatedPath(entry.path),
+  );
   const selected = selectedNodeIds(descriptor, target, changes);
-  const entries = clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot);
   const descriptorDigest = sha256Hex(descriptor);
   const ordered = topologicalTasks(descriptor);
   const outputContracts = new Map(

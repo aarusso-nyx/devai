@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -56,6 +56,67 @@ describe('canonical action registry constructor', () => {
     expect(unrelated.kind === 'output' ? unrelated.text : '').toContain('Run devai --help.');
     expect(unrelated.kind === 'output' ? unrelated.text : '').not.toContain('Did you mean');
     expect(typo.kind === 'output' ? typo.text : '').toContain("Did you mean 'devai doctor'?");
+  });
+
+  it('rejects option-only positional arguments before dispatch and suggests check spellings', () => {
+    const registry = canonicalRegistry();
+    const root = mkdtempSync(join(tmpdir(), 'devai-check-positionals-'));
+    temporaryRoots.push(root);
+
+    const positional = routeArgv(
+      ['node', 'devai', 'check', 'schemas', '--repo-root', root, '--format', 'json'],
+      registry,
+      '1.2.10',
+    );
+    expect(positional).toMatchObject({ kind: 'output', exitCode: 2 });
+    const positionalError = JSON.parse(
+      positional.kind === 'output' ? positional.text : '{}',
+    ) as Record<string, unknown>;
+    expect(positionalError).toMatchObject({
+      code: 'CHECK_SELECTION_INVALID',
+      message: 'Check selection is invalid: unexpected argument "schemas".',
+      remediation: 'Use --only schemas to run one member, or --suite <name> for a suite.',
+      context: { argument: 'schemas', known_member: true },
+    });
+    expect(existsSync(join(root, '.devai/state'))).toBe(false);
+
+    const valid = routeArgv(
+      ['node', 'devai', 'check', '--only', 'schemas', '--repo-root', process.cwd()],
+      registry,
+      '1.2.10',
+    );
+    expect(valid.kind).toBe('dispatch');
+
+    const typo = routeArgv(
+      [
+        'node',
+        'devai',
+        'check',
+        '--only',
+        'schemsa',
+        '--repo-root',
+        process.cwd(),
+        '--format',
+        'json',
+      ],
+      registry,
+      '1.2.10',
+    );
+    expect(typo).toMatchObject({ kind: 'output', exitCode: 2 });
+    expect(JSON.parse(typo.kind === 'output' ? typo.text : '{}')).toMatchObject({
+      code: 'CHECK_MEMBER_UNKNOWN',
+      context: { member: 'schemsa', suggestions: expect.arrayContaining(['schemas']) },
+    });
+    expect(typo.kind === 'output' ? typo.text : '').toContain('--only schemas');
+
+    for (const argv of [
+      ['node', 'devai', 'doctor', 'unexpected', '--format', 'json'],
+      ['node', 'devai', 'catalog', 'actions', 'unexpected', '--format', 'json'],
+    ]) {
+      const result = routeArgv(argv, registry, '1.2.10');
+      expect(result).toMatchObject({ kind: 'output', exitCode: 2 });
+      expect(result.kind === 'output' ? result.text : '').toContain('ROUTE_UNEXPECTED_ARGUMENT');
+    }
   });
 
   it('derives identical policy provenance from repeated constructions', () => {

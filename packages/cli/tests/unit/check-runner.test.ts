@@ -799,6 +799,44 @@ describe('content-addressed check runner', () => {
     });
   });
 
+  it('never lets harness-mutated paths become glob inputs while preserving source invalidation', () => {
+    const state = repository();
+    commit(state.root, '.gitignore', '');
+
+    const first = run(state.root);
+    expect(first.execution?.every((task) => task.disposition === 'executed')).toBe(true);
+
+    file(state.root, '.devai/state/manual-counter.json', '{"count":1}\n');
+    file(state.root, 'record/proofs/harness.json', '{"verdict":"pass"}\n');
+    file(state.root, 'scratch/transient.txt', 'ephemeral\n');
+    const second = run(state.root);
+    expect(second.execution?.every((task) => task.disposition === 'reused')).toBe(true);
+    expect(
+      second.plan.tasks
+        .flatMap((task) => task.inputPaths)
+        .some(
+          (path) =>
+            path.startsWith('.devai/state/') ||
+            path.startsWith('record/') ||
+            path.startsWith('scratch/'),
+        ),
+    ).toBe(false);
+
+    file(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const third = run(state.root);
+    expect(third.execution?.find((task) => task.nodeId === 'test:unit')).toMatchObject({
+      disposition: 'executed',
+      reason: 'task-key-changed',
+    });
+
+    file(state.root, '.devai/config/thresholds.json', '{"coverage":90}\n');
+    const fourth = run(state.root);
+    expect(fourth.execution?.find((task) => task.nodeId === 'test:local-full')).toMatchObject({
+      disposition: 'executed',
+      reason: 'task-key-changed',
+    });
+  });
+
   it('reuses a persisted multi-dependency result regardless of dependency declaration order', () => {
     const state = repository();
     const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
@@ -1139,6 +1177,33 @@ describe('content-addressed check runner', () => {
     firstTask.argv[0] = '../bin/tool';
     writeFileSync(descriptorPath, `${JSON.stringify(descriptor, null, 2)}\n`);
     expect(() => readTaskDescriptor(descriptorPath)).toThrow('CHECK_RUNNER_DESCRIPTOR');
+  });
+
+  it('explains the reserved local-closure root when a descriptor omits it', () => {
+    const state = repository();
+    const descriptorPath = join(state.root, 'test-tasks.json');
+    const declared = JSON.parse(readFileSync(descriptorPath, 'utf8')) as {
+      fallbackNodeId: string | null;
+      tasks: Array<{ nodeId: string }>;
+      profiles: Array<{ requiredNodes: string[]; eligibleNodes?: string[] }>;
+    };
+    declared.fallbackNodeId = 'test:unit';
+    declared.tasks = declared.tasks.filter((task) => task.nodeId !== 'test:local-full');
+    for (const profile of declared.profiles) {
+      profile.requiredNodes = profile.requiredNodes.filter(
+        (nodeId) => nodeId !== 'test:local-full',
+      );
+      if (profile.eligibleNodes !== undefined) {
+        profile.eligibleNodes = profile.eligibleNodes.filter(
+          (nodeId) => nodeId !== 'test:local-full',
+        );
+      }
+    }
+    writeFileSync(descriptorPath, `${JSON.stringify(declared, null, 2)}\n`);
+
+    expect(() => plan(state.root, 'local')).toThrow(
+      'local target requires a node named test:local-full (the local-closure root)',
+    );
   });
 
   it('keeps planning/status/explain read-only while --run requires write consent', () => {
