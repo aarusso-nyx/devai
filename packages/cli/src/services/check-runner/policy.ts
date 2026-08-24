@@ -12,7 +12,11 @@ import type {
   TaskTarget,
 } from './types.js';
 import { resolveMutationOutputContract } from './mutation-output.js';
-import { BARE_EXECUTABLE, resolveTaskExecutable } from './executable.js';
+import {
+  BARE_EXECUTABLE,
+  resolveTaskExecutable,
+  taskExecutableFromToolchain,
+} from './executable.js';
 
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
@@ -567,7 +571,10 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       nodeId,
       taskKey: taskKeys.get(nodeId),
     }));
-    const executable = resolveTaskExecutable(repoRoot, task.argv[0] ?? '');
+    const executableName = task.argv[0] ?? '';
+    const executable =
+      taskExecutableFromToolchain(toolchain, executableName) ??
+      resolveTaskExecutable(repoRoot, executableName);
     const taskKey = sha256Hex({
       schemaVersion: '1.0.0',
       descriptorDigest,

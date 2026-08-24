@@ -589,6 +589,34 @@ describe('content-addressed check runner', () => {
     );
   });
 
+  it('uses a protected executable identity when reconstructing task keys', () => {
+    const state = repository();
+    const descriptorValue = readTaskDescriptor(join(state.root, 'test-tasks.json'));
+    const build = (sha256: string) =>
+      withRunnerScope(() =>
+        buildTaskPlan({
+          repoRoot: state.root,
+          descriptor: descriptorValue,
+          target: 'local',
+          toolchain: {
+            ...TOOLCHAIN,
+            'executable:node': JSON.stringify({
+              path: '/protected/toolchain/node',
+              sha256,
+            }),
+          },
+          environment: {},
+          cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
+        }),
+      );
+    const first = build('a'.repeat(64));
+    const changed = build('b'.repeat(64));
+    expect(first.tasks[0]?.executable.path).toBe('/protected/toolchain/node');
+    expect(first.tasks.map((task) => task.taskKey)).not.toEqual(
+      changed.tasks.map((task) => task.taskKey),
+    );
+  });
+
   it('does not require release-candidate toolchains for the cheap local closure', () => {
     const state = repository();
     const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {

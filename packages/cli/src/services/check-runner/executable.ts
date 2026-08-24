@@ -9,6 +9,35 @@ export interface ResolvedTaskExecutable {
   readonly sha256: string;
 }
 
+export function executableToolchainKey(executable: string): string {
+  return `executable:${executable}`;
+}
+
+export function encodeTaskExecutable(identity: ResolvedTaskExecutable): string {
+  return JSON.stringify({ path: identity.path, sha256: identity.sha256 });
+}
+
+export function taskExecutableFromToolchain(
+  toolchain: Readonly<Record<string, string>>,
+  executable: string,
+): ResolvedTaskExecutable | undefined {
+  const encoded = toolchain[executableToolchainKey(executable)];
+  if (encoded === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(encoded) as Readonly<Record<string, unknown>>;
+    if (
+      typeof parsed.path !== 'string' ||
+      !/^[0-9a-f]{64}$/u.test(String(parsed.sha256)) ||
+      JSON.stringify({ path: parsed.path, sha256: parsed.sha256 }) !== encoded
+    ) {
+      throw new Error('invalid identity');
+    }
+    return { path: parsed.path, sha256: String(parsed.sha256) };
+  } catch {
+    throw new Error(`CHECK_RUNNER_TOOLCHAIN_INVALID: executable:${executable}`);
+  }
+}
+
 export function resolveTaskExecutable(
   repoRoot: string,
   executable: string,

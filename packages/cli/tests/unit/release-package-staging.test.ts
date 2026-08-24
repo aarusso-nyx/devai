@@ -83,7 +83,7 @@ describe('normalized release package staging', () => {
       verifier_package: '@aarusso-nyx/devai',
       verifier_package_version: '1.2.7',
       verifier_provenance_sha256: digest,
-      verifier_source_commit: '5f71d43a3d55b07fe866ea2df139dfaacc84f7db',
+      verifier_source_commit: '9e115014f8da5a16be526c7da5207bc0aae0801b',
     });
   });
 });

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "sourceCommit": "5f71d43a3d55b07fe866ea2df139dfaacc84f7db",
+  "sourceCommit": "9e115014f8da5a16be526c7da5207bc0aae0801b",
   "files": [
     {
       "path": "schemas/candidate-receipt-1.1.schema.json",
@@ -20,7 +20,7 @@
     },
     {
       "path": "schemas/task-descriptor.schema.json",
-      "sha256": "8ac4b94349139a62dc70f854b679f342bf083a02012c1892de35a041a37510d8"
+      "sha256": "e5ff00f3d8c9686d85731706b5e518e0198280e2f1c0ca3eaabbbeaac9e0fe4f"
     },
     {
       "path": "schemas/task-policy-1.1.schema.json",
@@ -72,7 +72,7 @@
     },
     {
       "path": "src/policy-builder.js",
-      "sha256": "4ce2c29003957b7ffa5249442d83c2b9a5616520b9e10cd156c20299b6ef6be3"
+      "sha256": "d4f8a8a3453991967efafb66023dee7650f8c29e49d6b85e4111eebe4e6df5c8"
     },
     {
       "path": "src/publish-cli.js",
