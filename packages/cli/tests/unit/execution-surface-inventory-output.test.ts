@@ -155,12 +155,12 @@ describe('execution-surface action output totality', () => {
 
   it('maps every governed failure exit to a total structured error for every current action', () => {
     const expected = {
-      2: 'routing-authority',
-      3: 'gate-fail',
-      4: 'invalid-input',
-      5: 'precondition',
-      6: 'infrastructure',
-      7: 'contract-violation',
+      2: { class: 'routing-authority', code: 'ACTION_INVOCATION_REFUSED' },
+      3: { class: 'gate-fail', code: 'ACTION_GATE_FAILED' },
+      4: { class: 'invalid-input', code: 'ACTION_INVOCATION_REFUSED' },
+      5: { class: 'precondition', code: 'ACTION_PRECONDITION_UNSATISFIED' },
+      6: { class: 'infrastructure', code: 'ACTION_INVOCATION_REFUSED' },
+      7: { class: 'contract-violation', code: 'ACTION_OUTPUT_CONTRACT_VIOLATION' },
     } as const;
 
     for (const entry of current) {
@@ -168,7 +168,7 @@ describe('execution-surface action output totality', () => {
         action_id: entry.name,
         ok: true,
       });
-      for (const [rawExit, errorClass] of Object.entries(expected)) {
+      for (const [rawExit, expectedError] of Object.entries(expected)) {
         const exit = Number(rawExit);
         expect(
           parseEnvelope(renderActionFailure(entry, 'bounded failure', exit)),
@@ -176,7 +176,7 @@ describe('execution-surface action output totality', () => {
         ).toMatchObject({
           action_id: entry.name,
           ok: false,
-          error: { class: errorClass, exit },
+          error: { ...expectedError, exit },
         });
       }
     }

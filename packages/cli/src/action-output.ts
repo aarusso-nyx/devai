@@ -52,6 +52,19 @@ function normalizeExit(exit: number): 2 | 3 | 4 | 5 | 6 | 7 {
   return exit >= 2 && exit <= 7 ? (exit as 2 | 3 | 4 | 5 | 6 | 7) : 7;
 }
 
+function errorCode(exit: 2 | 3 | 4 | 5 | 6 | 7): string {
+  if (exit === 3) return 'ACTION_GATE_FAILED';
+  if (exit === 5) return 'ACTION_PRECONDITION_UNSATISFIED';
+  if (exit === 7) return 'ACTION_OUTPUT_CONTRACT_VIOLATION';
+  return 'ACTION_INVOCATION_REFUSED';
+}
+
+function errorRemediation(exit: 2 | 3 | 4 | 5 | 6 | 7): string {
+  if (exit === 3) return 'Resolve the reported gate findings, then rerun the action.';
+  if (exit === 5) return 'Satisfy the reported precondition, then retry.';
+  return 'Correct the invocation or satisfy the reported precondition, then retry.';
+}
+
 function errorFrom(text: string, exit: number): CliError {
   const trimmed = text.trim();
   let parsedPayload: unknown;
@@ -80,11 +93,11 @@ function errorFrom(text: string, exit: number): CliError {
           ? 'The action precondition was not satisfied.'
           : 'The action returned a structured failure payload.';
   return cliError({
-    code: normalized === 7 ? 'ACTION_OUTPUT_CONTRACT_VIOLATION' : 'ACTION_INVOCATION_REFUSED',
+    code: errorCode(normalized),
     class: errorClass(normalized),
     exit: normalized,
     message,
-    remediation: 'Correct the invocation or satisfy the reported precondition, then retry.',
+    remediation: errorRemediation(normalized),
     ...(parsedPayload === undefined ? {} : { context: { payload: parsedPayload } }),
   });
 }
@@ -301,8 +314,9 @@ export function attachActionOutputBoundaries(
       const fail = (error: unknown): void => {
         if (!(error instanceof CommandExit)) {
           const message = error instanceof Error ? error.message : String(error);
-          const optionalDependency =
-            /^OPTIONAL_DEPENDENCY_MISSING:([A-Za-z0-9@/._-]+)$/u.exec(message);
+          const optionalDependency = /^OPTIONAL_DEPENDENCY_MISSING:([A-Za-z0-9@/._-]+)$/u.exec(
+            message,
+          );
           explicitExit = optionalDependency === null ? 6 : 5;
           stderr =
             optionalDependency === null
