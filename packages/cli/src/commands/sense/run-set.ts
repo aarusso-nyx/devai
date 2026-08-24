@@ -1,7 +1,7 @@
 import type { CAC } from 'cac';
 import { routeArgv } from '../../command-router.js';
 import { defineCommand, type RegistryEntry } from '../../define-command.js';
-import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
+import { EXIT_FAIL, EXIT_GATE, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
 import { sensorAdapter } from './adapters.js';
 import {
   resolveSenseSelection,
@@ -28,7 +28,7 @@ export interface SensorRunAggregate {
   readonly na_count: number;
   readonly counts: Readonly<Record<AggregateCountStatus, number>>;
   /** Total public result code. Operational errors dominate readiness. */
-  readonly exit_code: 0 | 1 | 2;
+  readonly exit_code: 0 | 1 | 3;
 }
 
 interface SenseRunOptions {
@@ -66,8 +66,8 @@ function parseStructuredStatus(stdout: string): StructuredStatus | undefined {
 function aggregateExitCode(
   executionStatus: SensorRunAggregate['execution_status'],
   readinessStatus: ReadinessStatus,
-): 0 | 1 | 2 {
-  if (executionStatus === 'error' || readinessStatus === 'fail') return EXIT_FAIL;
+): 0 | 1 | 3 {
+  if (executionStatus === 'error' || readinessStatus === 'fail') return EXIT_GATE;
   if (readinessStatus === 'review' || readinessStatus === 'unknown') return EXIT_REVIEW;
   return EXIT_PASS;
 }

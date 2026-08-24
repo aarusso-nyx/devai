@@ -182,6 +182,17 @@ describe('execution-surface action output totality', () => {
     }
   });
 
+  it('keeps parsed domain payloads in error context instead of stringifying them', () => {
+    const entry = current[0];
+    if (entry === undefined) throw new Error('action registry is empty');
+    const payload = { status: 'fail', findings: [{ code: 'BUILD_SCRIPT_MISSING' }] };
+    const envelope = parseEnvelope(renderActionFailure(entry, JSON.stringify(payload), 3)) as {
+      error: { message: string; context: { payload: unknown } };
+    };
+    expect(envelope.error.context.payload).toEqual(payload);
+    expect(() => JSON.parse(envelope.error.message)).toThrow();
+  });
+
   it('transports REVIEW as a typed result at exit 1 for every current action', () => {
     for (const entry of current) {
       const review = emit(entry, {

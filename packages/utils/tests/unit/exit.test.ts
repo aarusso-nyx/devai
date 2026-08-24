@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { EXIT_CONFIG, EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '../../src/exit.js';
+import {
+  EXIT_CONFIG,
+  EXIT_FAIL,
+  EXIT_GATE,
+  EXIT_PASS,
+  EXIT_REVIEW,
+  EXIT_USAGE,
+} from '../../src/exit.js';
 
 describe('exit codes', () => {
   it('PASS is 0', () => {
@@ -12,6 +19,10 @@ describe('exit codes', () => {
 
   it('FAIL is 2', () => {
     expect(EXIT_FAIL).toBe(2);
+  });
+
+  it('GATE is 3', () => {
+    expect(EXIT_GATE).toBe(3);
   });
 
   it('USAGE is 2 — one usage contract at every layer (R18.C.4, D-133; sysexits EX_USAGE=64 retired)', () => {

@@ -29,6 +29,7 @@ type Aggregate = {
   readonly applicable_count: number;
   readonly na_count: number;
   readonly counts: Record<string, number>;
+  readonly exit_code: number;
 };
 
 function reading(status: string): string {
@@ -299,5 +300,13 @@ describe('sense run readiness aggregation', () => {
     expect(spawnFailure.execution_status).toBe('error');
     expect(malformed.readiness_status).not.toBe('fail');
     expect(spawnFailure.readiness_status).not.toBe('fail');
+    expect(malformed.exit_code).toBe(3);
+    expect(spawnFailure.exit_code).toBe(3);
+  });
+
+  it('maps a valid FAIL reading to the gate-fail transport exit', () => {
+    expect(
+      aggregate([{ command: 'one', processStatus: 2, stdout: reading('fail'), stderr: '' }]),
+    ).toMatchObject({ execution_status: 'pass', readiness_status: 'fail', exit_code: 3 });
   });
 });

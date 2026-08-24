@@ -1,6 +1,7 @@
 export const EXIT_PASS = 0;
 export const EXIT_REVIEW = 1;
 export const EXIT_FAIL = 2;
+export const EXIT_GATE = 3;
 export const EXIT_PRECONDITION = 5;
 // R18.C.4 (D-133/M3): one usage contract, one code. D-129 made the router
 // exit 2 on usage failures before side effects; the command layer kept the
@@ -14,6 +15,7 @@ export type ExitCode =
   | typeof EXIT_PASS
   | typeof EXIT_REVIEW
   | typeof EXIT_FAIL
+  | typeof EXIT_GATE
   | typeof EXIT_PRECONDITION
   | typeof EXIT_USAGE
   | typeof EXIT_CONFIG;
