@@ -1,8 +1,8 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
@@ -423,10 +423,7 @@ describe('authority broker production boundary depth', () => {
         ['config', '--unset', 'remote.origin.url'],
       ]) {
         expect(() =>
-          host.scope.apply_effect(
-            effect('spawnSync', ['git', args], 'process'),
-            () => 'forbidden',
-          ),
+          host.scope.apply_effect(effect('spawnSync', ['git', args], 'process'), () => 'forbidden'),
         ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
       }
     } finally {
@@ -731,6 +728,48 @@ describe('authority broker production boundary depth', () => {
           () => 'forbidden',
         ),
       ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('carries declared check-task refusal detail outside the error message', () => {
+    const host = broker('check', 'engineer', [
+      process.execPath,
+      'devai',
+      'check',
+      '--local',
+      '--run',
+      '--as-role',
+      'engineer',
+      '--write',
+    ]);
+    try {
+      let refusal: unknown;
+      try {
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            [
+              'node',
+              ['-e', 'process.stdout.write("different")'],
+              { cwd: resolve(ROOT, '..'), shell: false },
+            ],
+            'process',
+          ),
+          () => 'forbidden',
+        );
+      } catch (error) {
+        refusal = error;
+      }
+      expect(refusal).toBeInstanceOf(Error);
+      expect((refusal as Error).message).toBe('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect((refusal as Error & { context: unknown }).context).toMatchObject({
+        executable: 'node',
+        argv: ['-e', 'process.stdout.write("different")'],
+        descriptor_path: join(realpathSync(ROOT), 'test-tasks.json'),
+        reason: 'cwd escapes the repository',
+      });
     } finally {
       host.dispose();
     }
