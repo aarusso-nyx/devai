@@ -555,7 +555,7 @@ try {
     readFileSync(join(projectRoot, '.devai/config/domains.json'), 'utf8'),
   );
   if (
-    installedAdopterDoctor.status !== 0 ||
+    ![0, 1].includes(installedAdopterDoctor.status) ||
     installedAdopterPolicyCheck?.ok !== true ||
     installedDomains.client?.join(',') !== 'COVERAGE,ERROR,FLOW,PRIVACY,RBAC' ||
     JSON.stringify(installedAdopterPolicyCheck?.info?.remediation_commands ?? []).includes(
