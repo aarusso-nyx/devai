@@ -166,6 +166,13 @@ export type RouteResult =
 
 export const ROUTER_INTERNAL_NAMES = ['check', 'round-close', 'init-bind'] as const;
 
+const POSITIONAL_ACTION_NAMES = new Set([
+  'evidence redact',
+  'round gap resolve',
+  'round gap show',
+  'sense run',
+]);
+
 function flagValue(args: readonly string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
   const value = index < 0 ? undefined : args[index + 1];
@@ -314,7 +321,7 @@ export function routeArgv(
     if (
       unexpectedPositionals.length > 0 &&
       (exact.runtime_args ?? '') === '' &&
-      exact.name !== 'sense run'
+      !POSITIONAL_ACTION_NAMES.has(exact.name)
     ) {
       const argument = unexpectedPositionals[0] ?? '';
       if (exact.name === 'check') {
