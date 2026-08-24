@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.7 — 2026-08-23
+
+- Makes schema-valid adopter task descriptors the process authority while retaining exact argv,
+  shell-free execution, repository-contained working directories, executable resolution, and
+  executable-digest cache binding.
+- Aligns tier diagnostics with bootstrap profiles, detects materialized-policy drift, and emits
+  actionable structured authority refusals with distinct gate-failure exit semantics.
+- Isolates typecheck output from packaged runtime files and makes OpenAI, Anthropic, and PostgreSQL
+  clients optional with typed missing-dependency remediation.
+
 ## 1.2.6 — 2026-08-22
 
 - Preserves exact-main observation provenance for user-owned private repositories through the
