@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
@@ -82,5 +82,15 @@ describe('init plan target preconditions', () => {
       class: 'precondition',
       context: { target_root: root },
     });
+  });
+
+  it('accepts a nested target when the worktree uses a .git file', async () => {
+    const worktree = join(root, 'linked-worktree');
+    const target = join(worktree, 'nested');
+    mkdirSync(target, { recursive: true });
+    writeFileSync(join(worktree, '.git'), 'gitdir: /fixture/common/worktrees/linked\n');
+    const result = await invoke(target);
+    expect(result.exit, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ target_root: target });
   });
 });

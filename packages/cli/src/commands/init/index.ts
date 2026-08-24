@@ -5,7 +5,6 @@ import {
   readFileSync,
   realpathSync,
   runAuthorityHostEffectsWithRollback,
-  spawnSync,
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
@@ -239,15 +238,25 @@ function validateInitTarget(options: InitOptions): ValidatedInitTarget | undefin
     initTargetError(path, 'Init target must exist and be a directory', options.human === true);
     return undefined;
   }
-  const result = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
-    cwd: path,
-    encoding: 'utf8',
-  });
-  if (result.status !== 0 || result.stdout.trim() !== 'true') {
+  const resolved = realpathSync(path);
+  let cursor = resolved;
+  let workTree = false;
+  while (true) {
+    const gitEntry = join(cursor, '.git');
+    if (existsSync(gitEntry)) {
+      const entry = lstatSync(gitEntry);
+      workTree = entry.isDirectory() || entry.isFile();
+      break;
+    }
+    const parent = dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+  if (!workTree) {
     initTargetError(path, 'Init target is not a Git repository', options.human === true);
     return undefined;
   }
-  return { requested, resolved: realpathSync(path) };
+  return { requested, resolved };
 }
 
 function initPlanFor(options: InitOptions, target: ValidatedInitTarget) {
