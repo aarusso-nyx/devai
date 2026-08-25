@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { renderHelp } from '../../src/command-router.js';
-import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
+import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
@@ -33,7 +33,7 @@ describe('resolveCliVersion', () => {
   });
 
   it('exposes the selected release through generated CLI help', () => {
-    expect(renderHelp(ACTION_REGISTRY, resolveCliVersion())).toContain(
+    expect(renderHelp(canonicalRegistry(), resolveCliVersion())).toContain(
       `devai/${SELECTED_RELEASE_VERSION}`,
     );
   });
