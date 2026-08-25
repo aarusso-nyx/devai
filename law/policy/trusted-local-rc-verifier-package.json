@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "trusted-local-rc-verifier-package",
+  "status": "active",
+  "authority": "Architect",
+  "package": {
+    "name": "@aarusso-nyx/devai",
+    "version": "1.2.12",
+    "registry": "https://npm.pkg.github.com",
+    "tarball": "https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.2.12/04a8bb1edd4f85f8a3663be931634f4e077139b2",
+    "shasum_sha1": "04a8bb1edd4f85f8a3663be931634f4e077139b2",
+    "integrity_sri": "sha512-WXd1oRdBDenC/VOLFzquIdGZ5giBAT7DBPppdtUDfCUQKioflzL2xO1iOmYKf5E6G5dDuRCgmMDoUOoq1Mxsgw==",
+    "release_source": {
+      "repository": "aarusso-nyx/devai",
+      "commit": "e365abdcf245882e3f5ee1fb0ea8ef7bebe3ab0d",
+      "tree": "5a89a8c482e0f145708b311904bd86bd7bd45939"
+    }
+  },
+  "authentication": {
+    "secret": "PACKAGES_READ_TOKEN",
+    "scope": "materialization-step-only",
+    "github_token_fallback": false
+  },
+  "workflow_permissions": {
+    "contents": "read",
+    "packages": "read",
+    "checks": "write"
+  },
+  "materialization": {
+    "root": "runner-temporary-storage",
+    "package_lifecycle_scripts": false,
+    "candidate_product_execution": false,
+    "validate_before_extraction": [
+      "package-name",
+      "package-version",
+      "tarball-url",
+      "tarball-sha1",
+      "tarball-sri",
+      "release-source-commit",
+      "release-source-tree"
+    ],
+    "reject_archive_entries": [
+      "absolute-path",
+      "path-traversal",
+      "symlink",
+      "hardlink",
+      "special-file"
+    ]
+  },
+  "verifier": {
+    "root": "dist/runtime/evidence-verification",
+    "provenance_sha256": "e6be4198ded731b9733c8e5c720fc5beb1ec8393a1eda01b76e6119b172d17c0",
+    "source_commit": "9e115014f8da5a16be526c7da5207bc0aae0801b",
+    "payload_file_count": 21,
+    "binaries": {
+      "devai-evidence-policy": "./dist/runtime/evidence-verification/src/build-policy-cli.js",
+      "devai-evidence-verify": "./dist/runtime/evidence-verification/src/cli.js",
+      "devai-evidence-bundle-verify": "./dist/runtime/evidence-verification/src/bundle-cli.js",
+      "devai-evidence-export": "./dist/runtime/evidence-verification/src/export-cli.js",
+      "devai-evidence-publish": "./dist/runtime/evidence-verification/src/publish-cli.js"
+    },
+    "reject_population": [
+      "missing-file",
+      "extra-file",
+      "symlink",
+      "special-file",
+      "digest-drift",
+      "binary-map-drift"
+    ]
+  },
+  "external_duplicate": {
+    "name": "DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256",
+    "required": true,
+    "sole_trust_root": false
+  },
+  "adopter_fallbacks": []
+}
