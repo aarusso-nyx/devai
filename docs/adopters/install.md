@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.12
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.13
 pnpm exec devai catalog actions --format json
 ```
 
@@ -95,6 +95,16 @@ pnpm exec devai init bind --target . --subprocess-effects --as-role architect --
 Run `pnpm exec devai doctor`, review every reported digest change, and commit the refreshed
 materialization with the package update. Materialized policy is a versioned snapshot, not a link;
 installing a newer package does not silently rewrite adopter-owned repository files.
+
+Repositories using trusted local RC evidence must also regenerate the byte-compared verifier
+workflow from the installed package and review the resulting diff:
+
+```bash
+pnpm exec devai init apply harness --target . --include ci --force
+```
+
+Do not hand-edit `.github/workflows/devai-local-rc-verify.yml`; `doctor` treats bytes that differ
+from the installed generator as stale.
 
 The core CLI installs without model-provider or PostgreSQL clients. Install `openai` for the
 Codex API bridge, `@anthropic-ai/sdk` for the Claude API bridge, and `pg` for database-backed

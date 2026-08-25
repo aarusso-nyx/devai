@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.13 — 2026-08-25
+
+- Repairs the generated trusted-local-RC verifier workflow so adopters materialize the exact
+  authenticated `@aarusso-nyx/devai@1.2.12` verifier package in runner-temporary storage instead
+  of falling back to the adopter's `packages/cli` tree.
+- Validates the package name, version, tarball identity, release commit and tree, archive safety,
+  provenance, declared 21-file verifier population, and five evidence binaries before execution.
+  Package authentication remains step-scoped to `PACKAGES_READ_TOKEN`, with no `github.token`
+  fallback, lifecycle-script execution, candidate-product execution, or permission widening.
+
 ## 1.2.12 — 2026-08-24
 
 - Makes Doctor validate adopter-policy binding receipts and deterministically reconstruct bound
