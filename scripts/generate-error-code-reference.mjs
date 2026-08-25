@@ -21,6 +21,7 @@ const prefixes = new Set([
   'CLI',
   'CONSTITUTION',
   'DATABASE',
+  'DEVAI',
   'DOCS',
   'EVIDENCE',
   'FORBIDDEN',
