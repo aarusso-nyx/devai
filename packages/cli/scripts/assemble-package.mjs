@@ -49,6 +49,7 @@ const policyFiles = [
   'sensor-registry.json',
   'subprocess-effects.json',
   'thresholds.json',
+  'trusted-local-rc-verifier-package.json',
 ];
 
 function schemaClosure(roots) {
@@ -254,6 +255,7 @@ try {
     ...verifierBins.map((name) => join(verifierRuntimeRoot, 'src', name)),
     join(verifierRuntimeRoot, 'schemas/task-descriptor.schema.json'),
     join(verifierRuntimeRoot, 'provenance.json'),
+    join(distRoot, 'law/policy/trusted-local-rc-verifier-package.json'),
     join(distRoot, 'law/constitution.md'),
     join(distRoot, 'resources/recipes/devai-round/SKILL.md'),
     join(distRoot, 'resources/operations/scaffold/templates/db/migration.sql.tpl'),

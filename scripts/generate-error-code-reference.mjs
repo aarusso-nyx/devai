@@ -123,6 +123,10 @@ for (const sourceRoot of sourceRoots) {
       const code = match[1];
       if (code !== undefined && prefixes.has(code.split('_')[0])) codes.add(code);
     }
+    for (const match of source.matchAll(/['"](DEVAI_VERIFIER_[A-Z0-9_]+)(?=[:'"])/gu)) {
+      const code = match[1];
+      if (code !== undefined) codes.add(code);
+    }
   }
 }
 
