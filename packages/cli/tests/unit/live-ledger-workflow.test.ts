@@ -1,6 +1,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -18,6 +26,24 @@ import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CHECKER = join(ROOT, 'scripts/check-workflows.mjs');
+const CHECKED_IN_LEDGER = readFileSync(
+  join(ROOT, '.github/workflows/devai-ledger-verify.yml'),
+  'utf8',
+);
+const VERIFIER_POLICY = JSON.parse(
+  readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
+) as {
+  package: {
+    name: string;
+    version: string;
+    registry: string;
+    tarball: string;
+    shasum_sha1: string;
+    integrity_sri: string;
+    release_source: { repository: string; commit: string; tree: string };
+  };
+  verifier: { provenance_sha256: string; root: string };
+};
 const roots: string[] = [];
 const EXPLICIT_PUBLISH_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
@@ -28,7 +54,7 @@ const PERMISSIVE_PUSH_PUBLICATION_CONDITION =
 const DISPATCH_ONLY_REHEARSAL_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
 
-function fixture(source = ledgerVerificationWorkflow(), file = 'devai-ledger-verify.yml') {
+function fixture(source = CHECKED_IN_LEDGER, file = 'devai-ledger-verify.yml') {
   const root = mkdtempSync(join(tmpdir(), 'devai-ledger-workflow-'));
   roots.push(root);
   const directory = join(root, '.github/workflows');
@@ -58,18 +84,142 @@ function verifierMaterializationScript(source: string): string {
   return materialize?.run ?? '';
 }
 
+function executablePackageMaterializationFixture(source = ledgerVerificationWorkflow()) {
+  const root = mkdtempSync(join(tmpdir(), 'devai-verifier-materialization-'));
+  roots.push(root);
+  const packageRoot = join(root, 'package');
+  const verifierRoot = join(packageRoot, VERIFIER_POLICY.verifier.root);
+  const runnerTemp = join(root, 'runner-temp');
+  const githubEnv = join(root, 'github-env');
+  const githubOutput = join(root, 'github-output');
+  const archive = join(root, 'package.tgz');
+  const mockBin = join(root, 'mock-bin');
+  mkdirSync(verifierRoot, { recursive: true });
+  mkdirSync(runnerTemp, { recursive: true });
+  mkdirSync(mockBin, { recursive: true });
+  cpSync(
+    join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
+    join(verifierRoot, 'provenance.json'),
+  );
+  cpSync(
+    join(ROOT, 'packages/cli/vendor/evidence-verification/schemas'),
+    join(verifierRoot, 'schemas'),
+    {
+      recursive: true,
+    },
+  );
+  cpSync(join(ROOT, 'packages/cli/vendor/evidence-verification/src'), join(verifierRoot, 'src'), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(packageRoot, 'package.json'),
+    `${JSON.stringify({
+      name: VERIFIER_POLICY.package.name,
+      version: VERIFIER_POLICY.package.version,
+      bin: {
+        'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+        'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+        'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+        'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+        'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+      },
+    })}\n`,
+  );
+  execFileSync('tar', ['-czf', archive, '--format', 'ustar', 'package'], {
+    cwd: root,
+    env: { ...process.env, COPYFILE_DISABLE: '1' },
+  });
+  const archiveBytes = readFileSync(archive);
+  const shasum = createHash('sha1').update(archiveBytes).digest('hex');
+  const integrity = `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`;
+  const registry = 'https://registry.fixture.invalid';
+  const tarball = `${registry}/package.tgz`;
+  const releaseRef = `https://api.github.com/repos/${VERIFIER_POLICY.package.release_source.repository}/git/ref/tags/v${VERIFIER_POLICY.package.version}`;
+  const tagUrl = 'https://api.fixture.invalid/tag';
+  const commitUrl = 'https://api.fixture.invalid/commit';
+  const responses = {
+    [`${registry}/${encodeURIComponent(VERIFIER_POLICY.package.name).replace('%40', '@')}`]: {
+      json: {
+        name: VERIFIER_POLICY.package.name,
+        versions: {
+          [VERIFIER_POLICY.package.version]: {
+            version: VERIFIER_POLICY.package.version,
+            dist: { tarball, shasum, integrity },
+          },
+        },
+      },
+    },
+    [tarball]: { file: archive },
+    [releaseRef]: { json: { object: { type: 'tag', url: tagUrl } } },
+    [tagUrl]: {
+      json: {
+        object: {
+          type: 'commit',
+          url: commitUrl,
+          sha: VERIFIER_POLICY.package.release_source.commit,
+        },
+      },
+    },
+    [commitUrl]: {
+      json: {
+        sha: VERIFIER_POLICY.package.release_source.commit,
+        tree: { sha: VERIFIER_POLICY.package.release_source.tree },
+      },
+    },
+  };
+  const curl = join(mockBin, 'curl');
+  writeFileSync(
+    curl,
+    `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const output = args[args.indexOf('--output') + 1];
+const url = args.at(-1);
+if (!args.includes('Authorization: Bearer fixture-token')) process.exit(91);
+const response = JSON.parse(process.env.MOCK_CURL_RESPONSES)[url];
+if (!response || !output) process.exit(92);
+if (response.file) fs.copyFileSync(response.file, output);
+else fs.writeFileSync(output, JSON.stringify(response.json));
+`,
+  );
+  chmodSync(curl, 0o755);
+  writeFileSync(githubEnv, '');
+  writeFileSync(githubOutput, '');
+  const script = verifierMaterializationScript(source)
+    .replaceAll(VERIFIER_POLICY.package.tarball, tarball)
+    .replaceAll(VERIFIER_POLICY.package.registry, registry)
+    .replaceAll(VERIFIER_POLICY.package.shasum_sha1, shasum)
+    .replaceAll(VERIFIER_POLICY.package.integrity_sri, integrity);
+  return {
+    root,
+    runnerTemp,
+    githubEnv,
+    githubOutput,
+    script,
+    provenanceDigest: VERIFIER_POLICY.verifier.provenance_sha256,
+    env: {
+      ...process.env,
+      PATH: `${mockBin}:${process.env.PATH ?? ''}`,
+      NODE_AUTH_TOKEN: 'fixture-token',
+      VERIFIER_PROVENANCE_SHA256: VERIFIER_POLICY.verifier.provenance_sha256,
+      RUNNER_TEMP: runnerTemp,
+      GITHUB_ENV: githubEnv,
+      GITHUB_OUTPUT: githubOutput,
+      MOCK_CURL_RESPONSES: JSON.stringify(responses),
+    },
+  };
+}
+
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
 describe('live ledger-verification workflow', () => {
-  it('keeps the checked-in workflow byte-identical to the current scaffold', () => {
+  it('keeps the immutable generated scaffold separate from the checked-in DEVAI workflow contract', () => {
     const expected = ledgerVerificationWorkflow();
-    const checkedIn = readFileSync(join(ROOT, '.github/workflows/devai-ledger-verify.yml'), 'utf8');
     const target = fixture();
     const plan = buildCiScaffoldPlan({ targetRoot: target });
 
-    expect(checkedIn).toBe(expected);
     expect(plan).toMatchObject({
       path: join(target, '.github/workflows/devai-ledger-verify.yml'),
       content: expected,
@@ -78,85 +228,62 @@ describe('live ledger-verification workflow', () => {
     expect(execFileSync(process.execPath, [CHECKER], { cwd: ROOT, encoding: 'utf8' })).toBe(
       'workflow contract: PASS\n',
     );
-    const digestCheck = checkedIn.indexOf(
+    const digestCheck = expected.indexOf(
       'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     );
-    const packageCopy = checkedIn.indexOf(
-      'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
+    const packageExtraction = expected.indexOf(
+      'tar -xzf "$archive" --directory "$control/extracted" --no-same-owner --no-same-permissions',
     );
-    const provenanceVerification = checkedIn.indexOf('const provenance = JSON.parse');
+    const provenanceVerification = expected.indexOf('const provenance = JSON.parse');
     expect(digestCheck).toBeGreaterThan(-1);
-    expect(packageCopy).toBeGreaterThan(digestCheck);
-    expect(provenanceVerification).toBeGreaterThan(packageCopy);
-    expect(checkedIn).toContain("manifest.name !== '@aarusso-nyx/devai'");
-    expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:');
-    expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
-    expect(checkedIn).toContain('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
-    expect(checkedIn).not.toContain('devai-nyx/devai-verifier');
+    expect(packageExtraction).toBeGreaterThan(-1);
+    expect(provenanceVerification).toBeGreaterThan(packageExtraction);
+    expect(expected).toContain("manifest.name !== '@aarusso-nyx/devai'");
+    expect(expected).toContain('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:');
+    expect(expected).toContain('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
+    expect(expected).toContain('DEVAI_VERIFIER_PACKAGE_FILE_MISSING:');
+    expect(expected).toContain('DEVAI_VERIFIER_PACKAGE_FILE_EXTRA:');
+    expect(expected).not.toContain('candidate/packages/cli');
+    expect(expected).not.toContain('devai-nyx/devai-verifier');
   });
 
-  it.each([
-    { name: 'ledger workflow', source: ledgerVerificationWorkflow() },
-    {
-      name: 'release workflow',
-      source: readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8'),
-    },
-  ])('executes protected verifier materialization in the $name', ({ source }) => {
-    const root = mkdtempSync(join(tmpdir(), 'devai-verifier-materialization-'));
-    roots.push(root);
-    const packageRoot = join(root, 'candidate/packages/cli');
-    const sourceRoot = join(packageRoot, 'vendor/evidence-verification');
-    const runnerTemp = join(root, 'runner-temp');
-    const githubEnv = join(root, 'github-env');
-    const githubOutput = join(root, 'github-output');
-    const fixtureVersion = '9.8.7-materialization-fixture';
-    mkdirSync(join(packageRoot, 'vendor'), { recursive: true });
-    mkdirSync(runnerTemp, { recursive: true });
-    cpSync(join(ROOT, 'packages/cli/vendor/evidence-verification'), sourceRoot, {
-      recursive: true,
-    });
-    writeFileSync(
-      join(packageRoot, 'package.json'),
-      `${JSON.stringify({
-        name: '@aarusso-nyx/devai',
-        version: fixtureVersion,
-        bin: {
-          'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
-          'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
-          'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
-          'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
-          'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
-        },
-      })}\n`,
-    );
-    writeFileSync(githubEnv, '');
-    writeFileSync(githubOutput, '');
-    const provenance = readFileSync(join(sourceRoot, 'provenance.json'));
-    const provenanceDigest = createHash('sha256').update(provenance).digest('hex');
-
-    const result = spawnSync('bash', ['-c', verifierMaterializationScript(source)], {
-      cwd: root,
+  it('executes authenticated immutable-package materialization in the generated ledger workflow', () => {
+    const materialization = executablePackageMaterializationFixture();
+    const result = spawnSync('bash', ['-c', materialization.script], {
+      cwd: materialization.root,
       encoding: 'utf8',
-      env: {
-        ...process.env,
-        RUNNER_TEMP: runnerTemp,
-        GITHUB_ENV: githubEnv,
-        GITHUB_OUTPUT: githubOutput,
-        VERIFIER_PROVENANCE_SHA256: provenanceDigest,
-      },
+      env: materialization.env,
     });
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toBe('');
-    expect(readFileSync(githubOutput, 'utf8').trim().split('\n')).toEqual([
-      `version=${fixtureVersion}`,
-      `provenance_sha256=${provenanceDigest}`,
+    expect(readFileSync(materialization.githubOutput, 'utf8').trim().split('\n')).toEqual([
+      `version=${VERIFIER_POLICY.package.version}`,
+      `provenance_sha256=${materialization.provenanceDigest}`,
     ]);
-    expect(readFileSync(githubEnv, 'utf8').trim().split('\n')).toEqual([
-      `DEVAI_EVIDENCE_POLICY=${runnerTemp}/devai-verifier-package/evidence-verification/src/build-policy-cli.js`,
-      `DEVAI_EVIDENCE_VERIFY=${runnerTemp}/devai-verifier-package/evidence-verification/src/cli.js`,
-      `DEVAI_EVIDENCE_BUNDLE_VERIFY=${runnerTemp}/devai-verifier-package/evidence-verification/src/bundle-cli.js`,
+    const installedVerifier = `${materialization.runnerTemp}/devai-verifier-package/extracted/package/${VERIFIER_POLICY.verifier.root}`;
+    expect(readFileSync(materialization.githubEnv, 'utf8').trim().split('\n')).toEqual([
+      `DEVAI_EVIDENCE_POLICY=${installedVerifier}/src/build-policy-cli.js`,
+      `DEVAI_EVIDENCE_VERIFY=${installedVerifier}/src/cli.js`,
+      `DEVAI_EVIDENCE_BUNDLE_VERIFY=${installedVerifier}/src/bundle-cli.js`,
     ]);
+  });
+
+  it.each([
+    { name: 'missing', token: undefined },
+    { name: 'empty', token: '' },
+  ])('fails before registry access when PACKAGES_READ_TOKEN is $name', ({ token }) => {
+    const materialization = executablePackageMaterializationFixture();
+    const env = { ...materialization.env } as Record<string, string | undefined>;
+    if (token === undefined) delete env.NODE_AUTH_TOKEN;
+    else env.NODE_AUTH_TOKEN = token;
+    const result = spawnSync('bash', ['-c', materialization.script], {
+      cwd: materialization.root,
+      encoding: 'utf8',
+      env,
+    });
+    expect(result.status).not.toBe(0);
+    expect(readFileSync(materialization.githubOutput, 'utf8')).toBe('');
   });
 
   it.each([
@@ -292,7 +419,7 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_VERIFIER_BINDING_MODE_INVALID',
     },
   ])('rejects $name', ({ mutate, diagnostic }) => {
-    const result = check(fixture(mutate(ledgerVerificationWorkflow())));
+    const result = check(fixture(mutate(CHECKED_IN_LEDGER)));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
   });
