@@ -3,10 +3,12 @@ import { createHash } from 'node:crypto';
 import {
   chmodSync,
   cpSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -84,7 +86,10 @@ function verifierMaterializationScript(source: string): string {
   return materialize?.run ?? '';
 }
 
-function executablePackageMaterializationFixture(source = ledgerVerificationWorkflow()) {
+function executablePackageMaterializationFixture(
+  source = ledgerVerificationWorkflow(),
+  mutate?: (packageRoot: string, verifierRoot: string) => void,
+) {
   const root = mkdtempSync(join(tmpdir(), 'devai-verifier-materialization-'));
   roots.push(root);
   const packageRoot = join(root, 'package');
@@ -125,6 +130,7 @@ function executablePackageMaterializationFixture(source = ledgerVerificationWork
       },
     })}\n`,
   );
+  mutate?.(packageRoot, verifierRoot);
   execFileSync('tar', ['-czf', archive, '--format', 'ustar', 'package'], {
     cwd: root,
     env: { ...process.env, COPYFILE_DISABLE: '1' },
@@ -283,6 +289,70 @@ describe('live ledger-verification workflow', () => {
       env,
     });
     expect(result.status).not.toBe(0);
+    expect(readFileSync(materialization.githubOutput, 'utf8')).toBe('');
+  });
+
+  it.each([
+    {
+      name: 'a missing declared verifier file',
+      mutate: (_packageRoot: string, verifierRoot: string) =>
+        rmSync(join(verifierRoot, 'src/verify.js')),
+      diagnostic: 'DEVAI_VERIFIER_PACKAGE_FILE_MISSING',
+    },
+    {
+      name: 'an extra verifier file',
+      mutate: (_packageRoot: string, verifierRoot: string) =>
+        writeFileSync(join(verifierRoot, 'src/extra.js'), 'export {};\n'),
+      diagnostic: 'DEVAI_VERIFIER_PACKAGE_FILE_EXTRA',
+    },
+    {
+      name: 'verifier file digest drift',
+      mutate: (_packageRoot: string, verifierRoot: string) =>
+        writeFileSync(join(verifierRoot, 'src/verify.js'), 'export {};\n'),
+      diagnostic: 'DEVAI_VERIFIER_PACKAGE_FILE_DIGEST_INVALID',
+    },
+    {
+      name: 'binary map drift',
+      mutate: (packageRoot: string) => {
+        const manifestPath = join(packageRoot, 'package.json');
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+          bin: Record<string, string>;
+        };
+        manifest.bin['devai-evidence-verify'] = './dist/runtime/evidence-verification/src/extra.js';
+        writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+      },
+      diagnostic: 'DEVAI_VERIFIER_PACKAGE_BIN_INVALID',
+    },
+    {
+      name: 'a verifier symlink archive entry',
+      mutate: (_packageRoot: string, verifierRoot: string) =>
+        symlinkSync('verify.js', join(verifierRoot, 'src/linked.js')),
+      diagnostic: 'DEVAI_VERIFIER_ARCHIVE_SYMLINK_INVALID',
+    },
+    {
+      name: 'a verifier hardlink archive entry',
+      mutate: (_packageRoot: string, verifierRoot: string) =>
+        linkSync(join(verifierRoot, 'src/verify.js'), join(verifierRoot, 'src/linked.js')),
+      diagnostic: 'DEVAI_VERIFIER_ARCHIVE_HARDLINK_INVALID',
+    },
+    {
+      name: 'a verifier special-file archive entry',
+      mutate: (_packageRoot: string, verifierRoot: string) =>
+        execFileSync('mkfifo', [join(verifierRoot, 'src/special')]),
+      diagnostic: 'DEVAI_VERIFIER_ARCHIVE_SPECIAL_FILE_INVALID',
+    },
+  ])('rejects $name in the executable package materializer', ({ mutate, diagnostic }) => {
+    const materialization = executablePackageMaterializationFixture(
+      ledgerVerificationWorkflow(),
+      mutate,
+    );
+    const result = spawnSync('bash', ['-c', materialization.script], {
+      cwd: materialization.root,
+      encoding: 'utf8',
+      env: materialization.env,
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(diagnostic);
     expect(readFileSync(materialization.githubOutput, 'utf8')).toBe('');
   });
 
