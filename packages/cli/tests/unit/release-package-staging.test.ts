@@ -6,7 +6,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
-const SELECTED_RELEASE_VERSION = '1.2.12';
+const SELECTED_RELEASE_VERSION = '1.2.13';
+const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.2.12';
 
 afterAll(() => rmSync(output, { recursive: true, force: true }));
 
@@ -70,7 +71,7 @@ describe('normalized release package staging', () => {
     expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.2.12', () => {
+  it('records a stable release and latest dist-tag for version 1.2.13', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -91,7 +92,7 @@ describe('normalized release package staging', () => {
         OUTPUT_FILE: manifest,
         COMMIT_SHA: 'b'.repeat(40),
         TREE_SHA: 'c'.repeat(40),
-        LEDGER_VERIFIER_PACKAGE_VERSION: SELECTED_RELEASE_VERSION,
+        LEDGER_VERIFIER_PACKAGE_VERSION: TRUSTED_VERIFIER_PACKAGE_VERSION,
         LEDGER_VERIFIER_PROVENANCE_SHA256: digest,
         LEDGER_POLICY_DIGEST: digest,
         LEDGER_ENVELOPE_SHA256: digest,
@@ -117,9 +118,19 @@ describe('normalized release package staging', () => {
     });
     expect(value.ledger).toMatchObject({
       verifier_package: '@aarusso-nyx/devai',
-      verifier_package_version: SELECTED_RELEASE_VERSION,
+      verifier_package_version: TRUSTED_VERIFIER_PACKAGE_VERSION,
       verifier_provenance_sha256: digest,
       verifier_source_commit: '9e115014f8da5a16be526c7da5207bc0aae0801b',
     });
+  });
+
+  it('keeps release closure bound to the selected public package version', () => {
+    const closure = JSON.parse(
+      execFileSync(process.execPath, [join(root, 'scripts/check-publishable-closure.mjs')], {
+        cwd: root,
+        encoding: 'utf8',
+      }),
+    ) as { package: string };
+    expect(closure.package).toBe(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 });
