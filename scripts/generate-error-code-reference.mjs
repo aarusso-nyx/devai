@@ -21,7 +21,6 @@ const prefixes = new Set([
   'CLI',
   'CONSTITUTION',
   'DATABASE',
-  'DEVAI',
   'DOCS',
   'EVIDENCE',
   'FORBIDDEN',
@@ -123,6 +122,10 @@ for (const sourceRoot of sourceRoots) {
     for (const match of source.matchAll(/['"]([A-Z][A-Z0-9]+(?:_[A-Z0-9]+)+)['"]/gu)) {
       const code = match[1];
       if (code !== undefined && prefixes.has(code.split('_')[0])) codes.add(code);
+    }
+    for (const match of source.matchAll(/['"](DEVAI_VERIFIER_[A-Z0-9_]+)(?=[:'"])/gu)) {
+      const code = match[1];
+      if (code !== undefined) codes.add(code);
     }
   }
 }
