@@ -37,6 +37,7 @@ Events are recorded at these boundaries:
 | Tracking disabled | `tracking_disabled` |
 | Sensor failure triaged (`triage classify --round`) | `finding_classified` |
 | Auditor observation (`audit observe --round`) | `finding_emitted` |
+| Authority granted an outward-reaching action | `authorization_recorded` |
 
 `triage classify` and `audit observe` are not inherently round-scoped, so attribution there is
 **opt-in per invocation** via an optional `--round`. Without it they behave exactly as they did
@@ -44,10 +45,17 @@ before tracking existed, and nothing is recorded — a round is never inferred. 
 observation is recorded as an observation, never as a verdict (Article 7: a report may recommend,
 never ratify).
 
-One boundary remains **not** wired, and its absence is a real coverage limit rather than an
-oversight: per-invocation authority decisions are not intercepted at the global authority layer.
-That layer runs for every command, so recording there needs its own design pass rather than being
-slipped in behind this feature.
+Authority decisions are recorded at the boundary where the decision took effect, under three
+deliberate limits:
+
+- **Granted decisions only.** A refused invocation has, by definition, no authorized scope to
+  write in. Minting one so the harness could note the refusal would grant an effect the decision
+  had just denied, so refusals are not recorded.
+- **Outward-reaching decisions only.** A `remote-write` action, or one carrying publication
+  consent, is recorded. A purely local harness write is already bracketed by its
+  `action_intended` / `action_completed` pair, and recording its authorization as well would
+  crowd findings and verification results out of the projection without adding signal.
+- **`--round` required.** As everywhere else, a round is never inferred.
 
 ## Binding the repository capability (Architect)
 

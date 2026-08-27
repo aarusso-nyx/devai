@@ -30,6 +30,7 @@ import {
   runWithAuthoritySessionOperation,
 } from './command-capabilities.js';
 import { buildTrustedAuthoritySources } from './policy.js';
+import { trackGovernanceEvent } from '@devai-nyx/loop';
 import {
   createTrackingReconcileScope,
   TrackingAuthorityError,
@@ -582,6 +583,66 @@ function stageHostScope(
   pendingExactCommit = broker.commit_exact;
 }
 
+/**
+ * Whether one invocation's authority decision is recordable as a governance
+ * event. This runs on the hot path for every command, so the cheap structural
+ * guards come first and nothing touches disk until all of them pass.
+ *
+ * Each guard is a deliberate coverage boundary, not an optimisation:
+ *
+ *  - Reads carry no authority decision; the layer reports them as not
+ *    applicable, so there is nothing to record.
+ *  - A dry run decided nothing that took effect.
+ *  - Without `--round` there is no round to attribute the decision to, and a
+ *    round is never inferred.
+ *  - Only decisions that reach outward or carry publication consent are worth
+ *    recording. A local harness write is already bracketed by its
+ *    action_intended / action_completed pair, so recording its authorization
+ *    too would crowd findings and verification results out of the projection
+ *    without adding signal.
+ *  - `round tracking` actions record their own authorization with more
+ *    fidelity; a second, vaguer event would only blur them.
+ *  - Without `fs:f5-state` the action could not write runtime state anyway and
+ *    the boundary would refuse silently. Every action that survives the gate
+ *    above already declares it, so this is a fail-closed backstop rather than a
+ *    coverage limit.
+ */
+export function authorityDecisionRecordable(
+  entry: RegistryEntry,
+  context: Readonly<{ dryRun: boolean; round: string | undefined; role: HumanRole | undefined }>,
+): boolean {
+  if (entry.effects === 'read' || context.dryRun) return false;
+  if (context.round === undefined || context.role === undefined) return false;
+  if (entry.path[0] === 'round' && entry.path[1] === 'tracking') return false;
+  if (entry.effects !== 'remote-write' && entry.authority_contract.consent.allow_publish !== true) {
+    return false;
+  }
+  return entry.authority_contract.capabilities.includes('fs:f5-state');
+}
+
+/**
+ * Record that authority allowed this invocation.
+ *
+ * Only granted decisions are recorded. A refused invocation has, by
+ * definition, no authorized scope to write in, and manufacturing one so the
+ * harness could note the refusal would grant an effect the decision just
+ * denied. That boundary is deliberate, and it is stated in the adopter docs
+ * rather than left for a reader to discover as missing coverage.
+ */
+function recordAuthorityDecision(entry: RegistryEntry, dryRun: boolean): void {
+  const round = flagValue(process.argv, '--round');
+  const role = declaredInvocationRole();
+  if (!authorityDecisionRecordable(entry, { dryRun, round, role })) return;
+  trackGovernanceEvent({
+    repoRoot: targetRoot(entry, process.argv),
+    round: round as string,
+    role: role as HumanRole,
+    kind: 'authorization_recorded',
+    summary: `Authority allowed ${entry.name} for role ${String(role)} with effect ${entry.effects}.`,
+    payload: { action_id: entry.name, effect: entry.effects, role },
+  });
+}
+
 export function attachAuthorityCommandBoundaries(
   commands: readonly Command[],
   entries: readonly RegistryEntry[],
@@ -622,7 +683,13 @@ export function attachAuthorityCommandBoundaries(
       try {
         const result = runWithAuthoritySessionOperation(sessionOperation, () =>
           runWithAuthorityPolicyMaterialization(policyMaterialization, () =>
-            runWithAuthorityHostEffects(scope, () => Reflect.apply(original, this, args)),
+            runWithAuthorityHostEffects(scope, () => {
+              // Inside the authorized scope, so the write is legal, and before
+              // the handler, so the decision is recorded even if the handler
+              // then fails.
+              recordAuthorityDecision(invocationEntry, dryRun);
+              return Reflect.apply(original, this, args);
+            }),
           ),
         );
         if (result && typeof (result as PromiseLike<unknown>).then === 'function') {

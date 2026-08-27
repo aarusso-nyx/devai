@@ -7,7 +7,7 @@
 // supply an identity or a consent alongside it is refused before a handler
 // ever runs. The ordinary interactive path must be untouched.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +82,26 @@ describe('reconcile-only refuses caller-claimed authority', () => {
   it('requires a round, since authority is derived per round and never globally', () => {
     const result = run(['round', 'tracking', 'sync', '--repo-root', repository(), '--reconcile']);
     expect(result.code).toBe('TRACKING_ROUND_REQUIRED');
+  });
+});
+
+describe('authority-decision recording never disturbs the decision', () => {
+  it('writes nothing when authority refuses, because a denied caller has no scope', () => {
+    const root = repository();
+    // A refused mutating invocation that names a round.
+    const result = run(['round', 'close', '--repo-root', root, '--round', 'R-0042']);
+    expect(result.ok).toBe(false);
+    // No tracking state is created on a denied path.
+    expect(existsSync(join(root, '.devai/state/tracking'))).toBe(false);
+  });
+
+  it('leaves read actions on their pre-existing hot path, writing nothing', () => {
+    const root = repository();
+    const result = run(['round', 'tracking', 'status', '--repo-root', root, '--round', 'R-0042']);
+    // An unbound repository refuses reads exactly as it did before decision
+    // recording existed; the hot path is unchanged.
+    expect(result.code).toBe('AUTHORITY_POLICY_MISSING');
+    expect(existsSync(join(root, '.devai/state/tracking'))).toBe(false);
   });
 });
 
