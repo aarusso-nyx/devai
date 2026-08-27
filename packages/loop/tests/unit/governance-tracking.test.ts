@@ -40,6 +40,7 @@ function draft(overrides: Partial<GovernanceEventDraft> = {}): GovernanceEventDr
   return {
     round_id: 'R-0042',
     authority_session_id: SESSION_A,
+    session_source: 'session-state',
     role: 'engineer',
     kind: 'action_completed',
     summary: 'Mediated action completed.',

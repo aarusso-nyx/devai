@@ -43,11 +43,7 @@
     "adapter": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id",
-        "adapter_version",
-        "package_version"
-      ],
+      "required": ["id", "adapter_version", "package_version"],
       "properties": {
         "id": {
           "const": "github-issues"
@@ -64,12 +60,7 @@
       "const": "public-safe-v1"
     },
     "reason": {
-      "enum": [
-        "checkpoint",
-        "round_close",
-        "tracking_disabled",
-        "reconciliation"
-      ]
+      "enum": ["checkpoint", "round_close", "tracking_disabled", "reconciliation"]
     },
     "sessions": {
       "type": "array",
@@ -78,15 +69,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "authority_session_id",
-          "first",
-          "last"
-        ],
+        "required": ["authority_session_id", "first", "last"],
         "properties": {
           "authority_session_id": {
             "type": "string",
-            "pattern": "^AUTH-SESSION-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+            "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
           },
           "first": {
             "type": "integer",
@@ -116,44 +103,22 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "event_id",
-          "role",
-          "kind",
-          "public_safe_summary",
-          "payload_digest_sha256"
-        ],
+        "required": ["event_id", "role", "kind", "public_safe_summary", "payload_digest_sha256"],
         "properties": {
           "event_id": {
             "type": "string",
             "pattern": "^GEV-[0-9a-f]{16}$"
           },
           "role": {
-            "enum": [
-              "owner",
-              "architect",
-              "inspector",
-              "engineer",
-              "auditor"
-            ]
+            "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
           },
           "kind": {
             "type": "string",
             "minLength": 1
           },
           "status": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "pass",
-              "review",
-              "fail",
-              "inconclusive",
-              "not_applicable",
-              null
-            ]
+            "type": ["string", "null"],
+            "enum": ["pass", "review", "fail", "inconclusive", "not_applicable", null]
           },
           "public_safe_summary": {
             "type": "string",
@@ -205,10 +170,7 @@
       "description": "Digests of the sealed local segments this batch was rendered from. A batch is never projected from unsealed events."
     },
     "projected_at": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "date-time"
     },
     "batch_digest_sha256": {
@@ -251,9 +213,7 @@
           "last": 1
         }
       ],
-      "event_ids": [
-        "GEV-3f2a91c40b7d5e68"
-      ],
+      "event_ids": ["GEV-3f2a91c40b7d5e68"],
       "entries": [
         {
           "event_id": "GEV-3f2a91c40b7d5e68",

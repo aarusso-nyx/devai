@@ -144,6 +144,7 @@ export function recordGovernanceEvent(options: RecordGovernanceEventOptions): Go
     round_id: draft.round_id,
     task_id: draft.task_id ?? null,
     authority_session_id: draft.authority_session_id,
+    session_source: draft.session_source,
     role: draft.role,
     session_sequence: (previous?.session_sequence ?? 0) + 1,
     previous_event_digest_sha256: previous === undefined ? null : governanceEventDigest(previous),

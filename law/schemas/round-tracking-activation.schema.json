@@ -16,9 +16,17 @@
     "pending_policy"
   ],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
-    "round_id": { "type": "string", "pattern": "^R-[0-9]{4,}$" },
-    "repository_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4,}$"
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
     "state": {
       "enum": ["active", "frozen", "disabled"],
       "description": "active accepts and projects events; frozen keeps canonical recording and stops projection; disabled ends tracking for the round. Previously published issues and comments are never deleted in any state."
@@ -34,14 +42,22 @@
         "workflow_digest_sha256"
       ],
       "properties": {
-        "id": { "const": "github-issues" },
-        "adapter_version": { "$ref": "#/$defs/semver" },
-        "package_version": { "$ref": "#/$defs/semver" },
+        "id": {
+          "const": "github-issues"
+        },
+        "adapter_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "package_version": {
+          "$ref": "#/$defs/semver"
+        },
         "config_digest_sha256": {
           "$ref": "#/$defs/sha256",
           "description": "Digest of the exact bound adapter configuration. A stale binding invalidates the activation rather than silently re-binding."
         },
-        "workflow_digest_sha256": { "$ref": "#/$defs/sha256" }
+        "workflow_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "target": {
@@ -54,7 +70,10 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$",
           "description": "Exact owner/name remote identity. A mismatch against the live binding is a refusal, never a re-target."
         },
-        "issue_number": { "type": ["integer", "null"], "minimum": 1 }
+        "issue_number": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
       }
     },
     "authorization": {
@@ -65,17 +84,24 @@
       "properties": {
         "authority_session_id": {
           "type": "string",
-          "pattern": "^AUTH-SESSION-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+          "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
         },
-        "role": { "const": "owner" },
+        "role": {
+          "const": "owner"
+        },
         "publish_flag": {
           "const": true,
           "description": "Activation refuses without explicit --publish. Consent is never derived from the presence of a binding."
         },
-        "authorized_at": { "type": "string", "format": "date-time" }
+        "authorized_at": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
-    "disclosure_profile": { "const": "public-safe-v1" },
+    "disclosure_profile": {
+      "const": "public-safe-v1"
+    },
     "pending_policy": {
       "enum": ["freeze", "drain"],
       "description": "Disposition of unprojected events when tracking is disabled. Defaults to freeze; drain performs remote writes and therefore requires its own explicit publication authorization."
@@ -85,18 +111,30 @@
       "additionalProperties": false,
       "required": ["disabled_at", "authority_session_id", "pending_events"],
       "properties": {
-        "disabled_at": { "type": "string", "format": "date-time" },
+        "disabled_at": {
+          "type": "string",
+          "format": "date-time"
+        },
         "authority_session_id": {
           "type": "string",
-          "pattern": "^AUTH-SESSION-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+          "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
         },
-        "pending_events": { "type": "integer", "minimum": 0 }
+        "pending_events": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "semver": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$" }
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+    }
   },
   "schema_version": "1.0.0",
   "examples": [
@@ -112,7 +150,10 @@
         "config_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
         "workflow_digest_sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
       },
-      "target": { "repository": "aarusso-nyx/devai", "issue_number": 123 },
+      "target": {
+        "repository": "aarusso-nyx/devai",
+        "issue_number": 123
+      },
       "authorization": {
         "authority_session_id": "AUTH-SESSION-0f1e2d3c4b5a69788796",
         "role": "owner",

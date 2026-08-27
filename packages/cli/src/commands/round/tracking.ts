@@ -13,7 +13,6 @@
  * unobserved remote and never as a governed verdict.
  */
 import type { CAC } from 'cac';
-import { randomUUID } from 'node:crypto';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import {
   buildProjectionBatch,
@@ -47,6 +46,11 @@ import {
 import { existsSync, readFileSync } from '@devai-nyx/authority';
 import { join, resolve } from 'node:path';
 import { defineCommand } from '../../define-command.js';
+import {
+  resolveTrackingChain,
+  TrackingSessionError,
+  type TrackingChain,
+} from './tracking-session.js';
 import { resolveCliVersion } from '../../version.js';
 
 interface TrackingOptions {
@@ -83,10 +87,28 @@ function requiredRound(options: TrackingOptions): string {
   return value;
 }
 
-function sessionId(options: TrackingOptions): string {
-  const declared = options.authoritySession?.trim();
-  if (declared !== undefined && declared.length > 0) return declared;
-  return `AUTH-SESSION-${randomUUID().replaceAll('-', '')}`;
+function chainFor(
+  repoRoot: string,
+  repositoryId: string,
+  round: string,
+  role: string,
+  options: TrackingOptions,
+): TrackingChain {
+  try {
+    return resolveTrackingChain({
+      repoRoot,
+      repositoryId,
+      round,
+      role,
+      declaredSession: options.authoritySession,
+    });
+  } catch (error) {
+    // A declared session that does not validate is a refusal. Falling back to a
+    // derived chain would silently attribute the event to a weaker identity
+    // than the caller claimed.
+    if (error instanceof TrackingSessionError) throw new TrackingCommandError(error.code, 5);
+    throw error;
+  }
 }
 
 function emit(value: GovernanceProjectionStatus, human: boolean, text: string): void {
@@ -276,7 +298,7 @@ export const roundTrackingEnable = defineCommand({
           }
 
           const now = new Date().toISOString();
-          const session = sessionId(options);
+          const chain = chainFor(repoRoot, config.binding.repository_id, round, 'owner', options);
           const activation: RoundTrackingActivation = {
             schemaVersion: '1.0.0',
             round_id: round,
@@ -291,7 +313,7 @@ export const roundTrackingEnable = defineCommand({
             },
             target: { repository, issue_number: null },
             authorization: {
-              authority_session_id: session,
+              authority_session_id: chain.id,
               role: 'owner',
               publish_flag: true,
               authorized_at: now,
@@ -314,7 +336,8 @@ export const roundTrackingEnable = defineCommand({
               repositoryId: config.binding.repository_id,
               draft: {
                 round_id: round,
-                authority_session_id: session,
+                authority_session_id: chain.id,
+                session_source: chain.source,
                 role: 'owner',
                 kind,
                 coverage: { mediated: true, adapter_id: 'github-issues' },
@@ -551,7 +574,7 @@ export const roundTrackingDisable = defineCommand({
           }
 
           const now = new Date().toISOString();
-          const session = sessionId(options);
+          const chain = chainFor(repoRoot, activation.repository_id, round, 'owner', options);
           const events = readGovernanceEvents({ repoRoot, round });
           const projected = readDeliveryState({ repoRoot, round }).projected_event_ids.length;
 
@@ -560,7 +583,8 @@ export const roundTrackingDisable = defineCommand({
             repositoryId: activation.repository_id,
             draft: {
               round_id: round,
-              authority_session_id: session,
+              authority_session_id: chain.id,
+              session_source: chain.source,
               role: 'owner',
               kind: 'tracking_disabled',
               coverage: { mediated: true, adapter_id: 'github-issues' },
@@ -579,7 +603,7 @@ export const roundTrackingDisable = defineCommand({
               pending_policy: pending,
               disabled: {
                 disabled_at: now,
-                authority_session_id: session,
+                authority_session_id: chain.id,
                 pending_events: Math.max(0, events.length - projected),
               },
             },
@@ -665,6 +689,9 @@ export function recordRoundCloseTracking(options: {
       draft: {
         round_id: options.round,
         authority_session_id: activation.authorization.authority_session_id,
+        session_source: activation.authorization.authority_session_id.startsWith('AUTH-SESSION-')
+          ? 'session-state'
+          : 'direct-cli',
         role: 'owner',
         kind: 'round_verdict',
         coverage: { mediated: true, adapter_id: 'github-issues' },

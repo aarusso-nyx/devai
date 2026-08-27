@@ -26,6 +26,14 @@ export const GOVERNANCE_EVENT_KINDS = [
 ] as const;
 
 export type GovernanceEventKind = (typeof GOVERNANCE_EVENT_KINDS)[number];
+
+/**
+ * Where a chain identity came from. A `direct-cli` chain is derived
+ * deterministically for an invocation that declared a role but no authority
+ * session; it is never minted per invocation, and it is never presented as a
+ * session it was not.
+ */
+export type GovernanceSessionSource = 'session-state' | 'direct-cli';
 export type GovernanceRole = 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
 export type GovernanceEventStatus = 'pass' | 'review' | 'fail' | 'inconclusive' | 'not_applicable';
 
@@ -54,6 +62,7 @@ export interface GovernanceEvent {
   readonly round_id: string;
   readonly task_id: string | null;
   readonly authority_session_id: string;
+  readonly session_source: GovernanceSessionSource;
   readonly role: GovernanceRole;
   readonly session_sequence: number;
   readonly previous_event_digest_sha256: string | null;
@@ -77,6 +86,7 @@ export interface GovernanceEventDraft {
   readonly round_id: string;
   readonly task_id?: string | null;
   readonly authority_session_id: string;
+  readonly session_source: GovernanceSessionSource;
   readonly role: GovernanceRole;
   readonly kind: GovernanceEventKind;
   readonly status?: GovernanceEventStatus;

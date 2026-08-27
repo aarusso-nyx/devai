@@ -60,6 +60,18 @@ round to the repository, the adapter digest, the Owner authority session, and th
 disclosure profile. It authorizes automatic publication only for validated public-safe events
 belonging to **that** round.
 
+### Chain identity
+
+Events chain per authority session, and the chain identity is never invented per invocation.
+
+- With `--authority-session <id>`, the session is validated exactly as the authority layer
+  validates it — schema, self-digest, status, expiry, and declared role must all agree. A session
+  that fails any of those checks is a **refusal**, never a silent downgrade.
+- Without one, the invocation gets a deterministic `DIRECT-CLI-…` chain derived from the
+  repository, role, and round. Repeated commands extend that one chain instead of scattering
+  single-event chains, and every event records `session_source: "direct-cli"` so it is never
+  mistaken for an authority session it never had.
+
 Inspect at any time, with no network call:
 
 ```bash
