@@ -28,7 +28,7 @@ const roots: string[] = [];
 const SOURCE = 'law/policy/devai-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
 const CONFIG = '.devai/config';
-const SELECTED_RELEASE_VERSION = '1.2.13';
+const SELECTED_RELEASE_VERSION = '1.3.0';
 const TARGETS = [
   '.devai/config/project.json',
   '.devai/config/domains.json',

@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.0 — 2026-08-27
+
+- Adds opt-in GitHub Issues governance tracking. Tracking is disabled by default, and a
+  repository with no binding behaves exactly as 1.2.13 did: no tracking state, no network call,
+  and no readiness effect. Enabling it takes an Architect repository binding and then an explicit
+  Owner activation per round, which also authorizes the bounded remote publication it performs.
+- Records every governed finding and mediated action locally first, append-only, with
+  content-derived identities chained per authority session so independent worktrees keep separate
+  chains instead of a fabricated global order. Correction is a new appended supersession; recorded
+  bytes are never edited, and delivery state is stored apart from evidence so no remote
+  acknowledgement can alter it.
+- Treats GitHub as an output-only, rebuildable projection. Batches post idempotently by a stable
+  marker, issue comments and labels grant no authority, and an unreachable remote is reported as
+  projection health rather than as a governed verdict. Publication is redacted through the
+  `public-safe-v1` disclosure profile, which withholds payload content and publishes digests in
+  its place.
+- Derives CI reconciliation authority from the Owner activation instead of a declared role,
+  refusing any caller-supplied identity or consent flag and executing inside an effect scope
+  narrower than a live Owner session.
+- Adds four preview actions — `round tracking enable`, `round tracking status`,
+  `round tracking sync`, and `round tracking disable` — taking the public action surface from 44
+  to 48.
+
 ## 1.2.13 — 2026-08-25
 
 - Repairs the generated trusted-local-RC verifier workflow so adopters materialize the exact
