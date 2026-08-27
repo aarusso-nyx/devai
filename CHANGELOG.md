@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 — 2026-08-27
+
+- Repairs the installed-tarball release rehearsal sensors to require the governed 48-action
+  catalog introduced in 1.3.0. The immutable `v1.3.0` rehearsal correctly failed before any
+  package, Release, registry tag, or Pages publication occurred.
+
 ## 1.3.0 — 2026-08-27
 
 - Adds opt-in GitHub Issues governance tracking. Tracking is disabled by default, and a
