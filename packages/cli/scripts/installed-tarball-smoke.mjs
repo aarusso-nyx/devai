@@ -116,7 +116,7 @@ try {
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
 
   const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
-  if (unboundCatalog?.result?.value?.length !== 44) {
+  if (unboundCatalog?.result?.value?.length !== 48) {
     throw new Error('INSTALLED_UNBOUND_CATALOG_INVALID');
   }
   const unboundPlan = JSON.parse(
@@ -238,7 +238,7 @@ try {
 
   const envelope = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
   const actions = envelope?.result?.value;
-  if (!Array.isArray(actions) || actions.length !== 44) {
+  if (!Array.isArray(actions) || actions.length !== 48) {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
@@ -1166,7 +1166,7 @@ try {
     existsSync(join(projectRoot, '.agents/skills/devai-assess')) ||
     existsSync(join(projectRoot, '.devai')) ||
     JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']))?.result?.value?.length !==
-      44
+      48
   ) {
     throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }
