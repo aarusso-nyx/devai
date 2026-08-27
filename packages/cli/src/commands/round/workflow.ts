@@ -27,6 +27,7 @@ import { defineCommand } from '../../define-command.js';
 import { resolveCliVersion } from '../../version.js';
 import { dispatchRoundTask } from './dispatch.js';
 import { recordRoundCloseTracking } from './tracking.js';
+import { trackGovernanceEvent } from '#runtime-core';
 
 interface RoundOptions {
   readonly repoRoot?: string;
@@ -217,6 +218,17 @@ export const roundGapCreate = defineCommand({
             ambiguity: options.ambiguity,
             evidenceRefs: asArray(options.evidence),
           });
+          trackGovernanceEvent({
+            repoRoot: root(options),
+            round,
+            role: record.emitting_discipline,
+            kind: 'finding_emitted',
+            status: 'review',
+            taskId: record.emitting_task_id,
+            summary: `Reference gap ${record.id} emitted: ${record.problem.summary}`,
+            payload: record,
+            evidenceRefs: [record.id, ...record.evidence_refs],
+          });
           emit(record, options.human === true, `round gap create: ${record.id}`);
         } catch (error) {
           failure('gap create', error);
@@ -305,6 +317,18 @@ export const roundGapResolve = defineCommand({
               rgrId: gapId,
               resolver: options.resolver,
               ...(options.status !== undefined && { newStatus: options.status }),
+            });
+            trackGovernanceEvent({
+              repoRoot: root(options),
+              round: requiredRound(options),
+              role: 'architect',
+              kind: 'finding_classified',
+              status: record.status === 'resolved' ? 'pass' : 'review',
+              taskId: record.emitting_task_id,
+              summary: `Reference gap ${record.id} resolved to ${record.status}.`,
+              payload: record,
+              evidenceRefs: [record.id],
+              checkpoint: true,
             });
             emit(
               record,

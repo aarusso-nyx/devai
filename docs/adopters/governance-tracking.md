@@ -19,7 +19,32 @@ Turning it on takes three separate, explicit decisions by two different authorit
 Only **DEVAI-mediated actions** are tracked: registered runtime actions and declared host-adapter
 events. Editor writes, shell commands, and anything else outside the DEVAI runtime are **not**
 covered, and DEVAI never implies otherwise. Every status report and every projected issue states
-this boundary explicitly.
+this boundary explicitly, and unmediated activity that DEVAI does notice is recorded as
+explicitly uncovered rather than omitted or claimed as tracked.
+
+Events are recorded at these boundaries:
+
+| Boundary | Event kind |
+| --- | --- |
+| Owner activation of a round | `session_opened`, `authorization_recorded` |
+| Task started or resumed | `action_intended` |
+| Task completed | `action_completed` |
+| Task paused for a reference gap, or escalated | `failure_observed` |
+| Reference gap emitted | `finding_emitted` |
+| Reference gap resolved | `finding_classified` |
+| Routine executor verification receipt | `verification_result` (with exact commit and tree) |
+| Round closed | `round_verdict` |
+| Tracking disabled | `tracking_disabled` |
+
+Two boundaries are deliberately **not** wired, and their absence is a real coverage limit rather
+than an oversight:
+
+- **`triage classify` and `audit observe`** are not round-scoped in the current CLI surface, so
+  there is no round to attribute their findings to. Wiring them would mean adding a round selector
+  to those actions — a change to their public contract.
+- **Per-invocation authority decisions** are not intercepted at the global authority layer. That
+  layer runs for every command, so recording there needs its own design pass rather than being
+  slipped in behind this feature.
 
 ## Binding the repository capability (Architect)
 
