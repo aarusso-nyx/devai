@@ -4,7 +4,7 @@ DEVAI is a human-supervised control harness for AI-assisted software development
 It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
-The DEVAI 1.2 product is one publishable package,
+The DEVAI 1.3 product is one publishable package,
 `@aarusso-nyx/devai`. Its current machine catalog contains **48 actions**, **59
 sensors**, and **7 host-invoked recipes**. The ordinary public CLI is organized
 into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
@@ -15,7 +15,7 @@ into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.2.13
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.3.0
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
