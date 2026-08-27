@@ -68,6 +68,19 @@ interface CliResult {
 
 const ROLES = new Set<HumanRole>(['owner', 'architect', 'inspector', 'engineer', 'auditor']);
 const SESSION_ID = /^AUTH-SESSION-[A-Za-z0-9]{16,}$/u;
+/**
+ * The human role the authority layer resolved for this invocation, from either
+ * `--as-role` or a validated session. Handlers cannot read the declaration
+ * themselves — it is stripped before dispatch — so anything that must attribute
+ * work to a role reads it here rather than re-parsing argv and risking a
+ * different answer than the one authority actually allowed.
+ */
+let resolvedInvocationRole: HumanRole | undefined;
+
+export function declaredInvocationRole(): HumanRole | undefined {
+  return resolvedInvocationRole;
+}
+
 let pendingHostScope: AuthorityHostEffectScope | undefined;
 let pendingHostDispose: (() => void) | undefined;
 let pendingHostDryRun = false;
@@ -887,6 +900,7 @@ export function authorizeCliArgv(
   }
   const role =
     asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
+  resolvedInvocationRole = role as HumanRole | undefined;
   if (!role || !routeRoles(entry, argv).includes(role as HumanRole)) {
     return renderAuthorityResult(
       taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {

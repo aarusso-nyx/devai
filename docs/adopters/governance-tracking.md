@@ -35,16 +35,19 @@ Events are recorded at these boundaries:
 | Routine executor verification receipt | `verification_result` (with exact commit and tree) |
 | Round closed | `round_verdict` |
 | Tracking disabled | `tracking_disabled` |
+| Sensor failure triaged (`triage classify --round`) | `finding_classified` |
+| Auditor observation (`audit observe --round`) | `finding_emitted` |
 
-Two boundaries are deliberately **not** wired, and their absence is a real coverage limit rather
-than an oversight:
+`triage classify` and `audit observe` are not inherently round-scoped, so attribution there is
+**opt-in per invocation** via an optional `--round`. Without it they behave exactly as they did
+before tracking existed, and nothing is recorded — a round is never inferred. An Auditor
+observation is recorded as an observation, never as a verdict (Article 7: a report may recommend,
+never ratify).
 
-- **`triage classify` and `audit observe`** are not round-scoped in the current CLI surface, so
-  there is no round to attribute their findings to. Wiring them would mean adding a round selector
-  to those actions — a change to their public contract.
-- **Per-invocation authority decisions** are not intercepted at the global authority layer. That
-  layer runs for every command, so recording there needs its own design pass rather than being
-  slipped in behind this feature.
+One boundary remains **not** wired, and its absence is a real coverage limit rather than an
+oversight: per-invocation authority decisions are not intercepted at the global authority layer.
+That layer runs for every command, so recording there needs its own design pass rather than being
+slipped in behind this feature.
 
 ## Binding the repository capability (Architect)
 
