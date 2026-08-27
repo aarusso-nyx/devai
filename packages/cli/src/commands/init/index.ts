@@ -38,6 +38,17 @@ import { executeAuthorityPolicyMaterialization } from '../../authority/command-c
 import { resolveCliVersion } from '../../version.js';
 import { buildCiScaffoldPlan, executeCiScaffoldPlan } from '../../services/ci-scaffold/index.js';
 import {
+  loadTrackingPolicyDefaults,
+  normalizeTrackingRepository,
+  TRACKING_CONFIG_RELATIVE,
+  TRACKING_WORKFLOW_RELATIVE,
+  trackingDefaultsDigest,
+} from '../../services/github-issues-tracking/config.js';
+import {
+  renderTrackingWorkflow,
+  trackingWorkflowDigest,
+} from '../../services/github-issues-tracking/workflow.js';
+import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
   HOOK_NAMES,
@@ -84,6 +95,8 @@ interface InitBindOptions {
   readonly operationalLaw?: boolean;
   readonly adopterPolicy?: string;
   readonly hostAdapter?: string;
+  readonly trackingAdapter?: string;
+  readonly trackingRepository?: string;
   readonly tier?: string;
   readonly write?: boolean;
   readonly human?: boolean;
@@ -528,6 +541,14 @@ export const initBind = defineCommand({
         '--host-adapter <adapter>',
         'Bind a verified host adapter: post-merge | github-actions',
       )
+      .option(
+        '--tracking-adapter <adapter>',
+        'Bind the opt-in governance tracking capability: github-issues',
+      )
+      .option(
+        '--tracking-repository <owner/name>',
+        'Exact remote repository the tracking binding authorizes',
+      )
       .option('--write', 'Materialize the selected binding.')
       .option('--human', 'Human-readable output')
       .action((options: InitBindOptions) => {
@@ -539,6 +560,7 @@ export const initBind = defineCommand({
           options.constitution === true,
           options.adopterPolicy !== undefined,
           options.hostAdapter !== undefined,
+          options.trackingAdapter !== undefined,
         ].filter(Boolean).length;
         if (modes > 1) {
           process.stderr.write('devai init bind: binding selectors are mutually exclusive\n');
@@ -725,6 +747,110 @@ export const initBind = defineCommand({
           } catch (error) {
             process.stderr.write(
               `devai init bind --adopter-policy: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+            process.exitCode = EXIT_FAIL;
+          }
+          return;
+        }
+        if (options.trackingAdapter !== undefined) {
+          // Repository capability binding only. It activates no round, authorizes
+          // no publication, and stores no credential; per-round activation is a
+          // separate Owner action.
+          if (options.trackingAdapter !== 'github-issues') {
+            process.stderr.write('devai init bind --tracking-adapter: expected github-issues\n');
+            process.exitCode = EXIT_USAGE;
+            return;
+          }
+          if (options.trackingRepository === undefined) {
+            process.stderr.write(
+              'devai init bind --tracking-adapter: --tracking-repository <owner/name> is required\n',
+            );
+            process.exitCode = EXIT_USAGE;
+            return;
+          }
+          try {
+            // --target keeps its established meaning (the working tree); the
+            // remote identity has its own flag so neither can be mistaken for
+            // the other by the authority layer or by a reader.
+            const targetRoot = realpathSync(resolve(options.target ?? DEFAULT_REPO_ROOT));
+            const repository = normalizeTrackingRepository(options.trackingRepository);
+            const defaults = loadTrackingPolicyDefaults();
+            const workflowContent = renderTrackingWorkflow(defaults);
+            const configPath = join(targetRoot, TRACKING_CONFIG_RELATIVE);
+            const workflowPath = join(targetRoot, TRACKING_WORKFLOW_RELATIVE);
+            const projectPath = join(targetRoot, '.devai/config/project.json');
+            const config = {
+              schemaVersion: '1.0.0',
+              id: 'github-issues-tracking',
+              binding: {
+                repository,
+                repository_id: repository.split('/')[1] ?? repository,
+                package_version: resolveCliVersion(),
+                bound_at: new Date().toISOString(),
+                bound_by_role: 'architect',
+              },
+              defaults,
+              digests: {
+                policy_defaults_sha256: trackingDefaultsDigest(defaults),
+                workflow_sha256: trackingWorkflowDigest(workflowContent),
+              },
+            };
+            const validateConfig = getValidator('github-issues-tracking-config.schema.json');
+            if (!validateConfig(config)) {
+              throw new Error(`TRACKING_CONFIG_INVALID:${JSON.stringify(validateConfig.errors)}`);
+            }
+            if (options.write !== true) {
+              emit(
+                {
+                  plan: {
+                    repository,
+                    config: TRACKING_CONFIG_RELATIVE,
+                    workflow: TRACKING_WORKFLOW_RELATIVE,
+                    workflow_sha256: config.digests.workflow_sha256,
+                  },
+                },
+                options.human === true,
+                `init bind --tracking-adapter github-issues (plan only): ${repository}`,
+              );
+              process.exitCode = EXIT_PASS;
+              return;
+            }
+            const project = JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject;
+            const nextProject = {
+              ...project,
+              governance_tracking: {
+                adapter: 'github-issues',
+                config: TRACKING_CONFIG_RELATIVE,
+                workflow: TRACKING_WORKFLOW_RELATIVE,
+              },
+            };
+            const validateProject = getValidator('project-config.schema.json');
+            if (!validateProject(nextProject)) {
+              throw new Error(`TRACKING_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
+            }
+            const result = runAuthorityHostEffectsWithRollback(
+              [configPath, workflowPath, projectPath],
+              () => {
+                mkdirSync(dirname(configPath), { recursive: true });
+                mkdirSync(dirname(workflowPath), { recursive: true });
+                writeFileSync(configPath, jsonBytes(config));
+                writeFileSync(workflowPath, workflowContent);
+                writeFileSync(projectPath, jsonBytes(nextProject));
+                return { repository, workflow_sha256: config.digests.workflow_sha256 };
+              },
+            );
+            emit(
+              {
+                plan: { config: TRACKING_CONFIG_RELATIVE, workflow: TRACKING_WORKFLOW_RELATIVE },
+                ...result,
+              },
+              options.human === true,
+              `init bind --tracking-adapter github-issues: ${repository}`,
+            );
+            process.exitCode = EXIT_PASS;
+          } catch (error) {
+            process.stderr.write(
+              `devai init bind --tracking-adapter github-issues: ${error instanceof Error ? error.message : String(error)}\n`,
             );
             process.exitCode = EXIT_FAIL;
           }

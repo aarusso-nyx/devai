@@ -325,6 +325,15 @@
       "effect": "read",
       "reason": "Doctor reads a zero-context patch for one selected revision.",
       "owner": "architect"
+    },
+    {
+      "template_id": "gh-api-issue-projection",
+      "executable": "gh",
+      "argv_shape": ["api", "<dynamic-argv>"],
+      "capabilities": ["proc:gh-remote", "net:github-issues"],
+      "effect": "remote-write",
+      "reason": "Opt-in governance tracking projects public-safe event batches to one governed round's GitHub Issue through the already-authenticated GitHub CLI boundary; no credential is read, extracted, or persisted by DEVAI.",
+      "owner": "architect"
     }
   ]
 }

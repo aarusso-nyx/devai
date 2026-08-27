@@ -59,7 +59,7 @@ describe('CLI binary smoke', () => {
     expect(r.status).toBe(0);
     expect(r.stderr).toBe('');
     const parsed = catalogValue(r.stdout);
-    expect(parsed).toHaveLength(44);
+    expect(parsed).toHaveLength(48);
     expect(parsed.map((action) => action.name)).toEqual(actionIds);
     expect(parsed.every((a) => typeof a.name === 'string')).toBe(true);
   });

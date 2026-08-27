@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/github-issues-tracking-policy.schema.json",
+  "title": "GitHub Issues tracking policy",
+  "description": "Architect-authored canonical source for the opt-in github-issues tracking adapter. Every adopter binding is materialized from this file: the bound configuration embeds this defaults block verbatim so a checker never writes its own inputs, and drift between the two is detectable. This file carries no adopter identity and no credential material.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "authority",
+    "defaults"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "github-issues-tracking"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "reconciliation",
+        "workflow",
+        "authentication",
+        "disclosure",
+        "retry",
+        "event_kinds"
+      ],
+      "properties": {
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "adapter_version",
+            "issue_granularity",
+            "projection_timing",
+            "disclosure_profile",
+            "readiness_impact"
+          ],
+          "properties": {
+            "id": {
+              "const": "github-issues"
+            },
+            "adapter_version": {
+              "$ref": "#/$defs/semver"
+            },
+            "issue_granularity": {
+              "const": "one-per-governed-round"
+            },
+            "projection_timing": {
+              "const": "checkpoint-and-close"
+            },
+            "disclosure_profile": {
+              "const": "public-safe-v1"
+            },
+            "readiness_impact": {
+              "const": "best-effort",
+              "$comment": "Article 41: a failure to observe the remote never manufactures or withdraws a readiness verdict."
+            }
+          }
+        },
+        "reconciliation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local",
+            "ci"
+          ],
+          "properties": {
+            "local": {
+              "const": "gh"
+            },
+            "ci": {
+              "const": "trusted-main-workflow"
+            }
+          }
+        },
+        "workflow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "triggers",
+            "trusted_ref",
+            "permissions",
+            "concurrency_group_prefix",
+            "required_context",
+            "pinned_actions"
+          ],
+          "properties": {
+            "file": {
+              "const": "devai-issue-tracking.yml"
+            },
+            "triggers": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "push",
+                  "workflow_dispatch"
+                ]
+              },
+              "minItems": 2,
+              "maxItems": 2,
+              "uniqueItems": true,
+              "$comment": "pull_request_target is prohibited: it would run trusted-credentialed code against untrusted refs."
+            },
+            "trusted_ref": {
+              "const": "refs/heads/main"
+            },
+            "permissions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "contents",
+                "issues"
+              ],
+              "properties": {
+                "contents": {
+                  "const": "read"
+                },
+                "issues": {
+                  "const": "write"
+                }
+              }
+            },
+            "concurrency_group_prefix": {
+              "const": "devai-issue-tracking"
+            },
+            "required_context": {
+              "const": false,
+              "$comment": "Projection failures are reported visibly but are never a required readiness context."
+            },
+            "pinned_actions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "checkout",
+                "setup_node"
+              ],
+              "description": "Immutable commit SHAs. Mutable action references (tags, branches) are a Doctor failure.",
+              "properties": {
+                "checkout": {
+                  "$ref": "#/$defs/git_object"
+                },
+                "setup_node": {
+                  "$ref": "#/$defs/git_object"
+                }
+              }
+            }
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_boundary",
+            "ci_token",
+            "pat_fallback",
+            "package_token_fallback",
+            "store_token_in_config"
+          ],
+          "properties": {
+            "local_boundary": {
+              "const": "gh-authenticated-subprocess",
+              "$comment": "The local projector invokes the existing authenticated gh boundary and never extracts, reads, or persists credentials."
+            },
+            "ci_token": {
+              "const": "github-token-scoped"
+            },
+            "pat_fallback": {
+              "const": false
+            },
+            "package_token_fallback": {
+              "const": false
+            },
+            "store_token_in_config": {
+              "const": false
+            }
+          }
+        },
+        "disclosure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "max_summary_chars",
+            "max_events_per_batch",
+            "max_batch_chars",
+            "withheld_payload_digest",
+            "neutralize",
+            "forbidden_content"
+          ],
+          "properties": {
+            "profile": {
+              "const": "public-safe-v1"
+            },
+            "max_summary_chars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 512
+            },
+            "max_events_per_batch": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_batch_chars": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "withheld_payload_digest": {
+              "const": "sha256"
+            },
+            "neutralize": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "mention",
+                  "html",
+                  "markdown-directive",
+                  "control-characters"
+                ]
+              }
+            },
+            "forbidden_content": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "raw-prompt",
+                  "command-output",
+                  "token",
+                  "environment-value",
+                  "signing-material",
+                  "sensitive-path",
+                  "unrestricted-payload-text"
+                ]
+              }
+            }
+          }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_attempts",
+            "initial_delay_ms",
+            "max_delay_ms",
+            "multiplier"
+          ],
+          "properties": {
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "initial_delay_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_delay_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "multiplier": {
+              "type": "integer",
+              "minimum": 2
+            }
+          }
+        },
+        "event_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "The exact closed set of v1.3.0 event kinds. Producing an unlisted kind is a validation failure, not a silent pass-through."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "$schema": "../schemas/github-issues-tracking-policy.schema.json",
+      "schemaVersion": "1.0.0",
+      "id": "github-issues-tracking",
+      "authority": "Architect",
+      "defaults": {
+        "adapter": {
+          "id": "github-issues",
+          "adapter_version": "1.0.0",
+          "issue_granularity": "one-per-governed-round",
+          "projection_timing": "checkpoint-and-close",
+          "disclosure_profile": "public-safe-v1",
+          "readiness_impact": "best-effort"
+        },
+        "reconciliation": {
+          "local": "gh",
+          "ci": "trusted-main-workflow"
+        },
+        "workflow": {
+          "file": "devai-issue-tracking.yml",
+          "triggers": [
+            "push",
+            "workflow_dispatch"
+          ],
+          "trusted_ref": "refs/heads/main",
+          "permissions": {
+            "contents": "read",
+            "issues": "write"
+          },
+          "concurrency_group_prefix": "devai-issue-tracking",
+          "required_context": false,
+          "pinned_actions": {
+            "checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "setup_node": "820762786026740c76f36085b0efc47a31fe5020"
+          }
+        },
+        "authentication": {
+          "local_boundary": "gh-authenticated-subprocess",
+          "ci_token": "github-token-scoped",
+          "pat_fallback": false,
+          "package_token_fallback": false,
+          "store_token_in_config": false
+        },
+        "disclosure": {
+          "profile": "public-safe-v1",
+          "max_summary_chars": 512,
+          "max_events_per_batch": 128,
+          "max_batch_chars": 60000,
+          "withheld_payload_digest": "sha256",
+          "neutralize": [
+            "mention",
+            "html",
+            "markdown-directive",
+            "control-characters"
+          ],
+          "forbidden_content": [
+            "raw-prompt",
+            "command-output",
+            "token",
+            "environment-value",
+            "signing-material",
+            "sensitive-path",
+            "unrestricted-payload-text"
+          ]
+        },
+        "retry": {
+          "max_attempts": 5,
+          "initial_delay_ms": 1000,
+          "max_delay_ms": 30000,
+          "multiplier": 2
+        },
+        "event_kinds": [
+          "session_opened",
+          "finding_emitted",
+          "finding_classified",
+          "authorization_recorded",
+          "action_intended",
+          "action_completed",
+          "verification_result",
+          "divergence_detected",
+          "failure_observed",
+          "evidence_superseded",
+          "round_verdict",
+          "tracking_disabled"
+        ]
+      }
+    }
+  ]
+}

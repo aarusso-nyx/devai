@@ -26,6 +26,7 @@ import {
 import { defineCommand } from '../../define-command.js';
 import { resolveCliVersion } from '../../version.js';
 import { dispatchRoundTask } from './dispatch.js';
+import { recordRoundCloseTracking } from './tracking.js';
 
 interface RoundOptions {
   readonly repoRoot?: string;
@@ -155,7 +156,20 @@ export const roundClose = defineCommand({
             const draft = JSON.parse(readFileSync(options.input, 'utf8')) as PhaseClosureDraft;
             if (draft.round_id !== round) throw new TaskServiceError('TASK_ROUND_MISMATCH');
             const result = closePhase(root(options), draft);
-            emit(result, options.human === true, `round close: ${round} -> ${result.record.id}`);
+            // Closure records and seals its final tracking event locally and never
+            // waits for GitHub. Any remaining outbox is projected later, from sealed
+            // evidence, by an explicit sync or the trusted-main workflow.
+            const tracking = recordRoundCloseTracking({
+              repoRoot: root(options),
+              round,
+              verdict: result.record.id,
+            });
+            emit(
+              { ...result, ...(tracking === undefined ? {} : { tracking }) },
+              options.human === true,
+              `round close: ${round} -> ${result.record.id}` +
+                (tracking === undefined ? '' : `; tracking_projection: ${tracking.projection}`),
+            );
           } catch (error) {
             failure('close', error);
           }

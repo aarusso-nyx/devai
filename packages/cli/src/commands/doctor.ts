@@ -38,6 +38,11 @@ import {
   attestedRcVerificationWorkflow,
 } from '../services/ci-scaffold/index.js';
 import {
+  readBoundTrackingConfig,
+  TRACKING_WORKFLOW_RELATIVE,
+  verifyTrackingBinding,
+} from '../services/github-issues-tracking/config.js';
+import {
   ADOPTER_POLICY_TARGETS,
   isJsonObject,
   resolveAdopterPolicyMaterialization,
@@ -1073,6 +1078,65 @@ interface CheckSpec {
   ) => CheckResult | Promise<CheckResult>;
 }
 
+/**
+ * Governance tracking is opt-in, so absence is a valid posture and must not be
+ * reported as a defect. What Doctor does refuse is a binding that misrepresents
+ * itself: a wrong repository, workflow drift, excess permissions, a mutable
+ * action reference, a credential fallback, or a coverage claim wider than the
+ * runtime can actually mediate. No network call is ever made here — remote
+ * reachability is tracking health, not adoption posture.
+ */
+function checkGovernanceTracking(repoRoot: string): CheckResult {
+  const name = 'governance-tracking-binding';
+  let config;
+  try {
+    config = readBoundTrackingConfig(repoRoot);
+  } catch (error) {
+    return {
+      name,
+      ok: false,
+      errors: [`tracking configuration is unreadable: ${String(error)}`],
+    };
+  }
+  if (config === undefined) {
+    return { name, ok: true, info: { mode: 'disabled', opt_out: true, network_calls: 0 } };
+  }
+
+  const workflowPath = join(repoRoot, TRACKING_WORKFLOW_RELATIVE);
+  const workflow = existsSync(workflowPath) ? readFileSync(workflowPath, 'utf8') : undefined;
+  const findings = verifyTrackingBinding({ repoRoot, config, workflow });
+
+  const errors = findings.map((finding) => `${finding.code}: ${finding.detail}`);
+  if (workflow !== undefined) {
+    if (workflow.includes('pull_request_target')) {
+      errors.push('TRACKING_WORKFLOW_TRUST_BOUNDARY_INVALID: pull_request_target is prohibited');
+    }
+    // A tag or branch reference can be moved under the adopter at any time.
+    for (const [, reference] of workflow.matchAll(/uses:\s*(\S+)/gu)) {
+      if (!/@[0-9a-f]{40}$/u.test(reference ?? '')) {
+        errors.push(`TRACKING_WORKFLOW_ACTION_MUTABLE: ${String(reference)}`);
+      }
+    }
+    if (/PACKAGES_READ_TOKEN|github_pat_|\bPAT\b/u.test(workflow)) {
+      errors.push('TRACKING_WORKFLOW_CREDENTIAL_FALLBACK: only GITHUB_TOKEN is permitted');
+    }
+  }
+
+  return {
+    name,
+    ok: errors.length === 0,
+    info: {
+      mode: 'github-issues',
+      repository: config.binding.repository,
+      disclosure_profile: config.defaults.disclosure.profile,
+      readiness_impact: config.defaults.adapter.readiness_impact,
+      coverage: 'devai-mediated-actions-only',
+      network_calls: 0,
+    },
+    ...(errors.length === 0 ? {} : { errors }),
+  };
+}
+
 const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'f1-paths-present',
@@ -1086,6 +1150,10 @@ const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'policy-materialization-current',
     run: (repoRoot) => checkPolicyMaterializationCurrent(repoRoot),
+  },
+  {
+    name: 'governance-tracking-binding',
+    run: (repoRoot) => checkGovernanceTracking(repoRoot),
   },
   {
     name: 'agents-claude-sync',

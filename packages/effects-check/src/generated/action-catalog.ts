@@ -203,6 +203,30 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: [],
   },
   {
+    action_id: 'round tracking disable',
+    public_action_id: 'round tracking disable',
+    effect: 'remote-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:gh', 'net:github-issues'],
+  },
+  {
+    action_id: 'round tracking enable',
+    public_action_id: 'round tracking enable',
+    effect: 'remote-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:gh', 'net:github-issues'],
+  },
+  {
+    action_id: 'round tracking status',
+    public_action_id: 'round tracking status',
+    effect: 'read',
+    capabilities: [],
+  },
+  {
+    action_id: 'round tracking sync',
+    public_action_id: 'round tracking sync',
+    effect: 'remote-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:gh', 'net:github-issues'],
+  },
+  {
     action_id: 'sense inventory',
     public_action_id: 'sense inventory',
     effect: 'read',
