@@ -5,7 +5,7 @@ It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
 The DEVAI 1.2 product is one publishable package,
-`@aarusso-nyx/devai`. Its current machine catalog contains **44 actions**, **59
+`@aarusso-nyx/devai`. Its current machine catalog contains **48 actions**, **59
 sensors**, and **7 host-invoked recipes**. The ordinary public CLI is organized
 into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
 `evidence`, `release`, and `triage`. `task` and `catalog` are internal plumbing exposed by
