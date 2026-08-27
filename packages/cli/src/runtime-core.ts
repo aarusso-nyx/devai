@@ -11,4 +11,5 @@ export * from '@devai-nyx/utils';
 export * from './services/ci-scaffold/index.js';
 export * from './services/dependency-security/index.js';
 export * from './services/docs/index.js';
+export * from './services/github-issues-tracking/index.js';
 export * from './services/hooks-install/index.js';

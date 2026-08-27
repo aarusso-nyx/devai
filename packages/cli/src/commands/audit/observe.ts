@@ -1,13 +1,33 @@
 import { appendVerbEvidence, loadChain } from '#runtime-core';
+import { execFileSync } from '@devai-nyx/authority';
 import { runAuditObservation } from '@devai-nyx/skills';
+import { trackGovernanceEvent } from '@devai-nyx/loop';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import type { CAC } from 'cac';
 import { resolve } from 'node:path';
 import { defineCommand } from '../../define-command.js';
 
+/**
+ * Exact tree of a commit. A commit SHA is not a tree SHA, so an unresolvable
+ * tree yields no binding at all rather than a plausible-looking false one.
+ */
+function treeOf(repoRoot: string, commit: string): string | undefined {
+  try {
+    const tree = execFileSync('git', ['rev-parse', '--verify', `${commit}^{tree}`], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    return /^[0-9a-f]{40}$/u.test(tree) ? tree : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface AuditObserveOptions {
   readonly repoRoot?: string;
   readonly at?: string;
+  readonly round?: string;
   readonly human?: boolean;
 }
 
@@ -21,6 +41,10 @@ export const auditObserve = defineCommand({
       .command('audit-observe', 'Observe the exact current repository commit')
       .option('--repo-root <path>', 'Repository root (default: cwd)')
       .option('--at <full-sha>', 'Mandatory exact 40-character commit SHA')
+      .option(
+        '--round <round_id>',
+        'Optional governed round to attribute this observation to for tracking',
+      )
       .option('--human', 'Human-readable output')
       .action(async (options: AuditObserveOptions) => {
         if (options.at === undefined || !/^[0-9a-f]{40}$/u.test(options.at)) {
@@ -59,6 +83,31 @@ export const auditObserve = defineCommand({
               : { ok: true as const, id: priorEvidence };
           if (!evidence.ok)
             throw new Error(`AUDIT_OBSERVE_EVIDENCE_FAILED:${evidence.error ?? ''}`);
+          // An Auditor report may recommend, never ratify (Article 7), so this
+          // is recorded as an observation and never as a verdict. A round is
+          // never inferred; without --round nothing is attributed.
+          if (options.round !== undefined) {
+            const tree = treeOf(repoRoot, options.at);
+            trackGovernanceEvent({
+              repoRoot,
+              round: options.round,
+              role: 'auditor',
+              kind: 'finding_emitted',
+              status: 'not_applicable',
+              summary: `Auditor observed commit ${options.at} with status ${observation.status}; non-promoting.`,
+              payload: observation,
+              evidenceRefs: evidence.id === undefined ? [] : [evidence.id],
+              commitBinding:
+                tree === undefined
+                  ? null
+                  : {
+                      base_commit: options.at,
+                      base_tree: tree,
+                      candidate_commit: null,
+                      candidate_tree: null,
+                    },
+            });
+          }
           const result = { ...observation, evidence_ref: evidence.id };
           process.stdout.write(
             options.human === true

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/governance-projection-status.schema.json",
+  "title": "Governance projection status and receipts",
+  "description": "Mutable delivery state for one governed round's tracking projection, stored separately from canonical events so that no acknowledgement, retry, or remote edit can alter recorded event bytes. Readiness and tracking health are reported as independent axes: a projection that is pending, failed, or unreachable is a failure to observe the remote and never changes a governed verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "mode",
+    "activation",
+    "canonical_events",
+    "projected_events",
+    "pending_events",
+    "projection",
+    "divergence"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "mode": {
+      "enum": ["disabled", "github-issues"],
+      "description": "disabled is a valid, fully supported opt-out and performs no network call."
+    },
+    "activation": { "enum": ["absent", "bound-inactive", "active", "frozen", "disabled"] },
+    "round_id": { "type": ["string", "null"], "pattern": "^R-[0-9]{4,}$" },
+    "canonical_events": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Events durably recorded locally. This is the authoritative count; it never depends on the remote."
+    },
+    "projected_events": { "type": "integer", "minimum": 0 },
+    "pending_events": { "type": "integer", "minimum": 0 },
+    "projection": {
+      "enum": ["idle", "pending", "synced", "failed", "unreachable"],
+      "description": "Remote-delivery health only. Never an input to the governed verdict."
+    },
+    "issue": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Null before the first successful sync. An absent issue is advisory, not a failure."
+    },
+    "divergence": {
+      "type": "boolean",
+      "description": "True when the observed remote state cannot be reconciled with sealed local evidence: a missing or closed issue, an edited or deleted comment, or a batch marker that does not match. Divergence is reported, never silently repaired."
+    },
+    "divergence_detail": { "type": ["string", "null"], "minLength": 1 },
+    "last_error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["classification", "observed_at"],
+      "description": "Last classified projection failure. An error is never a verdict.",
+      "properties": {
+        "classification": {
+          "enum": [
+            "authentication",
+            "permission",
+            "rate-limit",
+            "validation",
+            "missing-resource",
+            "service",
+            "ambiguous-response"
+          ]
+        },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "public_safe_detail": { "type": ["string", "null"], "maxLength": 512 }
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "description": "Per-batch delivery receipts. Append-only mutable delivery state; never merged into canonical event storage.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["batch_id", "state"],
+        "properties": {
+          "batch_id": { "type": "string", "pattern": "^GBAT-[0-9a-f]{16}$" },
+          "state": { "enum": ["queued", "in-flight", "delivered", "failed", "reconciled"] },
+          "comment_id": { "type": ["integer", "null"], "minimum": 1 },
+          "projected_at": { "type": ["string", "null"], "format": "date-time" },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "batch_digest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "coverage_disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mediated_only"],
+      "description": "Article 6 host-boundary statement carried into every status report so a reader is never invited to infer coverage DEVAI does not have.",
+      "properties": {
+        "mediated_only": { "const": true },
+        "uncovered_note": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "mode": "github-issues",
+      "activation": "active",
+      "round_id": "R-0042",
+      "canonical_events": 42,
+      "projected_events": 35,
+      "pending_events": 7,
+      "projection": "pending",
+      "issue": 123,
+      "divergence": false,
+      "divergence_detail": null,
+      "last_error": null,
+      "receipts": [],
+      "coverage_disclosure": {
+        "mediated_only": true,
+        "uncovered_note": "Editor and shell activity outside DEVAI-mediated actions is not tracked."
+      }
+    }
+  ]
+}

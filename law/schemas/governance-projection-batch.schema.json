@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/governance-projection-batch.schema.json",
+  "title": "Governance projection batch",
+  "description": "One public-safe, lossless batch of sealed governance events queued for output-only projection to a governed round's GitHub Issue. A batch names every event it covers by content-derived ID and preserves each session's recorded order; it never reorders across sessions and never fabricates a global order. Projection is rebuildable: the same outbox projected twice yields the same remote state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "batch_id",
+    "repository_id",
+    "round_id",
+    "adapter",
+    "disclosure_profile",
+    "reason",
+    "sessions",
+    "event_ids",
+    "entries",
+    "segment_digests_sha256",
+    "batch_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^GBAT-[0-9a-f]{16}$"
+    },
+    "marker": {
+      "type": "string",
+      "pattern": "^devai-governance-batch:[0-9a-f]{16}$",
+      "description": "Stable hidden identity marker searched for before posting. Finding it is proof the batch already landed; it is what makes a retry after an ambiguous response idempotent instead of duplicating."
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4,}$"
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "adapter_version", "package_version"],
+      "properties": {
+        "id": {
+          "const": "github-issues"
+        },
+        "adapter_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "package_version": {
+          "$ref": "#/$defs/semver"
+        }
+      }
+    },
+    "disclosure_profile": {
+      "const": "public-safe-v1"
+    },
+    "reason": {
+      "enum": ["checkpoint", "round_close", "tracking_disabled", "reconciliation"]
+    },
+    "sessions": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Per-session ordering preserved by the batch. Independent worktrees and disconnected hosts each keep their own chain.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authority_session_id", "first", "last"],
+        "properties": {
+          "authority_session_id": {
+            "type": "string",
+            "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+          },
+          "first": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "event_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^GEV-[0-9a-f]{16}$"
+      },
+      "description": "Every canonical event this batch projects, exactly once. Losslessness is checked against this list by ID, never by rendered text."
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Rendered public-safe rows, one per event_id, in the same order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "role", "kind", "public_safe_summary", "payload_digest_sha256"],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "pattern": "^GEV-[0-9a-f]{16}$"
+          },
+          "role": {
+            "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": ["string", "null"],
+            "enum": ["pass", "review", "fail", "inconclusive", "not_applicable", null]
+          },
+          "public_safe_summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "commit": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/git_object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tree": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/git_object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_digests_sha256": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "payload_digest_sha256": {
+            "$ref": "#/$defs/sha256",
+            "description": "Published in place of withheld payload text so the projection remains verifiable without disclosing content."
+          },
+          "mediated": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "segment_digests_sha256": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      },
+      "description": "Digests of the sealed local segments this batch was rendered from. A batch is never projected from unsealed events."
+    },
+    "projected_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "batch_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "batch_id": "GBAT-5d41402abc4b2a76",
+      "marker": "devai-governance-batch:5d41402abc4b2a76",
+      "repository_id": "devai",
+      "round_id": "R-0042",
+      "adapter": {
+        "id": "github-issues",
+        "adapter_version": "1.0.0",
+        "package_version": "1.3.0"
+      },
+      "disclosure_profile": "public-safe-v1",
+      "reason": "checkpoint",
+      "sessions": [
+        {
+          "authority_session_id": "AUTH-SESSION-0f1e2d3c4b5a69788796",
+          "first": 1,
+          "last": 1
+        }
+      ],
+      "event_ids": ["GEV-3f2a91c40b7d5e68"],
+      "entries": [
+        {
+          "event_id": "GEV-3f2a91c40b7d5e68",
+          "role": "owner",
+          "kind": "session_opened",
+          "status": null,
+          "public_safe_summary": "Owner authority session opened for round R-0042.",
+          "commit": null,
+          "tree": null,
+          "evidence_digests_sha256": [],
+          "payload_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "mediated": true
+        }
+      ],
+      "segment_digests_sha256": [
+        "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7"
+      ],
+      "projected_at": null,
+      "batch_digest_sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+    }
+  ]
+}

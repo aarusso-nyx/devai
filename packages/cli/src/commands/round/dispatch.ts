@@ -15,6 +15,7 @@ import {
   type TaskRecord,
 } from '@devai-nyx/loop';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import { trackGovernanceEvent } from '@devai-nyx/loop';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -35,6 +36,15 @@ function taskExecutionRoot(repoRoot: string, task: TaskRecord): string {
 
 function candidateSha(repoRoot: string): string {
   return execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+/** Exact tree of HEAD. A commit SHA is not a tree SHA and must never stand in for one. */
+function candidateTree(repoRoot: string): string {
+  return execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -103,6 +113,7 @@ async function dispatchRoutine(
   });
   const completedAt = new Date().toISOString();
   const candidate = candidateSha(executionRoot);
+  const tree = candidateTree(executionRoot);
   const id = evidenceId(running, startedAt, completedAt);
   const succeeded = result.ok;
   const resolvedArgv = result.ok ? (result.resolved.argv ?? []) : (executor.argv ?? []);
@@ -155,6 +166,28 @@ async function dispatchRoutine(
     task: evidenceTask,
     candidate_sha: candidate,
     evidence,
+  });
+  // The verification receipt is the one place a candidate tree is known, so it
+  // is where a governance event can carry an exact commit binding.
+  trackGovernanceEvent({
+    repoRoot,
+    round: running.round_id,
+    role: 'engineer',
+    kind: 'verification_result',
+    status: succeeded ? 'pass' : 'fail',
+    taskId: running.id,
+    summary: succeeded
+      ? `Routine executor verified task ${running.id}.`
+      : `Routine executor failed task ${running.id}: ${String(evidence.failure?.code)}`,
+    payload: evidence,
+    evidenceRefs: [id],
+    commitBinding: {
+      base_commit: candidate,
+      base_tree: tree,
+      candidate_commit: candidate,
+      candidate_tree: tree,
+    },
+    checkpoint: true,
   });
   if (succeeded) {
     saveTask(repoRoot, { ...running, status: 'pre_merge' });

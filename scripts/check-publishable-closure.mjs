@@ -120,11 +120,11 @@ if (publishable.length !== 1 || publishable[0]?.name !== PACKAGE_NAME) {
 }
 
 const actions = json('law/policy/action-registry.json');
-if (actions.entries?.length !== 44 || actions.counts?.total !== 44) {
+if (actions.entries?.length !== 48 || actions.counts?.total !== 48) {
   fail('PUBLISHABLE_ACTION_COUNT_INVALID', String(actions.entries?.length));
 }
 const actionIds = actions.entries.map((entry) => entry.action_id);
-if (new Set(actionIds).size !== 44) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
+if (new Set(actionIds).size !== 48) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
 for (const entry of actions.entries) {
   for (const forbidden of ['previous_name', 'lifecycle', 'migration', 'disposition']) {
     if (Object.hasOwn(entry, forbidden))
@@ -246,5 +246,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 44, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: 21, secondary_bins: 5 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 48, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: 21, secondary_bins: 5 })}\n`,
 );

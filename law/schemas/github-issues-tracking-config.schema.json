@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/github-issues-tracking-config.schema.json",
+  "title": "Bound GitHub Issues tracking configuration",
+  "description": "The adopter-local materialization written to .devai/config/github-issues-tracking.json by the registered init bind action. It embeds the canonical policy defaults verbatim and adds only the adopter's exact identity and the digests that make drift detectable. Presence of this file means the repository capability is bound; it does not activate tracking for any round and grants no publication authority on its own.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "binding",
+    "defaults",
+    "digests"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "github-issues-tracking"
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "repository_id",
+        "package_version",
+        "bound_at",
+        "bound_by_role"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "description": "Exact owner/name remote identity this binding authorizes. Any other repository is a refusal, never a re-target."
+        },
+        "repository_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "package_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "bound_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bound_by_role": {
+          "const": "architect",
+          "description": "Repository capability binding is Architect authority. Per-round activation is Owner authority and is recorded separately."
+        }
+      }
+    },
+    "defaults": {
+      "$ref": "github-issues-tracking-policy.schema.json#/properties/defaults",
+      "description": "Verbatim copy of the canonical law/policy/github-issues-tracking.json defaults block. Any byte difference is binding drift and a Doctor failure."
+    },
+    "digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_defaults_sha256",
+        "workflow_sha256"
+      ],
+      "properties": {
+        "policy_defaults_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "workflow_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the exact generated .github/workflows/devai-issue-tracking.yml bytes. Workflow drift invalidates the binding."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "github-issues-tracking",
+      "binding": {
+        "repository": "aarusso-nyx/devai",
+        "repository_id": "devai",
+        "package_version": "1.3.0",
+        "bound_at": "2026-08-27T12:00:00.000Z",
+        "bound_by_role": "architect"
+      },
+      "defaults": {
+        "adapter": {
+          "id": "github-issues",
+          "adapter_version": "1.0.0",
+          "issue_granularity": "one-per-governed-round",
+          "projection_timing": "checkpoint-and-close",
+          "disclosure_profile": "public-safe-v1",
+          "readiness_impact": "best-effort"
+        },
+        "reconciliation": {
+          "local": "gh",
+          "ci": "trusted-main-workflow"
+        },
+        "workflow": {
+          "file": "devai-issue-tracking.yml",
+          "triggers": [
+            "push",
+            "workflow_dispatch"
+          ],
+          "trusted_ref": "refs/heads/main",
+          "permissions": {
+            "contents": "read",
+            "issues": "write"
+          },
+          "concurrency_group_prefix": "devai-issue-tracking",
+          "required_context": false,
+          "pinned_actions": {
+            "checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "setup_node": "820762786026740c76f36085b0efc47a31fe5020"
+          }
+        },
+        "authentication": {
+          "local_boundary": "gh-authenticated-subprocess",
+          "ci_token": "github-token-scoped",
+          "pat_fallback": false,
+          "package_token_fallback": false,
+          "store_token_in_config": false
+        },
+        "disclosure": {
+          "profile": "public-safe-v1",
+          "max_summary_chars": 512,
+          "max_events_per_batch": 128,
+          "max_batch_chars": 60000,
+          "withheld_payload_digest": "sha256",
+          "neutralize": [
+            "mention",
+            "html",
+            "markdown-directive",
+            "control-characters"
+          ],
+          "forbidden_content": [
+            "raw-prompt",
+            "command-output",
+            "token",
+            "environment-value",
+            "signing-material",
+            "sensitive-path",
+            "unrestricted-payload-text"
+          ]
+        },
+        "retry": {
+          "max_attempts": 5,
+          "initial_delay_ms": 1000,
+          "max_delay_ms": 30000,
+          "multiplier": 2
+        },
+        "event_kinds": [
+          "session_opened",
+          "finding_emitted",
+          "finding_classified",
+          "authorization_recorded",
+          "action_intended",
+          "action_completed",
+          "verification_result",
+          "divergence_detected",
+          "failure_observed",
+          "evidence_superseded",
+          "round_verdict",
+          "tracking_disabled"
+        ]
+      },
+      "digests": {
+        "policy_defaults_sha256": "965ea80f88b2634082d74baefcfc8a707f117152c6eeb9fe214175c2544c2e8a",
+        "workflow_sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+      }
+    }
+  ]
+}

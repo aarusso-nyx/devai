@@ -85,6 +85,15 @@ function ensureSchemaReferences(name: SchemaName): void {
     }
   }
   if (
+    name === 'github-issues-tracking-config.schema.json' &&
+    ajv.getSchema('github-issues-tracking-policy.schema.json') === undefined
+  ) {
+    ajv.addSchema(
+      loadSchema('github-issues-tracking-policy.schema.json'),
+      'github-issues-tracking-policy.schema.json',
+    );
+  }
+  if (
     name === 'triage-classify-result.schema.json' &&
     ajv.getSchema('triage.schema.json') === undefined
   ) {

@@ -1,0 +1,79 @@
+{
+  "$schema": "../schemas/github-issues-tracking-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "github-issues-tracking",
+  "authority": "Architect",
+  "defaults": {
+    "adapter": {
+      "id": "github-issues",
+      "adapter_version": "1.0.0",
+      "issue_granularity": "one-per-governed-round",
+      "projection_timing": "checkpoint-and-close",
+      "disclosure_profile": "public-safe-v1",
+      "readiness_impact": "best-effort"
+    },
+    "reconciliation": {
+      "local": "gh",
+      "ci": "trusted-main-workflow"
+    },
+    "workflow": {
+      "file": "devai-issue-tracking.yml",
+      "triggers": ["push", "workflow_dispatch"],
+      "trusted_ref": "refs/heads/main",
+      "permissions": {
+        "contents": "read",
+        "issues": "write"
+      },
+      "concurrency_group_prefix": "devai-issue-tracking",
+      "required_context": false,
+      "pinned_actions": {
+        "checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "setup_node": "820762786026740c76f36085b0efc47a31fe5020"
+      }
+    },
+    "authentication": {
+      "local_boundary": "gh-authenticated-subprocess",
+      "ci_token": "github-token-scoped",
+      "pat_fallback": false,
+      "package_token_fallback": false,
+      "store_token_in_config": false
+    },
+    "disclosure": {
+      "profile": "public-safe-v1",
+      "max_summary_chars": 512,
+      "max_events_per_batch": 128,
+      "max_batch_chars": 60000,
+      "withheld_payload_digest": "sha256",
+      "neutralize": ["mention", "html", "markdown-directive", "control-characters"],
+      "forbidden_content": [
+        "raw-prompt",
+        "command-output",
+        "token",
+        "environment-value",
+        "signing-material",
+        "sensitive-path",
+        "unrestricted-payload-text"
+      ]
+    },
+    "retry": {
+      "max_attempts": 5,
+      "initial_delay_ms": 1000,
+      "max_delay_ms": 30000,
+      "multiplier": 2
+    },
+    "event_kinds": [
+      "session_opened",
+      "finding_emitted",
+      "finding_classified",
+      "authorization_recorded",
+      "action_intended",
+      "action_completed",
+      "verification_result",
+      "divergence_detected",
+      "failure_observed",
+      "evidence_superseded",
+      "round_verdict",
+      "tracking_disabled"
+    ]
+  }
+}

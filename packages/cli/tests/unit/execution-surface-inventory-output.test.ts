@@ -114,7 +114,7 @@ describe('execution-surface inventory discovery', () => {
   });
 
   it('renders every inventory slice through the registered command help', () => {
-    expect(current).toHaveLength(44);
+    expect(current).toHaveLength(48);
     const help = renderHelp(current, '1.0.0', ['sense', 'inventory']);
     expect(help).toContain('Usage: devai sense inventory');
     expect(help).toContain('--slice <name>');
@@ -132,7 +132,7 @@ describe('execution-surface inventory discovery', () => {
 
 describe('execution-surface action output totality', () => {
   it('emits one schema-valid empty success and one schema-valid refusal for every current action', () => {
-    expect(current).toHaveLength(44);
+    expect(current).toHaveLength(48);
     for (const entry of current) {
       const success = emit(entry, { exit: 0, stdout: '', stderr: '' });
       expect(success.stderr, entry.name).toBe('');

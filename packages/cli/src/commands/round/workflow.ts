@@ -26,6 +26,8 @@ import {
 import { defineCommand } from '../../define-command.js';
 import { resolveCliVersion } from '../../version.js';
 import { dispatchRoundTask } from './dispatch.js';
+import { recordRoundCloseTracking } from './tracking.js';
+import { trackGovernanceEvent } from '#runtime-core';
 
 interface RoundOptions {
   readonly repoRoot?: string;
@@ -155,7 +157,20 @@ export const roundClose = defineCommand({
             const draft = JSON.parse(readFileSync(options.input, 'utf8')) as PhaseClosureDraft;
             if (draft.round_id !== round) throw new TaskServiceError('TASK_ROUND_MISMATCH');
             const result = closePhase(root(options), draft);
-            emit(result, options.human === true, `round close: ${round} -> ${result.record.id}`);
+            // Closure records and seals its final tracking event locally and never
+            // waits for GitHub. Any remaining outbox is projected later, from sealed
+            // evidence, by an explicit sync or the trusted-main workflow.
+            const tracking = recordRoundCloseTracking({
+              repoRoot: root(options),
+              round,
+              verdict: result.record.id,
+            });
+            emit(
+              { ...result, ...(tracking === undefined ? {} : { tracking }) },
+              options.human === true,
+              `round close: ${round} -> ${result.record.id}` +
+                (tracking === undefined ? '' : `; tracking_projection: ${tracking.projection}`),
+            );
           } catch (error) {
             failure('close', error);
           }
@@ -202,6 +217,17 @@ export const roundGapCreate = defineCommand({
             summary: options.summary,
             ambiguity: options.ambiguity,
             evidenceRefs: asArray(options.evidence),
+          });
+          trackGovernanceEvent({
+            repoRoot: root(options),
+            round,
+            role: record.emitting_discipline,
+            kind: 'finding_emitted',
+            status: 'review',
+            taskId: record.emitting_task_id,
+            summary: `Reference gap ${record.id} emitted: ${record.problem.summary}`,
+            payload: record,
+            evidenceRefs: [record.id, ...record.evidence_refs],
           });
           emit(record, options.human === true, `round gap create: ${record.id}`);
         } catch (error) {
@@ -291,6 +317,18 @@ export const roundGapResolve = defineCommand({
               rgrId: gapId,
               resolver: options.resolver,
               ...(options.status !== undefined && { newStatus: options.status }),
+            });
+            trackGovernanceEvent({
+              repoRoot: root(options),
+              round: requiredRound(options),
+              role: 'architect',
+              kind: 'finding_classified',
+              status: record.status === 'resolved' ? 'pass' : 'review',
+              taskId: record.emitting_task_id,
+              summary: `Reference gap ${record.id} resolved to ${record.status}.`,
+              payload: record,
+              evidenceRefs: [record.id],
+              checkpoint: true,
             });
             emit(
               record,

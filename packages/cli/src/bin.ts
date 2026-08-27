@@ -101,18 +101,24 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
       return [releaseCheck, releaseDrift, releaseStatus, releaseVerify];
     }
     case 'round': {
-      const {
-        roundAssess,
-        roundClose,
-        roundGapCreate,
-        roundGapList,
-        roundGapResolve,
-        roundGapShow,
-        roundPlan,
-        roundRun,
-        roundSeal,
-        roundStatus,
-      } = await import('./commands/round/workflow.js');
+      const [
+        {
+          roundAssess,
+          roundClose,
+          roundGapCreate,
+          roundGapList,
+          roundGapResolve,
+          roundGapShow,
+          roundPlan,
+          roundRun,
+          roundSeal,
+          roundStatus,
+        },
+        { roundTrackingDisable, roundTrackingEnable, roundTrackingStatus, roundTrackingSync },
+      ] = await Promise.all([
+        import('./commands/round/workflow.js'),
+        import('./commands/round/tracking.js'),
+      ]);
       return [
         roundAssess,
         roundClose,
@@ -124,6 +130,10 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         roundRun,
         roundSeal,
         roundStatus,
+        roundTrackingDisable,
+        roundTrackingEnable,
+        roundTrackingStatus,
+        roundTrackingSync,
       ];
     }
     case 'sense': {

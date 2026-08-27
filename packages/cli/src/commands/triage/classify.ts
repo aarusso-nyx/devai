@@ -1,6 +1,6 @@
 import { appendVerbEvidence, loadChain } from '#runtime-core';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from '@devai-nyx/authority';
-import { classifyFailure } from '@devai-nyx/loop';
+import { classifyFailure, trackGovernanceEvent } from '@devai-nyx/loop';
 import { getValidator, validators } from '@devai-nyx/schemas';
 import type { SensorReading } from '@devai-nyx/sensors';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
@@ -8,11 +8,13 @@ import type { CAC } from 'cac';
 import { createHash } from 'node:crypto';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { defineCommand } from '../../define-command.js';
+import { declaredInvocationRole } from '../../authority/index.js';
 
 interface TriageOptions {
   readonly input?: string;
   readonly repoRoot?: string;
   readonly task?: string;
+  readonly round?: string;
   readonly human?: boolean;
 }
 
@@ -27,6 +29,10 @@ export const triageClassify = defineCommand({
       .option('--input <path>', 'SensorReading JSON path relative to the repository')
       .option('--repo-root <path>', 'Repository root (default: cwd)')
       .option('--task <task-id>', 'Optional TASK-N identity')
+      .option(
+        '--round <round_id>',
+        'Optional governed round to attribute this classification to for tracking',
+      )
       .option('--human', 'Human-readable output')
       .action((options: TriageOptions) => {
         if (options.input === undefined) {
@@ -99,6 +105,23 @@ export const triageClassify = defineCommand({
                 })
               : { ok: true as const, id: priorEvidence };
           if (!evidence.ok) throw new Error(`TRIAGE_EVIDENCE_FAILED:${evidence.error ?? ''}`);
+          // A round is never inferred. Without --round the classification is
+          // simply not attributed to one, exactly as before tracking existed.
+          if (options.round !== undefined) {
+            trackGovernanceEvent({
+              repoRoot,
+              round: options.round,
+              role: declaredInvocationRole() ?? 'auditor',
+              kind: 'finding_classified',
+              status: verdict.classification === 'inconclusive' ? 'inconclusive' : 'review',
+              ...(options.task === undefined ? {} : { taskId: options.task }),
+              summary:
+                `Sensor failure classified as ${verdict.classification}; ` +
+                `route ${verdict.recommended_route.action ?? verdict.recommended_route.discipline}.`,
+              payload: verdict,
+              evidenceRefs: evidence.id === undefined ? [] : [evidence.id],
+            });
+          }
           const result = { verdict, artifact, evidence_ref: evidence.id };
           process.stdout.write(
             options.human === true

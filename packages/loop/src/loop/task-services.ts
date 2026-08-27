@@ -29,6 +29,8 @@ import {
 } from './tasks.js';
 import { listWorktrees } from './worktrees.js';
 import { normalizeRoundId } from '../round-lifecycle/index.js';
+import { trackGovernanceEvent } from '../tracking/hook.js';
+import type { GovernanceEventStatus } from '../tracking/events.js';
 
 export class TaskServiceError extends Error {
   constructor(
@@ -42,6 +44,33 @@ export class TaskServiceError extends Error {
 
 function fail(code: string, exitCode = 2): never {
   throw new TaskServiceError(code, exitCode);
+}
+
+/**
+ * Record one task-lifecycle transition as a governance event.
+ *
+ * Inert unless the task's round has an Owner activation, and never able to
+ * fail a transition: the transition is the governed act, this is only its
+ * observation.
+ */
+function trackTaskTransition(
+  repoRoot: string,
+  task: TaskRecord,
+  kind: 'action_intended' | 'action_completed' | 'failure_observed',
+  summary: string,
+  extra: Readonly<{ status?: GovernanceEventStatus; checkpoint?: boolean }> = {},
+): void {
+  trackGovernanceEvent({
+    repoRoot,
+    round: task.round_id,
+    role: 'engineer',
+    kind,
+    taskId: task.id,
+    summary,
+    payload: { task_id: task.id, status: task.status, executor: task.executor.kind },
+    ...(extra.status === undefined ? {} : { status: extra.status }),
+    ...(extra.checkpoint === true ? { checkpoint: true } : {}),
+  });
 }
 
 function requestedRound(round: string | undefined): string {
@@ -260,6 +289,7 @@ export function startRoundTask(options: {
   const { schemaVersion: _schemaVersion, status: _status, ...request } = task;
   void _schemaVersion;
   void _status;
+  trackTaskTransition(options.repoRoot, task, 'action_intended', `Task ${task.id} started.`);
   return spawnTask({
     repoRoot: options.repoRoot,
     task: request,
@@ -326,7 +356,15 @@ export function finishRoundTask(
   } else if (task.status !== 'merging') {
     fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   }
-  return completeTask(transitionOptions({ ...options, operation: 'finish' }));
+  const completed = completeTask(transitionOptions({ ...options, operation: 'finish' }));
+  trackTaskTransition(
+    options.repoRoot,
+    completed,
+    'action_completed',
+    `Task ${completed.id} completed.`,
+    { status: 'pass', checkpoint: true },
+  );
+  return completed;
 }
 
 export function escalateRoundTask(
@@ -347,7 +385,15 @@ export function escalateRoundTask(
   ) {
     fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   }
-  return escalateTask(transitionOptions({ ...options, operation: 'escalate' }));
+  const escalated = escalateTask(transitionOptions({ ...options, operation: 'escalate' }));
+  trackTaskTransition(
+    options.repoRoot,
+    escalated,
+    'failure_observed',
+    `Task ${escalated.id} escalated after convergence failure.`,
+    { status: 'fail', checkpoint: true },
+  );
+  return escalated;
 }
 
 export function pauseRoundTask(options: {
@@ -360,11 +406,19 @@ export function pauseRoundTask(options: {
   if (task.status !== 'in_progress' && task.status !== 'checkpoint') {
     fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   }
-  return pauseTaskForRgr({
+  const paused = pauseTaskForRgr({
     repoRoot: options.repoRoot,
     taskId: options.taskId,
     rgrId: options.gapId,
   });
+  trackTaskTransition(
+    options.repoRoot,
+    paused,
+    'failure_observed',
+    `Task ${paused.id} paused pending reference gap ${options.gapId}.`,
+    { status: 'review' },
+  );
+  return paused;
 }
 
 export function resumeRoundTask(options: {
@@ -378,6 +432,12 @@ export function resumeRoundTask(options: {
   if (getPausedRgrId(task) !== options.gapId) fail('TASK_GAP_MISMATCH');
   const updated = resumeTaskFromRgr({ repoRoot: options.repoRoot, rgrId: options.gapId });
   if (updated.id !== options.taskId) fail('TASK_ID_MISMATCH');
+  trackTaskTransition(
+    options.repoRoot,
+    updated,
+    'action_intended',
+    `Task ${updated.id} resumed after reference gap ${options.gapId} was resolved.`,
+  );
   return updated;
 }
 

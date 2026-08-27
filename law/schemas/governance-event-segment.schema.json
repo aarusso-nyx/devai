@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/governance-event-segment.schema.json",
+  "title": "Sealed governance event-chain segment",
+  "description": "An immutable, hash-linked checkpoint over a contiguous run of one session's governance events. Segments are written by the executing verb into machine-written proof storage and are never edited; they are the durable evidence a projection is rebuilt from after a crash, an offline round, or a lost remote.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "segment_id",
+    "repository_id",
+    "round_id",
+    "authority_session_id",
+    "sequence_range",
+    "event_ids",
+    "chain",
+    "sealed_at",
+    "segment_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "segment_id": {
+      "type": "string",
+      "pattern": "^GSEG-[0-9a-f]{16}$"
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4,}$"
+    },
+    "authority_session_id": {
+      "type": "string",
+      "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+    },
+    "sequence_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "last"],
+      "description": "Inclusive per-session sequence bounds. Segments of one session are contiguous and non-overlapping.",
+      "properties": {
+        "first": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "event_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^GEV-[0-9a-f]{16}$"
+      },
+      "description": "Every event in the segment, in this session's recorded order."
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "previous_segment_digest_sha256",
+        "first_event_digest_sha256",
+        "last_event_digest_sha256"
+      ],
+      "properties": {
+        "previous_segment_digest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "first_event_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "last_event_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "sealed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seal_reason": {
+      "enum": ["checkpoint", "round_close", "tracking_disabled", "recovery"]
+    },
+    "segment_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest over every field of this segment except segment_digest_sha256 itself."
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "segment_id": "GSEG-a1b2c3d4e5f60718",
+      "repository_id": "devai",
+      "round_id": "R-0042",
+      "authority_session_id": "AUTH-SESSION-0f1e2d3c4b5a69788796",
+      "sequence_range": {
+        "first": 1,
+        "last": 3
+      },
+      "event_ids": ["GEV-3f2a91c40b7d5e68", "GEV-77c1a0e5b3d29f14", "GEV-0b9d4e6a2f8c1357"],
+      "chain": {
+        "previous_segment_digest_sha256": null,
+        "first_event_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "last_event_digest_sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+      },
+      "sealed_at": "2026-08-27T12:05:00.000Z",
+      "seal_reason": "checkpoint",
+      "segment_digest_sha256": "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7"
+    }
+  ]
+}

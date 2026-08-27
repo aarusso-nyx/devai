@@ -407,7 +407,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
-    environment.EXPECTED_ACTION_COUNT !== 44 ||
+    environment.EXPECTED_ACTION_COUNT !== 48 ||
     environment.PACKAGE_VERSION !== undefined ||
     environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION
   ) {

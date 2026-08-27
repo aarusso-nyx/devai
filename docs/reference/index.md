@@ -11,7 +11,7 @@ interpret them.
 
 | Reference                          | Current scope                                            |
 | ---------------------------------- | -------------------------------------------------------- |
-| [CLI](./cli/)                      | 44 actions in nine public domains plus internal plumbing |
+| [CLI](./cli/)                      | 48 actions in nine public domains plus internal plumbing |
 | [Sensors](./sensors-quick-ref.md)  | 59 registered sensor kinds                               |
 | [Recipes](./recipes/README.md)     | 7 host-invoked recipes                                   |
 | [Contracts](./contracts/README.md) | current JSON schemas and result envelopes                |

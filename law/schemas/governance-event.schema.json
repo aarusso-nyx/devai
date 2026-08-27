@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/governance-event.schema.json",
+  "title": "Governance event",
+  "description": "One canonical, locally recorded governed finding or mediated action. Events are append-only and correction-by-supersession only, per Constitution Article 41. Recording is local-first and never depends on any remote projection; a projection acknowledgement can never alter event bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "event_id",
+    "repository_id",
+    "round_id",
+    "authority_session_id",
+    "session_source",
+    "role",
+    "session_sequence",
+    "previous_event_digest_sha256",
+    "kind",
+    "recorded_at",
+    "coverage",
+    "public_safe_summary",
+    "payload_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^GEV-[0-9a-f]{16}$",
+      "description": "Content-derived identity. Computed as canonical SHA-256 over every field of this event except event_id itself, truncated to 16 hex characters."
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4,}$"
+    },
+    "task_id": {
+      "type": ["string", "null"],
+      "pattern": "^TASK-",
+      "description": "Null when the event is not bound to one task (round-level events)."
+    },
+    "authority_session_id": {
+      "type": "string",
+      "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$",
+      "description": "Chain identity. An AUTH-SESSION- value is a real, validated authority session. A DIRECT-CLI- value is a deterministic chain identity for direct invocations that declared a role but no session; it is derived, never minted per invocation, and is always labelled as such by session_source."
+    },
+    "role": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    "session_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Per-authority-session monotonic sequence. Ordering is per session only; DEVAI never fabricates a global order across independent worktrees or disconnected hosts."
+    },
+    "previous_event_digest_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Digest of the preceding event in this session's chain; null for the first event of the session."
+    },
+    "kind": {
+      "enum": [
+        "session_opened",
+        "finding_emitted",
+        "finding_classified",
+        "authorization_recorded",
+        "action_intended",
+        "action_completed",
+        "verification_result",
+        "divergence_detected",
+        "failure_observed",
+        "evidence_superseded",
+        "round_verdict",
+        "tracking_disabled"
+      ]
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": ["pass", "review", "fail", "inconclusive", "not_applicable"],
+      "description": "Outcome when the event kind carries one. Article 39: inconclusive is recorded rather than resolved into false precision."
+    },
+    "commit_binding": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["base_commit", "base_tree"],
+      "description": "Exact base and candidate identity, present only when the event kind is bound to a tree.",
+      "properties": {
+        "base_commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "base_tree": {
+          "$ref": "#/$defs/git_object"
+        },
+        "candidate_commit": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/git_object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_tree": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/git_object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mediated"],
+      "description": "Article 6 host-boundary disclosure. DEVAI reports the boundary rather than implying control it does not possess.",
+      "properties": {
+        "mediated": {
+          "type": "boolean",
+          "description": "True only for registered runtime actions and declared host-adapter events. Arbitrary editor or shell activity outside DEVAI is never covered and is never recorded as mediated."
+        },
+        "adapter_id": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "uncovered_reason": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "public_safe_summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Redacted, disclosure-profile-validated summary. Never contains raw prompts, command output, tokens, environment values, signing material, or sensitive paths."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?:EV|TXE|RGR|REL)-"
+      },
+      "description": "References to existing hash-chained evidence records. References only; payload bytes are never inlined."
+    },
+    "payload_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Digest of the full local payload this event summarizes. Published in place of withheld content so a projection stays verifiable without disclosing it."
+    },
+    "supersedes_event_id": {
+      "type": ["string", "null"],
+      "pattern": "^GEV-[0-9a-f]{16}$",
+      "description": "Set only on evidence_superseded events. Correction is a new appended record; the superseded event is never edited or removed."
+    },
+    "session_source": {
+      "enum": ["session-state", "direct-cli"],
+      "description": "Provenance of the chain identity. Article 39: a direct-CLI chain is reported as what it is rather than presented as an authority session it never was."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "evidence_superseded"
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "supersedes_event_id": {
+            "type": "string"
+          }
+        },
+        "required": ["supersedes_event_id"]
+      },
+      "else": {
+        "properties": {
+          "supersedes_event_id": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "event_id": "GEV-3f2a91c40b7d5e68",
+      "repository_id": "devai",
+      "round_id": "R-0042",
+      "task_id": null,
+      "authority_session_id": "AUTH-SESSION-0f1e2d3c4b5a69788796",
+      "session_source": "session-state",
+      "role": "owner",
+      "session_sequence": 1,
+      "previous_event_digest_sha256": null,
+      "kind": "session_opened",
+      "recorded_at": "2026-08-27T12:00:00.000Z",
+      "coverage": {
+        "mediated": true,
+        "adapter_id": null,
+        "uncovered_reason": null
+      },
+      "public_safe_summary": "Owner authority session opened for round R-0042.",
+      "evidence_refs": [],
+      "payload_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "supersedes_event_id": null
+    }
+  ]
+}

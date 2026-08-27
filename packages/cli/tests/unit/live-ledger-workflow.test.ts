@@ -521,7 +521,7 @@ describe('live ledger-verification workflow', () => {
     expect(parsed.jobs?.['deploy-pages']?.if).toBe(EXPLICIT_PUBLISH_CONDITION);
     expect(parsed.jobs?.['rehearsal-summary']?.if).toBe(REHEARSAL_CONDITION);
     expect(release).toContain('environment: devai-rc-publication');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 44');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 48');
     expect(release).toContain('pnpm run release:closure');
     expect(release).toContain('--binding exact-tree');
     expect(release).toContain('sbom_subject_sha256');
@@ -639,7 +639,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 44', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 48', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {

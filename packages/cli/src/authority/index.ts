@@ -30,6 +30,12 @@ import {
   runWithAuthoritySessionOperation,
 } from './command-capabilities.js';
 import { buildTrustedAuthoritySources } from './policy.js';
+import { trackGovernanceEvent } from '@devai-nyx/loop';
+import {
+  createTrackingReconcileScope,
+  TrackingAuthorityError,
+  verifyReconcileAuthorization,
+} from '../services/github-issues-tracking/reconcile-authority.js';
 import { resolveCliVersion } from '../version.js';
 
 type FailureCategory = 'usage-error' | 'refused' | 'dependency-error';
@@ -63,6 +69,19 @@ interface CliResult {
 
 const ROLES = new Set<HumanRole>(['owner', 'architect', 'inspector', 'engineer', 'auditor']);
 const SESSION_ID = /^AUTH-SESSION-[A-Za-z0-9]{16,}$/u;
+/**
+ * The human role the authority layer resolved for this invocation, from either
+ * `--as-role` or a validated session. Handlers cannot read the declaration
+ * themselves — it is stripped before dispatch — so anything that must attribute
+ * work to a role reads it here rather than re-parsing argv and risking a
+ * different answer than the one authority actually allowed.
+ */
+let resolvedInvocationRole: HumanRole | undefined;
+
+export function declaredInvocationRole(): HumanRole | undefined {
+  return resolvedInvocationRole;
+}
+
 let pendingHostScope: AuthorityHostEffectScope | undefined;
 let pendingHostDispose: (() => void) | undefined;
 let pendingHostDryRun = false;
@@ -564,6 +583,66 @@ function stageHostScope(
   pendingExactCommit = broker.commit_exact;
 }
 
+/**
+ * Whether one invocation's authority decision is recordable as a governance
+ * event. This runs on the hot path for every command, so the cheap structural
+ * guards come first and nothing touches disk until all of them pass.
+ *
+ * Each guard is a deliberate coverage boundary, not an optimisation:
+ *
+ *  - Reads carry no authority decision; the layer reports them as not
+ *    applicable, so there is nothing to record.
+ *  - A dry run decided nothing that took effect.
+ *  - Without `--round` there is no round to attribute the decision to, and a
+ *    round is never inferred.
+ *  - Only decisions that reach outward or carry publication consent are worth
+ *    recording. A local harness write is already bracketed by its
+ *    action_intended / action_completed pair, so recording its authorization
+ *    too would crowd findings and verification results out of the projection
+ *    without adding signal.
+ *  - `round tracking` actions record their own authorization with more
+ *    fidelity; a second, vaguer event would only blur them.
+ *  - Without `fs:f5-state` the action could not write runtime state anyway and
+ *    the boundary would refuse silently. Every action that survives the gate
+ *    above already declares it, so this is a fail-closed backstop rather than a
+ *    coverage limit.
+ */
+export function authorityDecisionRecordable(
+  entry: RegistryEntry,
+  context: Readonly<{ dryRun: boolean; round: string | undefined; role: HumanRole | undefined }>,
+): boolean {
+  if (entry.effects === 'read' || context.dryRun) return false;
+  if (context.round === undefined || context.role === undefined) return false;
+  if (entry.path[0] === 'round' && entry.path[1] === 'tracking') return false;
+  if (entry.effects !== 'remote-write' && entry.authority_contract.consent.allow_publish !== true) {
+    return false;
+  }
+  return entry.authority_contract.capabilities.includes('fs:f5-state');
+}
+
+/**
+ * Record that authority allowed this invocation.
+ *
+ * Only granted decisions are recorded. A refused invocation has, by
+ * definition, no authorized scope to write in, and manufacturing one so the
+ * harness could note the refusal would grant an effect the decision just
+ * denied. That boundary is deliberate, and it is stated in the adopter docs
+ * rather than left for a reader to discover as missing coverage.
+ */
+function recordAuthorityDecision(entry: RegistryEntry, dryRun: boolean): void {
+  const round = flagValue(process.argv, '--round');
+  const role = declaredInvocationRole();
+  if (!authorityDecisionRecordable(entry, { dryRun, round, role })) return;
+  trackGovernanceEvent({
+    repoRoot: targetRoot(entry, process.argv),
+    round: round as string,
+    role: role as HumanRole,
+    kind: 'authorization_recorded',
+    summary: `Authority allowed ${entry.name} for role ${String(role)} with effect ${entry.effects}.`,
+    payload: { action_id: entry.name, effect: entry.effects, role },
+  });
+}
+
 export function attachAuthorityCommandBoundaries(
   commands: readonly Command[],
   entries: readonly RegistryEntry[],
@@ -604,7 +683,13 @@ export function attachAuthorityCommandBoundaries(
       try {
         const result = runWithAuthoritySessionOperation(sessionOperation, () =>
           runWithAuthorityPolicyMaterialization(policyMaterialization, () =>
-            runWithAuthorityHostEffects(scope, () => Reflect.apply(original, this, args)),
+            runWithAuthorityHostEffects(scope, () => {
+              // Inside the authorized scope, so the write is legal, and before
+              // the handler, so the decision is recorded even if the handler
+              // then fails.
+              recordAuthorityDecision(invocationEntry, dryRun);
+              return Reflect.apply(original, this, args);
+            }),
           ),
         );
         if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
@@ -691,6 +776,51 @@ export function authorizeCliArgv(
         authorityErrorCode(error) ??
         (/^(?:HOST_RECEIPT_|POST_MERGE_)[A-Z0-9_]+$/u.test(message) ? message : undefined);
       if (code === undefined) throw error;
+      return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
+    }
+    return undefined;
+  }
+  if (entry.name === 'round tracking sync' && argv.includes('--reconcile')) {
+    const format = formatFor(argv);
+    // Reconciliation replays an authorization the Owner already recorded. A
+    // caller-supplied identity or consent flag would be claiming an authority
+    // no one is present to hold, so all of them are refused outright — the same
+    // rule the post-merge receipt path applies.
+    if (
+      argv.includes('--as-role') ||
+      argv.includes('--authority-session') ||
+      argv.includes('--write') ||
+      argv.includes('--publish') ||
+      argv.includes('--machine-actor')
+    ) {
+      return renderAuthorityResult(
+        taggedFailure('usage-error', 'TRACKING_RECONCILE_CALLER_AUTHORITY_FORBIDDEN'),
+        format,
+      );
+    }
+    const round = flagValue(argv, '--round');
+    if (round === undefined) {
+      return renderAuthorityResult(taggedFailure('usage-error', 'TRACKING_ROUND_REQUIRED'), format);
+    }
+    try {
+      const repoRoot = targetRoot(entry, argv);
+      // The runner's own repository identity is checked against the binding, so
+      // a fork that merely copied the committed activation cannot replay it.
+      const observed = process.env['GITHUB_REPOSITORY'];
+      verifyReconcileAuthorization({
+        repoRoot,
+        round,
+        ...(observed === undefined ? {} : { observedRepository: observed }),
+      });
+      const derived = createTrackingReconcileScope(repoRoot, round);
+      pendingHostScope = derived.scope;
+      pendingHostDispose = derived.dispose;
+      pendingHostDryRun = false;
+    } catch (error) {
+      const code =
+        error instanceof TrackingAuthorityError
+          ? error.code
+          : (authorityErrorCode(error) ?? 'TRACKING_RECONCILE_REFUSED');
       return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
     }
     return undefined;
@@ -837,6 +967,7 @@ export function authorizeCliArgv(
   }
   const role =
     asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
+  resolvedInvocationRole = role as HumanRole | undefined;
   if (!role || !routeRoles(entry, argv).includes(role as HumanRole)) {
     return renderAuthorityResult(
       taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {
