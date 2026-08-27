@@ -7,7 +7,7 @@ if (process.env.DEVAI_DB_TESTS !== '1') {
     'CHECK_RC_DB_TESTS_REQUIRED: set DEVAI_DB_TESTS=1 and provide a reachable test database before running the RC gate',
   );
 }
-import { LOCAL_INCLUDE } from './local.config.js';
+import { LOCAL_INCLUDE, MAX_TEST_WORKERS } from './local.config.js';
 
 interface ThresholdPolicy {
   coverage: {
@@ -50,6 +50,7 @@ export default defineConfig({
       'tests/regression/xref-resolver-performance.regression.test.ts',
     ],
     passWithNoTests: false,
+    maxWorkers: MAX_TEST_WORKERS,
     coverage: {
       provider: 'custom',
       customProviderModule: resolve('tests/config/subprocess-v8-coverage-provider.ts'),
