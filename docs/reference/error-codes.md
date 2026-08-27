@@ -244,6 +244,7 @@ authoritative for that invocation.
 | `GITHUB_EVENT_NAME` | github event name | Stable diagnostic for github event name. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `GITHUB_EVENT_PATH` | github event path | Stable diagnostic for github event path. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `GITHUB_REF` | github ref | Stable diagnostic for github ref. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
+| `GITHUB_REPOSITORY` | github repository | Stable diagnostic for github repository. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `GITHUB_SHA` | github sha | Stable diagnostic for github sha. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `HOOK_INSTALL_GIT_ADMIN_UNAVAILABLE` | hook install git admin unavailable | Stable diagnostic for hook install git admin unavailable. | Follow the structured envelope remediation and retry only after its condition is satisfied. | precondition / 5 |
 | `INIT_BIND_SELECTION_INVALID` | init bind selection invalid | Stable diagnostic for init bind selection invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |

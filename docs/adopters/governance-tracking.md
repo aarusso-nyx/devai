@@ -135,6 +135,39 @@ devai round tracking disable --round R-0042 --pending freeze --as-role owner --w
   `--pending drain` performs remote writes and therefore needs its own `--publish`.
 - Previously published issues and comments are **never deleted**.
 
+## CI reconciliation and derived authority
+
+The generated workflow reconciles the sealed outbox on trusted `main`. It cannot declare a role,
+because no human is present, and declaring `--as-role owner` from a workflow would be exactly the
+silent role elevation Article 7 forbids.
+
+It does not need to. The Owner already made the decision, at activation, and that decision is
+explicitly standing: activation *"authorizes automatic publication only for validated public-safe
+events belonging to that round"*. CI **replays** that recorded authorization; it never grants one.
+
+This follows the pattern `round close --post-merge-receipt` already establishes in DEVAI —
+caller-declared identity forbidden, authority derived from a verified artifact, effect scope
+bounded to what that artifact covers.
+
+Concretely, `round tracking sync --reconcile`:
+
+- **Refuses** `--as-role`, `--authority-session`, `--write`, `--publish`, and `--machine-actor`.
+  Supplying any of them is `TRACKING_RECONCILE_CALLER_AUTHORITY_FORBIDDEN`.
+- Requires a committed, schema-valid activation for that exact round, in state `active`, carrying
+  Owner publication consent. `frozen` and `disabled` are not standing authorizations.
+- Requires the binding to still be byte-identical to canonical policy, and the activation's
+  adapter and workflow digests to still match it. A re-binding is an Architect act, and an older
+  Owner authorization is never carried across one silently.
+- Checks the runner's own `GITHUB_REPOSITORY` against the binding, so a fork that merely copied
+  the committed activation cannot replay it.
+- Executes inside a **derived effect scope narrower than any live Owner session**: it may write
+  this round's `delivery.json` and outbox, and invoke `gh api`. Nothing else. The canonical event
+  log, sealed proofs, the activation record, other rounds, and every other process are refused at
+  the boundary.
+
+No fail-closed property is weakened by this. The interactive path is unchanged — an ordinary
+`round tracking sync` still demands an explicit role declaration plus `--write` and `--publish`.
+
 ## Trust boundaries
 
 GitHub is an output-only, rebuildable projection.
@@ -153,7 +186,8 @@ GitHub is an output-only, rebuildable projection.
 The generated workflow runs only on trusted `main` pushes and explicit dispatch, never through
 `pull_request_target`. It holds `contents: read` and `issues: write` and nothing else, pins every
 action to an immutable commit SHA, uses a per-round concurrency group, and is **not** a required
-readiness context.
+readiness context. Its reconciliation step runs under derived authority as described above, so a
+workflow edit cannot grant itself publication rights the Owner never recorded.
 
 ## Doctor behavior
 

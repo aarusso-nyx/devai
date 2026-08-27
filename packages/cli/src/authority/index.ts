@@ -30,6 +30,11 @@ import {
   runWithAuthoritySessionOperation,
 } from './command-capabilities.js';
 import { buildTrustedAuthoritySources } from './policy.js';
+import {
+  createTrackingReconcileScope,
+  TrackingAuthorityError,
+  verifyReconcileAuthorization,
+} from '../services/github-issues-tracking/reconcile-authority.js';
 import { resolveCliVersion } from '../version.js';
 
 type FailureCategory = 'usage-error' | 'refused' | 'dependency-error';
@@ -691,6 +696,51 @@ export function authorizeCliArgv(
         authorityErrorCode(error) ??
         (/^(?:HOST_RECEIPT_|POST_MERGE_)[A-Z0-9_]+$/u.test(message) ? message : undefined);
       if (code === undefined) throw error;
+      return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
+    }
+    return undefined;
+  }
+  if (entry.name === 'round tracking sync' && argv.includes('--reconcile')) {
+    const format = formatFor(argv);
+    // Reconciliation replays an authorization the Owner already recorded. A
+    // caller-supplied identity or consent flag would be claiming an authority
+    // no one is present to hold, so all of them are refused outright — the same
+    // rule the post-merge receipt path applies.
+    if (
+      argv.includes('--as-role') ||
+      argv.includes('--authority-session') ||
+      argv.includes('--write') ||
+      argv.includes('--publish') ||
+      argv.includes('--machine-actor')
+    ) {
+      return renderAuthorityResult(
+        taggedFailure('usage-error', 'TRACKING_RECONCILE_CALLER_AUTHORITY_FORBIDDEN'),
+        format,
+      );
+    }
+    const round = flagValue(argv, '--round');
+    if (round === undefined) {
+      return renderAuthorityResult(taggedFailure('usage-error', 'TRACKING_ROUND_REQUIRED'), format);
+    }
+    try {
+      const repoRoot = targetRoot(entry, argv);
+      // The runner's own repository identity is checked against the binding, so
+      // a fork that merely copied the committed activation cannot replay it.
+      const observed = process.env['GITHUB_REPOSITORY'];
+      verifyReconcileAuthorization({
+        repoRoot,
+        round,
+        ...(observed === undefined ? {} : { observedRepository: observed }),
+      });
+      const derived = createTrackingReconcileScope(repoRoot, round);
+      pendingHostScope = derived.scope;
+      pendingHostDispose = derived.dispose;
+      pendingHostDryRun = false;
+    } catch (error) {
+      const code =
+        error instanceof TrackingAuthorityError
+          ? error.code
+          : (authorityErrorCode(error) ?? 'TRACKING_RECONCILE_REFUSED');
       return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
     }
     return undefined;

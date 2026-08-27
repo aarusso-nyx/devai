@@ -199,10 +199,19 @@ describe('generated reconciliation workflow', () => {
     expect(source).not.toContain(':-all');
   });
 
-  it('reconciles read-only, so CI never performs an undeclared remote write', () => {
+  it('reconciles without passing any role or consent flag', () => {
     const source = renderTrackingWorkflow(loadTrackingPolicyDefaults());
     expect(source).toContain('--reconcile');
+    // Authority comes from the committed Owner activation. Supplying a role or
+    // consent flag from CI would be claiming an authority nobody holds, and the
+    // authority layer refuses it.
+    expect(source).not.toMatch(/--as-role|--authority-session|--publish/u);
     expect(source).not.toMatch(/^\s*--write/mu);
+  });
+
+  it('passes the runner repository so a fork cannot replay a copied activation', () => {
+    const source = renderTrackingWorkflow(loadTrackingPolicyDefaults());
+    expect(source).toContain('GITHUB_REPOSITORY: ${{ github.repository }}');
   });
 
   it('states that projection is not a required readiness context', () => {

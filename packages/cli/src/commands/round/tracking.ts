@@ -458,7 +458,10 @@ export const roundTrackingSync = defineCommand({
               throw new TrackingCommandError('TRACKING_ROUND_DISABLED', 5);
             }
 
-            if (options.write !== true) {
+            // Reconcile derives its authority from the Owner's recorded
+            // activation, which the authority layer has already verified; an
+            // interactive sync still requires explicit --write.
+            if (options.reconcile !== true && options.write !== true) {
               const pending = buildProjectionBatch({ repoRoot, round, reason: 'reconciliation' });
               emit(
                 statusFor(repoRoot, round),
