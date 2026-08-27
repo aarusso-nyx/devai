@@ -1,12 +1,12 @@
 ---
-title: DEVAI 1.3.0
+title: DEVAI 1.3.1
 slug: /
 ---
 
 # DEVAI
 
 DEVAI is a human-supervised control harness for AI-assisted software development on a declared
-stack. DEVAI 1.3.0 provides one CLI package, 48 actions, 59 sensor kinds, and seven
+stack. DEVAI 1.3.1 provides one CLI package, 48 actions, 59 sensor kinds, and seven
 host-invoked recipes.
 
 - [Start here](start/)
