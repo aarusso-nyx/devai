@@ -10,7 +10,7 @@ const UPSTREAM_TEST_DIGESTS = new Map([
   ['artifact-safety.test.js', '9bfc6ca5111be89b9bcb29466d5337e5093a80b38e172242e880949ab864d7bb'],
   ['export.test.js', '56b197c54e569410c395ea5ca95be4e064631e8f0e572ee44534e8e0fcc98ad3'],
   ['mutation.test.js', '88968fe06bda5b5fbacc41097d273e58a1b8b6bdb213cd8f95e4c602c56e9fc1'],
-  ['policy-builder.test.js', '9dc63e9cbbe4da1411d1b14a0269c8efb536da534797f4d50204a7e773a96cc4'],
+  ['policy-builder.test.js', '502a8657a03650e0aa3b787526b05fc90c8d14c33e0610aeda5e180b0b12acd4'],
   ['publish.test.js', '9d6e6d5de5a1dc365a435fc9fbfb02f530bd708daea15fd3a880ec2d505e6db5'],
   ['verifier.test.js', 'ea5fd7da37bd4a06406913227ed556cfae73cf1b5d41befbbe42f301c63ceb1c'],
 ]);
@@ -37,7 +37,7 @@ describe('package-owned evidence verifier native suite', () => {
   });
 
   it(
-    'executes all 43 vendored node:test cases against the packaged implementation',
+    'executes all 48 vendored node:test cases against the packaged implementation',
     () => {
       const files = readdirSync(VERIFIER_TEST_ROOT)
         .filter((name) => name.endsWith('.test.js'))
@@ -54,8 +54,8 @@ describe('package-owned evidence verifier native suite', () => {
       expect(result.error, output).toBeUndefined();
       expect(result.status, output).toBe(0);
       expect(result.signal, output).toBeNull();
-      expect(output).toMatch(/# tests 43(?:\r?\n|$)/u);
-      expect(output).toMatch(/# pass 43(?:\r?\n|$)/u);
+      expect(output).toMatch(/# tests 48(?:\r?\n|$)/u);
+      expect(output).toMatch(/# pass 48(?:\r?\n|$)/u);
       expect(output).toMatch(/# fail 0(?:\r?\n|$)/u);
     },
     130_000,
