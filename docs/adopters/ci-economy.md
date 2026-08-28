@@ -67,7 +67,10 @@ a human and signer-operational decision.
 
 ## Remote workflow posture
 
-Pull-request workflows cancel superseded runs and use Linux runners. They do not
+Pull-request workflows cancel superseded runs and use Linux runners. A workflow that
+also runs on push to a protected branch conditions the cancellation on the event —
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}` — so superseded
+pull-request runs stop while a branch-gating run on main is never cancelled. They do not
 combine pull-request, push, and scheduled product-validation triggers. Path filters
 are appropriate only for content the gate does not consume; tested documentation and
 policy inputs remain unfiltered. Concurrent suites that use PostgreSQL need isolated

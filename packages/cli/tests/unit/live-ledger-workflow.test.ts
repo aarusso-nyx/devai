@@ -869,3 +869,78 @@ describe('remote preflight workflow', () => {
     expect(result.stderr).toContain(diagnostic);
   });
 });
+
+describe('ci-economy concurrency-cancel rule', () => {
+  function economyFixture(cancelInProgress: string | null): string {
+    const root = mkdtempSync(join(tmpdir(), 'devai-ci-economy-'));
+    roots.push(root);
+    const directory = join(root, '.github/workflows');
+    mkdirSync(directory, { recursive: true });
+    const concurrency =
+      cancelInProgress === null
+        ? ''
+        : `concurrency:\n  group: pr-\${{ github.ref }}\n  cancel-in-progress: ${cancelInProgress}\n`;
+    writeFileSync(
+      join(directory, 'pr.yml'),
+      `name: pr\non:\n  pull_request:\n  push:\n    branches: [main]\n${concurrency}jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n`,
+    );
+    return root;
+  }
+
+  function concurrencyFinding(root: string) {
+    const report = checkCiEconomy({ repoRoot: root });
+    const finding = report.findings.find((f) => f.ruleId === 'ci-economy.concurrency-cancel');
+    expect(finding).toBeDefined();
+    return finding;
+  }
+
+  it.each([
+    { name: 'a literal true', value: 'true' },
+    { name: "a pull_request event expression", value: "${{ github.event_name == 'pull_request' }}" },
+    {
+      name: 'a pull_request_target event expression',
+      value: "${{ github.event_name == 'pull_request_target' }}",
+    },
+    { name: 'a double-quoted event expression', value: '${{ github.event_name == "pull_request" }}' },
+  ])('accepts $name', ({ value }) => {
+    expect(concurrencyFinding(economyFixture(value))).toMatchObject({ severity: 'pass' });
+  });
+
+  it.each([
+    { name: 'cancellation disabled outright', value: 'false' },
+    { name: 'an expression that never cancels a pull request', value: "${{ github.event_name == 'push' }}" },
+    { name: 'no concurrency block at all', value: null },
+  ])('rejects $name', ({ value }) => {
+    expect(concurrencyFinding(economyFixture(value))).toMatchObject({
+      severity: 'fail',
+      locations: ['pr.yml'],
+    });
+  });
+
+  it('leaves workflows without a pull-request trigger alone', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-ci-economy-'));
+    roots.push(root);
+    const directory = join(root, '.github/workflows');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'tag.yml'),
+      "name: tag\non:\n  push:\n    tags: ['v*']\nconcurrency:\n  group: release\n  cancel-in-progress: false\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+    );
+    expect(concurrencyFinding(root)).toMatchObject({ severity: 'pass' });
+  });
+
+  /**
+   * The regression guard this rule never had. Rule 1 failed against this
+   * repository from the day the expression allowlist was introduced, because no
+   * test asserted the rule's own verdict for the checked-in workflow tree.
+   */
+  it('passes against this repository, with only advisory findings left', () => {
+    const report = checkCiEconomy({ repoRoot: ROOT });
+    expect(report.findings.filter((f) => f.severity === 'fail')).toEqual([]);
+    expect(report.fail_count).toBe(0);
+    expect(report.verdict).not.toBe('fail');
+    expect(
+      report.findings.find((f) => f.ruleId === 'ci-economy.concurrency-cancel'),
+    ).toMatchObject({ severity: 'pass' });
+  });
+});
