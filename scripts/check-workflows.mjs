@@ -160,13 +160,14 @@ function checkWorkflow(file, source, findings) {
   if (
     preflight.if !== "${{ github.event_name == 'pull_request' }}" ||
     preflight.environment !== undefined ||
-    JSON.stringify(preflight).includes('secrets.')
+    JSON.stringify(preflight).includes('secrets.') ||
+    JSON.stringify(preflight).includes('vars.')
   ) {
     findings.push(
       finding(
         'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
         file,
-        'pull-request candidate preflight must have no environment or secrets',
+        'pull-request candidate preflight must have no environment, secrets, or variables',
       ),
     );
   }

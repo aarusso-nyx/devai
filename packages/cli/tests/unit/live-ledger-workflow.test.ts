@@ -390,6 +390,15 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
     },
     {
+      name: 'protected variable on untrusted preflight',
+      mutate: (source: string) =>
+        source.replace(
+          '    name: Validate candidate verifier without protected inputs\n',
+          '    name: Validate candidate verifier without protected inputs\n    env:\n      PROTECTED: ${{ vars.PROTECTED }}\n',
+        ),
+      diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
+    },
+    {
       name: 'protected verification pull-request guard removed',
       mutate: (source: string) =>
         source.replace("    if: ${{ github.event_name != 'pull_request' }}\n", ''),
