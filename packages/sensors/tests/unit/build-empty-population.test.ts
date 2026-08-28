@@ -68,9 +68,9 @@ describe('build sensor command selection', () => {
     writeFileSync(join(path, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n");
     const reading = senseBuild({ cwd: path });
     expect(reading).toMatchObject({ status: 'pass' });
-    expect(reading.command).toMatch(/pnpm\.js -r build$/u);
+    expect(reading.command).toMatch(/[/\\]pnpm(?:\.js)? -r build$/u);
     expect(mocks.runCommand).toHaveBeenCalledWith(
-      [expect.stringMatching(/pnpm\.js$/u), '-r', 'build'],
+      [expect.stringMatching(/[/\\]pnpm(?:\.js)?$/u), '-r', 'build'],
       expect.objectContaining({ cwd: realpathSync(path) }),
     );
   });
