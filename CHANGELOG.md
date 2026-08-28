@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.3 — 2026-08-28
+
+- Aligns the package-owned evidence verifier with the check runner by excluding only the exact
+  harness-mutated `.devai/state/`, `record/`, and `scratch/` prefixes from reusable task-policy
+  identity and affected-path classification.
+- Adds one optional, non-attesting pull-request preflight lane for build, lint, typecheck, and the
+  cheap local closure without protected environments, secrets, variables, evidence publication,
+  or execution of the attested RC closure.
+- Repairs CI-economy cancellation validation so the ordinary `pull_request` conditional form is
+  accepted while unsafe or non-cancelling forms continue to fail closed.
+
 ## 1.3.1 — 2026-08-27
 
 - Repairs the installed-tarball release rehearsal sensors to require the governed 48-action

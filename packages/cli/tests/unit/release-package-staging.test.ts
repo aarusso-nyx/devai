@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
-const SELECTED_RELEASE_VERSION = '1.3.1';
+const SELECTED_RELEASE_VERSION = '1.3.3';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.2.12';
 
 afterAll(() => rmSync(output, { recursive: true, force: true }));
@@ -71,7 +71,7 @@ describe('normalized release package staging', () => {
     expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.3.1', () => {
+  it('records a stable release and latest dist-tag for version 1.3.3', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
