@@ -138,6 +138,12 @@ function executablePackageMaterializationFixture(
   const archiveBytes = readFileSync(archive);
   const shasum = createHash('sha1').update(archiveBytes).digest('hex');
   const integrity = `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`;
+  const provenanceDigest = createHash('sha256')
+    .update(readFileSync(join(verifierRoot, 'provenance.json')))
+    .digest('hex');
+  const provenanceSourceCommit = JSON.parse(
+    readFileSync(join(verifierRoot, 'provenance.json'), 'utf8'),
+  ).sourceCommit as string;
   const registry = 'https://registry.fixture.invalid';
   const tarball = `${registry}/package.tgz`;
   const releaseRef = `https://api.github.com/repos/${VERIFIER_POLICY.package.release_source.repository}/git/ref/tags/v${VERIFIER_POLICY.package.version}`;
@@ -195,19 +201,21 @@ else fs.writeFileSync(output, JSON.stringify(response.json));
     .replaceAll(VERIFIER_POLICY.package.tarball, tarball)
     .replaceAll(VERIFIER_POLICY.package.registry, registry)
     .replaceAll(VERIFIER_POLICY.package.shasum_sha1, shasum)
-    .replaceAll(VERIFIER_POLICY.package.integrity_sri, integrity);
+    .replaceAll(VERIFIER_POLICY.package.integrity_sri, integrity)
+    .replaceAll(VERIFIER_POLICY.verifier.provenance_sha256, provenanceDigest)
+    .replaceAll(VERIFIER_SOURCE_COMMIT, provenanceSourceCommit);
   return {
     root,
     runnerTemp,
     githubEnv,
     githubOutput,
     script,
-    provenanceDigest: VERIFIER_POLICY.verifier.provenance_sha256,
+    provenanceDigest,
     env: {
       ...process.env,
       PATH: `${mockBin}:${process.env.PATH ?? ''}`,
       NODE_AUTH_TOKEN: 'fixture-token',
-      VERIFIER_PROVENANCE_SHA256: VERIFIER_POLICY.verifier.provenance_sha256,
+      VERIFIER_PROVENANCE_SHA256: provenanceDigest,
       RUNNER_TEMP: runnerTemp,
       GITHUB_ENV: githubEnv,
       GITHUB_OUTPUT: githubOutput,
@@ -378,6 +386,15 @@ describe('live ledger-verification workflow', () => {
         source.replace(
           '    name: Validate candidate verifier without protected inputs\n',
           `    name: Validate candidate verifier without protected inputs\n    environment: ${LEDGER_ENVIRONMENT}\n`,
+        ),
+      diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
+    },
+    {
+      name: 'protected variable on untrusted preflight',
+      mutate: (source: string) =>
+        source.replace(
+          '    name: Validate candidate verifier without protected inputs\n',
+          '    name: Validate candidate verifier without protected inputs\n    env:\n      PROTECTED: ${{ vars.PROTECTED }}\n',
         ),
       diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
     },

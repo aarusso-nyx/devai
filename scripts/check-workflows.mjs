@@ -8,8 +8,8 @@ import { parseDocument } from 'yaml';
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
-export const VERIFIER_SOURCE_COMMIT = '5f71d43a3d55b07fe866ea2df139dfaacc84f7db';
-export const NEXT_VERIFIER_SOURCE_COMMIT = '9e115014f8da5a16be526c7da5207bc0aae0801b';
+export const VERIFIER_SOURCE_COMMIT = '9e115014f8da5a16be526c7da5207bc0aae0801b';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -160,13 +160,14 @@ function checkWorkflow(file, source, findings) {
   if (
     preflight.if !== "${{ github.event_name == 'pull_request' }}" ||
     preflight.environment !== undefined ||
-    JSON.stringify(preflight).includes('secrets.')
+    JSON.stringify(preflight).includes('secrets.') ||
+    JSON.stringify(preflight).includes('vars.')
   ) {
     findings.push(
       finding(
         'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
         file,
-        'pull-request candidate preflight must have no environment or secrets',
+        'pull-request candidate preflight must have no environment, secrets, or variables',
       ),
     );
   }
