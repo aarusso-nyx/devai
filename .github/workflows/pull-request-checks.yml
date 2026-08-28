@@ -1,0 +1,55 @@
+name: Pull request preflight
+
+# Non-attesting preflight. See docs/dev/operations/remote-preflight-contract.md.
+# This workflow produces no evidence and cannot sign, export, or supplement a
+# candidate receipt. A green run is a contradiction check, not a claim.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: devai-preflight-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Lint, typecheck, and cheap local closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Cheap local closure
+        run: pnpm run test:local

@@ -8,6 +8,10 @@ to required sibling gates alongside coverage. The protected-ledger attestation m
 therefore be re-issued for the exact 1.2.8 candidate policy digest; an attestation
 for an earlier digest cannot authorize the changed closure.
 
+The [remote preflight lane](remote-preflight-contract.md) adds no RC node and changes no
+task-policy digest. An attestation issued before the preflight lane existed remains valid for
+the same closure.
+
 ## Inspect
 
 ```bash

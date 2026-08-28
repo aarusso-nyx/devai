@@ -12,8 +12,10 @@ import { inspectRemoteLocalOnlyNodes } from './ci-local-only.js';
  * `.github/workflows/`. Mechanical rules (hard unless noted):
  *
  *   1. ci-economy.concurrency-cancel — every pull_request-triggered
- *      workflow declares `concurrency` with `cancel-in-progress: true`
- *      (remote workflow posture).
+ *      workflow declares `concurrency` that cancels superseded pull-request
+ *      runs: either `cancel-in-progress: true`, or an expression true exactly
+ *      for pull-request events, which a workflow that also runs on push to a
+ *      protected branch needs (remote workflow posture).
  *   2. ci-economy.no-macos-on-pr — no macOS runner reference in any
  *      pull_request-triggered workflow (macOS bills 10×).
  *   3. ci-economy.no-triple-trigger — no workflow triggered by all three
@@ -173,6 +175,23 @@ export function parseTriggers(text: string): Set<string> {
   return triggers;
 }
 
+/**
+ * `cancel-in-progress` satisfies rule 1 when it is literally `true`, or when it
+ * is an expression true exactly for pull-request events.
+ *
+ * The expression form is not an evasion. A workflow that also runs on
+ * `push: [main]` must not cancel a superseded main run — its result gates the
+ * branch — so conditioning cancellation on the event is the only shape that
+ * satisfies the doctrine on pull requests without breaking main.
+ *
+ * Both pull-request triggers are accepted. Only `pull_request_target` was
+ * before, which rejected the ordinary, less privileged `pull_request` form used
+ * by this repository's own ledger workflow and left rule 1 failing unobserved.
+ * Quote style is free because GitHub accepts either.
+ */
+const CANCEL_IN_PROGRESS_SATISFIED =
+  /cancel-in-progress:\s*(?:true|\$\{\{\s*github\.event_name\s*==\s*(['"])pull_request(?:_target)?\1\s*\}\})/u;
+
 function collectFacts(dir: string, file: string): WorkflowFacts {
   const text = readFileSync(join(dir, file), 'utf8');
   const triggers = parseTriggers(text);
@@ -186,10 +205,7 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
     triggers,
     crons,
     hasConcurrencyKey: /^concurrency:/m.test(text),
-    hasCancelInProgress:
-      /cancel-in-progress:\s*(?:true|\$\{\{\s*github\.event_name\s*==\s*'pull_request_target'\s*\}\})/.test(
-        text,
-      ),
+    hasCancelInProgress: CANCEL_IN_PROGRESS_SATISFIED.test(text),
     hasPathFilters: /^\s+paths(-ignore)?:/m.test(text),
     referencesMacos: /\bmacos-/i.test(text) || /runs-on:.*macos/i.test(text),
     hasPostgresService: /image:\s*['"]?postgres/.test(text),
@@ -242,14 +258,14 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
           ruleId: 'ci-economy.concurrency-cancel',
           severity: 'pass',
           message:
-            'every pull_request-triggered workflow declares concurrency with cancel-in-progress: true',
+            'every pull_request-triggered workflow cancels superseded pull-request runs',
         }
       : {
           ruleId: 'ci-economy.concurrency-cancel',
           severity: 'fail',
-          message: `${String(missingConcurrency.length)} pull_request-triggered workflow(s) lack a concurrency block with cancel-in-progress: true`,
+          message: `${String(missingConcurrency.length)} pull_request-triggered workflow(s) do not cancel superseded pull-request runs`,
           remediation:
-            'Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`; see docs/adopters/ci-economy.md#remote-workflow-posture.',
+            "Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. A workflow that also runs on push to a protected branch may instead set `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` so main runs are never cancelled; see docs/adopters/ci-economy.md#remote-workflow-posture.",
           locations: missingConcurrency.map((f) => f.file),
         },
   );

@@ -44,7 +44,15 @@ E2E, performance, and containment scripts are diagnostic slices, not additional 
 
 ## Remote verification
 
-Remote CI does not rerun product tests. The package-owned `devai-evidence-export` entry point first
+Remote CI does not rerun the attested RC closure. It may execute the cheap local closure —
+lint, typecheck, and the local test suite — as a non-attesting preflight signal on pull
+requests. A preflight run creates no evidence: it neither produces, substitutes for, nor
+supplements a candidate receipt, and a green preflight proves only that those commands exited
+zero on an untrusted runner. Declare what must never run remotely with
+`ci_economy.attested_rc.local_only_nodes`; `check --only ci-economy` fails closed on any
+workflow that reaches a declared local-only node, directly or through an npm-script alias.
+
+The package-owned `devai-evidence-export` entry point first
 validates the clean local receipt and exact results from the protected signing environment, then
 signs the canonical receipt outside the candidate repository. CI checks that export with the
 immutable verifier in the exact installed DEVAI package, an allowlisted,
@@ -59,11 +67,20 @@ a human and signer-operational decision.
 
 ## Remote workflow posture
 
-Pull-request workflows cancel superseded runs and use Linux runners. They do not
+Pull-request workflows cancel superseded runs and use Linux runners. A workflow that
+also runs on push to a protected branch conditions the cancellation on the event —
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}` — so superseded
+pull-request runs stop while a branch-gating run on main is never cancelled. They do not
 combine pull-request, push, and scheduled product-validation triggers. Path filters
 are appropriate only for content the gate does not consume; tested documentation and
 policy inputs remain unfiltered. Concurrent suites that use PostgreSQL need isolated
 ephemeral databases or serialized database-heavy work rather than inflated timeouts.
+
+A preflight lane, where a repository runs one, is untrusted and non-attesting by
+construction: pull-request trigger only, `contents: read`, no job environment, no secret
+reference, pinned actions, no artifact upload, and no path from its result into the evidence
+chain. It is a contradiction check that runs before a signer spends time on a candidate, not
+a second source of truth.
 
 The `ci_economy` project configuration selects the full or staged enforcement profile.
 Its optional `local_evidence` declaration is fail-closed: a missing declaration never

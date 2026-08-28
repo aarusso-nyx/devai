@@ -7,6 +7,9 @@ import { parseDocument } from 'yaml';
 
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
+// Optional non-attesting preflight lane. Contract:
+// docs/dev/operations/remote-preflight-contract.md
+export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
 export const VERIFIER_SOURCE_COMMIT = '9e115014f8da5a16be526c7da5207bc0aae0801b';
 export const NEXT_VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
@@ -48,6 +51,26 @@ const PRODUCT_EXECUTION = [
   /\b(?:make|gradle|mvn)\s+(?:build|test|check)\b/iu,
 ];
 
+// Scripts whose results are bound into a candidate receipt. A preflight lane
+// must never reach them: re-running the attested closure remotely costs money
+// and proves nothing the receipt does not already claim.
+const PREFLIGHT_FORBIDDEN_SCRIPTS = [
+  'test:coverage:rc',
+  'test:db:rc',
+  'test:e2e:rc',
+  'test:performance:rc',
+  'test:containment:rc',
+  'release:closure',
+  'authority:materialize',
+];
+// The cheap local closure, plus the install and build it needs.
+const PREFLIGHT_ALLOWED_SCRIPTS = ['build', 'lint', 'typecheck', 'test:local'];
+// Tokens that would make a preflight run look like an evidence path. Checked
+// against executed content only (run bodies, step names, uses) — never against
+// comments, which are documentation and carry no authority.
+const PREFLIGHT_EVIDENCE_TOKENS =
+  /\b(?:evidence|receipt|attest(?:ation)?|verifier|provenance|ledger|sign(?:ing|ed)?)\b/iu;
+
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
@@ -67,13 +90,16 @@ function finding(code, file, detail) {
 export function checkWorkflowTree(root = process.cwd()) {
   const findings = [];
   const files = workflowFiles(root);
-  const expected = [LEDGER_WORKFLOW_FILE, RELEASE_WORKFLOW_FILE].sort();
-  if (JSON.stringify(files) !== JSON.stringify(expected)) {
+  const required = [LEDGER_WORKFLOW_FILE, RELEASE_WORKFLOW_FILE].sort();
+  const permitted = [...required, PREFLIGHT_WORKFLOW_FILE].sort();
+  const missing = required.filter((name) => !files.includes(name));
+  const unexpected = files.filter((name) => !permitted.includes(name));
+  if (missing.length > 0 || unexpected.length > 0) {
     findings.push(
       finding(
         'CI_WORKFLOW_SET_INVALID',
         '.github/workflows',
-        `expected exactly ${expected.join(', ')}; found ${files.join(', ') || 'none'}`,
+        `required ${required.join(', ')}; optional ${PREFLIGHT_WORKFLOW_FILE}; found ${files.join(', ') || 'none'}`,
       ),
     );
   }
@@ -103,6 +129,10 @@ function checkWorkflow(file, source, findings) {
 
   if (file === RELEASE_WORKFLOW_FILE) {
     checkReleaseWorkflow(file, workflow, source, findings);
+    return;
+  }
+  if (file === PREFLIGHT_WORKFLOW_FILE) {
+    checkPreflightWorkflow(file, workflow, source, findings);
     return;
   }
   if (file !== LEDGER_WORKFLOW_FILE) {
@@ -365,6 +395,157 @@ function checkWorkflow(file, source, findings) {
     ]) {
       if (!policyBuilderRun.includes(binding)) {
         findings.push(finding('CI_EXPECTED_POLICY_BINDING_MISSING', file, binding));
+      }
+    }
+  }
+}
+
+/**
+ * Non-attesting preflight contract. Two properties are enforced mechanically:
+ * the lane is untrusted (no protected inputs it could leak), and it is
+ * non-attesting (no path by which its result becomes evidence).
+ * See docs/dev/operations/remote-preflight-contract.md.
+ */
+function checkPreflightWorkflow(file, workflow, source, findings) {
+  const triggerNames = Object.keys(object(workflow.on)).sort();
+  if (triggerNames.length !== 1 || triggerNames[0] !== 'pull_request') {
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_TRIGGER_INVALID',
+        file,
+        'preflight must trigger on pull_request only; push, schedule, and workflow_dispatch would reach a protected ref',
+      ),
+    );
+  }
+
+  const permissions = object(workflow.permissions);
+  if (Object.keys(permissions).length !== 1 || permissions.contents !== 'read') {
+    findings.push(
+      finding('CI_WORKFLOW_PERMISSIONS_INVALID', file, 'only contents: read is permitted'),
+    );
+  }
+
+  const concurrency = object(workflow.concurrency);
+  if (concurrency['cancel-in-progress'] !== true) {
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_CONCURRENCY_INVALID',
+        file,
+        'preflight must declare concurrency with cancel-in-progress: true',
+      ),
+    );
+  }
+
+  if (/\bsecrets\./u.test(source)) {
+    findings.push(
+      finding('CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN', file, 'preflight must reference no secret'),
+    );
+  }
+
+  const jobs = object(workflow.jobs);
+  if (Object.keys(jobs).length === 0) {
+    findings.push(finding('CI_PREFLIGHT_JOBS_MISSING', file, 'preflight has no jobs'));
+    return;
+  }
+
+  for (const [name, rawJob] of Object.entries(jobs)) {
+    const job = object(rawJob);
+    if (job.environment !== undefined) {
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_ENVIRONMENT_FORBIDDEN',
+          file,
+          `jobs.${name} declares an environment; preflight must not reach protected inputs`,
+        ),
+      );
+    }
+    if (typeof job['runs-on'] !== 'string' || !job['runs-on'].startsWith('ubuntu-')) {
+      findings.push(
+        finding('CI_PREFLIGHT_RUNNER_INVALID', file, `jobs.${name} must run on a Linux runner`),
+      );
+    }
+    if (typeof job['timeout-minutes'] !== 'number') {
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_TIMEOUT_MISSING',
+          file,
+          `jobs.${name} must declare timeout-minutes`,
+        ),
+      );
+    }
+
+    const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+    for (const [index, step] of steps.entries()) {
+      const location = `jobs.${name}.steps[${String(index)}]`;
+      const uses = typeof step.uses === 'string' ? step.uses : '';
+      if (uses.startsWith('./')) {
+        findings.push(
+          finding('CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN', file, `${location} uses ${uses}`),
+        );
+      } else if (uses !== '' && !/@[0-9a-f]{40}$/u.test(uses)) {
+        findings.push(finding('CI_ACTION_REFERENCE_MUTABLE', file, `${location} uses ${uses}`));
+      }
+      if (
+        (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${CHECKOUT_COMMIT}`) ||
+        (uses.startsWith('actions/setup-node@') &&
+          uses !== `actions/setup-node@${SETUP_NODE_COMMIT}`) ||
+        (uses.startsWith('pnpm/action-setup@') &&
+          uses !== `pnpm/action-setup@${PNPM_SETUP_TAG_OBJECT}` &&
+          uses !== `pnpm/action-setup@${PNPM_SETUP_PEELED_COMMIT}`)
+      ) {
+        findings.push(finding('CI_ACTION_PIN_MISMATCH', file, `${location} uses ${uses}`));
+      }
+      if (uses.startsWith('actions/upload-artifact@')) {
+        findings.push(
+          finding(
+            'CI_PREFLIGHT_ARTIFACT_FORBIDDEN',
+            file,
+            `${location} uploads an artifact; a preflight run leaves nothing behind`,
+          ),
+        );
+      }
+      if (
+        uses.startsWith('actions/checkout@') &&
+        object(step.with)['persist-credentials'] !== false
+      ) {
+        findings.push(
+          finding('CI_PREFLIGHT_CREDENTIALS_PERSISTED', file, `${location} persists credentials`),
+        );
+      }
+
+      const run = typeof step.run === 'string' ? step.run : '';
+      if (run === '') continue;
+      const executed = `${typeof step.name === 'string' ? step.name : ''}\n${run}`;
+      for (const script of PREFLIGHT_FORBIDDEN_SCRIPTS) {
+        if (run.includes(script)) {
+          findings.push(
+            finding(
+              'CI_PREFLIGHT_ATTESTED_CLOSURE_FORBIDDEN',
+              file,
+              `${location} reaches attested RC script ${script}`,
+            ),
+          );
+        }
+      }
+      if (PREFLIGHT_EVIDENCE_TOKENS.test(executed)) {
+        findings.push(
+          finding(
+            'CI_PREFLIGHT_NON_ATTESTING_VIOLATION',
+            file,
+            `${location} executes evidence-path content; preflight must not produce or supplement a receipt`,
+          ),
+        );
+      }
+      for (const invocation of run.matchAll(/\bpnpm\s+(?:run\s+)?([A-Za-z0-9:_-]+)/gu)) {
+        const script = invocation[1];
+        if (script === 'install' || PREFLIGHT_ALLOWED_SCRIPTS.includes(script)) continue;
+        findings.push(
+          finding(
+            'CI_PREFLIGHT_SCRIPT_NOT_ALLOWED',
+            file,
+            `${location} runs pnpm ${script}; permitted: install, ${PREFLIGHT_ALLOWED_SCRIPTS.join(', ')}`,
+          ),
+        );
       }
     }
   }

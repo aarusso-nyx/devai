@@ -32,6 +32,11 @@ const CHECKED_IN_LEDGER = readFileSync(
   join(ROOT, '.github/workflows/devai-ledger-verify.yml'),
   'utf8',
 );
+const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
+const CHECKED_IN_PREFLIGHT = readFileSync(
+  join(ROOT, '.github/workflows', PREFLIGHT_WORKFLOW_FILE),
+  'utf8',
+);
 const VERIFIER_POLICY = JSON.parse(
   readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
 ) as {
@@ -56,17 +61,27 @@ const PERMISSIVE_PUSH_PUBLICATION_CONDITION =
 const DISPATCH_ONLY_REHEARSAL_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
 
+/**
+ * Both RC workflows are mandatory in every fixture; the preflight lane is
+ * optional and is written only when a case asks for it. Copying the checked-in
+ * bytes for whichever file the case is not mutating keeps a fixture from
+ * failing CI_WORKFLOW_SET_INVALID for an unrelated reason.
+ */
+const REQUIRED_WORKFLOWS = ['devai-ledger-verify.yml', 'release.yml'] as const;
+
 function fixture(source = CHECKED_IN_LEDGER, file = 'devai-ledger-verify.yml') {
   const root = mkdtempSync(join(tmpdir(), 'devai-ledger-workflow-'));
   roots.push(root);
   const directory = join(root, '.github/workflows');
   mkdirSync(directory, { recursive: true });
+  for (const required of REQUIRED_WORKFLOWS) {
+    if (required === file) continue;
+    writeFileSync(
+      join(directory, required),
+      readFileSync(join(ROOT, '.github/workflows', required), 'utf8'),
+    );
+  }
   writeFileSync(join(directory, file), source);
-  const companion = file === 'release.yml' ? 'devai-ledger-verify.yml' : 'release.yml';
-  writeFileSync(
-    join(directory, companion),
-    readFileSync(join(ROOT, '.github/workflows', companion), 'utf8'),
-  );
   return root;
 }
 
@@ -728,12 +743,221 @@ describe('live ledger-verification workflow', () => {
     expect(source).not.toContain('tests/config/t1-t3.coverage.config.ts');
 
     const economy = checkCiEconomy({ repoRoot: ROOT });
-    expect(economy.workflows_scanned).toBe(2);
+    expect(economy.workflows_scanned).toBe(3);
     expect(
       economy.findings.find((finding) => finding.ruleId === 'ci-economy.evidence-gate-wired'),
     ).toMatchObject({ severity: 'pass' });
     expect(
       economy.findings.some((finding) => finding.ruleId === 'ci-economy.scheduled-audit'),
     ).toBe(false);
+  });
+});
+
+describe('remote preflight workflow', () => {
+  it('accepts the checked-in three-workflow set', () => {
+    const result = check(fixture(CHECKED_IN_PREFLIGHT, PREFLIGHT_WORKFLOW_FILE));
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('workflow contract: PASS\n');
+  });
+
+  it('keeps the preflight lane optional', () => {
+    const result = check(fixture());
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('workflow contract: PASS\n');
+  });
+
+  it('still rejects any other additional workflow file', () => {
+    const root = fixture(CHECKED_IN_PREFLIGHT, PREFLIGHT_WORKFLOW_FILE);
+    writeFileSync(join(root, '.github/workflows/nightly.yml'), 'name: nightly\non: schedule\n');
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('CI_WORKFLOW_SET_INVALID');
+    expect(result.stderr).toContain('CI_WORKFLOW_UNRECOGNIZED');
+  });
+
+  it('binds the lane to the cheap local closure and to no protected input', () => {
+    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run lint');
+    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run typecheck');
+    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run test:local');
+    expect(CHECKED_IN_PREFLIGHT).toContain(`actions/checkout@${CHECKOUT_COMMIT}`);
+    expect(CHECKED_IN_PREFLIGHT).toContain(`actions/setup-node@${SETUP_NODE_COMMIT}`);
+    expect(CHECKED_IN_PREFLIGHT).toContain('persist-credentials: false');
+    expect(CHECKED_IN_PREFLIGHT).not.toMatch(/:rc\b/u);
+    expect(CHECKED_IN_PREFLIGHT).not.toContain('secrets.');
+    expect(CHECKED_IN_PREFLIGHT).not.toContain('environment:');
+    expect(CHECKED_IN_PREFLIGHT).not.toContain(LEDGER_ENVIRONMENT);
+    expect(CHECKED_IN_PREFLIGHT).not.toContain('upload-artifact');
+
+    const workflow = parse(CHECKED_IN_PREFLIGHT) as {
+      on?: Record<string, unknown>;
+      permissions?: Record<string, unknown>;
+      concurrency?: Record<string, unknown>;
+    };
+    expect(Object.keys(workflow.on ?? {})).toEqual(['pull_request']);
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.concurrency?.['cancel-in-progress']).toBe(true);
+  });
+
+  it('records the amended invariant beside the workflow it permits', () => {
+    const contract = readFileSync(
+      join(ROOT, 'docs/dev/operations/remote-preflight-contract.md'),
+      'utf8',
+    );
+    const economy = readFileSync(join(ROOT, 'docs/adopters/ci-economy.md'), 'utf8');
+    expect(contract).toContain('Remote CI does not execute the attested RC closure');
+    expect(contract).toContain(PREFLIGHT_WORKFLOW_FILE);
+    expect(economy).toContain('Remote CI does not rerun the attested RC closure');
+    expect(economy).not.toContain('Remote CI does not rerun product tests.');
+  });
+
+  it.each([
+    {
+      name: 'a trigger that reaches a protected ref',
+      mutate: (source: string) => source.replace('on:\n  pull_request:', 'on:\n  push:\n  pull_request:'),
+      diagnostic: 'CI_PREFLIGHT_TRIGGER_INVALID',
+    },
+    {
+      name: 'a declared job environment',
+      mutate: (source: string) =>
+        source.replace('    timeout-minutes: 20', `    timeout-minutes: 20\n    environment: ${LEDGER_ENVIRONMENT}`),
+      diagnostic: 'CI_PREFLIGHT_ENVIRONMENT_FORBIDDEN',
+    },
+    {
+      name: 'any secret reference',
+      mutate: (source: string) =>
+        source.replace(
+          '          node-version: 24',
+          '          node-version: 24\n          token: ${{ secrets.PACKAGES_READ_TOKEN }}',
+        ),
+      diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
+    },
+    {
+      name: 'remote execution of the attested RC closure',
+      mutate: (source: string) =>
+        source.replace('run: pnpm run test:local', 'run: pnpm run test:coverage:rc'),
+      diagnostic: 'CI_PREFLIGHT_ATTESTED_CLOSURE_FORBIDDEN',
+    },
+    {
+      name: 'a script outside the cheap local closure',
+      mutate: (source: string) =>
+        source.replace('run: pnpm run lint', 'run: pnpm publish --no-git-checks'),
+      diagnostic: 'CI_PREFLIGHT_SCRIPT_NOT_ALLOWED',
+    },
+    {
+      name: 'an artifact upload',
+      mutate: (source: string) =>
+        source.replace(
+          '      - name: Build',
+          '      - name: Save\n        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\n\n      - name: Build',
+        ),
+      diagnostic: 'CI_PREFLIGHT_ARTIFACT_FORBIDDEN',
+    },
+    {
+      name: 'a mutable action reference',
+      mutate: (source: string) =>
+        source.replace(`actions/setup-node@${SETUP_NODE_COMMIT}`, 'actions/setup-node@v7'),
+      diagnostic: 'CI_ACTION_REFERENCE_MUTABLE',
+    },
+    {
+      name: 'persisted checkout credentials',
+      mutate: (source: string) => source.replace('          persist-credentials: false\n', ''),
+      diagnostic: 'CI_PREFLIGHT_CREDENTIALS_PERSISTED',
+    },
+    {
+      name: 'superseded runs left uncancelled',
+      mutate: (source: string) =>
+        source.replace('  cancel-in-progress: true', '  cancel-in-progress: false'),
+      diagnostic: 'CI_PREFLIGHT_CONCURRENCY_INVALID',
+    },
+    {
+      name: 'a step on the evidence path',
+      mutate: (source: string) =>
+        source.replace('run: pnpm run typecheck', 'run: node ./export-receipt.mjs --attest'),
+      diagnostic: 'CI_PREFLIGHT_NON_ATTESTING_VIOLATION',
+    },
+    {
+      name: 'a billed macOS runner',
+      mutate: (source: string) => source.replace('runs-on: ubuntu-latest', 'runs-on: macos-14'),
+      diagnostic: 'CI_PREFLIGHT_RUNNER_INVALID',
+    },
+  ])('rejects $name', ({ mutate, diagnostic }) => {
+    const result = check(fixture(mutate(CHECKED_IN_PREFLIGHT), PREFLIGHT_WORKFLOW_FILE));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(diagnostic);
+  });
+});
+
+describe('ci-economy concurrency-cancel rule', () => {
+  function economyFixture(cancelInProgress: string | null): string {
+    const root = mkdtempSync(join(tmpdir(), 'devai-ci-economy-'));
+    roots.push(root);
+    const directory = join(root, '.github/workflows');
+    mkdirSync(directory, { recursive: true });
+    const concurrency =
+      cancelInProgress === null
+        ? ''
+        : `concurrency:\n  group: pr-\${{ github.ref }}\n  cancel-in-progress: ${cancelInProgress}\n`;
+    writeFileSync(
+      join(directory, 'pr.yml'),
+      `name: pr\non:\n  pull_request:\n  push:\n    branches: [main]\n${concurrency}jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n`,
+    );
+    return root;
+  }
+
+  function concurrencyFinding(root: string) {
+    const report = checkCiEconomy({ repoRoot: root });
+    const finding = report.findings.find((f) => f.ruleId === 'ci-economy.concurrency-cancel');
+    expect(finding).toBeDefined();
+    return finding;
+  }
+
+  it.each([
+    { name: 'a literal true', value: 'true' },
+    { name: "a pull_request event expression", value: "${{ github.event_name == 'pull_request' }}" },
+    {
+      name: 'a pull_request_target event expression',
+      value: "${{ github.event_name == 'pull_request_target' }}",
+    },
+    { name: 'a double-quoted event expression', value: '${{ github.event_name == "pull_request" }}' },
+  ])('accepts $name', ({ value }) => {
+    expect(concurrencyFinding(economyFixture(value))).toMatchObject({ severity: 'pass' });
+  });
+
+  it.each([
+    { name: 'cancellation disabled outright', value: 'false' },
+    { name: 'an expression that never cancels a pull request', value: "${{ github.event_name == 'push' }}" },
+    { name: 'no concurrency block at all', value: null },
+  ])('rejects $name', ({ value }) => {
+    expect(concurrencyFinding(economyFixture(value))).toMatchObject({
+      severity: 'fail',
+      locations: ['pr.yml'],
+    });
+  });
+
+  it('leaves workflows without a pull-request trigger alone', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-ci-economy-'));
+    roots.push(root);
+    const directory = join(root, '.github/workflows');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'tag.yml'),
+      "name: tag\non:\n  push:\n    tags: ['v*']\nconcurrency:\n  group: release\n  cancel-in-progress: false\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+    );
+    expect(concurrencyFinding(root)).toMatchObject({ severity: 'pass' });
+  });
+
+  /**
+   * The regression guard this rule never had. Rule 1 failed against this
+   * repository from the day the expression allowlist was introduced, because no
+   * test asserted the rule's own verdict for the checked-in workflow tree.
+   */
+  it('passes against this repository, with only advisory findings left', () => {
+    const report = checkCiEconomy({ repoRoot: ROOT });
+    expect(report.findings.filter((f) => f.severity === 'fail')).toEqual([]);
+    expect(report.fail_count).toBe(0);
+    expect(report.verdict).not.toBe('fail');
+    expect(
+      report.findings.find((f) => f.ruleId === 'ci-economy.concurrency-cancel'),
+    ).toMatchObject({ severity: 'pass' });
   });
 });
