@@ -9,6 +9,7 @@ export const ADOPTER_POLICY_TARGETS = [
   '.devai/config/thresholds.json',
   '.devai/config/scorecard-na.json',
   '.devai/config/glob-guards.json',
+  '.devai/config/release-verification.json',
 ] as const;
 
 export function isJsonObject(value: unknown): value is JsonObject {
@@ -67,6 +68,7 @@ export function resolveAdopterPolicyMaterialization(input: {
   ) as JsonObject;
   const scorecardNa = document['scorecard_na'] ?? defaults('scorecard-na.json');
   const globGuards = document['glob_guards'] ?? defaults('glob-guards.json');
+  const releaseVerification = document['release_verification'];
   validateCanonicalPolicyContent('domains.json', jsonBytes(domains));
   validateCanonicalPolicyContent('thresholds.json', jsonBytes(thresholds));
   validateCanonicalPolicyContent('scorecard-na.json', jsonBytes(scorecardNa));
@@ -86,11 +88,15 @@ export function resolveAdopterPolicyMaterialization(input: {
     throw new Error(`ADOPTER_POLICY_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
   }
 
-  return new Map([
+  const resolved = new Map<(typeof ADOPTER_POLICY_TARGETS)[number], string>([
     ['.devai/config/project.json', jsonBytes(project)],
     ['.devai/config/domains.json', jsonBytes(domains)],
     ['.devai/config/thresholds.json', jsonBytes(thresholds)],
     ['.devai/config/scorecard-na.json', jsonBytes(scorecardNa)],
     ['.devai/config/glob-guards.json', jsonBytes(globGuards)],
   ]);
+  if (releaseVerification !== undefined) {
+    resolved.set('.devai/config/release-verification.json', jsonBytes(releaseVerification));
+  }
+  return resolved;
 }

@@ -44,11 +44,12 @@ E2E, performance, and containment scripts are diagnostic slices, not additional 
 
 ## Remote verification
 
-Remote CI does not rerun the attested RC closure. It may execute the cheap local closure —
-lint, typecheck, and the local test suite — as a non-attesting preflight signal on pull
-requests. A preflight run creates no evidence: it neither produces, substitutes for, nor
-supplements a candidate receipt, and a green preflight proves only that those commands exited
-zero on an untrusted runner. Declare what must never run remotely with
+Remote CI does not rerun the attested RC closure. It may execute the unconditional
+release floor and a profile-selected DAG as a non-attesting preflight signal on
+pull requests. A transient preflight receipt coordinates that run but is not a
+candidate receipt, attestation, or publication authority; it is not uploaded and
+cannot supplement the protected ledger. A green preflight proves only that those
+commands exited zero on an untrusted runner. Declare what must never run remotely with
 `ci_economy.attested_rc.local_only_nodes`; `check --only ci-economy` fails closed on any
 workflow that reaches a declared local-only node, directly or through an npm-script alias.
 

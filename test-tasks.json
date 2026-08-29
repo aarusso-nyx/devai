@@ -538,6 +538,66 @@
       }
     },
     {
+      "nodeId": "format",
+      "dependencies": [],
+      "argv": ["pnpm", "run", "format:check"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [{ "kind": "glob", "pattern": "**" }],
+      "toolchainKeys": ["node", "pnpm"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "release:static-integrity",
+      "dependencies": ["generate"],
+      "argv": ["pnpm", "run", "release:static-integrity"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/" },
+        { "kind": "prefix", "pattern": "law/policy/" },
+        { "kind": "prefix", "pattern": "law/schemas/" },
+        { "kind": "prefix", "pattern": "scripts/" },
+        { "kind": "exact", "pattern": "package.json" },
+        { "kind": "exact", "pattern": "pnpm-lock.yaml" }
+      ],
+      "toolchainKeys": ["node", "pnpm"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "release:closure",
+      "dependencies": ["build"],
+      "argv": ["pnpm", "run", "release:closure"],
+      "cwd": ".",
+      "runner": "pnpm-script-v1",
+      "inputSelectors": [
+        { "kind": "prefix", "pattern": "packages/" },
+        { "kind": "prefix", "pattern": "docs/" },
+        { "kind": "prefix", "pattern": ".github/workflows/" },
+        { "kind": "prefix", "pattern": "law/" },
+        { "kind": "prefix", "pattern": "scripts/" },
+        { "kind": "exact", "pattern": "package.json" },
+        { "kind": "exact", "pattern": "pnpm-lock.yaml" },
+        { "kind": "exact", "pattern": "test-tasks.json" }
+      ],
+      "toolchainKeys": ["node", "pnpm"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "release:affected-anchor",
+      "dependencies": ["generate"],
+      "argv": ["node", "-e", "process.stdout.write('affected release selection complete\\n')"],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [{ "kind": "exact", "pattern": "test-tasks.json" }],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "marker", "value": "affected release selection complete" }
+    },
+    {
       "nodeId": "test:local-full",
       "dependencies": [
         "test:authority",
@@ -551,6 +611,7 @@
         "test:spec",
         "test:utils",
         "test:root",
+        "format",
         "lint",
         "typecheck"
       ],
@@ -754,6 +815,7 @@
         "test:root",
         "test:local-full",
         "build",
+        "format",
         "lint",
         "typecheck"
       ]

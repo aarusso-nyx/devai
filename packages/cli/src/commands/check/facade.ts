@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { CAC } from 'cac';
 import { EXIT_FAIL, EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
@@ -20,6 +21,10 @@ interface CheckCliOptions extends Omit<CheckExecutionOptions, 'repoRoot'> {
   readonly affected?: boolean;
   readonly local?: boolean;
   readonly rc?: boolean;
+  readonly releaseIntent?: string;
+  readonly releaseProfile?: string;
+  readonly releaseStage?: string;
+  readonly preflightReceipt?: string;
   readonly taskPlan?: boolean;
   readonly run?: boolean;
   readonly status?: boolean;
@@ -42,7 +47,12 @@ function exactlyOne<T extends string>(
 function runnerSelection(
   options: CheckCliOptions,
 ): Readonly<{ target: TaskTarget; operation: TaskOperation }> | undefined {
-  const targetFlags = [options.affected, options.local, options.rc];
+  const targetFlags = [
+    options.affected,
+    options.local,
+    options.rc,
+    options.releaseIntent !== undefined,
+  ];
   const operationFlags = [options.taskPlan, options.run, options.status, options.explain];
   if (![...targetFlags, ...operationFlags].some((value) => value === true)) return undefined;
   return {
@@ -51,8 +61,9 @@ function runnerSelection(
         { name: 'affected', selected: options.affected },
         { name: 'local', selected: options.local },
         { name: 'rc', selected: options.rc },
+        { name: 'release', selected: options.releaseIntent !== undefined },
       ],
-      'task target: --affected, --local, or --rc',
+      'task target: --affected, --local, --rc, or --release-intent',
     ),
     operation: exactlyOne<TaskOperation>(
       [
@@ -128,6 +139,16 @@ export const checkCmd = defineCommand({
       .option('--affected', 'Select tasks affected since the exact --base commit')
       .option('--local', 'Select the complete cheap local task closure')
       .option('--rc', 'Select the fixed release-candidate task closure')
+      .option(
+        '--release-intent <path>',
+        'Select a capability-driven release DAG from a candidate-bound intent',
+      )
+      .option(
+        '--release-profile <path>',
+        'Release verification profile (default: .devai/config/release-verification.json)',
+      )
+      .option('--release-stage <stage>', 'Release stage: preflight | certify (default: preflight)')
+      .option('--preflight-receipt <path>', 'Exact preflight receipt required for certification')
       .option('--task-plan', 'Task operation (choose one): plan without executing')
       .option('--run', 'Task operation (choose one): execute or reuse selected tasks')
       .option('--status', 'Task operation (choose one): show freshness status')
@@ -145,10 +166,37 @@ export const checkCmd = defineCommand({
             }
             const timeout =
               options.taskTimeoutMs === undefined ? undefined : Number(options.taskTimeoutMs);
+            if (
+              options.releaseStage !== undefined &&
+              options.releaseStage !== 'preflight' &&
+              options.releaseStage !== 'certify'
+            ) {
+              throw new Error('CHECK_RELEASE_STAGE: expected preflight or certify');
+            }
             const report = runCheckTasks({
               repoRoot,
               ...taskSelection,
               ...(options.base !== undefined && { baseCommit: options.base }),
+              ...(options.releaseIntent !== undefined && {
+                releaseIntent: JSON.parse(
+                  readFileSync(resolve(repoRoot, options.releaseIntent), 'utf8'),
+                ) as unknown,
+                releaseProfile: JSON.parse(
+                  readFileSync(
+                    resolve(
+                      repoRoot,
+                      options.releaseProfile ?? '.devai/config/release-verification.json',
+                    ),
+                    'utf8',
+                  ),
+                ) as unknown,
+                releaseStage: options.releaseStage === 'certify' ? 'certify' : 'preflight',
+                ...(options.preflightReceipt !== undefined && {
+                  preflightReceipt: JSON.parse(
+                    readFileSync(resolve(repoRoot, options.preflightReceipt), 'utf8'),
+                  ) as unknown,
+                }),
+              }),
               ...(timeout !== undefined && { timeoutMs: timeout }),
             });
             process.stdout.write(

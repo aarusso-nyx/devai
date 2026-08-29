@@ -64,7 +64,14 @@ const PREFLIGHT_FORBIDDEN_SCRIPTS = [
   'authority:materialize',
 ];
 // The cheap local closure, plus the install and build it needs.
-const PREFLIGHT_ALLOWED_SCRIPTS = ['build', 'lint', 'typecheck', 'test:local'];
+const PREFLIGHT_ALLOWED_SCRIPTS = [
+  'build',
+  'format:check',
+  'lint',
+  'typecheck',
+  'release:static-integrity',
+  'release:pr-gate',
+];
 // Tokens that would make a preflight run look like an evidence path. Checked
 // against executed content only (run bodies, step names, uses) — never against
 // comments, which are documentation and carry no authority.
@@ -466,11 +473,7 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
     }
     if (typeof job['timeout-minutes'] !== 'number') {
       findings.push(
-        finding(
-          'CI_PREFLIGHT_TIMEOUT_MISSING',
-          file,
-          `jobs.${name} must declare timeout-minutes`,
-        ),
+        finding('CI_PREFLIGHT_TIMEOUT_MISSING', file, `jobs.${name} must declare timeout-minutes`),
       );
     }
 

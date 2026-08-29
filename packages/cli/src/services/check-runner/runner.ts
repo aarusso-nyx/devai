@@ -1,9 +1,21 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
+import { getValidator } from '@devai-nyx/schemas';
+import { resolveReleaseTaskNodes, resolveReleaseVerification } from '../release-profile.js';
+import {
+  PREFLIGHT_CAPABILITIES,
+  verifyReleasePreflightReceipt,
+  type ReleasePreflightReceipt,
+} from '../release-preflight.js';
 import { CheckCache } from './cache.js';
 import { sha256Hex } from './canonical.js';
-import { buildTaskPlan, currentRepositoryState, readTaskDescriptor } from './policy.js';
+import {
+  buildTaskPlan,
+  currentRepositoryState,
+  exactCommitTree,
+  readTaskDescriptor,
+} from './policy.js';
 import {
   encodeTaskExecutable,
   executableToolchainKey,
@@ -152,6 +164,12 @@ function planWithCache(
     descriptor,
     target: options.target,
     ...(options.baseCommit !== undefined && { baseCommit: options.baseCommit }),
+    ...(options.releaseRequiredNodes !== undefined && {
+      releaseRequiredNodes: options.releaseRequiredNodes,
+    }),
+    ...(options.releaseAffectedSelection !== undefined && {
+      releaseAffectedSelection: options.releaseAffectedSelection,
+    }),
     toolchain,
     environment,
     cacheState(task) {
@@ -178,7 +196,10 @@ function planWithCache(
   });
 }
 
-function requiredTaskNodes(options: CheckRunnerOptions): readonly TaskDescriptorNode[] {
+function requiredTaskNodes(
+  options: CheckRunnerOptions,
+  releaseScope: 'selected' | 'complete' = 'complete',
+): readonly TaskDescriptorNode[] {
   const descriptor = readTaskDescriptor(
     resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
   );
@@ -188,9 +209,13 @@ function requiredTaskNodes(options: CheckRunnerOptions): readonly TaskDescriptor
     return descriptor.tasks.filter((task) => eligible.has(task.nodeId));
   }
   const roots =
-    options.target === 'local'
-      ? [descriptor.fallbackNodeId]
-      : (descriptor.profiles.find((entry) => entry.profileId === 'rc')?.requiredNodes ?? []);
+    options.target === 'release'
+      ? releaseScope === 'complete'
+        ? (options.releaseAllNodes ?? options.releaseRequiredNodes ?? [])
+        : (options.releaseRequiredNodes ?? [])
+      : options.target === 'local'
+        ? [descriptor.fallbackNodeId]
+        : (descriptor.profiles.find((entry) => entry.profileId === 'rc')?.requiredNodes ?? []);
   const byId = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const selected = new Set<string>();
   const pending = roots.filter((nodeId): nodeId is string => nodeId !== null);
@@ -221,7 +246,7 @@ function resolvedRunnerToolchain(options: CheckRunnerOptions): Readonly<Record<s
 }
 
 function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[] {
-  return requiredTaskNodes(options).flatMap((task) => task.allowlistedEnv);
+  return requiredTaskNodes(options, 'selected').flatMap((task) => task.allowlistedEnv);
 }
 
 function taskEnvironment(
@@ -236,16 +261,132 @@ function taskEnvironment(
   return selected;
 }
 
-export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
+function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
+  options: CheckRunnerOptions;
+  binding?: Readonly<{
+    digest: string;
+    profileDigest: string;
+    decision: ReturnType<typeof resolveReleaseVerification>;
+    base: Readonly<{ commit: string; tree: string }>;
+    preflightCapabilityTasks: Readonly<Record<string, readonly string[]>>;
+  }>;
+}> {
+  if (input.releaseIntent === undefined && input.releaseProfile === undefined) {
+    return { options: input };
+  }
+  if (input.releaseIntent === undefined || input.releaseProfile === undefined) {
+    throw new Error('CHECK_RELEASE_INTENT_AND_PROFILE_REQUIRED');
+  }
+  const validateIntent = getValidator('release-intent.schema.json');
+  const validateProfile = getValidator('release-verification-profile.schema.json');
+  if (!validateIntent(input.releaseIntent)) {
+    throw new Error(`CHECK_RELEASE_INTENT_INVALID:${JSON.stringify(validateIntent.errors)}`);
+  }
+  if (!validateProfile(input.releaseProfile)) {
+    throw new Error(`CHECK_RELEASE_PROFILE_INVALID:${JSON.stringify(validateProfile.errors)}`);
+  }
+  const intent = input.releaseIntent as {
+    release_unit: string;
+    current_version: string;
+    target_version: string;
+    support: 'preview' | 'current' | 'lts';
+    support_promotion?: boolean;
+    change_kind?: 'documentation' | 'metadata' | 'behavioral';
+    risks?: string[];
+    owner_escalations?: import('../release-profile.js').ReleaseCapability[];
+    candidate: { commit: string; tree: string };
+    base: { commit: string; tree: string };
+  };
+  const profile = input.releaseProfile as {
+    release_unit: string;
+    capability_tasks: Record<string, string[]>;
+    risk_capabilities: Record<string, import('../release-profile.js').ReleaseCapability[]>;
+    mutation_roster: readonly unknown[];
+  };
+  if (intent.release_unit !== profile.release_unit) {
+    throw new Error('CHECK_RELEASE_UNIT_MISMATCH');
+  }
+  const candidate = currentRepositoryState(input.repoRoot);
+  if (intent.candidate.commit !== candidate.commit || intent.candidate.tree !== candidate.tree) {
+    throw new Error('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
+  }
+  if (input.baseCommit === undefined || intent.base.commit !== input.baseCommit) {
+    throw new Error('CHECK_RELEASE_INTENT_BASE_MISMATCH');
+  }
+  if (exactCommitTree(input.repoRoot, intent.base.commit) !== intent.base.tree) {
+    throw new Error('CHECK_RELEASE_INTENT_BASE_TREE_MISMATCH');
+  }
+  const decision = resolveReleaseVerification({
+    currentVersion: intent.current_version,
+    targetVersion: intent.target_version,
+    support: intent.support,
+    riskCapabilities: profile.risk_capabilities,
+    mutationRosterSize: profile.mutation_roster.length,
+    ...(intent.support_promotion !== undefined && { supportPromotion: intent.support_promotion }),
+    ...(intent.change_kind !== undefined && { changeKind: intent.change_kind }),
+    ...(intent.risks !== undefined && { risks: intent.risks }),
+    ...(intent.owner_escalations !== undefined && { ownerEscalations: intent.owner_escalations }),
+  });
+  if (decision.verdict !== 'ready') {
+    throw new Error(`CHECK_RELEASE_INTENT_BLOCKED:${decision.blockingReasons.join(',')}`);
+  }
+  const descriptor = readTaskDescriptor(
+    resolve(input.descriptorPath ?? join(input.repoRoot, 'test-tasks.json')),
+  );
+  const allRoots = resolveReleaseTaskNodes(
+    decision,
+    profile.capability_tasks,
+    descriptor.tasks.map((task) => task.nodeId),
+  );
+  const preflightDecision = {
+    ...decision,
+    capabilities: decision.capabilities.filter((capability) =>
+      (PREFLIGHT_CAPABILITIES as readonly string[]).includes(capability),
+    ),
+  };
+  const preflightRoots = resolveReleaseTaskNodes(
+    preflightDecision,
+    profile.capability_tasks,
+    descriptor.tasks.map((task) => task.nodeId),
+  );
+  const stage = input.releaseStage ?? 'preflight';
+  return {
+    options: {
+      ...input,
+      target: 'release',
+      releaseStage: stage,
+      releaseRequiredNodes: stage === 'preflight' ? preflightRoots : allRoots,
+      releaseAllNodes: allRoots,
+      releaseAffectedSelection:
+        stage === 'certify' && decision.capabilities.includes('affected-checks'),
+    },
+    binding: {
+      digest: sha256Hex(input.releaseIntent),
+      profileDigest: sha256Hex(input.releaseProfile),
+      decision,
+      base: intent.base,
+      preflightCapabilityTasks: Object.fromEntries(
+        PREFLIGHT_CAPABILITIES.map((capability) => [
+          capability,
+          profile.capability_tasks[capability] ?? [],
+        ]),
+      ),
+    },
+  };
+}
+
+export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
+  const request = bindReleaseRequest(inputOptions);
+  const options = request.options;
   const requiredEnvironment = requiredEnvironmentKeys(options);
   const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
   if (
-    options.target === 'rc' &&
+    (options.target === 'rc' || options.target === 'release') &&
     requiredEnvironment.includes('DEVAI_DB_TESTS') &&
     configuredDbTests !== '1'
   ) {
     throw new Error(
-      'CHECK_RC_DB_TESTS_REQUIRED: the RC profile requires DEVAI_DB_TESTS=1 so database cases cannot silently skip',
+      'CHECK_RC_DB_TESTS_REQUIRED: RC and release profiles require DEVAI_DB_TESTS=1 when database tasks are selected so cases cannot silently skip',
     );
   }
   const cacheRoot = resolve(
@@ -270,7 +411,54 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
       environment[key] = inheritedValue;
     }
   }
-  const plan = planWithCache(options, cache, toolchain, environment);
+  const rawPlan = planWithCache(options, cache, toolchain, environment);
+  const releaseBinding = request.binding;
+  const plan =
+    releaseBinding === undefined
+      ? rawPlan
+      : {
+          ...rawPlan,
+          releaseIntentDigest: releaseBinding.digest,
+          releaseProfileDigest: releaseBinding.profileDigest,
+          toolchainDigest: sha256Hex(toolchain),
+          releaseDecision: releaseBinding.decision,
+        };
+  if (options.target === 'release' && options.releaseStage === 'certify') {
+    if (options.preflightReceipt === undefined || releaseBinding === undefined) {
+      throw new Error('CHECK_RELEASE_PREFLIGHT_REQUIRED');
+    }
+    const knownNodes = readTaskDescriptor(
+      resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
+    ).tasks.map((task) => task.nodeId);
+    const preflightPlan = planWithCache(
+      {
+        ...options,
+        releaseStage: 'preflight',
+        releaseAffectedSelection: false,
+        releaseRequiredNodes: resolveReleaseTaskNodes(
+          {
+            ...releaseBinding.decision,
+            capabilities: releaseBinding.decision.capabilities.filter((capability) =>
+              (PREFLIGHT_CAPABILITIES as readonly string[]).includes(capability),
+            ),
+          },
+          releaseBinding.preflightCapabilityTasks,
+          knownNodes,
+        ),
+      },
+      cache,
+      toolchain,
+      environment,
+    );
+    verifyReleasePreflightReceipt(options.preflightReceipt, {
+      repository: plan.repository,
+      base: releaseBinding.base,
+      releaseIntentDigest: releaseBinding.digest,
+      releaseProfileDigest: releaseBinding.profileDigest,
+      taskPolicyDigest: preflightPlan.taskPolicyDigest,
+      toolchainDigest: sha256Hex(toolchain),
+    });
+  }
   if (options.operation !== 'run') {
     return { schemaVersion: '1.0.0', operation: options.operation, plan, exitCode: 0 };
   }
@@ -413,6 +601,7 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
   }
 
   let receipt: CheckRunnerReport['receipt'];
+  let preflightReceipt: CheckRunnerReport['preflightReceipt'];
   let receiptRefusal: string | undefined;
   const allPass = execution.every((task) => task.outcome === 'PASS');
   const finalState = currentRepositoryState(options.repoRoot);
@@ -427,11 +616,58 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
     finalState.tree !== plan.repository.tree
   ) {
     receiptRefusal = 'repository-changed-during-run';
+  } else if (
+    options.target === 'release' &&
+    options.releaseStage === 'preflight' &&
+    releaseBinding !== undefined
+  ) {
+    const checks = PREFLIGHT_CAPABILITIES.map((capability) => {
+      const nodes = releaseBinding.preflightCapabilityTasks[capability] ?? [];
+      const digests = nodes.map((nodeId) => {
+        const digest = resultDigests.get(nodeId);
+        if (digest === undefined)
+          throw new Error(`CHECK_RELEASE_PREFLIGHT_RESULT_MISSING:${nodeId}`);
+        return { nodeId, digest };
+      });
+      const reused = nodes.every((nodeId) =>
+        execution.some((entry) => entry.nodeId === nodeId && entry.disposition === 'reused'),
+      );
+      return {
+        capability,
+        status: reused ? ('reused' as const) : ('executed' as const),
+        reasonCode: 'required-floor',
+        resultDigest: sha256Hex(digests),
+      };
+    });
+    const value: ReleasePreflightReceipt = {
+      schemaVersion: '1.0.0',
+      repository: plan.repository,
+      base: releaseBinding.base,
+      releaseIntentDigest: releaseBinding.digest,
+      releaseProfileDigest: releaseBinding.profileDigest,
+      taskPolicyDigest: plan.taskPolicyDigest,
+      toolchainDigest: sha256Hex(toolchain),
+      checks,
+      verdict: 'pass',
+      blockingReasons: [],
+      createdAt: now(),
+    };
+    verifyReleasePreflightReceipt(value, {
+      repository: plan.repository,
+      base: releaseBinding.base,
+      releaseIntentDigest: releaseBinding.digest,
+      releaseProfileDigest: releaseBinding.profileDigest,
+      taskPolicyDigest: plan.taskPolicyDigest,
+      toolchainDigest: sha256Hex(toolchain),
+    });
+    const written = cache.writePreflightReceipt(value);
+    preflightReceipt = { ...written, value };
+    receiptRefusal = 'release-preflight-only';
   } else {
     const candidateReceipt: CandidateReceipt = {
       schemaVersion: '1.1.0',
       repository: plan.repository,
-      profile: options.target,
+      profile: options.target === 'release' ? 'rc' : options.target,
       taskPolicyDigest: plan.taskPolicyDigest,
       createdAt: now(),
       tasks: plan.tasks.map((task) => {
@@ -450,6 +686,37 @@ export function runCheckTasks(options: CheckRunnerOptions): CheckRunnerReport {
     plan,
     execution,
     ...(receipt !== undefined && { receipt }),
+    ...(preflightReceipt !== undefined && { preflightReceipt }),
+    ...(options.target === 'release' && {
+      releaseVerification: readTaskDescriptor(
+        resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
+      ).tasks.map((task) => {
+        const result = execution.find((entry) => entry.nodeId === task.nodeId);
+        if (result === undefined) {
+          return {
+            nodeId: task.nodeId,
+            status: 'not-required' as const,
+            reasonCode: 'capability-not-selected',
+          };
+        }
+        const status =
+          result.outcome === 'PASS'
+            ? result.disposition === 'reused'
+              ? ('reused' as const)
+              : ('executed' as const)
+            : result.disposition === 'aborted'
+              ? ('blocked' as const)
+              : result.outcome === 'FAIL'
+                ? ('failed' as const)
+                : ('unknown' as const);
+        return {
+          nodeId: task.nodeId,
+          status,
+          reasonCode: result.reason,
+          ...(result.resultDigest !== undefined && { resultDigest: result.resultDigest }),
+        };
+      }),
+    }),
     ...(receiptRefusal !== undefined && { receiptRefusal }),
     exitCode: allPass ? 0 : 1,
   };

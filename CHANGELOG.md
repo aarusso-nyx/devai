@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.0 — 2026-08-29
+
+- Adds schema-validated, candidate-bound release intent and adopter release-verification profiles
+  with independent SemVer-transition and support-intention axes, capability union, fail-closed risk
+  escalation, and explicit mutation dispositions.
+- Extends the existing `check` task runner with additive release preflight and certification stages,
+  exact preflight-receipt verification, affected/dependent selection, and unchanged legacy
+  `affected`, `local`, and `rc` behavior.
+- Adds exact per-roster-entry mutation reuse identities, opt-in release-policy materialization,
+  DEVAI's self-profile, and one stable `devai-release-gate` PR status without adding a public action
+  or publication permission.
+- Enforces the unconditional formatting, lint, type, schema/generated, secret, path-portability,
+  package-boundary, and exact-candidate floor in local hygiene, profile preflight, and independent
+  CI. Signed-tag rehearsal, protected-ledger verification, and explicit `publish: true` remain
+  separate boundaries.
+
 ## 1.3.3 — 2026-08-28
 
 - Aligns the package-owned evidence verifier with the check runner by excluding only the exact

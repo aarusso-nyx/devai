@@ -78,6 +78,7 @@ function ensureSchemaReferences(name: SchemaName): void {
       'glob-guards.schema.json',
       'project-config.schema.json',
       'scorecard-na-config.schema.json',
+      'release-verification-profile.schema.json',
     ] as const) {
       if (ajv.getSchema(dependency) === undefined) {
         ajv.addSchema(loadSchema(dependency), dependency);

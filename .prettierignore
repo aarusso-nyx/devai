@@ -10,6 +10,7 @@ scratch/
 pnpm-lock.yaml
 law/policy/authority-policy.json
 law/trace.json
+docs/reference/error-codes.md
 law/register/DECISIONS.md
 law/adr/predecessor/
 work/rounds/R-0001/

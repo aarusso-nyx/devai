@@ -155,6 +155,35 @@ function descriptor() {
   } as const;
 }
 
+function releaseProfile() {
+  const capabilities = [
+    'formatting-hygiene',
+    'lint',
+    'type-integrity',
+    'schema-consistency',
+    'secret-scan',
+    'path-portability',
+    'package-integrity',
+    'exact-candidate',
+    'affected-checks',
+    'dependent-checks',
+    'build-integrity',
+  ];
+  return {
+    schemaVersion: '1.0.0',
+    policy_id: 'example.release',
+    policy_version: '1.0.0',
+    release_unit: 'example/repo',
+    version_source: 'package.json',
+    default_support: 'current',
+    capability_tasks: Object.fromEntries(
+      capabilities.map((capability) => [capability, ['test:unit']]),
+    ),
+    risk_capabilities: {},
+    mutation_roster: [],
+  } as const;
+}
+
 function repository(): Readonly<{ root: string; base: string }> {
   const root = mkdtempSync(join(tmpdir(), 'devai-check-runner-'));
   roots.push(root);
@@ -995,6 +1024,107 @@ describe('content-addressed check runner', () => {
       ['createdAt', 'profile', 'repository', 'schemaVersion', 'taskPolicyDigest', 'tasks'].sort(),
     );
     expect(receiptBytes).not.toContain('signature');
+  });
+
+  it('validates and binds exact release intent into the candidate receipt', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const releaseIntent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.1',
+      support: 'current',
+      candidate: {
+        commit: git(state.root, ['rev-parse', 'HEAD']),
+        tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    const preflight = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+    });
+    expect(preflight.plan.releaseIntentDigest).toBe(sha256Hex(releaseIntent));
+    expect(preflight.preflightReceipt?.value.verdict).toBe('pass');
+    expect(preflight.receipt).toBeUndefined();
+    expect(preflight.releaseVerification).toContainEqual({
+      nodeId: 'test:rc',
+      status: 'not-required',
+      reasonCode: 'capability-not-selected',
+    });
+    const report = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+      releaseStage: 'certify',
+      preflightReceipt: preflight.preflightReceipt?.value,
+    });
+    expect(report.receipt?.value.profile).toBe('rc');
+    expect(report.plan.releaseDecision).toMatchObject({
+      verdict: 'ready',
+      transition: 'patch',
+    });
+    expect(report.releaseVerification?.every((entry) => entry.status !== 'unknown')).toBe(true);
+  });
+
+  it('refuses certification without the exact cheap-preflight receipt', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const releaseIntent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.1',
+      support: 'current',
+      candidate: {
+        commit: git(state.root, ['rev-parse', 'HEAD']),
+        tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent,
+        releaseProfile: releaseProfile(),
+        releaseStage: 'certify',
+      }),
+    ).toThrow('CHECK_RELEASE_PREFLIGHT_REQUIRED');
+  });
+
+  it('rejects a release intent bound to the wrong candidate tree', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent: {
+          schemaVersion: '1.0.0',
+          release_unit: 'example/repo',
+          current_version: '1.0.0',
+          target_version: '1.0.1',
+          support: 'current',
+          candidate: { commit: git(state.root, ['rev-parse', 'HEAD']), tree: 'f'.repeat(40) },
+          base: {
+            commit: state.base,
+            tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+          },
+        },
+        releaseProfile: releaseProfile(),
+      }),
+    ).toThrow('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
   });
 
   it('binds a materialized authority policy into an allowlisted RC task key', () => {

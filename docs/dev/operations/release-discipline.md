@@ -8,9 +8,9 @@ to required sibling gates alongside coverage. The protected-ledger attestation m
 therefore be re-issued for the exact 1.2.8 candidate policy digest; an attestation
 for an earlier digest cannot authorize the changed closure.
 
-The [remote preflight lane](remote-preflight-contract.md) adds no RC node and changes no
-task-policy digest. An attestation issued before the preflight lane existed remains valid for
-the same closure.
+The [remote preflight lane](remote-preflight-contract.md) keeps the protected RC
+ledger and publication boundary unchanged. DEVAI 1.4 adds release-profile task
+nodes, so a 1.3.x task-policy attestation cannot certify a 1.4.0 candidate.
 
 ## Inspect
 

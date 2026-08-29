@@ -32,6 +32,8 @@ interface PolicyBuildOptions {
   readonly descriptor: TaskDescriptor;
   readonly target: TaskTarget;
   readonly baseCommit?: string;
+  readonly releaseRequiredNodes?: readonly string[];
+  readonly releaseAffectedSelection?: boolean;
   readonly toolchain: Readonly<Record<string, string>>;
   readonly environment: Readonly<Record<string, string>>;
   readonly cacheState: (
@@ -441,10 +443,17 @@ function selectedNodeIds(
   descriptor: TaskDescriptor,
   target: TaskTarget,
   changes: readonly string[],
+  releaseRequiredNodes: readonly string[] = [],
+  releaseAffectedSelection = false,
 ): Set<string> {
   const selected = new Set<string>();
   const impacted = new Set<string>();
-  if (target === 'local') {
+  if (target === 'release') {
+    if (releaseRequiredNodes.length === 0) {
+      throw new Error('CHECK_RELEASE_PROFILE_TASKS_REQUIRED');
+    }
+    releaseRequiredNodes.forEach((nodeId) => selected.add(nodeId));
+  } else if (target === 'local') {
     if (!descriptor.tasks.some((task) => task.nodeId === 'test:local-full')) {
       throw new Error(
         'CHECK_RUNNER_DESCRIPTOR: local target requires a node named test:local-full (the local-closure root); declare it in test-tasks.json or use --rc / --affected',
@@ -483,6 +492,34 @@ function selectedNodeIds(
     }
   }
 
+  if (target === 'release' && releaseAffectedSelection) {
+    const affectedProfile = descriptor.profiles.find((entry) => entry.profileId === 'affected');
+    if (affectedProfile?.mode !== 'affected') {
+      throw new Error('CHECK_RELEASE_AFFECTED_PROFILE_REQUIRED');
+    }
+    const eligible = new Set(affectedProfile.eligibleNodes ?? []);
+    for (const path of changes) {
+      if (descriptor.dynamicFallbackSelectors.some((selector) => selectorMatches(selector, path))) {
+        if (descriptor.fallbackNodeId === null) throw new Error('CHECK_RUNNER_UNKNOWN_PATH');
+        impacted.add(descriptor.fallbackNodeId);
+        continue;
+      }
+      const matches = descriptor.tasks.filter(
+        (task) =>
+          eligible.has(task.nodeId) &&
+          task.nodeId !== descriptor.fallbackNodeId &&
+          task.inputSelectors.some((selector) => selectorMatches(selector, path)),
+      );
+      if (matches.length === 0) {
+        if (descriptor.fallbackNodeId === null)
+          throw new Error(`CHECK_RUNNER_UNKNOWN_PATH: ${path}`);
+        impacted.add(descriptor.fallbackNodeId);
+      } else {
+        matches.forEach((task) => impacted.add(task.nodeId));
+      }
+    }
+  }
+
   const dependents = new Map(descriptor.tasks.map((task) => [task.nodeId, [] as string[]]));
   descriptor.tasks.forEach((task) =>
     task.dependencies.forEach((dependency) => dependents.get(dependency)?.push(task.nodeId)),
@@ -493,7 +530,11 @@ function selectedNodeIds(
     if (nodeId === undefined) continue;
     selected.add(nodeId);
     for (const dependent of dependents.get(nodeId) ?? []) {
-      const profile = descriptor.profiles.find((entry) => entry.profileId === target);
+      const profile = descriptor.profiles.find((entry) =>
+        target === 'release' && releaseAffectedSelection
+          ? entry.profileId === 'affected'
+          : entry.profileId === target,
+      );
       const eligible = profile?.mode === 'affected' ? new Set(profile.eligibleNodes ?? []) : null;
       const aggregateFallback = dependent === descriptor.fallbackNodeId;
       if (
@@ -528,9 +569,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   const tree = gitText(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`]).trim();
   const clean = cleanStatus(repoRoot);
   let changes: readonly string[] = [];
-  if (target === 'affected') {
+  if (target === 'affected' || target === 'release') {
     if (options.baseCommit === undefined) {
-      throw new Error('CHECK_RUNNER_BASE_REQUIRED: --affected requires --base');
+      throw new Error('CHECK_RUNNER_BASE_REQUIRED: affected and release targets require --base');
     }
     assertCommit(repoRoot, options.baseCommit, 'BASE');
     const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', options.baseCommit, commit], {
@@ -546,7 +587,13 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   const entries = (clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot)).filter(
     (entry) => !isHarnessMutatedPath(entry.path),
   );
-  const selected = selectedNodeIds(descriptor, target, changes);
+  const selected = selectedNodeIds(
+    descriptor,
+    target,
+    changes,
+    options.releaseRequiredNodes,
+    options.releaseAffectedSelection,
+  );
   const descriptorDigest = sha256Hex(descriptor);
   const ordered = topologicalTasks(descriptor);
   const outputContracts = new Map(
@@ -661,4 +708,9 @@ export function currentRepositoryState(repoRoot: string): Readonly<{
   const commit = gitText(repoRoot, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
   const tree = gitText(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`]).trim();
   return { commit, tree, clean: cleanStatus(repoRoot) };
+}
+
+export function exactCommitTree(repoRoot: string, commit: string): string {
+  assertCommit(repoRoot, commit, 'BASE');
+  return gitText(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`]).trim();
 }

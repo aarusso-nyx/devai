@@ -11,6 +11,7 @@ const files = [
   'scorecard-na.json',
   'thresholds.json',
   'subprocess-effects.json',
+  'release-verification.json',
 ];
 
 for (const file of files) {

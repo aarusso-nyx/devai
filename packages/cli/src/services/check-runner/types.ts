@@ -1,4 +1,4 @@
-export type TaskTarget = 'affected' | 'local' | 'rc';
+export type TaskTarget = 'affected' | 'local' | 'rc' | 'release';
 export type TaskOperation = 'plan' | 'run' | 'status' | 'explain';
 export type TaskOutcome = 'PASS' | 'FAIL' | 'TIMEOUT' | 'KILLED' | 'ABORTED';
 
@@ -69,6 +69,10 @@ export interface TaskPlan {
   readonly descriptorDigest: string;
   readonly taskPolicy: TaskPolicy;
   readonly taskPolicyDigest: string;
+  readonly releaseIntentDigest?: string;
+  readonly releaseProfileDigest?: string;
+  readonly toolchainDigest?: string;
+  readonly releaseDecision?: import('../release-profile.js').ReleaseVerificationDecision;
   readonly changedPaths: readonly string[];
   readonly tasks: readonly PlannedTask[];
 }
@@ -117,6 +121,17 @@ export interface CheckRunnerReport {
   readonly plan: TaskPlan;
   readonly execution?: readonly ExecutedTask[];
   readonly receipt?: Readonly<{ digest: string; path: string; value: CandidateReceipt }>;
+  readonly preflightReceipt?: Readonly<{
+    digest: string;
+    path: string;
+    value: import('../release-preflight.js').ReleasePreflightReceipt;
+  }>;
+  readonly releaseVerification?: readonly Readonly<{
+    nodeId: string;
+    status: 'executed' | 'reused' | 'not-required' | 'failed' | 'blocked' | 'unknown';
+    reasonCode: string;
+    resultDigest?: string;
+  }>[];
   readonly receiptRefusal?: string;
   readonly exitCode: number;
 }
@@ -139,6 +154,13 @@ export interface CheckRunnerOptions {
   readonly cacheRoot?: string;
   readonly toolchain?: Readonly<Record<string, string>>;
   readonly environment?: Readonly<Record<string, string>>;
+  readonly releaseIntent?: unknown;
+  readonly releaseProfile?: unknown;
+  readonly releaseRequiredNodes?: readonly string[];
+  readonly releaseAllNodes?: readonly string[];
+  readonly releaseAffectedSelection?: boolean;
+  readonly releaseStage?: 'preflight' | 'certify';
+  readonly preflightReceipt?: unknown;
   readonly executeTask?: (
     argv: readonly string[],
     cwd: string,

@@ -778,7 +778,10 @@ describe('remote preflight workflow', () => {
   it('binds the lane to the cheap local closure and to no protected input', () => {
     expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run lint');
     expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run typecheck');
-    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run test:local');
+    expect(CHECKED_IN_PREFLIGHT).toContain('name: devai-release-gate');
+    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run format:check');
+    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run release:static-integrity');
+    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run release:pr-gate');
     expect(CHECKED_IN_PREFLIGHT).toContain(`actions/checkout@${CHECKOUT_COMMIT}`);
     expect(CHECKED_IN_PREFLIGHT).toContain(`actions/setup-node@${SETUP_NODE_COMMIT}`);
     expect(CHECKED_IN_PREFLIGHT).toContain('persist-credentials: false');
@@ -813,13 +816,17 @@ describe('remote preflight workflow', () => {
   it.each([
     {
       name: 'a trigger that reaches a protected ref',
-      mutate: (source: string) => source.replace('on:\n  pull_request:', 'on:\n  push:\n  pull_request:'),
+      mutate: (source: string) =>
+        source.replace('on:\n  pull_request:', 'on:\n  push:\n  pull_request:'),
       diagnostic: 'CI_PREFLIGHT_TRIGGER_INVALID',
     },
     {
       name: 'a declared job environment',
       mutate: (source: string) =>
-        source.replace('    timeout-minutes: 20', `    timeout-minutes: 20\n    environment: ${LEDGER_ENVIRONMENT}`),
+        source.replace(
+          '    timeout-minutes: 20',
+          `    timeout-minutes: 20\n    environment: ${LEDGER_ENVIRONMENT}`,
+        ),
       diagnostic: 'CI_PREFLIGHT_ENVIRONMENT_FORBIDDEN',
     },
     {
@@ -834,7 +841,10 @@ describe('remote preflight workflow', () => {
     {
       name: 'remote execution of the attested RC closure',
       mutate: (source: string) =>
-        source.replace('run: pnpm run test:local', 'run: pnpm run test:coverage:rc'),
+        source.replace(
+          'run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }}',
+          'run: pnpm run test:coverage:rc',
+        ),
       diagnostic: 'CI_PREFLIGHT_ATTESTED_CLOSURE_FORBIDDEN',
     },
     {
@@ -913,19 +923,28 @@ describe('ci-economy concurrency-cancel rule', () => {
 
   it.each([
     { name: 'a literal true', value: 'true' },
-    { name: "a pull_request event expression", value: "${{ github.event_name == 'pull_request' }}" },
+    {
+      name: 'a pull_request event expression',
+      value: "${{ github.event_name == 'pull_request' }}",
+    },
     {
       name: 'a pull_request_target event expression',
       value: "${{ github.event_name == 'pull_request_target' }}",
     },
-    { name: 'a double-quoted event expression', value: '${{ github.event_name == "pull_request" }}' },
+    {
+      name: 'a double-quoted event expression',
+      value: '${{ github.event_name == "pull_request" }}',
+    },
   ])('accepts $name', ({ value }) => {
     expect(concurrencyFinding(economyFixture(value))).toMatchObject({ severity: 'pass' });
   });
 
   it.each([
     { name: 'cancellation disabled outright', value: 'false' },
-    { name: 'an expression that never cancels a pull request', value: "${{ github.event_name == 'push' }}" },
+    {
+      name: 'an expression that never cancels a pull request',
+      value: "${{ github.event_name == 'push' }}",
+    },
     { name: 'no concurrency block at all', value: null },
   ])('rejects $name', ({ value }) => {
     expect(concurrencyFinding(economyFixture(value))).toMatchObject({
@@ -956,8 +975,8 @@ describe('ci-economy concurrency-cancel rule', () => {
     expect(report.findings.filter((f) => f.severity === 'fail')).toEqual([]);
     expect(report.fail_count).toBe(0);
     expect(report.verdict).not.toBe('fail');
-    expect(
-      report.findings.find((f) => f.ruleId === 'ci-economy.concurrency-cancel'),
-    ).toMatchObject({ severity: 'pass' });
+    expect(report.findings.find((f) => f.ruleId === 'ci-economy.concurrency-cancel')).toMatchObject(
+      { severity: 'pass' },
+    );
   });
 });

@@ -45,6 +45,7 @@ const policyFiles = [
   'model-runtime-registry.json',
   'mutation-strength.json',
   'round-execution.json',
+  'release-verification.json',
   'scorecard-na.json',
   'sense-presets.json',
   'sensor-registry.json',

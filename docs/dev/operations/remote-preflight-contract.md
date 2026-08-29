@@ -11,7 +11,7 @@ rerun product tests." Read together they forbade any remote execution of lint,
 typecheck, or tests in this repository.
 
 That reading is stronger than the doctrine requires. The economy argument is
-about the *attested RC closure*: heavy, database-backed, coverage-instrumented
+about the _attested RC closure_: heavy, database-backed, coverage-instrumented
 nodes whose results are bound into a signed receipt. Re-running that closure
 remotely costs real money and proves nothing the receipt does not already claim.
 It is not an argument against cheap, unprivileged, non-attesting execution.
@@ -30,21 +30,24 @@ enough that it cannot become a second evidence path.
 Remote CI does not execute the attested RC closure, and remote execution never
 produces, substitutes for, or supplements a candidate receipt.
 
-Remote CI may execute the cheap local closure — `lint`, `typecheck`,
-`test:local` — as a non-attesting preflight signal.
+Remote CI may execute the unconditional release floor and the profile-selected
+internal DAG as a non-attesting preflight signal. The transient preflight
+receipt coordinates later expensive work but is not a candidate receipt,
+protected-ledger attestation, or publication authority and is not uploaded.
 
 The distinction is provenance, not cost. A preflight run is a fast contradiction
-check: if it fails, the candidate is wrong and no receipt should be signed. If it
-passes, nothing is proven and no evidence is created. The ledger remains the sole
-path by which any claim about this repository becomes evidence.
+check: if it fails, the candidate is wrong and no candidate receipt should be
+signed. Its transient preflight receipt gates expensive work but is not attested
+or uploaded. The ledger remains the sole path by which a release claim becomes
+authoritative evidence.
 
 ## Permitted workflow set
 
-| File | Status | Role |
-| --- | --- | --- |
-| `devai-ledger-verify.yml` | required | Protected ledger verification |
-| `release.yml` | required | Rehearsal and authorized publication |
-| `pull-request-checks.yml` | optional | Non-attesting preflight |
+| File                      | Status   | Role                                 |
+| ------------------------- | -------- | ------------------------------------ |
+| `devai-ledger-verify.yml` | required | Protected ledger verification        |
+| `release.yml`             | required | Rehearsal and authorized publication |
+| `pull-request-checks.yml` | optional | Non-attesting preflight              |
 
 `pull-request-checks.yml` is the only permitted addition. Any other file remains
 `CI_WORKFLOW_SET_INVALID`. Absence of the preflight file is not a finding: the
@@ -66,11 +69,12 @@ A conforming `pull-request-checks.yml`:
    contract already declares for checkout, setup-node, and pnpm setup;
 7. checks out with `persist-credentials: false`;
 8. invokes only `install --frozen-lockfile` and the allowed script closure —
-   `build`, `lint`, `typecheck`, `test:local`;
+   `build`, `format:check`, `lint`, `typecheck`, `release:static-integrity`, and
+   `release:pr-gate`;
 9. never invokes an RC script (`test:coverage:rc`, `test:db:rc`, `test:e2e:rc`,
    `test:performance:rc`, `test:containment:rc`) or a release script;
-10. contains no evidence, receipt, attestation, verifier, or signing token, and
-    uploads no artifact — a preflight run leaves nothing behind.
+10. contains no candidate-evidence export, attestation, verifier, or signing
+    token, and uploads no artifact; its preflight receipt remains transient.
 
 Rules 1–7 make the job untrusted. Rules 8–10 make it non-attesting. Both
 properties are checked mechanically; neither depends on reviewer vigilance.
