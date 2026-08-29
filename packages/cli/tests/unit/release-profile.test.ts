@@ -49,6 +49,9 @@ describe('release verification profile resolver', () => {
     expect(result.verdict).toBe('ready');
     expect(result.mutation).toBe('full-roster');
     expect(result.capabilities).toContain('provenance');
+    expect(result.capabilities).toEqual(
+      expect.arrayContaining(['security', 'database', 'tenancy', 'operational-matrix']),
+    );
   });
 
   it('orders prerelease identifiers according to SemVer and ignores build metadata', () => {
@@ -114,13 +117,28 @@ describe('release verification profile resolver', () => {
   });
 
   it('keeps MAJOR targeted while LTS alone requires the full mutation roster', () => {
-    expect(
-      resolveReleaseVerification({
-        currentVersion: '1.0.0',
-        targetVersion: '2.0.0',
-        support: 'current',
-      }).mutation,
-    ).toBe('targeted');
+    const major = resolveReleaseVerification({
+      currentVersion: '1.0.0',
+      targetVersion: '2.0.0',
+      support: 'current',
+    });
+    expect(major.mutation).toBe('targeted');
+    expect(major.capabilities).toEqual(
+      expect.arrayContaining([
+        'unit',
+        'integration',
+        'e2e',
+        'consumer',
+        'api-compatibility',
+        'migration',
+        'rollback',
+        'security',
+        'database',
+        'tenancy',
+        'provenance',
+        'reproducibility',
+      ]),
+    );
     expect(
       resolveReleaseVerification({
         currentVersion: '2.0.0',
@@ -129,6 +147,25 @@ describe('release verification profile resolver', () => {
         supportPromotion: true,
       }).mutation,
     ).toBe('full-roster');
+  });
+
+  it('selects the MINOR behavior, consumer, materialization, and E2E floor', () => {
+    expect(
+      resolveReleaseVerification({
+        currentVersion: '1.0.0',
+        targetVersion: '1.1.0',
+        support: 'current',
+      }).capabilities,
+    ).toEqual(
+      expect.arrayContaining([
+        'unit',
+        'integration',
+        'e2e',
+        'consumer',
+        'api-compatibility',
+        'adopter-materialization',
+      ]),
+    );
   });
 
   it('records documentation patch mutation as not-required and behavior as targeted', () => {

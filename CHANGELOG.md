@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.2 — 2026-08-29
+
+- Binds release-intent versions to the exact base and candidate package-manifest bytes declared by
+  `version_source`, failing closed for unresolved or inconsistent monorepo release units.
+- Completes the MINOR, MAJOR, and LTS capability floors and adds bounded failure classifications
+  for unsuccessful release-verification checks.
+- Exercises the installed release tarball in a path containing spaces and non-ASCII characters,
+  closing the v1.4 portability contract with real release-workflow evidence.
+
 ## 1.4.1 — 2026-08-29
 
 - Supersedes the unpublished `v1.4.0` rehearsal candidate after a fresh Linux release runner

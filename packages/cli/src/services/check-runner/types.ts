@@ -130,6 +130,7 @@ export interface CheckRunnerReport {
     nodeId: string;
     status: 'executed' | 'reused' | 'not-required' | 'failed' | 'blocked' | 'unknown';
     reasonCode: string;
+    failureClass?: import('../release-preflight.js').ReleaseFailureClass;
     resultDigest?: string;
   }>[];
   readonly receiptRefusal?: string;

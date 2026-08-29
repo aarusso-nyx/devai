@@ -18,6 +18,7 @@ import { sha256Hex } from './canonical.js';
 import {
   buildTaskPlan,
   currentRepositoryState,
+  exactCommitFile,
   exactCommitTree,
   readTaskDescriptor,
 } from './policy.js';
@@ -309,6 +310,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   };
   const profile = input.releaseProfile as {
     release_unit: string;
+    version_source: string;
     capability_tasks: Record<string, string[]>;
     risk_capabilities: Record<string, import('../release-profile.js').ReleaseCapability[]>;
     mutation_roster: readonly MutationRosterEntry[];
@@ -325,6 +327,32 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   }
   if (exactCommitTree(input.repoRoot, intent.base.commit) !== intent.base.tree) {
     throw new Error('CHECK_RELEASE_INTENT_BASE_TREE_MISMATCH');
+  }
+  const versionAt = (commit: string): string => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(exactCommitFile(input.repoRoot, commit, profile.version_source));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'CHECK_RELEASE_VERSION_SOURCE_UNREADABLE') {
+        throw error;
+      }
+      throw new Error('CHECK_RELEASE_VERSION_SOURCE_INVALID');
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed) ||
+      typeof (parsed as { version?: unknown }).version !== 'string'
+    ) {
+      throw new Error('CHECK_RELEASE_VERSION_SOURCE_INVALID');
+    }
+    return (parsed as { version: string }).version;
+  };
+  if (versionAt(intent.base.commit) !== intent.current_version) {
+    throw new Error('CHECK_RELEASE_CURRENT_VERSION_SOURCE_MISMATCH');
+  }
+  if (versionAt(intent.candidate.commit) !== intent.target_version) {
+    throw new Error('CHECK_RELEASE_TARGET_VERSION_SOURCE_MISMATCH');
   }
   const decision = resolveReleaseVerification({
     currentVersion: intent.current_version,
@@ -755,6 +783,14 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
           nodeId: task.nodeId,
           status,
           reasonCode: result.reason,
+          ...(['failed', 'blocked', 'unknown'].includes(status) && {
+            failureClass:
+              status === 'failed'
+                ? ('product-regression' as const)
+                : status === 'blocked'
+                  ? ('environment-drift' as const)
+                  : ('unknown' as const),
+          }),
           ...(result.resultDigest !== undefined && { resultDigest: result.resultDigest }),
         };
       }),

@@ -148,7 +148,7 @@ const UNCONDITIONAL_FLOOR: readonly ReleaseCapability[] = [
 const TRANSITION_CAPABILITIES: Record<VersionTransition, readonly ReleaseCapability[]> = {
   patch: ['affected-checks', 'dependent-checks', 'build-integrity'],
   prerelease: ['affected-checks', 'dependent-checks', 'build-integrity'],
-  minor: ['unit', 'integration', 'consumer', 'api-compatibility', 'adopter-materialization'],
+  minor: ['unit', 'integration', 'e2e', 'consumer', 'api-compatibility', 'adopter-materialization'],
   major: [
     'unit',
     'integration',
@@ -158,6 +158,11 @@ const TRANSITION_CAPABILITIES: Record<VersionTransition, readonly ReleaseCapabil
     'migration',
     'rollback',
     'adopter-materialization',
+    'security',
+    'database',
+    'tenancy',
+    'provenance',
+    'reproducibility',
   ],
   'support-promotion': [
     'unit',
@@ -168,11 +173,30 @@ const TRANSITION_CAPABILITIES: Record<VersionTransition, readonly ReleaseCapabil
     'migration',
     'rollback',
     'adopter-materialization',
+    'security',
+    'database',
+    'tenancy',
     'provenance',
     'reproducibility',
     'operational-matrix',
   ],
 };
+const LTS_CAPABILITIES: readonly ReleaseCapability[] = [
+  'unit',
+  'integration',
+  'e2e',
+  'consumer',
+  'api-compatibility',
+  'migration',
+  'rollback',
+  'adopter-materialization',
+  'security',
+  'database',
+  'tenancy',
+  'provenance',
+  'reproducibility',
+  'operational-matrix',
+];
 
 function parseVersion(value: string): ParsedVersion | undefined {
   const match = SEMVER.exec(value);
@@ -292,9 +316,7 @@ export function resolveReleaseVerification(
     ...TRANSITION_CAPABILITIES[transition],
   ]);
   if (input.support === 'lts') {
-    ['provenance', 'reproducibility', 'operational-matrix'].forEach((value) =>
-      capabilities.add(value as ReleaseCapability),
-    );
+    LTS_CAPABILITIES.forEach((value) => capabilities.add(value));
   }
   addRiskCapabilities(capabilities, risks);
   for (const risk of input.risks ?? []) {

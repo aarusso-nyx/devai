@@ -1,7 +1,7 @@
-# Migrate from 1.3.3 to 1.4.1
+# Migrate from 1.3.3 to 1.4.2
 
 The package update is backward compatible for adopters that do not opt into
-release profiles. Pin `@aarusso-nyx/devai@1.4.1`, run the ordinary Doctor and
+release profiles. Pin `@aarusso-nyx/devai@1.4.2`, run the ordinary Doctor and
 existing task gates, and keep using `check --affected`, `--local`, or `--rc`.
 Missing release intent never selects a cheaper profile.
 

@@ -191,6 +191,7 @@ function repository(): Readonly<{ root: string; base: string }> {
   git(root, ['config', 'user.name', 'Runner Test']);
   git(root, ['config', 'user.email', 'runner@example.invalid']);
   file(root, '.gitignore', '.devai/state/*\n');
+  file(root, 'package.json', '{"name":"example-repo","version":"1.0.0"}\n');
   file(root, 'test-tasks.json', `${JSON.stringify(descriptor(), null, 2)}\n`);
   file(root, 'src/app.ts', 'export const value = 1;\n');
   file(root, 'tests/app.test.ts', 'test(value);\n');
@@ -201,6 +202,14 @@ function repository(): Readonly<{ root: string; base: string }> {
   git(root, ['add', '.']);
   git(root, ['commit', '-qm', 'base']);
   return { root, base: git(root, ['rev-parse', 'HEAD']) };
+}
+
+function commitRelease(root: string, path: string, content: string, version = '1.0.1'): string {
+  file(root, path, content);
+  file(root, 'package.json', `${JSON.stringify({ name: 'example-repo', version })}\n`);
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-qm', `release ${version}`]);
+  return git(root, ['rev-parse', 'HEAD']);
 }
 
 function commit(root: string, path: string, content: string): string {
@@ -1073,14 +1082,14 @@ describe('content-addressed check runner', () => {
 
   it('validates and binds exact release intent into the candidate receipt', () => {
     const state = repository();
-    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
     const releaseIntent = {
       schemaVersion: '1.0.0',
       release_unit: 'example/repo',
       current_version: '1.0.0',
       target_version: '1.0.1',
       support: 'current',
-      changed_paths: ['src/app.ts'],
+      changed_paths: ['package.json', 'src/app.ts'],
       changed_packages: [],
       candidate: {
         commit: git(state.root, ['rev-parse', 'HEAD']),
@@ -1123,14 +1132,14 @@ describe('content-addressed check runner', () => {
 
   it('refuses certification without the exact cheap-preflight receipt', () => {
     const state = repository();
-    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
     const releaseIntent = {
       schemaVersion: '1.0.0',
       release_unit: 'example/repo',
       current_version: '1.0.0',
       target_version: '1.0.1',
       support: 'current',
-      changed_paths: ['src/app.ts'],
+      changed_paths: ['package.json', 'src/app.ts'],
       changed_packages: [],
       candidate: {
         commit: git(state.root, ['rev-parse', 'HEAD']),
@@ -1154,7 +1163,7 @@ describe('content-addressed check runner', () => {
 
   it('rejects a release intent bound to the wrong candidate tree', () => {
     const state = repository();
-    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
     expect(() =>
       run(state.root, {
         target: 'affected',
@@ -1180,7 +1189,7 @@ describe('content-addressed check runner', () => {
 
   it('rejects release intent changed paths that do not match the exact candidate diff', () => {
     const state = repository();
-    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
     expect(() =>
       run(state.root, {
         target: 'affected',
@@ -1205,6 +1214,73 @@ describe('content-addressed check runner', () => {
         releaseProfile: releaseProfile(),
       }),
     ).toThrow('CHECK_RELEASE_INTENT_CHANGED_PATHS_MISMATCH');
+  });
+
+  it('binds declared versions to the exact base and candidate version source', () => {
+    const state = repository();
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const intent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.2',
+      support: 'current',
+      changed_paths: ['package.json', 'src/app.ts'],
+      changed_packages: [],
+      candidate: {
+        commit: git(state.root, ['rev-parse', 'HEAD']),
+        tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent: intent,
+        releaseProfile: releaseProfile(),
+      }),
+    ).toThrow('CHECK_RELEASE_TARGET_VERSION_SOURCE_MISMATCH');
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent: { ...intent, current_version: '0.9.9', target_version: '1.0.1' },
+        releaseProfile: releaseProfile(),
+      }),
+    ).toThrow('CHECK_RELEASE_CURRENT_VERSION_SOURCE_MISMATCH');
+  });
+
+  it('fails closed when the declared release-unit version source is unavailable', () => {
+    const state = repository();
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent: {
+          schemaVersion: '1.0.0',
+          release_unit: 'example/repo',
+          current_version: '1.0.0',
+          target_version: '1.0.1',
+          support: 'current',
+          changed_paths: ['package.json', 'src/app.ts'],
+          changed_packages: [],
+          candidate: {
+            commit: git(state.root, ['rev-parse', 'HEAD']),
+            tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+          },
+          base: {
+            commit: state.base,
+            tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+          },
+        },
+        releaseProfile: { ...releaseProfile(), version_source: 'packages/missing/package.json' },
+      }),
+    ).toThrow('CHECK_RELEASE_VERSION_SOURCE_UNREADABLE');
   });
 
   it('binds a materialized authority policy into an allowlisted RC task key', () => {

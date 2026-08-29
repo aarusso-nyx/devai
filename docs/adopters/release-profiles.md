@@ -28,6 +28,13 @@ release unit and version source, maps each capability to one or more existing
 task nodes, maps adopter-specific risk names to capabilities, and declares the
 mutation roster and its source/test/config/sanitizer selectors.
 
+The version source is a repository-relative JSON package manifest with a string
+`version`. The runner reads it from both the exact base commit and the exact
+candidate commit and requires those bytes to agree with `current_version` and
+`target_version`. A monorepo release unit must therefore have one unambiguous
+version source. Mixed transitions require separate release intents; an absent,
+malformed, or inconsistent source fails closed.
+
 Each roster entry names its existing mutation task node, package, applicable
 risk classes, source and test populations, manifest, configuration, sanitizer
 and orchestration inputs, lockfile, toolchain identities, and thresholds. The
@@ -58,6 +65,11 @@ command with `--release-stage certify` and `--preflight-receipt <path>`. It
 refuses to start when any binding differs. A receipt records `executed`,
 `reused`, `not-required`, `failed`, `blocked`, or `unknown`; skipped work is
 never reported as passed.
+
+Failed, blocked, and unknown checks also carry one bounded `failureClass`:
+`static-defect`, `sensor-stale`, `environment-drift`, `product-regression`,
+`policy-invalid`, `evidence-mismatch`, or `unknown`. Receipts never embed raw
+errors or unbounded command output.
 
 The release intent's `changed_paths` must exactly equal the base-to-candidate
 Git diff. `changed_packages` can provide the adopter's package mapping, but it
