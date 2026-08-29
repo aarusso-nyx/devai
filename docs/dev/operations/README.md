@@ -8,7 +8,7 @@
 - [DEVAI 1.2.8 adopter-package contract](adopter-package-contract.md)
 - [Remote preflight contract](remote-preflight-contract.md)
 - [Release verification profiles](../../adopters/release-profiles.md)
-- [Migrate from 1.3.3 to 1.4.0](migrate-1.3.3-to-1.4.0.md)
+- [Migrate from 1.3.3 to 1.4.1](migrate-1.3.3-to-1.4.1.md)
 
 Expensive local evidence is run explicitly. Ordinary remote automation validates evidence.
 The immutable RC tag workflow is the sole remote path that builds and publishes release
