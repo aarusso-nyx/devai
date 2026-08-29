@@ -17,6 +17,31 @@ function packageVersionAt(commit) {
   return JSON.parse(git(['show', `${commit}:packages/cli/package.json`])).version;
 }
 
+function changedPathsBetween(baseCommit, candidateCommit) {
+  const fields = execFileSync(
+    'git',
+    ['diff', '--name-status', '-z', '-M', '--find-renames', baseCommit, candidateCommit],
+    { cwd: root, encoding: 'utf8' },
+  )
+    .split('\0')
+    .filter(Boolean);
+  const paths = new Set();
+  for (let index = 0; index < fields.length;) {
+    const status = fields[index++];
+    const before = fields[index++];
+    if (status === undefined || before === undefined) {
+      throw new Error('PR_RELEASE_GATE_CHANGED_PATHS_INVALID');
+    }
+    paths.add(before);
+    if (status.startsWith('R') || status.startsWith('C')) {
+      const after = fields[index++];
+      if (after === undefined) throw new Error('PR_RELEASE_GATE_CHANGED_PATHS_INVALID');
+      paths.add(after);
+    }
+  }
+  return [...paths].sort();
+}
+
 const candidateCommit = git(['rev-parse', 'HEAD^{commit}']);
 const candidateTree = git(['rev-parse', 'HEAD^{tree}']);
 const baseTree = git(['rev-parse', `${base}^{tree}`]);
@@ -24,9 +49,7 @@ const currentVersion = packageVersionAt(base);
 const targetVersion = JSON.parse(
   readFileSync(join(root, 'packages/cli/package.json'), 'utf8'),
 ).version;
-const changedPaths = git(['diff', '--name-only', `${base}..${candidateCommit}`])
-  .split('\n')
-  .filter(Boolean);
+const changedPaths = changedPathsBetween(base, candidateCommit);
 
 const cli = join(root, 'packages/cli/dist/runtime/index/bin.js');
 const common = ['--repo-root', root, '--base', base, '--run', '--write', '--as-role', 'inspector'];

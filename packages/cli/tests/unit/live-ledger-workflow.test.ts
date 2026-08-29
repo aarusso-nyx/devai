@@ -786,6 +786,7 @@ describe('remote preflight workflow', () => {
   });
 
   it('binds the lane to the cheap local closure and to no protected input', () => {
+    const gate = readFileSync(join(ROOT, 'scripts/run-pr-release-gate.mjs'), 'utf8');
     expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run lint');
     expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run typecheck');
     expect(CHECKED_IN_PREFLIGHT).toContain('name: devai-release-gate');
@@ -800,6 +801,8 @@ describe('remote preflight workflow', () => {
     expect(CHECKED_IN_PREFLIGHT).not.toContain('environment:');
     expect(CHECKED_IN_PREFLIGHT).not.toContain(LEDGER_ENVIRONMENT);
     expect(CHECKED_IN_PREFLIGHT).not.toContain('upload-artifact');
+    expect(gate).toContain("['diff', '--name-status', '-z', '-M', '--find-renames'");
+    expect(gate).not.toContain("['diff', '--name-only'");
 
     const workflow = parse(CHECKED_IN_PREFLIGHT) as {
       on?: Record<string, unknown>;
