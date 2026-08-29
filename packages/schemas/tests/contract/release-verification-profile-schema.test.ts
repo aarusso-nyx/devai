@@ -14,11 +14,17 @@ const profile = {
     {
       id: 'example',
       package: '@example/package',
+      task_node: 'test:mutation:example',
+      risk_classes: ['authorization'],
       source_selectors: ['src/'],
       test_selectors: ['tests/'],
       manifest_path: 'package.json',
       config_paths: ['mutation.config.ts'],
       sanitizer_paths: ['scripts/sanitize.mjs'],
+      orchestration_paths: ['scripts/run-mutation.mjs'],
+      lockfile_path: 'pnpm-lock.yaml',
+      toolchain_keys: ['node', 'pnpm', 'mutation-engine'],
+      thresholds: { high: 100, low: 90, break: 90 },
     },
   ],
 } as const;

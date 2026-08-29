@@ -11,6 +11,8 @@
     "current_version",
     "target_version",
     "support",
+    "changed_paths",
+    "changed_packages",
     "candidate",
     "base"
   ],
@@ -22,6 +24,19 @@
     "support": { "enum": ["preview", "current", "lts"] },
     "support_promotion": { "type": "boolean" },
     "change_kind": { "enum": ["documentation", "metadata", "behavioral"] },
+    "changed_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+      }
+    },
+    "changed_packages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
     "risks": {
       "type": "array",
       "uniqueItems": true,

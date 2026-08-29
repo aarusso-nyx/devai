@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  resolveReleaseMutationTaskNodes,
   resolveReleaseTaskNodes,
   resolveReleaseVerification,
 } from '../../src/services/release-profile.js';
@@ -186,6 +187,89 @@ describe('release verification profile resolver', () => {
       expect.arrayContaining(['security', 'consumer', 'integration']),
     );
     expect(result.mutation).toBe('targeted');
+  });
+
+  it('selects affected, risk-targeted, and full-roster mutation task nodes', () => {
+    const roster = [
+      {
+        id: 'a',
+        package: '@example/a',
+        task_node: 'mutation:a',
+        source_selectors: ['packages/a/src/'],
+      },
+      {
+        id: 'b',
+        package: '@example/b',
+        task_node: 'mutation:b',
+        risk_classes: ['authorization'],
+      },
+    ];
+    const affected = resolveReleaseVerification({
+      currentVersion: '1.0.0',
+      targetVersion: '1.0.1',
+      support: 'current',
+      changeKind: 'behavioral',
+      mutationRosterSize: roster.length,
+    });
+    expect(
+      resolveReleaseMutationTaskNodes(
+        affected,
+        roster,
+        [],
+        ['packages/a/src/index.ts'],
+        [],
+        ['mutation:a', 'mutation:b'],
+      ),
+    ).toEqual({ taskNodes: ['mutation:a'], rosterEntryIds: ['a'] });
+
+    const targeted = resolveReleaseVerification({
+      currentVersion: '1.0.0',
+      targetVersion: '1.1.0',
+      support: 'current',
+      risks: ['authorization'],
+      mutationRosterSize: roster.length,
+    });
+    expect(
+      resolveReleaseMutationTaskNodes(
+        targeted,
+        roster,
+        [],
+        [],
+        ['authorization'],
+        ['mutation:a', 'mutation:b'],
+      ),
+    ).toEqual({ taskNodes: ['mutation:b'], rosterEntryIds: ['b'] });
+
+    const lts = resolveReleaseVerification({
+      currentVersion: '1.1.0',
+      targetVersion: '1.1.0',
+      support: 'lts',
+      supportPromotion: true,
+      mutationRosterSize: roster.length,
+    });
+    expect(
+      resolveReleaseMutationTaskNodes(lts, roster, [], [], [], ['mutation:a', 'mutation:b']),
+    ).toEqual({ taskNodes: ['mutation:a', 'mutation:b'], rosterEntryIds: ['a', 'b'] });
+  });
+
+  it('fails closed when affected mutation cannot resolve a roster package', () => {
+    const decision = resolveReleaseVerification({
+      currentVersion: '1.0.0',
+      targetVersion: '1.0.1',
+      support: 'current',
+      changeKind: 'behavioral',
+      mutationRosterSize: 1,
+    });
+    expect(() =>
+      resolveReleaseMutationTaskNodes(
+        decision,
+        [{ id: 'a', package: '@example/a', task_node: 'mutation:a' }],
+        [],
+        [],
+        [],
+        ['mutation:a'],
+      ),
+    ).toThrow('CHECK_RELEASE_MUTATION_TARGET_UNRESOLVED');
   });
 
   it('applies the unconditional hygiene and candidate-integrity floor to every profile', () => {

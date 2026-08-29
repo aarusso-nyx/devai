@@ -12,11 +12,14 @@ To adopt profile-driven releases:
 2. Declare product-specific risk mappings and the exact mutation roster. An
    empty roster is explicit: targeted mutation is `not-required` for ordinary
    releases, while LTS promotion blocks until a roster exists.
+   Bind every roster entry to a real task node and declare its complete input,
+   toolchain, threshold, and sanitizer identity.
 3. Add `release_verification` to the reviewed adopter policy, preview `init bind`,
    resolve conflicts, then apply as Architect with `--write`.
 4. Generate a candidate-bound `release-intent` record only after the candidate
-   commit exists. Run preflight, retain its digest-verified receipt, then run
-   certification against the same candidate and toolchain.
+   commit exists. Record the exact base-to-candidate `changed_paths` and mapped
+   `changed_packages`. Run preflight, retain its digest-verified receipt, then
+   run certification against the same candidate and toolchain.
 5. Present one stable required-check name in CI while allowing the internal DAG
    to vary. Keep PR jobs unprivileged and publication-free.
 

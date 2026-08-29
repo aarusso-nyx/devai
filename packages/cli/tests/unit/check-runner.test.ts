@@ -1035,6 +1035,8 @@ describe('content-addressed check runner', () => {
       current_version: '1.0.0',
       target_version: '1.0.1',
       support: 'current',
+      changed_paths: ['src/app.ts'],
+      changed_packages: [],
       candidate: {
         commit: git(state.root, ['rev-parse', 'HEAD']),
         tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
@@ -1083,6 +1085,8 @@ describe('content-addressed check runner', () => {
       current_version: '1.0.0',
       target_version: '1.0.1',
       support: 'current',
+      changed_paths: ['src/app.ts'],
+      changed_packages: [],
       candidate: {
         commit: git(state.root, ['rev-parse', 'HEAD']),
         tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
@@ -1116,6 +1120,8 @@ describe('content-addressed check runner', () => {
           current_version: '1.0.0',
           target_version: '1.0.1',
           support: 'current',
+          changed_paths: ['src/app.ts'],
+          changed_packages: [],
           candidate: { commit: git(state.root, ['rev-parse', 'HEAD']), tree: 'f'.repeat(40) },
           base: {
             commit: state.base,
@@ -1125,6 +1131,35 @@ describe('content-addressed check runner', () => {
         releaseProfile: releaseProfile(),
       }),
     ).toThrow('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
+  });
+
+  it('rejects release intent changed paths that do not match the exact candidate diff', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent: {
+          schemaVersion: '1.0.0',
+          release_unit: 'example/repo',
+          current_version: '1.0.0',
+          target_version: '1.0.1',
+          support: 'current',
+          changed_paths: ['tests/not-the-change.test.ts'],
+          changed_packages: [],
+          candidate: {
+            commit: git(state.root, ['rev-parse', 'HEAD']),
+            tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+          },
+          base: {
+            commit: state.base,
+            tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+          },
+        },
+        releaseProfile: releaseProfile(),
+      }),
+    ).toThrow('CHECK_RELEASE_INTENT_CHANGED_PATHS_MISMATCH');
   });
 
   it('binds a materialized authority policy into an allowlisted RC task key', () => {

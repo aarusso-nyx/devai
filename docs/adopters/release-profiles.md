@@ -28,6 +28,15 @@ release unit and version source, maps each capability to one or more existing
 task nodes, maps adopter-specific risk names to capabilities, and declares the
 mutation roster and its source/test/config/sanitizer selectors.
 
+Each roster entry names its existing mutation task node, package, applicable
+risk classes, source and test populations, manifest, configuration, sanitizer
+and orchestration inputs, lockfile, toolchain identities, and thresholds. The
+runner selects affected entries from the candidate's exact declared path set,
+selects risk-matched entries for targeted assurance, and selects the complete
+roster for LTS. When targeted assurance cannot prove a narrower population it
+fails safe to the complete declared roster; an unresolved affected population
+blocks.
+
 Package policy can opt into materialization with `release_verification`. Use the
 existing `init bind` preview and reviewed write flow. Existing adopters without
 that field receive no release profile and retain their prior `affected`, `local`,
@@ -49,6 +58,10 @@ command with `--release-stage certify` and `--preflight-receipt <path>`. It
 refuses to start when any binding differs. A receipt records `executed`,
 `reused`, `not-required`, `failed`, `blocked`, or `unknown`; skipped work is
 never reported as passed.
+
+The release intent's `changed_paths` must exactly equal the base-to-candidate
+Git diff. `changed_packages` can provide the adopter's package mapping, but it
+cannot conceal a roster entry selected by the exact changed paths.
 
 Mutation reuse is exact per roster entry. A change to source, tests, manifest,
 configuration, orchestration, roster, thresholds, sanitizers, lockfile,

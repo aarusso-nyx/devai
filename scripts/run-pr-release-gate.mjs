@@ -71,6 +71,8 @@ const intent = {
   target_version: targetVersion,
   support: 'current',
   change_kind: documentationOnly ? 'documentation' : metadataOnly ? 'metadata' : 'behavioral',
+  changed_paths: changedPaths,
+  changed_packages: [],
   risks: [...risks].sort(),
   candidate: { commit: candidateCommit, tree: candidateTree },
   base: { commit: base, tree: baseTree },

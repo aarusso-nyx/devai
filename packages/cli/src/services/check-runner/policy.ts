@@ -34,6 +34,7 @@ interface PolicyBuildOptions {
   readonly baseCommit?: string;
   readonly releaseRequiredNodes?: readonly string[];
   readonly releaseAffectedSelection?: boolean;
+  readonly releaseTaskBindings?: Readonly<Record<string, unknown>>;
   readonly toolchain: Readonly<Record<string, string>>;
   readonly environment: Readonly<Record<string, string>>;
   readonly cacheState: (
@@ -645,6 +646,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       toolchain: selectedToolchain,
       environment: selectedEnvironment,
       outputContract: outputContracts.get(task.nodeId),
+      releaseBinding: options.releaseTaskBindings?.[task.nodeId] ?? null,
       inputs,
       dependencies,
     });

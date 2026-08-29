@@ -2,7 +2,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { getValidator } from '@devai-nyx/schemas';
-import { resolveReleaseTaskNodes, resolveReleaseVerification } from '../release-profile.js';
+import {
+  resolveReleaseMutationTaskNodes,
+  resolveReleaseTaskNodes,
+  resolveReleaseVerification,
+  type MutationRosterEntry,
+} from '../release-profile.js';
 import {
   PREFLIGHT_CAPABILITIES,
   verifyReleasePreflightReceipt,
@@ -170,6 +175,9 @@ function planWithCache(
     ...(options.releaseAffectedSelection !== undefined && {
       releaseAffectedSelection: options.releaseAffectedSelection,
     }),
+    ...(options.releaseTaskBindings !== undefined && {
+      releaseTaskBindings: options.releaseTaskBindings,
+    }),
     toolchain,
     environment,
     cacheState(task) {
@@ -292,6 +300,8 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     support: 'preview' | 'current' | 'lts';
     support_promotion?: boolean;
     change_kind?: 'documentation' | 'metadata' | 'behavioral';
+    changed_paths?: string[];
+    changed_packages?: string[];
     risks?: string[];
     owner_escalations?: import('../release-profile.js').ReleaseCapability[];
     candidate: { commit: string; tree: string };
@@ -301,7 +311,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     release_unit: string;
     capability_tasks: Record<string, string[]>;
     risk_capabilities: Record<string, import('../release-profile.js').ReleaseCapability[]>;
-    mutation_roster: readonly unknown[];
+    mutation_roster: readonly MutationRosterEntry[];
   };
   if (intent.release_unit !== profile.release_unit) {
     throw new Error('CHECK_RELEASE_UNIT_MISMATCH');
@@ -338,6 +348,29 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     profile.capability_tasks,
     descriptor.tasks.map((task) => task.nodeId),
   );
+  const mutationSelection = resolveReleaseMutationTaskNodes(
+    decision,
+    profile.mutation_roster,
+    intent.changed_packages ?? [],
+    intent.changed_paths ?? [],
+    intent.risks ?? [],
+    descriptor.tasks.map((task) => task.nodeId),
+  );
+  const selectedRoots = [...new Set([...allRoots, ...mutationSelection.taskNodes])].sort();
+  const profileDigest = sha256Hex(input.releaseProfile);
+  const mutationTaskBindings = Object.fromEntries(
+    mutationSelection.taskNodes.map((nodeId) => [
+      nodeId,
+      {
+        schemaVersion: '1.0.0',
+        mutation: decision.mutation,
+        profileDigest,
+        rosterEntries: profile.mutation_roster
+          .filter((entry) => mutationSelection.rosterEntryIds.includes(entry.id))
+          .filter((entry) => entry.task_node === nodeId),
+      },
+    ]),
+  );
   const preflightDecision = {
     ...decision,
     capabilities: decision.capabilities.filter((capability) =>
@@ -355,14 +388,15 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
       ...input,
       target: 'release',
       releaseStage: stage,
-      releaseRequiredNodes: stage === 'preflight' ? preflightRoots : allRoots,
-      releaseAllNodes: allRoots,
+      releaseRequiredNodes: stage === 'preflight' ? preflightRoots : selectedRoots,
+      releaseAllNodes: selectedRoots,
+      releaseTaskBindings: stage === 'preflight' ? {} : mutationTaskBindings,
       releaseAffectedSelection:
         stage === 'certify' && decision.capabilities.includes('affected-checks'),
     },
     binding: {
       digest: sha256Hex(input.releaseIntent),
-      profileDigest: sha256Hex(input.releaseProfile),
+      profileDigest,
       decision,
       base: intent.base,
       preflightCapabilityTasks: Object.fromEntries(
@@ -413,6 +447,13 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
   }
   const rawPlan = planWithCache(options, cache, toolchain, environment);
   const releaseBinding = request.binding;
+  if (releaseBinding !== undefined) {
+    const intent = inputOptions.releaseIntent as { changed_paths?: string[] };
+    const declared = [...(intent.changed_paths ?? [])].sort();
+    if (JSON.stringify(declared) !== JSON.stringify(rawPlan.changedPaths)) {
+      throw new Error('CHECK_RELEASE_INTENT_CHANGED_PATHS_MISMATCH');
+    }
+  }
   const plan =
     releaseBinding === undefined
       ? rawPlan
@@ -435,6 +476,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
         ...options,
         releaseStage: 'preflight',
         releaseAffectedSelection: false,
+        releaseTaskBindings: {},
         releaseRequiredNodes: resolveReleaseTaskNodes(
           {
             ...releaseBinding.decision,

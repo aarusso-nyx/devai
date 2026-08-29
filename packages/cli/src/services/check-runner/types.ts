@@ -159,6 +159,7 @@ export interface CheckRunnerOptions {
   readonly releaseRequiredNodes?: readonly string[];
   readonly releaseAllNodes?: readonly string[];
   readonly releaseAffectedSelection?: boolean;
+  readonly releaseTaskBindings?: Readonly<Record<string, unknown>>;
   readonly releaseStage?: 'preflight' | 'certify';
   readonly preflightReceipt?: unknown;
   readonly executeTask?: (

@@ -84,6 +84,20 @@ export interface ReleaseVerificationDecision {
   readonly blockingReasons: readonly string[];
 }
 
+export interface MutationRosterEntry {
+  readonly id: string;
+  readonly package: string;
+  readonly task_node: string;
+  readonly risk_classes?: readonly string[];
+  readonly source_selectors?: readonly string[];
+  readonly test_selectors?: readonly string[];
+  readonly manifest_path?: string;
+  readonly config_paths?: readonly string[];
+  readonly sanitizer_paths?: readonly string[];
+  readonly orchestration_paths?: readonly string[];
+  readonly lockfile_path?: string;
+}
+
 interface ParsedVersion {
   readonly major: number;
   readonly minor: number;
@@ -344,4 +358,61 @@ export function resolveReleaseTaskNodes(
     throw new Error(`CHECK_RELEASE_PROFILE_CAPABILITY_UNSATISFIED:${missing.sort().join(',')}`);
   }
   return [...selected].sort();
+}
+
+export function resolveReleaseMutationTaskNodes(
+  decision: ReleaseVerificationDecision,
+  roster: readonly MutationRosterEntry[],
+  changedPackages: readonly string[],
+  changedPaths: readonly string[],
+  risks: readonly string[],
+  knownTaskNodes: readonly string[],
+): Readonly<{ taskNodes: readonly string[]; rosterEntryIds: readonly string[] }> {
+  if (decision.verdict !== 'ready') throw new Error('CHECK_RELEASE_DECISION_BLOCKED');
+  if (decision.mutation === 'none') return { taskNodes: [], rosterEntryIds: [] };
+
+  const known = new Set(knownTaskNodes);
+  const changed = new Set(changedPackages);
+  const pathAffectsEntry = (entry: MutationRosterEntry): boolean => {
+    const selectors = [
+      ...(entry.source_selectors ?? []),
+      ...(entry.test_selectors ?? []),
+      ...(entry.config_paths ?? []),
+      ...(entry.sanitizer_paths ?? []),
+      ...(entry.orchestration_paths ?? []),
+      ...(entry.manifest_path === undefined ? [] : [entry.manifest_path]),
+      ...(entry.lockfile_path === undefined ? [] : [entry.lockfile_path]),
+    ];
+    return changedPaths.some((path) =>
+      selectors.some((selector) => {
+        const normalized = selector.replace(/\/$/u, '');
+        return path === normalized || path.startsWith(`${normalized}/`);
+      }),
+    );
+  };
+  const selected =
+    decision.mutation === 'full-roster'
+      ? [...roster]
+      : roster.filter(
+          (entry) =>
+            changed.has(entry.package) ||
+            pathAffectsEntry(entry) ||
+            (decision.mutation === 'targeted' &&
+              (entry.risk_classes ?? []).some((risk) => risks.includes(risk))),
+        );
+
+  // Targeted assurance fails safe to the declared roster when no narrower target
+  // can be proven. Affected assurance requires an explicit package match.
+  const effective =
+    decision.mutation === 'targeted' && selected.length === 0 ? [...roster] : selected;
+  if (effective.length === 0) throw new Error('CHECK_RELEASE_MUTATION_TARGET_UNRESOLVED');
+  for (const entry of effective) {
+    if (!known.has(entry.task_node)) {
+      throw new Error(`CHECK_RELEASE_PROFILE_UNKNOWN_TASK:${entry.task_node}`);
+    }
+  }
+  return {
+    taskNodes: [...new Set(effective.map((entry) => entry.task_node))].sort(),
+    rosterEntryIds: effective.map((entry) => entry.id).sort(),
+  };
 }
