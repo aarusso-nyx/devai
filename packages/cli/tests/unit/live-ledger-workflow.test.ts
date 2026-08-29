@@ -555,6 +555,16 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 48');
     expect(release).toContain('pnpm run release:closure');
+    const buildIndex = release.indexOf('pnpm run build');
+    expect(buildIndex).toBeGreaterThanOrEqual(0);
+    for (const check of [
+      'pnpm run format:check',
+      'pnpm run lint',
+      'pnpm run typecheck',
+      'pnpm run release:static-integrity',
+    ]) {
+      expect(release.indexOf(check), check).toBeGreaterThan(buildIndex);
+    }
     expect(release).toContain('--binding exact-tree');
     expect(release).toContain('sbom_subject_sha256');
     expect(release).toContain('Verify npm adopter quickstart on Linux');

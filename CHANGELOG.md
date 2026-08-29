@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1 — 2026-08-29
+
+- Supersedes the unpublished `v1.4.0` rehearsal candidate after a fresh Linux release runner
+  demonstrated that type-aware lint requires workspace build declarations.
+- Builds the exact tagged workspace before independently rerunning formatting, lint, typecheck,
+  schema/generated integrity, closure, package smoke, and documentation checks.
+
 ## 1.4.0 — 2026-08-29
 
 - Adds schema-validated, candidate-bound release intent and adopter release-verification profiles
