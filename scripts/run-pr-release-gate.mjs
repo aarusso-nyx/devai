@@ -30,6 +30,12 @@ const changedPaths = git(['diff', '--name-only', `${base}..${candidateCommit}`])
 
 const cli = join(root, 'packages/cli/dist/runtime/index/bin.js');
 const common = ['--repo-root', root, '--base', base, '--run', '--write', '--as-role', 'inspector'];
+const binding = spawnSync(
+  process.execPath,
+  [cli, 'init', 'bind', '--target', root, '--as-role', 'architect', '--write', '--format', 'json'],
+  { cwd: root, stdio: 'inherit' },
+);
+if (binding.status !== 0) process.exit(binding.status ?? 1);
 if (currentVersion === targetVersion) {
   const result = spawnSync(process.execPath, [cli, 'check', '--affected', ...common], {
     cwd: root,
