@@ -363,7 +363,7 @@ jobs:
           git init --quiet
           git config user.name 'DEVAI Linux Adopter Check'
           git config user.email 'devai-linux@example.invalid'
-          npm init --yes >/dev/null
+          node -e 'require("node:fs").writeFileSync("package.json", `${JSON.stringify({ name: "devai-linux-adopter", version: "1.0.0", private: true }, null, 2)}\n`)'
           npm install --save-dev --save-exact "$tarball"
           devai='./node_modules/.bin/devai'
           "$devai" init bind --target . --tier tier1 --constitution --as-role architect --write --format json
