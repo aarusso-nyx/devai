@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   computeScorecard,
@@ -45,7 +46,7 @@ describe('DII-103 same-kind sensor standing', () => {
   });
 
   it('turns a stale latest FAIL into REVIEW-stale without dropping its evidence', () => {
-    const policyMs = loadScorecardFailureMaxAgeMs(new URL('../..', import.meta.url).pathname);
+    const policyMs = loadScorecardFailureMaxAgeMs(fileURLToPath(new URL('../..', import.meta.url)));
     expect(policyMs).toBe(168 * 60 * 60 * 1000);
     const veryOld = reading('SR-fail', '2026-07-01T10:00:00.000Z', 'fail');
     const cell = lintCell([veryOld], policyMs);

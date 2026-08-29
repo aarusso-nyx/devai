@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-verification-profile.schema.json",
+  "title": "Release verification profile",
+  "description": "Adopter-owned mapping from generic release risks and capabilities to repository task nodes and mutation evidence selectors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "policy_id",
+    "policy_version",
+    "release_unit",
+    "version_source",
+    "default_support",
+    "capability_tasks",
+    "risk_capabilities",
+    "mutation_roster"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
+    "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "version_source": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$",
+      "maxLength": 500
+    },
+    "default_support": { "enum": ["preview", "current", "lts"] },
+    "required_check": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Stable external CI status name; internal selected task nodes may vary."
+    },
+    "capability_tasks": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" }
+      }
+    },
+    "risk_capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+      }
+    },
+    "mutation_roster": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "package",
+          "task_node",
+          "source_selectors",
+          "test_selectors",
+          "manifest_path",
+          "config_paths",
+          "sanitizer_paths",
+          "orchestration_paths",
+          "lockfile_path",
+          "toolchain_keys",
+          "thresholds"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
+          "package": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "task_node": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
+          },
+          "risk_classes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+          },
+          "source_selectors": { "$ref": "#/$defs/pathList" },
+          "test_selectors": { "$ref": "#/$defs/pathList" },
+          "manifest_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "config_paths": { "$ref": "#/$defs/pathList" },
+          "sanitizer_paths": { "$ref": "#/$defs/pathList" },
+          "orchestration_paths": { "$ref": "#/$defs/pathList" },
+          "lockfile_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "toolchain_keys": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+          },
+          "thresholds": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pathList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+      }
+    }
+  }
+}

@@ -9,6 +9,7 @@ import type {
   TaskOutcome,
   TaskResult,
 } from './types.js';
+import type { ReleasePreflightReceipt } from '../release-preflight.js';
 
 const MAX_DIAGNOSTIC_STREAM_BYTES = 8 * 1024;
 
@@ -222,6 +223,16 @@ export class CheckCache {
   writeReceipt(receipt: CandidateReceipt): Readonly<{ digest: string; path: string }> {
     const digest = sha256Hex(receipt);
     const path = join(this.#root, 'receipts', `${digest}.json`);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, canonicalBytes(receipt));
+    return { digest, path };
+  }
+
+  writePreflightReceipt(
+    receipt: ReleasePreflightReceipt,
+  ): Readonly<{ digest: string; path: string }> {
+    const digest = sha256Hex(receipt);
+    const path = join(this.#root, 'preflight-receipts', `${digest}.json`);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, canonicalBytes(receipt));
     return { digest, path };

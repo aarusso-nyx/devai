@@ -19,7 +19,7 @@ import { parseDocument } from 'yaml';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
-const smokeRoot = mkdtempSync(join(tmpdir(), 'devai-installed-tarball-smoke-'));
+const smokeRoot = mkdtempSync(join(tmpdir(), 'devai installed çandidate-'));
 const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
@@ -497,6 +497,17 @@ try {
           local_only_nodes: ['test:mutation'],
         },
       },
+      release_verification: {
+        schemaVersion: '1.0.0',
+        policy_id: 'installed-smoke.release',
+        policy_version: '1.0.0',
+        release_unit: 'installed-smoke',
+        version_source: 'package.json',
+        default_support: 'current',
+        capability_tasks: { lint: ['lint'] },
+        risk_capabilities: {},
+        mutation_roster: [],
+      },
     },
     null,
     2,
@@ -521,6 +532,7 @@ try {
     '.devai/config/thresholds.json',
     '.devai/config/scorecard-na.json',
     '.devai/config/glob-guards.json',
+    '.devai/config/release-verification.json',
     '.devai/config/adopter-policy-binding.json',
   ];
   const adopterSnapshot = new Map(
@@ -529,13 +541,18 @@ try {
   const boundProject = JSON.parse(
     readFileSync(join(projectRoot, '.devai/config/project.json'), 'utf8'),
   );
+  const boundReleaseProfile = JSON.parse(
+    readFileSync(join(projectRoot, '.devai/config/release-verification.json'), 'utf8'),
+  );
   if (
     boundProject.ci_economy?.attested_rc?.required_check !== 'verified-local-rc' ||
     boundProject.ci_economy?.attested_rc?.local_only_nodes?.join(',') !== 'test:mutation' ||
     boundProject.feature_flags?.adopter_owned_toggle !== true ||
     boundProject.docs?.output_dir !== 'site/build' ||
     boundProject.docs?.publish_target !== 'gh-pages' ||
-    boundProject.docs?.gh_pages_branch !== 'gh-pages'
+    boundProject.docs?.gh_pages_branch !== 'gh-pages' ||
+    boundReleaseProfile.release_unit !== 'installed-smoke' ||
+    boundReleaseProfile.capability_tasks?.lint?.join(',') !== 'lint'
   ) {
     throw new Error('INSTALLED_ADOPTER_POLICY_ATTESTED_RC_INVALID');
   }

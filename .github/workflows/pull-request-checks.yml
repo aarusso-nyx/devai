@@ -1,8 +1,9 @@
 name: Pull request preflight
 
 # Non-attesting preflight. See docs/dev/operations/remote-preflight-contract.md.
-# This workflow produces no evidence and cannot sign, export, or supplement a
-# candidate receipt. A green run is a contradiction check, not a claim.
+# This workflow produces no attested evidence and cannot sign, export, or
+# supplement a candidate receipt. A transient preflight receipt only gates the
+# current run; a green run is a contradiction check, not a release claim.
 
 on:
   pull_request:
@@ -17,7 +18,7 @@ permissions:
 
 jobs:
   preflight:
-    name: Lint, typecheck, and cheap local closure
+    name: devai-release-gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -25,7 +26,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up pnpm
@@ -45,11 +46,18 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Formatting and static candidate integrity
+        env:
+          DEVAI_FORMAT_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          pnpm run format:check
+          pnpm run release:static-integrity
+
       - name: Lint
         run: pnpm run lint
 
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Cheap local closure
-        run: pnpm run test:local
+      - name: Profile-selected candidate preflight
+        run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }}

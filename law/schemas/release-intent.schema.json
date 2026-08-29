@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-intent.schema.json",
+  "title": "Release verification intent",
+  "description": "Candidate-bound, bounded release-verification input. It grants no publication authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "release_unit",
+    "current_version",
+    "target_version",
+    "support",
+    "changed_paths",
+    "changed_packages",
+    "candidate",
+    "base"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "current_version": { "type": "string", "maxLength": 100 },
+    "target_version": { "type": "string", "maxLength": 100 },
+    "support": { "enum": ["preview", "current", "lts"] },
+    "support_promotion": { "type": "boolean" },
+    "change_kind": { "enum": ["documentation", "metadata", "behavioral"] },
+    "changed_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+      }
+    },
+    "changed_packages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "risks": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+    },
+    "owner_escalations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+    },
+    "candidate": { "$ref": "#/$defs/gitIdentity" },
+    "base": { "$ref": "#/$defs/gitIdentity" }
+  },
+  "$defs": {
+    "gitIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    }
+  }
+}

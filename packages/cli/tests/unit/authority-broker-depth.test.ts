@@ -3,13 +3,14 @@ import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
 
-const ROOT = new URL('../../../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const originalArgv = [...process.argv];
 const originalStdout = process.stdout.write;
 let entries: readonly RegistryEntry[];

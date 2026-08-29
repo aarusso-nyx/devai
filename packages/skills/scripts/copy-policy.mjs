@@ -12,6 +12,7 @@ const files = [
   'forbidden-actions.json',
   'glob-guards.json',
   'mutation-strength.json',
+  'release-verification.json',
   'scorecard-na.json',
   'thresholds.json',
 ];

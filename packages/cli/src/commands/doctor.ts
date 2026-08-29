@@ -310,17 +310,7 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
   }
   const binding = parsedBinding.binding;
 
-  const expectedTargets = [...ADOPTER_POLICY_TARGETS];
   const receiptTargets = Object.keys(binding.materialized).sort();
-  if (
-    receiptTargets.length !== expectedTargets.length ||
-    expectedTargets.some((target) => !receiptTargets.includes(target))
-  ) {
-    addReason(
-      'TARGET_SET_MISMATCH',
-      'adopter-policy binding must contain the exact complete materialized target set',
-    );
-  }
 
   const sourceLexical = binding.source_path;
   const normalizedSource = sourceLexical.split('/').join(sep);
@@ -443,6 +433,17 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
       `adopter-policy source cannot be materialized: ${sourceLexical}`,
     );
     return result(sourceLexical);
+  }
+
+  const expectedTargets = [...expected.keys()].sort();
+  if (
+    receiptTargets.length !== expectedTargets.length ||
+    expectedTargets.some((target) => !receiptTargets.includes(target))
+  ) {
+    addReason(
+      'TARGET_SET_MISMATCH',
+      'adopter-policy binding must contain the exact policy-selected materialized target set',
+    );
   }
 
   for (const targetRelative of ADOPTER_POLICY_TARGETS) {

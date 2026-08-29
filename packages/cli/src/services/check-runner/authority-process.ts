@@ -54,7 +54,9 @@ export function matchDeclaredCheckTaskProcess(
   request: AuthorityHostEffectRequest,
 ): DeclaredCheckTaskProcess | undefined {
   if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
-  const targets = ['--affected', '--local', '--rc'].filter((flag) => invocationArgv.includes(flag));
+  const targets = ['--affected', '--local', '--rc', '--release-intent'].filter((flag) =>
+    invocationArgv.includes(flag),
+  );
   const suiteIndex = invocationArgv.indexOf('--suite');
   const suite = suiteIndex < 0 ? undefined : invocationArgv[suiteIndex + 1];
   const onlyIndex = invocationArgv.indexOf('--only');

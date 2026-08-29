@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-preflight-receipt.schema.json",
+  "title": "Release preflight receipt",
+  "description": "Exact cheap-preflight evidence required before expensive release verification starts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "base",
+    "releaseIntentDigest",
+    "releaseProfileDigest",
+    "taskPolicyDigest",
+    "toolchainDigest",
+    "checks",
+    "verdict",
+    "blockingReasons",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "base": { "$ref": "#/$defs/gitIdentity" },
+    "releaseIntentDigest": { "$ref": "#/$defs/sha256" },
+    "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+    "taskPolicyDigest": { "$ref": "#/$defs/sha256" },
+    "toolchainDigest": { "$ref": "#/$defs/sha256" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "status", "reasonCode"],
+        "properties": {
+          "capability": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "status": {
+            "enum": ["executed", "reused", "not-required", "failed", "blocked", "unknown"]
+          },
+          "reasonCode": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "resultDigest": { "$ref": "#/$defs/sha256" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "enum": ["executed", "reused"] } } },
+            "then": { "required": ["resultDigest"] }
+          }
+        ]
+      }
+    },
+    "verdict": { "enum": ["pass", "block"] },
+    "blockingReasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "gitIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    }
+  }
+}

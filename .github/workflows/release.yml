@@ -272,6 +272,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm run release:static-integrity
           pnpm run build
           pnpm run release:closure
           pnpm --filter "$PACKAGE_NAME" run pack:smoke

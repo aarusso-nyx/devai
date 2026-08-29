@@ -33,6 +33,7 @@
       "$ref": "project-config.schema.json#/properties/ci_economy",
       "description": "Optional CI-economy policy materialized into the adopter project configuration."
     },
+    "release_verification": { "$ref": "release-verification-profile.schema.json" },
     "domains": {
       "type": "object",
       "additionalProperties": false,
