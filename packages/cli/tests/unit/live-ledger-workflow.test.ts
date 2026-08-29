@@ -554,6 +554,8 @@ describe('live ledger-verification workflow', () => {
     expect(parsed.jobs?.['rehearsal-summary']?.if).toBe(REHEARSAL_CONDITION);
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('devai adopter espaço não-ASCII');
+    expect(release).toContain('name: "devai-linux-adopter"');
+    expect(release).not.toContain('npm init --yes');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 48');
     expect(release).toContain('pnpm run release:closure');
     const buildIndex = release.indexOf('pnpm run build');

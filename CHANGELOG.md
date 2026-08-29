@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.3 — 2026-08-29
+
+- Supersedes the unpublished `v1.4.2` rehearsal candidate after npm rejected the non-ASCII
+  adopter-directory basename as an inferred package name.
+- Preserves the real space and non-ASCII installation path while creating an explicit,
+  deterministic npm adopter manifest with a portable package name.
+
 ## 1.4.2 — 2026-08-29
 
 - Binds release-intent versions to the exact base and candidate package-manifest bytes declared by
