@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const base = process.argv[2];
+const base = process.argv.slice(2).find((argument) => argument !== '--');
 if (!/^[a-f0-9]{40}$/u.test(base ?? '')) throw new Error('PR_RELEASE_GATE_BASE_INVALID');
 
 function git(args) {
