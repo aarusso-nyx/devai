@@ -39,12 +39,29 @@
             "enum": ["executed", "reused", "not-required", "failed", "blocked", "unknown"]
           },
           "reasonCode": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "failureClass": {
+            "enum": [
+              "static-defect",
+              "sensor-stale",
+              "environment-drift",
+              "product-regression",
+              "policy-invalid",
+              "evidence-mismatch",
+              "unknown"
+            ]
+          },
           "resultDigest": { "$ref": "#/$defs/sha256" }
         },
         "allOf": [
           {
             "if": { "properties": { "status": { "enum": ["executed", "reused"] } } },
             "then": { "required": ["resultDigest"] }
+          },
+          {
+            "if": {
+              "properties": { "status": { "enum": ["failed", "blocked", "unknown"] } }
+            },
+            "then": { "required": ["failureClass"] }
           }
         ]
       }

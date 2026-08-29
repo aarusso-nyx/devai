@@ -73,4 +73,32 @@ describe('release preflight receipt', () => {
       ),
     ).toThrow('CHECK_RELEASE_PREFLIGHT_CAPABILITY_MISSING:lint');
   });
+
+  it('requires a bounded failure classification for unsuccessful checks', () => {
+    const value = receipt();
+    const failed = {
+      ...value,
+      verdict: 'block',
+      blockingReasons: ['lint-failed'],
+      checks: value.checks.map((check) =>
+        check.capability === 'lint'
+          ? { capability: check.capability, status: 'failed', reasonCode: 'lint-failed' }
+          : check,
+      ),
+    };
+    expect(() => verifyReleasePreflightReceipt(failed, expected)).toThrow(
+      'CHECK_RELEASE_PREFLIGHT_INVALID',
+    );
+    expect(() =>
+      verifyReleasePreflightReceipt(
+        {
+          ...failed,
+          checks: failed.checks.map((check) =>
+            check.capability === 'lint' ? { ...check, failureClass: 'static-defect' } : check,
+          ),
+        },
+        expected,
+      ),
+    ).toThrow('CHECK_RELEASE_PREFLIGHT_BLOCKED');
+  });
 });

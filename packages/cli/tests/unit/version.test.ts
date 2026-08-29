@@ -6,7 +6,7 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const SELECTED_RELEASE_VERSION = '1.4.1';
+const SELECTED_RELEASE_VERSION = '1.4.2';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.2.12';
 
 describe('resolveCliVersion', () => {

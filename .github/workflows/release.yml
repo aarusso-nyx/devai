@@ -357,7 +357,7 @@ jobs:
           (cd release-assets && sha256sum --check SHA256SUMS)
           tarball="$(realpath "$(find release-assets -maxdepth 1 -name '*.tgz' -print -quit)")"
           test -n "$tarball"
-          adopter="$RUNNER_TEMP/devai-linux-adopter"
+          adopter="$RUNNER_TEMP/devai adopter espaço não-ASCII"
           mkdir -p "$adopter"
           cd "$adopter"
           git init --quiet

@@ -12,6 +12,15 @@ export const PREFLIGHT_CAPABILITIES = [
   'exact-candidate',
 ] as const;
 
+export type ReleaseFailureClass =
+  | 'static-defect'
+  | 'sensor-stale'
+  | 'environment-drift'
+  | 'product-regression'
+  | 'policy-invalid'
+  | 'evidence-mismatch'
+  | 'unknown';
+
 export interface ReleasePreflightReceipt {
   readonly schemaVersion: '1.0.0';
   readonly repository: Readonly<{ id: string; commit: string; tree: string }>;
@@ -24,6 +33,7 @@ export interface ReleasePreflightReceipt {
     capability: string;
     status: 'executed' | 'reused' | 'not-required' | 'failed' | 'blocked' | 'unknown';
     reasonCode: string;
+    failureClass?: ReleaseFailureClass;
     resultDigest?: string;
   }>[];
   readonly verdict: 'pass' | 'block';

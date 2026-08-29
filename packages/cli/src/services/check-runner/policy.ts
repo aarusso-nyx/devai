@@ -717,3 +717,12 @@ export function exactCommitTree(repoRoot: string, commit: string): string {
   assertCommit(repoRoot, commit, 'BASE');
   return gitText(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`]).trim();
 }
+
+export function exactCommitFile(repoRoot: string, commit: string, path: string): string {
+  assertCommit(repoRoot, commit, 'RELEASE_VERSION_SOURCE');
+  try {
+    return gitText(repoRoot, ['cat-file', 'blob', `${commit}:${path}`]);
+  } catch {
+    throw new Error('CHECK_RELEASE_VERSION_SOURCE_UNREADABLE');
+  }
+}
