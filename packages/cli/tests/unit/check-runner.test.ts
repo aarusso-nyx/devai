@@ -1026,6 +1026,51 @@ describe('content-addressed check runner', () => {
     expect(receiptBytes).not.toContain('signature');
   });
 
+  it('keeps ordinary RC task keys identical to independent protected-policy reconstruction', () => {
+    const state = repository();
+    const report = run(state.root, { target: 'rc' });
+    const executable = report.plan.tasks[0]?.executable;
+    if (executable === undefined) throw new Error('test fixture executable missing');
+    const toolchainPath = join(state.root, 'protected-toolchain.json');
+    const environmentPath = join(state.root, 'protected-environment.json');
+    const outputPath = join(state.root, 'protected-task-policy.json');
+    writeFileSync(
+      toolchainPath,
+      `${JSON.stringify({
+        node: TOOLCHAIN.node,
+        'executable:node': JSON.stringify(executable),
+      })}\n`,
+    );
+    writeFileSync(environmentPath, '{}\n');
+    const reconstructed = spawnSync(
+      process.execPath,
+      [
+        join(REPOSITORY_ROOT, 'packages/cli/vendor/evidence-verification/src/build-policy-cli.js'),
+        '--repo',
+        state.root,
+        '--descriptor',
+        join(state.root, 'test-tasks.json'),
+        '--profile',
+        'rc',
+        '--schema-version',
+        '1.1.0',
+        '--commit',
+        report.plan.repository.commit,
+        '--tree',
+        report.plan.repository.tree,
+        '--toolchain',
+        toolchainPath,
+        '--environment',
+        environmentPath,
+        '--output',
+        outputPath,
+      ],
+      { cwd: state.root, encoding: 'utf8' },
+    );
+    expect(reconstructed.status, reconstructed.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(outputPath, 'utf8'))).toEqual(report.plan.taskPolicy);
+  });
+
   it('validates and binds exact release intent into the candidate receipt', () => {
     const state = repository();
     commit(state.root, 'src/app.ts', 'export const value = 2;\n');
