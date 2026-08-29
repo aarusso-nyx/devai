@@ -634,6 +634,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     const executable =
       taskExecutableFromToolchain(toolchain, executableName) ??
       resolveTaskExecutable(repoRoot, executableName);
+    const releaseBinding = options.releaseTaskBindings?.[task.nodeId];
     const taskKey = sha256Hex({
       schemaVersion: '1.0.0',
       descriptorDigest,
@@ -646,7 +647,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       toolchain: selectedToolchain,
       environment: selectedEnvironment,
       outputContract: outputContracts.get(task.nodeId),
-      releaseBinding: options.releaseTaskBindings?.[task.nodeId] ?? null,
+      ...(releaseBinding === undefined ? {} : { releaseBinding }),
       inputs,
       dependencies,
     });
