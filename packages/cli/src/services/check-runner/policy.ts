@@ -635,7 +635,8 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     const executable = resolveTaskExecutable(repoRoot, executableName);
     if (
       protectedExecutable !== undefined &&
-      (protectedExecutable.path !== executable.path || protectedExecutable.sha256 !== executable.sha256)
+      (protectedExecutable.path !== executable.path ||
+        protectedExecutable.sha256 !== executable.sha256)
     ) {
       throw new Error(`CHECK_RUNNER_EXECUTABLE_IDENTITY_MISMATCH: ${executableName}`);
     }

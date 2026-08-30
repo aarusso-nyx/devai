@@ -105,7 +105,7 @@ function validateVerifierAssets() {
   const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
   if (
     provenance.schemaVersion !== '1.0.0' ||
-    provenance.sourceCommit !== '93b03f4924f15d4946f9b3f7e5fba820aefb7c4a' ||
+    provenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de' ||
     !Array.isArray(provenance.files)
   ) {
     throw new Error('PACKAGE_VERIFIER_PROVENANCE_INVALID');

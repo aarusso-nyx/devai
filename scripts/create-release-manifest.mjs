@@ -45,7 +45,7 @@ const manifest = {
     verifier_package: '@aarusso-nyx/devai',
     verifier_package_version: required('LEDGER_VERIFIER_PACKAGE_VERSION'),
     verifier_provenance_sha256: required('LEDGER_VERIFIER_PROVENANCE_SHA256'),
-    verifier_source_commit: '93b03f4924f15d4946f9b3f7e5fba820aefb7c4a',
+    verifier_source_commit: '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de',
     policy_digest: required('LEDGER_POLICY_DIGEST'),
     envelope_sha256: required('LEDGER_ENVELOPE_SHA256'),
     results_archive_sha256: required('LEDGER_RESULTS_SHA256'),

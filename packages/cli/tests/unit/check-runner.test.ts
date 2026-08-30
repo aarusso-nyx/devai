@@ -1036,10 +1036,7 @@ describe('content-addressed check runner', () => {
     const toolchainPath = join(state.root, 'protected-toolchain.json');
     const environmentPath = join(state.root, 'protected-environment.json');
     const outputPath = join(state.root, 'protected-task-policy.json');
-    writeFileSync(
-      toolchainPath,
-      `${JSON.stringify({ node: TOOLCHAIN.node })}\n`,
-    );
+    writeFileSync(toolchainPath, `${JSON.stringify({ node: TOOLCHAIN.node })}\n`);
     writeFileSync(environmentPath, '{}\n');
     const reconstructed = spawnSync(
       process.execPath,
