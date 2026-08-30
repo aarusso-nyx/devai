@@ -1098,7 +1098,7 @@ try {
     .filter((path) => !path.endsWith('/provenance.json'))
     .sort();
   if (
-    verifierProvenance.sourceCommit !== '09739104a7edc2a63808ca20649b0e007bcee0a4' ||
+    verifierProvenance.sourceCommit !== '93b03f4924f15d4946f9b3f7e5fba820aefb7c4a' ||
     verifierProvenance.files?.length !== 21 ||
     verifierFiles.length !== 21
   ) {

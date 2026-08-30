@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.4 — 2026-08-30
+
+- Make ordinary task identity portable across hosts by excluding ambient executable paths.
+- Verify governed composed mutation evidence strictly and bind the canonical verifier provenance.
+- Add a non-writing export preflight so destination and signing failures surface before RC execution.
+
 ## 1.4.3 — 2026-08-29
 
 - Supersedes the unpublished `v1.4.2` rehearsal candidate after npm rejected the non-ASCII

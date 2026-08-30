@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
-const SELECTED_RELEASE_VERSION = '1.4.3';
+const SELECTED_RELEASE_VERSION = '1.4.4';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.2.12';
 
 afterAll(() => rmSync(output, { recursive: true, force: true }));
@@ -71,7 +71,7 @@ describe('normalized release package staging', () => {
     expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.4.3', () => {
+  it('records a stable release and latest dist-tag for version 1.4.4', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -120,7 +120,7 @@ describe('normalized release package staging', () => {
       verifier_package: '@aarusso-nyx/devai',
       verifier_package_version: TRUSTED_VERIFIER_PACKAGE_VERSION,
       verifier_provenance_sha256: digest,
-      verifier_source_commit: '09739104a7edc2a63808ca20649b0e007bcee0a4',
+      verifier_source_commit: '93b03f4924f15d4946f9b3f7e5fba820aefb7c4a',
     });
   });
 
