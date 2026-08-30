@@ -22,11 +22,6 @@ import {
   exactCommitTree,
   readTaskDescriptor,
 } from './policy.js';
-import {
-  encodeTaskExecutable,
-  executableToolchainKey,
-  resolveTaskExecutable,
-} from './executable.js';
 import type {
   CandidateReceipt,
   CheckRunnerOptions,
@@ -242,16 +237,10 @@ function requiredToolchainKeys(options: CheckRunnerOptions): readonly string[] {
 }
 
 function resolvedRunnerToolchain(options: CheckRunnerOptions): Readonly<Record<string, string>> {
-  const resolved: Record<string, string> = {
-    ...resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options)),
-  };
-  for (const task of requiredTaskNodes(options)) {
-    const executable = task.argv[0] ?? '';
-    resolved[executableToolchainKey(executable)] = encodeTaskExecutable(
-      resolveTaskExecutable(options.repoRoot, executable),
-    );
-  }
-  return resolved;
+  // A PATH or node_modules resolution is needed to execute a task, but is host
+  // state, not portable policy.  Only an explicitly supplied protected
+  // executable identity may be included in the task key.
+  return resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options));
 }
 
 function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[] {

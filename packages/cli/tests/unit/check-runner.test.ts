@@ -625,14 +625,14 @@ describe('content-addressed check runner', () => {
     expect(restored.repository.commit).not.toBe(initial.repository.commit);
   });
 
-  it('invalidates task keys when the resolved executable bytes change', () => {
+  it('does not bind ambient resolved executable bytes into portable task keys', () => {
     const state = repository();
     file(state.root, 'node_modules/.bin/node', '#!/bin/sh\nexit 0\n');
     chmodSync(join(state.root, 'node_modules/.bin/node'), 0o755);
-    const first = plan(state.root, 'local');
+    const first = plan(state.root, 'rc');
     file(state.root, 'node_modules/.bin/node', '#!/bin/sh\nexit 1\n');
-    const changed = plan(state.root, 'local');
-    expect(changed.tasks.map((task) => task.taskKey)).not.toEqual(
+    const changed = plan(state.root, 'rc');
+    expect(changed.tasks.map((task) => task.taskKey)).toEqual(
       first.tasks.map((task) => task.taskKey),
     );
     expect(first.tasks[0]?.executable.path).toBe(
@@ -640,7 +640,7 @@ describe('content-addressed check runner', () => {
     );
   });
 
-  it('uses a protected executable identity when reconstructing task keys', () => {
+  it('rejects a protected executable identity that does not match the executable it will run', () => {
     const state = repository();
     const descriptorValue = readTaskDescriptor(join(state.root, 'test-tasks.json'));
     const build = (sha256: string) =>
@@ -660,12 +660,7 @@ describe('content-addressed check runner', () => {
           cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
         }),
       );
-    const first = build('a'.repeat(64));
-    const changed = build('b'.repeat(64));
-    expect(first.tasks[0]?.executable.path).toBe('/protected/toolchain/node');
-    expect(first.tasks.map((task) => task.taskKey)).not.toEqual(
-      changed.tasks.map((task) => task.taskKey),
-    );
+    expect(() => build('a'.repeat(64))).toThrow('CHECK_RUNNER_EXECUTABLE_IDENTITY_MISMATCH');
   });
 
   it('does not require release-candidate toolchains for the cheap local closure', () => {
@@ -1035,21 +1030,13 @@ describe('content-addressed check runner', () => {
     expect(receiptBytes).not.toContain('signature');
   });
 
-  it('keeps ordinary RC task keys identical to independent protected-policy reconstruction', () => {
+  it('keeps ordinary RC task keys identical to independent portable-policy reconstruction', () => {
     const state = repository();
     const report = run(state.root, { target: 'rc' });
-    const executable = report.plan.tasks[0]?.executable;
-    if (executable === undefined) throw new Error('test fixture executable missing');
     const toolchainPath = join(state.root, 'protected-toolchain.json');
     const environmentPath = join(state.root, 'protected-environment.json');
     const outputPath = join(state.root, 'protected-task-policy.json');
-    writeFileSync(
-      toolchainPath,
-      `${JSON.stringify({
-        node: TOOLCHAIN.node,
-        'executable:node': JSON.stringify(executable),
-      })}\n`,
-    );
+    writeFileSync(toolchainPath, `${JSON.stringify({ node: TOOLCHAIN.node })}\n`);
     writeFileSync(environmentPath, '{}\n');
     const reconstructed = spawnSync(
       process.execPath,

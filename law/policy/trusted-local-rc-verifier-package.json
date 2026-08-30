@@ -50,7 +50,7 @@
   "verifier": {
     "root": "dist/runtime/evidence-verification",
     "provenance_sha256": "e6be4198ded731b9733c8e5c720fc5beb1ec8393a1eda01b76e6119b172d17c0",
-    "source_commit": "9e115014f8da5a16be526c7da5207bc0aae0801b",
+    "source_commit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
     "payload_file_count": 21,
     "binaries": {
       "devai-evidence-policy": "./dist/runtime/evidence-verification/src/build-policy-cli.js",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "sourceCommit": "4e202ca3c9aade41f3d3a0286a4e7a37a175790a",
+  "sourceCommit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
   "files": [
     {
       "path": "schemas/candidate-receipt-1.1.schema.json",
@@ -60,15 +60,15 @@
     },
     {
       "path": "src/export-cli.js",
-      "sha256": "cd165e3fbe319716044b7d1616dedbd144479fac3d43cd83fc93bbc6607f9126"
+      "sha256": "a1fd50fc949b0b215d6f8e57dc15a4f2b551fb7d685104463b9b0b80b1a00598"
     },
     {
       "path": "src/export.js",
-      "sha256": "7fd4315660b9fb7752136b0f84cee086b84041891efe79e69962bcada53f7a43"
+      "sha256": "a1604a902c70c1c487ddc30d69af2d12ad9643359bc0ba16ee327f94acd32b7a"
     },
     {
       "path": "src/mutation.js",
-      "sha256": "dc656ff32494190db815189d9fab10a179a2179af95fd6cd0a3f2bbb3207f22f"
+      "sha256": "b7287cade2b01b8593491f7652e9403d31a85b7947d54abe979357868d8daefb"
     },
     {
       "path": "src/policy-builder.js",
@@ -84,7 +84,7 @@
     },
     {
       "path": "src/verify.js",
-      "sha256": "08690dbd804e0795a54966c9f3557d530a62ecb6e60cbd7a600c770bf6a41d60"
+      "sha256": "b6c1033f7e236dd722acc913656a828a28cee6ad5536d9b48515b4ef9aa9d6e3"
     }
   ]
 }
