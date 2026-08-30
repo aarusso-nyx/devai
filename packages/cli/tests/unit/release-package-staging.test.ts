@@ -120,7 +120,7 @@ describe('normalized release package staging', () => {
       verifier_package: '@aarusso-nyx/devai',
       verifier_package_version: TRUSTED_VERIFIER_PACKAGE_VERSION,
       verifier_provenance_sha256: digest,
-      verifier_source_commit: '4e202ca3c9aade41f3d3a0286a4e7a37a175790a',
+      verifier_source_commit: '09739104a7edc2a63808ca20649b0e007bcee0a4',
     });
   });
 

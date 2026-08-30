@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "sourceCommit": "4e202ca3c9aade41f3d3a0286a4e7a37a175790a",
+  "sourceCommit": "09739104a7edc2a63808ca20649b0e007bcee0a4",
   "files": [
     {
       "path": "schemas/candidate-receipt-1.1.schema.json",
@@ -68,7 +68,7 @@
     },
     {
       "path": "src/mutation.js",
-      "sha256": "dc656ff32494190db815189d9fab10a179a2179af95fd6cd0a3f2bbb3207f22f"
+      "sha256": "ea0769918a0e739ffd54534bcc45b816296e2cde40bea47b56370db35dc8b9ce"
     },
     {
       "path": "src/policy-builder.js",
@@ -84,7 +84,7 @@
     },
     {
       "path": "src/verify.js",
-      "sha256": "08690dbd804e0795a54966c9f3557d530a62ecb6e60cbd7a600c770bf6a41d60"
+      "sha256": "1a2ace37f048c5141d594fe9a988fe12e3800e24576808951ea0020a44c25504"
     }
   ]
 }

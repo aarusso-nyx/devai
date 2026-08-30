@@ -631,9 +631,14 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       taskKey: taskKeys.get(nodeId),
     }));
     const executableName = task.argv[0] ?? '';
-    const executable =
-      taskExecutableFromToolchain(toolchain, executableName) ??
-      resolveTaskExecutable(repoRoot, executableName);
+    const protectedExecutable = taskExecutableFromToolchain(toolchain, executableName);
+    const executable = resolveTaskExecutable(repoRoot, executableName);
+    if (
+      protectedExecutable !== undefined &&
+      (protectedExecutable.path !== executable.path || protectedExecutable.sha256 !== executable.sha256)
+    ) {
+      throw new Error(`CHECK_RUNNER_EXECUTABLE_IDENTITY_MISMATCH: ${executableName}`);
+    }
     const releaseBinding = options.releaseTaskBindings?.[task.nodeId];
     const taskKey = sha256Hex({
       schemaVersion: '1.0.0',
@@ -641,7 +646,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       descriptorVersion: descriptor.descriptorVersion,
       nodeId: task.nodeId,
       argv: task.argv,
-      executable,
+      ...(protectedExecutable === undefined ? {} : { executable: protectedExecutable }),
       cwd: task.cwd,
       runner: task.runner,
       toolchain: selectedToolchain,

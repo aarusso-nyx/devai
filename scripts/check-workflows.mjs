@@ -11,8 +11,8 @@ export const RELEASE_WORKFLOW_FILE = 'release.yml';
 // docs/dev/operations/remote-preflight-contract.md
 export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
-export const VERIFIER_SOURCE_COMMIT = '9e115014f8da5a16be526c7da5207bc0aae0801b';
-export const NEXT_VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
+export const VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '09739104a7edc2a63808ca20649b0e007bcee0a4';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -314,7 +314,7 @@ function checkWorkflow(file, source, findings) {
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
     'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
     `manifest.name !== '${VERIFIER_PACKAGE}'`,
-    `!['${VERIFIER_SOURCE_COMMIT}', '${NEXT_VERIFIER_SOURCE_COMMIT}'].includes(provenance.sourceCommit)`,
+    `provenance.sourceCommit !== '${NEXT_VERIFIER_SOURCE_COMMIT}'`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
     'DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js',
@@ -717,7 +717,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
     'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
     `manifest.name !== '${VERIFIER_PACKAGE}'`,
-    `!['${VERIFIER_SOURCE_COMMIT}', '${NEXT_VERIFIER_SOURCE_COMMIT}'].includes(provenance.sourceCommit)`,
+    `provenance.sourceCommit !== '${NEXT_VERIFIER_SOURCE_COMMIT}'`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
     '--schema-version 1.1.0',
