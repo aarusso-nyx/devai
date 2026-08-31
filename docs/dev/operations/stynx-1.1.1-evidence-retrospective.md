@@ -21,5 +21,5 @@ receipt-only export attempts delayed publication and consumed operator attention
 
 This correction does not reinterpret `not-required`, stale, foreign-candidate, or
 integrity-invalid mutation evidence as passing. It does not silently migrate STYNX;
-the 1.4.4 migration guide requires a new exact-candidate receipt and regenerated
+the 1.4.5 migration guide requires a new exact-candidate receipt and regenerated
 workflow before any publication decision.

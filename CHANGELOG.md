@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.5 — 2026-08-30
+
+- Bind generated trusted-local-RC workflows to immutable `@aarusso-nyx/devai@1.4.4`, the first
+  package that actually contains portable composed-mutation verifier source `37e75a5c`.
+- Keep package metadata, release commit/tree, verifier provenance, and generated workflow checks
+  mutually consistent so adopters fail before RC execution instead of after evidence publication.
+- Correct the 1.4.4 migration guide's intermediate verifier SHA to the released source identity.
+- Prove from the signed provider tag and immutable release commit that its packaged provenance
+  contains the declared verifier source and exact 21-file population.
+- Document the separately authorized protected-provenance rollover and mark new 1.4.4 adoption as
+  superseded by 1.4.5.
+
 ## 1.4.4 — 2026-08-30
 
 - Make ordinary task identity portable across hosts by excluding ambient executable paths.

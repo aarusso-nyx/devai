@@ -10,6 +10,7 @@
 - [Release verification profiles](../../adopters/release-profiles.md)
 - [Migrate from 1.3.3 to 1.4.3](migrate-1.3.3-to-1.4.3.md)
 - [Migrate from 1.4.3 to 1.4.4](migrate-1.4.3-to-1.4.4.md)
+- [Migrate from 1.4.4 to 1.4.5](migrate-1.4.4-to-1.4.5.md)
 - [STYNX 1.1.1 evidence campaign retrospective](stynx-1.1.1-evidence-retrospective.md)
 
 Expensive local evidence is run explicitly. Ordinary remote automation validates evidence.
