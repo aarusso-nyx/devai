@@ -9,8 +9,14 @@ identity.
 1. Pin `@aarusso-nyx/devai@1.4.5` exactly and regenerate the governed workflow.
 2. Confirm the generated materializer downloads exact `@aarusso-nyx/devai@1.4.4`
    with its authenticated tarball, release commit/tree, and verifier provenance.
-3. Run the installed non-writing evidence-export preflight before any RC task.
-4. Generate a new exact-candidate receipt. A receipt from 1.4.4 or an older
+3. Under separate Owner authorization, set the protected workflow variable
+   `DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256` to exactly
+   `8ebafff53524031a3207a2256ebcd0fa6e0cc4271fd4bb6bca5aa003395034bd`.
+   The Inspector must independently compare that value with the authenticated
+   1.4.4 tarball before any verifier binary executes; candidate source cannot
+   select or substitute it.
+4. Run the installed non-writing evidence-export preflight before any RC task.
+5. Generate a new exact-candidate receipt. A receipt from 1.4.4 or an older
    provider remains historical evidence and is not reusable as 1.4.5 evidence.
 
 This migration changes no mutation target, threshold, disposition, or remote
