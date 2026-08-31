@@ -144,8 +144,8 @@ prerequisite for an independence claim.
 ### Trusted-local-RC verifier materialization
 
 The generated trusted-local-RC workflow resolves its verifier from the single Architect-owned
-identity in `law/policy/trusted-local-rc-verifier-package.json`. The initial supported identity is
-exactly `@aarusso-nyx/devai@1.2.12`; neither `latest`, a version range, a source checkout, nor an
+identity in `law/policy/trusted-local-rc-verifier-package.json`. The current supported identity is
+exactly `@aarusso-nyx/devai@1.4.4`; neither `latest`, a version range, a source checkout, nor an
 allowlist of interchangeable package or provenance identities is valid. The policy binds the
 authenticated registry response and downloaded tarball to the exact package name, version,
 tarball URL, SHA-1 shasum, SRI integrity, DEVAI release source commit, and release source tree.

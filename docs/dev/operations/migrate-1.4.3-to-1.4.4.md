@@ -7,7 +7,7 @@ and packaged verifier provenance change.
 
 1. Pin `@aarusso-nyx/devai@1.4.4` exactly and regenerate the governed workflow.
 2. Re-materialize the verifier-package policy and confirm the generated workflow
-   binds verifier source `93b03f4924f15d4946f9b3f7e5fba820aefb7c4a`.
+   binds verifier source `37e75a5c27569d4cb3fdb4a3dc97a140da4d78de`.
 3. Before an expensive RC run, run the installed evidence-export preflight using
    the exact candidate receipt inputs and intended output destination. Correct
    every typed refusal before executing RC tasks.
