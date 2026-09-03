@@ -800,15 +800,13 @@
             "stock_composition": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["built_in_actions", "prepare"],
+              "required": ["built_in_actions", "certify", "prepare"],
               "properties": {
                 "built_in_actions": {
-                  "const": [
-                    "release plan",
-                    "release preflight",
-                    "release certify",
-                    "release resume"
-                  ]
+                  "const": ["release plan", "release preflight", "release resume"]
+                },
+                "certify": {
+                  "const": "requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only"
                 },
                 "prepare": {
                   "const": "requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink"
@@ -820,6 +818,8 @@
               "additionalProperties": false,
               "required": [
                 "produced_by",
+                "producer",
+                "evidence_sink",
                 "schema",
                 "binding",
                 "coverage",
@@ -831,6 +831,12 @@
               ],
               "properties": {
                 "produced_by": { "const": "release certify" },
+                "producer": {
+                  "const": "injected-protected-certification-provider-v3-executes-the-selected-immutable-task-policy-outside-candidate-authority-and-returns-the-complete-package-output-closure"
+                },
+                "evidence_sink": {
+                  "const": "injected-two-phase-content-addressed-certification-evidence-sink;missing-provider-or-sink-fails-before-task-execution-output-exposure-or-state-append"
+                },
                 "schema": {
                   "const": "law/schemas/release-lifecycle-state.schema.json#/$defs/certification_package_entry_manifest"
                 },
@@ -866,13 +872,13 @@
               "required": ["git_object", "generated_output", "locator_rule", "mismatch"],
               "properties": {
                 "git_object": {
-                  "const": "read-the-exact-candidate-tree-object-by-immutable-object-id-recompute-the-git-object-id-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use"
+                  "const": "require-exact-repository-commit-tree-object_format-path-mode-object_id-size-and-content_digest-sha256;prove-path-mode-object-membership-in-the-exact-candidate-tree-then-recompute-the-declared-sha1-or-sha256-git-blob-framing-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use"
                 },
                 "generated_output": {
-                  "const": "resolve-the-immutable-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-verify-its-candidate-commit-tree-task-policy-package-id-and-output-blob-sha256-referent-then-read-only-from-that-content-addressed-output-blob-and-recompute-sha256-over-the-returned-bytes-before-use"
+                  "const": "resolve-the-externally-finalized-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-and-opaque-content-addressed-evidence-sink-handle;verify-its-exact-candidate-commit-tree-task-policy-package-output-blob-handle-size-and-sha256-referent-and-complete-package-output-closure-then-read-only-and-recompute-sha256-over-the-returned-bytes-before-use"
                 },
                 "locator_rule": {
-                  "const": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-and-ambient-worktree-reads-are-forbidden"
+                  "const": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-ambient-worktree-reads-self-issued-generated-receipts-and-foreign-git-objects-are-forbidden"
                 },
                 "mismatch": { "const": "fail-closed" }
               }
@@ -939,12 +945,13 @@
                     "sink-verifies-each-artifact-byte-digest-size-and-pack-spec-binding",
                     "core-reverifies-the-sink-reported-handles-and-digests",
                     "commit-one-complete-manifest-atomically-once",
-                    "abort-the-open-transaction-on-every-pre-commit-failure"
+                    "abort-the-open-transaction-only-on-a-proven-pre-commit-failure",
+                    "append-unknown-terminal-evidence-and-preserve-handles-without-abort-or-rollback-on-timeout-lost-response-or-unverifiable-commit"
                   ]
                 },
                 "missing_sink": { "const": "fail-before-package-generation-or-exposure" },
                 "partial_or_unverifiable_commit": {
-                  "const": "fail-closed-and-preserve-the-sink-transaction-for-inspection-without-reuse"
+                  "const": "append-unknown-ambiguous-terminal-evidence-preserve-the-sink-transaction-and-handles-without-abort-rollback-retry-or-redispatch-until-external-reconciliation"
                 }
               }
             },
@@ -963,10 +970,18 @@
                 "release-prepare-pack-spec-digest-mismatch",
                 "release-prepare-unsupported-package-semantics",
                 "release-prepare-subprocess-forbidden",
+                "release-certification-provider-unavailable",
+                "release-certification-evidence-sink-unavailable",
+                "release-certification-ambient-input-forbidden",
+                "release-certification-generated-output-untrusted",
+                "release-certification-output-closure-invalid",
+                "release-prepare-git-locator-invalid",
+                "release-prepare-git-tree-membership-invalid",
                 "release-artifact-sink-unavailable",
                 "release-artifact-sink-protocol-invalid",
                 "release-artifact-sink-verification-failed",
                 "release-artifact-sink-commit-failed",
+                "release-artifact-sink-commit-unknown",
                 "release-artifact-sink-abort-failed",
                 "release-downstream-artifact-reverification-failed"
               ]
@@ -1057,6 +1072,8 @@
                 "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
                 "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
                 "require-release-certify-to-emit-one-complete-candidate-tree-task-policy-bound-package-entry-manifest-per-package-before-a-v3-prepare",
+                "require-v3-certify-to-use-only-the-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink-and-never-scan-ambient-worktree-or-self-issue-generated-output-receipts",
+                "require-every-v3-git-source-locator-to-prove-exact-repository-candidate-commit-tree-path-mode-object-format-object-id-size-and-content-digest-membership-before-pack-and-preserve-unprovable-sink-commit-outcomes-as-unknown-without-abort-or-retry",
                 "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
                 "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
                 "require-package-artifact-and-evidence-bijections-for-the-action",
@@ -3333,16 +3350,14 @@
             "v3_prepare": "pure-in-memory-and-sink-mediated-only"
           },
           "stock_composition": {
-            "built_in_actions": [
-              "release plan",
-              "release preflight",
-              "release certify",
-              "release resume"
-            ],
+            "built_in_actions": ["release plan", "release preflight", "release resume"],
+            "certify": "requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only",
             "prepare": "requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink"
           },
           "certification_manifest": {
             "produced_by": "release certify",
+            "producer": "injected-protected-certification-provider-v3-executes-the-selected-immutable-task-policy-outside-candidate-authority-and-returns-the-complete-package-output-closure",
+            "evidence_sink": "injected-two-phase-content-addressed-certification-evidence-sink;missing-provider-or-sink-fails-before-task-execution-output-exposure-or-state-append",
             "schema": "law/schemas/release-lifecycle-state.schema.json#/$defs/certification_package_entry_manifest",
             "binding": [
               "repository.commit",
@@ -3360,9 +3375,9 @@
             "missing_or_extra_entry": "fail-closed"
           },
           "content_source": {
-            "git_object": "read-the-exact-candidate-tree-object-by-immutable-object-id-recompute-the-git-object-id-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use",
-            "generated_output": "resolve-the-immutable-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-verify-its-candidate-commit-tree-task-policy-package-id-and-output-blob-sha256-referent-then-read-only-from-that-content-addressed-output-blob-and-recompute-sha256-over-the-returned-bytes-before-use",
-            "locator_rule": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-and-ambient-worktree-reads-are-forbidden",
+            "git_object": "require-exact-repository-commit-tree-object_format-path-mode-object_id-size-and-content_digest-sha256;prove-path-mode-object-membership-in-the-exact-candidate-tree-then-recompute-the-declared-sha1-or-sha256-git-blob-framing-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use",
+            "generated_output": "resolve-the-externally-finalized-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-and-opaque-content-addressed-evidence-sink-handle;verify-its-exact-candidate-commit-tree-task-policy-package-output-blob-handle-size-and-sha256-referent-and-complete-package-output-closure-then-read-only-and-recompute-sha256-over-the-returned-bytes-before-use",
+            "locator_rule": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-ambient-worktree-reads-self-issued-generated-receipts-and-foreign-git-objects-are-forbidden",
             "mismatch": "fail-closed"
           },
           "pack": {
@@ -3394,10 +3409,11 @@
               "sink-verifies-each-artifact-byte-digest-size-and-pack-spec-binding",
               "core-reverifies-the-sink-reported-handles-and-digests",
               "commit-one-complete-manifest-atomically-once",
-              "abort-the-open-transaction-on-every-pre-commit-failure"
+              "abort-the-open-transaction-only-on-a-proven-pre-commit-failure",
+              "append-unknown-terminal-evidence-and-preserve-handles-without-abort-or-rollback-on-timeout-lost-response-or-unverifiable-commit"
             ],
             "missing_sink": "fail-before-package-generation-or-exposure",
-            "partial_or_unverifiable_commit": "fail-closed-and-preserve-the-sink-transaction-for-inspection-without-reuse"
+            "partial_or_unverifiable_commit": "append-unknown-ambiguous-terminal-evidence-preserve-the-sink-transaction-and-handles-without-abort-rollback-retry-or-redispatch-until-external-reconciliation"
           },
           "prepared_state": "v3-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only",
           "downstream_reverification": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-the-exact-committed-manifest-handle-then-recompute-byte-digest-size-and-manifest-membership-before-use",
@@ -3409,10 +3425,18 @@
             "release-prepare-pack-spec-digest-mismatch",
             "release-prepare-unsupported-package-semantics",
             "release-prepare-subprocess-forbidden",
+            "release-certification-provider-unavailable",
+            "release-certification-evidence-sink-unavailable",
+            "release-certification-ambient-input-forbidden",
+            "release-certification-generated-output-untrusted",
+            "release-certification-output-closure-invalid",
+            "release-prepare-git-locator-invalid",
+            "release-prepare-git-tree-membership-invalid",
             "release-artifact-sink-unavailable",
             "release-artifact-sink-protocol-invalid",
             "release-artifact-sink-verification-failed",
             "release-artifact-sink-commit-failed",
+            "release-artifact-sink-commit-unknown",
             "release-artifact-sink-abort-failed",
             "release-downstream-artifact-reverification-failed"
           ]
@@ -3464,6 +3488,8 @@
             "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
             "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
             "require-release-certify-to-emit-one-complete-candidate-tree-task-policy-bound-package-entry-manifest-per-package-before-a-v3-prepare",
+            "require-v3-certify-to-use-only-the-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink-and-never-scan-ambient-worktree-or-self-issue-generated-output-receipts",
+            "require-every-v3-git-source-locator-to-prove-exact-repository-candidate-commit-tree-path-mode-object-format-object-id-size-and-content-digest-membership-before-pack-and-preserve-unprovable-sink-commit-outcomes-as-unknown-without-abort-or-retry",
             "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
             "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
             "require-package-artifact-and-evidence-bijections-for-the-action",

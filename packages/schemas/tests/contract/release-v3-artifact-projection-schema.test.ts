@@ -82,6 +82,25 @@ function projection(artifacts: Artifact[]) {
     .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 }
 
+function firstImmutableBlobLocator(value: unknown): Record<string, unknown> {
+  const state = value as {
+    release_units?: Array<{
+      packages?: Array<{
+        certification_manifest?: {
+          entries?: Array<{ immutable_blob_locator?: Record<string, unknown> }>;
+        };
+      }>;
+    }>;
+  };
+  const locator =
+    state.release_units?.[0]?.packages?.[0]?.certification_manifest?.entries?.[0]
+      ?.immutable_blob_locator;
+  if (!locator) {
+    throw new Error('fixture is missing its first immutable blob locator');
+  }
+  return locator;
+}
+
 function fixtures() {
   const artifacts = packageArtifacts();
   const aggregate = Object.values(artifacts);
@@ -106,7 +125,15 @@ function fixtures() {
         sha256: sha('1'),
         immutable_blob_locator: {
           kind: 'git-object',
+          repository: 'devai',
+          commit: git,
+          tree: git,
+          object_format: 'sha1',
+          path: 'index.js',
+          mode: '100644',
           object_id: git,
+          size_bytes: 1,
+          content_digest_sha256: sha('1'),
         },
       },
     ],
@@ -279,5 +306,35 @@ describe('release v3 artifact projection schemas', () => {
     omission.receipt.artifacts.pop();
     expect(projection(omission.state.artifacts)).not.toEqual(projection(omission.aggregate));
     expect(projection(omission.receipt.artifacts)).not.toEqual(projection(omission.aggregate));
+  });
+
+  it('requires complete declared Git source locators for both supported object formats', () => {
+    const validateState = getValidator('release-lifecycle-state.schema.json');
+    const valid = fixtures();
+    const locator = firstImmutableBlobLocator(valid.state);
+    expect(validateState(valid.state), JSON.stringify(validateState.errors)).toBe(true);
+
+    const missingMembership = structuredClone(valid.state);
+    delete firstImmutableBlobLocator(missingMembership).path;
+    expect(validateState(missingMembership)).toBe(false);
+
+    const wrongSha1Length = structuredClone(valid.state);
+    firstImmutableBlobLocator(wrongSha1Length).object_id = 'a'.repeat(64);
+    expect(validateState(wrongSha1Length)).toBe(false);
+
+    const sha256 = structuredClone(valid.state);
+    const sha256Locator = firstImmutableBlobLocator(sha256);
+    sha256Locator.object_format = 'sha256';
+    sha256Locator.commit = 'a'.repeat(64);
+    sha256Locator.tree = 'b'.repeat(64);
+    sha256Locator.object_id = 'c'.repeat(64);
+    expect(validateState(sha256), JSON.stringify(validateState.errors)).toBe(true);
+
+    expect(locator).toMatchObject({
+      repository: 'devai',
+      path: 'index.js',
+      mode: '100644',
+      size_bytes: 1,
+    });
   });
 });

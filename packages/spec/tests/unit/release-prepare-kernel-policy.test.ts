@@ -17,8 +17,10 @@ describe('release prepare v3 policy', () => {
       execution_contract: {
         prepare_kernel: {
           kernel_id: string;
-          stock_composition: { built_in_actions: string[]; prepare: string };
+          stock_composition: { built_in_actions: string[]; certify: string; prepare: string };
           certification_manifest: {
+            producer: string;
+            evidence_sink: string;
             entry_fields: string[];
             entry_origins: string[];
             entry_order: string;
@@ -33,7 +35,12 @@ describe('release prepare v3 policy', () => {
             outputs: string[];
             forbidden_execution: string[];
           };
-          artifact_sink: { required: boolean; protocol: string[]; missing_sink: string };
+          artifact_sink: {
+            required: boolean;
+            protocol: string[];
+            missing_sink: string;
+            partial_or_unverifiable_commit: string;
+          };
           prepared_state: string;
           downstream_reverification: string;
           errors: string[];
@@ -56,7 +63,9 @@ describe('release prepare v3 policy', () => {
     expect(policySchema.examples[0]?.execution_contract.prepare_kernel).toEqual(kernel);
     expect(kernel.kernel_id).toBe('devai.kernel.release-prepare.v3');
     expect(kernel.stock_composition).toEqual({
-      built_in_actions: ['release plan', 'release preflight', 'release certify', 'release resume'],
+      built_in_actions: ['release plan', 'release preflight', 'release resume'],
+      certify:
+        'requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only',
       prepare: 'requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink',
     });
     expect(kernel.certification_manifest.entry_fields).toEqual([
@@ -72,15 +81,25 @@ describe('release prepare v3 policy', () => {
       manifest_digest:
         'sha256-of-domain-DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1-nul-followed-by-utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted',
     });
+    expect(kernel.certification_manifest.producer).toContain('protected-certification-provider-v3');
+    expect(kernel.certification_manifest.evidence_sink).toContain(
+      'missing-provider-or-sink-fails-before-task-execution',
+    );
     expect(kernel.content_source.git_object).toContain(
       'blob-space-decimal-byte-length-nul-raw-bytes',
     );
+    expect(kernel.content_source.git_object).toContain(
+      'path-mode-object-membership-in-the-exact-candidate-tree',
+    );
     expect(kernel.content_source.locator_rule).toContain(
-      'host-paths-symlinks-and-ambient-worktree-reads-are-forbidden',
+      'ambient-worktree-reads-self-issued-generated-receipts-and-foreign-git-objects-are-forbidden',
     );
     expect(kernel.pack.implementation).toBe('pure-in-memory-npm-compatible-tar-gzip');
     expect(kernel.content_source.generated_output).toContain(
       'release-certification-evidence-receipt-v1',
+    );
+    expect(kernel.content_source.generated_output).toContain(
+      'opaque-content-addressed-evidence-sink-handle',
     );
     expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v3');
     expect(kernel.pack.pack_spec_digest_sha256).toBe(
@@ -119,8 +138,12 @@ describe('release prepare v3 policy', () => {
       'sink-verifies-each-artifact-byte-digest-size-and-pack-spec-binding',
       'core-reverifies-the-sink-reported-handles-and-digests',
       'commit-one-complete-manifest-atomically-once',
-      'abort-the-open-transaction-on-every-pre-commit-failure',
+      'abort-the-open-transaction-only-on-a-proven-pre-commit-failure',
+      'append-unknown-terminal-evidence-and-preserve-handles-without-abort-or-rollback-on-timeout-lost-response-or-unverifiable-commit',
     ]);
+    expect(kernel.artifact_sink.partial_or_unverifiable_commit).toContain(
+      'without-abort-rollback-retry-or-redispatch-until-external-reconciliation',
+    );
     expect(kernel.prepared_state).toContain('schemaVersion-2.1.0');
     expect(kernel.downstream_reverification).toContain('exact-committed-manifest-handle');
     expect(kernel.errors).toEqual([
@@ -131,10 +154,18 @@ describe('release prepare v3 policy', () => {
       'release-prepare-pack-spec-digest-mismatch',
       'release-prepare-unsupported-package-semantics',
       'release-prepare-subprocess-forbidden',
+      'release-certification-provider-unavailable',
+      'release-certification-evidence-sink-unavailable',
+      'release-certification-ambient-input-forbidden',
+      'release-certification-generated-output-untrusted',
+      'release-certification-output-closure-invalid',
+      'release-prepare-git-locator-invalid',
+      'release-prepare-git-tree-membership-invalid',
       'release-artifact-sink-unavailable',
       'release-artifact-sink-protocol-invalid',
       'release-artifact-sink-verification-failed',
       'release-artifact-sink-commit-failed',
+      'release-artifact-sink-commit-unknown',
       'release-artifact-sink-abort-failed',
       'release-downstream-artifact-reverification-failed',
     ]);
@@ -154,6 +185,7 @@ describe('release prepare v3 policy', () => {
       (branch) => branch.if?.properties?.action_id?.const === 'release prepare',
     );
     const action = registry.entries.find((entry) => entry.action_id === 'release prepare');
+    const certify = registry.entries.find((entry) => entry.action_id === 'release certify');
 
     expect(prepare?.then).toEqual({
       required: ['receipt_locators'],
@@ -163,6 +195,12 @@ describe('release prepare v3 policy', () => {
       'fs:f5-state',
       'fs:proofs',
       'artifact-sink:write',
+    ]);
+    expect(certify?.authority_contract.capabilities).toEqual([
+      'fs:f5-state',
+      'fs:proofs',
+      'protected-certification-provider-v3:execute',
+      'certification-evidence-sink:write',
     ]);
   });
 
@@ -198,6 +236,12 @@ describe('release prepare v3 policy', () => {
           immutable_blob_locator: {
             kind: 'generated-output',
             output_blob_sha256: sha('b'),
+            output_blob_handle: {
+              evidence_sink_id: 'certification-evidence-sink',
+              opaque_handle: 'generated-b',
+              sha256: sha('b'),
+              size_bytes: 1,
+            },
             certification_evidence_receipt: {
               kind: 'release-certification-evidence-receipt-v1',
               receipt_digest_sha256: sha('c'),
@@ -208,6 +252,12 @@ describe('release prepare v3 policy', () => {
                 task_policy_digest_sha256: sha('a'),
                 package_id: 'pkg',
                 output_blob_sha256: sha('b'),
+                output_blob_handle: {
+                  evidence_sink_id: 'certification-evidence-sink',
+                  opaque_handle: 'generated-b',
+                  sha256: sha('b'),
+                  size_bytes: 1,
+                },
               },
             },
           },

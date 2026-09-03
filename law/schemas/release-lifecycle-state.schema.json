@@ -839,19 +839,72 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "object_id"],
+          "required": [
+            "kind",
+            "repository",
+            "commit",
+            "tree",
+            "object_format",
+            "path",
+            "mode",
+            "object_id",
+            "size_bytes",
+            "content_digest_sha256"
+          ],
           "properties": {
             "kind": { "const": "git-object" },
-            "object_id": { "$ref": "#/$defs/git_object" }
-          }
+            "repository": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+            "commit": { "type": "string", "pattern": "^[a-f0-9]{40}([a-f0-9]{24})?$" },
+            "tree": { "type": "string", "pattern": "^[a-f0-9]{40}([a-f0-9]{24})?$" },
+            "object_format": { "enum": ["sha1", "sha256"] },
+            "path": { "$ref": "#/$defs/relative_path" },
+            "mode": { "enum": ["100644", "100755"] },
+            "object_id": { "type": "string", "pattern": "^[a-f0-9]{40}([a-f0-9]{24})?$" },
+            "size_bytes": { "type": "integer", "minimum": 0 },
+            "content_digest_sha256": { "$ref": "#/$defs/sha256" }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "object_format": { "const": "sha1" } },
+                "required": ["object_format"]
+              },
+              "then": {
+                "properties": {
+                  "commit": { "pattern": "^[a-f0-9]{40}$" },
+                  "tree": { "pattern": "^[a-f0-9]{40}$" },
+                  "object_id": { "pattern": "^[a-f0-9]{40}$" }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": { "object_format": { "const": "sha256" } },
+                "required": ["object_format"]
+              },
+              "then": {
+                "properties": {
+                  "commit": { "pattern": "^[a-f0-9]{64}$" },
+                  "tree": { "pattern": "^[a-f0-9]{64}$" },
+                  "object_id": { "pattern": "^[a-f0-9]{64}$" }
+                }
+              }
+            }
+          ]
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "output_blob_sha256", "certification_evidence_receipt"],
+          "required": [
+            "kind",
+            "output_blob_sha256",
+            "output_blob_handle",
+            "certification_evidence_receipt"
+          ],
           "properties": {
             "kind": { "const": "generated-output" },
             "output_blob_sha256": { "$ref": "#/$defs/sha256" },
+            "output_blob_handle": { "$ref": "#/$defs/certification_output_blob_handle" },
             "certification_evidence_receipt": {
               "$ref": "#/$defs/certification_evidence_receipt_ref"
             }
@@ -860,7 +913,7 @@
       ]
     },
     "certification_evidence_receipt_ref": {
-      "description": "Independent finalized certification evidence, never the mutable or self-referential lifecycle state digest. Resolution loads the immutable receipt by digest from the certified evidence store and verifies this exact referent before reading the generated blob.",
+      "description": "Independent externally finalized certification evidence, never the mutable or self-referential lifecycle state digest. Resolution loads the immutable receipt by digest from the protected certification-evidence sink and verifies this exact referent and opaque output handle before reading the generated blob.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "receipt_digest_sha256", "canonicalization", "referent"],
@@ -876,16 +929,29 @@
             "candidate_tree",
             "task_policy_digest_sha256",
             "package_id",
-            "output_blob_sha256"
+            "output_blob_sha256",
+            "output_blob_handle"
           ],
           "properties": {
             "candidate_commit": { "$ref": "#/$defs/git_object" },
             "candidate_tree": { "$ref": "#/$defs/git_object" },
             "task_policy_digest_sha256": { "$ref": "#/$defs/sha256" },
             "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-            "output_blob_sha256": { "$ref": "#/$defs/sha256" }
+            "output_blob_sha256": { "$ref": "#/$defs/sha256" },
+            "output_blob_handle": { "$ref": "#/$defs/certification_output_blob_handle" }
           }
         }
+      }
+    },
+    "certification_output_blob_handle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_sink_id", "opaque_handle", "sha256", "size_bytes"],
+      "properties": {
+        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
       }
     },
     "artifact_ref": {
@@ -1265,7 +1331,7 @@
     },
     "git_object": {
       "type": "string",
-      "pattern": "^[a-f0-9]{40}$"
+      "pattern": "^[a-f0-9]{40}([a-f0-9]{24})?$"
     },
     "relative_path": {
       "type": "string",

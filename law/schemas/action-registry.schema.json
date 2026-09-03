@@ -186,6 +186,55 @@
           },
           {
             "if": {
+              "properties": { "action_id": { "const": "release certify" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "harness-write" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release certify" },
+                    "effect": { "const": "harness-write" },
+                    "capabilities": {
+                      "const": [
+                        "fs:f5-state",
+                        "fs:proofs",
+                        "protected-certification-provider-v3:execute",
+                        "certification-evidence-sink:write"
+                      ]
+                    },
+                    "planner": {
+                      "properties": {
+                        "target_kinds": {
+                          "const": [
+                            "fs",
+                            "protected-certification-provider",
+                            "certification-evidence-sink"
+                          ]
+                        }
+                      }
+                    },
+                    "boundary": {
+                      "properties": {
+                        "kind": { "const": "mutation-adapters" },
+                        "adapter_ids": {
+                          "const": [
+                            "fs-authority-boundary",
+                            "protected-certification-provider-v3",
+                            "trusted-certification-evidence-sink-v1"
+                          ]
+                        },
+                        "final_reverification": { "const": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
               "properties": { "action_id": { "const": "release prepare" } },
               "required": ["action_id"]
             },
@@ -386,7 +435,9 @@
                   "db:read",
                   "db:write",
                   "db:unclassified",
-                  "host-cache:write"
+                  "host-cache:write",
+                  "protected-certification-provider-v3:execute",
+                  "certification-evidence-sink:write"
                 ]
               },
               {
@@ -577,7 +628,15 @@
                   "minItems": 1,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["fs", "git-ref", "db", "remote", "artifact-sink"]
+                    "enum": [
+                      "fs",
+                      "git-ref",
+                      "db",
+                      "remote",
+                      "artifact-sink",
+                      "protected-certification-provider",
+                      "certification-evidence-sink"
+                    ]
                   }
                 },
                 "atomicity": {
@@ -602,7 +661,15 @@
                   "minItems": 1,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["fs", "git-ref", "db", "remote", "artifact-sink"]
+                    "enum": [
+                      "fs",
+                      "git-ref",
+                      "db",
+                      "remote",
+                      "artifact-sink",
+                      "protected-certification-provider",
+                      "certification-evidence-sink"
+                    ]
                   }
                 },
                 "bounds": {

@@ -84,4 +84,14 @@ describe('action registry schema', () => {
     ];
     expect(validators.actionRegistry(malformed)).toBe(false);
   });
+
+  it('pins release certify to the protected provider and certification-evidence sink', () => {
+    const malformed = structuredClone(registry);
+    const certify = malformed.entries.find((entry) => entry.action_id === 'release certify');
+    expect(certify, 'current registry must contain release certify').toBeDefined();
+    if (certify === undefined) return;
+
+    certify.authority_contract.capabilities = ['fs:f5-state', 'fs:proofs', 'proc:git'];
+    expect(validators.actionRegistry(malformed)).toBe(false);
+  });
 });
