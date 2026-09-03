@@ -70,6 +70,7 @@ interface OfflineVerifyOptions {
 }
 
 export interface ReleaseLifecycleCommandAdapters {
+  readonly preflight_provider?: (request: ReleaseLifecycleRequest) => ReleaseProvider | undefined;
   readonly certification_provider?: (
     request: ReleaseLifecycleRequest,
   ) => Parameters<typeof createReleaseCertificationProvider>[0] | undefined;
@@ -321,6 +322,9 @@ function lifecycleAction(
               }
             } else {
               provider =
+                (name === 'release preflight'
+                  ? adapters?.preflight_provider?.(request)
+                  : undefined) ??
                 adapters?.provider(name, request) ??
                 builtInReleaseLifecycleLocalProvider(
                   {
