@@ -1,10 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
-import { getValidator } from '@devai-nyx/schemas';
 import {
   CANONICAL_FORBIDDEN_ACTIONS,
   checkForbiddenRegistryCoverage,
@@ -17,20 +15,7 @@ aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 
 let dir = '';
 let registryPath = '';
-
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
-    .join(',')}}`;
-}
-
-function digest(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
+const REPO_ROOT = process.cwd();
 
 function writeRegistry(body: Record<string, unknown>): void {
   writeFileSync(registryPath, JSON.stringify(body, null, 2));
@@ -201,59 +186,33 @@ describe('scanForbiddenActions', () => {
   }
 
   function writeCiAdr(options?: {
-    readonly status?: 'active' | 'superseded';
+    readonly status?: 'accepted' | 'superseded';
     readonly affectedRule?: string;
     readonly malformed?: boolean;
   }): void {
-    mkdirSync(join(dir, 'law/adr'), { recursive: true });
-    mkdirSync(join(dir, 'law/policy'), { recursive: true });
-    const source =
+    cpSync(join(REPO_ROOT, 'law', 'adr'), join(dir, 'law', 'adr'), { recursive: true });
+    for (const file of [
+      'ADR-GOV-0008-canonical-subject-projections.md',
+      'ADR-GOV-0009-instance-validatable-adr-results.md',
+      'ADR-GOV-0010-complete-adr-validation-result.md',
+      'ADR-GOV-0011-fail-closed-adr-result-state.md',
+    ]) {
+      const path = join(dir, 'law', 'adr', file);
+      writeFileSync(
+        path,
+        readFileSync(path, 'utf8').replaceAll(
+          'scripts/check-workflows.mjs',
+          'scripts/adr-fixture-coverage.mjs',
+        ),
+      );
+    }
+    cpSync(join(REPO_ROOT, 'law', 'policy'), join(dir, 'law', 'policy'), { recursive: true });
+    writeFileSync(
+      join(dir, 'law/adr/ADR-GOV-9999-ci-checker.md'),
       options?.malformed === true
         ? '---\nid: ADR-014\nstatus active\n---\n'
-        : `---\nid: ADR-014\ntype: adr\nstatus: ${options?.status ?? 'active'}\naffected_rules:\n  - ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\n---\n`;
-    writeFileSync(join(dir, 'law/adr/ADR-014-ci-checker.md'), source);
-    if (options?.malformed === true) return;
-
-    const policy = JSON.parse(
-      readFileSync(join(process.cwd(), 'law/policy/adr-validation.json'), 'utf8'),
-    ) as {
-      semantic_resolver: {
-        resolvable_legacy_references: Array<Record<string, unknown>>;
-      };
-      exception_catalog: {
-        catalog_digest_sha256: string;
-        entries: Array<Record<string, unknown>>;
-      };
-    };
-    const entry = {
-      path: 'ADR-014-ci-checker.md',
-      sha256: digest(source),
-      disposition: 'preserved-pre-v2-record',
-      reason: 'Immutable numeric-id active-ADR compatibility fixture.',
-      legacy_record: {
-        reference: 'ADR-014',
-        title: 'CI checker affected-rule fixture',
-        status: options?.status === 'superseded' ? 'superseded' : 'accepted',
-        date: null,
-        source_format: 'numeric-id-frontmatter',
-        supersedes: [],
-        affected_rules: [options?.affectedRule ?? 'scripts/check-workflows.mjs'],
-      },
-    };
-    policy.exception_catalog.entries = [entry];
-    policy.exception_catalog.catalog_digest_sha256 = digest(canonicalJson([entry]));
-    policy.semantic_resolver.resolvable_legacy_references = [
-      {
-        reference: 'ADR-014',
-        path: 'ADR-014-ci-checker.md',
-        disposition: 'preserved-pre-v2-record',
-      },
-    ];
-    expect(getValidator('adr-validation-policy.schema.json')(policy)).toBe(true);
-    expect(policy.exception_catalog.catalog_digest_sha256).toBe(
-      digest(canonicalJson(policy.exception_catalog.entries)),
+        : `---\nid: ADR-GOV-9999\ntitle: CI checker change review\ntype: adr\nstatus: ${options?.status ?? 'accepted'}\ndate: 2026-09-03\nauthority: Architect\nsupersedes: []\nprovenance:\n  - law/constitution.md Article 6 (substrate authority-by-path)\naffected_rules:\n  - ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\ninspector_acceptance:\n  - IA-001 -- A CI checker change requires an effective accepted ADR that covers its exact governed path.\n${options?.status === 'superseded' ? 'disposition: Superseded fixture record has no active authority.\n' : ''}---\n\n# CI checker change review\n\n## Status\n\nFixture record.\n\n## Context\n\nFixture coverage for a governed CI checker change.\n\n## Decision\n\nThe fixture records the exact governed checker path.\n\n## Consequences\n\nOnly an effective accepted record can authorize coverage.\n\n## Alternatives Considered\n\n**No ADR coverage.** Rejected because the forbidden-action check must fail closed.\n\n## Affected Rules\n\n- ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\n\n## Inspector Adversarial Acceptance\n\n- IA-001 -- A superseded, malformed, or unrelated fixture does not provide coverage.\n`,
     );
-    writeFileSync(join(dir, 'law/policy/adr-validation.json'), JSON.stringify(policy, null, 2));
   }
 
   function commitCiCheckerChange(): string {
