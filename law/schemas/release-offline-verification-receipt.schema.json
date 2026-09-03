@@ -180,6 +180,8 @@
         "kernel_id",
         "mandatory",
         "schema_validation_alone_establishes_pass",
+        "supported_canonicalization_kernels",
+        "v2_package_trust_result_closure",
         "roster",
         "roster_complete",
         "unknown_check_permitted",
@@ -190,13 +192,25 @@
       "description": "The named verifier that produced this roster and the exact roster it is obliged to run. A verification that ran a shorter list is not a weaker verification; it is a different one, and this receipt is not the document it may emit.",
       "properties": {
         "kernel_id": {
-          "const": "devai.kernel.offline-verification-receipt.v1"
+          "enum": [
+            "devai.kernel.offline-verification-receipt.v1",
+            "devai.kernel.offline-verification-receipt.v2"
+          ]
         },
         "mandatory": {
           "const": true
         },
         "schema_validation_alone_establishes_pass": {
           "const": false
+        },
+        "supported_canonicalization_kernels": {
+          "const": [
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v2"
+          ]
+        },
+        "v2_package_trust_result_closure": {
+          "const": "for-a-v2-receipt-recompute-the-v2-canonicalization-and-require-the-release-unit-package-roster-to-close-exactly-over-manifest-tarball-sbom-evidence-manifest-provider-result-and-trust-root-trust-store-digest-key-id-and-signature-algorithm"
         },
         "roster": {
           "const": [
@@ -230,14 +244,14 @@
             "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
             "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
             "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
-            "recompute-receipt_digest_sha256-and-receipt_id-under-devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+            "recompute-receipt_digest_sha256-and-receipt_id-under-the-schemaVersion-bound-release-offline-verification-receipt-canonicalization-kernel",
             "reject-pass-when-any-preceding-step-fails"
           ]
         },
         "errors": {
           "type": "array",
-          "minItems": 9,
-          "maxItems": 9,
+          "minItems": 10,
+          "maxItems": 10,
           "items": false,
           "prefixItems": [
             {
@@ -263,6 +277,9 @@
             },
             {
               "const": "rov-receipt-digest-mismatch"
+            },
+            {
+              "const": "rov-v2-package-trust-result-closure-invalid"
             },
             {
               "const": "rov-semantic-verification-not-performed"
@@ -793,6 +810,11 @@
         "kernel_id": "devai.kernel.offline-verification-receipt.v1",
         "mandatory": true,
         "schema_validation_alone_establishes_pass": false,
+        "supported_canonicalization_kernels": [
+          "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+          "devai.kernel.release-offline-verification-receipt-canonicalization.v2"
+        ],
+        "v2_package_trust_result_closure": "for-a-v2-receipt-recompute-the-v2-canonicalization-and-require-the-release-unit-package-roster-to-close-exactly-over-manifest-tarball-sbom-evidence-manifest-provider-result-and-trust-root-trust-store-digest-key-id-and-signature-algorithm",
         "roster": [
           "candidate-tree-identity",
           "receipt-envelope-canonicality",
@@ -813,7 +835,7 @@
           "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
           "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
           "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
-          "recompute-receipt_digest_sha256-and-receipt_id-under-devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+          "recompute-receipt_digest_sha256-and-receipt_id-under-the-schemaVersion-bound-release-offline-verification-receipt-canonicalization-kernel",
           "reject-pass-when-any-preceding-step-fails"
         ],
         "errors": [
@@ -825,6 +847,7 @@
           "rov-mutation-semantics-not-applicable-not-permitted",
           "rov-artifact-digest-mismatch",
           "rov-receipt-digest-mismatch",
+          "rov-v2-package-trust-result-closure-invalid",
           "rov-semantic-verification-not-performed"
         ]
       },

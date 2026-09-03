@@ -458,15 +458,16 @@
       "semantic_kernel": {
         "kernel_id": "devai.kernel.release-lifecycle-store.v2",
         "rules": [
-          "the-opening-completion-has-generation-zero-null-predecessor-and-null-head-before",
-          "each-successor-completion-has-generation-equal-to-the-current-head-generation-plus-one-and-names-the-current-head-completion-exactly",
-          "each-attempt-id-has-at-most-one-terminal-record-and-a-terminal-record-is-exactly-one-of-completion-failure-or-unknown-provider-result",
+          "the-opening-attempt-has-null-predecessor-and-null-head-before-and-the-opening-completion-names-that-attempt",
+          "each-successor-attempt-names-its-predecessor-as-the-exact-current-head-completion-and-observes-that-head-before-cas",
+          "each-terminal-record-names-its-predecessor-as-the-exact-prior-attempt-and-each-attempt-id-has-at-most-one-terminal-record",
           "a-completion-and-an-unknown-provider-result-for-the-same-attempt-are-mutually-exclusive-and-an-unknown-provider-result-never-advances-the-head",
           "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
         ],
         "errors": [
-          "release-store-genesis-invalid",
-          "release-store-successor-invalid",
+          "release-store-opening-attempt-invalid",
+          "release-store-attempt-predecessor-invalid",
+          "release-store-terminal-attempt-link-invalid",
           "release-store-terminal-attempt-conflict",
           "release-store-completion-unknown-conflict",
           "release-store-head-completion-mismatch"

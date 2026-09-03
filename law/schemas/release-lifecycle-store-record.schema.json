@@ -195,8 +195,11 @@
     },
     {
       "if": {
-        "properties": { "record_kind": { "const": "completion" } },
-        "required": ["record_kind"]
+        "properties": {
+          "record_kind": { "const": "completion" },
+          "action_id": { "enum": ["release evidence-publish", "release publish"] }
+        },
+        "required": ["record_kind", "action_id"]
       },
       "then": {
         "properties": {

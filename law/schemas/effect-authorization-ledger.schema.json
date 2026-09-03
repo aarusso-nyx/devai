@@ -56,12 +56,17 @@
         "mandatory",
         "schema_validation_alone_establishes_authorization",
         "event_canonicalization",
+        "supported_event_schema_versions",
+        "v2_consumption_binding",
         "algorithm",
         "errors"
       ],
       "properties": {
         "kernel_id": {
-          "const": "devai.kernel.effect-authorization-ledger.v1"
+          "enum": [
+            "devai.kernel.effect-authorization-ledger.v1",
+            "devai.kernel.effect-authorization-ledger.v2"
+          ]
         },
         "mandatory": {
           "const": true
@@ -73,10 +78,22 @@
         "event_canonicalization": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "payload_projection_excludes", "event_id_derivation", "event_digest_projection", "calculation_order"],
+          "required": [
+            "kernel_id",
+            "encoding",
+            "json_form",
+            "digest_algorithm",
+            "payload_projection_excludes",
+            "event_id_derivation",
+            "event_digest_projection",
+            "calculation_order"
+          ],
           "properties": {
             "kernel_id": {
-              "const": "devai.kernel.effect-authorization-event-canonicalization.v1"
+              "enum": [
+                "devai.kernel.effect-authorization-event-canonicalization.v1",
+                "devai.kernel.effect-authorization-event-canonicalization.v2"
+              ]
             },
             "encoding": {
               "const": "utf-8"
@@ -105,10 +122,16 @@
             }
           }
         },
+        "supported_event_schema_versions": {
+          "const": ["1.0.0", "2.0.0"]
+        },
+        "v2_consumption_binding": {
+          "const": "for-a-v2-consumed-event-require-the-v2-canonicalization-and-a-null-legacy-state-field-and-recompute-the-exact-attempt-id-action-request-digest-repository-candidate-destination-grant-event-id-and-ledger-predecessor-binding-before-authorizing-dispatch"
+        },
         "algorithm": {
           "type": "array",
-          "minItems": 16,
-          "maxItems": 16,
+          "minItems": 18,
+          "maxItems": 18,
           "items": false,
           "prefixItems": [
             {
@@ -157,14 +180,20 @@
               "const": "verify-head-sequence-event-id-and-event-digest-equal-the-final-entry"
             },
             {
+              "const": "for-a-v1-event-recompute-and-validate-the-v1-canonicalization-and-preserve-its-non-null-consumed_by_state_id-semantics"
+            },
+            {
+              "const": "for-a-v2-consumed-event-recompute-and-validate-the-v2-canonicalization-and-the-exact-durable-consumption-binding-before-authorizing-dispatch"
+            },
+            {
               "const": "deny-when-any-preceding-step-fails"
             }
           ]
         },
         "errors": {
           "type": "array",
-          "minItems": 22,
-          "maxItems": 22,
+          "minItems": 24,
+          "maxItems": 24,
           "items": false,
           "prefixItems": [
             {
@@ -229,6 +258,12 @@
             },
             {
               "const": "eal-head-not-final-entry"
+            },
+            {
+              "const": "eal-event-canonicalization-version-invalid"
+            },
+            {
+              "const": "eal-v2-consumption-binding-invalid"
             },
             {
               "const": "eal-semantic-verification-not-performed"
@@ -432,7 +467,7 @@
       "append_only": true,
       "ordering": "hash-linked-ascending-sequence",
       "semantic_verifier": {
-        "kernel_id": "devai.kernel.effect-authorization-ledger.v1",
+        "kernel_id": "devai.kernel.effect-authorization-ledger.v2",
         "mandatory": true,
         "schema_validation_alone_establishes_authorization": false,
         "event_canonicalization": {
@@ -449,6 +484,8 @@
             "compute-ledger-event-digest-over-the-complete-event-record"
           ]
         },
+        "supported_event_schema_versions": ["1.0.0", "2.0.0"],
+        "v2_consumption_binding": "for-a-v2-consumed-event-require-the-v2-canonicalization-and-a-null-legacy-state-field-and-recompute-the-exact-attempt-id-action-request-digest-repository-candidate-destination-grant-event-id-and-ledger-predecessor-binding-before-authorizing-dispatch",
         "algorithm": [
           "resolve-every-entry-to-the-content-of-the-event-record-it-references",
           "require-each-resolved-event-ledger_id-to-equal-the-ledger-ledger_id",
@@ -465,6 +502,8 @@
           "reject-every-terminal-event-whose-grant-already-has-an-earlier-terminal-event",
           "verify-each-consumed-recorded_at-is-greater-than-or-equal-to-the-grant-not_before-and-strictly-less-than-the-grant-expires_at",
           "verify-head-sequence-event-id-and-event-digest-equal-the-final-entry",
+          "for-a-v1-event-recompute-and-validate-the-v1-canonicalization-and-preserve-its-non-null-consumed_by_state_id-semantics",
+          "for-a-v2-consumed-event-recompute-and-validate-the-v2-canonicalization-and-the-exact-durable-consumption-binding-before-authorizing-dispatch",
           "deny-when-any-preceding-step-fails"
         ],
         "errors": [
@@ -489,6 +528,8 @@
           "eal-terminal-after-terminal",
           "eal-consume-outside-live-window",
           "eal-head-not-final-entry",
+          "eal-event-canonicalization-version-invalid",
+          "eal-v2-consumption-binding-invalid",
           "eal-semantic-verification-not-performed"
         ]
       },
