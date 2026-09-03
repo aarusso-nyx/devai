@@ -20,8 +20,6 @@ import type {
   ReleaseLifecycleStateV2,
 } from '../../src/services/release-lifecycle-execution.js';
 
-const COMMIT = '1'.repeat(40);
-const TREE = '2'.repeat(40);
 const TASK_POLICY = '3'.repeat(64);
 const CERTIFICATION_EVIDENCE = '4'.repeat(64);
 
