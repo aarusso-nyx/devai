@@ -1377,7 +1377,12 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'release preflight',
       effect: 'harness-write',
-      capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+      capabilities: [
+        'fs:f5-state',
+        'fs:proofs',
+        'proc:git',
+        'protected-certification-provider-v3:execute',
+      ],
       subject: {
         kind: 'derived-machine',
         actor: 'harness',
@@ -1395,7 +1400,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'release-preflight-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'protected-certification-provider'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -1405,7 +1410,7 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: ['fs-authority-boundary', 'protected-certification-provider-v3'],
         final_reverification: true,
       },
       readiness: {

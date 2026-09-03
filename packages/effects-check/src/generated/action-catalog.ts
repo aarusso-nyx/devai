@@ -162,7 +162,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'release preflight',
     public_action_id: 'release preflight',
     effect: 'harness-write',
-    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+    capabilities: [
+      'fs:f5-state',
+      'fs:proofs',
+      'proc:git',
+      'protected-certification-provider-v3:execute',
+    ],
   },
   {
     action_id: 'release prepare',

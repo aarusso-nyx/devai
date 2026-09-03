@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   constants as nodeFileConstants,
   appendFileSync as nodeAppendFileSync,
@@ -11,6 +11,7 @@ import {
   fstatSync,
   fsyncSync as nodeFsyncSync,
   lstatSync,
+  linkSync as nodeLinkSync,
   mkdirSync as nodeMkdirSync,
   mkdtempSync as nodeMkdtempSync,
   openSync as nodeOpenSync,
@@ -50,7 +51,7 @@ export interface AuthorityHostEffectScope {
 }
 
 export interface AuthorityHostEffectRequest {
-  readonly kind: 'filesystem' | 'process';
+  readonly kind: 'filesystem' | 'process' | 'protected-release';
   readonly symbol: string;
   readonly arguments: readonly unknown[];
 }
@@ -61,6 +62,110 @@ export interface AtomicAuthorityHostEffect {
 }
 
 const scopes = new AsyncLocalStorage<AuthorityHostEffectScope>();
+const protectedSinkScopes = new AsyncLocalStorage<
+  Readonly<{
+    scope: AuthorityHostEffectScope;
+    apply: <T>(callback: () => T) => T;
+  }>
+>();
+
+export interface ProtectedReleaseHostBinding {
+  readonly action_id: 'release certify' | 'release preflight';
+  readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
+  readonly task_policy_digest_sha256: string;
+  readonly plan_receipt_digest_sha256: string;
+  readonly helper_identity_sha256: string;
+}
+
+const protectedOperations = new WeakMap<
+  object,
+  Readonly<{
+    binding: ProtectedReleaseHostBinding;
+    scope: AuthorityHostEffectScope;
+    kind: 'provider' | 'sink';
+    operation_id: string;
+  }>
+>();
+let protectedOperationSequence = 0;
+
+/** Broker-only inspection of a live, single-use, process-local protected operation. */
+export function protectedReleaseHostEffect(request: AuthorityHostEffectRequest) {
+  if (request.kind !== 'protected-release' || request.symbol !== 'protectedReleaseHostOperation')
+    return undefined;
+  const token = request.arguments[0];
+  if (token === null || typeof token !== 'object') return undefined;
+  const operation = protectedOperations.get(token);
+  if (operation === undefined || operation.scope !== scopes.getStore()) return undefined;
+  return operation;
+}
+
+/** Only the trusted installed host composition creates this adapter. It is never passed to a task. */
+export function createProtectedReleaseHostAdapter(binding: ProtectedReleaseHostBinding) {
+  const selected = Object.freeze({
+    ...binding,
+    repository: Object.freeze({ ...binding.repository }),
+  });
+  if (
+    !['release certify', 'release preflight'].includes(selected.action_id) ||
+    selected.repository.id.length === 0 ||
+    ![selected.repository.commit, selected.repository.tree].every((value) =>
+      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+    ) ||
+    selected.repository.commit.length !== selected.repository.tree.length ||
+    ![
+      selected.task_policy_digest_sha256,
+      selected.plan_receipt_digest_sha256,
+      selected.helper_identity_sha256,
+    ].every((value) => /^[0-9a-f]{64}$/u.test(value))
+  ) {
+    throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+  }
+  const invoke = <T>(kind: 'provider' | 'sink', callback: () => T): T => {
+    const scope = requireScope('mutation');
+    if (
+      scope.action_id !== selected.action_id ||
+      (kind === 'sink' && selected.action_id !== 'release certify')
+    )
+      throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+    const token = Object.freeze({});
+    protectedOperationSequence += 1;
+    const operation = Object.freeze({
+      binding: selected,
+      scope,
+      kind,
+      operation_id: `${scope.invocation_id}-${String(protectedOperationSequence)}`,
+    });
+    protectedOperations.set(token, operation);
+    try {
+      return scope.apply_effect(
+        { kind: 'protected-release', symbol: 'protectedReleaseHostOperation', arguments: [token] },
+        () => {
+          if (protectedOperations.get(token) !== operation || scopes.getStore() !== scope)
+            throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+          protectedOperations.delete(token);
+          return callback();
+        },
+      ) as T;
+    } finally {
+      protectedOperations.delete(token);
+    }
+  };
+  return Object.freeze({
+    spawnSync: ((...args: Parameters<typeof nodeSpawnSync>) =>
+      invoke('provider', () =>
+        Reflect.apply(nodeSpawnSync, undefined, args),
+      )) as typeof nodeSpawnSync,
+    invokeSink: <T>(callback: () => T): T => {
+      const scope = requireScope('mutation');
+      return invoke('sink', () =>
+        protectedSinkScopes.run(
+          { scope, apply: (operation) => invoke('sink', operation) },
+          callback,
+        ),
+      );
+    },
+  });
+}
 
 function requireScope(mode: 'mutation' | 'process'): AuthorityHostEffectScope {
   const scope = scopes.getStore();
@@ -87,6 +192,135 @@ function guarded<T extends object>(
     );
   };
   return wrapper as T;
+}
+
+/** Root-confined primitives for the installed trusted CAS, never handed to candidate processes. */
+export function createProtectedReleaseSinkFilesystem(rootPath: string) {
+  const root = realpathSync(rootPath);
+  const initial = lstatSync(root);
+  if (
+    !isAbsolute(rootPath) ||
+    root !== resolve(rootPath) ||
+    !initial.isDirectory() ||
+    (initial.mode & 0o777) !== 0o700
+  )
+    throw new Error('AUTHORITY_PROTECTED_SINK_ROOT_INVALID');
+  const descriptors = new Map<number, Readonly<{ dev: number; ino: number; writable: boolean }>>();
+  const pathFor = (path: string): string => {
+    if (!isAbsolute(path) || resolve(path) !== path)
+      throw new Error('AUTHORITY_PROTECTED_SINK_PATH_INVALID');
+    const child = relative(root, path);
+    if (child === '..' || child.startsWith(`..${sep}`) || isAbsolute(child))
+      throw new Error('AUTHORITY_PROTECTED_SINK_PATH_INVALID');
+    const observedRoot = lstatSync(root);
+    if (
+      observedRoot.isSymbolicLink() ||
+      observedRoot.dev !== initial.dev ||
+      observedRoot.ino !== initial.ino ||
+      (observedRoot.mode & 0o777) !== 0o700
+    )
+      throw new Error('AUTHORITY_PROTECTED_SINK_ROOT_INVALID');
+    let current = root;
+    for (const part of child.split(sep).filter(Boolean)) {
+      current = resolve(current, part);
+      try {
+        if (lstatSync(current).isSymbolicLink())
+          throw new Error('AUTHORITY_PROTECTED_SINK_PATH_INVALID');
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+      }
+    }
+    return path;
+  };
+  const fdFor = (fd: number, write = false) => {
+    const expected = descriptors.get(fd);
+    if (expected === undefined || (write && !expected.writable))
+      throw new Error('AUTHORITY_PROTECTED_SINK_DESCRIPTOR_INVALID');
+    const observed = fstatSync(fd);
+    if (observed.dev !== expected.dev || observed.ino !== expected.ino)
+      throw new Error('AUTHORITY_PROTECTED_SINK_DESCRIPTOR_INVALID');
+    return fd;
+  };
+  const effect = <T>(operation: () => T): T => {
+    const sink = protectedSinkScopes.getStore();
+    if (sink === undefined || sink.scope !== scopes.getStore())
+      throw new Error('AUTHORITY_PROTECTED_SINK_OPERATION_FORBIDDEN');
+    return sink.apply(operation);
+  };
+  return Object.freeze({
+    root,
+    lstatSync: (path: string) => lstatSync(pathFor(path)),
+    readdirSync: (path: string, options?: { withFileTypes: true }) =>
+      options === undefined ? readdirSync(pathFor(path)) : readdirSync(pathFor(path), options),
+    fstatSync: (fd: number) => fstatSync(fdFor(fd)),
+    readFileSync: (path: string | number): Buffer => {
+      if (typeof path === 'number') return readFileSync(fdFor(path));
+      const fd = nodeOpenSync(
+        pathFor(path),
+        nodeFileConstants.O_RDONLY | nodeFileConstants.O_NOFOLLOW,
+      );
+      try {
+        return readFileSync(fd);
+      } finally {
+        nodeCloseSync(fd);
+      }
+    },
+    openSync: (path: string, flags: number, mode = 0o600): number => {
+      const writeFlags =
+        nodeFileConstants.O_WRONLY |
+        nodeFileConstants.O_CREAT |
+        nodeFileConstants.O_EXCL |
+        nodeFileConstants.O_NOFOLLOW;
+      const readFlags = nodeFileConstants.O_RDONLY | nodeFileConstants.O_NOFOLLOW;
+      if ((flags !== writeFlags && flags !== readFlags) || (flags === writeFlags && mode !== 0o600))
+        throw new Error('AUTHORITY_PROTECTED_SINK_OPEN_INVALID');
+      const open = () => {
+        const fd = nodeOpenSync(pathFor(path), flags, mode);
+        const observed = fstatSync(fd);
+        descriptors.set(fd, {
+          dev: observed.dev,
+          ino: observed.ino,
+          writable: flags === writeFlags,
+        });
+        return fd;
+      };
+      return flags === writeFlags ? effect(open) : open();
+    },
+    writeSync: (
+      fd: number,
+      bytes: Buffer,
+      offset: number,
+      length: number,
+      position: number | null,
+    ): number => effect(() => nodeWriteSync(fdFor(fd, true), bytes, offset, length, position)),
+    fsyncSync: (fd: number): void => effect(() => nodeFsyncSync(fdFor(fd))),
+    closeSync: (fd: number): void => {
+      fdFor(fd);
+      const close = () => {
+        nodeCloseSync(fd);
+        descriptors.delete(fd);
+      };
+      if (descriptors.get(fd)?.writable === true) effect(close);
+      else close();
+    },
+    mkdirSync: (
+      path: string,
+      options: { recursive?: boolean; mode?: number } = {},
+    ): string | undefined =>
+      effect(() => {
+        if (options.mode !== undefined && options.mode !== 0o700)
+          throw new Error('AUTHORITY_PROTECTED_SINK_MODE_INVALID');
+        return nodeMkdirSync(pathFor(path), { ...options, mode: 0o700 });
+      }),
+    linkSync: (source: string, destination: string): void =>
+      effect(() => {
+        const from = pathFor(source);
+        const metadata = lstatSync(from);
+        if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600)
+          throw new Error('AUTHORITY_PROTECTED_SINK_PATH_INVALID');
+        nodeLinkSync(from, pathFor(destination));
+      }),
+  });
 }
 
 export function runWithAuthorityHostEffects<T>(

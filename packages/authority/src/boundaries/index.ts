@@ -88,7 +88,47 @@ function relativePath(value: unknown): value is string {
 
 function adapterId(target: AnyRecord): string {
   if (target.kind === 'fs-rename') return 'fs-authority-boundary';
+  const protectedAdapter = protectedReleaseBoundaryAdapterId(target);
+  if (protectedAdapter !== undefined) return protectedAdapter;
   return `${String(target.kind)}-authority-boundary`;
+}
+
+/** Exact internal projection of the frozen protected release adapters, never a generic remote override. */
+export function protectedReleaseBoundaryAdapterId(
+  target: Readonly<Record<string, unknown>>,
+): string | undefined {
+  if (target.kind !== 'remote' || target.endpoint_id !== 'host' || target.publication !== false)
+    return undefined;
+  const provider =
+    target.system_id === 'devai-protected-certification-provider-v3' &&
+    target.operation_id === 'execute';
+  const sink =
+    target.system_id === 'trusted-certification-evidence-sink-v1' &&
+    target.operation_id === 'write';
+  if (!provider && !sink) return undefined;
+  const binding = target.protected_release_binding;
+  if (
+    !isRecord(binding) ||
+    !isRecord(binding.repository) ||
+    !['release preflight', 'release certify'].includes(binding.action_id) ||
+    (sink && binding.action_id !== 'release certify') ||
+    typeof binding.repository.id !== 'string' ||
+    binding.repository.id.length === 0 ||
+    ![binding.repository.commit, binding.repository.tree].every(
+      (value) => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+    ) ||
+    ![
+      binding.task_policy_digest_sha256,
+      binding.plan_receipt_digest_sha256,
+      binding.helper_identity_sha256,
+    ].every((value) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value)) ||
+    typeof target.protected_operation_id !== 'string' ||
+    target.protected_operation_id.length === 0
+  )
+    return undefined;
+  return provider
+    ? 'protected-certification-provider-v3'
+    : 'trusted-certification-evidence-sink-v1';
 }
 
 export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
@@ -199,7 +239,16 @@ export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
     ) {
       return failure('refused', 'AUTHORITY_PUBLISH_CONSENT_REQUIRED');
     }
-    return success(deepFreeze({ target: input, adapter_id: 'remote-authority-boundary' }));
+    if (
+      [
+        'devai-protected-certification-provider-v3',
+        'trusted-certification-evidence-sink-v1',
+      ].includes(input.system_id) &&
+      protectedReleaseBoundaryAdapterId(input) === undefined
+    ) {
+      return failure('refused', 'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+    }
+    return success(deepFreeze({ target: input, adapter_id: adapterId(input) }));
   }
   return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
 }

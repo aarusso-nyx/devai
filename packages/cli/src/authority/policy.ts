@@ -234,6 +234,46 @@ export function buildTrustedAuthoritySources(
   const human = (role: string) => [{ kind: 'human', roles: [role] }];
   const joint = [{ kind: 'human', roles: ['owner', 'architect'] }];
   const coreRules = defined([
+    ...[
+      {
+        kind: 'provider',
+        capability: 'protected-certification-provider-v3:execute',
+        system: 'devai-protected-certification-provider-v3',
+        operation: 'execute',
+        actions: ['release preflight', 'release certify'],
+      },
+      {
+        kind: 'sink',
+        capability: 'certification-evidence-sink:write',
+        system: 'trusted-certification-evidence-sink-v1',
+        operation: 'write',
+        actions: ['release certify'],
+      },
+    ].map((adapter) =>
+      rule({
+        id: `core-protected-release-${adapter.kind}`,
+        origin: 'immutable-core',
+        precedence: 750,
+        actionIds: actionIds(
+          entries,
+          (entry) =>
+            adapter.actions.includes(entry.name) &&
+            entry.authority_contract.capabilities.some(
+              (capability) => capability === adapter.capability,
+            ),
+        ),
+        selector: {
+          kind: 'remote',
+          system_id: adapter.system,
+          endpoint_ids: ['host'],
+          operation_ids: [adapter.operation],
+          publication: false,
+        },
+        subjects: [harnessSubject(['inspector'])],
+        rationale:
+          'Frozen protected release adapter; exact host capability, candidate, task policy and stage are reverified by the final boundary.',
+      }),
+    ),
     rule({
       id: 'core-owner-product-root',
       origin: 'immutable-core',

@@ -19,6 +19,8 @@ import {
   type AuthorityHostEffectRequest,
   type AuthorityHostEffectScope,
   type AtomicAuthorityHostEffect,
+  protectedReleaseHostEffect,
+  protectedReleaseBoundaryAdapterId,
 } from '@devai-nyx/authority';
 import {
   computeManifestHash,
@@ -815,6 +817,8 @@ function processTarget(
 }
 
 function adapterId(target: JsonRecord): string {
+  const protectedAdapter = protectedReleaseBoundaryAdapterId(target);
+  if (protectedAdapter !== undefined) return protectedAdapter;
   return `${String(target.kind)}-authority-boundary`;
 }
 
@@ -823,6 +827,31 @@ function targetOperation(target: JsonRecord): string {
 }
 
 function boundedSelectors(kind: string, repositoryId: string, actionName: string): JsonRecord[] {
+  if (
+    (actionName === 'release certify' || actionName === 'release preflight') &&
+    kind === 'protected-certification-provider'
+  ) {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'devai-protected-certification-provider-v3',
+        endpoint_ids: ['host'],
+        operation_ids: ['execute'],
+        publication: false,
+      },
+    ];
+  }
+  if (actionName === 'release certify' && kind === 'certification-evidence-sink') {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'trusted-certification-evidence-sink-v1',
+        endpoint_ids: ['host'],
+        operation_ids: ['write'],
+        publication: false,
+      },
+    ];
+  }
   if (kind === 'fs') {
     return [
       {
@@ -1299,6 +1328,73 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   };
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
+    if (request.kind === 'protected-release') {
+      const operation = protectedReleaseHostEffect(request);
+      const provider = operation?.kind === 'provider';
+      const requiredCapability = provider
+        ? 'protected-certification-provider-v3:execute'
+        : 'certification-evidence-sink:write';
+      const requiredKind = provider
+        ? 'protected-certification-provider'
+        : 'certification-evidence-sink';
+      const requiredAdapter = provider
+        ? 'protected-certification-provider-v3'
+        : 'trusted-certification-evidence-sink-v1';
+      if (
+        operation === undefined ||
+        operation.binding.action_id !== input.entry.name ||
+        input.role !== 'inspector' ||
+        !input.argv.includes('--write') ||
+        !input.entry.authority_contract.capabilities.some(
+          (capability) => capability === requiredCapability,
+        ) ||
+        !('target_kinds' in actionPlanner) ||
+        !actionPlanner.target_kinds.includes(requiredKind) ||
+        input.entry.authority_contract.boundary.kind !== 'mutation-adapters' ||
+        !input.entry.authority_contract.boundary.adapter_ids.includes(requiredAdapter)
+      )
+        throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+      const requestPath = flagValue(input.argv, '--request');
+      if (requestPath === undefined) throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      const declaredRequest = JSON.parse(
+        readFileSync(resolve(repositoryRoot, requestPath), 'utf8'),
+      ) as JsonRecord;
+      if (
+        declaredRequest.action_id !== input.entry.name ||
+        canonicalSha256(declaredRequest.repository_locator) !==
+          canonicalSha256(operation.binding.repository) ||
+        operation.binding.repository.id !== sources.repository_id ||
+        !Array.isArray(declaredRequest.receipt_locators) ||
+        !declaredRequest.receipt_locators.some(
+          (locator: unknown) =>
+            isRecord(locator) &&
+            locator.kind === 'release-plan-receipt' &&
+            locator.receipt_digest_sha256 === operation.binding.plan_receipt_digest_sha256,
+        )
+      )
+        throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      const target: JsonRecord = {
+        kind: 'remote',
+        id: `protected-release:${operation.operation_id}`,
+        system_id: provider
+          ? 'devai-protected-certification-provider-v3'
+          : 'trusted-certification-evidence-sink-v1',
+        endpoint_id: 'host',
+        operation_id: provider ? 'execute' : 'write',
+        publication: false,
+        protected_release_binding: operation.binding,
+        protected_operation_id: operation.operation_id,
+      };
+      return authorizeTarget(
+        {
+          name: input.entry.name,
+          effects: input.entry.effects as 'harness-write',
+          authority_contract: input.entry.authority_contract,
+        },
+        target,
+        apply,
+      );
+    }
     if (request.kind === 'process') {
       if (readOnlyProcess(request, input.entry.name, input.entry.authority_contract.capabilities))
         return apply();
