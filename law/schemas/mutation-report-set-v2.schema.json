@@ -2,18 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/mutation-report-set-v2.schema.json",
   "title": "Canonical mutation report set v2",
-  "description": "The sole forward mutation-v2 contract. It validates a declared package roster, an immutable package result bound to its complete input projection, or a candidate-specific composition that records executed, reused, and not-required packages without rewriting execution artifacts. Semantic verification and digest recomputation remain mandatory.",
+  "description": "Sole forward mutation-v2 schema. The strict union covers the output contract, normalized Stryker report, immutable package result, candidate composition, and prior semantic-verification receipt. Schema validation never establishes a pass.",
   "schema_version": "2.1.0",
   "oneOf": [
     { "$ref": "#/$defs/output_contract" },
+    { "$ref": "#/$defs/normalized_report" },
     { "$ref": "#/$defs/package_result" },
-    { "$ref": "#/$defs/composition" }
+    { "$ref": "#/$defs/composition" },
+    { "$ref": "#/$defs/semantic_receipt" }
   ],
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "git_object": {
       "type": "string",
       "pattern": "^(?!0+$)(?:[0-9a-f]{40}|[0-9a-f]{64})$"
@@ -22,13 +21,14 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!//)(?!.*[\\u0000-\\u001f\\u007f])(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)[^/]+(?:/[^/]+)*$"
     },
     "package_name": {
       "type": "string",
       "pattern": "^@[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
     },
-    "thresholds": {
+    "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "stryker_thresholds": {
       "type": "object",
       "additionalProperties": false,
       "required": ["break", "high", "low"],
@@ -38,14 +38,35 @@
         "low": { "type": "number", "minimum": 0, "maximum": 100 }
       }
     },
+    "effective_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["break", "high", "low", "scoreMin", "survivedMax"],
+      "properties": {
+        "break": { "type": "number", "minimum": 0, "maximum": 100 },
+        "high": { "type": "number", "minimum": 0, "maximum": 100 },
+        "low": { "type": "number", "minimum": 0, "maximum": 100 },
+        "scoreMin": { "type": "number", "minimum": 0, "maximum": 100 },
+        "survivedMax": { "$ref": "#/$defs/count" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseUnit", "commit", "tree"],
+      "properties": {
+        "releaseUnit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
     "population_binding": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Identity of both a selected population and the rule that selected it. The semantic kernel recomputes both digests; absent or additional members deny reuse.",
       "required": ["canonicalization", "memberCount", "populationDigest", "selectionRuleDigest"],
       "properties": {
         "canonicalization": { "const": "rfc8785-jcs-utf8" },
-        "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "memberCount": { "$ref": "#/$defs/count" },
         "populationDigest": { "$ref": "#/$defs/sha256" },
         "selectionRuleDigest": { "$ref": "#/$defs/sha256" }
       }
@@ -117,15 +138,9 @@
         "Timeout": { "$ref": "#/$defs/count" }
       }
     },
-    "count": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 9007199254740991
-    },
     "process": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Bounded process metadata only. Stdout, stderr, commands, environment values, and host paths are never evidence fields.",
       "required": ["errorAbsent", "signal", "status"],
       "properties": {
         "errorAbsent": { "type": "boolean" },
@@ -137,15 +152,6 @@
         }
       }
     },
-    "target_census": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["targetFileCount", "totalMutants"],
-      "properties": {
-        "targetFileCount": { "$ref": "#/$defs/count" },
-        "totalMutants": { "$ref": "#/$defs/count" }
-      }
-    },
     "tool_versions": {
       "type": "object",
       "minProperties": 1,
@@ -155,18 +161,99 @@
         "maxLength": 128,
         "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:-]*$"
       },
-      "propertyNames": {
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
-      }
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
     },
-    "candidate": {
+    "position": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["releaseUnit", "commit", "tree"],
+      "required": ["line", "column"],
       "properties": {
-        "releaseUnit": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "commit": { "$ref": "#/$defs/git_object" },
-        "tree": { "$ref": "#/$defs/git_object" }
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" }
+      }
+    },
+    "mutant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mutatorName", "replacementDigest", "location", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+        "mutatorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\u0000-\\u001f\\u007f/\\\\]+$"
+        },
+        "replacementDigest": { "$ref": "#/$defs/sha256" },
+        "location": { "$ref": "#/$defs/location" },
+        "status": {
+          "enum": [
+            "CompileError",
+            "Ignored",
+            "Killed",
+            "NoCoverage",
+            "Pending",
+            "RuntimeError",
+            "Survived",
+            "Timeout"
+          ]
+        }
+      }
+    },
+    "normalized_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "strykerSchemaVersion",
+        "projectRoot",
+        "thresholds",
+        "files",
+        "testFiles",
+        "config",
+        "framework"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-normalized-stryker-report-v2" },
+        "strykerSchemaVersion": { "const": "1" },
+        "projectRoot": { "const": "." },
+        "thresholds": { "$ref": "#/$defs/stryker_thresholds" },
+        "files": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/portable_path" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["language", "mutants"],
+            "properties": {
+              "language": { "enum": ["javascript", "typescript"] },
+              "mutants": { "type": "array", "items": { "$ref": "#/$defs/mutant" } }
+            }
+          }
+        },
+        "testFiles": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/portable_path" },
+          "additionalProperties": { "const": {} }
+        },
+        "config": { "const": {} },
+        "framework": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": { "name": { "const": "StrykerJS" } }
+        }
       }
     },
     "required_package_contract": {
@@ -178,6 +265,8 @@
         "requirement",
         "reportPath",
         "resultPath",
+        "inputProjection",
+        "inputDigest",
         "thresholds"
       ],
       "properties": {
@@ -186,7 +275,9 @@
         "requirement": { "const": "required" },
         "reportPath": { "$ref": "#/$defs/portable_path" },
         "resultPath": { "$ref": "#/$defs/portable_path" },
-        "thresholds": { "$ref": "#/$defs/thresholds" }
+        "inputProjection": { "$ref": "#/$defs/input_projection" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" }
       }
     },
     "not_required_package_contract": {
@@ -213,8 +304,10 @@
         "kind",
         "expectedPackageCount",
         "summaryPath",
+        "semanticReceiptPath",
         "releasePlanReceiptDigest",
         "releaseProfileDigest",
+        "policyDigest",
         "packages",
         "paths"
       ],
@@ -223,8 +316,10 @@
         "kind": { "const": "mutation-report-set-v2" },
         "expectedPackageCount": { "type": "integer", "minimum": 1 },
         "summaryPath": { "$ref": "#/$defs/portable_path" },
+        "semanticReceiptPath": { "$ref": "#/$defs/portable_path" },
         "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
         "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
         "packages": {
           "type": "array",
           "minItems": 1,
@@ -237,7 +332,7 @@
         },
         "paths": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 2,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/portable_path" }
         }
@@ -254,7 +349,6 @@
         "inputProjection",
         "inputDigest",
         "reportDigest",
-        "durationMs",
         "toolVersions",
         "process",
         "thresholds",
@@ -272,20 +366,37 @@
         "inputProjection": { "$ref": "#/$defs/input_projection" },
         "inputDigest": { "$ref": "#/$defs/sha256" },
         "reportDigest": { "$ref": "#/$defs/sha256" },
-        "durationMs": { "$ref": "#/$defs/count" },
         "toolVersions": { "$ref": "#/$defs/tool_versions" },
         "process": { "$ref": "#/$defs/process" },
-        "thresholds": { "$ref": "#/$defs/thresholds" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
         "statusTotals": { "$ref": "#/$defs/status_totals" },
-        "targetCensus": { "$ref": "#/$defs/target_census" },
+        "targetCensus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFileCount", "totalMutants"],
+          "properties": {
+            "targetFileCount": { "$ref": "#/$defs/count" },
+            "totalMutants": { "$ref": "#/$defs/count" }
+          }
+        },
         "score": { "type": "number", "minimum": 0, "maximum": 100 },
         "complete": { "type": "boolean" },
         "passed": { "type": "boolean" }
       }
     },
-    "evidence_ref": {
+    "reuse_origin": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["candidate", "semanticReceiptDigest", "evidenceSetDigest"],
+      "properties": {
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "semanticReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "unevaluatedProperties": false,
       "required": [
         "kind",
         "packageName",
@@ -294,10 +405,9 @@
         "resultPath",
         "reportDigest",
         "resultDigest",
-        "inputProjectionDigest",
+        "inputDigest",
         "provenance",
-        "baselineCommit",
-        "baselineTree"
+        "origin"
       ],
       "properties": {
         "kind": { "const": "mutation-package-evidence-ref-v2" },
@@ -307,19 +417,27 @@
         "resultPath": { "$ref": "#/$defs/portable_path" },
         "reportDigest": { "$ref": "#/$defs/sha256" },
         "resultDigest": { "$ref": "#/$defs/sha256" },
-        "inputProjectionDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
         "provenance": { "enum": ["fresh", "reused"] },
-        "baselineCommit": {
-          "oneOf": [{ "$ref": "#/$defs/git_object" }, { "type": "null" }]
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin" }] }
+      },
+      "oneOf": [
+        {
+          "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } },
+          "required": ["provenance", "origin"]
         },
-        "baselineTree": {
-          "oneOf": [{ "$ref": "#/$defs/git_object" }, { "type": "null" }]
+        {
+          "properties": {
+            "provenance": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin" }
+          },
+          "required": ["provenance", "origin"]
         }
-      }
+      ]
     },
     "evidence_package_entry": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "required": [
         "packageName",
         "workspace",
@@ -332,14 +450,14 @@
         "resultPath",
         "reportDigest",
         "resultDigest",
-        "inputProjectionDigest",
+        "inputDigest",
         "evidenceRef",
         "evidenceRefDigest",
-        "durationMs",
         "thresholds",
         "statusTotals",
         "targetCensus",
-        "score"
+        "score",
+        "origin"
       ],
       "properties": {
         "packageName": { "$ref": "#/$defs/package_name" },
@@ -353,15 +471,48 @@
         "resultPath": { "$ref": "#/$defs/portable_path" },
         "reportDigest": { "$ref": "#/$defs/sha256" },
         "resultDigest": { "$ref": "#/$defs/sha256" },
-        "inputProjectionDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
         "evidenceRef": { "$ref": "#/$defs/evidence_ref" },
         "evidenceRefDigest": { "$ref": "#/$defs/sha256" },
-        "durationMs": { "$ref": "#/$defs/count" },
-        "thresholds": { "$ref": "#/$defs/thresholds" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
         "statusTotals": { "$ref": "#/$defs/status_totals" },
-        "targetCensus": { "$ref": "#/$defs/target_census" },
-        "score": { "type": "number", "minimum": 0, "maximum": 100 }
-      }
+        "targetCensus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFileCount", "totalMutants"],
+          "properties": {
+            "targetFileCount": { "$ref": "#/$defs/count" },
+            "totalMutants": { "$ref": "#/$defs/count" }
+          }
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin" }] }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "disposition": { "const": "executed" },
+            "origin": { "type": "null" },
+            "evidenceRef": {
+              "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        },
+        {
+          "properties": {
+            "disposition": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin" },
+            "evidenceRef": {
+              "properties": {
+                "provenance": { "const": "reused" },
+                "origin": { "$ref": "#/$defs/reuse_origin" }
+              }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        }
+      ]
     },
     "not_required_package_entry": {
       "type": "object",
@@ -398,11 +549,10 @@
         "executedPackageCount",
         "reusedPackageCount",
         "notRequiredPackageCount",
-        "durationMs",
-        "executedDurationMs",
-        "reusedDurationMs",
         "score",
         "statusTotals",
+        "verdict",
+        "passed",
         "evidenceSetDigest"
       ],
       "properties": {
@@ -410,11 +560,12 @@
         "executedPackageCount": { "$ref": "#/$defs/count" },
         "reusedPackageCount": { "$ref": "#/$defs/count" },
         "notRequiredPackageCount": { "$ref": "#/$defs/count" },
-        "durationMs": { "$ref": "#/$defs/count" },
-        "executedDurationMs": { "$ref": "#/$defs/count" },
-        "reusedDurationMs": { "$ref": "#/$defs/count" },
-        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "score": {
+          "oneOf": [{ "type": "number", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+        },
         "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "passed": { "type": "boolean" },
         "evidenceSetDigest": { "$ref": "#/$defs/sha256" }
       }
     },
@@ -426,6 +577,7 @@
         "kind",
         "candidate",
         "complete",
+        "verdict",
         "passed",
         "packages",
         "aggregate"
@@ -435,6 +587,7 @@
         "kind": { "const": "mutation-composed-report-set-v2" },
         "candidate": { "$ref": "#/$defs/candidate" },
         "complete": { "type": "boolean" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
         "passed": { "type": "boolean" },
         "packages": {
           "type": "array",
@@ -447,6 +600,150 @@
           }
         },
         "aggregate": { "$ref": "#/$defs/aggregate" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "packages": {
+                "not": {
+                  "contains": {
+                    "type": "object",
+                    "required": ["requirement"],
+                    "properties": { "requirement": { "const": "required" } }
+                  }
+                }
+              }
+            },
+            "required": ["packages"]
+          },
+          "then": {
+            "properties": {
+              "verdict": { "const": "not-applicable" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "executedPackageCount": { "const": 0 },
+                      "reusedPackageCount": { "const": 0 },
+                      "score": { "type": "null" },
+                      "verdict": { "const": "not-applicable" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "verifier_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "vendor", "byteEquality"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "commit", "tree", "byteSetDigest"],
+          "properties": {
+            "repository": { "const": "devai-verifier" },
+            "commit": { "$ref": "#/$defs/git_object" },
+            "tree": { "$ref": "#/$defs/git_object" },
+            "byteSetDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "vendor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "manifestPath",
+            "manifestDigest",
+            "sourceCommit",
+            "sourceTree",
+            "byteSetDigest"
+          ],
+          "properties": {
+            "root": { "$ref": "#/$defs/portable_path" },
+            "manifestPath": { "$ref": "#/$defs/portable_path" },
+            "manifestDigest": { "$ref": "#/$defs/sha256" },
+            "sourceCommit": { "$ref": "#/$defs/git_object" },
+            "sourceTree": { "$ref": "#/$defs/git_object" },
+            "byteSetDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "byteEquality": { "const": true }
+      }
+    },
+    "semantic_receipt_package": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName", "disposition", "inputDigest", "compositionEntryDigest"],
+          "properties": {
+            "packageName": { "$ref": "#/$defs/package_name" },
+            "disposition": { "enum": ["executed", "reused"] },
+            "inputDigest": { "$ref": "#/$defs/sha256" },
+            "compositionEntryDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName", "disposition", "compositionEntryDigest"],
+          "properties": {
+            "packageName": { "$ref": "#/$defs/package_name" },
+            "disposition": { "const": "not-required" },
+            "compositionEntryDigest": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "semantic_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptId",
+        "candidate",
+        "outputContractDigest",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "verifierProvenance",
+        "packages",
+        "packageResultSetDigest",
+        "evidenceSetDigest",
+        "verdict",
+        "semanticVerificationPerformed",
+        "receiptDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-semantic-verification-receipt-v2" },
+        "receiptId": { "type": "string", "pattern": "^MSV2-[0-9a-f]{16}$" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "outputContractDigest": { "$ref": "#/$defs/sha256" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "verifierProvenance": { "$ref": "#/$defs/verifier_provenance" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/semantic_receipt_package" }
+        },
+        "packageResultSetDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "semanticVerificationPerformed": { "const": true },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
       }
     }
   },
@@ -456,16 +753,105 @@
       "kind": "mutation-report-set-v2",
       "expectedPackageCount": 2,
       "summaryPath": "mutation/summary.json",
+      "semanticReceiptPath": "mutation/semantic-receipt.json",
       "releasePlanReceiptDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
       "releaseProfileDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "policyDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
       "packages": [
         {
           "packageName": "@devai-nyx/spec",
           "workspace": "packages/spec",
           "requirement": "required",
-          "reportPath": "mutation/packages-spec.stryker.json",
-          "resultPath": "mutation/packages-spec.result.json",
-          "thresholds": { "break": 90, "high": 90, "low": 80 }
+          "reportPath": "mutation/spec/report.json",
+          "resultPath": "mutation/spec/result.json",
+          "inputProjection": {
+            "schemaVersion": "2.1.0",
+            "kind": "mutation-input-projection-v2",
+            "packageName": "@devai-nyx/spec",
+            "workspace": "packages/spec",
+            "bindings": {
+              "source": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "tests": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "manifests": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "mutationConfiguration": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "runner": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "roster": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 2,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "thresholds": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "sanitizer": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "lockfile": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "environment": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "toolchain": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "semanticRebind": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              }
+            }
+          },
+          "inputDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "thresholds": {
+            "break": 90,
+            "high": 90,
+            "low": 80,
+            "scoreMin": 60,
+            "survivedMax": 50
+          }
         },
         {
           "packageName": "@devai-nyx/schemas",
@@ -476,8 +862,9 @@
       ],
       "paths": [
         "mutation/summary.json",
-        "mutation/packages-spec.stryker.json",
-        "mutation/packages-spec.result.json"
+        "mutation/semantic-receipt.json",
+        "mutation/spec/report.json",
+        "mutation/spec/result.json"
       ]
     }
   ]

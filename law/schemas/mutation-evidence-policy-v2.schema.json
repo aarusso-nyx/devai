@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/mutation-evidence-policy-v2.schema.json",
   "title": "Canonical mutation evidence policy v2",
-  "description": "Closed policy for the sole forward mutation-v2 report-set protocol, its source-first activation gate, complete package input identity, eight raw Stryker statuses, pure composition, read-only v1 boundary, and mandatory semantic verifier.",
+  "description": "Exact policy contract for the sole forward mutation-v2 protocol. All frozen semantics are constants; activation requires a complete byte-equal canonical-source-to-vendor provenance proof.",
   "schema_version": "2.1.0",
   "type": "object",
   "additionalProperties": false,
@@ -17,14 +17,17 @@
     "documents",
     "artifactModel",
     "inputIdentity",
+    "thresholdModel",
     "dispositions",
     "statusModel",
     "scoreModel",
     "composition",
+    "semanticReceiptModel",
     "compatibility",
-    "contentSafety",
+    "pathAndContentSafety",
     "offlineVerification",
-    "semanticKernel"
+    "semanticKernel",
+    "negativeFixtures"
   ],
   "properties": {
     "$schema": { "type": "string", "minLength": 1 },
@@ -34,375 +37,373 @@
     "authority": { "const": "Architect" },
     "contractSchema": { "const": "law/schemas/mutation-report-set-v2.schema.json" },
     "sourceBaseline": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["repository", "commit", "tree"],
-      "properties": {
-        "repository": { "const": "devai-verifier" },
-        "commit": { "$ref": "#/$defs/git_object" },
-        "tree": { "$ref": "#/$defs/git_object" }
+      "const": {
+        "repository": "devai-verifier",
+        "commit": "fcefd0ad9b1210f5d460509f801a16fc3c4dcbd1",
+        "tree": "ad06a07074428af47e2fd33ad1115efc7b1feb1e"
       }
     },
     "activation": {
       "oneOf": [
         {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "canonicalVerifierCommit",
-            "canonicalVerifierTree",
-            "emissionPermitted",
-            "verificationPermitted",
-            "vendorBeforeActivation"
-          ],
-          "properties": {
-            "canonicalVerifierCommit": { "type": "null" },
-            "canonicalVerifierTree": { "type": "null" },
-            "emissionPermitted": { "const": false },
-            "verificationPermitted": { "const": false },
-            "vendorBeforeActivation": { "const": true }
+          "const": {
+            "provenanceProof": null,
+            "emissionPermitted": false,
+            "verificationPermitted": false
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "canonicalVerifierCommit",
-            "canonicalVerifierTree",
-            "emissionPermitted",
-            "verificationPermitted",
-            "vendorBeforeActivation"
-          ],
+          "required": ["provenanceProof", "emissionPermitted", "verificationPermitted"],
           "properties": {
-            "canonicalVerifierCommit": { "$ref": "#/$defs/git_object" },
-            "canonicalVerifierTree": { "$ref": "#/$defs/git_object" },
+            "provenanceProof": { "$ref": "#/$defs/vendor_provenance" },
             "emissionPermitted": { "const": true },
-            "verificationPermitted": { "const": true },
-            "vendorBeforeActivation": { "const": true }
+            "verificationPermitted": { "const": true }
           }
         }
       ]
     },
     "documents": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["outputContract", "packageResult", "composition", "schemaVersion"],
-      "properties": {
-        "outputContract": { "const": "mutation-report-set-v2" },
-        "packageResult": { "const": "mutation-package-result-v2" },
-        "composition": { "const": "mutation-composed-report-set-v2" },
-        "schemaVersion": { "const": "2.1.0" }
+      "const": {
+        "outputContract": "mutation-report-set-v2",
+        "normalizedReport": "mutation-normalized-stryker-report-v2",
+        "packageResult": "mutation-package-result-v2",
+        "composition": "mutation-composed-report-set-v2",
+        "semanticReceipt": "mutation-semantic-verification-receipt-v2",
+        "schemaVersion": "2.1.0"
       }
     },
     "artifactModel": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "authoritativeArtifacts",
-        "canonicalization",
-        "contentAddress",
-        "storeLayout",
-        "candidateSpecificPackageBytes",
-        "compositionWritesExecutionArtifacts",
-        "refinalizationMutationProcessCount",
-        "refinalizationDeterministicAcross",
-        "verbatimRunnerOutputPermitted"
-      ],
-      "properties": {
-        "authoritativeArtifacts": {
-          "const": ["normalized-stryker-report", "package-result"]
-        },
-        "canonicalization": { "const": "rfc8785-jcs-utf8" },
-        "contentAddress": { "const": "sha256-of-canonical-artifact-bytes" },
-        "storeLayout": {
-          "const": ".devai/state/mutation/v2/store/sha256/<inputDigest>/{report.json,result.json}"
-        },
-        "candidateSpecificPackageBytes": { "const": false },
-        "compositionWritesExecutionArtifacts": { "const": false },
-        "refinalizationMutationProcessCount": { "const": 0 },
-        "refinalizationDeterministicAcross": {
-          "const": ["time", "cwd", "unrelated-environment", "ambient-host-state"]
-        },
-        "verbatimRunnerOutputPermitted": { "const": false }
+      "const": {
+        "authoritativePackageArtifacts": ["normalized-stryker-report", "package-result"],
+        "canonicalization": "rfc8785-jcs-utf8",
+        "cacheKey": "inputDigest",
+        "contentAddress": "artifact-sha256",
+        "storeLayout": ".devai/state/mutation/v2/store/inputs/<inputDigest>/objects/<artifactSha256>.<report|result>.json",
+        "writeOnce": true,
+        "candidateSpecificPackageBytes": false,
+        "compositionWritesExecutionArtifacts": false,
+        "nondeterministicDurationInImmutableEvidence": false,
+        "refinalizationMutationProcessCount": 0,
+        "refinalizationDeterministicAcross": [
+          "time",
+          "cwd",
+          "unrelated-environment",
+          "ambient-host-state"
+        ],
+        "verbatimRunnerOutputPermitted": false
       }
     },
     "inputIdentity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "digest",
-        "bindings",
-        "bindingFields",
-        "rawEnvironmentOrToolchainValuesPermitted",
-        "missingBehavior",
-        "mismatchBehavior",
-        "additionalBehavior"
-      ],
-      "properties": {
-        "digest": {
-          "const": "sha256-domain-devai-mutation-input-v2.1-nul-u64be-length-rfc8785-jcs-input-projection"
-        },
-        "bindings": {
-          "const": [
-            "source",
-            "tests",
-            "manifests",
-            "mutationConfiguration",
-            "runner",
-            "roster",
-            "thresholds",
-            "sanitizer",
-            "lockfile",
-            "environment",
-            "toolchain",
-            "semanticRebind"
-          ]
-        },
-        "bindingFields": {
-          "const": ["canonicalization", "memberCount", "populationDigest", "selectionRuleDigest"]
-        },
-        "rawEnvironmentOrToolchainValuesPermitted": { "const": false },
-        "missingBehavior": { "const": "deny-reuse" },
-        "mismatchBehavior": { "const": "deny-reuse" },
-        "additionalBehavior": { "const": "deny-reuse" }
+      "const": {
+        "digest": "sha256-domain-devai-mutation-input-v2.1-nul-u64be-length-rfc8785-jcs-input-projection",
+        "bindings": [
+          "source",
+          "tests",
+          "manifests",
+          "mutationConfiguration",
+          "runner",
+          "roster",
+          "thresholds",
+          "sanitizer",
+          "lockfile",
+          "environment",
+          "toolchain",
+          "semanticRebind"
+        ],
+        "bindingFields": [
+          "canonicalization",
+          "memberCount",
+          "populationDigest",
+          "selectionRuleDigest"
+        ],
+        "rawEnvironmentOrToolchainValuesPermitted": false,
+        "wholeRosterBindingInEveryPackage": true,
+        "missingBehavior": "deny-reuse",
+        "mismatchBehavior": "deny-reuse",
+        "additionalBehavior": "deny-reuse"
+      }
+    },
+    "thresholdModel": {
+      "const": {
+        "fields": ["break", "high", "low", "scoreMin", "survivedMax"],
+        "ordering": "zero<=low<=high<=100-and-zero<=break<=100-and-zero<=scoreMin<=100",
+        "effectiveScoreFloor": "max(break,scoreMin)",
+        "survivorCondition": "Survived<=survivedMax",
+        "passCondition": "score>=max(break,scoreMin)-and-Survived<=survivedMax",
+        "weakeningPermitted": false
       }
     },
     "dispositions": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "declared",
-        "provenanceCompatibility",
-        "notRequired",
-        "aggregatePreservesCounts"
-      ],
-      "properties": {
-        "declared": { "const": ["executed", "reused", "not-required"] },
+      "const": {
+        "declared": ["executed", "reused", "not-required"],
         "provenanceCompatibility": {
-          "const": { "executed": "fresh", "reused": "reused", "not-required": null }
+          "executed": "fresh",
+          "reused": "reused",
+          "not-required": null
+        },
+        "origin": {
+          "executed": "null",
+          "reused": "producing-candidate-semantic-receipt-and-evidence-set",
+          "not-required": "absent"
         },
         "notRequired": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["isPass", "artifactReferencePermitted", "permittedReasons"],
-          "properties": {
-            "isPass": { "const": false },
-            "artifactReferencePermitted": { "const": false },
-            "permittedReasons": {
-              "const": [
-                "no-mutatable-production-surface",
-                "package-excluded-by-approved-release-profile"
-              ]
-            }
-          }
+          "isPass": false,
+          "artifactReferencePermitted": false,
+          "permittedReasons": [
+            "no-mutatable-production-surface",
+            "package-excluded-by-approved-release-profile"
+          ]
         },
-        "aggregatePreservesCounts": { "const": true }
+        "aggregatePreservesCounts": true,
+        "allNotRequiredVerdict": "not-applicable",
+        "allNotRequiredPassed": false
       }
     },
     "statusModel": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "rawStatuses",
-        "detectedScored",
-        "undetectedScored",
-        "preservedNonScored",
-        "completionBlocking",
-        "passBlocking",
-        "compileErrorThresholdAdded",
-        "ignoredRulesBoundBy"
-      ],
-      "properties": {
-        "rawStatuses": {
-          "const": [
-            "CompileError",
-            "Ignored",
-            "Killed",
-            "NoCoverage",
-            "Pending",
-            "RuntimeError",
-            "Survived",
-            "Timeout"
-          ]
-        },
-        "detectedScored": { "const": ["Killed", "Timeout"] },
-        "undetectedScored": { "const": ["Survived", "NoCoverage"] },
-        "preservedNonScored": { "const": ["CompileError", "Ignored"] },
-        "completionBlocking": { "const": ["Pending"] },
-        "passBlocking": { "const": ["RuntimeError", "infrastructure-failure"] },
-        "compileErrorThresholdAdded": { "const": false },
-        "ignoredRulesBoundBy": { "const": "mutationConfiguration" }
+      "const": {
+        "rawStatuses": [
+          "CompileError",
+          "Ignored",
+          "Killed",
+          "NoCoverage",
+          "Pending",
+          "RuntimeError",
+          "Survived",
+          "Timeout"
+        ],
+        "detectedScored": ["Killed", "Timeout"],
+        "undetectedScored": ["Survived", "NoCoverage"],
+        "preservedNonScored": ["CompileError", "Ignored"],
+        "completionBlocking": ["Pending"],
+        "passBlocking": ["RuntimeError", "infrastructure-failure"],
+        "compileErrorThresholdAdded": false,
+        "ignoredRulesBoundBy": "mutationConfiguration"
       }
     },
     "scoreModel": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "numericModel",
-        "detected",
-        "scored",
-        "score",
-        "reportedComparison",
-        "thresholds",
-        "passThreshold"
-      ],
-      "properties": {
-        "numericModel": { "const": "ieee-754-binary64-round-to-nearest-ties-to-even" },
-        "detected": { "const": "binary64-add(Killed,Timeout)" },
-        "scored": { "const": "binary64-add(binary64-add(detected,Survived),NoCoverage)" },
-        "score": {
-          "const": "scored-binary64-equals-zero-question-100-colon-binary64-multiply(binary64-divide(detected,scored),100)"
-        },
-        "reportedComparison": { "const": "samevalue-and-not-negative-zero" },
-        "thresholds": { "const": ["break", "high", "low"] },
-        "passThreshold": { "const": "score-greater-than-or-equal-to-break" }
+      "const": {
+        "numericModel": "ieee-754-binary64-round-to-nearest-ties-to-even",
+        "detected": "binary64-add(Killed,Timeout)",
+        "scored": "binary64-add(binary64-add(detected,Survived),NoCoverage)",
+        "score": "scored-binary64-equals-zero-question-100-colon-binary64-multiply(binary64-divide(detected,scored),100)",
+        "reportedComparison": "samevalue-and-not-negative-zero"
       }
     },
     "composition": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "candidateSpecific",
-        "exactRosterBijection",
-        "packageOrder",
-        "evidenceSetDigest",
-        "aggregateCounts",
-        "pureFinalizer"
-      ],
-      "properties": {
-        "candidateSpecific": { "const": true },
-        "exactRosterBijection": { "const": true },
-        "packageOrder": { "const": "output-contract-order" },
-        "evidenceSetDigest": {
-          "const": "sha256-domain-devai-mutation-composition-v2.1-nul-u64be-length-rfc8785-jcs-complete-ordered-package-entry-array"
-        },
-        "aggregateCounts": {
-          "const": [
-            "packageCount",
-            "executedPackageCount",
-            "reusedPackageCount",
-            "notRequiredPackageCount"
-          ]
-        },
-        "pureFinalizer": { "const": true }
+      "const": {
+        "candidateSpecific": true,
+        "exactRosterBijection": true,
+        "packageOrder": "output-contract-order",
+        "inputDigestEquality": "package-result-equals-evidence-reference-equals-composition-entry",
+        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-nul-u64be-length-rfc8785-jcs-complete-ordered-package-entry-array",
+        "aggregateCounts": [
+          "packageCount",
+          "executedPackageCount",
+          "reusedPackageCount",
+          "notRequiredPackageCount"
+        ],
+        "pureFinalizer": true
+      }
+    },
+    "semanticReceiptModel": {
+      "const": {
+        "requiredForExportAndOfflineVerification": true,
+        "receiptDigestBoundBySignedArtifactManifest": true,
+        "receiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-nul-u64be-length-rfc8785-jcs-receipt-without-receiptDigest",
+        "receiptBinds": [
+          "candidate",
+          "outputContractDigest",
+          "releasePlanReceiptDigest",
+          "releaseProfileDigest",
+          "policyDigest",
+          "verifierProvenance",
+          "perPackageInputDigest",
+          "packageResultSetDigest",
+          "evidenceSetDigest",
+          "verdict"
+        ],
+        "schemaValidationEstablishesVerification": false
       }
     },
     "compatibility": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "v1ReadOnly",
-        "v1ReuseEligible",
-        "v1ExportPermitted",
-        "v1PublicationPermitted",
-        "v1ReuseIntoV2",
-        "v1TranslationIntoV2",
-        "draftV2SchemaVersionAccepted",
-        "dualWritePermitted",
-        "assuranceV2WriterPermitted",
-        "assuranceV2KernelPermitted"
-      ],
-      "properties": {
-        "v1ReadOnly": { "const": true },
-        "v1ReuseEligible": { "const": false },
-        "v1ExportPermitted": { "const": false },
-        "v1PublicationPermitted": { "const": false },
-        "v1ReuseIntoV2": { "const": false },
-        "v1TranslationIntoV2": { "const": false },
-        "draftV2SchemaVersionAccepted": { "const": false },
-        "dualWritePermitted": { "const": false },
-        "assuranceV2WriterPermitted": { "const": false },
-        "assuranceV2KernelPermitted": { "const": false }
+      "const": {
+        "v1ReadOnly": true,
+        "v1ReuseEligible": false,
+        "v1ExportPermitted": false,
+        "v1PublicationPermitted": false,
+        "v1ReuseIntoV2": false,
+        "v1TranslationIntoV2": false,
+        "draftV2SchemaVersionAccepted": false,
+        "dualWritePermitted": false,
+        "assuranceV2WriterPermitted": false,
+        "assuranceV2KernelPermitted": false
       }
     },
-    "contentSafety": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "reservedKindPrefix",
-        "portablePathsRequired",
-        "hostPathsForbidden",
-        "symlinkEscapesForbidden",
-        "noFollowScope",
-        "credentialMaterialForbidden",
-        "privateMaterialForbidden",
-        "unknownFieldsForbidden",
-        "unknownVersionsForbidden"
-      ],
-      "properties": {
-        "reservedKindPrefix": { "const": "mutation-" },
-        "portablePathsRequired": { "const": true },
-        "hostPathsForbidden": { "const": true },
-        "symlinkEscapesForbidden": { "const": true },
-        "noFollowScope": { "const": "final-component-and-every-ancestor" },
-        "credentialMaterialForbidden": { "const": true },
-        "privateMaterialForbidden": { "const": true },
-        "unknownFieldsForbidden": { "const": true },
-        "unknownVersionsForbidden": { "const": true }
+    "pathAndContentSafety": {
+      "const": {
+        "reservedKindPrefix": "mutation-",
+        "pathNormalization": "nfc-posix-relative-single-representation",
+        "absoluteDriveUncAndControlsForbidden": true,
+        "hostPathsForbidden": true,
+        "symlinkEscapesForbidden": true,
+        "noFollowScope": "final-component-and-every-ancestor",
+        "credentialMaterialForbidden": true,
+        "privateMaterialForbidden": true,
+        "unknownFieldsForbidden": true,
+        "unknownVersionsForbidden": true,
+        "nativePathInErrorPermitted": false
       }
     },
     "offlineVerification": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "externalExpectationsRequired",
-        "candidateDefaultsPermitted",
-        "exactResultSetClosure",
-        "trustStoreNoFollowRequired",
-        "artifactNoFollowRequired",
-        "nativePathInErrorPermitted"
-      ],
-      "properties": {
-        "externalExpectationsRequired": {
-          "const": [
-            "repository",
-            "candidateCommit",
-            "candidateTree",
-            "taskPolicyDigest",
-            "signerId",
-            "trustRootId",
-            "trustStoreDigest",
-            "keyId"
-          ]
-        },
-        "candidateDefaultsPermitted": { "const": false },
-        "exactResultSetClosure": {
-          "const": "signed-receipt-results-equals-manifest-resultDigests-equals-supplied-result-files"
-        },
-        "trustStoreNoFollowRequired": { "const": true },
-        "artifactNoFollowRequired": { "const": true },
-        "nativePathInErrorPermitted": { "const": false }
+      "const": {
+        "externalExpectationsRequired": [
+          "repository",
+          "candidateCommit",
+          "candidateTree",
+          "taskPolicyDigest",
+          "signerId",
+          "trustRootId",
+          "trustStoreDigest",
+          "keyId"
+        ],
+        "candidateDefaultsPermitted": false,
+        "semanticReceiptRequired": true,
+        "requiredPackageInputClosure": "output-contract-embeds-complete-canonical-inputProjection-and-inputDigest",
+        "exactResultSetClosure": "signed-receipt-results-equals-manifest-resultDigests-equals-supplied-result-files",
+        "trustStoreNoFollowRequired": true,
+        "artifactNoFollowRequired": true
       }
     },
     "semanticKernel": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "mandatory", "schemaValidationEstablishesPass", "algorithm", "errors"],
-      "properties": {
-        "id": { "const": "devai.kernel.mutation-report-set-v2.v1" },
-        "mandatory": { "const": true },
-        "schemaValidationEstablishesPass": { "const": false },
-        "algorithm": {
-          "type": "array",
-          "minItems": 18,
-          "maxItems": 18,
-          "uniqueItems": true,
-          "items": { "type": "string", "minLength": 20 }
-        },
-        "errors": {
-          "type": "array",
-          "minItems": 21,
-          "maxItems": 21,
-          "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" }
-        }
+      "const": {
+        "id": "devai.kernel.mutation-report-set-v2.v1",
+        "mandatory": true,
+        "schemaValidationEstablishesPass": false,
+        "algorithm": [
+          "validate-the-output-contract-as-schema-version-2.1.0-and-require-one-ordered-entry-for-every-declared-package",
+          "require-every-required-output-contract-entry-to-embed-the-complete-canonical-inputProjection-and-inputDigest-needed-for-offline-recomputation-without-a-live-provider",
+          "reserve-every-mutation-prefix-kind-and-reject-unknown-spellings-or-versions-before-generic-artifact-handling",
+          "resolve-every-path-as-an-already-nfc-posix-relative-single-representation-and-reject-absolute-drive-unc-control-dot-dotdot-or-symlinked-final-or-ancestor-components",
+          "for-every-required-package-read-exactly-one-canonical-normalized-stryker-report-and-one-canonical-package-result-from-the-input-keyed-artifact-addressed-write-once-store",
+          "reject-host-paths-credential-material-private-material-unknown-fields-and-unknown-versions-before-scoring",
+          "recompute-every-report-and-result-byte-digest-and-require-equality-with-the-output-contract-composition-evidence-reference-and-store-address",
+          "recompute-each-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-as-sha256-over-domain-devai-mutation-input-v2.1-nul-u64be-length-and-rfc8785-jcs-inputProjection",
+          "require-the-exact-same-inputDigest-in-the-output-contract-package-result-evidence-reference-composition-entry-and-semantic-receipt",
+          "deny-reuse-if-any-required-input-binding-is-missing-mismatched-or-additional-and-invalidate-every-package-on-whole-roster-drift",
+          "recompute-all-eight-raw-stryker-status-counts-from-the-strict-normalized-report-as-nonnegative-safe-integers",
+          "preserve-CompileError-and-Ignored-as-non-scored-require-Pending-zero-for-completion-and-require-RuntimeError-zero-for-pass",
+          "require-process-errorAbsent-true-signal-null-and-status-zero-for-completion-and-treat-any-other-process-outcome-as-infrastructure-failure",
+          "recompute-detected-scored-and-score-under-the-exact-binary64-operation-order-and-require-samevalue-and-not-negative-zero",
+          "require-zero-less-than-or-equal-to-low-less-than-or-equal-to-high-less-than-or-equal-to-100-independent-zero-to-100-break-and-scoreMin-and-nonnegative-safe-integer-survivedMax",
+          "require-score-greater-than-or-equal-to-max-break-scoreMin-and-Survived-less-than-or-equal-to-survivedMax-with-no-threshold-weakening",
+          "during-certify-recompute-every-package-requirement-from-the-exact-release-plan-and-profile-then-bind-those-digests-and-decisions-in-the-semantic-verification-receipt-for-offline-trust",
+          "require-executed-origin-null-reused-origin-to-bind-producing-candidate-semantic-receipt-and-evidence-set-and-not-required-to-have-no-origin-or-artifact-reference",
+          "require-every-composition-package-to-biject-with-the-output-contract-and-declare-exactly-executed-reused-or-not-required",
+          "recompute-status-totals-target-census-all-three-disposition-counts-and-evidenceSetDigest-without-opening-a-subprocess-or-reading-time-cwd-or-unrelated-environment",
+          "return-not-applicable-and-passed-false-for-an-all-not-required-composition-and-never-derive-a-vacuous-pass",
+          "activate-emission-and-verification-only-when-source-and-vendor-commit-tree-and-byteSetDigest-are-equal-and-the-vendor-manifest-path-manifestDigest-and-root-prove-the-exact-no-follow-byte-set",
+          "emit-a-semantic-verification-receipt-binding-the-candidate-contract-plan-profile-policy-verifier-provenance-package-result-set-evidence-set-and-verdict-and-recompute-its-receiptDigest-with-receiptDigest-omitted",
+          "offline-verify-the-signed-semantic-receipt-and-exact-result-set-closure-using-only-required-external-repository-candidate-policy-signer-trust-root-trust-store-digest-and-key-expectations"
+        ],
+        "errors": [
+          "MUTATION_VERSION_UNSUPPORTED",
+          "MUTATION_ROSTER_MISMATCH",
+          "MUTATION_INPUT_IDENTITY_MISSING",
+          "MUTATION_INPUT_DIGEST_MISMATCH",
+          "MUTATION_REUSE_DENIED",
+          "MUTATION_ORIGIN_MISMATCH",
+          "MUTATION_NOT_REQUIRED_MISMATCH",
+          "MUTATION_REPORT_INVALID",
+          "MUTATION_INCOMPLETE",
+          "MUTATION_RUNTIME_FAILURE",
+          "MUTATION_INFRASTRUCTURE_FAILURE",
+          "MUTATION_METRIC_MISMATCH",
+          "MUTATION_THRESHOLD_MISMATCH",
+          "MUTATION_THRESHOLD_FAILED",
+          "MUTATION_SUMMARY_MISMATCH",
+          "MUTATION_SEMANTIC_RECEIPT_MISMATCH",
+          "MUTATION_VENDOR_PROVENANCE_MISMATCH",
+          "MUTATION_OFFLINE_EXPECTATION_MISSING",
+          "ARTIFACT_DIGEST_MISMATCH",
+          "ARTIFACT_HOST_PATH",
+          "ARTIFACT_CREDENTIAL_MATERIAL",
+          "ARTIFACT_SYMLINK_ESCAPE",
+          "RESULT_SET_MISMATCH",
+          "NON_CANONICAL_JSON"
+        ]
       }
+    },
+    "negativeFixtures": {
+      "const": [
+        "score-passes-but-survivedMax-fails",
+        "low-greater-than-high",
+        "offline-input-population-self-asserted-without-semantic-receipt",
+        "reused-origin-null",
+        "executed-origin-non-null",
+        "result-reference-composition-inputDigest-diverge",
+        "all-not-required-reported-pass",
+        "normalized-report-unknown-field",
+        "cache-key-used-as-artifact-address",
+        "activation-without-byte-equal-vendor-provenance",
+        "portable-path-control-character",
+        "portable-path-non-nfc-alias",
+        "mutation-unknown-kind-generic-fallthrough",
+        "symlinked-trust-store-ancestor"
+      ]
     }
   },
   "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "git_object": {
       "type": "string",
       "pattern": "^(?!0+$)(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "portable_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!//)(?!.*[\\u0000-\\u001f\\u007f])(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)[^/]+(?:/[^/]+)*$"
+    },
+    "vendor_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "vendor", "byteEquality"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "commit", "tree", "byteSetDigest"],
+          "properties": {
+            "repository": { "const": "devai-verifier" },
+            "commit": { "$ref": "#/$defs/git_object" },
+            "tree": { "$ref": "#/$defs/git_object" },
+            "byteSetDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "vendor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "manifestPath",
+            "manifestDigest",
+            "sourceCommit",
+            "sourceTree",
+            "byteSetDigest"
+          ],
+          "properties": {
+            "root": { "$ref": "#/$defs/portable_path" },
+            "manifestPath": { "$ref": "#/$defs/portable_path" },
+            "manifestDigest": { "$ref": "#/$defs/sha256" },
+            "sourceCommit": { "$ref": "#/$defs/git_object" },
+            "sourceTree": { "$ref": "#/$defs/git_object" },
+            "byteSetDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "byteEquality": { "const": true }
+      }
     }
   },
   "allOf": [
@@ -414,11 +415,10 @@
       "then": {
         "properties": {
           "activation": {
-            "properties": {
-              "canonicalVerifierCommit": { "type": "null" },
-              "canonicalVerifierTree": { "type": "null" },
-              "emissionPermitted": { "const": false },
-              "verificationPermitted": { "const": false }
+            "const": {
+              "provenanceProof": null,
+              "emissionPermitted": false,
+              "verificationPermitted": false
             }
           }
         }
@@ -432,12 +432,13 @@
       "then": {
         "properties": {
           "activation": {
+            "type": "object",
             "properties": {
-              "canonicalVerifierCommit": { "$ref": "#/$defs/git_object" },
-              "canonicalVerifierTree": { "$ref": "#/$defs/git_object" },
+              "provenanceProof": { "$ref": "#/$defs/vendor_provenance" },
               "emissionPermitted": { "const": true },
               "verificationPermitted": { "const": true }
-            }
+            },
+            "required": ["provenanceProof", "emissionPermitted", "verificationPermitted"]
           }
         }
       }
@@ -457,25 +458,28 @@
         "tree": "ad06a07074428af47e2fd33ad1115efc7b1feb1e"
       },
       "activation": {
-        "canonicalVerifierCommit": null,
-        "canonicalVerifierTree": null,
+        "provenanceProof": null,
         "emissionPermitted": false,
-        "verificationPermitted": false,
-        "vendorBeforeActivation": true
+        "verificationPermitted": false
       },
       "documents": {
         "outputContract": "mutation-report-set-v2",
+        "normalizedReport": "mutation-normalized-stryker-report-v2",
         "packageResult": "mutation-package-result-v2",
         "composition": "mutation-composed-report-set-v2",
+        "semanticReceipt": "mutation-semantic-verification-receipt-v2",
         "schemaVersion": "2.1.0"
       },
       "artifactModel": {
-        "authoritativeArtifacts": ["normalized-stryker-report", "package-result"],
+        "authoritativePackageArtifacts": ["normalized-stryker-report", "package-result"],
         "canonicalization": "rfc8785-jcs-utf8",
-        "contentAddress": "sha256-of-canonical-artifact-bytes",
-        "storeLayout": ".devai/state/mutation/v2/store/sha256/<inputDigest>/{report.json,result.json}",
+        "cacheKey": "inputDigest",
+        "contentAddress": "artifact-sha256",
+        "storeLayout": ".devai/state/mutation/v2/store/inputs/<inputDigest>/objects/<artifactSha256>.<report|result>.json",
+        "writeOnce": true,
         "candidateSpecificPackageBytes": false,
         "compositionWritesExecutionArtifacts": false,
+        "nondeterministicDurationInImmutableEvidence": false,
         "refinalizationMutationProcessCount": 0,
         "refinalizationDeterministicAcross": [
           "time",
@@ -508,9 +512,18 @@
           "selectionRuleDigest"
         ],
         "rawEnvironmentOrToolchainValuesPermitted": false,
+        "wholeRosterBindingInEveryPackage": true,
         "missingBehavior": "deny-reuse",
         "mismatchBehavior": "deny-reuse",
         "additionalBehavior": "deny-reuse"
+      },
+      "thresholdModel": {
+        "fields": ["break", "high", "low", "scoreMin", "survivedMax"],
+        "ordering": "zero<=low<=high<=100-and-zero<=break<=100-and-zero<=scoreMin<=100",
+        "effectiveScoreFloor": "max(break,scoreMin)",
+        "survivorCondition": "Survived<=survivedMax",
+        "passCondition": "score>=max(break,scoreMin)-and-Survived<=survivedMax",
+        "weakeningPermitted": false
       },
       "dispositions": {
         "declared": ["executed", "reused", "not-required"],
@@ -518,6 +531,11 @@
           "executed": "fresh",
           "reused": "reused",
           "not-required": null
+        },
+        "origin": {
+          "executed": "null",
+          "reused": "producing-candidate-semantic-receipt-and-evidence-set",
+          "not-required": "absent"
         },
         "notRequired": {
           "isPass": false,
@@ -527,7 +545,9 @@
             "package-excluded-by-approved-release-profile"
           ]
         },
-        "aggregatePreservesCounts": true
+        "aggregatePreservesCounts": true,
+        "allNotRequiredVerdict": "not-applicable",
+        "allNotRequiredPassed": false
       },
       "statusModel": {
         "rawStatuses": [
@@ -553,14 +573,13 @@
         "detected": "binary64-add(Killed,Timeout)",
         "scored": "binary64-add(binary64-add(detected,Survived),NoCoverage)",
         "score": "scored-binary64-equals-zero-question-100-colon-binary64-multiply(binary64-divide(detected,scored),100)",
-        "reportedComparison": "samevalue-and-not-negative-zero",
-        "thresholds": ["break", "high", "low"],
-        "passThreshold": "score-greater-than-or-equal-to-break"
+        "reportedComparison": "samevalue-and-not-negative-zero"
       },
       "composition": {
         "candidateSpecific": true,
         "exactRosterBijection": true,
         "packageOrder": "output-contract-order",
+        "inputDigestEquality": "package-result-equals-evidence-reference-equals-composition-entry",
         "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-nul-u64be-length-rfc8785-jcs-complete-ordered-package-entry-array",
         "aggregateCounts": [
           "packageCount",
@@ -569,6 +588,24 @@
           "notRequiredPackageCount"
         ],
         "pureFinalizer": true
+      },
+      "semanticReceiptModel": {
+        "requiredForExportAndOfflineVerification": true,
+        "receiptDigestBoundBySignedArtifactManifest": true,
+        "receiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-nul-u64be-length-rfc8785-jcs-receipt-without-receiptDigest",
+        "receiptBinds": [
+          "candidate",
+          "outputContractDigest",
+          "releasePlanReceiptDigest",
+          "releaseProfileDigest",
+          "policyDigest",
+          "verifierProvenance",
+          "perPackageInputDigest",
+          "packageResultSetDigest",
+          "evidenceSetDigest",
+          "verdict"
+        ],
+        "schemaValidationEstablishesVerification": false
       },
       "compatibility": {
         "v1ReadOnly": true,
@@ -582,16 +619,18 @@
         "assuranceV2WriterPermitted": false,
         "assuranceV2KernelPermitted": false
       },
-      "contentSafety": {
+      "pathAndContentSafety": {
         "reservedKindPrefix": "mutation-",
-        "portablePathsRequired": true,
+        "pathNormalization": "nfc-posix-relative-single-representation",
+        "absoluteDriveUncAndControlsForbidden": true,
         "hostPathsForbidden": true,
         "symlinkEscapesForbidden": true,
         "noFollowScope": "final-component-and-every-ancestor",
         "credentialMaterialForbidden": true,
         "privateMaterialForbidden": true,
         "unknownFieldsForbidden": true,
-        "unknownVersionsForbidden": true
+        "unknownVersionsForbidden": true,
+        "nativePathInErrorPermitted": false
       },
       "offlineVerification": {
         "externalExpectationsRequired": [
@@ -605,10 +644,11 @@
           "keyId"
         ],
         "candidateDefaultsPermitted": false,
+        "semanticReceiptRequired": true,
+        "requiredPackageInputClosure": "output-contract-embeds-complete-canonical-inputProjection-and-inputDigest",
         "exactResultSetClosure": "signed-receipt-results-equals-manifest-resultDigests-equals-supplied-result-files",
         "trustStoreNoFollowRequired": true,
-        "artifactNoFollowRequired": true,
-        "nativePathInErrorPermitted": false
+        "artifactNoFollowRequired": true
       },
       "semanticKernel": {
         "id": "devai.kernel.mutation-report-set-v2.v1",
@@ -616,23 +656,29 @@
         "schemaValidationEstablishesPass": false,
         "algorithm": [
           "validate-the-output-contract-as-schema-version-2.1.0-and-require-one-ordered-entry-for-every-declared-package",
-          "for-every-required-package-read-exactly-one-canonical-portable-normalized-stryker-report-and-one-canonical-package-result",
-          "reject-host-paths-credential-material-private-material-unknown-fields-and-unknown-versions-before-scoring",
+          "require-every-required-output-contract-entry-to-embed-the-complete-canonical-inputProjection-and-inputDigest-needed-for-offline-recomputation-without-a-live-provider",
           "reserve-every-mutation-prefix-kind-and-reject-unknown-spellings-or-versions-before-generic-artifact-handling",
-          "recompute-every-report-and-result-byte-digest-and-require-equality-with-the-contract-composition-and-evidence-reference",
+          "resolve-every-path-as-an-already-nfc-posix-relative-single-representation-and-reject-absolute-drive-unc-control-dot-dotdot-or-symlinked-final-or-ancestor-components",
+          "for-every-required-package-read-exactly-one-canonical-normalized-stryker-report-and-one-canonical-package-result-from-the-input-keyed-artifact-addressed-write-once-store",
+          "reject-host-paths-credential-material-private-material-unknown-fields-and-unknown-versions-before-scoring",
+          "recompute-every-report-and-result-byte-digest-and-require-equality-with-the-output-contract-composition-evidence-reference-and-store-address",
           "recompute-each-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-as-sha256-over-domain-devai-mutation-input-v2.1-nul-u64be-length-and-rfc8785-jcs-inputProjection",
-          "deny-reuse-if-any-required-input-binding-is-missing-mismatched-or-additional-and-never-translate-v1-evidence",
-          "recompute-all-eight-raw-stryker-status-counts-from-the-normalized-report-as-nonnegative-safe-integers",
+          "require-the-exact-same-inputDigest-in-the-output-contract-package-result-evidence-reference-composition-entry-and-semantic-receipt",
+          "deny-reuse-if-any-required-input-binding-is-missing-mismatched-or-additional-and-invalidate-every-package-on-whole-roster-drift",
+          "recompute-all-eight-raw-stryker-status-counts-from-the-strict-normalized-report-as-nonnegative-safe-integers",
           "preserve-CompileError-and-Ignored-as-non-scored-require-Pending-zero-for-completion-and-require-RuntimeError-zero-for-pass",
           "require-process-errorAbsent-true-signal-null-and-status-zero-for-completion-and-treat-any-other-process-outcome-as-infrastructure-failure",
-          "recompute-detected-scored-score-and-threshold-verdict-under-the-exact-binary64-operation-order",
-          "require-the-output-contract-to-bind-the-exact-verified-release-plan-receipt-and-release-profile-digests-and-recompute-every-package-requirement-from-those-inputs",
+          "recompute-detected-scored-and-score-under-the-exact-binary64-operation-order-and-require-samevalue-and-not-negative-zero",
+          "require-zero-less-than-or-equal-to-low-less-than-or-equal-to-high-less-than-or-equal-to-100-independent-zero-to-100-break-and-scoreMin-and-nonnegative-safe-integer-survivedMax",
+          "require-score-greater-than-or-equal-to-max-break-scoreMin-and-Survived-less-than-or-equal-to-survivedMax-with-no-threshold-weakening",
+          "during-certify-recompute-every-package-requirement-from-the-exact-release-plan-and-profile-then-bind-those-digests-and-decisions-in-the-semantic-verification-receipt-for-offline-trust",
+          "require-executed-origin-null-reused-origin-to-bind-producing-candidate-semantic-receipt-and-evidence-set-and-not-required-to-have-no-origin-or-artifact-reference",
           "require-every-composition-package-to-biject-with-the-output-contract-and-declare-exactly-executed-reused-or-not-required",
-          "require-executed-to-map-to-fresh-reused-to-map-to-reused-and-not-required-to-have-no-artifact-reference-and-no-pass",
-          "recompute-package-duration-metrics-status-totals-target-census-and-all-three-disposition-counts-without-opening-a-subprocess",
-          "recompute-evidenceSetDigest-over-domain-devai-mutation-composition-v2.1-nul-u64be-length-and-rfc8785-jcs-complete-ordered-package-entry-array-and-reject-any-add-drop-reorder-or-substitution",
-          "return-pass-only-for-a-complete-composition-whose-required-packages-pass-and-whose-not-required-entries-are-policy-permitted",
-          "offline-verify-with-only-external-expected-repository-candidate-policy-signer-trust-root-trust-store-digest-and-key-identities-and-require-exact-result-set-closure-with-no-follow-reads"
+          "recompute-status-totals-target-census-all-three-disposition-counts-and-evidenceSetDigest-without-opening-a-subprocess-or-reading-time-cwd-or-unrelated-environment",
+          "return-not-applicable-and-passed-false-for-an-all-not-required-composition-and-never-derive-a-vacuous-pass",
+          "activate-emission-and-verification-only-when-source-and-vendor-commit-tree-and-byteSetDigest-are-equal-and-the-vendor-manifest-path-manifestDigest-and-root-prove-the-exact-no-follow-byte-set",
+          "emit-a-semantic-verification-receipt-binding-the-candidate-contract-plan-profile-policy-verifier-provenance-package-result-set-evidence-set-and-verdict-and-recompute-its-receiptDigest-with-receiptDigest-omitted",
+          "offline-verify-the-signed-semantic-receipt-and-exact-result-set-closure-using-only-required-external-repository-candidate-policy-signer-trust-root-trust-store-digest-and-key-expectations"
         ],
         "errors": [
           "MUTATION_VERSION_UNSUPPORTED",
@@ -640,6 +686,7 @@
           "MUTATION_INPUT_IDENTITY_MISSING",
           "MUTATION_INPUT_DIGEST_MISMATCH",
           "MUTATION_REUSE_DENIED",
+          "MUTATION_ORIGIN_MISMATCH",
           "MUTATION_NOT_REQUIRED_MISMATCH",
           "MUTATION_REPORT_INVALID",
           "MUTATION_INCOMPLETE",
@@ -649,15 +696,33 @@
           "MUTATION_THRESHOLD_MISMATCH",
           "MUTATION_THRESHOLD_FAILED",
           "MUTATION_SUMMARY_MISMATCH",
+          "MUTATION_SEMANTIC_RECEIPT_MISMATCH",
+          "MUTATION_VENDOR_PROVENANCE_MISMATCH",
+          "MUTATION_OFFLINE_EXPECTATION_MISSING",
           "ARTIFACT_DIGEST_MISMATCH",
           "ARTIFACT_HOST_PATH",
           "ARTIFACT_CREDENTIAL_MATERIAL",
-          "NON_CANONICAL_JSON",
-          "MUTATION_OFFLINE_EXPECTATION_MISSING",
+          "ARTIFACT_SYMLINK_ESCAPE",
           "RESULT_SET_MISMATCH",
-          "ARTIFACT_SYMLINK_ESCAPE"
+          "NON_CANONICAL_JSON"
         ]
-      }
+      },
+      "negativeFixtures": [
+        "score-passes-but-survivedMax-fails",
+        "low-greater-than-high",
+        "offline-input-population-self-asserted-without-semantic-receipt",
+        "reused-origin-null",
+        "executed-origin-non-null",
+        "result-reference-composition-inputDigest-diverge",
+        "all-not-required-reported-pass",
+        "normalized-report-unknown-field",
+        "cache-key-used-as-artifact-address",
+        "activation-without-byte-equal-vendor-provenance",
+        "portable-path-control-character",
+        "portable-path-non-nfc-alias",
+        "mutation-unknown-kind-generic-fallthrough",
+        "symlinked-trust-store-ancestor"
+      ]
     }
   ]
 }
