@@ -115,6 +115,15 @@ function ensureSchemaReferences(name: SchemaName): void {
       'release-lifecycle-store-head.schema.json',
     );
   }
+  if (
+    name === 'release-lifecycle-store-record.schema.json' &&
+    ajv.getSchema('release-lifecycle-state.schema.json') === undefined
+  ) {
+    ajv.addSchema(
+      loadSchema('release-lifecycle-state.schema.json'),
+      'release-lifecycle-state.schema.json',
+    );
+  }
 }
 
 const compiled = new Map<SchemaName, ReturnType<typeof ajv.compile>>();

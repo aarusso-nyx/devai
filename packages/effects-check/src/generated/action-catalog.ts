@@ -115,7 +115,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'release certify',
     public_action_id: 'release certify',
     effect: 'harness-write',
-    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+    capabilities: [
+      'fs:f5-state',
+      'fs:proofs',
+      'protected-certification-provider-v3:execute',
+      'certification-evidence-sink:write',
+    ],
   },
   {
     action_id: 'release check',
