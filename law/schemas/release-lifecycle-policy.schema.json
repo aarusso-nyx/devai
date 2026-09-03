@@ -780,7 +780,9 @@
             "content_source",
             "pack",
             "artifact_sink",
-            "downstream_reverification"
+            "prepared_state",
+            "downstream_reverification",
+            "errors"
           ],
           "properties": {
             "kernel_id": { "const": "devai.kernel.release-prepare.v3" },
@@ -823,6 +825,8 @@
                 "coverage",
                 "entry_fields",
                 "entry_origins",
+                "entry_order",
+                "manifest_digest",
                 "missing_or_extra_entry"
               ],
               "properties": {
@@ -847,6 +851,12 @@
                   "const": ["path", "mode", "size_bytes", "sha256", "immutable_blob_locator"]
                 },
                 "entry_origins": { "const": ["git-object", "generated-output"] },
+                "entry_order": {
+                  "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse"
+                },
+                "manifest_digest": {
+                  "const": "sha256-of-domain-DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1-nul-followed-by-utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted"
+                },
                 "missing_or_extra_entry": { "const": "fail-closed" }
               }
             },
@@ -859,7 +869,7 @@
                   "const": "read-the-exact-candidate-tree-object-by-immutable-object-id-recompute-the-git-object-id-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use"
                 },
                 "generated_output": {
-                  "const": "read-only-from-the-certified-immutable-output-blob-locator-and-recompute-sha256-over-the-returned-bytes-before-use"
+                  "const": "resolve-the-immutable-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-verify-its-candidate-commit-tree-task-policy-package-id-and-output-blob-sha256-referent-then-read-only-from-that-content-addressed-output-blob-and-recompute-sha256-over-the-returned-bytes-before-use"
                 },
                 "locator_rule": {
                   "const": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-and-ambient-worktree-reads-are-forbidden"
@@ -882,12 +892,12 @@
               ],
               "properties": {
                 "implementation": { "const": "pure-in-memory-npm-compatible-tar-gzip" },
-                "pack_spec_id": { "const": "devai.pure-npm-compatible-pack.v1" },
+                "pack_spec_id": { "const": "devai.pure-npm-compatible-pack.v2" },
                 "pack_spec_canonical_bytes": {
-                  "const": "devai.pure-npm-compatible-pack.v1\nutf-8\nrfc8785-jcs\ntar-ustar\ngzip-mtime-zero\n"
+                  "const": "devai.pure-npm-compatible-pack.v2\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;utf-8;no-backslash;maximum-100-bytes;no-pax\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=archive-path;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=empty\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;chunk-maximum-65535;block-order=tar-byte-order;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool:devai.pure-npm-compatible-pack.v2];packages=[SPDXRef-Package];files=entries-in-entry-order;file.SPDXID=SPDXRef-File-<sha256>;file.fileName=archive-path;file.checksums=[SHA256:<sha256>];relationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n"
                 },
                 "pack_spec_digest_sha256": {
-                  "const": "cc6b8ecd03c470a658b4a6f40c9adca37158d05700f69d780b9e12e12a6b092b"
+                  "const": "5d3e20b4b26b0846e0f006cd6880376d00fbbeb87e629746c09c42666301acd3"
                 },
                 "outputs": { "const": ["package-tarball", "sbom", "manifest"] },
                 "determinism": {
@@ -938,8 +948,28 @@
                 }
               }
             },
+            "prepared_state": {
+              "const": "v3-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only"
+            },
             "downstream_reverification": {
-              "const": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-recompute-byte-digest-size-and-manifest-membership-before-use"
+              "const": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-the-exact-committed-manifest-handle-then-recompute-byte-digest-size-and-manifest-membership-before-use"
+            },
+            "errors": {
+              "const": [
+                "release-prepare-certification-manifest-invalid",
+                "release-prepare-package-entry-coverage-invalid",
+                "release-prepare-immutable-blob-locator-invalid",
+                "release-prepare-content-digest-mismatch",
+                "release-prepare-pack-spec-digest-mismatch",
+                "release-prepare-unsupported-package-semantics",
+                "release-prepare-subprocess-forbidden",
+                "release-artifact-sink-unavailable",
+                "release-artifact-sink-protocol-invalid",
+                "release-artifact-sink-verification-failed",
+                "release-artifact-sink-commit-failed",
+                "release-artifact-sink-abort-failed",
+                "release-downstream-artifact-reverification-failed"
+              ]
             }
           }
         },
@@ -3293,6 +3323,97 @@
           "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
           "retry": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
         },
+        "prepare_kernel": {
+          "kernel_id": "devai.kernel.release-prepare.v3",
+          "compatibility": {
+            "v2_local_path_and_npm_adapter": "deprecated-read-only-v2-compatibility-only;it-must-never-be-selected-for-a-v3-prepare",
+            "v3_prepare": "pure-in-memory-and-sink-mediated-only"
+          },
+          "stock_composition": {
+            "built_in_actions": [
+              "release plan",
+              "release preflight",
+              "release certify",
+              "release resume"
+            ],
+            "prepare": "requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink"
+          },
+          "certification_manifest": {
+            "produced_by": "release certify",
+            "schema": "law/schemas/release-lifecycle-state.schema.json#/$defs/certification_package_entry_manifest",
+            "binding": [
+              "repository.commit",
+              "repository.tree",
+              "candidate.commit",
+              "candidate.tree",
+              "task-policy-digest-sha256",
+              "release-unit-and-package-roster"
+            ],
+            "coverage": "one-complete-sorted-unique-package-entry-manifest-per-package-including-all-certified-generated-outputs",
+            "entry_fields": ["path", "mode", "size_bytes", "sha256", "immutable_blob_locator"],
+            "entry_origins": ["git-object", "generated-output"],
+            "entry_order": "ascending-utf-8-byte-collation-by-path;duplicates-refuse",
+            "manifest_digest": "sha256-of-domain-DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1-nul-followed-by-utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted",
+            "missing_or_extra_entry": "fail-closed"
+          },
+          "content_source": {
+            "git_object": "read-the-exact-candidate-tree-object-by-immutable-object-id-recompute-the-git-object-id-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use",
+            "generated_output": "resolve-the-immutable-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-verify-its-candidate-commit-tree-task-policy-package-id-and-output-blob-sha256-referent-then-read-only-from-that-content-addressed-output-blob-and-recompute-sha256-over-the-returned-bytes-before-use",
+            "locator_rule": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-and-ambient-worktree-reads-are-forbidden",
+            "mismatch": "fail-closed"
+          },
+          "pack": {
+            "implementation": "pure-in-memory-npm-compatible-tar-gzip",
+            "pack_spec_id": "devai.pure-npm-compatible-pack.v2",
+            "pack_spec_canonical_bytes": "devai.pure-npm-compatible-pack.v2\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;utf-8;no-backslash;maximum-100-bytes;no-pax\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=archive-path;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=empty\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;chunk-maximum-65535;block-order=tar-byte-order;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool:devai.pure-npm-compatible-pack.v2];packages=[SPDXRef-Package];files=entries-in-entry-order;file.SPDXID=SPDXRef-File-<sha256>;file.fileName=archive-path;file.checksums=[SHA256:<sha256>];relationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n",
+            "pack_spec_digest_sha256": "5d3e20b4b26b0846e0f006cd6880376d00fbbeb87e629746c09c42666301acd3",
+            "outputs": ["package-tarball", "sbom", "manifest"],
+            "determinism": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec",
+            "forbidden_execution": [
+              "npm-subprocess",
+              "tool-subprocess",
+              "shell",
+              "ambient-path-resolution"
+            ],
+            "unsupported_semantics": "fail-closed-before-any-sink-effect"
+          },
+          "artifact_sink": {
+            "required": true,
+            "trust_boundary": "injected-trusted-artifact-sink-outside-the-candidate-repository",
+            "forbidden_implementations": [
+              "built-in-pathname-sink",
+              "repository-contained-sink",
+              "direct-filesystem-destination"
+            ],
+            "protocol": [
+              "begin-transaction-and-receive-opaque-transaction-handle",
+              "put-verified-in-memory-artifacts-and-receive-opaque-artifact-handles",
+              "sink-verifies-each-artifact-byte-digest-size-and-pack-spec-binding",
+              "core-reverifies-the-sink-reported-handles-and-digests",
+              "commit-one-complete-manifest-atomically-once",
+              "abort-the-open-transaction-on-every-pre-commit-failure"
+            ],
+            "missing_sink": "fail-before-package-generation-or-exposure",
+            "partial_or_unverifiable_commit": "fail-closed-and-preserve-the-sink-transaction-for-inspection-without-reuse"
+          },
+          "prepared_state": "v3-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only",
+          "downstream_reverification": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-the-exact-committed-manifest-handle-then-recompute-byte-digest-size-and-manifest-membership-before-use",
+          "errors": [
+            "release-prepare-certification-manifest-invalid",
+            "release-prepare-package-entry-coverage-invalid",
+            "release-prepare-immutable-blob-locator-invalid",
+            "release-prepare-content-digest-mismatch",
+            "release-prepare-pack-spec-digest-mismatch",
+            "release-prepare-unsupported-package-semantics",
+            "release-prepare-subprocess-forbidden",
+            "release-artifact-sink-unavailable",
+            "release-artifact-sink-protocol-invalid",
+            "release-artifact-sink-verification-failed",
+            "release-artifact-sink-commit-failed",
+            "release-artifact-sink-abort-failed",
+            "release-downstream-artifact-reverification-failed"
+          ]
+        },
         "release_unit_bijection": {
           "state_schema": "law/schemas/release-lifecycle-state.schema.json",
           "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
@@ -3339,6 +3460,7 @@
             "accept-v1-only-for-wire-compatible-read-and-never-as-a-v2-write",
             "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
             "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
+            "require-release-certify-to-emit-one-complete-candidate-tree-task-policy-bound-package-entry-manifest-per-package-before-a-v3-prepare",
             "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
             "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
             "require-package-artifact-and-evidence-bijections-for-the-action",

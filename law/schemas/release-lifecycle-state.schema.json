@@ -27,7 +27,7 @@
     "record_digest_sha256"
   ],
   "properties": {
-    "schemaVersion": { "enum": ["1.0.0", "2.0.0"] },
+    "schemaVersion": { "enum": ["1.0.0", "2.0.0", "2.1.0"] },
     "state_id": {
       "type": "string",
       "pattern": "^RLS-[0-9a-f]{16}$"
@@ -170,33 +170,11 @@
     "artifacts": {
       "type": "array",
       "uniqueItems": true,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["kind", "path", "sha256", "size_bytes"],
-        "properties": {
-          "kind": {
-            "enum": [
-              "package-tarball",
-              "evidence-bundle",
-              "manifest",
-              "sbom",
-              "attestation",
-              "provider-result"
-            ]
-          },
-          "path": {
-            "$ref": "#/$defs/relative_path"
-          },
-          "sha256": {
-            "$ref": "#/$defs/sha256"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "minimum": 0
-          }
-        }
-      }
+      "items": { "$ref": "#/$defs/state_artifact_ref" }
+    },
+    "artifact_sink": {
+      "description": "V3-only trusted ArtifactSink transaction identity. It is absent from legacy records and contains opaque handles rather than a filesystem path.",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_sink_commit" }]
     },
     "actor": {
       "type": "object",
@@ -291,7 +269,7 @@
   "allOf": [
     {
       "if": {
-        "properties": { "schemaVersion": { "const": "2.0.0" } },
+        "properties": { "schemaVersion": { "enum": ["2.0.0", "2.1.0"] } },
         "required": ["schemaVersion"]
       },
       "then": { "required": ["canonicalization", "release_units", "storage"] }
@@ -599,6 +577,59 @@
     {
       "if": {
         "properties": {
+          "schemaVersion": { "const": "2.1.0" },
+          "action_id": {
+            "enum": [
+              "release prepare",
+              "release export",
+              "release evidence-publish",
+              "release publish"
+            ]
+          }
+        },
+        "required": ["schemaVersion", "action_id"]
+      },
+      "then": {
+        "required": ["artifact_sink"],
+        "properties": {
+          "artifact_sink": { "$ref": "#/$defs/artifact_sink_commit" },
+          "artifacts": { "items": { "$ref": "#/$defs/opaque_artifact_ref" } },
+          "release_units": {
+            "items": {
+              "properties": {
+                "packages": { "items": { "$ref": "#/$defs/v3_handle_package_evidence" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": { "const": "2.1.0" },
+          "action_id": { "const": "release prepare" }
+        },
+        "required": ["schemaVersion", "action_id"]
+      },
+      "then": {
+        "required": ["artifact_sink"],
+        "properties": {
+          "artifact_sink": { "$ref": "#/$defs/artifact_sink_commit" },
+          "artifacts": { "items": { "$ref": "#/$defs/opaque_artifact_ref" } },
+          "release_units": {
+            "items": {
+              "properties": {
+                "packages": { "items": { "$ref": "#/$defs/v3_prepared_package_evidence" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "action_id": {
             "const": "release evidence-publish"
           }
@@ -696,11 +727,15 @@
       ],
       "properties": {
         "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "manifest": { "$ref": "#/$defs/artifact_ref" },
-        "tarball": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
-        "sbom": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
-        "evidence_manifest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
-        "provider_result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
+        "manifest": { "$ref": "#/$defs/release_artifact_ref" },
+        "tarball": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/release_artifact_ref" }] },
+        "sbom": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/release_artifact_ref" }] },
+        "evidence_manifest": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/release_artifact_ref" }]
+        },
+        "provider_result": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/release_artifact_ref" }]
+        },
         "trust": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trust_identity" }] },
         "certification_manifest": {
           "description": "V3 certification package-entry manifest. It is required by the active prepare semantic kernel for certified packages and stays optional here only for byte-preserved v1/v2 read compatibility.",
@@ -715,6 +750,9 @@
         "candidate",
         "task_policy_digest_sha256",
         "package_id",
+        "package_version",
+        "entry_order",
+        "manifest_digest_contract",
         "entries",
         "manifest_digest_sha256"
       ],
@@ -730,6 +768,21 @@
         },
         "task_policy_digest_sha256": { "$ref": "#/$defs/sha256" },
         "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "package_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "entry_order": { "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse" },
+        "manifest_digest_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["domain", "payload", "canonicalization", "algorithm"],
+          "properties": {
+            "domain": { "const": "DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\u0000" },
+            "payload": {
+              "const": "utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes"
+            },
+            "canonicalization": { "const": "rfc8785-jcs" },
+            "algorithm": { "const": "sha256" }
+          }
+        },
         "entries": {
           "type": "array",
           "minItems": 1,
@@ -765,14 +818,45 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "output_blob_sha256", "certification_state_digest_sha256"],
+          "required": ["kind", "output_blob_sha256", "certification_evidence_receipt"],
           "properties": {
             "kind": { "const": "generated-output" },
             "output_blob_sha256": { "$ref": "#/$defs/sha256" },
-            "certification_state_digest_sha256": { "$ref": "#/$defs/sha256" }
+            "certification_evidence_receipt": {
+              "$ref": "#/$defs/certification_evidence_receipt_ref"
+            }
           }
         }
       ]
+    },
+    "certification_evidence_receipt_ref": {
+      "description": "Independent finalized certification evidence, never the mutable or self-referential lifecycle state digest. Resolution loads the immutable receipt by digest from the certified evidence store and verifies this exact referent before reading the generated blob.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt_digest_sha256", "canonicalization", "referent"],
+      "properties": {
+        "kind": { "const": "release-certification-evidence-receipt-v1" },
+        "receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "canonicalization": { "const": "utf-8-rfc8785-jcs-sha256" },
+        "referent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "candidate_commit",
+            "candidate_tree",
+            "task_policy_digest_sha256",
+            "package_id",
+            "output_blob_sha256"
+          ],
+          "properties": {
+            "candidate_commit": { "$ref": "#/$defs/git_object" },
+            "candidate_tree": { "$ref": "#/$defs/git_object" },
+            "task_policy_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "output_blob_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
     },
     "artifact_ref": {
       "type": "object",
@@ -782,6 +866,135 @@
         "path": { "$ref": "#/$defs/relative_path" },
         "sha256": { "$ref": "#/$defs/sha256" },
         "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "opaque_artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sink_id", "opaque_handle", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "package-tarball",
+            "evidence-bundle",
+            "manifest",
+            "sbom",
+            "attestation",
+            "provider-result"
+          ]
+        },
+        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "release_artifact_ref": {
+      "description": "Legacy path references are readable only in v1/v2 records. V3 preparation and every downstream action use the opaque form.",
+      "oneOf": [{ "$ref": "#/$defs/artifact_ref" }, { "$ref": "#/$defs/opaque_artifact_ref" }]
+    },
+    "legacy_state_artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "package-tarball",
+            "evidence-bundle",
+            "manifest",
+            "sbom",
+            "attestation",
+            "provider-result"
+          ]
+        },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "state_artifact_ref": {
+      "oneOf": [
+        { "$ref": "#/$defs/legacy_state_artifact_ref" },
+        { "$ref": "#/$defs/opaque_artifact_ref" }
+      ]
+    },
+    "artifact_sink_commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sink_id",
+        "transaction_handle",
+        "committed_manifest_handle",
+        "committed_manifest_sha256",
+        "committed_manifest_size_bytes",
+        "commit_protocol"
+      ],
+      "properties": {
+        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "transaction_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        },
+        "committed_manifest_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        },
+        "committed_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "committed_manifest_size_bytes": { "type": "integer", "minimum": 1 },
+        "commit_protocol": { "const": "devai.artifact-sink.two-phase.v1" }
+      }
+    },
+    "v3_prepared_package_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "manifest",
+        "tarball",
+        "sbom",
+        "evidence_manifest",
+        "provider_result",
+        "trust",
+        "certification_manifest"
+      ],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "manifest": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "tarball": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "sbom": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "evidence_manifest": { "type": "null" },
+        "provider_result": { "type": "null" },
+        "trust": { "type": "null" },
+        "certification_manifest": { "$ref": "#/$defs/certification_package_entry_manifest" }
+      }
+    },
+    "v3_handle_package_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "manifest",
+        "tarball",
+        "sbom",
+        "evidence_manifest",
+        "provider_result",
+        "trust",
+        "certification_manifest"
+      ],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "manifest": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "tarball": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "sbom": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "evidence_manifest": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/opaque_artifact_ref" }]
+        },
+        "provider_result": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/opaque_artifact_ref" }]
+        },
+        "trust": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trust_identity" }] },
+        "certification_manifest": { "$ref": "#/$defs/certification_package_entry_manifest" }
       }
     },
     "trust_identity": {

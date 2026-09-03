@@ -8,6 +8,7 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 interface RegistryEntry {
   readonly action_id: string;
   readonly authority_contract: {
+    capabilities: string[];
     subject: {
       kind: string;
       actor?: string;
@@ -67,5 +68,20 @@ describe('action registry schema', () => {
         path: '$root/properties/nested',
       },
     ]);
+  });
+
+  it('pins release prepare to its sink-only non-process authority contract', () => {
+    const malformed = structuredClone(registry);
+    const prepare = malformed.entries.find((entry) => entry.action_id === 'release prepare');
+    expect(prepare, 'current registry must contain release prepare').toBeDefined();
+    if (prepare === undefined) return;
+
+    prepare.authority_contract.capabilities = [
+      'fs:f5-state',
+      'fs:proofs',
+      'artifact-sink:write',
+      'proc:npm',
+    ];
+    expect(validators.actionRegistry(malformed)).toBe(false);
   });
 });

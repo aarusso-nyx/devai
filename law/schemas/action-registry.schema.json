@@ -183,6 +183,40 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": { "action_id": { "const": "release prepare" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "local-write" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release prepare" },
+                    "effect": { "const": "local-write" },
+                    "capabilities": {
+                      "const": ["fs:f5-state", "fs:proofs", "artifact-sink:write"]
+                    },
+                    "planner": {
+                      "properties": {
+                        "target_kinds": { "const": ["fs", "artifact-sink"] }
+                      }
+                    },
+                    "boundary": {
+                      "properties": {
+                        "kind": { "const": "mutation-adapters" },
+                        "adapter_ids": {
+                          "const": ["fs-authority-boundary", "trusted-artifact-sink-v3"]
+                        },
+                        "final_reverification": { "const": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         ]
       }
