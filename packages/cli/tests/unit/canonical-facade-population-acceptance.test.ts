@@ -29,8 +29,17 @@ import {
   initPlan,
 } from '../../src/commands/init/index.js';
 import {
+  releaseCertify,
   releaseCheck,
   releaseDrift,
+  releaseEvidencePublish,
+  releaseExport,
+  releaseOfflineVerify,
+  releasePlan,
+  releasePreflight,
+  releasePrepare,
+  releasePublish,
+  releaseResume,
   releaseStatus,
   releaseVerify,
 } from '../../src/commands/release/facade.js';
@@ -53,6 +62,11 @@ interface FacadeDefinition {
   register(cli: CAC): void;
 }
 
+interface RefusalProbe {
+  readonly args: readonly string[];
+  readonly exit: 1 | 2;
+}
+
 const FACADES: readonly FacadeDefinition[] = [
   auditObserve,
   auditScorecard,
@@ -69,8 +83,17 @@ const FACADES: readonly FacadeDefinition[] = [
   initApplyOwner,
   initBind,
   initPlan,
+  releaseCertify,
   releaseCheck,
   releaseDrift,
+  releaseEvidencePublish,
+  releaseExport,
+  releaseOfflineVerify,
+  releasePlan,
+  releasePreflight,
+  releasePrepare,
+  releasePublish,
+  releaseResume,
   releaseStatus,
   releaseVerify,
   ...roundWorkflowCommands,
@@ -83,55 +106,72 @@ const FACADES: readonly FacadeDefinition[] = [
   triageClassify,
 ] as const;
 
-const REFUSAL_ARGS: Readonly<Record<string, readonly string[]>> = {
-  'audit observe': [],
-  'audit scorecard': [],
-  'catalog actions': ['--authority', 'invalid-authority'],
-  check: ['--only', 'not-a-check-service'],
-  doctor: ['--probe', 'not-a-probe'],
-  'evidence collect': ['--source', 'not-a-source'],
-  'evidence record': ['--kind', 'not-a-kind'],
-  'evidence redact': ['1'],
-  'evidence render': ['--kind', 'not-a-kind'],
-  'evidence verify': ['--scope', 'not-a-scope'],
-  'init apply architect': ['--tier', 'not-a-tier'],
-  'init apply harness': ['--tier', 'not-a-tier'],
-  'init apply owner': ['--tier', 'not-a-tier'],
-  'init plan': ['--tier', 'not-a-tier'],
-  'init bind': ['--unknown-option'],
-  'release check': ['--environment', 'not-an-environment'],
-  'release drift': ['--environment', 'not-an-environment'],
-  'release status': ['--kind', 'not-a-kind'],
-  'release verify': [],
-  'round assess': [],
-  'round close': [],
-  'round gap create': [],
-  'round gap list': [],
-  'round gap resolve': ['missing-gap'],
-  'round gap show': ['missing-gap'],
-  'round plan': [],
-  'round run': [],
-  'round seal': [],
-  'round status': [],
-  'round tracking disable': [],
-  'round tracking enable': [],
-  'round tracking status': [],
-  'round tracking sync': [],
-  'sense inventory': [],
-  'sense migrate': [],
-  'sense record': [],
-  'sense run': [],
-  'task escalate': [],
-  'task finish': [],
-  'task pause': [],
-  'task queue add': [],
-  'task queue complete': [],
-  'task queue list': [],
-  'task queue next': [],
-  'task resume': [],
-  'task start': [],
-  'task status': [],
-  'triage classify': [],
+const usage = (args: readonly string[]): RefusalProbe => ({ args, exit: 2 });
+const failed = (args: readonly string[]): RefusalProbe => ({ args, exit: 1 });
+
+const REFUSAL_PROBES: Readonly<Record<string, RefusalProbe>> = {
+  'audit observe': usage([]),
+  'audit scorecard': usage([]),
+  'catalog actions': usage(['--authority', 'invalid-authority']),
+  check: usage(['--only', 'not-a-check-service']),
+  doctor: usage(['--probe', 'not-a-probe']),
+  'evidence collect': usage(['--source', 'not-a-source']),
+  'evidence record': usage(['--kind', 'not-a-kind']),
+  'evidence redact': usage(['1']),
+  'evidence render': usage(['--kind', 'not-a-kind']),
+  'evidence verify': usage(['--scope', 'not-a-scope']),
+  'init apply architect': usage(['--tier', 'not-a-tier']),
+  'init apply harness': usage(['--tier', 'not-a-tier']),
+  'init apply owner': usage(['--tier', 'not-a-tier']),
+  'init plan': usage(['--tier', 'not-a-tier']),
+  'init bind': usage(['--unknown-option']),
+  'release certify': failed(['--request', 'missing-release-request.json']),
+  'release check': usage(['--environment', 'not-an-environment']),
+  'release drift': usage(['--environment', 'not-an-environment']),
+  'release evidence-publish': failed(['--request', 'missing-release-request.json']),
+  'release export': failed(['--request', 'missing-release-request.json']),
+  'release offline-verify': failed(['--exported-state', 'missing-exported-state.json']),
+  'release plan': failed([
+    '--intent',
+    'missing-release-intent.json',
+    '--repository',
+    'aarusso-nyx/devai',
+  ]),
+  'release preflight': failed(['--request', 'missing-release-request.json']),
+  'release prepare': failed(['--request', 'missing-release-request.json']),
+  'release publish': failed(['--request', 'missing-release-request.json']),
+  'release resume': failed(['--state-chain', 'missing-release-state-chain.json']),
+  'release status': usage(['--kind', 'not-a-kind']),
+  'release verify': usage([]),
+  'round assess': usage([]),
+  'round close': usage([]),
+  'round gap create': usage([]),
+  'round gap list': usage([]),
+  'round gap resolve': usage(['missing-gap']),
+  'round gap show': usage(['missing-gap']),
+  'round plan': usage([]),
+  'round run': usage([]),
+  'round seal': usage([]),
+  'round status': usage([]),
+  'round tracking disable': usage([]),
+  'round tracking enable': usage([]),
+  'round tracking status': usage([]),
+  'round tracking sync': usage([]),
+  'sense inventory': usage([]),
+  'sense migrate': usage([]),
+  'sense record': usage([]),
+  'sense run': usage([]),
+  'task escalate': usage([]),
+  'task finish': usage([]),
+  'task pause': usage([]),
+  'task queue add': usage([]),
+  'task queue complete': usage([]),
+  'task queue list': usage([]),
+  'task queue next': usage([]),
+  'task resume': usage([]),
+  'task start': usage([]),
+  'task status': usage([]),
+  'triage classify': usage([]),
 };
 
 describe('canonical facade population acceptance', () => {
@@ -143,7 +183,7 @@ describe('canonical facade population acceptance', () => {
     expect(ACTION_REGISTRY).toHaveLength(57);
     expect(new Set(facadeNames).size).toBe(57);
     expect(facadeNames).toEqual(currentBindings);
-    expect(Object.keys(REFUSAL_ARGS).sort()).toEqual(currentBindings);
+    expect(Object.keys(REFUSAL_PROBES).sort()).toEqual(currentBindings);
 
     const cli = cac('devai-canonical-facade-population');
     for (const definition of FACADES) definition.register(cli);
@@ -180,9 +220,9 @@ describe('canonical facade population acceptance', () => {
       for (const definition of FACADES) {
         let stdout = '';
         let stderr = '';
-        const args = REFUSAL_ARGS[definition.name];
-        if (args === undefined) throw new Error(`missing refusal fixture for ${definition.name}`);
-        process.argv = ['node', 'devai', definition.name.replaceAll(' ', '-'), ...args];
+        const probe = REFUSAL_PROBES[definition.name];
+        if (probe === undefined) throw new Error(`missing refusal fixture for ${definition.name}`);
+        process.argv = ['node', 'devai', definition.name.replaceAll(' ', '-'), ...probe.args];
         process.exitCode = undefined;
         process.stdout.write = ((chunk: unknown) => {
           stdout += String(chunk);
@@ -213,7 +253,7 @@ describe('canonical facade population acceptance', () => {
         expect(
           exit,
           `${definition.name}: exit=${String(exit)} stdout=${stdout} stderr=${stderr}`,
-        ).toBe(2);
+        ).toBe(probe.exit);
         expect(
           stdout.length + stderr.length,
           `${definition.name}: refusal was silent`,
