@@ -157,10 +157,10 @@
     },
     "affected_rule_subject": {
       "type": "string",
-      "minLength": 6,
+      "minLength": 1,
       "maxLength": 200,
-      "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)(?!.*[*?\\[\\]{}])(?:[^/\\u0000\\\\]+/)*[^/\\u0000\\\\]+$",
-      "description": "Lexically canonical repository-relative governed or review path. It has no leading slash, dot segment, repeated separator, backslash, NUL, glob, or trailing separator. Semantic resolution also requires a tracked regular file and an input already normalized to Unicode NFC."
+      "pattern": "^(?!/)(?![A-Za-z]:/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)(?!.*[*?\\[\\]{}])(?:[^/\\u0000\\\\]+/)*[^/\\u0000\\\\]+$",
+      "description": "Lexically canonical repository-relative POSIX governed or review subject. It has no POSIX or Windows-drive absolute form, dot segment, repeated separator, backslash, NUL, glob, or trailing separator. Semantic resolution requires input already normalized to Unicode NFC and performs no filesystem or Git lookup."
     }
   },
   "examples": [
