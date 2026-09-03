@@ -231,6 +231,7 @@
     ]
   },
   "execution_seams": {
+    "status": "deprecated-read-only-v1-non-authoritative",
     "kernel_id": "devai.kernel.release-execution-seams.v1",
     "request_projection": {
       "allowed_fields": [
@@ -435,6 +436,7 @@
     },
     "store": {
       "schema": "law/schemas/release-lifecycle-store-record.schema.json",
+      "head_schema": "law/schemas/release-lifecycle-store-head.schema.json",
       "canonicalization": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters",
       "paths": {
         "head": "{campaign-path}/HEAD.json",
@@ -452,7 +454,24 @@
         "fsync-head-and-parent-directory"
       ],
       "orphan_handling": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting",
-      "head_compare_and_swap": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it"
+      "head_compare_and_swap": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it",
+      "semantic_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-store.v2",
+        "rules": [
+          "the-opening-completion-has-generation-zero-null-predecessor-and-null-head-before",
+          "each-successor-completion-has-generation-equal-to-the-current-head-generation-plus-one-and-names-the-current-head-completion-exactly",
+          "each-attempt-id-has-at-most-one-terminal-record-and-a-terminal-record-is-exactly-one-of-completion-failure-or-unknown-provider-result",
+          "a-completion-and-an-unknown-provider-result-for-the-same-attempt-are-mutually-exclusive-and-an-unknown-provider-result-never-advances-the-head",
+          "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
+        ],
+        "errors": [
+          "release-store-genesis-invalid",
+          "release-store-successor-invalid",
+          "release-store-terminal-attempt-conflict",
+          "release-store-completion-unknown-conflict",
+          "release-store-head-completion-mismatch"
+        ]
+      }
     },
     "resume": {
       "schema": "law/schemas/release-lifecycle-observation.schema.json",
@@ -490,6 +509,10 @@
     },
     "remote_effect": {
       "attempt_authorization_binding": "the-consumed-authorization-event-must-name-the-exact-attempt-id-request-digest-repository-candidate-action-and-destination-before-dispatch",
+      "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+      "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
+      "pre_dispatch_handle": "a-remote-attempt-must-record-provider-dispatch-not-dispatched-handle-observed-false-and-provider-handle-null",
+      "terminal_handle": "a-dispatched-completion-must-record-handle-observed-true-and-a-nonempty-provider-handle;-a-failure-may-record-failed-before-dispatch-with-null-handle;-an-unknown-provider-result-must-preserve-whether-a-handle-was-observed",
       "order": [
         "append-and-fsync-attempt",
         "verify-live-unconsumed-exact-authorization",
@@ -504,6 +527,35 @@
       "state_schema": "law/schemas/release-lifecycle-state.schema.json",
       "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
       "unit_roster": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result",
+      "artifact_requirements": {
+        "release preflight": [],
+        "release certify": [],
+        "release prepare": ["manifest", "package-tarball", "sbom"],
+        "release export": [
+          "manifest",
+          "package-tarball",
+          "sbom",
+          "evidence-manifest",
+          "provider-result",
+          "trust"
+        ],
+        "release evidence-publish": [
+          "manifest",
+          "package-tarball",
+          "sbom",
+          "evidence-manifest",
+          "provider-result",
+          "trust"
+        ],
+        "release publish": [
+          "manifest",
+          "package-tarball",
+          "sbom",
+          "evidence-manifest",
+          "provider-result",
+          "trust"
+        ]
+      },
       "prepare": "each-package-has-exactly-one-manifest-tarball-and-sbom",
       "export": "each-package-has-exactly-one-evidence-manifest-and-provider-result",
       "offline_verify": "each-package-evidence-manifest-artifact-digest-and-external-trust-identity-must-match-the-exported-state",
@@ -520,7 +572,9 @@
         "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
         "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
         "require-package-artifact-and-evidence-bijections-for-the-action",
-        "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results"
+        "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results",
+        "require-a-remote-attempt-to-be-durable-before-consumption-and-dispatch-and-reject-fabricated-absent-handles-after-a-dispatch-could-have-occurred",
+        "require-the-v2-consumed-authorization-binding-to-equal-the-attempt-request-repository-candidate-action-destination-grant-and-ledger-predecessor-before-dispatch"
       ],
       "errors": [
         "release-request-identity-mismatch",
@@ -530,7 +584,10 @@
         "release-state-head-mismatch",
         "release-release-unit-bijection-invalid",
         "release-provider-result-unknown",
-        "release-provider-trust-identity-mismatch"
+        "release-provider-trust-identity-mismatch",
+        "release-provider-handle-observation-invalid",
+        "release-authorization-attempt-binding-invalid",
+        "release-authorization-consumption-not-durable"
       ]
     }
   },
@@ -722,7 +779,8 @@
         "evidence",
         "artifact",
         "prior-state",
-        "verifier"
+        "verifier",
+        "trust"
       ],
       "authorization": {
         "required": false,
@@ -815,7 +873,7 @@
       "action_id": "release resume",
       "effect": "read",
       "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
-      "requires_prior_state": ["publication_dispatched"],
+      "requires_prior_state": [],
       "requires_receipts": [],
       "produces_state": null,
       "appends_state_record": false,
@@ -905,6 +963,7 @@
     ]
   },
   "observation_kernel": {
+    "status": "active",
     "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
     "mandatory": true,
     "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",

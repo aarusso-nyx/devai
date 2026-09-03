@@ -279,6 +279,7 @@
       "additionalProperties": false,
       "description": "The frozen procedure by which an observation may derive published, and the exact codes by which it refuses. Deriving published is a cross-check between three documents that must agree completely: the recorded head, the observation's own claim about what it verified against, and the signed receipt. Any single divergence derives no published; there is no partial derivation and no near match.",
       "required": [
+        "status",
         "kernel_id",
         "mandatory",
         "observation_schema",
@@ -289,6 +290,9 @@
         "errors"
       ],
       "properties": {
+        "status": {
+          "const": "active"
+        },
         "kernel_id": {
           "const": "devai.kernel.release-lifecycle-observation.v1",
           "description": "Every emitted observation carries this identifier. An observation carrying another one was produced by a procedure this policy does not define."
@@ -487,14 +491,17 @@
           "additionalProperties": false,
           "required": [
             "schema",
+            "head_schema",
             "canonicalization",
             "paths",
             "append_order",
             "orphan_handling",
-            "head_compare_and_swap"
+            "head_compare_and_swap",
+            "semantic_kernel"
           ],
           "properties": {
             "schema": { "const": "law/schemas/release-lifecycle-store-record.schema.json" },
+            "head_schema": { "const": "law/schemas/release-lifecycle-store-head.schema.json" },
             "canonicalization": {
               "const": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters"
             },
@@ -533,6 +540,32 @@
             },
             "head_compare_and_swap": {
               "const": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it"
+            },
+            "semantic_kernel": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kernel_id", "rules", "errors"],
+              "properties": {
+                "kernel_id": { "const": "devai.kernel.release-lifecycle-store.v2" },
+                "rules": {
+                  "const": [
+                    "the-opening-completion-has-generation-zero-null-predecessor-and-null-head-before",
+                    "each-successor-completion-has-generation-equal-to-the-current-head-generation-plus-one-and-names-the-current-head-completion-exactly",
+                    "each-attempt-id-has-at-most-one-terminal-record-and-a-terminal-record-is-exactly-one-of-completion-failure-or-unknown-provider-result",
+                    "a-completion-and-an-unknown-provider-result-for-the-same-attempt-are-mutually-exclusive-and-an-unknown-provider-result-never-advances-the-head",
+                    "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
+                  ]
+                },
+                "errors": {
+                  "const": [
+                    "release-store-genesis-invalid",
+                    "release-store-successor-invalid",
+                    "release-store-terminal-attempt-conflict",
+                    "release-store-completion-unknown-conflict",
+                    "release-store-head-completion-mismatch"
+                  ]
+                }
+              }
             }
           }
         },
@@ -598,10 +631,31 @@
         "remote_effect": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["attempt_authorization_binding", "order", "unknown_result", "retry"],
+          "required": [
+            "attempt_authorization_binding",
+            "authorization_event_schema",
+            "store_schema",
+            "pre_dispatch_handle",
+            "terminal_handle",
+            "order",
+            "unknown_result",
+            "retry"
+          ],
           "properties": {
             "attempt_authorization_binding": {
               "const": "the-consumed-authorization-event-must-name-the-exact-attempt-id-request-digest-repository-candidate-action-and-destination-before-dispatch"
+            },
+            "authorization_event_schema": {
+              "const": "law/schemas/effect-authorization-event.schema.json"
+            },
+            "store_schema": {
+              "const": "law/schemas/release-lifecycle-store-record.schema.json"
+            },
+            "pre_dispatch_handle": {
+              "const": "a-remote-attempt-must-record-provider-dispatch-not-dispatched-handle-observed-false-and-provider-handle-null"
+            },
+            "terminal_handle": {
+              "const": "a-dispatched-completion-must-record-handle-observed-true-and-a-nonempty-provider-handle;-a-failure-may-record-failed-before-dispatch-with-null-handle;-an-unknown-provider-result-must-preserve-whether-a-handle-was-observed"
             },
             "order": {
               "const": [
@@ -627,6 +681,7 @@
             "state_schema",
             "store_schema",
             "unit_roster",
+            "artifact_requirements",
             "prepare",
             "export",
             "offline_verify",
@@ -637,6 +692,37 @@
             "store_schema": { "const": "law/schemas/release-lifecycle-store-record.schema.json" },
             "unit_roster": {
               "const": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result"
+            },
+            "artifact_requirements": {
+              "const": {
+                "release preflight": [],
+                "release certify": [],
+                "release prepare": ["manifest", "package-tarball", "sbom"],
+                "release export": [
+                  "manifest",
+                  "package-tarball",
+                  "sbom",
+                  "evidence-manifest",
+                  "provider-result",
+                  "trust"
+                ],
+                "release evidence-publish": [
+                  "manifest",
+                  "package-tarball",
+                  "sbom",
+                  "evidence-manifest",
+                  "provider-result",
+                  "trust"
+                ],
+                "release publish": [
+                  "manifest",
+                  "package-tarball",
+                  "sbom",
+                  "evidence-manifest",
+                  "provider-result",
+                  "trust"
+                ]
+              }
             },
             "prepare": { "const": "each-package-has-exactly-one-manifest-tarball-and-sbom" },
             "export": {
@@ -672,7 +758,9 @@
                 "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
                 "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
                 "require-package-artifact-and-evidence-bijections-for-the-action",
-                "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results"
+                "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results",
+                "require-a-remote-attempt-to-be-durable-before-consumption-and-dispatch-and-reject-fabricated-absent-handles-after-a-dispatch-could-have-occurred",
+                "require-the-v2-consumed-authorization-binding-to-equal-the-attempt-request-repository-candidate-action-destination-grant-and-ledger-predecessor-before-dispatch"
               ]
             },
             "errors": {
@@ -684,7 +772,10 @@
                 "release-state-head-mismatch",
                 "release-release-unit-bijection-invalid",
                 "release-provider-result-unknown",
-                "release-provider-trust-identity-mismatch"
+                "release-provider-trust-identity-mismatch",
+                "release-provider-handle-observation-invalid",
+                "release-authorization-attempt-binding-invalid",
+                "release-authorization-consumption-not-durable"
               ]
             }
           }
@@ -729,6 +820,7 @@
         "errors"
       ],
       "properties": {
+        "status": { "const": "deprecated-read-only-v1-non-authoritative" },
         "kernel_id": { "const": "devai.kernel.release-execution-seams.v1" },
         "request_projection": {
           "type": "object",
@@ -1982,43 +2074,6 @@
           "if": {
             "properties": {
               "action_id": {
-                "const": "release resume"
-              }
-            },
-            "required": ["action_id"]
-          },
-          "then": {
-            "properties": {
-              "effect": {
-                "const": "read"
-              },
-              "emits_receipt": {
-                "const": "release-lifecycle-observation"
-              },
-              "requires_prior_state": {
-                "const": ["publication_dispatched"]
-              },
-              "binds_identity": {
-                "allOf": [
-                  {
-                    "contains": {
-                      "const": "prior-state"
-                    }
-                  },
-                  {
-                    "contains": {
-                      "const": "publication-receipt"
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "action_id": {
                 "const": "release preflight"
               }
             },
@@ -2166,6 +2221,178 @@
               },
               "requires_prior_state": {
                 "const": ["evidence_published"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release resume"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              },
+              "requires_prior_state": {
+                "const": []
+              },
+              "produces_state": {
+                "type": "null"
+              },
+              "appends_state_record": {
+                "const": false
+              },
+              "persists_repository_state": {
+                "const": false
+              },
+              "emits_receipt": {
+                "const": "release-lifecycle-observation"
+              },
+              "observational": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release plan" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": { "binds_identity": { "const": ["repository", "candidate", "input"] } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release preflight" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": ["repository", "candidate", "input", "evidence", "plan-receipt"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release certify" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": ["repository", "candidate", "input", "evidence", "prior-state"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release prepare" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release export" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release offline-verify" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": [
+                  "repository",
+                  "candidate",
+                  "evidence",
+                  "artifact",
+                  "prior-state",
+                  "verifier",
+                  "trust"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release evidence-publish" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": [
+                  "repository",
+                  "candidate",
+                  "input",
+                  "evidence",
+                  "artifact",
+                  "prior-state",
+                  "offline-verification-receipt"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release publish" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "action_id": { "const": "release resume" } },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "binds_identity": {
+                "const": [
+                  "repository",
+                  "candidate",
+                  "artifact",
+                  "prior-state",
+                  "publication-receipt",
+                  "workflow",
+                  "trust"
+                ]
               }
             }
           }
@@ -2406,6 +2633,7 @@
         ]
       },
       "execution_seams": {
+        "status": "deprecated-read-only-v1-non-authoritative",
         "kernel_id": "devai.kernel.release-execution-seams.v1",
         "request_projection": {
           "allowed_fields": [
@@ -2615,6 +2843,7 @@
         },
         "store": {
           "schema": "law/schemas/release-lifecycle-store-record.schema.json",
+          "head_schema": "law/schemas/release-lifecycle-store-head.schema.json",
           "canonicalization": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters",
           "paths": {
             "head": "{campaign-path}/HEAD.json",
@@ -2632,7 +2861,24 @@
             "fsync-head-and-parent-directory"
           ],
           "orphan_handling": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting",
-          "head_compare_and_swap": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it"
+          "head_compare_and_swap": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it",
+          "semantic_kernel": {
+            "kernel_id": "devai.kernel.release-lifecycle-store.v2",
+            "rules": [
+              "the-opening-completion-has-generation-zero-null-predecessor-and-null-head-before",
+              "each-successor-completion-has-generation-equal-to-the-current-head-generation-plus-one-and-names-the-current-head-completion-exactly",
+              "each-attempt-id-has-at-most-one-terminal-record-and-a-terminal-record-is-exactly-one-of-completion-failure-or-unknown-provider-result",
+              "a-completion-and-an-unknown-provider-result-for-the-same-attempt-are-mutually-exclusive-and-an-unknown-provider-result-never-advances-the-head",
+              "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
+            ],
+            "errors": [
+              "release-store-genesis-invalid",
+              "release-store-successor-invalid",
+              "release-store-terminal-attempt-conflict",
+              "release-store-completion-unknown-conflict",
+              "release-store-head-completion-mismatch"
+            ]
+          }
         },
         "resume": {
           "schema": "law/schemas/release-lifecycle-observation.schema.json",
@@ -2670,6 +2916,10 @@
         },
         "remote_effect": {
           "attempt_authorization_binding": "the-consumed-authorization-event-must-name-the-exact-attempt-id-request-digest-repository-candidate-action-and-destination-before-dispatch",
+          "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+          "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
+          "pre_dispatch_handle": "a-remote-attempt-must-record-provider-dispatch-not-dispatched-handle-observed-false-and-provider-handle-null",
+          "terminal_handle": "a-dispatched-completion-must-record-handle-observed-true-and-a-nonempty-provider-handle;-a-failure-may-record-failed-before-dispatch-with-null-handle;-an-unknown-provider-result-must-preserve-whether-a-handle-was-observed",
           "order": [
             "append-and-fsync-attempt",
             "verify-live-unconsumed-exact-authorization",
@@ -2684,6 +2934,35 @@
           "state_schema": "law/schemas/release-lifecycle-state.schema.json",
           "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
           "unit_roster": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result",
+          "artifact_requirements": {
+            "release preflight": [],
+            "release certify": [],
+            "release prepare": ["manifest", "package-tarball", "sbom"],
+            "release export": [
+              "manifest",
+              "package-tarball",
+              "sbom",
+              "evidence-manifest",
+              "provider-result",
+              "trust"
+            ],
+            "release evidence-publish": [
+              "manifest",
+              "package-tarball",
+              "sbom",
+              "evidence-manifest",
+              "provider-result",
+              "trust"
+            ],
+            "release publish": [
+              "manifest",
+              "package-tarball",
+              "sbom",
+              "evidence-manifest",
+              "provider-result",
+              "trust"
+            ]
+          },
           "prepare": "each-package-has-exactly-one-manifest-tarball-and-sbom",
           "export": "each-package-has-exactly-one-evidence-manifest-and-provider-result",
           "offline_verify": "each-package-evidence-manifest-artifact-digest-and-external-trust-identity-must-match-the-exported-state",
@@ -2700,7 +2979,9 @@
             "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
             "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
             "require-package-artifact-and-evidence-bijections-for-the-action",
-            "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results"
+            "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results",
+            "require-a-remote-attempt-to-be-durable-before-consumption-and-dispatch-and-reject-fabricated-absent-handles-after-a-dispatch-could-have-occurred",
+            "require-the-v2-consumed-authorization-binding-to-equal-the-attempt-request-repository-candidate-action-destination-grant-and-ledger-predecessor-before-dispatch"
           ],
           "errors": [
             "release-request-identity-mismatch",
@@ -2710,7 +2991,10 @@
             "release-state-head-mismatch",
             "release-release-unit-bijection-invalid",
             "release-provider-result-unknown",
-            "release-provider-trust-identity-mismatch"
+            "release-provider-trust-identity-mismatch",
+            "release-provider-handle-observation-invalid",
+            "release-authorization-attempt-binding-invalid",
+            "release-authorization-consumption-not-durable"
           ]
         }
       },
@@ -2828,7 +3112,7 @@
           "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate"],
+          "binds_identity": ["repository", "candidate", "input", "evidence", "prior-state"],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -2848,7 +3132,15 @@
           "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": true,
-          "binds_identity": ["candidate", "offline-verification-receipt"],
+          "binds_identity": [
+            "repository",
+            "candidate",
+            "input",
+            "evidence",
+            "artifact",
+            "prior-state",
+            "offline-verification-receipt"
+          ],
           "authorization": {
             "required": true,
             "authorized_by": "owner",
@@ -2868,7 +3160,14 @@
           "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate"],
+          "binds_identity": [
+            "repository",
+            "candidate",
+            "input",
+            "evidence",
+            "artifact",
+            "prior-state"
+          ],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -2888,7 +3187,15 @@
           "emits_receipt": "release-offline-verification-receipt",
           "observational": true,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate", "prior-state", "verifier"],
+          "binds_identity": [
+            "repository",
+            "candidate",
+            "evidence",
+            "artifact",
+            "prior-state",
+            "verifier",
+            "trust"
+          ],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -2928,7 +3235,7 @@
           "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate", "plan-receipt"],
+          "binds_identity": ["repository", "candidate", "input", "evidence", "plan-receipt"],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -2948,7 +3255,14 @@
           "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate"],
+          "binds_identity": [
+            "repository",
+            "candidate",
+            "input",
+            "evidence",
+            "artifact",
+            "prior-state"
+          ],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -2968,7 +3282,14 @@
           "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": true,
-          "binds_identity": ["candidate"],
+          "binds_identity": [
+            "repository",
+            "candidate",
+            "input",
+            "evidence",
+            "artifact",
+            "prior-state"
+          ],
           "authorization": {
             "required": true,
             "authorized_by": "owner",
@@ -2980,7 +3301,7 @@
           "action_id": "release resume",
           "effect": "read",
           "initiator_roles": ["architect"],
-          "requires_prior_state": ["publication_dispatched"],
+          "requires_prior_state": [],
           "requires_receipts": [],
           "produces_state": null,
           "appends_state_record": false,
@@ -2988,7 +3309,15 @@
           "emits_receipt": "release-lifecycle-observation",
           "observational": true,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate", "prior-state", "publication-receipt"],
+          "binds_identity": [
+            "repository",
+            "candidate",
+            "artifact",
+            "prior-state",
+            "publication-receipt",
+            "workflow",
+            "trust"
+          ],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -3062,6 +3391,7 @@
         ]
       },
       "observation_kernel": {
+        "status": "active",
         "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
         "mandatory": true,
         "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",

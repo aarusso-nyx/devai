@@ -55,6 +55,7 @@ export const ROSTER = [
   'release-lifecycle-policy.schema.json',
   'release-lifecycle-request.schema.json',
   'release-lifecycle-state.schema.json',
+  'release-lifecycle-store-head.schema.json',
   'release-lifecycle-store-record.schema.json',
   'release-offline-verification-receipt.schema.json',
   'release-plan-receipt.schema.json',

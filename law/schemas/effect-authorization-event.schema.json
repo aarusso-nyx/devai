@@ -31,20 +31,34 @@
     "grant_event_id"
   ],
   "properties": {
-    "schemaVersion": {
-      "const": "1.0.0"
-    },
+    "schemaVersion": { "enum": ["1.0.0", "2.0.0"] },
     "canonicalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "payload_projection_excludes", "event_id_derivation", "event_digest_projection", "calculation_order"],
+      "required": [
+        "kernel_id",
+        "encoding",
+        "json_form",
+        "digest_algorithm",
+        "payload_projection_excludes",
+        "event_id_derivation",
+        "event_digest_projection",
+        "calculation_order"
+      ],
       "properties": {
-        "kernel_id": { "const": "devai.kernel.effect-authorization-event-canonicalization.v1" },
+        "kernel_id": {
+          "enum": [
+            "devai.kernel.effect-authorization-event-canonicalization.v1",
+            "devai.kernel.effect-authorization-event-canonicalization.v2"
+          ]
+        },
         "encoding": { "const": "utf-8" },
         "json_form": { "const": "rfc8785-jcs" },
         "digest_algorithm": { "const": "sha256" },
         "payload_projection_excludes": { "const": ["event_id", "payload_digest_sha256"] },
-        "event_id_derivation": { "const": "EA-hyphen-plus-the-first-16-lowercase-hex-characters-of-payload_digest_sha256" },
+        "event_id_derivation": {
+          "const": "EA-hyphen-plus-the-first-16-lowercase-hex-characters-of-payload_digest_sha256"
+        },
         "event_digest_projection": { "const": "complete-event-record-with-no-field-excluded" },
         "calculation_order": {
           "const": [
@@ -107,16 +121,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": [
-              "create",
-              "update",
-              "delete",
-              "rename",
-              "merge",
-              "push",
-              "publish",
-              "execute"
-            ]
+            "enum": ["create", "update", "delete", "rename", "merge", "push", "publish", "execute"]
           }
         }
       }
@@ -230,8 +235,36 @@
       "description": "The grant this event resolves: null on granted and the exact grant id on consumed, revoked, expired, and rejected."
     },
     "consumed_by_state_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "pattern": "^RLS-[0-9a-f]{16}$"
+    },
+    "consumption_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "action_id",
+        "request_digest_sha256",
+        "repository",
+        "candidate",
+        "destination",
+        "grant_event_id",
+        "ledger_predecessor_digest_sha256"
+      ],
+      "properties": {
+        "attempt_id": { "type": "string", "pattern": "^RLA-[0-9a-f]{16}$" },
+        "action_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$",
+          "maxLength": 100
+        },
+        "request_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "repository": { "$ref": "#/$defs/repository_binding" },
+        "candidate": { "$ref": "#/$defs/candidate_binding" },
+        "destination": { "$ref": "#/$defs/destination_binding" },
+        "grant_event_id": { "type": "string", "pattern": "^EA-[0-9a-f]{16}$" },
+        "ledger_predecessor_digest_sha256": { "$ref": "#/$defs/sha256" }
+      }
     },
     "reason_code": {
       "type": "string",
@@ -283,6 +316,55 @@
         "not": {
           "required": ["consumed_by_state_id"]
         }
+      }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "canonicalization": {
+            "properties": {
+              "kernel_id": {
+                "const": "devai.kernel.effect-authorization-event-canonicalization.v1"
+              }
+            }
+          }
+        },
+        "not": { "required": ["consumption_binding"] }
+      }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.0.0" }, "kind": { "const": "consumed" } },
+        "required": ["schemaVersion", "kind"]
+      },
+      "then": {
+        "properties": {
+          "consumed_by_state_id": { "type": "string", "pattern": "^RLS-[0-9a-f]{16}$" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "2.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "kind": { "const": "consumed" },
+          "canonicalization": {
+            "properties": {
+              "kernel_id": {
+                "const": "devai.kernel.effect-authorization-event-canonicalization.v2"
+              }
+            }
+          },
+          "consumed_by_state_id": { "type": "null" }
+        },
+        "required": ["consumption_binding"]
       }
     },
     {
@@ -390,6 +472,37 @@
     }
   ],
   "$defs": {
+    "repository_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "candidate_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "destination_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "exact_identifier", "operation"],
+      "properties": {
+        "system_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "exact_identifier": { "$ref": "#/$defs/exact_identifier" },
+        "operation": { "enum": ["publish", "create"] }
+      }
+    },
     "role": {
       "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
     },

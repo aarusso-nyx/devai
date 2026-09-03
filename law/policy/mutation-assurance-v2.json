@@ -2,10 +2,18 @@
   "$schema": "../schemas/mutation-assurance-policy-v2.schema.json",
   "schemaVersion": "2.0.0",
   "id": "mutation-assurance-v2",
-  "status": "active",
+  "status": "deprecated-read-only-pending-verifier-alignment",
   "authority": "Architect",
   "policy_version": "2.0.0",
   "report_schema": "law/schemas/mutation-assurance-v2.schema.json",
+  "successor_contract": {
+    "source_commit": "fcefd0ad9b1210f5d460509f801a16fc3c4dcbd1",
+    "report_set_schema": "mutation-report-set-v2",
+    "composed_report_set_schema": "mutation-composed-report-set-v2",
+    "adoption_status": "blocking-alignment",
+    "non_scored_statuses": ["CompileError", "Ignored"],
+    "prohibition": "no-new-release-may-treat-this-divergent-assurance-v2-policy-as-the-canonical-verifier-contract"
+  },
   "supersedes_policy": ["law/policy/mutation-strength.json"],
   "required_identity_bindings": [
     "candidate",
@@ -95,7 +103,14 @@
     "score_model": {
       "model": "stryker-detected-over-scored-v1",
       "numeric_model": "ieee-754-binary64-round-to-nearest-ties-to-even",
-      "outcomes": ["killed", "timeout", "survived", "no_coverage", "runtime_error", "infrastructure_error"],
+      "outcomes": [
+        "killed",
+        "timeout",
+        "survived",
+        "no_coverage",
+        "runtime_error",
+        "infrastructure_error"
+      ],
       "count_domain": "nonnegative-safe-integer-counts-converted-exactly-to-binary64;nan-infinity-and-non-safe-integer-counts-fail",
       "detected": "binary64-add(killed,timeout)",
       "scored": "binary64-add(binary64-add(detected,survived),no_coverage)",

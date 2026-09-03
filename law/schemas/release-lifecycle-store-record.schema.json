@@ -20,6 +20,7 @@
     "request_digest_sha256",
     "authorization_event_id",
     "provider_handle",
+    "provider_dispatch",
     "completion",
     "failure",
     "unknown",
@@ -71,6 +72,15 @@
     "provider_handle": {
       "type": ["string", "null"],
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+    },
+    "provider_dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "handle_observed"],
+      "properties": {
+        "status": { "enum": ["not-dispatched", "failed-before-dispatch", "dispatched", "unknown"] },
+        "handle_observed": { "type": "boolean" }
+      }
     },
     "completion": { "$ref": "#/$defs/completion" },
     "failure": { "$ref": "#/$defs/failure" },
@@ -141,13 +151,72 @@
       "then": {
         "properties": {
           "authorization_event_id": { "type": "string" },
-          "provider_handle": { "type": "string" }
+          "provider_dispatch": { "type": "object" }
         }
       },
       "else": {
         "properties": {
           "authorization_event_id": { "type": "null" },
-          "provider_handle": { "type": "null" }
+          "provider_handle": { "type": "null" },
+          "provider_dispatch": {
+            "properties": {
+              "status": { "const": "not-dispatched" },
+              "handle_observed": { "const": false }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "provider_dispatch": { "properties": { "handle_observed": { "const": true } } }
+        },
+        "required": ["provider_dispatch"]
+      },
+      "then": { "properties": { "provider_handle": { "type": "string", "minLength": 1 } } },
+      "else": { "properties": { "provider_handle": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "attempt" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "properties": {
+          "provider_dispatch": {
+            "properties": {
+              "status": { "const": "not-dispatched" },
+              "handle_observed": { "const": false }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "completion" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "properties": {
+          "provider_dispatch": {
+            "properties": {
+              "status": { "const": "dispatched" },
+              "handle_observed": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "unknown-provider-result" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "properties": {
+          "provider_dispatch": { "properties": { "status": { "const": "unknown" } } }
         }
       }
     }
@@ -198,21 +267,13 @@
     "package_evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "package_id",
-        "manifest",
-        "tarball",
-        "sbom",
-        "evidence_manifest",
-        "provider_result",
-        "trust"
-      ],
+      "required": ["package_id"],
       "properties": {
         "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "manifest": { "$ref": "#/$defs/artifact" },
-        "tarball": { "$ref": "#/$defs/artifact" },
-        "sbom": { "$ref": "#/$defs/artifact" },
-        "evidence_manifest": { "$ref": "#/$defs/artifact" },
+        "manifest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
+        "tarball": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
+        "sbom": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
+        "evidence_manifest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
         "provider_result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
         "trust": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trust_identity" }] }
       }
