@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -26,6 +27,26 @@ interface CurrentReceipt {
 }
 
 const sha = (letter: string) => letter.repeat(64);
+
+function canonicalizeJcs(value: unknown): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'number') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalizeJcs).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalizeJcs(record[key])}`)
+    .join(',')}}`;
+}
+
+function receiptDigest(receipt: Record<string, unknown>): string {
+  const projection = structuredClone(receipt);
+  delete projection.receipt_id;
+  delete projection.receipt_digest_sha256;
+  return createHash('sha256').update(canonicalizeJcs(projection), 'utf8').digest('hex');
+}
 const artifact = (kind: string, handle: string, digest: string) => ({
   kind,
   sink_id: 'trusted-sink',
@@ -97,6 +118,22 @@ describe('release offline verification receipt schema', () => {
   it('preserves the pathname receipt as a read-only legacy form', () => {
     const validate = getValidator('release-offline-verification-receipt.schema.json');
     expect(validate(receiptSchema.examples[0]), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it('recomputes the non-circular example identity from the exact JCS projection', () => {
+    const example = structuredClone(receiptSchema.examples[0]) as Record<string, unknown>;
+    const digest = receiptDigest(example);
+    expect(digest).toBe(example.receipt_digest_sha256);
+    expect(example.receipt_id).toBe(`ROV-${digest.slice(0, 16)}`);
+
+    const alteredDerivedFields = structuredClone(example);
+    alteredDerivedFields.receipt_id = 'ROV-0000000000000000';
+    alteredDerivedFields.receipt_digest_sha256 = sha('0');
+    expect(receiptDigest(alteredDerivedFields)).toBe(digest);
+
+    const alteredCoveredField = structuredClone(example) as Record<string, unknown>;
+    alteredCoveredField.verdict = 'fail';
+    expect(receiptDigest(alteredCoveredField)).not.toBe(digest);
   });
 
   it('accepts only the current opaque-handle receipt form', () => {

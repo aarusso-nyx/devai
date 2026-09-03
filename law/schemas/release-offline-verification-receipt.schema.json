@@ -927,7 +927,7 @@
           "derive-receipt_id-as-ROV-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"
         ]
       },
-      "receipt_id": "ROV-ce36a10cd57b72c0",
+      "receipt_id": "ROV-9b13f1e992921de5",
       "verdict": "pass",
       "state_observed": "offline_verified",
       "repository": {
@@ -1077,7 +1077,7 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "receipt_digest_sha256": "ce36a10cd57b72c077340de56d3a44c153b35b761237bd436c7062ce257d22a0"
+      "receipt_digest_sha256": "9b13f1e992921de5b21b75725293492110edd05356084dae6ebbb3d07a9fd66e"
     }
   ]
 }
