@@ -21,6 +21,7 @@ const GOVERNANCE_SCHEMAS = [
 const POLICY_EXAMPLES = [
   ['adr-validation-policy.schema.json', 'law/policy/adr-validation.json'],
   ['mutation-assurance-policy-v2.schema.json', 'law/policy/mutation-assurance-v2.json'],
+  ['mutation-evidence-policy-v2.schema.json', 'law/policy/mutation-evidence-v2.json'],
   ['release-lifecycle-policy.schema.json', 'law/policy/release-lifecycle.json'],
   ['self-dogfood-policy.schema.json', 'law/policy/self-dogfood.json'],
 ] as const;
@@ -35,6 +36,11 @@ describe('DEVAI 1.5 governance schema closure', () => {
   });
 
   it('makes every governance contract reachable from the packaged schema roster', () => {
-    expect(GOVERNANCE_SCHEMAS.filter((name) => !ROSTER.includes(name))).toEqual([]);
+    const policySchemaNames = POLICY_EXAMPLES.map(([schemaName]) => schemaName);
+    expect(
+      [...new Set([...GOVERNANCE_SCHEMAS, ...policySchemaNames])].filter(
+        (name) => !ROSTER.includes(name),
+      ),
+    ).toEqual([]);
   });
 });

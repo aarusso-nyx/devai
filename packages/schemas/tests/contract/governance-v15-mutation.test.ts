@@ -4,6 +4,37 @@ import { canonicalJson, mutationReport, readJson, sha256 } from '../fixtures/gov
 
 type Json = Record<string, unknown>;
 
+const APPROVED_SOURCE = {
+  repository: 'devai-nyx/devai-verifier',
+  commit: '098d090013dda34e38d1045ba06274d99bd5aec1',
+  tree: '8eb8491dc43ca893399b2fc87dcfc25815c4a209',
+} as const;
+
+const PROVENANCE_PROOF = {
+  source: APPROVED_SOURCE,
+  vendor: {
+    root: 'packages/cli/vendor/evidence-verification',
+    manifestPath: 'packages/cli/vendor/evidence-verification/provenance.json',
+    manifestDigest: '5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b',
+    sourceCommit: APPROVED_SOURCE.commit,
+    sourceTree: APPROVED_SOURCE.tree,
+    byteSetDigest: 'dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e',
+  },
+  sourceByteSetDigest: 'dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e',
+  byteEqual: true,
+} as const;
+
+const SEMANTIC_RECEIPT_PROVENANCE = {
+  source: {
+    repository: 'devai-verifier',
+    commit: APPROVED_SOURCE.commit,
+    tree: APPROVED_SOURCE.tree,
+    byteSetDigest: PROVENANCE_PROOF.sourceByteSetDigest,
+  },
+  vendor: PROVENANCE_PROOF.vendor,
+  byteEquality: true,
+} as const;
+
 function aggregate(
   expectedPackages: readonly string[],
   reports: Readonly<Record<string, Json>>,
@@ -189,5 +220,173 @@ describe('mutation assurance v2 evidence matrix', () => {
       'orchestration',
       'lockfile',
     ]);
+  });
+});
+
+describe('source-pinned mutation v2.1 verifier activation', () => {
+  const validate = getValidator('mutation-evidence-policy-v2.schema.json');
+  const policy = readJson<Json>('law/policy/mutation-evidence-v2.json');
+
+  function changed(mutator: (candidate: Json) => void): Json {
+    const candidate = structuredClone(policy);
+    mutator(candidate);
+    return candidate;
+  }
+
+  it('accepts only the complete active source and vendor provenance proof', () => {
+    expect(validate(policy), JSON.stringify(validate.errors)).toBe(true);
+
+    const activation = policy.activation as Json;
+    const proof = activation.provenanceProof as Json;
+    const vendor = proof.vendor as Json;
+    const activationModel = policy.activationModel as Json;
+    expect(policy.status).toBe('active');
+    expect(policy.approvedSource).toEqual(APPROVED_SOURCE);
+    expect(proof).toEqual(PROVENANCE_PROOF);
+    expect(activation).toMatchObject({ emissionPermitted: true, verificationPermitted: true });
+    expect(policy.approvedSource).toEqual(proof.source);
+    expect(vendor.sourceCommit).toBe((policy.approvedSource as Json).commit);
+    expect(vendor.sourceTree).toBe((policy.approvedSource as Json).tree);
+    expect(proof.sourceByteSetDigest).toBe(vendor.byteSetDigest);
+    expect(proof.byteEqual).toBe(true);
+    expect(activationModel.policyDigestRequirement).toBe(
+      'before-emission-or-verification-require-output-contract-and-current-and-every-reused-producing-semantic-receipt-policyDigest-to-equal-sha256-of-rfc8785-jcs-utf8-of-the-complete-canonical-law-policy-mutation-evidence-v2-json-document-with-no-excluded-members;distinct-from-taskPolicyDigest;compute-at-runtime-and-never-store-the-actual-policy-digest-inside-this-policy',
+    );
+    expect(activationModel.semanticReceiptProvenance).toEqual(SEMANTIC_RECEIPT_PROVENANCE);
+    expect(activationModel.sourceOnlyTestPaths).toEqual([
+      'test/artifact-safety.test.js',
+      'test/export.test.js',
+      'test/mutation-v21-contract.test.js',
+      'test/mutation.test.js',
+      'test/policy-builder.test.js',
+      'test/publish.test.js',
+      'test/verifier.test.js',
+    ]);
+  });
+
+  it.each([
+    [
+      'inactive status',
+      (candidate: Json) => {
+        candidate.status = 'frozen-pending-canonical-verifier';
+      },
+    ],
+    [
+      'missing approved source',
+      (candidate: Json) => {
+        candidate.approvedSource = null;
+      },
+    ],
+    [
+      'substituted approved source repository',
+      (candidate: Json) => {
+        (candidate.approvedSource as Json).repository = 'candidate-controlled/verifier';
+      },
+    ],
+    [
+      'substituted approved source commit',
+      (candidate: Json) => {
+        (candidate.approvedSource as Json).commit = 'a'.repeat(40);
+      },
+    ],
+    [
+      'substituted approved source tree',
+      (candidate: Json) => {
+        (candidate.approvedSource as Json).tree = 'b'.repeat(40);
+      },
+    ],
+    [
+      'substituted vendor manifest digest',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        const proof = activation.provenanceProof as Json;
+        (proof.vendor as Json).manifestDigest = 'c'.repeat(64);
+      },
+    ],
+    [
+      'substituted vendor root',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        const proof = activation.provenanceProof as Json;
+        (proof.vendor as Json).root = 'candidate/vendor';
+      },
+    ],
+    [
+      'substituted vendor manifest path',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        const proof = activation.provenanceProof as Json;
+        (proof.vendor as Json).manifestPath = 'candidate/provenance.json';
+      },
+    ],
+    [
+      'substituted vendor source commit',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        const proof = activation.provenanceProof as Json;
+        (proof.vendor as Json).sourceCommit = 'e'.repeat(40);
+      },
+    ],
+    [
+      'substituted vendor source tree',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        const proof = activation.provenanceProof as Json;
+        (proof.vendor as Json).sourceTree = 'f'.repeat(40);
+      },
+    ],
+    [
+      'substituted vendor byte-set digest',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        const proof = activation.provenanceProof as Json;
+        (proof.vendor as Json).byteSetDigest = 'd'.repeat(64);
+      },
+    ],
+    [
+      'substituted source byte-set digest',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        (activation.provenanceProof as Json).sourceByteSetDigest = '0'.repeat(64);
+      },
+    ],
+    [
+      'self-asserted byte equality',
+      (candidate: Json) => {
+        const activation = candidate.activation as Json;
+        (activation.provenanceProof as Json).byteEqual = false;
+      },
+    ],
+    [
+      'substituted semantic receipt wire repository',
+      (candidate: Json) => {
+        const model = candidate.activationModel as Json;
+        const provenance = model.semanticReceiptProvenance as Json;
+        (provenance.source as Json).repository = 'candidate-verifier';
+      },
+    ],
+    [
+      'weakened complete-policy digest binding',
+      (candidate: Json) => {
+        (candidate.activationModel as Json).policyDigestRequirement = 'task-policy-digest-only';
+      },
+    ],
+    [
+      'installed vendor root emitted as semantic provenance',
+      (candidate: Json) => {
+        const model = candidate.activationModel as Json;
+        const provenance = model.semanticReceiptProvenance as Json;
+        (provenance.vendor as Json).root = 'dist/runtime/evidence-verification';
+      },
+    ],
+    [
+      'missing source-only test closure member',
+      (candidate: Json) => {
+        const model = candidate.activationModel as Json;
+        (model.sourceOnlyTestPaths as unknown[]).pop();
+      },
+    ],
+  ])('rejects %s', (_name, mutate) => {
+    expect(validate(changed(mutate))).toBe(false);
   });
 });
