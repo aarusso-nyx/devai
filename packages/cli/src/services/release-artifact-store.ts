@@ -2,10 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { canonicalJson } from '@devai-nyx/utils';
-import {
-  createProtectedArtifactSinkAdapter,
-  type ProtectedArtifactSinkBinding,
-} from '@devai-nyx/authority';
+import { createProtectedArtifactSinkAdapter } from '@devai-nyx/authority';
 import {
   createDurableReleaseContentStore,
   type DurableReleaseContentStoreOptions,
@@ -50,7 +47,13 @@ function guard<T>(operation: () => T): T {
 
 /** Supplied only by the trusted host. Neither the CLI request nor a candidate chooses storage. */
 export interface ReleaseArtifactStoreOptions extends DurableReleaseContentStoreOptions {
-  readonly binding: ProtectedArtifactSinkBinding;
+  readonly binding: {
+    readonly action_id: 'release prepare';
+    readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
+    readonly plan_receipt_digest_sha256: string;
+    readonly pack_spec_digest_sha256: string;
+    readonly sink_id: string;
+  };
 }
 
 type Begin = Parameters<TrustedArtifactSink['begin']>[0];
