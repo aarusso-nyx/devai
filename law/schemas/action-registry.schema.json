@@ -186,6 +186,72 @@
           },
           {
             "if": {
+              "properties": { "action_id": { "const": "release preflight" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "harness-write" },
+                "authority": { "const": "release_controller" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release preflight" },
+                    "effect": { "const": "harness-write" },
+                    "capabilities": {
+                      "const": [
+                        "fs:f5-state",
+                        "fs:proofs",
+                        "proc:git",
+                        "protected-certification-provider-v3:execute"
+                      ]
+                    },
+                    "subject": {
+                      "const": {
+                        "kind": "derived-machine",
+                        "actor": "harness",
+                        "transition": "harness-write",
+                        "initiator": {
+                          "allowed_roles": ["inspector"],
+                          "preserve_in_context": true
+                        }
+                      }
+                    },
+                    "consent": {
+                      "const": { "write": true, "allow_publish": false, "experimental": false }
+                    },
+                    "planner": {
+                      "const": {
+                        "kind": "bounded-batches",
+                        "planner_id": "release-preflight-bounded-plan",
+                        "target_kinds": ["fs", "protected-certification-provider"],
+                        "bounds": {
+                          "max_batches": 128,
+                          "max_targets_per_batch": 64,
+                          "max_total_targets": 8192
+                        },
+                        "recovery": "preserve-and-report"
+                      }
+                    },
+                    "boundary": {
+                      "const": {
+                        "kind": "mutation-adapters",
+                        "adapter_ids": [
+                          "fs-authority-boundary",
+                          "protected-certification-provider-v3"
+                        ],
+                        "final_reverification": true
+                      }
+                    },
+                    "readiness": {
+                      "const": { "requires_binding": true, "independent_acceptance_required": true }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
               "properties": { "action_id": { "const": "release certify" } },
               "required": ["action_id"]
             },

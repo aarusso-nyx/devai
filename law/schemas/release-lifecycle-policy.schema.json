@@ -429,6 +429,7 @@
         "store",
         "resume",
         "remote_effect",
+        "protected_preflight",
         "prepare_kernel",
         "release_unit_bijection",
         "state_semantic_kernel"
@@ -769,6 +770,48 @@
             }
           }
         },
+        "protected_preflight": {
+          "const": {
+            "action_id": "release preflight",
+            "stage": "preflight",
+            "boundary": "protected-certification-provider-v3",
+            "capability": "protected-certification-provider-v3:execute",
+            "scope": "execution-only-of-the-preflight-task-subset-derived-from-the-exact-bound-immutable-task-policy-and-plan;never-certification-task-selection-or-promotion",
+            "binding": [
+              "action_id",
+              "repository-id-commit-tree",
+              "candidate-commit-tree",
+              "plan-receipt-digest",
+              "task-policy-digest-sha256",
+              "helper-identity-sha256"
+            ],
+            "helper_identity": "bind-the-exact-stage-selected-task-ids-argv-cwd-executable-digests-plan-toolchain-container-image-platform-and-dependency-identities;preflight-and-certify-use-the-same-immutable-execution-toolchain-and-candidate-not-identical-stage-task-subsets",
+            "invocation": "host-owned-opaque-single-use-capability-bound-to-the-exact-live-action-scope;reverify-all-bindings-before-execution;candidate-cannot-select-helper-code-profile-toolchain-or-ambient-environment",
+            "isolation": "tasks-run-outside-candidate-authority-without-sink-signing-control-or-publication-capabilities;capture-bounded-output-in-host-owned-proofs-and-prove-descendant-quiescence-before-acceptance",
+            "projection": {
+              "kind": "remote",
+              "system_id": "devai-protected-certification-provider-v3",
+              "endpoint_id": "host",
+              "operation_id": "execute",
+              "publication": false,
+              "adapter_id": "protected-certification-provider-v3"
+            },
+            "projection_guard": "fixed-internal-semantic-representation-only;selector-materialization-prepare-apply-and-final-reverification-check-the-same-named-boundary-and-opaque-binding;target-id-alone-or-a-generic-remote-process-docker-or-filesystem-cache-rule-never-grants-execution",
+            "permitted_transition": "only-the-existing-planned-to-preflight_passed-transition-after-core-verification",
+            "forbidden": [
+              "certification-evidence-sink",
+              "certification-manifest-or-generated-output-receipt",
+              "certified-state-promotion",
+              "artifact-sink",
+              "prepare",
+              "export",
+              "offline-verification",
+              "remote-publication",
+              "generic-process-execution"
+            ],
+            "missing_or_mismatched_provider": "refuse-before-task-execution-or-success-state-append;no-ambient-or-unprotected-fallback"
+          }
+        },
         "prepare_kernel": {
           "type": "object",
           "additionalProperties": false,
@@ -800,10 +843,13 @@
             "stock_composition": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["built_in_actions", "certify", "prepare"],
+              "required": ["built_in_actions", "preflight", "certify", "prepare"],
               "properties": {
                 "built_in_actions": {
                   "const": ["release plan", "release preflight", "release resume"]
+                },
+                "preflight": {
+                  "const": "built-in-orchestration-requires-injected-execution-only-protected-preflight;missing-or-mismatched-helper-refuses-without-ambient-fallback"
                 },
                 "certify": {
                   "const": "requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only"
@@ -2735,7 +2781,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.3.1",
+      "policy_version": "2.6.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -3343,6 +3389,46 @@
           "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
           "retry": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
         },
+        "protected_preflight": {
+          "action_id": "release preflight",
+          "stage": "preflight",
+          "boundary": "protected-certification-provider-v3",
+          "capability": "protected-certification-provider-v3:execute",
+          "scope": "execution-only-of-the-preflight-task-subset-derived-from-the-exact-bound-immutable-task-policy-and-plan;never-certification-task-selection-or-promotion",
+          "binding": [
+            "action_id",
+            "repository-id-commit-tree",
+            "candidate-commit-tree",
+            "plan-receipt-digest",
+            "task-policy-digest-sha256",
+            "helper-identity-sha256"
+          ],
+          "helper_identity": "bind-the-exact-stage-selected-task-ids-argv-cwd-executable-digests-plan-toolchain-container-image-platform-and-dependency-identities;preflight-and-certify-use-the-same-immutable-execution-toolchain-and-candidate-not-identical-stage-task-subsets",
+          "invocation": "host-owned-opaque-single-use-capability-bound-to-the-exact-live-action-scope;reverify-all-bindings-before-execution;candidate-cannot-select-helper-code-profile-toolchain-or-ambient-environment",
+          "isolation": "tasks-run-outside-candidate-authority-without-sink-signing-control-or-publication-capabilities;capture-bounded-output-in-host-owned-proofs-and-prove-descendant-quiescence-before-acceptance",
+          "projection": {
+            "kind": "remote",
+            "system_id": "devai-protected-certification-provider-v3",
+            "endpoint_id": "host",
+            "operation_id": "execute",
+            "publication": false,
+            "adapter_id": "protected-certification-provider-v3"
+          },
+          "projection_guard": "fixed-internal-semantic-representation-only;selector-materialization-prepare-apply-and-final-reverification-check-the-same-named-boundary-and-opaque-binding;target-id-alone-or-a-generic-remote-process-docker-or-filesystem-cache-rule-never-grants-execution",
+          "permitted_transition": "only-the-existing-planned-to-preflight_passed-transition-after-core-verification",
+          "forbidden": [
+            "certification-evidence-sink",
+            "certification-manifest-or-generated-output-receipt",
+            "certified-state-promotion",
+            "artifact-sink",
+            "prepare",
+            "export",
+            "offline-verification",
+            "remote-publication",
+            "generic-process-execution"
+          ],
+          "missing_or_mismatched_provider": "refuse-before-task-execution-or-success-state-append;no-ambient-or-unprotected-fallback"
+        },
         "prepare_kernel": {
           "kernel_id": "devai.kernel.release-prepare.v3",
           "compatibility": {
@@ -3351,6 +3437,7 @@
           },
           "stock_composition": {
             "built_in_actions": ["release plan", "release preflight", "release resume"],
+            "preflight": "built-in-orchestration-requires-injected-execution-only-protected-preflight;missing-or-mismatched-helper-refuses-without-ambient-fallback",
             "certify": "requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only",
             "prepare": "requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink"
           },
