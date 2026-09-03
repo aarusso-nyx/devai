@@ -2253,15 +2253,11 @@ export async function resumeReleaseLifecycleExecution(input: {
     locatorMismatch ||
     receiptInvalid;
   const ambiguous = !blocked && storeReduction.ambiguous;
-  const published =
-    head !== null && input.publication_receipt !== undefined && input.verify_signature !== undefined
-      ? ((await verifyPublicationReceipt(
-          input.publication_receipt,
-          head,
-          input.verify_signature,
-        )) ?? { observed: false, receipt: null, verified_against: null })
-      : { observed: false, receipt: null, verified_against: null };
-  const publishedObserved = published['observed'] === true;
+  let published: Readonly<Record<string, unknown>> = {
+    observed: false,
+    receipt: null,
+    verified_against: null,
+  };
   const derived: Readonly<Record<string, unknown>>[] = [];
   const seenReceiptIds = new Set<string>();
   const expectedPlanCandidates = (
@@ -2348,6 +2344,18 @@ export async function resumeReleaseLifecycleExecution(input: {
   ) {
     receiptInvalid = true;
   }
+  if (
+    !blocked &&
+    !receiptInvalid &&
+    head !== null &&
+    input.publication_receipt !== undefined &&
+    input.verify_signature !== undefined
+  ) {
+    published =
+      (await verifyPublicationReceipt(input.publication_receipt, head, input.verify_signature)) ??
+      published;
+  }
+  const publishedObserved = published['observed'] === true;
   if (publishedObserved) {
     const receipt = object(published['receipt']);
     derived.push({
@@ -2358,6 +2366,7 @@ export async function resumeReleaseLifecycleExecution(input: {
       verified: true,
     });
   }
+  if (blocked || receiptInvalid) derived.length = 0;
   const hasPlan = derived.some((entry) => entry['state'] === 'planned');
   const hasOffline = derived.some((entry) => entry['state'] === 'offline_verified');
   let nextAction: ReleaseAction | null;
