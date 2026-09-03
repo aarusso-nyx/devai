@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
 import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
+import { createReleaseCertificationProvider } from '../../src/services/release-lifecycle-certification.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
   ReleaseLifecycleFileStore,
@@ -25,12 +26,16 @@ import {
   type TrustedReleaseAuthority,
 } from '../../src/services/release-lifecycle-execution.js';
 
-const COMMIT = '5461ba500000000000000000000000000000aaaa';
-const TREE = '2cad519aba8117a1850eee85d41eae452d51a141';
-const ARTIFACT_BYTES = Buffer.from('x');
+const ARTIFACT_BYTES = Buffer.from(JSON.stringify({ name: '@aarusso-nyx/devai', version: '1.5.0' }));
+const BLOB = createHash('sha1').update(Buffer.from(`blob ${String(ARTIFACT_BYTES.byteLength)}\0`)).update(ARTIFACT_BYTES).digest('hex');
+const TREE_BYTES = Buffer.concat([Buffer.from('100644 package.json\0'), Buffer.from(BLOB, 'hex')]);
+const TREE = createHash('sha1').update(Buffer.from(`tree ${String(TREE_BYTES.byteLength)}\0`)).update(TREE_BYTES).digest('hex');
+const COMMIT_BYTES = Buffer.from(`tree ${TREE}\n\nfixture\n`);
+const COMMIT = createHash('sha1').update(Buffer.from(`commit ${String(COMMIT_BYTES.byteLength)}\0`)).update(COMMIT_BYTES).digest('hex');
 const MANIFEST_DIGEST = createHash('sha256').update(ARTIFACT_BYTES).digest('hex');
 const EVIDENCE_DIGEST = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08';
-const TASK_POLICY_DIGEST = 'c'.repeat(64);
+const CERTIFICATION_TASK_POLICY = { nodes: ['certify'] };
+const TASK_POLICY_DIGEST = canonicalSha256(CERTIFICATION_TASK_POLICY);
 const SINK_ID = 'release-test-sink';
 const TRANSACTION_HANDLE = 'release-test-transaction';
 const COMMIT_MANIFEST_HANDLE = 'release-test-commit-manifest';
@@ -198,7 +203,11 @@ function material(): ReleaseStateMaterial {
         packages: [
           {
             package_id: '@aarusso-nyx/devai',
-            manifest: { path: 'package.json', sha256: MANIFEST_DIGEST, size_bytes: 1 },
+            manifest: {
+              path: 'package.json',
+              sha256: MANIFEST_DIGEST,
+              size_bytes: ARTIFACT_BYTES.byteLength,
+            },
             tarball: null,
             sbom: null,
             evidence_manifest: null,
@@ -249,7 +258,18 @@ function certificationManifest() {
         mode: '100644',
         size_bytes: ARTIFACT_BYTES.byteLength,
         sha256: MANIFEST_DIGEST,
-        immutable_blob_locator: { kind: 'git-object', object_id: 'd'.repeat(40) },
+        immutable_blob_locator: {
+          kind: 'git-object',
+          repository: 'aarusso-nyx/devai',
+          commit: COMMIT,
+          tree: TREE,
+          object_format: 'sha1',
+          path: 'package.json',
+          mode: '100644',
+          object_id: BLOB,
+          size_bytes: ARTIFACT_BYTES.byteLength,
+          content_digest_sha256: MANIFEST_DIGEST,
+        },
       },
     ],
   });
@@ -358,6 +378,42 @@ function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseState
     artifacts,
     artifact_sink: committedSink(artifacts).identity,
   };
+}
+
+function providerFor(action: ReleaseLifecycleRequest['action_id']) {
+  if (action !== 'release certify') return () => ({ outcome: 'success' as const, material: materialFor(action) });
+  return createReleaseCertificationProvider({
+    provider: {
+      kind: 'protected-certification-provider-v3',
+      certify: () => ({ outcome: 'success' as const, material: materialFor('release certify') }),
+    },
+    evidence_sink: {
+      kind: 'certification-evidence-sink-v3',
+      protocol: 'two-phase-content-addressed',
+      begin: () => undefined as never,
+      readCertificationEvidenceReceipt: () => { throw new Error('no generated output'); },
+      readCertificationOutputClosure: binding => ({ ...binding, outputs: [] }),
+      readGeneratedBlob: () => { throw new Error('no generated output'); },
+    },
+    content_source: {
+      readGitObject: ({ type, object_id }) => {
+        if (type === 'commit' && object_id === COMMIT) return COMMIT_BYTES;
+        if (type === 'tree' && object_id === TREE) return TREE_BYTES;
+        throw new Error('unknown Git object');
+      },
+      readGitBlob: ({ object_id }) => {
+        if (object_id !== BLOB) throw new Error('unknown Git blob');
+        return ARTIFACT_BYTES;
+      },
+    },
+    task_policies: [
+      {
+        release_unit: '@aarusso-nyx/devai',
+        task_policy_digest_sha256: TASK_POLICY_DIGEST,
+        document: CERTIFICATION_TASK_POLICY,
+      },
+    ],
+  });
 }
 
 function artifactReaderFor(action: ReleaseLifecycleRequest['action_id']) {
@@ -704,7 +760,7 @@ async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void
         store,
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: materialFor(action) }),
+        provider: providerFor(action),
         artifactReader:
           action === 'release export' ? artifactReaderFor('release prepare') : undefined,
         recorded_at: '2026-09-03T00:00:00.000Z',
@@ -751,6 +807,109 @@ function required<T>(value: T | undefined, message: string): T {
 }
 
 describe('release lifecycle execution kernel', () => {
+  it('refuses v3 certify before task execution or state append without a protected provider and two-phase evidence sink', async () => {
+    const value = request('release certify');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    const genericProvider = vi.fn(() => ({ outcome: 'success' as const, material: materialFor('release certify') }));
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release certify',
+        authority: authorityFor('release certify'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: genericProvider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'provider',
+      code: 'release-certification-provider-unavailable',
+    });
+    expect(genericProvider).not.toHaveBeenCalled();
+    expect(store.readStoreRecords()).toEqual([]);
+
+    const protectedProvider = {
+      kind: 'protected-certification-provider-v3' as const,
+      certify: vi.fn(),
+    };
+    expect(() =>
+      createReleaseCertificationProvider({
+        provider: protectedProvider,
+        evidence_sink: undefined as never,
+        content_source: undefined as never,
+        task_policies: [],
+      }),
+    ).toThrow('release-certification-evidence-sink-unavailable');
+    expect(protectedProvider.certify).not.toHaveBeenCalled();
+  });
+
+  it('preserves an ambiguous prepare sink commit without cleanup or redispatch until external reconciliation', async () => {
+    const initial = request();
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    for (const action of ['release preflight', 'release certify'] as const) {
+      const result = await withAuthorityHostTestScope(() =>
+        executeReleaseLifecycleAction({
+          request: request(action), action, authority: authorityFor(action), store,
+          resolveReceipt: () => planReceipt(), resolvePlanInput, provider: providerFor(action),
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+      expect(result.ok).toBe(true);
+    }
+    const rollback = vi.fn();
+    const dispose = vi.fn();
+    const provider = vi.fn(() => ({
+      outcome: 'success' as const,
+      material: materialFor('release prepare'),
+      transaction: { commit: () => { throw new Error('lost sink response'); }, rollback, dispose },
+    }));
+    const prepared = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: request('release prepare'), action: 'release prepare',
+        authority: authorityFor('release prepare'), store,
+        resolveReceipt: () => planReceipt(), resolvePlanInput, provider,
+        recorded_at: '2026-09-03T00:00:01.000Z',
+      }),
+    );
+    expect(prepared).toMatchObject({ ok: false, phase: 'ambiguous', code: 'release-artifact-sink-commit-unknown' });
+    expect(rollback).not.toHaveBeenCalled();
+    expect(dispose).not.toHaveBeenCalled();
+    const terminal = store.readStoreRecords().at(-1);
+    expect(terminal).toMatchObject({
+      record_kind: 'unknown-provider-result',
+      provider_dispatch: { status: 'not-dispatched', handle_observed: false },
+      unknown: {
+        code: 'release-provider-result-unknown', redispatch_permitted: false,
+        artifact_sink: materialFor('release prepare').artifact_sink,
+        artifacts: materialFor('release prepare').artifacts,
+      },
+    });
+    const observation = await resumeReleaseLifecycleExecution({
+      states: store.readStateRecords(), store_records: store.readStoreRecords(), store_head: store.readHead(),
+      repository: initial.repository_locator,
+      candidate: required(store.readStateRecords().at(-1), 'missing certified state').candidate,
+      candidate_locator: request('release prepare').candidate_locator,
+      receipt_documents: [planReceipt()], resolve_plan_input: resolvePlanInput,
+    });
+    expect(observation).toMatchObject({
+      next_action: null, next_outcome: 'ambiguous',
+      reconciliation_requirements: ['external_sink_commit_reconciliation_required'],
+    });
+    const retry = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: request('release prepare'), action: 'release prepare',
+        authority: authorityFor('release prepare'), store,
+        resolveReceipt: () => planReceipt(), resolvePlanInput, provider,
+        recorded_at: '2026-09-03T00:00:02.000Z',
+      }),
+    );
+    expect(retry).toMatchObject({ ok: false, phase: 'reconciliation', code: 'release-provider-result-unknown' });
+    expect(provider).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects recursive authority injection, identity drift, and non-canonical rosters', () => {
     const valid = request();
     expect(validateReleaseLifecycleRequest(valid, 'release preflight')).toEqual(valid);

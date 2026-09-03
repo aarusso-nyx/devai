@@ -29,28 +29,48 @@ function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function gitBlobId(bytes: Buffer): string {
-  return createHash('sha1')
-    .update(Buffer.from(`blob ${String(bytes.byteLength)}\0`))
+function gitObjectId(bytes: Buffer, type: 'blob' | 'tree' | 'commit', format: 'sha1' | 'sha256' = 'sha1'): string {
+  return createHash(format)
+    .update(Buffer.from(`${type} ${String(bytes.byteLength)}\0`))
     .update(bytes)
     .digest('hex');
 }
 
-function fixture(generatedBytes?: Buffer) {
+function gitTreeEntry(mode: string, path: string, objectId: string): Buffer {
+  return Buffer.concat([Buffer.from(`${mode} ${path}\0`, 'utf8'), Buffer.from(objectId, 'hex')]);
+}
+
+function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha1') {
   const packageJson = Buffer.from(
     `${JSON.stringify({ name: '@scope/demo', version: '1.2.0', files: ['dist'], main: 'dist/index.js' })}\n`,
   );
   const generated =
     generatedBytes ?? Buffer.from('#!/usr/bin/env node\nexport const answer = 42;\n');
+  const generatedHandle = {
+    evidence_sink_id: 'certification-evidence-sink',
+    opaque_handle: `output-${sha256(generated)}`,
+    sha256: sha256(generated),
+    size_bytes: generated.byteLength,
+  } as const;
+  const packageBlobId = gitObjectId(packageJson, 'blob', objectFormat);
+  const packageTreeBytes = gitTreeEntry('100644', 'package.json', packageBlobId);
+  const packageTree = gitObjectId(packageTreeBytes, 'tree', objectFormat);
+  const demoTreeBytes = gitTreeEntry('40000', 'demo', packageTree);
+  const demoTree = gitObjectId(demoTreeBytes, 'tree', objectFormat);
+  const treeBytes = gitTreeEntry('40000', 'packages', demoTree);
+  const tree = gitObjectId(treeBytes, 'tree', objectFormat);
+  const commitBytes = Buffer.from(`tree ${tree}\nauthor Release Test <release@example.invalid> 0 +0000\ncommitter Release Test <release@example.invalid> 0 +0000\n\ncandidate\n`);
+  const commit = gitObjectId(commitBytes, 'commit', objectFormat);
   const certificationEvidenceReceipt = finalizeCertificationReceipt({
-    candidate_commit: COMMIT,
-    candidate_tree: TREE,
+    candidate_commit: commit,
+    candidate_tree: tree,
     task_policy_digest_sha256: TASK_POLICY,
     package_id: '@scope/demo',
     output_blob_sha256: sha256(generated),
+    output_blob_handle: generatedHandle,
   });
   const manifestDraft = {
-    candidate: { commit: COMMIT, tree: TREE },
+    candidate: { commit, tree },
     task_policy_digest_sha256: TASK_POLICY,
     package_id: '@scope/demo',
     package_version: '1.2.0',
@@ -71,6 +91,7 @@ function fixture(generatedBytes?: Buffer) {
         immutable_blob_locator: {
           kind: 'generated-output' as const,
           output_blob_sha256: sha256(generated),
+          output_blob_handle: generatedHandle,
           certification_evidence_receipt: certificationEvidenceReceipt,
         },
       },
@@ -81,7 +102,15 @@ function fixture(generatedBytes?: Buffer) {
         sha256: sha256(packageJson),
         immutable_blob_locator: {
           kind: 'git-object' as const,
-          object_id: gitBlobId(packageJson),
+          repository: 'scope/repository',
+          commit,
+          tree,
+          object_format: objectFormat,
+          path: 'packages/demo/package.json',
+          mode: '100644' as const,
+          object_id: packageBlobId,
+          size_bytes: packageJson.byteLength,
+          content_digest_sha256: sha256(packageJson),
         },
       },
     ],
@@ -91,10 +120,10 @@ function fixture(generatedBytes?: Buffer) {
     schemaVersion: '1.0.0',
     request_kind: 'release-lifecycle-request',
     action_id: 'release prepare',
-    repository_locator: { id: 'scope/repository', commit: COMMIT, tree: TREE },
+    repository_locator: { id: 'scope/repository', commit, tree },
     candidate_locator: {
-      commit: COMMIT,
-      tree: TREE,
+      commit,
+      tree,
       release_units: [
         {
           release_unit: '@scope/demo',
@@ -125,8 +154,8 @@ function fixture(generatedBytes?: Buffer) {
     candidate: {
       release_unit: '@scope/demo',
       version: '1.2.0',
-      commit: COMMIT,
-      tree: TREE,
+      commit,
+      tree,
     },
     release_units: [
       {
@@ -159,18 +188,38 @@ function fixture(generatedBytes?: Buffer) {
     artifacts: [],
   } as unknown as ReleaseLifecycleStateV2;
   const source: ImmutableReleaseContentSource = {
+    readGitObject: ({ object_id, type }) => {
+      if (type === 'commit' && object_id === commit) return commitBytes;
+      if (type === 'tree' && object_id === tree) return treeBytes;
+      if (type === 'tree' && object_id === demoTree) return demoTreeBytes;
+      if (type === 'tree' && object_id === packageTree) return packageTreeBytes;
+      throw new Error('wrong git object');
+    },
     readGitBlob: ({ object_id }) => {
-      if (object_id !== gitBlobId(packageJson)) throw new Error('wrong git object');
+      if (object_id !== packageBlobId) throw new Error('wrong git object');
       return packageJson;
     },
-    readCertificationEvidenceReceipt: ({ receipt_digest_sha256 }) => {
+    readCertificationEvidenceReceipt: ({ receipt_digest_sha256, evidence_sink_id }) => {
       if (receipt_digest_sha256 !== certificationEvidenceReceipt.receipt_digest_sha256) {
         throw new Error('wrong certification receipt');
       }
+      if (evidence_sink_id !== generatedHandle.evidence_sink_id) throw new Error('wrong evidence sink');
       return certificationEvidenceReceipt;
     },
-    readGeneratedBlob: ({ output_blob_sha256, receipt }) => {
+    readCertificationOutputClosure: (binding) => ({
+      ...binding,
+      outputs: [
+        {
+          path: 'dist/index.js',
+          mode: '100755',
+          output_blob_handle: generatedHandle,
+          certification_evidence_receipt: certificationEvidenceReceipt,
+        },
+      ],
+    }),
+    readGeneratedBlob: ({ output_blob_sha256, output_blob_handle, receipt }) => {
       if (output_blob_sha256 !== sha256(generated)) throw new Error('wrong generated object');
+      if (output_blob_handle.opaque_handle !== generatedHandle.opaque_handle) throw new Error('wrong generated handle');
       if (receipt.receipt_digest_sha256 !== certificationEvidenceReceipt.receipt_digest_sha256) {
         throw new Error('wrong certification receipt');
       }
@@ -342,6 +391,52 @@ describe('pure release prepare kernel', () => {
     await firstResult.transaction?.commit();
   });
 
+  it('accepts a SHA-256 Git locator only after exact candidate-tree traversal', async () => {
+    const value = fixture(undefined, 'sha256');
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      certified_state: value.state,
+      content_source: value.source,
+      artifact_sink: target.sink,
+    })(value.request);
+    expect(result.outcome).toBe('success');
+    await result.transaction?.rollback();
+  });
+
+  it.each([
+    ['omitted', []],
+    ['duplicated', ['dist/index.js', 'dist/index.js']],
+  ])('refuses a %s externally finalized generated-output closure before sink effects', async (_name, paths) => {
+    const value = fixture();
+    const target = memorySink();
+    const generated = value.certificationManifest.entries[0];
+    if (generated === undefined || generated.immutable_blob_locator.kind !== 'generated-output') {
+      throw new Error('generated entry missing');
+    }
+    const locator = generated.immutable_blob_locator;
+    const result = await createReleasePrepareProvider({
+      certified_state: value.state,
+      content_source: {
+        ...value.source,
+        readCertificationOutputClosure: binding => ({
+          ...binding,
+          outputs: paths.map(path => ({
+            path,
+            mode: '100755' as const,
+            output_blob_handle: locator.output_blob_handle,
+            certification_evidence_receipt: locator.certification_evidence_receipt,
+          })),
+        }),
+      },
+      artifact_sink: target.sink,
+    })(value.request);
+    expect(result).toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-output-closure-invalid',
+    });
+    expect(target.begin).not.toHaveBeenCalled();
+  });
+
   it('emits the exact SPDX 2.3 package, file, checksum, and relationship projection', async () => {
     const value = fixture();
     const target = memorySink();
@@ -373,7 +468,7 @@ describe('pure release prepare kernel', () => {
       dataLicense: 'CC0-1.0',
       SPDXID: 'SPDXRef-DOCUMENT',
       name: '@scope/demo@1.2.0',
-      documentNamespace: `https://devai.nyxk.com.br/spdx/${COMMIT}/@scope/demo`,
+      documentNamespace: `https://devai.nyxk.com.br/spdx/${value.request.candidate_locator.commit}/@scope/demo`,
       creationInfo: {
         created: '1970-01-01T00:00:00Z',
         creators: ['Tool: devai.pure-npm-compatible-pack.v3'],
@@ -491,15 +586,14 @@ describe('pure release prepare kernel', () => {
             }
           | undefined;
         if (entry === undefined) throw new Error('entry fixture missing');
-        entry.immutable_blob_locator = {
-          kind: 'git-object',
-          object_id: 'e'.repeat(40),
-        };
+        const locator = entry.immutable_blob_locator;
+        if (locator.kind !== 'git-object') throw new Error('git locator missing');
+        entry.immutable_blob_locator = { ...locator, object_id: 'e'.repeat(40) };
         const { manifest_digest_sha256: _digest, ...draft } = value.certificationManifest;
         (value.certificationManifest as { manifest_digest_sha256: string }).manifest_digest_sha256 =
           finalizeCertificationManifest(draft).manifest_digest_sha256;
       },
-      'release-prepare-immutable-blob-locator-invalid',
+      'release-prepare-git-tree-membership-invalid',
     ],
   ] as const)('refuses a mutated %s before a sink effect', async (_name, mutate, code) => {
     const value = fixture();
@@ -555,7 +649,7 @@ describe('pure release prepare kernel', () => {
     })(value.request);
     expect(result).toMatchObject({
       outcome: 'failure',
-      code: 'release-prepare-unsupported-package-semantics',
+      code: 'release-certification-output-closure-invalid',
     });
     expect(target.begin).not.toHaveBeenCalled();
   });
@@ -582,7 +676,7 @@ describe('pure release prepare kernel', () => {
     })(value.request);
     expect(staged.outcome).toBe('success');
     await expect(staged.transaction?.commit()).rejects.toThrow(
-      'release-artifact-sink-commit-failed',
+      'release-artifact-sink-commit-unknown',
     );
     await staged.transaction?.rollback();
     expect(failing.abort).not.toHaveBeenCalled();
