@@ -42,6 +42,8 @@ export const ROSTER = [
   'module-blueprint.schema.json',
   'mutation-assurance-policy-v2.schema.json',
   'mutation-assurance-v2.schema.json',
+  'mutation-evidence-policy-v2.schema.json',
+  'mutation-report-set-v2.schema.json',
   'mutation-intent.schema.json',
   'mutation-scenario.schema.json',
   'phase-closure.schema.json',
