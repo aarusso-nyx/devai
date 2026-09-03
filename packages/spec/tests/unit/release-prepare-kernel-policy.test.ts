@@ -84,7 +84,7 @@ describe('release prepare v3 policy', () => {
     );
     expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v3');
     expect(kernel.pack.pack_spec_digest_sha256).toBe(
-      '7337bde13c87c3b1add64cc8e7d849311874272788fe4813c1b3f14d9e1ea2ec',
+      'd287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd',
     );
     expect(createHash('sha256').update(kernel.pack.pack_spec_canonical_bytes).digest('hex')).toBe(
       kernel.pack.pack_spec_digest_sha256,
@@ -97,10 +97,10 @@ describe('release prepare v3 policy', () => {
       'BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
-      'creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-reviews-snippets-builds=absent',
+      'creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
-      'package.packageVerificationCode.value=SHA1-of-utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value',
+      'package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value))',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
       'file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256]',
