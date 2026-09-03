@@ -32,9 +32,16 @@ export type {
   MutationV2SemanticError,
   MutationV2Verification,
 } from '../mutation-assurance-v2.js';
-export { buildTaskPlan, readTaskDescriptor, selectorMatches } from './policy.js';
+export {
+  buildTaskPlan,
+  parseTaskDescriptor,
+  readTaskDescriptor,
+  selectorMatches,
+} from './policy.js';
 export { canonicalBytes, canonicalize, sha256Hex } from './canonical.js';
 export {
+  bindReleaseTaskProcessOptions,
+  bindReleaseToolProcessOptions,
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
   matchDeclaredReleaseTaskProcess,

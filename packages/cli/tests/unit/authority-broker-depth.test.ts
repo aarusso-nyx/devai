@@ -1,5 +1,6 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -9,6 +10,14 @@ import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
+import {
+  bindReleaseTaskProcessOptions,
+  bindReleaseToolProcessOptions,
+  matchDeclaredReleaseTaskProcess,
+  readTaskDescriptor,
+  sha256Hex,
+} from '../../src/services/check-runner/index.js';
+import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const originalArgv = [...process.argv];
@@ -113,6 +122,12 @@ function effect(
   return { kind, symbol, arguments: args };
 }
 
+function git(root: string, args: readonly string[]): string {
+  const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(String(result.stderr));
+  return String(result.stdout).trim();
+}
+
 describe('authority broker production boundary depth', () => {
   it('admits only exact declared check tasks for stock release preflight execution', () => {
     const host = broker('release preflight', 'inspector', [
@@ -126,14 +141,40 @@ describe('authority broker production boundary depth', () => {
       'inspector',
       '--write',
     ]);
+    const descriptor = readTaskDescriptor(join(ROOT, 'test-tasks.json'));
+    const task = descriptor.tasks.find(
+      (candidate) =>
+        JSON.stringify(candidate.argv) === JSON.stringify(['pnpm', 'run', 'devai:prepare']),
+    );
+    if (task === undefined) throw new Error('devai:prepare task fixture missing');
+    const identity = resolveTaskExecutable(ROOT, 'pnpm');
+    const candidate = {
+      commit: git(ROOT, ['rev-parse', 'HEAD']),
+      tree: git(ROOT, ['rev-parse', 'HEAD^{tree}']),
+    };
+    const options = bindReleaseTaskProcessOptions(
+      { cwd: realpathSync(ROOT), shell: false },
+      {
+        candidate,
+        descriptor_digest: sha256Hex(descriptor),
+        task_policy_digest: 'a'.repeat(64),
+        node_id: task.nodeId,
+        executable: identity,
+        argv: task.argv,
+        cwd: task.cwd,
+      },
+    );
     try {
       expect(
+        matchDeclaredReleaseTaskProcess(ROOT, {
+          kind: 'process',
+          symbol: 'spawnSync',
+          arguments: [identity.path, ['run', 'devai:prepare'], options],
+        }),
+      ).toMatchObject({ nodeId: task.nodeId });
+      expect(
         host.scope.apply_effect(
-          effect(
-            'spawnSync',
-            ['pnpm', ['run', 'devai:prepare'], { cwd: ROOT, shell: false }],
-            'process',
-          ),
+          effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
           () => 'applied',
         ),
       ).toBe('applied');
@@ -181,17 +222,40 @@ describe('authority broker production boundary depth', () => {
       '--pack-destination',
       join(ROOT, '.devai/state'),
     ];
+    const npm = resolveTaskExecutable(ROOT, 'npm');
+    const packCwd = realpathSync(join(ROOT, 'packages/cli'));
+    const packOutput = realpathSync(join(ROOT, '.devai/state'));
+    const candidate = {
+      commit: git(ROOT, ['rev-parse', 'HEAD']),
+      tree: git(ROOT, ['rev-parse', 'HEAD^{tree}']),
+    };
+    const options = bindReleaseToolProcessOptions(
+      { cwd: packCwd, shell: false },
+      { candidate, tool: 'npm', executable: npm, cwd: packCwd, output: packOutput },
+    );
     try {
       expect(
         host.scope.apply_effect(
-          effect(
-            'spawnSync',
-            ['npm', exact, { cwd: join(ROOT, 'packages/cli'), shell: false }],
-            'process',
-          ),
+          effect('spawnSync', [npm.path, exact, options], 'process'),
           () => 'applied',
         ),
       ).toBe('applied');
+      const forgedIdentityOptions = bindReleaseToolProcessOptions(
+        { cwd: packCwd, shell: false },
+        {
+          candidate,
+          tool: 'npm',
+          executable: { ...npm, sha256: '0'.repeat(64) },
+          cwd: packCwd,
+          output: packOutput,
+        },
+      );
+      expect(() =>
+        host.scope.apply_effect(
+          effect('spawnSync', [npm.path, exact, forgedIdentityOptions], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
       expect(() =>
         host.scope.apply_effect(
           effect(

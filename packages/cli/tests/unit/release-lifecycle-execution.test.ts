@@ -679,6 +679,76 @@ describe('release lifecycle execution kernel', () => {
     ]);
   });
 
+  it('commits prepared artifacts only after semantic validation and rolls them back on store failure', async () => {
+    const value = request();
+    const invalidStore = new ReleaseLifecycleFileStore(root(), value);
+    const invalidCommit = vi.fn();
+    const invalidRollback = vi.fn();
+    const invalidDispose = vi.fn();
+    const invalid = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release preflight',
+        authority: authorityFor('release preflight'),
+        store: invalidStore,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: () => ({
+          outcome: 'success',
+          material: { ...material(), release_units: [] },
+          transaction: {
+            commit: invalidCommit,
+            rollback: invalidRollback,
+            dispose: invalidDispose,
+          },
+        }),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(invalid).toMatchObject({ ok: false, phase: 'validation' });
+    expect(invalidCommit).not.toHaveBeenCalled();
+    expect(invalidRollback).toHaveBeenCalledOnce();
+    expect(invalidDispose).toHaveBeenCalledOnce();
+
+    const failingStore = new ReleaseLifecycleFileStore(root(), value);
+    vi.spyOn(failingStore, 'appendStateAndAdvanceHead').mockImplementation(() => {
+      throw new Error('synthetic-append-failure');
+    });
+    const order: string[] = [];
+    const failed = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release preflight',
+        authority: authorityFor('release preflight'),
+        store: failingStore,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: () => ({
+          outcome: 'success',
+          material: material(),
+          transaction: {
+            commit: () => {
+              order.push('commit');
+            },
+            rollback: () => {
+              order.push('rollback');
+            },
+            dispose: () => {
+              order.push('dispose');
+            },
+          },
+        }),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(failed).toMatchObject({
+      ok: false,
+      phase: 'append',
+      code: 'synthetic-append-failure',
+    });
+    expect(order).toEqual(['commit', 'rollback', 'dispose']);
+  });
+
   it('refuses invalid authorization before provider availability or invocation', async () => {
     const initial = request('release evidence-publish');
     const store = new ReleaseLifecycleFileStore(root(), initial);

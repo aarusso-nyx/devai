@@ -324,3 +324,92 @@ export function readGitObjectSync(repoRoot: string, revision: string, path: stri
   }
   return result.stdout;
 }
+
+export interface ReadOnlyGitTreeEntry {
+  readonly path: string;
+  readonly mode: '100644' | '100755' | '120000';
+  readonly object_id: string;
+  readonly bytes: Buffer;
+}
+
+function validGitObject(value: string): boolean {
+  return /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value);
+}
+
+function validGitPath(path: string): boolean {
+  return (
+    path.length > 0 &&
+    !path.startsWith('/') &&
+    !path.includes('\\') &&
+    !/[\u0000-\u001f\u007f]/u.test(path) &&
+    !path.split('/').some((part) => part === '' || part === '.' || part === '..')
+  );
+}
+
+function rawGitRead(repoRoot: string, args: readonly string[]): Buffer {
+  const result = Reflect.apply(nodeSpawnSync, undefined, [
+    'git',
+    [...args],
+    {
+      cwd: repoRoot,
+      encoding: null,
+      maxBuffer: 256 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    },
+  ]) as ReturnType<typeof nodeSpawnSync>;
+  if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+    throw new Error('GIT_TREE_READ_FAILED');
+  }
+  return result.stdout;
+}
+
+/**
+ * Read a regular-file/symlink projection from one exact immutable Git tree.
+ * The caller must still decide which Git modes are safe to materialize.
+ */
+export function readExactGitTreeSync(
+  repoRoot: string,
+  commit: string,
+  expectedTree: string,
+  prefix: string,
+): readonly ReadOnlyGitTreeEntry[] {
+  if (!validGitObject(commit) || !validGitObject(expectedTree)) {
+    throw new Error('GIT_TREE_IDENTITY_INVALID');
+  }
+  if (prefix !== '.' && !validGitPath(prefix)) throw new Error('GIT_OBJECT_PATH_INVALID');
+  const observedCommit = rawGitRead(repoRoot, ['rev-parse', '--verify', `${commit}^{commit}`])
+    .toString('utf8')
+    .trim();
+  if (observedCommit !== commit) throw new Error('GIT_COMMIT_IDENTITY_MISMATCH');
+  const observedTree = rawGitRead(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`])
+    .toString('utf8')
+    .trim();
+  if (observedTree !== expectedTree) throw new Error('GIT_TREE_IDENTITY_MISMATCH');
+  const listing = rawGitRead(repoRoot, [
+    'ls-tree',
+    '-r',
+    '-z',
+    '--full-tree',
+    commit,
+    '--',
+    prefix,
+  ]).toString('utf8');
+  const entries: ReadOnlyGitTreeEntry[] = [];
+  for (const line of listing.split('\0')) {
+    if (line.length === 0) continue;
+    const match = /^(100644|100755|120000) blob ([0-9a-f]{40,64})\t(.+)$/u.exec(line);
+    if (match?.[1] === undefined || match[2] === undefined || match[3] === undefined) {
+      throw new Error('GIT_TREE_ENTRY_UNSUPPORTED');
+    }
+    if (!validGitPath(match[3])) throw new Error('GIT_OBJECT_PATH_INVALID');
+    entries.push({
+      path: match[3],
+      mode: match[1] as ReadOnlyGitTreeEntry['mode'],
+      object_id: match[2],
+      bytes: rawGitRead(repoRoot, ['cat-file', 'blob', match[2]]),
+    });
+  }
+  if (entries.length === 0) throw new Error('GIT_TREE_PROJECTION_EMPTY');
+  return entries.sort((left, right) => left.path.localeCompare(right.path, 'en'));
+}

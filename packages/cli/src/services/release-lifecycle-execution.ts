@@ -241,6 +241,11 @@ export interface ReleaseProviderResult {
   readonly provider_handle?: string;
   readonly material?: ReleaseStateMaterial;
   readonly code?: string;
+  readonly transaction?: {
+    readonly commit: () => void | Promise<void>;
+    readonly rollback: () => void | Promise<void>;
+    readonly dispose: () => void | Promise<void>;
+  };
 }
 
 export type ReleaseProvider = (
@@ -2169,6 +2174,13 @@ export async function executeReleaseLifecycleAction(input: {
           : { outcome: 'failure', code: 'release-provider-failed' };
       }
       if (result.outcome !== 'success') {
+        if (!remote && result.transaction !== undefined) {
+          try {
+            await result.transaction.rollback();
+          } finally {
+            await result.transaction.dispose();
+          }
+        }
         const unsafeRemoteFailure =
           remote &&
           result.outcome === 'failure' &&
@@ -2216,7 +2228,32 @@ export async function executeReleaseLifecycleAction(input: {
           record: unknown,
         };
       }
+      if (remote && result.transaction !== undefined) {
+        const unknown = buildStoreRecord(
+          request,
+          attempt,
+          head,
+          attemptId,
+          'unknown-provider-result',
+          authorizationEventId,
+          { outcome: 'unknown', code: 'release-provider-result-unknown' },
+        );
+        input.store.appendStoreRecord(unknown);
+        return {
+          ok: false,
+          phase: 'ambiguous',
+          code: 'release-adapter-output-invalid',
+          record: unknown,
+        };
+      }
       if (result.material === undefined) {
+        if (!remote && result.transaction !== undefined) {
+          try {
+            await result.transaction.rollback();
+          } finally {
+            await result.transaction.dispose();
+          }
+        }
         const terminal = buildStoreRecord(
           request,
           attempt,
@@ -2238,6 +2275,7 @@ export async function executeReleaseLifecycleAction(input: {
       }
 
       let state: ReleaseLifecycleStateV2;
+      let completion: StoreRecord;
       try {
         state = buildState(
           request,
@@ -2248,7 +2286,22 @@ export async function executeReleaseLifecycleAction(input: {
           input.publication_controls,
           input.recorded_at,
         );
+        completion = buildStoreRecord(
+          request,
+          attempt,
+          head,
+          attemptId,
+          'completion',
+          authorizationEventId,
+          result,
+          state,
+        );
       } catch (error) {
+        try {
+          await result.transaction?.rollback();
+        } finally {
+          await result.transaction?.dispose();
+        }
         const terminal = buildStoreRecord(
           request,
           attempt,
@@ -2272,20 +2325,44 @@ export async function executeReleaseLifecycleAction(input: {
           record: terminal,
         };
       }
-      const completion = buildStoreRecord(
-        request,
-        attempt,
-        head,
-        attemptId,
-        'completion',
-        authorizationEventId,
-        result,
-        state,
-      );
+      try {
+        await result.transaction?.commit();
+      } catch {
+        try {
+          await result.transaction?.rollback();
+        } finally {
+          await result.transaction?.dispose();
+        }
+        const failure = buildStoreRecord(
+          request,
+          attempt,
+          head,
+          attemptId,
+          'failure',
+          authorizationEventId,
+          {
+            outcome: 'failure',
+            dispatch_status: 'failed-before-dispatch',
+            code: 'release-provider-commit-failed',
+          },
+        );
+        input.store.appendStoreRecord(failure);
+        return {
+          ok: false,
+          phase: 'provider',
+          code: 'release-provider-commit-failed',
+          record: failure,
+        };
+      }
       try {
         input.store.appendStoreRecord(completion);
         input.store.appendStateAndAdvanceHead(state, completion, head);
       } catch (error) {
+        try {
+          await result.transaction?.rollback();
+        } finally {
+          await result.transaction?.dispose();
+        }
         return {
           ok: false,
           phase: 'append',
@@ -2293,6 +2370,7 @@ export async function executeReleaseLifecycleAction(input: {
           record: completion,
         };
       }
+      await result.transaction?.dispose();
       return { ok: true, state, completion };
     });
   } catch (error) {

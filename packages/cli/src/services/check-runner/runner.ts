@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { getValidator } from '@devai-nyx/schemas';
@@ -15,11 +15,14 @@ import {
 } from '../release-preflight.js';
 import { CheckCache } from './cache.js';
 import { sha256Hex } from './canonical.js';
+import { bindReleaseTaskProcessOptions } from './authority-process.js';
 import {
   buildTaskPlan,
   currentRepositoryState,
+  exactCandidateRepositoryState,
   exactCommitFile,
   exactCommitTree,
+  parseTaskDescriptor,
   readTaskDescriptor,
 } from './policy.js';
 import type {
@@ -35,6 +38,14 @@ import type {
 } from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 15 * 60_000;
+
+function descriptorFor(options: CheckRunnerOptions) {
+  return options.descriptorDocument === undefined
+    ? readTaskDescriptor(
+        resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
+      )
+    : parseTaskDescriptor(options.descriptorDocument);
+}
 
 function commandVersion(command: string, args: readonly string[], cwd: string): string {
   const result = spawnSync(command, [...args], { cwd, encoding: 'utf8', timeout: 10_000 });
@@ -86,6 +97,7 @@ function defaultExecute(
   cwd: string,
   timeoutMs: number,
   environment: Readonly<Record<string, string>>,
+  releaseBinding?: Parameters<typeof bindReleaseTaskProcessOptions>[1],
 ): TaskExecutionResult {
   const executionEnvironment: NodeJS.ProcessEnv = {
     ...(process.env.PATH !== undefined && { PATH: process.env.PATH }),
@@ -95,14 +107,21 @@ function defaultExecute(
     NO_COLOR: '1',
     ...environment,
   };
-  const result = spawnSync(argv[0] ?? '', argv.slice(1), {
+  const spawnOptions = {
     cwd,
     encoding: 'utf8',
     timeout: timeoutMs,
     maxBuffer: 64 * 1024 * 1024,
     env: executionEnvironment,
     shell: false,
-  });
+  } as const;
+  const result = spawnSync(
+    argv[0] ?? '',
+    argv.slice(1),
+    releaseBinding === undefined
+      ? spawnOptions
+      : bindReleaseTaskProcessOptions({ ...spawnOptions }, releaseBinding),
+  );
   return {
     status: result.status,
     signal: result.signal,
@@ -155,16 +174,14 @@ function planWithCache(
   toolchain: Readonly<Record<string, string>>,
   environment: Readonly<Record<string, string>>,
 ) {
-  const descriptorPath = resolve(
-    options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json'),
-  );
-  const descriptor = readTaskDescriptor(descriptorPath);
+  const descriptor = descriptorFor(options);
   const reusableDigests = new Map<string, string>();
   return buildTaskPlan({
     repoRoot: options.repoRoot,
     descriptor,
     target: options.target,
     ...(options.baseCommit !== undefined && { baseCommit: options.baseCommit }),
+    ...(options.releaseCandidate !== undefined && { releaseCandidate: options.releaseCandidate }),
     ...(options.releaseRequiredNodes !== undefined && {
       releaseRequiredNodes: options.releaseRequiredNodes,
     }),
@@ -204,9 +221,7 @@ function requiredTaskNodes(
   options: CheckRunnerOptions,
   releaseScope: 'selected' | 'complete' = 'complete',
 ): readonly TaskDescriptorNode[] {
-  const descriptor = readTaskDescriptor(
-    resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-  );
+  const descriptor = descriptorFor(options);
   if (options.target === 'affected') {
     const profile = descriptor.profiles.find((entry) => entry.profileId === 'affected');
     const eligible = new Set(profile?.eligibleNodes ?? []);
@@ -307,9 +322,9 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   if (intent.release_unit !== profile.release_unit) {
     throw new Error('CHECK_RELEASE_UNIT_MISMATCH');
   }
-  const candidate = currentRepositoryState(input.repoRoot);
-  if (intent.candidate.commit !== candidate.commit || intent.candidate.tree !== candidate.tree) {
-    throw new Error('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
+  const candidate = exactCandidateRepositoryState(input.repoRoot, intent.candidate);
+  if (!candidate.clean) {
+    throw new Error('CHECK_RELEASE_CANDIDATE_WORKTREE_MISMATCH');
   }
   if (input.baseCommit === undefined || intent.base.commit !== input.baseCommit) {
     throw new Error('CHECK_RELEASE_INTENT_BASE_MISMATCH');
@@ -357,9 +372,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   if (decision.verdict !== 'ready') {
     throw new Error(`CHECK_RELEASE_INTENT_BLOCKED:${decision.blockingReasons.join(',')}`);
   }
-  const descriptor = readTaskDescriptor(
-    resolve(input.descriptorPath ?? join(input.repoRoot, 'test-tasks.json')),
-  );
+  const descriptor = descriptorFor(input);
   const allRoots = resolveReleaseTaskNodes(
     decision,
     profile.capability_tasks,
@@ -405,6 +418,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
       ...input,
       target: 'release',
       releaseStage: stage,
+      releaseCandidate: intent.candidate,
       releaseRequiredNodes: stage === 'preflight' ? preflightRoots : selectedRoots,
       releaseAllNodes: selectedRoots,
       releaseTaskBindings: stage === 'preflight' ? {} : mutationTaskBindings,
@@ -485,9 +499,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     if (options.preflightReceipt === undefined || releaseBinding === undefined) {
       throw new Error('CHECK_RELEASE_PREFLIGHT_REQUIRED');
     }
-    const knownNodes = readTaskDescriptor(
-      resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-    ).tasks.map((task) => task.nodeId);
+    const knownNodes = descriptorFor(options).tasks.map((task) => task.nodeId);
     const preflightPlan = planWithCache(
       {
         ...options,
@@ -522,17 +534,18 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     return { schemaVersion: '1.0.0', operation: options.operation, plan, exitCode: 0 };
   }
 
-  const execute = options.executeTask ?? defaultExecute;
-  const descriptor = readTaskDescriptor(
-    resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-  );
+  const descriptor = descriptorFor(options);
   const descriptorById = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new Error('CHECK_RUNNER_TIMEOUT: timeout must be a positive integer');
   }
   const now = options.now ?? (() => new Date().toISOString());
-  const initialState = currentRepositoryState(options.repoRoot);
+  const repositoryState = (): Readonly<{ commit: string; tree: string; clean: boolean }> =>
+    options.target === 'release' && options.releaseCandidate !== undefined
+      ? exactCandidateRepositoryState(options.repoRoot, options.releaseCandidate)
+      : currentRepositoryState(options.repoRoot);
+  const initialState = repositoryState();
   const resultDigests = new Map<string, string>();
   const execution: ExecutedTask[] = [];
 
@@ -578,12 +591,31 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     if (descriptorTask === undefined) {
       throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
     }
-    const result = execute(
-      options.executeTask === undefined ? [task.executable.path, ...task.argv.slice(1)] : task.argv,
-      resolve(options.repoRoot, task.cwd),
-      timeoutMs,
-      taskEnvironment(descriptorTask, environment),
-    );
+    const taskCwd = realpathSync(resolve(options.repoRoot, task.cwd));
+    const taskEnv = taskEnvironment(descriptorTask, environment);
+    const result =
+      options.executeTask === undefined
+        ? defaultExecute(
+            [task.executable.path, ...task.argv.slice(1)],
+            taskCwd,
+            timeoutMs,
+            taskEnv,
+            options.target === 'release'
+              ? {
+                  candidate: {
+                    commit: plan.repository.commit,
+                    tree: plan.repository.tree,
+                  },
+                  descriptor_digest: plan.descriptorDigest,
+                  task_policy_digest: plan.taskPolicyDigest,
+                  node_id: task.nodeId,
+                  executable: task.executable,
+                  argv: task.argv,
+                  cwd: task.cwd,
+                }
+              : undefined,
+          )
+        : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv);
     const durationMs = Math.max(0, Date.now() - started);
     const finishedAt = now();
     const outcome = executionOutcome(result);
@@ -663,7 +695,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
   let preflightReceipt: CheckRunnerReport['preflightReceipt'];
   let receiptRefusal: string | undefined;
   const allPass = execution.every((task) => task.outcome === 'PASS');
-  const finalState = currentRepositoryState(options.repoRoot);
+  const finalState = repositoryState();
   if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
   else if (!plan.clean || !initialState.clean) receiptRefusal = 'dirty-start';
   else if (!allPass) receiptRefusal = 'task-population-not-pass';
@@ -747,9 +779,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     ...(receipt !== undefined && { receipt }),
     ...(preflightReceipt !== undefined && { preflightReceipt }),
     ...(options.target === 'release' && {
-      releaseVerification: readTaskDescriptor(
-        resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-      ).tasks.map((task) => {
+      releaseVerification: descriptorFor(options).tasks.map((task) => {
         const result = execution.find((entry) => entry.nodeId === task.nodeId);
         if (result === undefined) {
           return {

@@ -45,6 +45,12 @@ export interface TaskPolicy {
   readonly schemaVersion: '1.1.0';
   readonly repositoryId: string;
   readonly requiredNodes: readonly TaskPolicyNode[];
+  readonly inputProjection?: Readonly<{
+    schemaVersion: '1.0.0';
+    source: 'exact-candidate-tree';
+    excludedPrefixes: readonly string[];
+    digest: string;
+  }>;
 }
 
 export interface PlannedTask extends TaskPolicyNode {
@@ -152,6 +158,8 @@ export interface CheckRunnerOptions {
   readonly baseCommit?: string;
   readonly timeoutMs?: number;
   readonly descriptorPath?: string;
+  readonly descriptorDocument?: TaskDescriptor;
+  readonly releaseCandidate?: Readonly<{ commit: string; tree: string }>;
   readonly cacheRoot?: string;
   readonly toolchain?: Readonly<Record<string, string>>;
   readonly environment?: Readonly<Record<string, string>>;

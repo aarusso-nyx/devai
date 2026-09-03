@@ -1,10 +1,17 @@
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   cpSync,
+  existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,6 +26,7 @@ import {
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release-lifecycle-local-adapters.js';
 
 const { runChecks, declaredRole } = vi.hoisted(() => ({
   runChecks: vi.fn(),
@@ -71,6 +79,12 @@ function json(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 
+function git(root: string, args: readonly string[]): string {
+  const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(String(result.stderr));
+  return String(result.stdout).trim();
+}
+
 async function withLocalMutationScope<T>(callback: () => Promise<T>): Promise<T> {
   let ordinal = 0;
   const issuer = createAuthorityDecisionIssuer({
@@ -109,11 +123,56 @@ describe('release lifecycle command adapter composition', () => {
     ]) {
       cpSync(join(process.cwd(), 'law/policy', name), join(root, 'law/policy', name));
     }
-    const commit = '5'.repeat(40);
-    const tree = '6'.repeat(40);
-    const manifestBytes = `${canonicalJson({ name: '@aarusso-nyx/devai', version: '1.5.0' })}\n`;
+    const manifestBytes = `${canonicalJson({
+      name: '@aarusso-nyx/devai',
+      version: '1.5.0',
+      bin: { 'mode-fixture': 'bin/mode-fixture.mjs' },
+    })}\n`;
     mkdirSync(join(root, 'packages/cli'), { recursive: true });
     writeFileSync(join(root, 'packages/cli/package.json'), manifestBytes);
+    mkdirSync(join(root, 'packages/cli/bin'), { recursive: true });
+    writeFileSync(join(root, 'packages/cli/bin/mode-fixture.mjs'), '#!/usr/bin/env node\n');
+    chmodSync(join(root, 'packages/cli/bin/mode-fixture.mjs'), 0o755);
+    writeFileSync(
+      join(root, 'test-tasks.json'),
+      `${canonicalJson({
+        schemaVersion: '1.0.0',
+        descriptorVersion: 'release-test-v1',
+        repositoryId: 'aarusso-nyx/devai',
+        fallbackNodeId: 'format',
+        dynamicFallbackSelectors: [],
+        tasks: [
+          {
+            nodeId: 'format',
+            dependencies: [],
+            argv: ['node', '-e', 'process.exit(0)'],
+            cwd: '.',
+            runner: 'node-v1',
+            inputSelectors: [{ kind: 'glob', pattern: '**' }],
+            toolchainKeys: ['node'],
+            allowlistedEnv: [],
+            outputContract: { kind: 'test', requiredResult: 'pass' },
+          },
+        ],
+        profiles: [
+          {
+            profileId: 'affected',
+            mode: 'affected',
+            requiredNodes: ['format'],
+            eligibleNodes: ['format'],
+          },
+          { profileId: 'rc', mode: 'fixed', requiredNodes: ['format'] },
+        ],
+      })}\n`,
+    );
+    git(root, ['init', '-q']);
+    git(root, ['config', 'user.name', 'Release Test']);
+    git(root, ['config', 'user.email', 'release@example.invalid']);
+    git(root, ['add', '.']);
+    git(root, ['commit', '-qm', 'candidate']);
+    const commit = git(root, ['rev-parse', 'HEAD']);
+    const tree = git(root, ['rev-parse', 'HEAD^{tree}']);
+    mkdirSync(join(root, '.devai/state'), { recursive: true });
     const intent = {
       schemaVersion: '1.0.0',
       release_unit: '@aarusso-nyx/devai',
@@ -230,7 +289,11 @@ describe('release lifecycle command adapter composition', () => {
     runChecks.mockReturnValue({
       schemaVersion: '1.0.0',
       operation: 'run',
-      plan: {},
+      plan: {
+        descriptorDigest: canonicalSha256(json(join(root, 'test-tasks.json'))),
+        taskPolicyDigest: 'a'.repeat(64),
+        toolchainDigest: 'b'.repeat(64),
+      },
       execution: [
         {
           nodeId: 'format',
@@ -287,7 +350,11 @@ describe('release lifecycle command adapter composition', () => {
       .mockReturnValueOnce({
         schemaVersion: '1.0.0',
         operation: 'run',
-        plan: {},
+        plan: {
+          descriptorDigest: canonicalSha256(json(join(root, 'test-tasks.json'))),
+          taskPolicyDigest: 'c'.repeat(64),
+          toolchainDigest: 'd'.repeat(64),
+        },
         execution: [
           {
             nodeId: 'format',
@@ -308,7 +375,11 @@ describe('release lifecycle command adapter composition', () => {
       .mockReturnValueOnce({
         schemaVersion: '1.0.0',
         operation: 'run',
-        plan: {},
+        plan: {
+          descriptorDigest: canonicalSha256(json(join(root, 'test-tasks.json'))),
+          taskPolicyDigest: 'e'.repeat(64),
+          toolchainDigest: 'f'.repeat(64),
+        },
         execution: [
           {
             nodeId: 'test',
@@ -348,6 +419,15 @@ describe('release lifecycle command adapter composition', () => {
         },
       })}\n`,
     );
+    writeFileSync(
+      join(root, 'packages/cli/package.json'),
+      `${canonicalJson({
+        name: '@aarusso-nyx/devai',
+        version: '1.5.0',
+        private_live_mutation: true,
+      })}\n`,
+    );
+    chmodSync(join(root, 'packages/cli/bin/mode-fixture.mjs'), 0o644);
     declaredRole.value = 'architect';
     output.mockClear();
     await withLocalMutationScope(() =>
@@ -363,6 +443,80 @@ describe('release lifecycle command adapter composition', () => {
     expect(
       readFileSync(join(root, '.devai/state/release-staging/aarusso-nyx-devai-1.5.0.cdx.json')),
     ).toBeInstanceOf(Buffer);
+    const tarballPath = join(root, '.devai/state/release-staging/aarusso-nyx-devai-1.5.0.tgz');
+    const packedManifest = spawnSync('tar', ['-xOf', tarballPath, 'package/package.json'], {
+      encoding: 'utf8',
+    });
+    expect(packedManifest.status).toBe(0);
+    expect(packedManifest.stdout).toBe(manifestBytes);
+    const packedModes = spawnSync('tar', ['-tvzf', tarballPath], { encoding: 'utf8' });
+    expect(packedModes.status).toBe(0);
+    expect(packedModes.stdout).toMatch(/^-rwxr-xr-x .* package\/bin\/mode-fixture\.mjs$/mu);
+    expect(
+      readdirSync(join(root, '.devai/state')).filter((name) =>
+        name.startsWith('.devai-release-prepare-'),
+      ),
+    ).toEqual([]);
+
+    symlinkSync('state', join(root, '.devai/linked-state'));
+    const directPrepare = builtInReleaseLifecycleLocalProvider(
+      {
+        repo_root: root,
+        resolve_receipt: () => receipt,
+        resolve_plan_input: (input) => json(join(root, String(input['path']))),
+        read_contained_bytes: (path) => readFileSync(join(root, path)),
+      },
+      'release prepare',
+    );
+    if (directPrepare === undefined) throw new Error('stock prepare adapter missing');
+    const unsafePreparation = await directPrepare({
+      ...request,
+      action_id: 'release prepare',
+      destination: { kind: 'local-staging', exact_identifier: '.devai/linked-state/escape' },
+    });
+    expect(unsafePreparation).toMatchObject({
+      outcome: 'failure',
+      code: 'release-destination-path-unsafe',
+    });
+    expect(readdirSync(join(root, '.devai/state'))).not.toContain('escape');
+
+    const adversarial = await withLocalMutationScope(async () =>
+      directPrepare({
+        ...request,
+        action_id: 'release prepare',
+        destination: {
+          kind: 'local-staging',
+          exact_identifier: '.devai/state/adversarial-release',
+        },
+      }),
+    );
+    expect(adversarial).toMatchObject({ outcome: 'success' });
+    if (adversarial.outcome !== 'success' || adversarial.transaction === undefined) {
+      throw new Error('adversarial prepare transaction missing');
+    }
+    const stageName = readdirSync(join(root, '.devai/state')).find((name) =>
+      name.startsWith('.devai-release-prepare-'),
+    );
+    if (stageName === undefined) throw new Error('private prepare stage missing');
+    const stagedTarball = join(
+      root,
+      '.devai/state',
+      stageName,
+      'publish/aarusso-nyx-devai-1.5.0.tgz',
+    );
+    const hostileLink = join(root, '.devai/state/hostile-hardlink.tgz');
+    linkSync(stagedTarball, hostileLink);
+    await expect(
+      withLocalMutationScope(async () => adversarial.transaction?.commit()),
+    ).rejects.toThrow('release-staging-file-identity-invalid');
+    await withLocalMutationScope(async () => adversarial.transaction?.dispose());
+    unlinkSync(hostileLink);
+    expect(existsSync(join(root, '.devai/state/adversarial-release'))).toBe(false);
+    expect(
+      readdirSync(join(root, '.devai/state')).filter((name) =>
+        name.startsWith('.devai-release-prepare-'),
+      ),
+    ).toEqual([]);
     declaredRole.value = 'inspector';
 
     output.mockClear();
@@ -399,4 +553,3 @@ describe('release lifecycle command adapter composition', () => {
     );
   });
 });
-import { createHash } from 'node:crypto';

@@ -22,6 +22,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { invocationIsNonMutating } from '../../src/command-router.js';
 import {
   buildTaskPlan,
+  bindReleaseTaskProcessOptions,
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
   matchDeclaredReleaseTaskProcess,
@@ -31,6 +32,7 @@ import {
   type CheckRunnerOptions,
   type TaskExecutionResult,
 } from '../../src/services/check-runner/index.js';
+import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
 
 const roots: string[] = [];
 const TOOLCHAIN = { node: 'v-test' } as const;
@@ -1095,6 +1097,12 @@ describe('content-addressed check runner', () => {
       releaseProfile: releaseProfile(),
     });
     expect(preflight.plan.releaseIntentDigest).toBe(sha256Hex(releaseIntent));
+    expect(preflight.plan.taskPolicy.inputProjection).toMatchObject({
+      schemaVersion: '1.0.0',
+      source: 'exact-candidate-tree',
+      excludedPrefixes: ['.devai/state/', 'record/', 'scratch/'],
+      digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    });
     expect(preflight.preflightReceipt?.value.verdict).toBe('pass');
     expect(preflight.receipt).toBeUndefined();
     expect(preflight.releaseVerification).toContainEqual({
@@ -1116,6 +1124,54 @@ describe('content-addressed check runner', () => {
       transition: 'patch',
     });
     expect(report.releaseVerification?.every((entry) => entry.status !== 'unknown')).toBe(true);
+  });
+
+  it('uses the exact release candidate without resolving HEAD and refuses tracked mutation', () => {
+    const state = repository();
+    const candidateCommit = commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const releaseIntent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.1',
+      support: 'current',
+      changed_paths: ['package.json', 'src/app.ts'],
+      changed_packages: [],
+      candidate: {
+        commit: candidateCommit,
+        tree: git(state.root, ['show', '-s', '--format=%T', candidateCommit]),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    git(state.root, ['symbolic-ref', 'HEAD', 'refs/heads/intentionally-missing']);
+    const detachedFromHead = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+    });
+    expect(detachedFromHead.preflightReceipt?.value.verdict).toBe('pass');
+    rmSync(join(state.root, '.devai/state'), { recursive: true, force: true });
+
+    let mutated = false;
+    const refused = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+      executeTask: () => {
+        if (!mutated) {
+          file(state.root, 'src/app.ts', 'export const value = 999;\n');
+          mutated = true;
+        }
+        return PASS;
+      },
+    });
+    expect(refused.preflightReceipt).toBeUndefined();
+    expect(refused.receiptRefusal).toBe('repository-changed-during-run');
   });
 
   it('refuses certification without the exact cheap-preflight receipt', () => {
@@ -1313,6 +1369,35 @@ describe('content-addressed check runner', () => {
       arguments: [executable, argv, { cwd, ...(shell !== undefined && { shell }) }],
     });
     const invocation = ['node', 'devai', 'check', '--local', '--run', '--write'];
+    const immutableDescriptor = readTaskDescriptor(join(state.root, 'test-tasks.json'));
+    const candidate = {
+      commit: git(state.root, ['rev-parse', 'HEAD']),
+      tree: git(state.root, ['rev-parse', 'HEAD^{tree}']),
+    };
+    const releaseRequest = (
+      argv: readonly string[],
+      shell = false,
+      identity = resolveTaskExecutable(state.root, 'node'),
+    ): AuthorityHostEffectRequest => ({
+      kind: 'process',
+      symbol: 'spawnSync',
+      arguments: [
+        identity.path,
+        argv.slice(1),
+        bindReleaseTaskProcessOptions(
+          { cwd: realpathSync(state.root), shell },
+          {
+            candidate,
+            descriptor_digest: sha256Hex(immutableDescriptor),
+            task_policy_digest: 'a'.repeat(64),
+            node_id: 'test:local-full',
+            executable: identity,
+            argv,
+            cwd: '.',
+          },
+        ),
+      ],
+    });
     expect(
       matchDeclaredCheckTaskProcess(
         state.root,
@@ -1328,32 +1413,29 @@ describe('content-addressed check runner', () => {
     expect(
       matchDeclaredReleaseTaskProcess(
         state.root,
-        request(
+        releaseRequest([
           'node',
-          ['-e', "process.stdout.write('local test dependency closure complete\\n')"],
-          state.root,
-          false,
-        ),
+          '-e',
+          "process.stdout.write('local test dependency closure complete\\n')",
+        ]),
       ),
     ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
     expect(
       matchDeclaredReleaseTaskProcess(
         state.root,
-        request(
+        releaseRequest([
           'node',
-          ['-e', "process.stdout.write('local test dependency closure complete\\n')", '--extra'],
-          state.root,
-          false,
-        ),
+          '-e',
+          "process.stdout.write('local test dependency closure complete\\n')",
+          '--extra',
+        ]),
       ),
     ).toBeUndefined();
     expect(
       matchDeclaredReleaseTaskProcess(
         state.root,
-        request(
-          'node',
-          ['-e', "process.stdout.write('local test dependency closure complete\\n')"],
-          state.root,
+        releaseRequest(
+          ['node', '-e', "process.stdout.write('local test dependency closure complete\\n')"],
           true,
         ),
       ),
@@ -1385,6 +1467,26 @@ describe('content-addressed check runner', () => {
     const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
       tasks: Array<Record<string, unknown>>;
     };
+    const mutableReleaseTask = declared.tasks.find((task) => task['nodeId'] === 'test:local-full');
+    if (mutableReleaseTask === undefined) throw new Error('release task fixture missing');
+    mutableReleaseTask['argv'] = ['node', '-e', 'process.stdout.write("mutable attack")'];
+    writeFileSync(join(state.root, 'test-tasks.json'), `${JSON.stringify(declared, null, 2)}\n`);
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest([
+          'node',
+          '-e',
+          "process.stdout.write('local test dependency closure complete\\n')",
+        ]),
+      ),
+    ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest(['node', '-e', 'process.stdout.write("mutable attack")']),
+      ),
+    ).toBeUndefined();
     declared.tasks.push({
       nodeId: 'build',
       dependencies: [],
