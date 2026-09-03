@@ -14,6 +14,7 @@ import {
   executeParameterizedMutationRoster,
   verifyMutationAssuranceV2,
 } from '../../src/services/mutation-assurance-v2.js';
+import { canonicalize } from '../../vendor/evidence-verification/src/canonical-json.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const VENDOR_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
@@ -435,6 +436,60 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
         files: [...snapshot.files.slice(1), { ...firstFile, path: secondFile.path }],
       }),
     );
+  });
+
+  it('requires the frozen source-only roster and exact semantic-receipt wire provenance', () => {
+    const snapshot = activationSnapshot();
+    type ActivationPolicy = {
+      activationModel: {
+        sourceOnlyTestPaths: string[];
+        semanticReceiptRepositoryBinding: { wireRepository: string };
+        semanticReceiptProvenance: { source: { repository: string } };
+      };
+    };
+
+    const missingSourceTest = structuredClone(snapshot.policy) as ActivationPolicy;
+    missingSourceTest.activationModel.sourceOnlyTestPaths.pop();
+    expectActivationRefusal(() =>
+      validateMutationV21ActivationSnapshot({ ...snapshot, policy: missingSourceTest }),
+    );
+
+    const alternateWire = structuredClone(snapshot.policy) as ActivationPolicy;
+    alternateWire.activationModel.semanticReceiptRepositoryBinding.wireRepository =
+      'devai-nyx/devai-verifier';
+    expectActivationRefusal(() =>
+      validateMutationV21ActivationSnapshot({ ...snapshot, policy: alternateWire }),
+    );
+
+    const alternateReceiptProvenance = structuredClone(snapshot.policy) as ActivationPolicy;
+    alternateReceiptProvenance.activationModel.semanticReceiptProvenance.source.repository =
+      'devai-nyx/devai-verifier';
+    expectActivationRefusal(() =>
+      validateMutationV21ActivationSnapshot({
+        ...snapshot,
+        policy: alternateReceiptProvenance,
+      }),
+    );
+  });
+
+  it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY, Object.create({ inherited: true })])(
+    'refuses non-JSON canonicalizer input %p',
+    (value) => {
+      expect(() => canonicalize(value)).toThrow(
+        expect.objectContaining({ code: 'NON_CANONICAL_JSON' }),
+      );
+    },
+  );
+
+  it('does not provide a no-follow fallback when the platform lacks O_NOFOLLOW', () => {
+    // Node exposes this constant as non-configurable, so this is the portable
+    // sensor for the required fail-closed branch rather than a monkeypatch.
+    const source = readFileSync(
+      join(ROOT, 'packages/cli/src/services/mutation-evidence-v21.ts'),
+      'utf8',
+    );
+    expect(source).toContain("typeof constants.O_NOFOLLOW !== 'number'");
+    expect(source).toContain('constants.O_RDONLY | constants.O_NOFOLLOW');
   });
 
   it('finalizes without launching mutation work and verifies only the exact current receipt provenance', async () => {

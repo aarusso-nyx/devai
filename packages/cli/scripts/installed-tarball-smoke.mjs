@@ -1299,6 +1299,36 @@ void adapters;
     renameSync(source, `${source}-real`);
     symlinkSync(`${source}-real`, source);
   });
+  const racePackage = join(probeRoot, 'load-race');
+  mkdirSync(racePackage, { recursive: true });
+  cpSync(probeTemplate, racePackage, { recursive: true, dereference: true });
+  const race = JSON.parse(
+    runInstalledModuleCheck(
+      'probe-load-race',
+      `
+        import { writeFileSync } from 'node:fs';
+        import { createRequire, syncBuiltinESMExports } from 'node:module';
+        import { join } from 'node:path';
+        import { pathToFileURL } from 'node:url';
+        const require = createRequire(import.meta.url);
+        const module = require('node:module');
+        const originalRegisterHooks = module.registerHooks;
+        module.registerHooks = (hooks) => {
+          const registration = originalRegisterHooks(hooks);
+          writeFileSync(join(${JSON.stringify(racePackage)}, 'dist/runtime/evidence-verification/src/mutation-v21.js'), 'globalThis.__devaiMutationRaceSentinel = true; throw new Error("unverified code executed");\\n');
+          return registration;
+        };
+        syncBuiltinESMExports();
+        const host = await import(pathToFileURL(join(${JSON.stringify(racePackage)}, 'dist/runtime/index/release-host.js')).href);
+        const outcome = await host.finalizeMutationEvidenceV21({}).then(() => null, (error) => error.code ?? error.message);
+        if (outcome !== 'MUTATION_VENDOR_PROVENANCE_MISMATCH' || globalThis.__devaiMutationRaceSentinel === true) throw new Error('INSTALLED_MUTATION_LOAD_RACE_ACCEPTED:' + outcome);
+        process.stdout.write(JSON.stringify({ outcome, executed: globalThis.__devaiMutationRaceSentinel === true }));
+      `,
+    ),
+  );
+  if (race.outcome !== 'MUTATION_VENDOR_PROVENANCE_MISMATCH' || race.executed !== false) {
+    throw new Error('INSTALLED_MUTATION_LOAD_RACE_RESULT_INVALID');
+  }
   rmSync(probeRoot, { recursive: true, force: true });
 
   const requiredAssets = [
