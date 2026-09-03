@@ -305,8 +305,7 @@ function activeAdrAffectedRules(repoRoot: string): ReadonlySet<string> {
   if (!validation.ok || !validation.semantic_resolution_performed) return new Set();
   const affected = new Set<string>();
   for (const adr of validation.adrs) {
-    if (!adr.effective) continue;
-    for (const rule of adr.affected_rules) {
+    for (const rule of adr.effective_affected_rules) {
       if (!rule.startsWith('/') && !rule.split('/').includes('..')) affected.add(rule);
     }
   }
