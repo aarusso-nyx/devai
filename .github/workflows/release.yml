@@ -24,7 +24,7 @@ concurrency:
 
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
-  EXPECTED_ACTION_COUNT: 48
+  EXPECTED_ACTION_COUNT: 57
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
 
 jobs:
