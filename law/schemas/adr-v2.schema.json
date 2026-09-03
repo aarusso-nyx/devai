@@ -159,8 +159,8 @@
       "type": "string",
       "minLength": 6,
       "maxLength": 200,
-      "pattern": "^law/(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9._-])?$",
-      "description": "Canonical repository-relative law path that names one exact authority subject. It has no leading slash, dot segment, repeated separator, backslash, glob, or trailing separator."
+      "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)(?!.*[*?\\[\\]{}])(?:[^/\\u0000\\\\]+/)*[^/\\u0000\\\\]+$",
+      "description": "Lexically canonical repository-relative governed or review path. It has no leading slash, dot segment, repeated separator, backslash, NUL, glob, or trailing separator. Semantic resolution also requires a tracked regular file and an input already normalized to Unicode NFC."
     }
   },
   "examples": [
@@ -173,7 +173,7 @@
       "authority": "Architect",
       "supersedes": [],
       "provenance": ["law/constitution.md#article-9"],
-      "affected_rules": ["law/policy/example.json"],
+      "affected_rules": ["scripts/check-workflows.mjs"],
       "inspector_acceptance": [
         "IA-001 -- A record with a missing id is rejected rather than defaulted to a derived id."
       ]

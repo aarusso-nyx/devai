@@ -4,7 +4,7 @@
   "id": "adr-validation",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.1.0",
+  "policy_version": "2.2.0",
   "record_schema": "law/schemas/adr-v2.schema.json",
   "scan": {
     "root": "law/adr",
@@ -53,6 +53,74 @@
     "effective_authority_rule": "unique-effective-accepted-head-per-affected-rule-subject-lineage",
     "status_rewrite_permitted": false,
     "superseded_record_edit_permitted": false,
+    "affected_rule_subject_contract": {
+      "kind": "canonical-repository-relative-governed-or-review-file",
+      "unicode_normalization": "NFC",
+      "input_must_already_be_nfc": true,
+      "repository_membership": "tracked-regular-file-required",
+      "forbidden": [
+        "absolute-path",
+        "backslash",
+        "empty-segment",
+        "dot-segment",
+        "dotdot-segment",
+        "duplicate-separator",
+        "nul",
+        "glob",
+        "trailing-separator",
+        "non-nfc-alias"
+      ],
+      "comparison": "utf8-byte-lexicographic-after-nfc-validation"
+    },
+    "output_contract": {
+      "result_type": "adr-semantic-resolution-result-v3",
+      "canonical_comparison": "utf8-byte-lexicographic-after-nfc-validation",
+      "record_projection": {
+        "record_order": "id-utf8-byte-ascending",
+        "preserved_declared_fields": ["id", "affected_rules"],
+        "affected_rules_order": "declaration-order-preserved",
+        "effective_affected_rules": {
+          "field": "effective_affected_rules",
+          "type": "array<affected-rule-subject>",
+          "ordering": "utf8-byte-lexicographic-ascending",
+          "unique": true,
+          "definition": "declared subjects for which this record is the effective accepted head of at least one subject-lineage"
+        },
+        "effective": {
+          "field": "effective",
+          "type": "boolean",
+          "definition": "true-if-and-only-if-effective_affected_rules-is-nonempty"
+        }
+      },
+      "effective_authorities": {
+        "field": "effective_authorities",
+        "type": "array<adr-reference>",
+        "ordering": "utf8-byte-lexicographic-ascending",
+        "unique": true,
+        "definition": "sorted-unique compatibility union of every subject_authorities effective_head"
+      },
+      "subject_authorities": {
+        "field": "subject_authorities",
+        "type": "array<subject-authority-entry>",
+        "ordering": "subject-then-lineage_members-canonical-json-utf8-byte-lexicographic-ascending",
+        "entry_fields": [
+          {
+            "name": "subject",
+            "type": "affected-rule-subject",
+            "ordering": "utf8-byte-lexicographic-ascending"
+          },
+          {
+            "name": "lineage_members",
+            "type": "array<adr-reference>",
+            "ordering": "utf8-byte-lexicographic-ascending",
+            "unique": true
+          },
+          { "name": "effective_head", "type": "adr-reference" }
+        ],
+        "definition": "one entry for every deterministic weakly connected accepted subject-lineage"
+      },
+      "downstream_coverage_subject_source": "records[].effective_affected_rules"
+    },
     "resolvable_legacy_references": [
       {
         "reference": "ADR-014",
@@ -65,11 +133,13 @@
       "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
       "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
       "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects",
-      "normalize-every-affected-rule-subject-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
+      "validate-every-affected-rule-subject-as-an-already-nfc-canonical-repository-relative-tracked-governed-or-review-file-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
       "reject-when-two-scanned-records-declare-the-same-id",
       "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
       "reject-when-a-supersedes-entry-resolves-to-nothing",
       "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself",
+      "build-one-global-directed-supersession-edge-for-every-resolved-record-reference-before-subject-projection",
+      "reject-when-the-global-supersession-graph-contains-any-cycle",
       "build-one-directed-edge-for-each-normalized-affected-rule-subject-in-the-intersection-of-an-accepted-superseding-record-and-its-resolved-target",
       "reject-when-an-affected-rule-subject-supersession-graph-contains-any-cycle",
       "partition-each-affected-rule-subject-supersession-graph-into-deterministic-weakly-connected-subject-lineages",
@@ -78,7 +148,10 @@
       "define-the-effective-accepted-head-of-an-affected-rule-subject-lineage-as-an-accepted-record-for-that-subject-not-marked-non-effective",
       "reject-when-one-target-has-more-than-one-effective-accepted-direct-successor-for-the-same-affected-rule-subject",
       "reject-when-an-affected-rule-subject-lineage-has-more-than-one-effective-accepted-head",
-      "emit-the-unique-effective-accepted-head-of-every-affected-rule-subject-lineage-as-the-effective-authority"
+      "emit-sorted-record-projections-that-preserve-affected-rules-and-add-sorted-effective-affected-rules-and-derived-effective",
+      "emit-effective-authorities-as-the-sorted-unique-union-of-subject-authority-effective-heads",
+      "emit-sorted-subject-authorities-with-subject-sorted-lineage-members-and-effective-head",
+      "require-every-downstream-coverage-consumer-to-use-record-effective-affected-rules"
     ],
     "errors": [
       "adr-legacy-catalog-metadata-invalid",
