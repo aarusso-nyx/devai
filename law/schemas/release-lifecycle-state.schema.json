@@ -3,7 +3,7 @@
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-state.schema.json",
   "title": "Release lifecycle state record",
   "description": "One appended release lifecycle state transition. Only the six persisted states are appendable: preflight_passed, certified, prepared, exported, evidence_published, and publication_dispatched. The three derived states are never persisted, so a record naming planned, offline_verified, or published is rejected. Every record binds exact repository, candidate, input, evidence, artifact, and prior-state identity, so a state is never inherited from an unnamed predecessor or a differently identified tree. A record additionally binds, by exact digest, every read receipt its action requires: release preflight binds a valid plan receipt and release evidence-publish binds a passing offline-verification receipt. A bound receipt is checkable evidence and never an authorization. Records are appended, never edited; a correction is a new record. Remote-write transitions additionally cite the exact one-time effect authorization they consumed. release publish records publication_dispatched, which asserts that a publication was dispatched and never that it completed.",
-  "schema_version": "2.0.0",
+  "schema_version": "2.1.0",
   "type": "object",
   "additionalProperties": false,
   "required": [

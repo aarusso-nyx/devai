@@ -74,16 +74,29 @@ describe('release prepare v3 policy', () => {
     expect(kernel.content_source.generated_output).toContain(
       'release-certification-evidence-receipt-v1',
     );
-    expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v2');
+    expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v3');
     expect(kernel.pack.pack_spec_digest_sha256).toBe(
-      '5d3e20b4b26b0846e0f006cd6880376d00fbbeb87e629746c09c42666301acd3',
+      'b907f43c9d203f3c8aaacb51c0eb9ae4f17be640dc4d3447b6249e9194bddbfb',
     );
     expect(createHash('sha256').update(kernel.pack.pack_spec_canonical_bytes).digest('hex')).toBe(
       kernel.pack.pack_spec_digest_sha256,
     );
     expect(kernel.pack.outputs).toEqual(['package-tarball', 'sbom', 'manifest']);
-    expect(kernel.pack.pack_spec_canonical_bytes).toContain('deflate=stored-blocks-only');
-    expect(kernel.pack.pack_spec_canonical_bytes).toContain('sbom=spdx-json-2.3');
+    expect(kernel.pack.pack_spec_canonical_bytes).toContain(
+      'block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block',
+    );
+    expect(kernel.pack.pack_spec_canonical_bytes).toContain(
+      'BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1',
+    );
+    expect(kernel.pack.pack_spec_canonical_bytes).toContain(
+      'package.downloadLocation=NOASSERTION;package.filesAnalyzed=true',
+    );
+    expect(kernel.pack.pack_spec_canonical_bytes).toContain(
+      'package.packageVerificationCode.value=SHA1-of-utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-in-entry-order',
+    );
+    expect(kernel.pack.pack_spec_canonical_bytes).toContain(
+      'file.SPDXID=SPDXRef-File-<sha256-of-utf8-archive-path>',
+    );
     expect(kernel.pack.forbidden_execution).toEqual([
       'npm-subprocess',
       'tool-subprocess',
