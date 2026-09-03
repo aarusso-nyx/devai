@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-request.schema.json",
+  "title": "Release lifecycle execution request",
+  "description": "Closed untrusted invocation projection for one DEVAI release action. It is a locator document, never a lifecycle record, authorization, actor declaration, state selection, digest assertion, or provider result. The core resolves and rehashes every locator before it can append state or contact a provider.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "request_kind",
+    "action_id",
+    "repository_locator",
+    "candidate_locator"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "request_kind": { "const": "release-lifecycle-request" },
+    "action_id": {
+      "enum": [
+        "release plan",
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release offline-verify",
+        "release evidence-publish",
+        "release publish",
+        "release resume"
+      ]
+    },
+    "repository_locator": { "$ref": "#/$defs/repository_locator" },
+    "candidate_locator": { "$ref": "#/$defs/candidate_locator" },
+    "receipt_locators": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/receipt_locator" }
+    },
+    "provider": { "$ref": "#/$defs/provider_locator" },
+    "destination": { "$ref": "#/$defs/destination_locator" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action_id": { "const": "release plan" } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["receipt_locators"] },
+            { "required": ["provider"] },
+            { "required": ["destination"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "enum": ["release preflight", "release certify"] } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "required": ["receipt_locators"],
+        "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["destination"] }] }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "const": "release prepare" } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "required": ["receipt_locators", "destination"],
+        "properties": { "destination": { "properties": { "kind": { "const": "local-staging" } } } },
+        "not": { "required": ["provider"] }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "const": "release export" } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "required": ["receipt_locators", "provider", "destination"],
+        "properties": { "provider": { "properties": { "kind": { "const": "evidence-export" } } } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "const": "release offline-verify" } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "required": ["receipt_locators", "provider", "destination"],
+        "properties": {
+          "provider": { "properties": { "kind": { "const": "offline-verifier" } } },
+          "destination": {
+            "required": ["trust"],
+            "properties": { "kind": { "const": "external-trust-input" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "enum": ["release evidence-publish", "release publish"] } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "required": ["receipt_locators", "provider", "destination"],
+        "properties": {
+          "provider": { "properties": { "kind": { "const": "protected-dispatch" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "const": "release resume" } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["receipt_locators"] },
+            { "required": ["provider"] },
+            { "required": ["destination"] }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "$ref": "common-defs.schema.json#/$defs/sha256" },
+    "git_object": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "repository_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "candidate_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree", "release_units"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" },
+        "release_units": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/release_unit_locator" }
+        }
+      }
+    },
+    "release_unit_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "package_roster"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "package_roster": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/package_locator" }
+        }
+      }
+    },
+    "package_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_id", "manifest_path", "manifest_digest_sha256"],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "manifest_path": { "$ref": "#/$defs/relative_path" },
+        "manifest_digest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "receipt_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt_id", "receipt_digest_sha256", "path"],
+      "properties": {
+        "kind": { "enum": ["release-plan-receipt", "release-offline-verification-receipt"] },
+        "receipt_id": { "type": "string", "pattern": "^(?:RPL|ROV)-[0-9a-f]{16}$" },
+        "receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "path": { "$ref": "#/$defs/relative_path" }
+      }
+    },
+    "provider_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "provider_id"],
+      "properties": {
+        "kind": { "enum": ["evidence-export", "offline-verifier", "protected-dispatch"] },
+        "provider_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "destination_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "exact_identifier"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "local-staging",
+            "external-trust-input",
+            "evidence-destination",
+            "publication-destination"
+          ]
+        },
+        "exact_identifier": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "trust_root_id",
+            "trust_store_digest_sha256",
+            "key_id",
+            "signature_algorithm"
+          ],
+          "properties": {
+            "trust_root_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+            "trust_store_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "key_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+            "signature_algorithm": { "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"] }
+          }
+        }
+      }
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    }
+  }
+}

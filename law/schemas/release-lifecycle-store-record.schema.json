@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-store-record.schema.json",
+  "title": "Release lifecycle append-only store record",
+  "description": "One durable append-only release execution event. Every event is canonical RFC 8785 JCS, content-addressed, and chained to its exact predecessor. The state head advances only from a completion record after an exclusive record create and atomic head compare-and-swap. An unknown provider result is terminal for its attempt and forbids automatic redispatch.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "record_kind",
+    "canonicalization",
+    "record_id",
+    "sequence",
+    "repository",
+    "candidate",
+    "predecessor_record",
+    "attempt_id",
+    "action_id",
+    "request_digest_sha256",
+    "authorization_event_id",
+    "provider_handle",
+    "completion",
+    "failure",
+    "unknown",
+    "record_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "record_kind": { "enum": ["attempt", "completion", "failure", "unknown-provider-result"] },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "json_form",
+        "encoding",
+        "digest_algorithm",
+        "projection_excludes",
+        "id_derivation"
+      ],
+      "properties": {
+        "json_form": { "const": "rfc8785-jcs" },
+        "encoding": { "const": "utf-8" },
+        "digest_algorithm": { "const": "sha256" },
+        "projection_excludes": { "const": ["record_id", "record_digest_sha256"] },
+        "id_derivation": {
+          "const": "RLE-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256"
+        }
+      }
+    },
+    "record_id": { "type": "string", "pattern": "^RLE-[0-9a-f]{16}$" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "repository": { "$ref": "#/$defs/repository" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "predecessor_record": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/record_ref" }]
+    },
+    "attempt_id": { "type": "string", "pattern": "^RLA-[0-9a-f]{16}$" },
+    "action_id": {
+      "enum": [
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release evidence-publish",
+        "release publish"
+      ]
+    },
+    "request_digest_sha256": { "$ref": "#/$defs/sha256" },
+    "authorization_event_id": { "type": ["string", "null"], "pattern": "^EA-[0-9a-f]{16}$" },
+    "provider_handle": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+    },
+    "completion": { "$ref": "#/$defs/completion" },
+    "failure": { "$ref": "#/$defs/failure" },
+    "unknown": { "$ref": "#/$defs/unknown" },
+    "record_digest_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "attempt" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "properties": {
+          "completion": { "type": "null" },
+          "failure": { "type": "null" },
+          "unknown": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "completion" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["completion"],
+        "properties": {
+          "completion": { "type": "object" },
+          "failure": { "type": "null" },
+          "unknown": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "failure" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["failure"],
+        "properties": {
+          "completion": { "type": "null" },
+          "failure": { "type": "object" },
+          "unknown": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "record_kind": { "const": "unknown-provider-result" } },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["authorization_event_id", "provider_handle", "unknown"],
+        "properties": {
+          "completion": { "type": "null" },
+          "failure": { "type": "null" },
+          "unknown": { "type": "object" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_id": { "enum": ["release evidence-publish", "release publish"] } },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "authorization_event_id": { "type": "string" },
+          "provider_handle": { "type": "string" }
+        }
+      },
+      "else": {
+        "properties": {
+          "authorization_event_id": { "type": "null" },
+          "provider_handle": { "type": "null" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "$ref": "common-defs.schema.json#/$defs/sha256" },
+    "git_object": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree", "release_units"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" },
+        "release_units": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/release_unit" }
+        }
+      }
+    },
+    "release_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "packages"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/package_evidence" }
+        }
+      }
+    },
+    "package_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "manifest",
+        "tarball",
+        "sbom",
+        "evidence_manifest",
+        "provider_result",
+        "trust"
+      ],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "manifest": { "$ref": "#/$defs/artifact" },
+        "tarball": { "$ref": "#/$defs/artifact" },
+        "sbom": { "$ref": "#/$defs/artifact" },
+        "evidence_manifest": { "$ref": "#/$defs/artifact" },
+        "provider_result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] },
+        "trust": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trust_identity" }] }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "trust_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_root_id", "trust_store_digest_sha256", "key_id", "signature_algorithm"],
+      "properties": {
+        "trust_root_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "trust_store_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "key_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "signature_algorithm": { "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"] }
+      }
+    },
+    "record_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "record_id", "record_digest_sha256"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "record_id": { "type": "string", "pattern": "^RLE-[0-9a-f]{16}$" },
+        "record_digest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "completion": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["state_id", "state_digest_sha256", "state"],
+      "properties": {
+        "state_id": { "type": "string", "pattern": "^RLS-[0-9a-f]{16}$" },
+        "state_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "state": {
+          "enum": [
+            "preflight_passed",
+            "certified",
+            "prepared",
+            "exported",
+            "evidence_published",
+            "publication_dispatched"
+          ]
+        }
+      }
+    },
+    "failure": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "retryable"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^release-[a-z0-9-]+$" },
+        "retryable": { "const": false }
+      }
+    },
+    "unknown": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "redispatch_permitted"],
+      "properties": {
+        "code": { "const": "release-provider-result-unknown" },
+        "redispatch_permitted": { "const": false }
+      }
+    }
+  }
+}

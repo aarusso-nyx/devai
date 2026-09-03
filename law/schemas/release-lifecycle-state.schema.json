@@ -23,14 +23,11 @@
     "consent",
     "authorization_event_id",
     "publication_expectation",
-    "storage",
     "recorded_at",
     "record_digest_sha256"
   ],
   "properties": {
-    "schemaVersion": {
-      "const": "1.0.0"
-    },
+    "schemaVersion": { "enum": ["1.0.0", "2.0.0"] },
     "state_id": {
       "type": "string",
       "pattern": "^RLS-[0-9a-f]{16}$"
@@ -242,6 +239,35 @@
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/publication_expectation" }],
       "description": "Authoritative expected publication destination, protected workflow/environment, external trust identities, and exact Owner grant. Present only on release publish/publication_dispatched and contains no key material."
     },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "encoding",
+        "json_form",
+        "digest_algorithm",
+        "projection_excludes",
+        "id_derivation"
+      ],
+      "properties": {
+        "kernel_id": { "const": "devai.kernel.release-lifecycle-state.v2" },
+        "encoding": { "const": "utf-8" },
+        "json_form": { "const": "rfc8785-jcs" },
+        "digest_algorithm": { "const": "sha256" },
+        "projection_excludes": { "const": ["state_id", "record_digest_sha256"] },
+        "id_derivation": {
+          "const": "RLS-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256"
+        }
+      }
+    },
+    "release_units": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The exact multi-package release-unit roster. The v2 semantic kernel requires a sorted unique bijection to candidate, request, state artifacts, evidence, provider results, and trust identities.",
+      "items": { "$ref": "#/$defs/release_unit_evidence" }
+    },
     "storage": {
       "type": "object",
       "additionalProperties": false,
@@ -263,6 +289,13 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "2.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": { "required": ["canonicalization", "release_units", "storage"] }
+    },
     {
       "properties": {
         "state": {
@@ -634,6 +667,64 @@
     }
   ],
   "$defs": {
+    "release_unit_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "packages"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/package_evidence" }
+        }
+      }
+    },
+    "package_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "manifest",
+        "tarball",
+        "sbom",
+        "evidence_manifest",
+        "provider_result",
+        "trust"
+      ],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "manifest": { "$ref": "#/$defs/artifact_ref" },
+        "tarball": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
+        "sbom": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
+        "evidence_manifest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
+        "provider_result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_ref" }] },
+        "trust": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trust_identity" }] }
+      }
+    },
+    "artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "trust_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_root_id", "trust_store_digest_sha256", "key_id", "signature_algorithm"],
+      "properties": {
+        "trust_root_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "trust_store_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "key_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "signature_algorithm": { "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"] }
+      }
+    },
     "storage_head": {
       "type": "object",
       "additionalProperties": false,
@@ -804,8 +895,16 @@
   },
   "examples": [
     {
-      "schemaVersion": "1.0.0",
-      "state_id": "RLS-0123456789abcdef",
+      "schemaVersion": "2.0.0",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.release-lifecycle-state.v2",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "projection_excludes": ["state_id", "record_digest_sha256"],
+        "id_derivation": "RLS-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256"
+      },
+      "state_id": "RLS-92fb1c67758497bd",
       "state": "preflight_passed",
       "action_id": "release preflight",
       "effect": "harness-write",
@@ -829,6 +928,27 @@
         "commit": "5461ba500000000000000000000000000000aaaa",
         "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
       },
+      "release_units": [
+        {
+          "release_unit": "@aarusso-nyx/devai",
+          "version": "1.5.0",
+          "packages": [
+            {
+              "package_id": "@aarusso-nyx/devai",
+              "manifest": {
+                "path": "package.json",
+                "sha256": "a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872881ce68d5",
+                "size_bytes": 1
+              },
+              "tarball": null,
+              "sbom": null,
+              "evidence_manifest": null,
+              "provider_result": null,
+              "trust": null
+            }
+          ]
+        }
+      ],
       "inputs": [
         {
           "kind": "release-lifecycle-policy",
@@ -859,11 +979,19 @@
         "head_before": null
       },
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "record_digest_sha256": "f90611253c61944031c1283152234bfffcfea6b4df132a426d3e87f9e0b3ab16"
+      "record_digest_sha256": "92fb1c67758497bd19926ee925dc842ddac35cf3dc898e7990faecfbc6e352b2"
     },
     {
-      "schemaVersion": "1.0.0",
-      "state_id": "RLS-fedcba9876543210",
+      "schemaVersion": "2.0.0",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.release-lifecycle-state.v2",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "projection_excludes": ["state_id", "record_digest_sha256"],
+        "id_derivation": "RLS-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256"
+      },
+      "state_id": "RLS-44fe08232bd382aa",
       "state": "publication_dispatched",
       "action_id": "release publish",
       "effect": "remote-write",
@@ -884,6 +1012,48 @@
         "commit": "5461ba500000000000000000000000000000aaaa",
         "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
       },
+      "release_units": [
+        {
+          "release_unit": "@aarusso-nyx/devai",
+          "version": "1.5.0",
+          "packages": [
+            {
+              "package_id": "@aarusso-nyx/devai",
+              "manifest": {
+                "path": "package.json",
+                "sha256": "a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872881ce68d5",
+                "size_bytes": 1
+              },
+              "tarball": {
+                "path": "dist/aarusso-nyx-devai-1.5.0.tgz",
+                "sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+                "size_bytes": 1048576
+              },
+              "sbom": {
+                "path": "dist/aarusso-nyx-devai-1.5.0.sbom.json",
+                "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "size_bytes": 1
+              },
+              "evidence_manifest": {
+                "path": "dist/evidence-manifest.json",
+                "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "size_bytes": 1
+              },
+              "provider_result": {
+                "path": "dist/provider-result.json",
+                "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "size_bytes": 1
+              },
+              "trust": {
+                "trust_root_id": "devai-publication-receipt-root",
+                "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
+                "key_id": "publication-receipt-2026-09",
+                "signature_algorithm": "ed25519"
+              }
+            }
+          ]
+        }
+      ],
       "inputs": [
         {
           "kind": "release-lifecycle-policy",
@@ -944,7 +1114,7 @@
         }
       },
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "record_digest_sha256": "2b53ce99283c106be6514c7f4f7bf8a5f5bcf3bb33d827b17f6c36694fced03a"
+      "record_digest_sha256": "44fe08232bd382aa98e20ea4c1af40003bae7765b23c257c3896355accd6c8b3"
     }
   ]
 }

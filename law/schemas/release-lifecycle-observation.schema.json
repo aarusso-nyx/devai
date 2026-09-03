@@ -16,6 +16,8 @@
     "head",
     "derived_states",
     "published",
+    "next_action",
+    "next_outcome",
     "emitted_by",
     "grants",
     "determinism",
@@ -42,11 +44,7 @@
     "verification_kernel": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "kernel_id",
-        "policy_source",
-        "schema_validation_alone_derives_published"
-      ],
+      "required": ["kernel_id", "policy_source", "schema_validation_alone_derives_published"],
       "description": "The named kernel that produced this observation. Its ordered algorithm and its exact error codes are frozen in the canonical release lifecycle policy; this field binds the observation to that procedure so a document asserting published cannot have been produced by a looser one.",
       "properties": {
         "kernel_id": {
@@ -266,6 +264,26 @@
         }
       }
     },
+    "next_action": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "release plan",
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release offline-verify",
+        "release evidence-publish",
+        "release publish",
+        "release resume"
+      ],
+      "description": "The only deterministic next action for a complete unambiguous observation. Null on complete, blocked, or ambiguous outcomes; resume never executes it."
+    },
+    "next_outcome": {
+      "enum": ["ready", "awaiting-external-receipt", "complete", "blocked", "ambiguous"],
+      "description": "A blocked or ambiguous result is non-authoritative and has null next_action. Unknown provider results are always ambiguous and never authorize redispatch."
+    },
     "emitted_by": {
       "type": "object",
       "additionalProperties": false,
@@ -326,11 +344,7 @@
     "determinism": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "deterministic",
-        "derived_from_bound_inputs_only",
-        "contains_wall_clock_time"
-      ],
+      "required": ["deterministic", "derived_from_bound_inputs_only", "contains_wall_clock_time"],
       "properties": {
         "deterministic": {
           "const": true
@@ -349,6 +363,27 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": { "next_outcome": { "enum": ["complete", "blocked", "ambiguous"] } },
+        "required": ["next_outcome"]
+      },
+      "then": { "properties": { "next_action": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "const": "ready" } },
+        "required": ["next_outcome"]
+      },
+      "then": { "properties": { "next_action": { "type": "string" } } }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "const": "awaiting-external-receipt" } },
+        "required": ["next_outcome"]
+      },
+      "then": { "properties": { "next_action": { "const": "release resume" } } }
+    },
     {
       "if": {
         "properties": {
@@ -500,7 +535,7 @@
     {
       "schemaVersion": "1.0.0",
       "observation_kind": "release-lifecycle-observation",
-      "observation_id": "RLO-1ee74bef7b4ac1bd",
+      "observation_id": "RLO-298828dd9e39dd07",
       "repository": {
         "id": "aarusso-nyx/devai",
         "commit": "5461ba500000000000000000000000000000aaaa",
@@ -554,6 +589,8 @@
           "trust_identity_verified": true
         }
       },
+      "next_action": null,
+      "next_outcome": "complete",
       "emitted_by": {
         "action_id": "release resume",
         "effect": "read",
@@ -573,12 +610,12 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "observation_digest_sha256": "1ee74bef7b4ac1bda925bc9fe9b39257d1c08d7865bec1a3c6a6a1ef6af6e247"
+      "observation_digest_sha256": "298828dd9e39dd076dc379937a4fe99b0e073fdf538173ba87ca5ea41b84fa3d"
     },
     {
       "schemaVersion": "1.0.0",
       "observation_kind": "release-lifecycle-observation",
-      "observation_id": "RLO-9846bd2b588ff8b3",
+      "observation_id": "RLO-a001454061bfbcdc",
       "repository": {
         "id": "aarusso-nyx/devai",
         "commit": "5461ba500000000000000000000000000000aaaa",
@@ -614,6 +651,8 @@
         "receipt": null,
         "verified_against": null
       },
+      "next_action": "release evidence-publish",
+      "next_outcome": "ready",
       "emitted_by": {
         "action_id": "release resume",
         "effect": "read",
@@ -633,7 +672,7 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "observation_digest_sha256": "9846bd2b588ff8b33c1b1dab50360d769cdbaf86c477eddb90fed04cba22186c"
+      "observation_digest_sha256": "a001454061bfbcdcd3538839c8faa47624b9aed63ef518f8573661008e159f09"
     }
   ]
 }

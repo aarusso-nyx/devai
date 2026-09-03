@@ -17,6 +17,7 @@
     "receipt_schemas",
     "plan_determination",
     "execution_seams",
+    "execution_contract",
     "states",
     "actions",
     "read_action_purity",
@@ -81,6 +82,9 @@
     },
     "execution_seams": {
       "$ref": "#/$defs/execution_seams"
+    },
+    "execution_contract": {
+      "$ref": "#/$defs/execution_contract"
     },
     "states": {
       "type": "array",
@@ -411,6 +415,305 @@
     }
   },
   "$defs": {
+    "execution_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "compatibility",
+        "request",
+        "store",
+        "resume",
+        "remote_effect",
+        "release_unit_bijection",
+        "state_semantic_kernel"
+      ],
+      "properties": {
+        "kernel_id": { "const": "devai.kernel.release-execution-contract.v2" },
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["v1_state_read", "v2_state_write", "client_drafted_state"],
+          "properties": {
+            "v1_state_read": {
+              "const": "accept-wire-compatible-v1-state-records-for-observation-only"
+            },
+            "v2_state_write": {
+              "const": "all-new-persisted-state-records-must-satisfy-the-v2-semantic-kernel"
+            },
+            "client_drafted_state": { "const": "never-trusted" }
+          }
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "canonicalization", "recursive_forbidden", "identity_bindings"],
+          "properties": {
+            "schema": { "const": "law/schemas/release-lifecycle-request.schema.json" },
+            "canonicalization": {
+              "const": "core-hashes-the-closed-request-projection-as-utf-8-rfc8785-jcs"
+            },
+            "recursive_forbidden": {
+              "const": [
+                "state_id",
+                "generation",
+                "head",
+                "digest",
+                "record_digest_sha256",
+                "actor",
+                "role",
+                "authority",
+                "authorization",
+                "consent",
+                "effective_authorities",
+                "provider_result",
+                "provider_handle"
+              ]
+            },
+            "identity_bindings": {
+              "const": [
+                "repository.commit",
+                "repository.tree",
+                "candidate.commit",
+                "candidate.tree",
+                "release_units",
+                "receipt_locators"
+              ]
+            }
+          }
+        },
+        "store": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "canonicalization",
+            "paths",
+            "append_order",
+            "orphan_handling",
+            "head_compare_and_swap"
+          ],
+          "properties": {
+            "schema": { "const": "law/schemas/release-lifecycle-store-record.schema.json" },
+            "canonicalization": {
+              "const": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters"
+            },
+            "paths": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["head", "attempt", "completion", "failure", "unknown"],
+              "properties": {
+                "head": { "const": "{campaign-path}/HEAD.json" },
+                "attempt": {
+                  "const": "{campaign-path}/attempts/{sequence}-{record-digest-sha256}.json"
+                },
+                "completion": {
+                  "const": "{campaign-path}/completions/{sequence}-{record-digest-sha256}.json"
+                },
+                "failure": {
+                  "const": "{campaign-path}/failures/{sequence}-{record-digest-sha256}.json"
+                },
+                "unknown": {
+                  "const": "{campaign-path}/unknown/{sequence}-{record-digest-sha256}.json"
+                }
+              }
+            },
+            "append_order": {
+              "const": [
+                "lstat-parents-and-targets-and-reject-nonsafe-paths",
+                "recompute-request-and-predecessor-identities",
+                "atomic-create-append-only-record-with-o_excl",
+                "fsync-record-and-parent-directory",
+                "for-completion-only-recheck-head-and-atomically-replace-head",
+                "fsync-head-and-parent-directory"
+              ]
+            },
+            "orphan_handling": {
+              "const": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting"
+            },
+            "head_compare_and_swap": {
+              "const": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it"
+            }
+          }
+        },
+        "resume": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "always_pure",
+            "next_actions",
+            "blocked_outcomes",
+            "ambiguous_outcome"
+          ],
+          "properties": {
+            "schema": { "const": "law/schemas/release-lifecycle-observation.schema.json" },
+            "always_pure": { "const": true },
+            "next_actions": {
+              "const": [
+                { "from": "none", "next_action": "release plan", "outcome": "ready" },
+                { "from": "planned", "next_action": "release preflight", "outcome": "ready" },
+                {
+                  "from": "preflight_passed",
+                  "next_action": "release certify",
+                  "outcome": "ready"
+                },
+                { "from": "certified", "next_action": "release prepare", "outcome": "ready" },
+                { "from": "prepared", "next_action": "release export", "outcome": "ready" },
+                { "from": "exported", "next_action": "release offline-verify", "outcome": "ready" },
+                {
+                  "from": "offline_verified",
+                  "next_action": "release evidence-publish",
+                  "outcome": "ready"
+                },
+                {
+                  "from": "evidence_published",
+                  "next_action": "release publish",
+                  "outcome": "ready"
+                },
+                {
+                  "from": "publication_dispatched",
+                  "next_action": "release resume",
+                  "outcome": "awaiting-external-receipt"
+                },
+                { "from": "published", "next_action": null, "outcome": "complete" }
+              ]
+            },
+            "blocked_outcomes": {
+              "const": [
+                "broken-chain",
+                "stale-head",
+                "orphan-record",
+                "unknown-provider-result",
+                "authorization-consumed",
+                "candidate-identity-mismatch",
+                "receipt-identity-mismatch"
+              ]
+            },
+            "ambiguous_outcome": {
+              "const": "next_action-null-and-no-automatic-redispatch-or-state-advance"
+            }
+          }
+        },
+        "remote_effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attempt_authorization_binding", "order", "unknown_result", "retry"],
+          "properties": {
+            "attempt_authorization_binding": {
+              "const": "the-consumed-authorization-event-must-name-the-exact-attempt-id-request-digest-repository-candidate-action-and-destination-before-dispatch"
+            },
+            "order": {
+              "const": [
+                "append-and-fsync-attempt",
+                "verify-live-unconsumed-exact-authorization",
+                "append-and-fsync-authorization-consumption-bound-to-attempt",
+                "dispatch-provider-once",
+                "append-completion-or-failure-or-unknown-provider-result"
+              ]
+            },
+            "unknown_result": {
+              "const": "append-and-fsync-unknown-provider-result-and-block-without-redispatch"
+            },
+            "retry": {
+              "const": "a-consumed-attempt-never-retries;-a-new-attempt-requires-a-fresh-exact-owner-authorization"
+            }
+          }
+        },
+        "release_unit_bijection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state_schema",
+            "store_schema",
+            "unit_roster",
+            "prepare",
+            "export",
+            "offline_verify",
+            "trust"
+          ],
+          "properties": {
+            "state_schema": { "const": "law/schemas/release-lifecycle-state.schema.json" },
+            "store_schema": { "const": "law/schemas/release-lifecycle-store-record.schema.json" },
+            "unit_roster": {
+              "const": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result"
+            },
+            "prepare": { "const": "each-package-has-exactly-one-manifest-tarball-and-sbom" },
+            "export": {
+              "const": "each-package-has-exactly-one-evidence-manifest-and-provider-result"
+            },
+            "offline_verify": {
+              "const": "each-package-evidence-manifest-artifact-digest-and-external-trust-identity-must-match-the-exported-state"
+            },
+            "trust": {
+              "const": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
+            }
+          }
+        },
+        "state_semantic_kernel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kernel_id",
+            "state_schema",
+            "schema_validation_alone_establishes_state",
+            "algorithm",
+            "errors"
+          ],
+          "properties": {
+            "kernel_id": { "const": "devai.kernel.release-lifecycle-state.v2" },
+            "state_schema": { "const": "law/schemas/release-lifecycle-state.schema.json" },
+            "schema_validation_alone_establishes_state": { "const": false },
+            "algorithm": {
+              "const": [
+                "accept-v1-only-for-wire-compatible-read-and-never-as-a-v2-write",
+                "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
+                "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
+                "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
+                "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
+                "require-package-artifact-and-evidence-bijections-for-the-action",
+                "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results"
+              ]
+            },
+            "errors": {
+              "const": [
+                "release-request-identity-mismatch",
+                "release-state-v2-canonicalization-invalid",
+                "release-state-id-or-digest-mismatch",
+                "release-state-predecessor-mismatch",
+                "release-state-head-mismatch",
+                "release-release-unit-bijection-invalid",
+                "release-provider-result-unknown",
+                "release-provider-trust-identity-mismatch"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "resume_next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "next_action", "outcome"],
+      "properties": {
+        "from": {
+          "enum": [
+            "none",
+            "planned",
+            "preflight_passed",
+            "certified",
+            "prepared",
+            "exported",
+            "offline_verified",
+            "evidence_published",
+            "publication_dispatched",
+            "published"
+          ]
+        },
+        "next_action": { "type": ["string", "null"] },
+        "outcome": { "enum": ["ready", "awaiting-external-receipt", "complete"] }
+      }
+    },
     "execution_seams": {
       "type": "object",
       "additionalProperties": false,
@@ -2275,6 +2578,141 @@
           "release-authorization-replay",
           "release-evidence-binding-invalid"
         ]
+      },
+      "execution_contract": {
+        "kernel_id": "devai.kernel.release-execution-contract.v2",
+        "compatibility": {
+          "v1_state_read": "accept-wire-compatible-v1-state-records-for-observation-only",
+          "v2_state_write": "all-new-persisted-state-records-must-satisfy-the-v2-semantic-kernel",
+          "client_drafted_state": "never-trusted"
+        },
+        "request": {
+          "schema": "law/schemas/release-lifecycle-request.schema.json",
+          "canonicalization": "core-hashes-the-closed-request-projection-as-utf-8-rfc8785-jcs",
+          "recursive_forbidden": [
+            "state_id",
+            "generation",
+            "head",
+            "digest",
+            "record_digest_sha256",
+            "actor",
+            "role",
+            "authority",
+            "authorization",
+            "consent",
+            "effective_authorities",
+            "provider_result",
+            "provider_handle"
+          ],
+          "identity_bindings": [
+            "repository.commit",
+            "repository.tree",
+            "candidate.commit",
+            "candidate.tree",
+            "release_units",
+            "receipt_locators"
+          ]
+        },
+        "store": {
+          "schema": "law/schemas/release-lifecycle-store-record.schema.json",
+          "canonicalization": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters",
+          "paths": {
+            "head": "{campaign-path}/HEAD.json",
+            "attempt": "{campaign-path}/attempts/{sequence}-{record-digest-sha256}.json",
+            "completion": "{campaign-path}/completions/{sequence}-{record-digest-sha256}.json",
+            "failure": "{campaign-path}/failures/{sequence}-{record-digest-sha256}.json",
+            "unknown": "{campaign-path}/unknown/{sequence}-{record-digest-sha256}.json"
+          },
+          "append_order": [
+            "lstat-parents-and-targets-and-reject-nonsafe-paths",
+            "recompute-request-and-predecessor-identities",
+            "atomic-create-append-only-record-with-o_excl",
+            "fsync-record-and-parent-directory",
+            "for-completion-only-recheck-head-and-atomically-replace-head",
+            "fsync-head-and-parent-directory"
+          ],
+          "orphan_handling": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting",
+          "head_compare_and_swap": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it"
+        },
+        "resume": {
+          "schema": "law/schemas/release-lifecycle-observation.schema.json",
+          "always_pure": true,
+          "next_actions": [
+            { "from": "none", "next_action": "release plan", "outcome": "ready" },
+            { "from": "planned", "next_action": "release preflight", "outcome": "ready" },
+            { "from": "preflight_passed", "next_action": "release certify", "outcome": "ready" },
+            { "from": "certified", "next_action": "release prepare", "outcome": "ready" },
+            { "from": "prepared", "next_action": "release export", "outcome": "ready" },
+            { "from": "exported", "next_action": "release offline-verify", "outcome": "ready" },
+            {
+              "from": "offline_verified",
+              "next_action": "release evidence-publish",
+              "outcome": "ready"
+            },
+            { "from": "evidence_published", "next_action": "release publish", "outcome": "ready" },
+            {
+              "from": "publication_dispatched",
+              "next_action": "release resume",
+              "outcome": "awaiting-external-receipt"
+            },
+            { "from": "published", "next_action": null, "outcome": "complete" }
+          ],
+          "blocked_outcomes": [
+            "broken-chain",
+            "stale-head",
+            "orphan-record",
+            "unknown-provider-result",
+            "authorization-consumed",
+            "candidate-identity-mismatch",
+            "receipt-identity-mismatch"
+          ],
+          "ambiguous_outcome": "next_action-null-and-no-automatic-redispatch-or-state-advance"
+        },
+        "remote_effect": {
+          "attempt_authorization_binding": "the-consumed-authorization-event-must-name-the-exact-attempt-id-request-digest-repository-candidate-action-and-destination-before-dispatch",
+          "order": [
+            "append-and-fsync-attempt",
+            "verify-live-unconsumed-exact-authorization",
+            "append-and-fsync-authorization-consumption-bound-to-attempt",
+            "dispatch-provider-once",
+            "append-completion-or-failure-or-unknown-provider-result"
+          ],
+          "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
+          "retry": "a-consumed-attempt-never-retries;-a-new-attempt-requires-a-fresh-exact-owner-authorization"
+        },
+        "release_unit_bijection": {
+          "state_schema": "law/schemas/release-lifecycle-state.schema.json",
+          "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
+          "unit_roster": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result",
+          "prepare": "each-package-has-exactly-one-manifest-tarball-and-sbom",
+          "export": "each-package-has-exactly-one-evidence-manifest-and-provider-result",
+          "offline_verify": "each-package-evidence-manifest-artifact-digest-and-external-trust-identity-must-match-the-exported-state",
+          "trust": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
+        },
+        "state_semantic_kernel": {
+          "kernel_id": "devai.kernel.release-lifecycle-state.v2",
+          "state_schema": "law/schemas/release-lifecycle-state.schema.json",
+          "schema_validation_alone_establishes_state": false,
+          "algorithm": [
+            "accept-v1-only-for-wire-compatible-read-and-never-as-a-v2-write",
+            "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
+            "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
+            "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
+            "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
+            "require-package-artifact-and-evidence-bijections-for-the-action",
+            "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results"
+          ],
+          "errors": [
+            "release-request-identity-mismatch",
+            "release-state-v2-canonicalization-invalid",
+            "release-state-id-or-digest-mismatch",
+            "release-state-predecessor-mismatch",
+            "release-state-head-mismatch",
+            "release-release-unit-bijection-invalid",
+            "release-provider-result-unknown",
+            "release-provider-trust-identity-mismatch"
+          ]
+        }
       },
       "states": [
         {
