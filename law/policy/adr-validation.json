@@ -4,7 +4,7 @@
   "id": "adr-validation",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.0.0",
+  "policy_version": "2.1.0",
   "record_schema": "law/schemas/adr-v2.schema.json",
   "scan": {
     "root": "law/adr",
@@ -47,10 +47,10 @@
     "self_reference_behavior": "fail"
   },
   "semantic_resolver": {
-    "kernel_id": "devai.kernel.adr-supersession-resolution.v2",
+    "kernel_id": "devai.kernel.adr-supersession-resolution.v3",
     "mandatory": true,
     "schema_validation_alone_establishes_effective_authority": false,
-    "effective_authority_rule": "unique-effective-accepted-head-per-supersession-lineage",
+    "effective_authority_rule": "unique-effective-accepted-head-per-affected-rule-subject-lineage",
     "status_rewrite_permitted": false,
     "superseded_record_edit_permitted": false,
     "resolvable_legacy_references": [
@@ -64,23 +64,26 @@
       "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
       "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
       "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
-      "collect-every-v2-and-materialized-legacy-record-with-its-id-status-and-supersedes-list",
+      "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects",
+      "normalize-every-affected-rule-subject-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
       "reject-when-two-scanned-records-declare-the-same-id",
       "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
       "reject-when-a-supersedes-entry-resolves-to-nothing",
       "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself",
-      "build-one-directed-edge-from-each-superseding-record-to-each-resolved-target",
-      "reject-when-the-supersession-graph-contains-any-cycle",
-      "reject-when-one-target-has-more-than-one-accepted-direct-successor",
-      "compute-the-transitive-closure-of-supersession-over-accepted-records",
-      "mark-every-accepted-record-superseded-directly-or-transitively-by-an-accepted-record-as-non-effective",
-      "define-the-effective-accepted-head-of-a-lineage-as-an-accepted-record-in-that-lineage-not-marked-non-effective",
-      "reject-when-a-lineage-has-more-than-one-effective-accepted-head",
-      "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
+      "build-one-directed-edge-for-each-normalized-affected-rule-subject-in-the-intersection-of-an-accepted-superseding-record-and-its-resolved-target",
+      "reject-when-an-affected-rule-subject-supersession-graph-contains-any-cycle",
+      "partition-each-affected-rule-subject-supersession-graph-into-deterministic-weakly-connected-subject-lineages",
+      "compute-the-transitive-closure-of-supersession-over-accepted-records-per-affected-rule-subject-lineage",
+      "mark-an-accepted-record-non-effective-only-for-an-affected-rule-subject-lineage-superseded-directly-or-transitively-by-an-accepted-record",
+      "define-the-effective-accepted-head-of-an-affected-rule-subject-lineage-as-an-accepted-record-for-that-subject-not-marked-non-effective",
+      "reject-when-one-target-has-more-than-one-effective-accepted-direct-successor-for-the-same-affected-rule-subject",
+      "reject-when-an-affected-rule-subject-lineage-has-more-than-one-effective-accepted-head",
+      "emit-the-unique-effective-accepted-head-of-every-affected-rule-subject-lineage-as-the-effective-authority"
     ],
     "errors": [
       "adr-legacy-catalog-metadata-invalid",
       "adr-legacy-reference-allowlist-mismatch",
+      "adr-affected-rule-subject-invalid",
       "adr-duplicate-id",
       "adr-unresolved-supersedes-reference",
       "adr-uncatalogued-legacy-reference",
@@ -144,6 +147,7 @@
     "catalog-digest-mismatch",
     "legacy-catalog-metadata-invalid",
     "legacy-reference-allowlist-mismatch",
+    "affected-rule-subject-invalid",
     "unresolved-supersedes-reference",
     "self-supersedes-reference",
     "superseded-record-edited",
@@ -158,6 +162,7 @@
     "adr-superseded-record-edited",
     "adr-legacy-catalog-metadata-invalid",
     "adr-legacy-reference-allowlist-mismatch",
+    "adr-affected-rule-subject-invalid",
     "adr-semantic-resolution-not-performed"
   ]
 }

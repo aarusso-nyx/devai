@@ -65,9 +65,7 @@
       "type": "array",
       "uniqueItems": true,
       "items": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 200
+        "$ref": "#/$defs/affected_rule_subject"
       }
     },
     "inspector_acceptance": {
@@ -102,6 +100,9 @@
       "then": {
         "properties": {
           "inspector_acceptance": {
+            "minItems": 1
+          },
+          "affected_rules": {
             "minItems": 1
           }
         },
@@ -153,6 +154,13 @@
       "type": "string",
       "pattern": "^(?:ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$",
       "description": "A v2 scoped identity, a legacy numeric identity, or an explicitly catalogued LEGACY: identity. A LEGACY: reference resolves only through the validation policy's exact reference allowlist."
+    },
+    "affected_rule_subject": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 200,
+      "pattern": "^law/(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9._-])?$",
+      "description": "Canonical repository-relative law path that names one exact authority subject. It has no leading slash, dot segment, repeated separator, backslash, glob, or trailing separator."
     }
   },
   "examples": [
@@ -165,7 +173,7 @@
       "authority": "Architect",
       "supersedes": [],
       "provenance": ["law/constitution.md#article-9"],
-      "affected_rules": [],
+      "affected_rules": ["law/policy/example.json"],
       "inspector_acceptance": [
         "IA-001 -- A record with a missing id is rejected rather than defaulted to a derived id."
       ]

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/adr-validation-policy.schema.json",
   "title": "ADR validation policy",
-  "description": "Fail-closed contract for validating every Markdown file under law/adr/. The scan is recursive and total: a file is either a conforming ADR v2 record or an exact catalogued exception, and anything else is a failure. Exceptions are pinned by exact repository-relative path and sha256, and the catalog itself is digest-bound so an entry cannot be added, removed, or repointed silently. Validation is two passes: every record is checked against the record schema, and the record set is then resolved by the named semantic resolver, which decides which accepted record is the effective authority of each supersession lineage.",
+  "description": "Fail-closed contract for validating every Markdown file under law/adr/. The scan is recursive and total: a file is either a conforming ADR v2 record or an exact catalogued exception, and anything else is a failure. Exceptions are pinned by exact repository-relative path and sha256, and the catalog itself is digest-bound so an entry cannot be added, removed, or repointed silently. Validation is two passes: every record is checked against the record schema, and the record set is then resolved by the named semantic resolver, which decides the effective accepted authority of each exact affected-rule subject and explicit supersession-connected lineage.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -190,7 +190,7 @@
     "semantic_resolver": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The mandatory semantic pass over the scanned record set. Per-record schema validation says a record is well formed; it never says which accepted record is the effective authority. Effective authority is the unique accepted head of each supersession lineage, computed by this frozen algorithm, so an accepted record that a later accepted record supersedes stops being effective without either record's bytes changing.",
+      "description": "The mandatory semantic pass over the scanned record set. Per-record schema validation says a record is well formed; it never says which accepted record is the effective authority. Effective authority is computed per exact affected-rule subject and explicit supersession-connected lineage. Independent decisions with no supersession edge may coexist on a file; within one subject-lineage there is exactly one effective accepted head. A supersession transfers authority only for the normalized subjects shared by the superseding and superseded records; it never erases an unrelated subject.",
       "required": [
         "kernel_id",
         "mandatory",
@@ -204,7 +204,7 @@
       ],
       "properties": {
         "kernel_id": {
-          "const": "devai.kernel.adr-supersession-resolution.v2",
+          "const": "devai.kernel.adr-supersession-resolution.v3",
           "description": "The named resolver. An implementation that resolves supersession by any other procedure is not this kernel and does not discharge the obligation."
         },
         "mandatory": {
@@ -215,8 +215,8 @@
           "description": "Article 41: a record validating against adr-v2 is not a demonstration that it still binds."
         },
         "effective_authority_rule": {
-          "const": "unique-effective-accepted-head-per-supersession-lineage",
-          "description": "An accepted record superseded directly or transitively by an accepted record is non-effective. A lineage that does not resolve to exactly one effective accepted head is a failure, not a choice."
+          "const": "unique-effective-accepted-head-per-affected-rule-subject-lineage",
+          "description": "An accepted record becomes non-effective only for a normalized affected-rule subject transferred to it by an accepted successor. Each deterministic supersession-connected lineage for that subject must resolve to exactly one effective accepted head; independent lineages may coexist."
         },
         "status_rewrite_permitted": {
           "const": false,
@@ -248,8 +248,8 @@
         },
         "algorithm": {
           "type": "array",
-          "minItems": 16,
-          "maxItems": 16,
+          "minItems": 18,
+          "maxItems": 18,
           "items": false,
           "description": "The frozen ordered procedure. Steps are evaluated in this order and a rejection at any step ends the resolution; no step is optional, reorderable, or replaceable by a weaker check.",
           "prefixItems": [
@@ -263,7 +263,10 @@
               "const": "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references"
             },
             {
-              "const": "collect-every-v2-and-materialized-legacy-record-with-its-id-status-and-supersedes-list"
+              "const": "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects"
+            },
+            {
+              "const": "normalize-every-affected-rule-subject-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set"
             },
             {
               "const": "reject-when-two-scanned-records-declare-the-same-id"
@@ -278,35 +281,38 @@
               "const": "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself"
             },
             {
-              "const": "build-one-directed-edge-from-each-superseding-record-to-each-resolved-target"
+              "const": "build-one-directed-edge-for-each-normalized-affected-rule-subject-in-the-intersection-of-an-accepted-superseding-record-and-its-resolved-target"
             },
             {
-              "const": "reject-when-the-supersession-graph-contains-any-cycle"
+              "const": "reject-when-an-affected-rule-subject-supersession-graph-contains-any-cycle"
             },
             {
-              "const": "reject-when-one-target-has-more-than-one-accepted-direct-successor"
+              "const": "partition-each-affected-rule-subject-supersession-graph-into-deterministic-weakly-connected-subject-lineages"
             },
             {
-              "const": "compute-the-transitive-closure-of-supersession-over-accepted-records"
+              "const": "compute-the-transitive-closure-of-supersession-over-accepted-records-per-affected-rule-subject-lineage"
             },
             {
-              "const": "mark-every-accepted-record-superseded-directly-or-transitively-by-an-accepted-record-as-non-effective"
+              "const": "mark-an-accepted-record-non-effective-only-for-an-affected-rule-subject-lineage-superseded-directly-or-transitively-by-an-accepted-record"
             },
             {
-              "const": "define-the-effective-accepted-head-of-a-lineage-as-an-accepted-record-in-that-lineage-not-marked-non-effective"
+              "const": "define-the-effective-accepted-head-of-an-affected-rule-subject-lineage-as-an-accepted-record-for-that-subject-not-marked-non-effective"
             },
             {
-              "const": "reject-when-a-lineage-has-more-than-one-effective-accepted-head"
+              "const": "reject-when-one-target-has-more-than-one-effective-accepted-direct-successor-for-the-same-affected-rule-subject"
             },
             {
-              "const": "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
+              "const": "reject-when-an-affected-rule-subject-lineage-has-more-than-one-effective-accepted-head"
+            },
+            {
+              "const": "emit-the-unique-effective-accepted-head-of-every-affected-rule-subject-lineage-as-the-effective-authority"
             }
           ]
         },
         "errors": {
           "type": "array",
-          "minItems": 12,
-          "maxItems": 12,
+          "minItems": 13,
+          "maxItems": 13,
           "items": false,
           "description": "The exact codes this kernel may report. An implementation reporting a different code, or passing where one of these applies, is not this kernel.",
           "prefixItems": [
@@ -315,6 +321,9 @@
             },
             {
               "const": "adr-legacy-reference-allowlist-mismatch"
+            },
+            {
+              "const": "adr-affected-rule-subject-invalid"
             },
             {
               "const": "adr-duplicate-id"
@@ -495,9 +504,27 @@
         "affected_rules": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+          "items": { "$ref": "#/$defs/affected_rule_subject" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "accepted" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "affected_rules": { "minItems": 1 } }
+          }
+        }
+      ]
+    },
+    "affected_rule_subject": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 200,
+      "pattern": "^law/(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9._-])?$",
+      "description": "Canonical repository-relative law path that names one exact authority subject."
     }
   },
   "examples": [
@@ -506,7 +533,7 @@
       "id": "adr-validation",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.0.0",
+      "policy_version": "2.1.0",
       "record_schema": "law/schemas/adr-v2.schema.json",
       "scan": {
         "root": "law/adr",
@@ -541,10 +568,10 @@
         "self_reference_behavior": "fail"
       },
       "semantic_resolver": {
-        "kernel_id": "devai.kernel.adr-supersession-resolution.v2",
+        "kernel_id": "devai.kernel.adr-supersession-resolution.v3",
         "mandatory": true,
         "schema_validation_alone_establishes_effective_authority": false,
-        "effective_authority_rule": "unique-effective-accepted-head-per-supersession-lineage",
+        "effective_authority_rule": "unique-effective-accepted-head-per-affected-rule-subject-lineage",
         "status_rewrite_permitted": false,
         "superseded_record_edit_permitted": false,
         "resolvable_legacy_references": [],
@@ -552,23 +579,26 @@
           "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
           "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
           "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
-          "collect-every-v2-and-materialized-legacy-record-with-its-id-status-and-supersedes-list",
+          "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects",
+          "normalize-every-affected-rule-subject-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
           "reject-when-two-scanned-records-declare-the-same-id",
           "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
           "reject-when-a-supersedes-entry-resolves-to-nothing",
           "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself",
-          "build-one-directed-edge-from-each-superseding-record-to-each-resolved-target",
-          "reject-when-the-supersession-graph-contains-any-cycle",
-          "reject-when-one-target-has-more-than-one-accepted-direct-successor",
-          "compute-the-transitive-closure-of-supersession-over-accepted-records",
-          "mark-every-accepted-record-superseded-directly-or-transitively-by-an-accepted-record-as-non-effective",
-          "define-the-effective-accepted-head-of-a-lineage-as-an-accepted-record-in-that-lineage-not-marked-non-effective",
-          "reject-when-a-lineage-has-more-than-one-effective-accepted-head",
-          "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
+          "build-one-directed-edge-for-each-normalized-affected-rule-subject-in-the-intersection-of-an-accepted-superseding-record-and-its-resolved-target",
+          "reject-when-an-affected-rule-subject-supersession-graph-contains-any-cycle",
+          "partition-each-affected-rule-subject-supersession-graph-into-deterministic-weakly-connected-subject-lineages",
+          "compute-the-transitive-closure-of-supersession-over-accepted-records-per-affected-rule-subject-lineage",
+          "mark-an-accepted-record-non-effective-only-for-an-affected-rule-subject-lineage-superseded-directly-or-transitively-by-an-accepted-record",
+          "define-the-effective-accepted-head-of-an-affected-rule-subject-lineage-as-an-accepted-record-for-that-subject-not-marked-non-effective",
+          "reject-when-one-target-has-more-than-one-effective-accepted-direct-successor-for-the-same-affected-rule-subject",
+          "reject-when-an-affected-rule-subject-lineage-has-more-than-one-effective-accepted-head",
+          "emit-the-unique-effective-accepted-head-of-every-affected-rule-subject-lineage-as-the-effective-authority"
         ],
         "errors": [
           "adr-legacy-catalog-metadata-invalid",
           "adr-legacy-reference-allowlist-mismatch",
+          "adr-affected-rule-subject-invalid",
           "adr-duplicate-id",
           "adr-unresolved-supersedes-reference",
           "adr-uncatalogued-legacy-reference",
