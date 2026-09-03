@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { CAC } from 'cac';
-import { resumeReleaseLifecycle, type ReleaseLifecycleStateRecord } from '@devai-nyx/loop';
-import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
+import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand, type CommandDefinition } from '../../define-command.js';
+import {
+  resumeReleaseLifecycleExecution,
+  validateReleaseLifecycleRequest,
+  verifyReleaseStateIdentity,
+} from '../../services/release-lifecycle-execution.js';
 import { buildReleasePlanReceipt } from '../../services/release-lifecycle.js';
 
 interface PlanOptions {
@@ -15,7 +19,19 @@ interface PlanOptions {
 
 interface ResumeOptions {
   readonly stateChain?: string;
+  readonly storeRecords?: string;
   readonly publicationReceipt?: string;
+  readonly human?: boolean;
+}
+
+interface ActionOptions {
+  readonly request?: string;
+  readonly human?: boolean;
+}
+
+interface OfflineVerifyOptions {
+  readonly request?: string;
+  readonly exportedState?: string;
   readonly human?: boolean;
 }
 
@@ -72,6 +88,7 @@ export const releasePlan = defineCommand({
             'release plan',
             'RELEASE_PLAN_FAILED',
             error instanceof Error ? error.message : String(error),
+            EXIT_REVIEW,
           );
         }
       });
@@ -97,12 +114,32 @@ function unavailableAction(
         .command(name.replace(' ', '-'), description)
         .option('--request <path>', 'Exact candidate-bound action request JSON')
         .option('--human', 'Human-readable output')
-        .action(() => {
-          fail(
-            name,
-            'RELEASE_ACTION_PROVIDER_UNAVAILABLE',
-            'no protected injectable action provider is installed; no state was appended',
-          );
+        .action((options: ActionOptions) => {
+          if (options.request === undefined) {
+            fail(name, 'RELEASE_ACTION_USAGE', '--request is required', EXIT_USAGE);
+            return;
+          }
+          try {
+            validateReleaseLifecycleRequest(readJson(options.request), name);
+            const remote = name === 'release evidence-publish' || name === 'release publish';
+            fail(
+              name,
+              remote
+                ? 'RELEASE_AUTHORIZATION_PROVIDER_UNAVAILABLE'
+                : 'RELEASE_ACTION_PROVIDER_UNAVAILABLE',
+              remote
+                ? 'no protected authorization ledger provider is installed; the action provider was not consulted'
+                : 'no protected injectable action provider is installed; no state was appended',
+              EXIT_REVIEW,
+            );
+          } catch (error) {
+            fail(
+              name,
+              'RELEASE_ACTION_REQUEST_INVALID',
+              error instanceof Error ? error.message : String(error),
+              EXIT_REVIEW,
+            );
+          }
         });
     },
   });
@@ -140,14 +177,41 @@ export const releaseOfflineVerify = defineCommand({
   register(cli: CAC): void {
     cli
       .command('release-offline-verify', 'Verify exported release artifacts without network access')
+      .option('--request <path>', 'Exact candidate-bound offline verification request JSON')
       .option('--exported-state <path>', 'Exact exported lifecycle state record')
       .option('--human', 'Human-readable output')
-      .action(() => {
-        fail(
-          'release offline-verify',
-          'OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE',
-          'canonical verifier source is not installed; no receipt or state was written',
-        );
+      .action((options: OfflineVerifyOptions) => {
+        if (options.request === undefined && options.exportedState === undefined) {
+          fail(
+            'release offline-verify',
+            'RELEASE_OFFLINE_VERIFY_USAGE',
+            '--request or the deprecated --exported-state alias is required',
+            EXIT_USAGE,
+          );
+          return;
+        }
+        try {
+          if (options.request !== undefined) {
+            validateReleaseLifecycleRequest(readJson(options.request), 'release offline-verify');
+          }
+          if (options.exportedState !== undefined) {
+            const state = verifyReleaseStateIdentity(readJson(options.exportedState));
+            if (state.state !== 'exported') throw new Error('release-offline-state-mismatch');
+          }
+          fail(
+            'release offline-verify',
+            'OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE',
+            'canonical verifier source is not installed; no receipt or state was written',
+            EXIT_REVIEW,
+          );
+        } catch (error) {
+          fail(
+            'release offline-verify',
+            'RELEASE_OFFLINE_VERIFY_INPUT_INVALID',
+            error instanceof Error ? error.message : String(error),
+            EXIT_REVIEW,
+          );
+        }
       });
   },
 });
@@ -160,6 +224,10 @@ export const releaseResume = defineCommand({
     cli
       .command('release-resume', 'Emit a pure release lifecycle observation')
       .option('--state-chain <path>', 'JSON array containing the exact persisted state chain')
+      .option(
+        '--store-records <path>',
+        'Optional JSON array containing append-only execution records',
+      )
       .option('--publication-receipt <path>', 'Signed external publication receipt')
       .option('--human', 'Human-readable output')
       .action(async (options: ResumeOptions) => {
@@ -168,25 +236,31 @@ export const releaseResume = defineCommand({
           return;
         }
         try {
-          const records = readJson(options.stateChain);
-          if (!Array.isArray(records) || records.length === 0) {
+          const states = readJson(options.stateChain);
+          if (!Array.isArray(states) || states.length === 0) {
             throw new Error('state chain must be a non-empty JSON array');
           }
-          const first = records[0] as ReleaseLifecycleStateRecord;
-          const observation = await resumeReleaseLifecycle({
-            records,
+          const first = verifyReleaseStateIdentity(states[0]);
+          const storeRecords =
+            options.storeRecords === undefined ? [] : readJson(options.storeRecords);
+          if (!Array.isArray(storeRecords)) throw new Error('store records must be a JSON array');
+          const observation = await resumeReleaseLifecycleExecution({
+            states,
+            store_records: storeRecords,
             repository: first.repository,
             candidate: first.candidate,
             ...(options.publicationReceipt === undefined
               ? {}
-              : { publication_receipt: readJson(options.publicationReceipt) }),
-            // External trust material is intentionally not vendored. Until an
-            // exact trust provider is injected, no receipt derives published.
-            verifySignature: () => false,
+              : {
+                  publication_receipt: readJson(options.publicationReceipt),
+                  // Trust material is deliberately external. The stock CLI
+                  // cannot derive published without an injected verifier.
+                  verify_signature: () => false,
+                }),
           });
           process.stdout.write(
             options.human === true
-              ? `release resume: ${observation.observation_id} -> ${String(observation.published['observed'])}\n`
+              ? `release resume: ${String(observation['observation_id'])} -> ${String(observation['next_outcome'])}\n`
               : `${JSON.stringify(observation)}\n`,
           );
           process.exitCode = EXIT_PASS;
@@ -195,6 +269,7 @@ export const releaseResume = defineCommand({
             'release resume',
             'RELEASE_RESUME_FAILED',
             error instanceof Error ? error.message : String(error),
+            EXIT_REVIEW,
           );
         }
       });
