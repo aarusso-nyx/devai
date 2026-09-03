@@ -14,7 +14,6 @@ import {
   executeParameterizedMutationRoster,
   verifyMutationAssuranceV2,
 } from '../../src/services/mutation-assurance-v2.js';
-import { canonicalize } from '../../vendor/evidence-verification/src/canonical-json.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const VENDOR_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
@@ -474,8 +473,11 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
 
   it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY, Object.create({ inherited: true })])(
     'refuses non-JSON canonicalizer input %p',
-    (value) => {
-      expect(() => canonicalize(value)).toThrow(
+    async (value) => {
+      const canonical = (await import(
+        new URL('../../vendor/evidence-verification/src/canonical-json.js', import.meta.url).href
+      )) as { canonicalize: (input: unknown) => string };
+      expect(() => canonical.canonicalize(value)).toThrow(
         expect.objectContaining({ code: 'NON_CANONICAL_JSON' }),
       );
     },
