@@ -4,7 +4,7 @@
   "id": "adr-validation",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.3.0",
+  "policy_version": "2.4.0",
   "record_schema": "law/schemas/adr-v2.schema.json",
   "scan": {
     "root": "law/adr",
@@ -70,21 +70,51 @@
         "trailing-separator",
         "non-nfc-alias"
       ],
-      "comparison": "utf8-byte-lexicographic-after-nfc-validation"
+      "comparison": "rfc8785-jcs-utf8-byte-lexicographic-ascending"
     },
     "output_contract": {
       "result_schema_pointer": "law/schemas/adr-validation-policy.schema.json#/$defs/adrValidationResult",
-      "canonical_comparison": "utf8-byte-lexicographic-after-nfc-validation",
+      "canonical_comparison": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
+      "validate_adrs_envelope": {
+        "top_level_fields": [
+          "ok",
+          "kernel_id",
+          "semantic_resolution_performed",
+          "files_scanned",
+          "errors",
+          "adrs",
+          "effective_authorities",
+          "subject_authorities"
+        ],
+        "additional_properties": false,
+        "error_entry": {
+          "required_fields": ["file", "message"],
+          "optional_fields": ["code", "pointer"],
+          "additional_properties": false
+        }
+      },
       "adr_projection": {
         "array_field": "adrs",
-        "adr_order": "adr_id-utf8-byte-ascending",
+        "adr_order": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
         "adr_id_field": "adr_id",
+        "public_fields": [
+          "file",
+          "adr_id",
+          "title",
+          "status",
+          "date",
+          "format",
+          "supersedes",
+          "affected_rules",
+          "effective",
+          "effective_affected_rules"
+        ],
         "preserved_declared_fields": ["adr_id", "affected_rules"],
         "affected_rules_order": "declaration-order-preserved",
         "effective_affected_rules": {
           "field": "effective_affected_rules",
           "type": "array<affected-rule-subject>",
-          "ordering": "utf8-byte-lexicographic-ascending",
+          "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
           "unique": true,
           "definition": "declared subjects for which this record is the effective accepted head of at least one subject-lineage"
         },
@@ -97,24 +127,24 @@
       "effective_authorities": {
         "field": "effective_authorities",
         "type": "array<adr-reference>",
-        "ordering": "utf8-byte-lexicographic-ascending",
+        "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
         "unique": true,
         "definition": "sorted-unique compatibility union of every subject_authorities effective_head"
       },
       "subject_authorities": {
         "field": "subject_authorities",
         "type": "array<subject-authority-entry>",
-        "ordering": "subject-then-lineage_members-canonical-json-utf8-byte-lexicographic-ascending",
+        "ordering": "subject-then-lineage_members-rfc8785-jcs-utf8-byte-lexicographic-ascending",
         "entry_fields": [
           {
             "name": "subject",
             "type": "affected-rule-subject",
-            "ordering": "utf8-byte-lexicographic-ascending"
+            "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending"
           },
           {
             "name": "lineage_members",
             "type": "array<adr-reference>",
-            "ordering": "utf8-byte-lexicographic-ascending",
+            "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
             "unique": true
           },
           { "name": "effective_head", "type": "adr-reference" }
@@ -123,11 +153,13 @@
       },
       "downstream_coverage_subject_source": "adrs[].effective_affected_rules",
       "semantic_rules": [
-        "adrs-must-be-sorted-by-adr_id-utf8-byte-ascending-and-adr_id-must-be-unique",
-        "each-effective-affected-rules-array-must-be-sorted-unique-and-a-subset-of-that-adrs-declared-affected-rules",
+        "adrs-must-be-sorted-by-adr-id-rfc8785-jcs-utf8-byte-lexicographic-ascending-and-adr-id-must-be-unique",
+        "each-effective-affected-rules-array-must-be-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-and-a-subset-of-that-adrs-declared-affected-rules",
         "each-effective-must-equal-whether-that-adrs-effective-affected-rules-array-is-nonempty",
-        "subject-authorities-must-be-sorted-by-subject-then-rfc8785-jcs-lineage-members-each-lineage-members-array-must-be-sorted-unique-and-contain-its-effective-head",
-        "effective-authorities-must-equal-the-sorted-unique-union-of-subject-authorities-effective-head"
+        "subject-authorities-must-be-sorted-by-subject-then-lineage-members-rfc8785-jcs-utf8-byte-lexicographic-ascending-each-lineage-members-array-must-be-sorted-unique-and-contain-its-effective-head",
+        "each-subject-authority-member-and-head-must-reference-a-known-adr-member-must-declare-the-subject-and-members-must-exactly-equal-that-subjects-weak-component",
+        "each-subject-authority-head-must-be-the-unique-effective-adr-for-its-subject-lineage-and-biject-with-that-heads-effective-affected-rules-subject",
+        "effective-authorities-must-equal-the-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-set-of-subject-authority-effective-heads-and-of-adr-ids-with-nonempty-effective-affected-rules"
       ]
     },
     "resolvable_legacy_references": [
