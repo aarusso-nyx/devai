@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/effect-authorization-ledger.schema.json",
+  "title": "Effect authorization ledger",
+  "description": "Append-only, hash-linked index over exact effect authorization events. The ledger orders events by strictly increasing sequence and links each to its predecessor by digest; it references event records and never restates their bytes. Resolution is fail-closed: a replayed, revoked, expired, unresolvable, or out-of-order authorization authorizes nothing, and an absent ledger is a failure to observe rather than an absence of restriction.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "ledger_id",
+    "repository",
+    "event_schema",
+    "append_only",
+    "ordering",
+    "head",
+    "entries",
+    "enforcement"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "ledger_id": {
+      "type": "string",
+      "pattern": "^EAL-[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        }
+      }
+    },
+    "event_schema": {
+      "const": "law/schemas/effect-authorization-event.schema.json"
+    },
+    "append_only": {
+      "const": true,
+      "description": "Article 41: records are never edited. A correction is a new appended event."
+    },
+    "ordering": {
+      "const": "hash-linked-ascending-sequence"
+    },
+    "head": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "event_id", "event_digest_sha256"],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "$ref": "#/$defs/event_id"
+        },
+        "event_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "event_id",
+          "event_digest_sha256",
+          "previous_event_digest_sha256",
+          "kind"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "event_id": {
+            "$ref": "#/$defs/event_id"
+          },
+          "event_digest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "previous_event_digest_sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "kind": {
+            "enum": ["granted", "consumed", "revoked", "expired", "rejected"]
+          }
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay",
+        "revocation",
+        "expiry",
+        "sequence_gap",
+        "link_mismatch",
+        "unresolved_reference",
+        "identity_mismatch",
+        "absent_ledger",
+        "wildcard_scope",
+        "bearer_presentation"
+      ],
+      "description": "Every resolution outcome that is not an exact, live, unconsumed match. All of them deny.",
+      "properties": {
+        "replay": {
+          "const": "deny"
+        },
+        "revocation": {
+          "const": "deny"
+        },
+        "expiry": {
+          "const": "deny"
+        },
+        "sequence_gap": {
+          "const": "deny"
+        },
+        "link_mismatch": {
+          "const": "deny"
+        },
+        "unresolved_reference": {
+          "const": "deny"
+        },
+        "identity_mismatch": {
+          "const": "deny",
+          "description": "Any divergence in action, effect, resource, repository, candidate, consuming role, or consent denies."
+        },
+        "absent_ledger": {
+          "const": "deny"
+        },
+        "wildcard_scope": {
+          "const": "deny"
+        },
+        "bearer_presentation": {
+          "const": "deny"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^EA-[0-9a-f]{16}$"
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "ledger_id": "EAL-devai-release",
+      "repository": {
+        "id": "aarusso-nyx/devai"
+      },
+      "event_schema": "law/schemas/effect-authorization-event.schema.json",
+      "append_only": true,
+      "ordering": "hash-linked-ascending-sequence",
+      "head": {
+        "sequence": 1,
+        "event_id": "EA-0123456789abcdef",
+        "event_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      },
+      "entries": [
+        {
+          "sequence": 1,
+          "event_id": "EA-0123456789abcdef",
+          "event_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "previous_event_digest_sha256": null,
+          "kind": "granted"
+        }
+      ],
+      "enforcement": {
+        "replay": "deny",
+        "revocation": "deny",
+        "expiry": "deny",
+        "sequence_gap": "deny",
+        "link_mismatch": "deny",
+        "unresolved_reference": "deny",
+        "identity_mismatch": "deny",
+        "absent_ledger": "deny",
+        "wildcard_scope": "deny",
+        "bearer_presentation": "deny"
+      }
+    }
+  ]
+}

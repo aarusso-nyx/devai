@@ -1,0 +1,185 @@
+{
+  "$schema": "../schemas/self-dogfood-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "self-dogfood",
+  "status": "active",
+  "authority": "Architect",
+  "policy_version": "1.0.0",
+  "scope": {
+    "subject": "devai-source-repository",
+    "governs_human_maintainers": false,
+    "produces_readiness_claim": false,
+    "adopter_applicability": "none"
+  },
+  "invocation": {
+    "human_invoked_only": true,
+    "autonomous_work": "forbidden",
+    "scheduled_execution": "forbidden",
+    "backlog_dequeue": "forbidden",
+    "self_dispatch": "forbidden",
+    "unknown_invocation_behavior": "fail"
+  },
+  "role_widening": {
+    "permitted": false,
+    "inference": "forbidden",
+    "elevation": "forbidden",
+    "cross_role_session": "forbidden"
+  },
+  "publication_authority": {
+    "granted": false,
+    "implied_by_check_pass": false,
+    "implied_by_write_consent": false,
+    "remote_effects": "forbidden"
+  },
+  "permitted_checks": [
+    {
+      "check_id": "action-registry:check",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "error-codes:check",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "format:check",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "lint",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "release:closure",
+      "effect": "local-write",
+      "initiator_roles": ["architect"]
+    },
+    {
+      "check_id": "release:static-integrity",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "test-task-selectors:check",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "test:schemas",
+      "effect": "local-write",
+      "initiator_roles": ["inspector"]
+    },
+    {
+      "check_id": "typecheck",
+      "effect": "local-write",
+      "initiator_roles": ["architect", "engineer"]
+    }
+  ],
+  "role_effect_matrix": [
+    {
+      "role": "owner",
+      "permitted_effects": ["read"],
+      "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+      "may_initiate": [
+        "audit scorecard",
+        "catalog actions",
+        "doctor",
+        "evidence verify",
+        "init plan",
+        "release offline-verify",
+        "release plan",
+        "release resume",
+        "release status",
+        "round status"
+      ]
+    },
+    {
+      "role": "architect",
+      "permitted_effects": ["read", "local-write"],
+      "forbidden_effects": ["harness-write", "remote-write"],
+      "may_initiate": [
+        "audit scorecard",
+        "catalog actions",
+        "check",
+        "doctor",
+        "evidence verify",
+        "init plan",
+        "release offline-verify",
+        "release plan",
+        "release resume",
+        "release status",
+        "round status"
+      ]
+    },
+    {
+      "role": "inspector",
+      "permitted_effects": ["read", "harness-write", "local-write"],
+      "forbidden_effects": ["remote-write"],
+      "may_initiate": [
+        "audit scorecard",
+        "catalog actions",
+        "check",
+        "doctor",
+        "evidence record",
+        "evidence verify",
+        "init plan",
+        "release offline-verify",
+        "release plan",
+        "release resume",
+        "release status",
+        "round status"
+      ]
+    },
+    {
+      "role": "engineer",
+      "permitted_effects": ["read"],
+      "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+      "may_initiate": [
+        "audit scorecard",
+        "catalog actions",
+        "doctor",
+        "evidence verify",
+        "init plan",
+        "release offline-verify",
+        "release plan",
+        "release resume",
+        "release status",
+        "round status"
+      ]
+    },
+    {
+      "role": "auditor",
+      "permitted_effects": ["read"],
+      "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+      "may_initiate": [
+        "audit scorecard",
+        "catalog actions",
+        "doctor",
+        "evidence verify",
+        "init plan",
+        "release offline-verify",
+        "release plan",
+        "release resume",
+        "release status",
+        "round status"
+      ]
+    }
+  ],
+  "fail_closed": [
+    "undeclared-check-id",
+    "undeclared-action-id",
+    "absent-human-invocation",
+    "inferred-role",
+    "elevated-role",
+    "cross-role-session",
+    "effect-outside-role-row",
+    "remote-effect-attempted",
+    "publication-inferred-from-check-pass",
+    "scheduled-or-timer-invocation",
+    "backlog-dequeue-attempted",
+    "self-dispatch-attempted"
+  ]
+}

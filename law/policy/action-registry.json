@@ -10,10 +10,10 @@
     "packages/sensors/src/generated/action-kinds.ts"
   ],
   "counts": {
-    "stable": 23,
+    "stable": 32,
     "preview": 14,
     "internal": 11,
-    "total": 48
+    "total": 57
   },
   "entries": [
     {
@@ -925,6 +925,71 @@
       }
     },
     {
+      "action_id": "release certify",
+      "handler": "release certify",
+      "path": ["release", "certify"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "release_controller",
+      "description": "Record the Inspector verification transition from preflighted to certified for one exact candidate; it grants no packaging or publication authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release certify",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "proc:git"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["inspector"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-certify-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
       "action_id": "release check",
       "handler": "release check",
       "path": ["release", "check"],
@@ -1050,6 +1115,474 @@
         },
         "readiness": {
           "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release evidence-publish",
+      "handler": "release evidence-publish",
+      "path": ["release", "evidence-publish"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "remote-write",
+      "authority": "release_controller",
+      "description": "Publish the exported evidence bundle for one exact candidate under an Owner-issued one-time authorization; it never publishes the product.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release evidence-publish",
+        "effect": "remote-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "proc:git", "net:evidence-registry"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": true,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-evidence-publish-bounded-plan",
+          "target_kinds": ["fs", "remote"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary", "remote-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release export",
+      "handler": "release export",
+      "path": ["release", "export"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "release_controller",
+      "description": "Export the prepared candidate and its evidence bundle to local artifacts under Architect authority; it performs no remote effect.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release export",
+        "effect": "local-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "fs:workspace", "proc:git"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["architect"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-export-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release offline-verify",
+      "handler": "release offline-verify",
+      "path": ["release", "offline-verify"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "release_controller",
+      "description": "Verify an exported candidate and its evidence bundle without network access; the result grants no lifecycle transition and no publication authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release offline-verify",
+        "effect": "read",
+        "capabilities": ["proc:git"],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release plan",
+      "handler": "release plan",
+      "path": ["release", "plan"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "release_controller",
+      "description": "Resolve the release lifecycle plan for one exact candidate from canonical inputs without persisting state or evidence.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": null
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release plan",
+        "effect": "read",
+        "capabilities": ["proc:git"],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release preflight",
+      "handler": "release preflight",
+      "path": ["release", "preflight"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "harness-write",
+      "authority": "release_controller",
+      "description": "Record the Inspector preflight receipt that opens the release lifecycle for one exact candidate; it grants no packaging or publication authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-preflight-receipt.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release preflight",
+        "effect": "harness-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "proc:git"],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["inspector"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-preflight-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release prepare",
+      "handler": "release prepare",
+      "path": ["release", "prepare"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "release_controller",
+      "description": "Package the certified candidate into local release material under Architect authority; it performs no remote effect.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release prepare",
+        "effect": "local-write",
+        "capabilities": ["fs:f5-state", "fs:proofs", "fs:workspace", "proc:git", "proc:pnpm"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["architect"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-prepare-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release publish",
+      "handler": "release publish",
+      "path": ["release", "publish"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "remote-write",
+      "authority": "release_controller",
+      "description": "Publish the product for one exact candidate under a separate Owner-issued one-time authorization; published evidence never authorizes it.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release publish",
+        "effect": "remote-write",
+        "capabilities": [
+          "fs:f5-state",
+          "fs:proofs",
+          "proc:git",
+          "proc:pnpm",
+          "net:package-registry"
+        ],
+        "subject": {
+          "kind": "derived-machine",
+          "actor": "harness",
+          "transition": "harness-write",
+          "initiator": {
+            "allowed_roles": ["owner"],
+            "preserve_in_context": true
+          }
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": true,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "release-publish-bounded-plan",
+          "target_kinds": ["fs", "remote"],
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary", "remote-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "release resume",
+      "handler": "release resume",
+      "path": ["release", "resume"],
+      "status": "stable",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "read",
+      "authority": "release_controller",
+      "description": "Report the exact recorded lifecycle head for one candidate; the observation advances, repairs, and revives nothing.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "release resume",
+        "effect": "read",
+        "capabilities": ["proc:git"],
+        "subject": {
+          "kind": "none"
+        },
+        "consent": {
+          "write": false,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "none"
+        },
+        "boundary": {
+          "kind": "none"
+        },
+        "readiness": {
+          "requires_binding": false,
           "independent_acceptance_required": true
         }
       }

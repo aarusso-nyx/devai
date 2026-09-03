@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/adr-v2.schema.json",
+  "title": "Architecture Decision Record v2",
+  "description": "Frontmatter contract for scoped ADR markdown under law/adr/. Identity is ADR-<SCOPE>-<NNNN> and is mandatory. Supersession is recorded forward on the superseding record only: this contract has no superseded_by field, so a superseding decision never requires editing the bytes of the record it supersedes. Frontmatter is restricted to scalars and block string arrays so the governed frontmatter reader parses it without a general YAML engine.",
+  "schema_version": "2.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "type",
+    "status",
+    "date",
+    "authority",
+    "supersedes",
+    "provenance",
+    "affected_rules",
+    "inspector_acceptance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/adr_v2_id",
+      "description": "Mandatory scoped identity. The one-or-more scope segments are the sole scope declaration; scope is never restated in a separate field."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "type": {
+      "const": "adr"
+    },
+    "status": {
+      "enum": ["proposed", "accepted", "rejected", "superseded"],
+      "description": "Exactly four lifecycle values. Only accepted is binding; proposed, rejected, and superseded carry no authority over the reference signal."
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "authority": {
+      "const": "Architect",
+      "description": "Article 6 binds law/adr to Architect authority. No other authority may author an ADR."
+    },
+    "supersedes": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Exact identities of the records this decision supersedes. This is the sole supersession mechanism: the superseded record is never edited.",
+      "items": {
+        "$ref": "#/$defs/adr_reference"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "affected_rules": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "inspector_acceptance": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Adversarial acceptance obligations the Inspector must discharge before the decision is treated as demonstrated. Each entry names one attack the contract must survive, not one happy-path assertion.",
+      "items": {
+        "type": "string",
+        "minLength": 12,
+        "maxLength": 500,
+        "pattern": "^IA-[0-9]{3} -- .+$",
+        "description": "The separator is ' -- ' rather than ': ' so the entry stays an unquoted plain scalar in frontmatter and the governed frontmatter reader returns the text without surrounding quote characters."
+      }
+    },
+    "disposition": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Why a non-binding record is non-binding. Required for rejected and superseded records."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "accepted"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "inspector_acceptance": {
+            "minItems": 1
+          }
+        },
+        "required": ["inspector_acceptance"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["rejected", "superseded"]
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["disposition"]
+      },
+      "else": {
+        "not": {
+          "required": ["disposition"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "supersedes": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "adr_v2_id": {
+      "type": "string",
+      "pattern": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$"
+    },
+    "adr_reference": {
+      "type": "string",
+      "pattern": "^ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})$",
+      "description": "A v2 scoped identity, or a legacy numeric identity retained so a v2 decision can supersede a preserved pre-v2 record without touching its bytes."
+    }
+  },
+  "examples": [
+    {
+      "id": "ADR-GOV-0001",
+      "title": "Example scoped decision",
+      "type": "adr",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "authority": "Architect",
+      "supersedes": [],
+      "provenance": ["law/constitution.md#article-9"],
+      "affected_rules": [],
+      "inspector_acceptance": [
+        "IA-001 -- A record with a missing id is rejected rather than defaulted to a derived id."
+      ]
+    }
+  ]
+}

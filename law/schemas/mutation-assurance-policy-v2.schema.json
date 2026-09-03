@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/mutation-assurance-policy-v2.schema.json",
+  "title": "Mutation assurance policy v2",
+  "description": "Additive v2 policy binding mutation assurance results to exact identities. It declares the ten identity classes a report must bind, keeps targeted and full assurance distinct and non-substitutable, forbids a not-required disposition from ever reading as a pass, and permits reuse of a prior result only on an exact match of every declared identity.",
+  "schema_version": "2.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "report_schema",
+    "supersedes_policy",
+    "required_identity_bindings",
+    "modes",
+    "dispositions",
+    "reuse",
+    "not_required",
+    "thresholds",
+    "prohibitions"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "2.0.0"
+    },
+    "id": {
+      "const": "mutation-assurance-v2"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "report_schema": {
+      "const": "law/schemas/mutation-assurance-v2.schema.json"
+    },
+    "supersedes_policy": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Policies this one extends additively. v2 adds identity binding; it does not relax any v1 pass condition.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "required_identity_bindings": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "candidate",
+          "source",
+          "test",
+          "config",
+          "toolchain",
+          "roster",
+          "threshold",
+          "sanitizer",
+          "orchestration",
+          "lockfile"
+        ]
+      }
+    },
+    "modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declared", "interchangeable", "targeted", "full"],
+      "properties": {
+        "declared": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["targeted", "full"]
+          }
+        },
+        "interchangeable": {
+          "const": false,
+          "description": "A targeted result never discharges a full-roster requirement and a full result never retroactively re-scopes a targeted one."
+        },
+        "targeted": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selection_must_be_nonempty", "roster_complete_required", "satisfies"],
+          "properties": {
+            "selection_must_be_nonempty": {
+              "const": true
+            },
+            "roster_complete_required": {
+              "const": false
+            },
+            "satisfies": {
+              "const": "targeted"
+            }
+          }
+        },
+        "full": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selection_must_be_nonempty", "roster_complete_required", "satisfies"],
+          "properties": {
+            "selection_must_be_nonempty": {
+              "const": true
+            },
+            "roster_complete_required": {
+              "const": true
+            },
+            "satisfies": {
+              "const": "full"
+            }
+          }
+        }
+      }
+    },
+    "dispositions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["disposition", "pass_permitted", "blocks_required_readiness"],
+        "properties": {
+          "disposition": {
+            "enum": ["executed", "reused", "not-required", "failed", "unknown"]
+          },
+          "pass_permitted": {
+            "type": "boolean"
+          },
+          "blocks_required_readiness": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "enum": ["not-required", "failed", "unknown"]
+                }
+              },
+              "required": ["disposition"]
+            },
+            "then": {
+              "properties": {
+                "pass_permitted": {
+                  "const": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "reuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "permitted_when",
+        "partial_match_behavior",
+        "missing_identity_behavior",
+        "cross_mode_reuse"
+      ],
+      "properties": {
+        "permitted_when": {
+          "const": "every-required-identity-binding-matches-exactly"
+        },
+        "partial_match_behavior": {
+          "const": "deny"
+        },
+        "missing_identity_behavior": {
+          "const": "deny"
+        },
+        "cross_mode_reuse": {
+          "const": "deny",
+          "description": "A targeted report is never reused to satisfy a full requirement."
+        }
+      }
+    },
+    "not_required": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "requires_typed_reason", "permitted_reasons", "is_pass"],
+      "properties": {
+        "verdict": {
+          "const": "not-applicable"
+        },
+        "requires_typed_reason": {
+          "const": true
+        },
+        "permitted_reasons": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "documentation-only-change",
+              "metadata-only-change",
+              "no-behavioral-surface-selected"
+            ]
+          }
+        },
+        "is_pass": {
+          "const": false
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "score_operator", "survived_operator"],
+      "properties": {
+        "source": {
+          "const": "law/policy/thresholds.json#/mutation"
+        },
+        "score_operator": {
+          "const": ">="
+        },
+        "survived_operator": {
+          "const": "<="
+        }
+      }
+    },
+    "prohibitions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "2.0.0",
+      "id": "mutation-assurance-v2",
+      "status": "active",
+      "authority": "Architect",
+      "policy_version": "2.0.0",
+      "report_schema": "law/schemas/mutation-assurance-v2.schema.json",
+      "supersedes_policy": [],
+      "required_identity_bindings": [
+        "candidate",
+        "source",
+        "test",
+        "config",
+        "toolchain",
+        "roster",
+        "threshold",
+        "sanitizer",
+        "orchestration",
+        "lockfile"
+      ],
+      "modes": {
+        "declared": ["targeted", "full"],
+        "interchangeable": false,
+        "targeted": {
+          "selection_must_be_nonempty": true,
+          "roster_complete_required": false,
+          "satisfies": "targeted"
+        },
+        "full": {
+          "selection_must_be_nonempty": true,
+          "roster_complete_required": true,
+          "satisfies": "full"
+        }
+      },
+      "dispositions": [
+        {
+          "disposition": "executed",
+          "pass_permitted": true,
+          "blocks_required_readiness": false
+        },
+        {
+          "disposition": "reused",
+          "pass_permitted": true,
+          "blocks_required_readiness": false
+        },
+        {
+          "disposition": "not-required",
+          "pass_permitted": false,
+          "blocks_required_readiness": false
+        },
+        {
+          "disposition": "failed",
+          "pass_permitted": false,
+          "blocks_required_readiness": true
+        },
+        {
+          "disposition": "unknown",
+          "pass_permitted": false,
+          "blocks_required_readiness": true
+        }
+      ],
+      "reuse": {
+        "permitted_when": "every-required-identity-binding-matches-exactly",
+        "partial_match_behavior": "deny",
+        "missing_identity_behavior": "deny",
+        "cross_mode_reuse": "deny"
+      },
+      "not_required": {
+        "verdict": "not-applicable",
+        "requires_typed_reason": true,
+        "permitted_reasons": ["documentation-only-change"],
+        "is_pass": false
+      },
+      "thresholds": {
+        "source": "law/policy/thresholds.json#/mutation",
+        "score_operator": ">=",
+        "survived_operator": "<="
+      },
+      "prohibitions": ["empty-selection-pass"]
+    }
+  ]
+}

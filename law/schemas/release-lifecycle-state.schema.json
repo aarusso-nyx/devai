@@ -1,0 +1,446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-state.schema.json",
+  "title": "Release lifecycle state record",
+  "description": "One appended release lifecycle state transition. Every record binds exact repository, candidate, input, evidence, artifact, and prior-state identity, so a state is never inherited from an unnamed predecessor or a differently identified tree. Records are appended, never edited; a correction is a new record. Remote-write transitions additionally cite the exact one-time effect authorization they consumed.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "state_id",
+    "state",
+    "action_id",
+    "effect",
+    "prior_state",
+    "repository",
+    "candidate",
+    "inputs",
+    "evidence",
+    "artifacts",
+    "actor",
+    "consent",
+    "authorization_event_id",
+    "recorded_at",
+    "record_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "state_id": {
+      "type": "string",
+      "pattern": "^RLS-[0-9a-f]{16}$"
+    },
+    "state": {
+      "$ref": "#/$defs/state"
+    },
+    "action_id": {
+      "enum": [
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release evidence-publish",
+        "release publish"
+      ],
+      "description": "Read actions are observational and never produce a state record."
+    },
+    "effect": {
+      "enum": ["harness-write", "local-write", "remote-write"]
+    },
+    "prior_state": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["state", "state_id", "record_digest_sha256"],
+      "description": "Exact identity of the consumed predecessor. Null only for the record that opens the chain.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "state_id": {
+          "type": "string",
+          "pattern": "^RLS-[0-9a-f]{16}$"
+        },
+        "record_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every governed input the transition consumed, pinned by exact path and content digest.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "path", "sha256"],
+        "properties": {
+          "kind": {
+            "enum": [
+              "release-intent",
+              "release-profile",
+              "release-lifecycle-policy",
+              "task-policy",
+              "toolchain",
+              "lockfile",
+              "action-registry",
+              "threshold"
+            ]
+          },
+          "path": {
+            "$ref": "#/$defs/relative_path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_digest_sha256", "receipt_digests", "independently_checkable"],
+      "properties": {
+        "manifest_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_digests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "independently_checkable": {
+          "const": true,
+          "description": "Article 41: judge-only or otherwise uncheckable evidence never establishes readiness."
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "path", "sha256", "size_bytes"],
+        "properties": {
+          "kind": {
+            "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
+          },
+          "path": {
+            "$ref": "#/$defs/relative_path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "role", "declaration_source"],
+      "properties": {
+        "kind": {
+          "const": "human"
+        },
+        "role": {
+          "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        "declaration_source": {
+          "enum": ["cli-flag", "session-state"]
+        }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["write", "allow_publish", "experimental"],
+      "properties": {
+        "write": {
+          "const": true
+        },
+        "allow_publish": {
+          "type": "boolean"
+        },
+        "experimental": {
+          "const": false
+        }
+      }
+    },
+    "authorization_event_id": {
+      "type": ["string", "null"],
+      "pattern": "^EA-[0-9a-f]{16}$",
+      "description": "The exact one-time authorization consumed by this transition. Null for every non-remote effect; a non-null value on a non-remote transition is a violation."
+    },
+    "recorded_at": {
+      "$ref": "common-defs.schema.json#/$defs/timestamp"
+    },
+    "record_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest of this record with this field omitted. Audit integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "preflighted"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "prior_state": {
+            "type": "null"
+          },
+          "action_id": {
+            "const": "release preflight"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "prior_state": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "const": "remote-write"
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "authorization_event_id": {
+            "type": "string"
+          },
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "owner"
+              }
+            }
+          },
+          "consent": {
+            "properties": {
+              "allow_publish": {
+                "const": true
+              }
+            }
+          },
+          "artifacts": {
+            "minItems": 1
+          }
+        },
+        "required": ["authorization_event_id"]
+      },
+      "else": {
+        "properties": {
+          "authorization_event_id": {
+            "type": "null"
+          },
+          "consent": {
+            "properties": {
+              "allow_publish": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "const": "harness-write"
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "action_id": {
+            "enum": ["release preflight", "release certify"]
+          },
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "inspector"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "const": "local-write"
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "action_id": {
+            "enum": ["release prepare", "release export"]
+          },
+          "actor": {
+            "properties": {
+              "role": {
+                "const": "architect"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "const": "remote-write"
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "action_id": {
+            "enum": ["release evidence-publish", "release publish"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "state": {
+      "enum": [
+        "preflighted",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence-published",
+        "published"
+      ]
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "state_id": "RLS-0123456789abcdef",
+      "state": "preflighted",
+      "action_id": "release preflight",
+      "effect": "harness-write",
+      "prior_state": null,
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "inputs": [
+        {
+          "kind": "release-lifecycle-policy",
+          "path": "law/policy/release-lifecycle.json",
+          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        }
+      ],
+      "evidence": {
+        "manifest_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "receipt_digests": [],
+        "independently_checkable": true
+      },
+      "artifacts": [],
+      "actor": {
+        "kind": "human",
+        "role": "inspector",
+        "declaration_source": "cli-flag"
+      },
+      "consent": {
+        "write": true,
+        "allow_publish": false,
+        "experimental": false
+      },
+      "authorization_event_id": null,
+      "recorded_at": "2026-09-03T00:00:00.000Z",
+      "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  ]
+}

@@ -1,0 +1,570 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/mutation-assurance-v2.schema.json",
+  "title": "Mutation assurance report v2",
+  "description": "Additive v2 mutation assurance record. Every report binds the exact candidate, source, test, config, toolchain, roster, threshold, sanitizer, orchestration, and lockfile identity it was produced under. Targeted and full assurance are distinct results and neither substitutes for the other. A not-required disposition is never a pass, and a prior result may be reused only when every declared identity matches exactly.",
+  "schema_version": "2.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "report_id",
+    "mode",
+    "satisfies_requirement",
+    "disposition",
+    "verdict",
+    "identity",
+    "selection",
+    "thresholds_applied",
+    "independently_checkable",
+    "recorded_at",
+    "record_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0.0"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^MA2-[0-9a-f]{16}$"
+    },
+    "mode": {
+      "enum": ["targeted", "full"],
+      "description": "Distinct assurance kinds. targeted covers a selected behavioral subset; full covers the complete declared roster."
+    },
+    "satisfies_requirement": {
+      "enum": ["targeted", "full"],
+      "description": "The requirement this report may discharge. It always equals mode: a targeted run never discharges a full-roster requirement."
+    },
+    "disposition": {
+      "enum": ["executed", "reused", "not-required", "failed", "unknown"]
+    },
+    "verdict": {
+      "enum": ["pass", "fail", "unknown", "not-applicable"]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate",
+        "source",
+        "test",
+        "config",
+        "toolchain",
+        "roster",
+        "threshold",
+        "sanitizer",
+        "orchestration",
+        "lockfile"
+      ],
+      "description": "The ten exact identities the result is bound to. A result is valid only for this tuple.",
+      "properties": {
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["release_unit", "commit", "tree"],
+          "properties": {
+            "release_unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "commit": {
+              "$ref": "#/$defs/git_object"
+            },
+            "tree": {
+              "$ref": "#/$defs/git_object"
+            }
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "test": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "config": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "toolchain": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "roster": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "threshold": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "sanitizer": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "orchestration": {
+          "$ref": "#/$defs/identity_binding"
+        },
+        "lockfile": {
+          "$ref": "#/$defs/identity_binding"
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_ids", "roster_complete", "caller_trimmed"],
+      "properties": {
+        "scenario_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+          }
+        },
+        "roster_complete": {
+          "type": "boolean",
+          "description": "True only when every roster member was selected and executed."
+        },
+        "caller_trimmed": {
+          "const": false,
+          "description": "A caller never narrows the selection. A trimmed selection is not a smaller pass; it is not a result."
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "killed",
+        "survived",
+        "timeout",
+        "runtime_error",
+        "infrastructure_error",
+        "score"
+      ],
+      "properties": {
+        "killed": {
+          "$ref": "#/$defs/count"
+        },
+        "survived": {
+          "$ref": "#/$defs/count"
+        },
+        "timeout": {
+          "$ref": "#/$defs/count"
+        },
+        "runtime_error": {
+          "$ref": "#/$defs/count"
+        },
+        "infrastructure_error": {
+          "$ref": "#/$defs/count"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "thresholds_applied": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "score_min", "survived_max"],
+      "properties": {
+        "source": {
+          "const": "law/policy/thresholds.json#/mutation",
+          "description": "The canonical threshold source. A report that scored itself against any other source is rejected rather than rescored."
+        },
+        "score_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "survived_max": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "thresholds_met": {
+      "type": "boolean"
+    },
+    "reuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reused_from_report_id", "reused_from_digest_sha256", "all_identities_match"],
+      "properties": {
+        "reused_from_report_id": {
+          "type": "string",
+          "pattern": "^MA2-[0-9a-f]{16}$"
+        },
+        "reused_from_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "all_identities_match": {
+          "const": true,
+          "description": "Reuse requires an exact match on all ten identities. A partial match is a miss, never a discount."
+        }
+      }
+    },
+    "not_required": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason_code", "blocks_required_readiness"],
+      "properties": {
+        "reason_code": {
+          "enum": [
+            "documentation-only-change",
+            "metadata-only-change",
+            "no-behavioral-surface-selected"
+          ]
+        },
+        "blocks_required_readiness": {
+          "type": "boolean"
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "reason_code"],
+      "properties": {
+        "class": {
+          "enum": [
+            "required-critical-mutant-survived",
+            "score-below-threshold",
+            "survivors-above-threshold",
+            "runner-unavailable",
+            "timeout",
+            "crash",
+            "infrastructure-error",
+            "incomplete-selection",
+            "empty-selection",
+            "invalid-report",
+            "exact-subject-mismatch",
+            "independently-uncheckable-result"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
+      }
+    },
+    "independently_checkable": {
+      "type": "boolean",
+      "description": "Article 41: a judge-only or otherwise uncheckable result never establishes readiness."
+    },
+    "recorded_at": {
+      "$ref": "common-defs.schema.json#/$defs/timestamp"
+    },
+    "record_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "full"
+          }
+        },
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "satisfies_requirement": {
+            "const": "full"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "satisfies_requirement": {
+            "const": "targeted"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "not-required"
+          }
+        },
+        "required": ["disposition"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "const": "not-applicable"
+          }
+        },
+        "required": ["not_required"],
+        "not": {
+          "required": ["results"]
+        }
+      },
+      "else": {
+        "not": {
+          "required": ["not_required"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "reused"
+          }
+        },
+        "required": ["disposition"]
+      },
+      "then": {
+        "required": ["reuse", "results"]
+      },
+      "else": {
+        "not": {
+          "required": ["reuse"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "executed"
+          }
+        },
+        "required": ["disposition"]
+      },
+      "then": {
+        "required": ["results"],
+        "properties": {
+          "verdict": {
+            "enum": ["pass", "fail", "unknown"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "failed"
+          }
+        },
+        "required": ["disposition"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "const": "fail"
+          }
+        },
+        "required": ["failure"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "unknown"
+          }
+        },
+        "required": ["disposition"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "const": "unknown"
+          }
+        },
+        "required": ["failure"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "pass"
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "enum": ["executed", "reused"]
+          },
+          "independently_checkable": {
+            "const": true
+          },
+          "thresholds_met": {
+            "const": true
+          },
+          "results": {
+            "properties": {
+              "runtime_error": {
+                "const": 0
+              },
+              "infrastructure_error": {
+                "const": 0
+              }
+            }
+          },
+          "selection": {
+            "properties": {
+              "scenario_ids": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": ["results", "thresholds_met"]
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "verdict": {
+                "const": "pass"
+              }
+            },
+            "required": ["verdict"]
+          },
+          {
+            "properties": {
+              "mode": {
+                "const": "full"
+              }
+            },
+            "required": ["mode"]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "selection": {
+            "properties": {
+              "roster_complete": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "identity_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest_sha256", "member_count", "canonical_form"],
+      "description": "Content identity over an ordered member set. member_count is part of the identity so an empty or truncated set is never mistaken for a match.",
+      "properties": {
+        "digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "member_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "canonical_form": {
+          "const": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "2.0.0",
+      "report_id": "MA2-0123456789abcdef",
+      "mode": "targeted",
+      "satisfies_requirement": "targeted",
+      "disposition": "not-required",
+      "verdict": "not-applicable",
+      "identity": {
+        "candidate": {
+          "release_unit": "@aarusso-nyx/devai",
+          "commit": "5461ba500000000000000000000000000000aaaa",
+          "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+        },
+        "source": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "test": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "config": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "toolchain": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "roster": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "threshold": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 1,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "sanitizer": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "orchestration": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 0,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        },
+        "lockfile": {
+          "digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "member_count": 1,
+          "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline"
+        }
+      },
+      "selection": {
+        "scenario_ids": [],
+        "roster_complete": false,
+        "caller_trimmed": false
+      },
+      "thresholds_applied": {
+        "source": "law/policy/thresholds.json#/mutation",
+        "score_min": 60,
+        "survived_max": 50
+      },
+      "not_required": {
+        "reason_code": "documentation-only-change",
+        "blocks_required_readiness": false
+      },
+      "independently_checkable": true,
+      "recorded_at": "2026-09-03T00:00:00.000Z",
+      "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  ]
+}

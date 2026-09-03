@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/adr-validation-policy.schema.json",
+  "title": "ADR validation policy",
+  "description": "Fail-closed contract for validating every Markdown file under law/adr/. The scan is recursive and total: a file is either a conforming ADR v2 record or an exact catalogued exception, and anything else is a failure. Exceptions are pinned by exact repository-relative path and sha256, and the catalog itself is digest-bound so an entry cannot be added, removed, or repointed silently.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "record_schema",
+    "scan",
+    "identity",
+    "lifecycle",
+    "body",
+    "supersession",
+    "exception_catalog",
+    "fail_closed"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "adr-validation"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "record_schema": {
+      "const": "law/schemas/adr-v2.schema.json"
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "recursive",
+        "include",
+        "extension_match",
+        "follow_symlinks",
+        "unreadable_behavior",
+        "unmatched_file_behavior",
+        "empty_directory_behavior"
+      ],
+      "properties": {
+        "root": {
+          "const": "law/adr"
+        },
+        "recursive": {
+          "const": true,
+          "description": "Every descendant directory is scanned. A nested directory never hides a record."
+        },
+        "include": {
+          "const": ["*.md", "**/*.md"],
+          "description": "Root-level and recursively nested Markdown files are both in the census; extension matching is case-insensitive."
+        },
+        "extension_match": {
+          "const": "case-insensitive",
+          "description": "A .MD or .Md file is a Markdown file. Case is never an escape hatch from the scan."
+        },
+        "follow_symlinks": {
+          "const": false
+        },
+        "unreadable_behavior": {
+          "const": "fail",
+          "description": "Article 41: a failure to read is a failure to observe and never a pass."
+        },
+        "unmatched_file_behavior": {
+          "const": "fail",
+          "description": "A Markdown file that is neither a conforming record nor a catalogued exception fails the scan."
+        },
+        "empty_directory_behavior": {
+          "const": "pass"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id_pattern", "id_required", "scope_source", "filename_binding", "uniqueness"],
+      "properties": {
+        "id_pattern": {
+          "const": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$"
+        },
+        "id_required": {
+          "const": true,
+          "description": "A missing id is a validation failure. An id is never derived from the filename, the path, or the directory sequence."
+        },
+        "scope_source": {
+          "const": "id-scope-segments"
+        },
+        "filename_binding": {
+          "const": "basename-starts-with-id-followed-by-hyphen"
+        },
+        "uniqueness": {
+          "const": "id-unique-across-recursive-scan"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statuses", "binding_statuses", "unknown_status_behavior"],
+      "properties": {
+        "statuses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["proposed", "accepted", "rejected", "superseded"]
+          }
+        },
+        "binding_statuses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "accepted"
+          }
+        },
+        "unknown_status_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_sections", "missing_section_behavior"],
+      "properties": {
+        "required_sections": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "missing_section_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "supersession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recorded_on",
+        "edit_superseded_record",
+        "unresolved_reference_behavior",
+        "self_reference_behavior"
+      ],
+      "properties": {
+        "recorded_on": {
+          "const": "superseding-record-only",
+          "description": "Supersession is a forward assertion by a new record. The superseded record's bytes are never modified."
+        },
+        "edit_superseded_record": {
+          "const": false
+        },
+        "unresolved_reference_behavior": {
+          "const": "fail",
+          "description": "A supersedes entry must resolve to a scanned record or to a catalogued preserved exception."
+        },
+        "self_reference_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "exception_catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest_algorithm",
+        "canonical_form",
+        "ordering",
+        "catalog_digest_sha256",
+        "entries",
+        "digest_mismatch_behavior",
+        "content_mismatch_behavior"
+      ],
+      "properties": {
+        "digest_algorithm": {
+          "const": "sha256"
+        },
+        "canonical_form": {
+          "const": "utf8-lines-of-<relative_path>-space-<sha256>-newline",
+          "description": "One line per entry: the path relative to scan.root, a single U+0020, the lowercase hex sha256 of the file bytes, and a single U+000A. Lines are concatenated with no separator and no trailing content."
+        },
+        "ordering": {
+          "const": "utf8-bytes-ascending-by-path"
+        },
+        "catalog_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "sha256 over the canonical form of entries. Binds the catalog as a whole so an entry cannot be added or dropped without changing this value."
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "disposition", "reason"],
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/relative_path",
+                "description": "Exact path relative to scan.root. No glob, no prefix, no directory exception."
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "disposition": {
+                "enum": ["non-record", "preserved-pre-v2-record"]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 500
+              }
+            }
+          }
+        },
+        "digest_mismatch_behavior": {
+          "const": "fail"
+        },
+        "content_mismatch_behavior": {
+          "const": "fail",
+          "description": "A catalogued file whose bytes no longer hash to its pinned sha256 fails the scan; the exception does not migrate to the new content."
+        }
+      }
+    },
+    "fail_closed": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "adr-validation",
+      "status": "active",
+      "authority": "Architect",
+      "policy_version": "1.0.0",
+      "record_schema": "law/schemas/adr-v2.schema.json",
+      "scan": {
+        "root": "law/adr",
+        "recursive": true,
+        "include": ["*.md", "**/*.md"],
+        "extension_match": "case-insensitive",
+        "follow_symlinks": false,
+        "unreadable_behavior": "fail",
+        "unmatched_file_behavior": "fail",
+        "empty_directory_behavior": "pass"
+      },
+      "identity": {
+        "id_pattern": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$",
+        "id_required": true,
+        "scope_source": "id-scope-segments",
+        "filename_binding": "basename-starts-with-id-followed-by-hyphen",
+        "uniqueness": "id-unique-across-recursive-scan"
+      },
+      "lifecycle": {
+        "statuses": ["proposed", "accepted", "rejected", "superseded"],
+        "binding_statuses": ["accepted"],
+        "unknown_status_behavior": "fail"
+      },
+      "body": {
+        "required_sections": ["Status"],
+        "missing_section_behavior": "fail"
+      },
+      "supersession": {
+        "recorded_on": "superseding-record-only",
+        "edit_superseded_record": false,
+        "unresolved_reference_behavior": "fail",
+        "self_reference_behavior": "fail"
+      },
+      "exception_catalog": {
+        "digest_algorithm": "sha256",
+        "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline",
+        "ordering": "utf8-bytes-ascending-by-path",
+        "catalog_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "entries": [
+          {
+            "path": "README.md",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "disposition": "non-record",
+            "reason": "Directory prose, not a decision record."
+          }
+        ],
+        "digest_mismatch_behavior": "fail",
+        "content_mismatch_behavior": "fail"
+      },
+      "fail_closed": ["unparseable-frontmatter"]
+    }
+  ]
+}

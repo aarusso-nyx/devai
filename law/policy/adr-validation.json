@@ -1,0 +1,90 @@
+{
+  "$schema": "../schemas/adr-validation-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "adr-validation",
+  "status": "active",
+  "authority": "Architect",
+  "policy_version": "1.0.0",
+  "record_schema": "law/schemas/adr-v2.schema.json",
+  "scan": {
+    "root": "law/adr",
+    "recursive": true,
+    "include": ["*.md", "**/*.md"],
+    "extension_match": "case-insensitive",
+    "follow_symlinks": false,
+    "unreadable_behavior": "fail",
+    "unmatched_file_behavior": "fail",
+    "empty_directory_behavior": "pass"
+  },
+  "identity": {
+    "id_pattern": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$",
+    "id_required": true,
+    "scope_source": "id-scope-segments",
+    "filename_binding": "basename-starts-with-id-followed-by-hyphen",
+    "uniqueness": "id-unique-across-recursive-scan"
+  },
+  "lifecycle": {
+    "statuses": ["proposed", "accepted", "rejected", "superseded"],
+    "binding_statuses": ["accepted"],
+    "unknown_status_behavior": "fail"
+  },
+  "body": {
+    "required_sections": [
+      "Status",
+      "Context",
+      "Decision",
+      "Consequences",
+      "Alternatives Considered",
+      "Affected Rules",
+      "Inspector Adversarial Acceptance"
+    ],
+    "missing_section_behavior": "fail"
+  },
+  "supersession": {
+    "recorded_on": "superseding-record-only",
+    "edit_superseded_record": false,
+    "unresolved_reference_behavior": "fail",
+    "self_reference_behavior": "fail"
+  },
+  "exception_catalog": {
+    "digest_algorithm": "sha256",
+    "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline",
+    "ordering": "utf8-bytes-ascending-by-path",
+    "catalog_digest_sha256": "cc965ab3ee630d5e139f0fc77e3a25d3cb313cb5b6bf7953488ebe7b2f116c91",
+    "entries": [
+      {
+        "path": "ADR-014-release-verification-profiles.md",
+        "sha256": "1d644d0221dab66332d24366f12aeaf454444db1876e0c38a58247d6639ea440",
+        "disposition": "preserved-pre-v2-record",
+        "reason": "Pre-v2 record preserved byte-for-byte. Superseded forward by ADR-REL-0001; never edited, never revalidated against the v2 record schema."
+      },
+      {
+        "path": "README.md",
+        "sha256": "3b1943af6a3024e6bdb6e1c1ec67683707cf3caac66ada69a26f2419ad80671f",
+        "disposition": "non-record",
+        "reason": "Directory prose describing how adopters add their own records. It is not a decision record and carries no identity."
+      }
+    ],
+    "digest_mismatch_behavior": "fail",
+    "content_mismatch_behavior": "fail"
+  },
+  "fail_closed": [
+    "missing-id",
+    "malformed-id",
+    "duplicate-id",
+    "filename-id-mismatch",
+    "unknown-status",
+    "unparseable-frontmatter",
+    "missing-frontmatter",
+    "missing-required-section",
+    "unmatched-markdown-file",
+    "unreadable-file",
+    "symlinked-record",
+    "uncatalogued-exception",
+    "catalog-entry-content-mismatch",
+    "catalog-digest-mismatch",
+    "unresolved-supersedes-reference",
+    "self-supersedes-reference",
+    "superseded-record-edited"
+  ]
+}

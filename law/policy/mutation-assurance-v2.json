@@ -1,0 +1,98 @@
+{
+  "$schema": "../schemas/mutation-assurance-policy-v2.schema.json",
+  "schemaVersion": "2.0.0",
+  "id": "mutation-assurance-v2",
+  "status": "active",
+  "authority": "Architect",
+  "policy_version": "2.0.0",
+  "report_schema": "law/schemas/mutation-assurance-v2.schema.json",
+  "supersedes_policy": ["law/policy/mutation-strength.json"],
+  "required_identity_bindings": [
+    "candidate",
+    "source",
+    "test",
+    "config",
+    "toolchain",
+    "roster",
+    "threshold",
+    "sanitizer",
+    "orchestration",
+    "lockfile"
+  ],
+  "modes": {
+    "declared": ["targeted", "full"],
+    "interchangeable": false,
+    "targeted": {
+      "selection_must_be_nonempty": true,
+      "roster_complete_required": false,
+      "satisfies": "targeted"
+    },
+    "full": {
+      "selection_must_be_nonempty": true,
+      "roster_complete_required": true,
+      "satisfies": "full"
+    }
+  },
+  "dispositions": [
+    {
+      "disposition": "executed",
+      "pass_permitted": true,
+      "blocks_required_readiness": false
+    },
+    {
+      "disposition": "reused",
+      "pass_permitted": true,
+      "blocks_required_readiness": false
+    },
+    {
+      "disposition": "not-required",
+      "pass_permitted": false,
+      "blocks_required_readiness": false
+    },
+    {
+      "disposition": "failed",
+      "pass_permitted": false,
+      "blocks_required_readiness": true
+    },
+    {
+      "disposition": "unknown",
+      "pass_permitted": false,
+      "blocks_required_readiness": true
+    }
+  ],
+  "reuse": {
+    "permitted_when": "every-required-identity-binding-matches-exactly",
+    "partial_match_behavior": "deny",
+    "missing_identity_behavior": "deny",
+    "cross_mode_reuse": "deny"
+  },
+  "not_required": {
+    "verdict": "not-applicable",
+    "requires_typed_reason": true,
+    "permitted_reasons": [
+      "documentation-only-change",
+      "metadata-only-change",
+      "no-behavioral-surface-selected"
+    ],
+    "is_pass": false
+  },
+  "thresholds": {
+    "source": "law/policy/thresholds.json#/mutation",
+    "score_operator": ">=",
+    "survived_operator": "<="
+  },
+  "prohibitions": [
+    "targeted-result-discharging-full-requirement",
+    "full-requirement-satisfied-by-reused-targeted-report",
+    "not-required-reported-as-pass",
+    "reuse-on-partial-identity-match",
+    "reuse-without-declared-identity",
+    "caller-trimmed-selection",
+    "empty-selection-pass",
+    "judge-only-substitution",
+    "mutation-pass-as-sole-readiness-evidence",
+    "threshold-override-outside-canonical-policy",
+    "infrastructure-error-reported-as-fail",
+    "infrastructure-error-reported-as-pass"
+  ]
+}

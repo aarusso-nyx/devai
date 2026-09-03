@@ -1,0 +1,220 @@
+{
+  "$schema": "../schemas/release-lifecycle-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "release-lifecycle",
+  "status": "active",
+  "authority": "Architect",
+  "policy_version": "1.0.0",
+  "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
+  "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+  "states": [
+    "preflighted",
+    "certified",
+    "prepared",
+    "exported",
+    "evidence-published",
+    "published"
+  ],
+  "actions": [
+    {
+      "action_id": "release certify",
+      "effect": "harness-write",
+      "initiator_roles": ["inspector"],
+      "requires_prior_state": ["preflighted"],
+      "produces_state": "certified",
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input", "evidence", "prior-state"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release evidence-publish",
+      "effect": "remote-write",
+      "initiator_roles": ["owner"],
+      "requires_prior_state": ["exported"],
+      "produces_state": "evidence-published",
+      "observational": false,
+      "grants_publication_authority": true,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "input",
+        "evidence",
+        "artifact",
+        "prior-state"
+      ],
+      "authorization": {
+        "required": true,
+        "authorized_by": "owner",
+        "one_time": true,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release export",
+      "effect": "local-write",
+      "initiator_roles": ["architect"],
+      "requires_prior_state": ["prepared"],
+      "produces_state": "exported",
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "input",
+        "evidence",
+        "artifact",
+        "prior-state"
+      ],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release offline-verify",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "requires_prior_state": [],
+      "produces_state": null,
+      "observational": true,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "evidence", "artifact"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release plan",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "requires_prior_state": [],
+      "produces_state": null,
+      "observational": true,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release preflight",
+      "effect": "harness-write",
+      "initiator_roles": ["inspector"],
+      "requires_prior_state": [],
+      "produces_state": "preflighted",
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input", "evidence"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release prepare",
+      "effect": "local-write",
+      "initiator_roles": ["architect"],
+      "requires_prior_state": ["certified"],
+      "produces_state": "prepared",
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "input",
+        "evidence",
+        "artifact",
+        "prior-state"
+      ],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release publish",
+      "effect": "remote-write",
+      "initiator_roles": ["owner"],
+      "requires_prior_state": ["evidence-published"],
+      "produces_state": "published",
+      "observational": false,
+      "grants_publication_authority": true,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "input",
+        "evidence",
+        "artifact",
+        "prior-state"
+      ],
+      "authorization": {
+        "required": true,
+        "authorized_by": "owner",
+        "one_time": true,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release resume",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "requires_prior_state": [],
+      "produces_state": null,
+      "observational": true,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "prior-state"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    }
+  ],
+  "publication_separation": {
+    "evidence_action": "release evidence-publish",
+    "product_action": "release publish",
+    "evidence_implies_product": false,
+    "product_implies_evidence": false,
+    "shared_authorization": false
+  },
+  "fail_closed": [
+    "missing-prior-state",
+    "prior-state-digest-mismatch",
+    "repository-identity-mismatch",
+    "candidate-identity-mismatch",
+    "input-digest-mismatch",
+    "evidence-digest-mismatch",
+    "artifact-digest-mismatch",
+    "absent-effect-authorization",
+    "consumed-effect-authorization",
+    "revoked-effect-authorization",
+    "expired-effect-authorization",
+    "authorization-identity-mismatch",
+    "initiator-role-mismatch",
+    "absent-publish-consent",
+    "observational-action-attempted-transition",
+    "offline-verify-treated-as-grant",
+    "resume-treated-as-transition",
+    "unknown-action-id",
+    "unknown-state"
+  ]
+}

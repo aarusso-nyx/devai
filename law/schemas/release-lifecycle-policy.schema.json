@@ -1,0 +1,547 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-policy.schema.json",
+  "title": "Release lifecycle policy",
+  "description": "Action and state contract for the release lifecycle. Each action declares exactly one effect ceiling, the single role that may initiate it, the prior states it may consume, and the state it produces. Read actions are observational and produce no state. Remote-write actions require an exact, one-time, Owner-issued effect authorization. Evidence publication and product publication are distinct actions and neither implies the other.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "state_record_schema",
+    "authorization_event_schema",
+    "states",
+    "actions",
+    "publication_separation",
+    "fail_closed"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "release-lifecycle"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "state_record_schema": {
+      "const": "law/schemas/release-lifecycle-state.schema.json"
+    },
+    "authorization_event_schema": {
+      "const": "law/schemas/effect-authorization-event.schema.json"
+    },
+    "states": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "description": "The ordered lifecycle. A state is reachable only from its declared predecessor.",
+      "items": {
+        "$ref": "#/$defs/state"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "publication_separation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_action",
+        "product_action",
+        "evidence_implies_product",
+        "product_implies_evidence",
+        "shared_authorization"
+      ],
+      "properties": {
+        "evidence_action": {
+          "const": "release evidence-publish"
+        },
+        "product_action": {
+          "const": "release publish"
+        },
+        "evidence_implies_product": {
+          "const": false
+        },
+        "product_implies_evidence": {
+          "const": false
+        },
+        "shared_authorization": {
+          "const": false,
+          "description": "One authorization never covers both publications. Each remote effect consumes its own exact authorization."
+        }
+      }
+    },
+    "fail_closed": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "state": {
+      "enum": [
+        "preflighted",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence-published",
+        "published"
+      ]
+    },
+    "role": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "effect",
+        "initiator_roles",
+        "requires_prior_state",
+        "produces_state",
+        "observational",
+        "grants_publication_authority",
+        "binds_identity",
+        "authorization"
+      ],
+      "properties": {
+        "action_id": {
+          "enum": [
+            "release plan",
+            "release resume",
+            "release offline-verify",
+            "release preflight",
+            "release certify",
+            "release prepare",
+            "release export",
+            "release evidence-publish",
+            "release publish"
+          ]
+        },
+        "effect": {
+          "enum": ["read", "harness-write", "local-write", "remote-write"]
+        },
+        "initiator_roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/role"
+          }
+        },
+        "requires_prior_state": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Empty means the action opens the chain or reads without a required predecessor.",
+          "items": {
+            "$ref": "#/$defs/state"
+          }
+        },
+        "produces_state": {
+          "type": ["string", "null"],
+          "enum": [
+            null,
+            "preflighted",
+            "certified",
+            "prepared",
+            "exported",
+            "evidence-published",
+            "published"
+          ]
+        },
+        "observational": {
+          "type": "boolean",
+          "description": "True when the action reports state and changes none. An observational action never advances, repairs, or revives a lifecycle."
+        },
+        "grants_publication_authority": {
+          "type": "boolean"
+        },
+        "binds_identity": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The identity classes the action must bind exactly before it may report or act.",
+          "items": {
+            "enum": [
+              "repository",
+              "candidate",
+              "input",
+              "evidence",
+              "artifact",
+              "prior-state"
+            ]
+          }
+        },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "authorized_by", "one_time", "wildcard_permitted"],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "authorized_by": {
+              "type": ["string", "null"],
+              "enum": [null, "owner"]
+            },
+            "one_time": {
+              "type": "boolean"
+            },
+            "wildcard_permitted": {
+              "const": false
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "properties": {
+              "observational": {
+                "const": true
+              },
+              "produces_state": {
+                "type": "null"
+              },
+              "grants_publication_authority": {
+                "const": false
+              },
+              "authorization": {
+                "properties": {
+                  "required": {
+                    "const": false
+                  },
+                  "authorized_by": {
+                    "type": "null"
+                  },
+                  "one_time": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "observational": {
+                "const": false
+              },
+              "produces_state": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "harness-write"
+              }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "properties": {
+              "initiator_roles": {
+                "const": ["inspector"]
+              },
+              "grants_publication_authority": {
+                "const": false
+              },
+              "authorization": {
+                "properties": {
+                  "required": {
+                    "const": false
+                  },
+                  "authorized_by": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "local-write"
+              }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "properties": {
+              "initiator_roles": {
+                "const": ["architect"]
+              },
+              "grants_publication_authority": {
+                "const": false
+              },
+              "authorization": {
+                "properties": {
+                  "required": {
+                    "const": false
+                  },
+                  "authorized_by": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "remote-write"
+              }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "properties": {
+              "initiator_roles": {
+                "const": ["owner"]
+              },
+              "grants_publication_authority": {
+                "const": true
+              },
+              "requires_prior_state": {
+                "minItems": 1
+              },
+              "authorization": {
+                "properties": {
+                  "required": {
+                    "const": true
+                  },
+                  "authorized_by": {
+                    "const": "owner"
+                  },
+                  "one_time": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "release-lifecycle",
+      "status": "active",
+      "authority": "Architect",
+      "policy_version": "1.0.0",
+      "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
+      "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+      "states": [
+        "preflighted",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence-published",
+        "published"
+      ],
+      "actions": [
+        {
+          "action_id": "release certify",
+          "effect": "harness-write",
+          "initiator_roles": ["inspector"],
+          "requires_prior_state": ["preflighted"],
+          "produces_state": "certified",
+          "observational": false,
+          "grants_publication_authority": false,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release evidence-publish",
+          "effect": "remote-write",
+          "initiator_roles": ["owner"],
+          "requires_prior_state": ["exported"],
+          "produces_state": "evidence-published",
+          "observational": false,
+          "grants_publication_authority": true,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": true,
+            "authorized_by": "owner",
+            "one_time": true,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release export",
+          "effect": "local-write",
+          "initiator_roles": ["architect"],
+          "requires_prior_state": ["prepared"],
+          "produces_state": "exported",
+          "observational": false,
+          "grants_publication_authority": false,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release offline-verify",
+          "effect": "read",
+          "initiator_roles": ["auditor"],
+          "requires_prior_state": [],
+          "produces_state": null,
+          "observational": true,
+          "grants_publication_authority": false,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release plan",
+          "effect": "read",
+          "initiator_roles": ["architect"],
+          "requires_prior_state": [],
+          "produces_state": null,
+          "observational": true,
+          "grants_publication_authority": false,
+          "binds_identity": ["repository", "candidate", "input"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release preflight",
+          "effect": "harness-write",
+          "initiator_roles": ["inspector"],
+          "requires_prior_state": [],
+          "produces_state": "preflighted",
+          "observational": false,
+          "grants_publication_authority": false,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release prepare",
+          "effect": "local-write",
+          "initiator_roles": ["architect"],
+          "requires_prior_state": ["certified"],
+          "produces_state": "prepared",
+          "observational": false,
+          "grants_publication_authority": false,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release publish",
+          "effect": "remote-write",
+          "initiator_roles": ["owner"],
+          "requires_prior_state": ["evidence-published"],
+          "produces_state": "published",
+          "observational": false,
+          "grants_publication_authority": true,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": true,
+            "authorized_by": "owner",
+            "one_time": true,
+            "wildcard_permitted": false
+          }
+        },
+        {
+          "action_id": "release resume",
+          "effect": "read",
+          "initiator_roles": ["architect"],
+          "requires_prior_state": [],
+          "produces_state": null,
+          "observational": true,
+          "grants_publication_authority": false,
+          "binds_identity": ["candidate"],
+          "authorization": {
+            "required": false,
+            "authorized_by": null,
+            "one_time": false,
+            "wildcard_permitted": false
+          }
+        }
+      ],
+      "publication_separation": {
+        "evidence_action": "release evidence-publish",
+        "product_action": "release publish",
+        "evidence_implies_product": false,
+        "product_implies_evidence": false,
+        "shared_authorization": false
+      },
+      "fail_closed": ["missing-prior-state"]
+    }
+  ]
+}

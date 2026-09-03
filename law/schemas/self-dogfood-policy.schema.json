@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/self-dogfood-policy.schema.json",
+  "title": "Constrained self-dogfood policy",
+  "description": "Contract for DEVAI running its own governed checks against the DEVAI source repository. Self-consumption is verification configuration only: every run is human-invoked, no run performs autonomous work, no run widens a role, and no run carries publication authority. The role and effect matrix states, per role, exactly which effects a self-dogfood run may initiate; remote-write is forbidden for every role without exception.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "scope",
+    "invocation",
+    "role_widening",
+    "publication_authority",
+    "permitted_checks",
+    "role_effect_matrix",
+    "fail_closed"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "self-dogfood"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "governs_human_maintainers",
+        "produces_readiness_claim",
+        "adopter_applicability"
+      ],
+      "properties": {
+        "subject": {
+          "const": "devai-source-repository"
+        },
+        "governs_human_maintainers": {
+          "const": false,
+          "description": "DEVAI does not govern its own development. Maintainers choose scope, review changes, and decide releases."
+        },
+        "produces_readiness_claim": {
+          "const": false,
+          "description": "Self-observation is evidence about the harness, never a readiness verdict the harness grants itself."
+        },
+        "adopter_applicability": {
+          "const": "none"
+        }
+      }
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "human_invoked_only",
+        "autonomous_work",
+        "scheduled_execution",
+        "backlog_dequeue",
+        "self_dispatch",
+        "unknown_invocation_behavior"
+      ],
+      "properties": {
+        "human_invoked_only": {
+          "const": true
+        },
+        "autonomous_work": {
+          "const": "forbidden"
+        },
+        "scheduled_execution": {
+          "const": "forbidden",
+          "description": "Article 34: never on a timer. The framework is quiescent when the repository is quiet."
+        },
+        "backlog_dequeue": {
+          "const": "forbidden"
+        },
+        "self_dispatch": {
+          "const": "forbidden"
+        },
+        "unknown_invocation_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "role_widening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["permitted", "inference", "elevation", "cross_role_session"],
+      "properties": {
+        "permitted": {
+          "const": false
+        },
+        "inference": {
+          "const": "forbidden",
+          "description": "Article 7: DEVAI never infers a role."
+        },
+        "elevation": {
+          "const": "forbidden"
+        },
+        "cross_role_session": {
+          "const": "forbidden"
+        }
+      }
+    },
+    "publication_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["granted", "implied_by_check_pass", "implied_by_write_consent", "remote_effects"],
+      "properties": {
+        "granted": {
+          "const": false
+        },
+        "implied_by_check_pass": {
+          "const": false
+        },
+        "implied_by_write_consent": {
+          "const": false
+        },
+        "remote_effects": {
+          "const": "forbidden"
+        }
+      }
+    },
+    "permitted_checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The exact check identifiers a self-dogfood run may execute. Anything absent is not permitted by default.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "effect", "initiator_roles"],
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(:[a-z0-9][a-z0-9-]*)*$"
+          },
+          "effect": {
+            "enum": ["read", "harness-write", "local-write"]
+          },
+          "initiator_roles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/role"
+            }
+          }
+        }
+      }
+    },
+    "role_effect_matrix": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "One row per declared human role. The matrix is total: a role absent from a row's permitted list may not initiate that effect.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "permitted_effects", "forbidden_effects", "may_initiate"],
+        "properties": {
+          "role": {
+            "$ref": "#/$defs/role"
+          },
+          "permitted_effects": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": ["read", "harness-write", "local-write"]
+            }
+          },
+          "forbidden_effects": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "contains": {
+              "const": "remote-write"
+            },
+            "description": "Every row forbids remote-write. Publication is never a self-dogfood effect.",
+            "items": {
+              "enum": ["read", "harness-write", "local-write", "remote-write"]
+            }
+          },
+          "may_initiate": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "auditor"
+                }
+              },
+              "required": ["role"]
+            },
+            "then": {
+              "properties": {
+                "permitted_effects": {
+                  "const": ["read"]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "fail_closed": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+  },
+  "$defs": {
+    "role": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "self-dogfood",
+      "status": "active",
+      "authority": "Architect",
+      "policy_version": "1.0.0",
+      "scope": {
+        "subject": "devai-source-repository",
+        "governs_human_maintainers": false,
+        "produces_readiness_claim": false,
+        "adopter_applicability": "none"
+      },
+      "invocation": {
+        "human_invoked_only": true,
+        "autonomous_work": "forbidden",
+        "scheduled_execution": "forbidden",
+        "backlog_dequeue": "forbidden",
+        "self_dispatch": "forbidden",
+        "unknown_invocation_behavior": "fail"
+      },
+      "role_widening": {
+        "permitted": false,
+        "inference": "forbidden",
+        "elevation": "forbidden",
+        "cross_role_session": "forbidden"
+      },
+      "publication_authority": {
+        "granted": false,
+        "implied_by_check_pass": false,
+        "implied_by_write_consent": false,
+        "remote_effects": "forbidden"
+      },
+      "permitted_checks": [
+        {
+          "check_id": "check:schemas",
+          "effect": "read",
+          "initiator_roles": ["architect"]
+        }
+      ],
+      "role_effect_matrix": [
+        {
+          "role": "owner",
+          "permitted_effects": ["read"],
+          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+          "may_initiate": []
+        },
+        {
+          "role": "architect",
+          "permitted_effects": ["read"],
+          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+          "may_initiate": []
+        },
+        {
+          "role": "inspector",
+          "permitted_effects": ["read"],
+          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+          "may_initiate": []
+        },
+        {
+          "role": "engineer",
+          "permitted_effects": ["read"],
+          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+          "may_initiate": []
+        },
+        {
+          "role": "auditor",
+          "permitted_effects": ["read"],
+          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+          "may_initiate": ["audit scorecard"]
+        }
+      ],
+      "fail_closed": ["undeclared-check-id"]
+    }
+  ]
+}

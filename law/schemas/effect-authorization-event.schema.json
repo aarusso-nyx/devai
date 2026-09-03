@@ -1,0 +1,433 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/effect-authorization-event.schema.json",
+  "title": "Exact effect authorization event",
+  "description": "One append-only, hash-linked authorization event. An authorization names exactly one action, one effect, one resource, one repository, one candidate, one consuming role, and one validity window, and it is consumable exactly once. There is no wildcard scope, no bearer transfer, and no delegation: possession of a record is not authority, and a record that cannot be resolved, has been revoked, has expired, or has already been consumed authorizes nothing.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "event_id",
+    "ledger_id",
+    "sequence",
+    "previous_event_digest_sha256",
+    "kind",
+    "action_id",
+    "effect",
+    "resource",
+    "repository",
+    "candidate",
+    "grantor",
+    "subject_role",
+    "consent",
+    "one_time",
+    "uses_permitted",
+    "bearer_transferable",
+    "delegable",
+    "recorded_at",
+    "payload_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^EA-[0-9a-f]{16}$",
+      "description": "Content-derived identity: canonical sha256 over every field of this event except event_id, truncated to 16 hex characters."
+    },
+    "ledger_id": {
+      "type": "string",
+      "pattern": "^EAL-[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Strictly increasing per ledger. A gap or a repeat is a chain violation, never a recoverable ordering hint."
+    },
+    "previous_event_digest_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Digest of the preceding event in this ledger; null only at sequence 1."
+    },
+    "kind": {
+      "enum": ["granted", "consumed", "revoked", "expired", "rejected"]
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$",
+      "maxLength": 100,
+      "description": "Exactly one canonical action id. The pattern admits no wildcard character, so an authorization can never widen to an action family."
+    },
+    "effect": {
+      "enum": ["read", "harness-write", "local-write", "remote-write"]
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "system_id", "exact_identifier", "operations"],
+      "description": "Exactly one resource. Identifiers are literal: no glob, no prefix match, no default remainder.",
+      "properties": {
+        "kind": {
+          "enum": ["fs", "git-ref", "db", "remote"]
+        },
+        "system_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "exact_identifier": {
+          "$ref": "#/$defs/exact_identifier"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "create",
+              "update",
+              "delete",
+              "rename",
+              "merge",
+              "push",
+              "publish",
+              "execute"
+            ]
+          }
+        }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "grantor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "role", "declaration_source"],
+      "description": "The human who issued the authorization. A machine transition never grants its own authority.",
+      "properties": {
+        "kind": {
+          "const": "human"
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "declaration_source": {
+          "enum": ["cli-flag", "session-state"]
+        }
+      }
+    },
+    "subject_role": {
+      "$ref": "#/$defs/role",
+      "description": "The single role permitted to consume this authorization. A different declared role fails closed."
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["write", "allow_publish", "experimental"],
+      "properties": {
+        "write": {
+          "type": "boolean"
+        },
+        "allow_publish": {
+          "type": "boolean"
+        },
+        "experimental": {
+          "const": false
+        }
+      }
+    },
+    "one_time": {
+      "const": true
+    },
+    "uses_permitted": {
+      "const": 1
+    },
+    "bearer_transferable": {
+      "const": false,
+      "description": "Holding the bytes of this record confers nothing. Authority resolves from the ledger, the declared role, and the exact bound identities."
+    },
+    "delegable": {
+      "const": false
+    },
+    "not_before": {
+      "$ref": "common-defs.schema.json#/$defs/timestamp"
+    },
+    "expires_at": {
+      "$ref": "common-defs.schema.json#/$defs/timestamp"
+    },
+    "recorded_at": {
+      "$ref": "common-defs.schema.json#/$defs/timestamp"
+    },
+    "payload_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "grant_event_id": {
+      "type": "string",
+      "pattern": "^EA-[0-9a-f]{16}$",
+      "description": "The grant this terminal event resolves. Required on consumed, revoked, expired, and rejected events."
+    },
+    "consumed_by_state_id": {
+      "type": "string",
+      "pattern": "^RLS-[0-9a-f]{16}$"
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "granted"
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["not_before", "expires_at"],
+        "not": {
+          "anyOf": [
+            {
+              "required": ["grant_event_id"]
+            },
+            {
+              "required": ["consumed_by_state_id"]
+            }
+          ]
+        }
+      },
+      "else": {
+        "required": ["grant_event_id"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "consumed"
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["consumed_by_state_id"]
+      },
+      "else": {
+        "not": {
+          "required": ["consumed_by_state_id"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": ["revoked", "expired", "rejected"]
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["reason_code"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "sequence": {
+            "const": 1
+          }
+        },
+        "required": ["sequence"]
+      },
+      "then": {
+        "properties": {
+          "previous_event_digest_sha256": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "previous_event_digest_sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "const": "remote-write"
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "grantor": {
+            "properties": {
+              "role": {
+                "const": "owner"
+              }
+            }
+          },
+          "subject_role": {
+            "const": "owner"
+          },
+          "consent": {
+            "properties": {
+              "write": {
+                "const": true
+              },
+              "allow_publish": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "consent": {
+            "properties": {
+              "allow_publish": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "const": "read"
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "consent": {
+            "properties": {
+              "write": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "role": {
+      "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "exact_identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!.*[*?\\[\\]])[^\\u0000]+$",
+      "description": "Literal identifier. Glob metacharacters are rejected so a scope can never expand at resolution time."
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "event_id": "EA-0123456789abcdef",
+      "ledger_id": "EAL-devai-release",
+      "sequence": 1,
+      "previous_event_digest_sha256": null,
+      "kind": "granted",
+      "action_id": "release publish",
+      "effect": "remote-write",
+      "resource": {
+        "kind": "remote",
+        "system_id": "npm.pkg.github.com",
+        "exact_identifier": "@aarusso-nyx/devai@1.5.0",
+        "operations": ["publish"]
+      },
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "grantor": {
+        "kind": "human",
+        "role": "owner",
+        "declaration_source": "cli-flag"
+      },
+      "subject_role": "owner",
+      "consent": {
+        "write": true,
+        "allow_publish": true,
+        "experimental": false
+      },
+      "one_time": true,
+      "uses_permitted": 1,
+      "bearer_transferable": false,
+      "delegable": false,
+      "not_before": "2026-09-03T00:00:00.000Z",
+      "expires_at": "2026-09-03T01:00:00.000Z",
+      "recorded_at": "2026-09-03T00:00:00.000Z",
+      "payload_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  ]
+}
