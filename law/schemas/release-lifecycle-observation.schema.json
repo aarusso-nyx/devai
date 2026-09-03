@@ -278,11 +278,36 @@
         "release publish",
         "release resume"
       ],
-      "description": "The only deterministic next action for a complete unambiguous observation. Null on complete, blocked, or ambiguous outcomes; resume never executes it."
+      "description": "The deterministic action reported by pure resume. It is null on complete and ambiguous outcomes. It is normally null when blocked; the sole exception is a failed remote attempt blocked only on fresh exact Owner authorization, which reports its exact remote retry action without granting authority or executing it."
     },
     "next_outcome": {
       "enum": ["ready", "awaiting-external-receipt", "complete", "blocked", "ambiguous"],
-      "description": "A blocked or ambiguous result is non-authoritative and has null next_action. Unknown provider results are always ambiguous and never authorize redispatch."
+      "description": "A blocked result is non-authoritative. Only the closed fresh-authorization retry shape may carry a reported next_action; an ambiguous result always has null next_action. Unknown provider results are always ambiguous and never authorize redispatch."
+    },
+    "blocked_reason": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "broken-chain",
+        "stale-head",
+        "orphan-record",
+        "unterminated-attempt",
+        "unknown-provider-result",
+        "authorization-consumed",
+        "fresh-exact-authorization-required",
+        "candidate-identity-mismatch",
+        "receipt-identity-mismatch"
+      ],
+      "description": "Closed stable reason for a blocked observation. It is required only for next_outcome blocked; unknown provider results remain ambiguous, non-retriable, and do not use this retry shape."
+    },
+    "blocked_requirements": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 1,
+      "items": {
+        "enum": ["fresh_exact_owner_authorization_required"]
+      },
+      "description": "Closed requirements for a blocked observation. The sole non-empty value identifies the one fresh exact Owner authorization required before a new remote attempt may be authorized."
     },
     "emitted_by": {
       "type": "object",
@@ -365,10 +390,50 @@
   "allOf": [
     {
       "if": {
-        "properties": { "next_outcome": { "enum": ["complete", "blocked", "ambiguous"] } },
+        "properties": { "next_outcome": { "enum": ["complete", "ambiguous"] } },
         "required": ["next_outcome"]
       },
       "then": { "properties": { "next_action": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "const": "blocked" } },
+        "required": ["next_outcome"]
+      },
+      "then": {
+        "required": ["blocked_reason", "blocked_requirements"],
+        "oneOf": [
+          {
+            "properties": {
+              "blocked_reason": { "const": "fresh-exact-authorization-required" },
+              "blocked_requirements": {
+                "const": ["fresh_exact_owner_authorization_required"]
+              },
+              "next_action": {
+                "enum": ["release evidence-publish", "release publish"]
+              }
+            }
+          },
+          {
+            "properties": {
+              "blocked_reason": {
+                "enum": [
+                  "broken-chain",
+                  "stale-head",
+                  "orphan-record",
+                  "unterminated-attempt",
+                  "unknown-provider-result",
+                  "authorization-consumed",
+                  "candidate-identity-mismatch",
+                  "receipt-identity-mismatch"
+                ]
+              },
+              "blocked_requirements": { "const": [] },
+              "next_action": { "type": "null" }
+            }
+          }
+        ]
+      }
     },
     {
       "if": {
@@ -673,6 +738,70 @@
         "contains_wall_clock_time": false
       },
       "observation_digest_sha256": "a001454061bfbcdcd3538839c8faa47624b9aed63ef518f8573661008e159f09"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "observation_kind": "release-lifecycle-observation",
+      "observation_id": "RLO-b001454061bfbcdc",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "policy_source": "law/policy/release-lifecycle.json#/observation_kernel",
+        "schema_validation_alone_derives_published": false
+      },
+      "head": {
+        "state": "exported",
+        "state_id": "RLS-0123456789abcdef",
+        "record_digest_sha256": "b1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
+      },
+      "derived_states": [
+        {
+          "state": "offline_verified",
+          "receipt_kind": "release-offline-verification-receipt",
+          "receipt_id": "ROV-0eca1bdad698a5db",
+          "receipt_digest_sha256": "0eca1bdad698a5db560528da47fa11bd5129f3e9ddb0fe1220bec789740b1e5c",
+          "verified": true
+        }
+      ],
+      "published": {
+        "observed": false,
+        "receipt": null,
+        "verified_against": null
+      },
+      "next_action": "release evidence-publish",
+      "next_outcome": "blocked",
+      "blocked_reason": "fresh-exact-authorization-required",
+      "blocked_requirements": ["fresh_exact_owner_authorization_required"],
+      "emitted_by": {
+        "action_id": "release resume",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appends_published_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "observation_digest_sha256": "b001454061bfbcdcd3538839c8faa47624b9aed63ef518f8573661008e159f09"
     }
   ]
 }

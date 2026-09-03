@@ -645,6 +645,7 @@
             "always_pure",
             "next_actions",
             "blocked_outcomes",
+            "blocked_retry_observation",
             "history_resolution",
             "ambiguous_outcome"
           ],
@@ -694,6 +695,15 @@
                 "receipt-identity-mismatch"
               ]
             },
+            "blocked_retry_observation": {
+              "const": {
+                "outcome": "blocked",
+                "reason": "fresh-exact-authorization-required",
+                "requirements": ["fresh_exact_owner_authorization_required"],
+                "next_action": "the-exact-remote-action-of-the-failed-attempt",
+                "authority": "reporting-this-action-never-authorizes-or-dispatches-it;a-distinct-new-attempt-still-requires-a-fresh-exact-owner-authorization"
+              }
+            },
             "history_resolution": {
               "const": {
                 "inputs": [
@@ -701,7 +711,7 @@
                   "validated-full-v2-canonical-completed-state-head"
                 ],
                 "completion": "derive-next-action-from-the-completed-state-head",
-                "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-remote-action-is-blocked-until-a-fresh-exact-owner-authorization-is-supplied",
+                "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-failed-remote-action-is-reported-as-blocked-with-its-exact-retry-action-and-fresh_exact_owner_authorization_required-until-a-fresh-exact-owner-authorization-is-supplied",
                 "unknown": "next-action-null-and-blocked-reason-unknown-provider-result-with-no-retry-or-redispatch",
                 "unterminated_attempt": "next-action-null-and-blocked-reason-unterminated-attempt-with-no-automatic-terminal-inference",
                 "divergence": "next-action-null-and-the-exact-store-validation-error-as-blocked-reason"
@@ -2499,7 +2509,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.3.0",
+      "policy_version": "2.3.1",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -3071,13 +3081,20 @@
             "candidate-identity-mismatch",
             "receipt-identity-mismatch"
           ],
+          "blocked_retry_observation": {
+            "outcome": "blocked",
+            "reason": "fresh-exact-authorization-required",
+            "requirements": ["fresh_exact_owner_authorization_required"],
+            "next_action": "the-exact-remote-action-of-the-failed-attempt",
+            "authority": "reporting-this-action-never-authorizes-or-dispatches-it;a-distinct-new-attempt-still-requires-a-fresh-exact-owner-authorization"
+          },
           "history_resolution": {
             "inputs": [
               "validated-append-log-tail",
               "validated-full-v2-canonical-completed-state-head"
             ],
             "completion": "derive-next-action-from-the-completed-state-head",
-            "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-remote-action-is-blocked-until-a-fresh-exact-owner-authorization-is-supplied",
+            "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-failed-remote-action-is-reported-as-blocked-with-its-exact-retry-action-and-fresh_exact_owner_authorization_required-until-a-fresh-exact-owner-authorization-is-supplied",
             "unknown": "next-action-null-and-blocked-reason-unknown-provider-result-with-no-retry-or-redispatch",
             "unterminated_attempt": "next-action-null-and-blocked-reason-unterminated-attempt-with-no-automatic-terminal-inference",
             "divergence": "next-action-null-and-the-exact-store-validation-error-as-blocked-reason"
