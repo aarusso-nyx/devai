@@ -1,5 +1,6 @@
 import { execFileSync } from '@devai-nyx/authority';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { validateAdrs } from '@devai-nyx/spec';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -300,32 +301,13 @@ function loadForbiddenAuthorizations(
 function activeAdrAffectedRules(repoRoot: string): ReadonlySet<string> {
   const adrDir = join(repoRoot, 'law', 'adr');
   if (!existsSync(adrDir)) return new Set();
+  const validation = validateAdrs({ adrsDir: adrDir });
+  if (!validation.ok || !validation.semantic_resolution_performed) return new Set();
   const affected = new Set<string>();
-  let files: string[];
-  try {
-    files = readdirSync(adrDir).filter((file) => /^ADR-\d{3}-.+\.md$/u.test(file));
-  } catch {
-    return affected;
-  }
-  for (const file of files) {
-    let source: string;
-    try {
-      source = readFileSync(join(adrDir, file), 'utf8');
-    } catch {
-      continue;
-    }
-    const frontmatter = source.match(/^---\n([\s\S]*?)\n---(?:\n|$)/u)?.[1];
-    if (frontmatter === undefined) continue;
-    if (!/^id: ADR-\d{3}$/mu.test(frontmatter)) continue;
-    if (!/^type: adr$/mu.test(frontmatter)) continue;
-    if (!/^status: active$/mu.test(frontmatter)) continue;
-    const block = frontmatter.match(/^affected_rules:\n((?: {2}- .+\n?)+)/mu)?.[1];
-    if (block === undefined) continue;
-    for (const line of block.split('\n')) {
-      const rule = line.match(/^ {2}- ([^\s].*)$/u)?.[1];
-      if (rule !== undefined && !rule.startsWith('/') && !rule.split('/').includes('..')) {
-        affected.add(rule);
-      }
+  for (const adr of validation.adrs) {
+    if (!adr.effective) continue;
+    for (const rule of adr.affected_rules) {
+      if (!rule.startsWith('/') && !rule.split('/').includes('..')) affected.add(rule);
     }
   }
   return affected;
