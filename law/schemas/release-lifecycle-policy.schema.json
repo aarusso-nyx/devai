@@ -20,6 +20,7 @@
     "read_action_purity",
     "publication_separation",
     "publication_dispatch",
+    "observation_kernel",
     "fail_closed"
   ],
   "properties": {
@@ -224,6 +225,126 @@
             "trust"
           ],
           "description": "published is derived only by verifying the receipt against the exact recorded publication_dispatched state, candidate, artifact, and trust identity. Any divergence derives nothing."
+        }
+      }
+    },
+    "observation_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The frozen procedure by which an observation may derive published, and the exact codes by which it refuses. Deriving published is a cross-check between three documents that must agree completely: the recorded head, the observation's own claim about what it verified against, and the signed receipt. Any single divergence derives no published; there is no partial derivation and no near match.",
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "observation_schema",
+        "receipt_canonicalization_kernel_id",
+        "schema_validation_alone_derives_published",
+        "mismatch_behavior",
+        "algorithm",
+        "errors"
+      ],
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.release-lifecycle-observation.v1",
+          "description": "Every emitted observation carries this identifier. An observation carrying another one was produced by a procedure this policy does not define."
+        },
+        "mandatory": {
+          "const": true
+        },
+        "observation_schema": {
+          "const": "law/schemas/release-lifecycle-observation.schema.json"
+        },
+        "receipt_canonicalization_kernel_id": {
+          "const": "devai.kernel.publication-receipt-canonicalization.v1",
+          "description": "Receipt digests are recomputed under the receipt's own frozen canonicalization kernel rather than trusted as printed."
+        },
+        "schema_validation_alone_derives_published": {
+          "const": false
+        },
+        "mismatch_behavior": {
+          "const": "derive-no-published",
+          "description": "A mismatch is not a failure to publish and not a weaker published. It is the absence of a derivation, and the lifecycle stays at publication_dispatched."
+        },
+        "algorithm": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "load-the-recorded-persisted-head-for-the-exact-observed-candidate"
+            },
+            {
+              "const": "require-the-head-state-to-be-publication_dispatched"
+            },
+            {
+              "const": "require-published-verified_against-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256"
+            },
+            {
+              "const": "require-the-publication-receipt-dispatched_state-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256"
+            },
+            {
+              "const": "require-published-receipt-receipt_id-and-receipt_digest_sha256-to-equal-the-published-derived-state-entry-receipt_id-and-receipt_digest_sha256"
+            },
+            {
+              "const": "recompute-the-publication-receipt-signed-payload-digest-receipt-id-and-receipt-digest-under-the-receipt-canonicalization-kernel-and-compare"
+            },
+            {
+              "const": "require-the-receipt-candidate-release_unit-version-commit-and-tree-to-equal-the-observed-candidate"
+            },
+            {
+              "const": "require-the-receipt-artifact-set-to-equal-the-dispatched-artifact-set-by-kind-path-sha256-and-size_bytes"
+            },
+            {
+              "const": "require-the-receipt-workflow-repository-workflow_path-workflow_sha-run_id-run_attempt-and-protected-to-equal-the-recorded-dispatch-workflow-identity"
+            },
+            {
+              "const": "require-the-receipt-trust_root_id-key_id-and-signature_algorithm-to-be-declared-trusted-and-the-signature-to-verify-over-the-recomputed-signed-payload-digest"
+            },
+            {
+              "const": "derive-published-only-when-every-preceding-step-holds-and-otherwise-derive-no-published"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "rlo-head-not-publication-dispatched"
+            },
+            {
+              "const": "rlo-head-verified-against-mismatch"
+            },
+            {
+              "const": "rlo-receipt-dispatched-state-mismatch"
+            },
+            {
+              "const": "rlo-derived-state-receipt-mismatch"
+            },
+            {
+              "const": "rlo-receipt-digest-mismatch"
+            },
+            {
+              "const": "rlo-candidate-identity-mismatch"
+            },
+            {
+              "const": "rlo-artifact-identity-mismatch"
+            },
+            {
+              "const": "rlo-workflow-identity-mismatch"
+            },
+            {
+              "const": "rlo-trust-identity-mismatch"
+            },
+            {
+              "const": "rlo-signature-invalid"
+            },
+            {
+              "const": "rlo-semantic-verification-not-performed"
+            }
+          ]
         }
       }
     },
@@ -1453,6 +1574,40 @@
           "candidate",
           "artifact",
           "trust"
+        ]
+      },
+      "observation_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "mandatory": true,
+        "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",
+        "receipt_canonicalization_kernel_id": "devai.kernel.publication-receipt-canonicalization.v1",
+        "schema_validation_alone_derives_published": false,
+        "mismatch_behavior": "derive-no-published",
+        "algorithm": [
+          "load-the-recorded-persisted-head-for-the-exact-observed-candidate",
+          "require-the-head-state-to-be-publication_dispatched",
+          "require-published-verified_against-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256",
+          "require-the-publication-receipt-dispatched_state-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256",
+          "require-published-receipt-receipt_id-and-receipt_digest_sha256-to-equal-the-published-derived-state-entry-receipt_id-and-receipt_digest_sha256",
+          "recompute-the-publication-receipt-signed-payload-digest-receipt-id-and-receipt-digest-under-the-receipt-canonicalization-kernel-and-compare",
+          "require-the-receipt-candidate-release_unit-version-commit-and-tree-to-equal-the-observed-candidate",
+          "require-the-receipt-artifact-set-to-equal-the-dispatched-artifact-set-by-kind-path-sha256-and-size_bytes",
+          "require-the-receipt-workflow-repository-workflow_path-workflow_sha-run_id-run_attempt-and-protected-to-equal-the-recorded-dispatch-workflow-identity",
+          "require-the-receipt-trust_root_id-key_id-and-signature_algorithm-to-be-declared-trusted-and-the-signature-to-verify-over-the-recomputed-signed-payload-digest",
+          "derive-published-only-when-every-preceding-step-holds-and-otherwise-derive-no-published"
+        ],
+        "errors": [
+          "rlo-head-not-publication-dispatched",
+          "rlo-head-verified-against-mismatch",
+          "rlo-receipt-dispatched-state-mismatch",
+          "rlo-derived-state-receipt-mismatch",
+          "rlo-receipt-digest-mismatch",
+          "rlo-candidate-identity-mismatch",
+          "rlo-artifact-identity-mismatch",
+          "rlo-workflow-identity-mismatch",
+          "rlo-trust-identity-mismatch",
+          "rlo-signature-invalid",
+          "rlo-semantic-verification-not-performed"
         ]
       },
       "fail_closed": ["missing-prior-state"]

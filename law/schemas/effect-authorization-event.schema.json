@@ -8,6 +8,7 @@
   "additionalProperties": false,
   "required": [
     "schemaVersion",
+    "canonicalization",
     "event_id",
     "ledger_id",
     "sequence",
@@ -32,10 +33,31 @@
     "schemaVersion": {
       "const": "1.0.0"
     },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "payload_projection_excludes", "event_id_derivation", "event_digest_projection", "calculation_order"],
+      "properties": {
+        "kernel_id": { "const": "devai.kernel.effect-authorization-event-canonicalization.v1" },
+        "encoding": { "const": "utf-8" },
+        "json_form": { "const": "rfc8785-jcs" },
+        "digest_algorithm": { "const": "sha256" },
+        "payload_projection_excludes": { "const": ["event_id", "payload_digest_sha256"] },
+        "event_id_derivation": { "const": "EA-hyphen-plus-the-first-16-lowercase-hex-characters-of-payload_digest_sha256" },
+        "event_digest_projection": { "const": "complete-event-record-with-no-field-excluded" },
+        "calculation_order": {
+          "const": [
+            "compute-payload_digest_sha256-over-the-canonical-payload-projection",
+            "derive-event_id-from-payload_digest_sha256",
+            "compute-ledger-event-digest-over-the-complete-event-record"
+          ]
+        }
+      }
+    },
     "event_id": {
       "type": "string",
       "pattern": "^EA-[0-9a-f]{16}$",
-      "description": "Content-derived identity: canonical sha256 over every field of this event except event_id, truncated to 16 hex characters."
+      "description": "Derived after payload_digest_sha256 as EA- plus its first 16 lowercase hexadecimal characters."
     },
     "ledger_id": {
       "type": "string",
@@ -198,7 +220,8 @@
       "$ref": "common-defs.schema.json#/$defs/timestamp"
     },
     "payload_digest_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "#/$defs/sha256",
+      "description": "SHA-256 over the RFC 8785 canonical event projection excluding only event_id and payload_digest_sha256."
     },
     "grant_event_id": {
       "type": "string",
@@ -385,6 +408,20 @@
   "examples": [
     {
       "schemaVersion": "1.0.0",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.effect-authorization-event-canonicalization.v1",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "payload_projection_excludes": ["event_id", "payload_digest_sha256"],
+        "event_id_derivation": "EA-hyphen-plus-the-first-16-lowercase-hex-characters-of-payload_digest_sha256",
+        "event_digest_projection": "complete-event-record-with-no-field-excluded",
+        "calculation_order": [
+          "compute-payload_digest_sha256-over-the-canonical-payload-projection",
+          "derive-event_id-from-payload_digest_sha256",
+          "compute-ledger-event-digest-over-the-complete-event-record"
+        ]
+      },
       "event_id": "EA-0123456789abcdef",
       "ledger_id": "EAL-devai-release",
       "sequence": 1,

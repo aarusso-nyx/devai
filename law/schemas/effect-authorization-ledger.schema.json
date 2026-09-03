@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/effect-authorization-ledger.schema.json",
   "title": "Effect authorization ledger",
-  "description": "Append-only, hash-linked index over exact effect authorization events. The ledger orders events by strictly increasing sequence and links each to its predecessor by digest; it references event records and never restates their bytes. Resolution is fail-closed: a replayed, revoked, expired, unresolvable, or out-of-order authorization authorizes nothing, and an absent ledger is a failure to observe rather than an absence of restriction.",
+  "description": "Append-only, hash-linked index over exact effect authorization events. The ledger orders events by strictly increasing sequence and links each to its predecessor by digest; it references event records and never restates their bytes. Resolution is fail-closed: a replayed, revoked, expired, unresolvable, or out-of-order authorization authorizes nothing, and an absent ledger is a failure to observe rather than an absence of restriction. A ledger that validates against this shape has been read, not verified: authorization is established only by the named semantic verifier, which resolves every referenced event and recomputes the identities, digests, links, and head the ledger asserts.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -13,6 +13,7 @@
     "event_schema",
     "append_only",
     "ordering",
+    "semantic_verifier",
     "head",
     "entries",
     "enforcement"
@@ -46,6 +47,154 @@
     "ordering": {
       "const": "hash-linked-ascending-sequence"
     },
+    "semantic_verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The mandatory pass that reads the referenced event records and recomputes what the ledger asserts. The ledger's own shape is checkable without any event being present; that a well-formed index validates says nothing about whether the events it indexes exist, hash as claimed, or link in the order claimed.",
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_validation_alone_establishes_authorization",
+        "event_canonicalization",
+        "algorithm",
+        "errors"
+      ],
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.effect-authorization-ledger.v1"
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_validation_alone_establishes_authorization": {
+          "const": false,
+          "description": "A ledger that validates structurally authorizes nothing. Authorization is established only by a completed run of this kernel."
+        },
+        "event_canonicalization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "payload_projection_excludes", "event_id_derivation", "event_digest_projection", "calculation_order"],
+          "properties": {
+            "kernel_id": {
+              "const": "devai.kernel.effect-authorization-event-canonicalization.v1"
+            },
+            "encoding": {
+              "const": "utf-8"
+            },
+            "json_form": {
+              "const": "rfc8785-jcs"
+            },
+            "digest_algorithm": {
+              "const": "sha256"
+            },
+            "payload_projection_excludes": {
+              "const": ["event_id", "payload_digest_sha256"]
+            },
+            "event_id_derivation": {
+              "const": "EA-hyphen-plus-the-first-16-lowercase-hex-characters-of-payload_digest_sha256"
+            },
+            "event_digest_projection": {
+              "const": "complete-event-record-with-no-field-excluded"
+            },
+            "calculation_order": {
+              "const": [
+                "compute-payload_digest_sha256-over-the-canonical-payload-projection",
+                "derive-event_id-from-payload_digest_sha256",
+                "compute-ledger-event-digest-over-the-complete-event-record"
+              ]
+            }
+          }
+        },
+        "algorithm": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "resolve-every-entry-to-the-content-of-the-event-record-it-references"
+            },
+            {
+              "const": "recompute-each-event-payload-digest-over-the-canonical-payload-projection-and-compare-to-the-event-record"
+            },
+            {
+              "const": "recompute-each-event-id-from-the-recomputed-payload-digest-and-compare-to-the-entry-and-to-the-event-record"
+            },
+            {
+              "const": "recompute-each-ledger-event-digest-over-the-complete-event-record-and-compare-to-the-entry"
+            },
+            {
+              "const": "verify-entry-sequences-are-unique-and-contiguous-ascending-from-1-with-no-gap"
+            },
+            {
+              "const": "verify-the-first-entry-previous-event-digest-is-null-and-every-later-entry-previous-event-digest-equals-the-preceding-entry-event-digest"
+            },
+            {
+              "const": "verify-every-consumed-revoked-expired-and-rejected-entry-references-an-earlier-granted-entry-in-this-ledger"
+            },
+            {
+              "const": "verify-the-referenced-grant-identity-equals-the-terminal-event-identity-across-action-effect-resource-repository-candidate-consuming-role-and-consent"
+            },
+            {
+              "const": "verify-no-granted-entry-is-consumed-by-more-than-one-consumed-entry"
+            },
+            {
+              "const": "verify-head-sequence-event-id-and-event-digest-equal-the-final-entry"
+            },
+            {
+              "const": "deny-when-any-preceding-step-fails"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "eal-event-content-unresolved"
+            },
+            {
+              "const": "eal-event-payload-digest-mismatch"
+            },
+            {
+              "const": "eal-event-digest-mismatch"
+            },
+            {
+              "const": "eal-event-id-mismatch"
+            },
+            {
+              "const": "eal-sequence-not-contiguous-from-one"
+            },
+            {
+              "const": "eal-duplicate-sequence"
+            },
+            {
+              "const": "eal-previous-digest-mismatch"
+            },
+            {
+              "const": "eal-terminal-entry-without-grant-reference"
+            },
+            {
+              "const": "eal-grant-reference-unresolved"
+            },
+            {
+              "const": "eal-grant-identity-mismatch"
+            },
+            {
+              "const": "eal-grant-consumed-more-than-once"
+            },
+            {
+              "const": "eal-head-not-final-entry"
+            },
+            {
+              "const": "eal-semantic-verification-not-performed"
+            }
+          ]
+        }
+      }
+    },
     "head": {
       "type": "object",
       "additionalProperties": false,
@@ -67,33 +216,37 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
+      "description": "The chain in order. The first entry opens it and links to nothing; every later entry carries a non-null link. Position is structural here so an unlinked entry cannot be appended in the middle.",
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            }
+          ],
+          "properties": {
+            "sequence": {
+              "const": 1
+            },
+            "previous_event_digest_sha256": {
+              "type": "null",
+              "description": "Only the opening entry links to nothing."
+            }
+          }
+        }
+      ],
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "sequence",
-          "event_id",
-          "event_digest_sha256",
-          "previous_event_digest_sha256",
-          "kind"
+        "allOf": [
+          {
+            "$ref": "#/$defs/entry"
+          }
         ],
         "properties": {
           "sequence": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "event_id": {
-            "$ref": "#/$defs/event_id"
-          },
-          "event_digest_sha256": {
-            "$ref": "#/$defs/sha256"
+            "minimum": 2
           },
           "previous_event_digest_sha256": {
-            "type": ["string", "null"],
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "kind": {
-            "enum": ["granted", "consumed", "revoked", "expired", "rejected"]
+            "type": "string"
           }
         }
       }
@@ -150,6 +303,74 @@
     }
   },
   "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "event_id",
+        "event_digest_sha256",
+        "previous_event_digest_sha256",
+        "kind",
+        "references_event_id"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "$ref": "#/$defs/event_id"
+        },
+        "event_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "previous_event_digest_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "kind": {
+          "enum": ["granted", "consumed", "revoked", "expired", "rejected"]
+        },
+        "references_event_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/event_id"
+            }
+          ],
+          "description": "The granted entry this entry terminates. A grant references nothing; a consumption, revocation, expiry, or rejection names exactly the grant it acts on, so a terminal entry can never float free of a grant."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "granted"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "references_event_id": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "references_event_id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
     "event_id": {
       "type": "string",
       "pattern": "^EA-[0-9a-f]{16}$"
@@ -168,6 +389,53 @@
       "event_schema": "law/schemas/effect-authorization-event.schema.json",
       "append_only": true,
       "ordering": "hash-linked-ascending-sequence",
+      "semantic_verifier": {
+        "kernel_id": "devai.kernel.effect-authorization-ledger.v1",
+        "mandatory": true,
+        "schema_validation_alone_establishes_authorization": false,
+        "event_canonicalization": {
+          "kernel_id": "devai.kernel.effect-authorization-event-canonicalization.v1",
+          "encoding": "utf-8",
+          "json_form": "rfc8785-jcs",
+          "digest_algorithm": "sha256",
+          "payload_projection_excludes": ["event_id", "payload_digest_sha256"],
+          "event_id_derivation": "EA-hyphen-plus-the-first-16-lowercase-hex-characters-of-payload_digest_sha256",
+          "event_digest_projection": "complete-event-record-with-no-field-excluded",
+          "calculation_order": [
+            "compute-payload_digest_sha256-over-the-canonical-payload-projection",
+            "derive-event_id-from-payload_digest_sha256",
+            "compute-ledger-event-digest-over-the-complete-event-record"
+          ]
+        },
+        "algorithm": [
+          "resolve-every-entry-to-the-content-of-the-event-record-it-references",
+          "recompute-each-event-payload-digest-over-the-canonical-payload-projection-and-compare-to-the-event-record",
+          "recompute-each-event-id-from-the-recomputed-payload-digest-and-compare-to-the-entry-and-to-the-event-record",
+          "recompute-each-ledger-event-digest-over-the-complete-event-record-and-compare-to-the-entry",
+          "verify-entry-sequences-are-unique-and-contiguous-ascending-from-1-with-no-gap",
+          "verify-the-first-entry-previous-event-digest-is-null-and-every-later-entry-previous-event-digest-equals-the-preceding-entry-event-digest",
+          "verify-every-consumed-revoked-expired-and-rejected-entry-references-an-earlier-granted-entry-in-this-ledger",
+          "verify-the-referenced-grant-identity-equals-the-terminal-event-identity-across-action-effect-resource-repository-candidate-consuming-role-and-consent",
+          "verify-no-granted-entry-is-consumed-by-more-than-one-consumed-entry",
+          "verify-head-sequence-event-id-and-event-digest-equal-the-final-entry",
+          "deny-when-any-preceding-step-fails"
+        ],
+        "errors": [
+          "eal-event-content-unresolved",
+          "eal-event-payload-digest-mismatch",
+          "eal-event-digest-mismatch",
+          "eal-event-id-mismatch",
+          "eal-sequence-not-contiguous-from-one",
+          "eal-duplicate-sequence",
+          "eal-previous-digest-mismatch",
+          "eal-terminal-entry-without-grant-reference",
+          "eal-grant-reference-unresolved",
+          "eal-grant-identity-mismatch",
+          "eal-grant-consumed-more-than-once",
+          "eal-head-not-final-entry",
+          "eal-semantic-verification-not-performed"
+        ]
+      },
       "head": {
         "sequence": 1,
         "event_id": "EA-0123456789abcdef",
@@ -179,7 +447,8 @@
           "event_id": "EA-0123456789abcdef",
           "event_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
           "previous_event_digest_sha256": null,
-          "kind": "granted"
+          "kind": "granted",
+          "references_event_id": null
         }
       ],
       "enforcement": {

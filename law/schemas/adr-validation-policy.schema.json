@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/adr-validation-policy.schema.json",
   "title": "ADR validation policy",
-  "description": "Fail-closed contract for validating every Markdown file under law/adr/. The scan is recursive and total: a file is either a conforming ADR v2 record or an exact catalogued exception, and anything else is a failure. Exceptions are pinned by exact repository-relative path and sha256, and the catalog itself is digest-bound so an entry cannot be added, removed, or repointed silently.",
+  "description": "Fail-closed contract for validating every Markdown file under law/adr/. The scan is recursive and total: a file is either a conforming ADR v2 record or an exact catalogued exception, and anything else is a failure. Exceptions are pinned by exact repository-relative path and sha256, and the catalog itself is digest-bound so an entry cannot be added, removed, or repointed silently. Validation is two passes: every record is checked against the record schema, and the record set is then resolved by the named semantic resolver, which decides which accepted record is the effective authority of each supersession lineage.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -18,6 +18,7 @@
     "lifecycle",
     "body",
     "supersession",
+    "semantic_resolver",
     "exception_catalog",
     "fail_closed"
   ],
@@ -186,6 +187,155 @@
         }
       }
     },
+    "semantic_resolver": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The mandatory semantic pass over the scanned record set. Per-record schema validation says a record is well formed; it never says which accepted record is the effective authority. Effective authority is the unique accepted head of each supersession lineage, computed by this frozen algorithm, so an accepted record that a later accepted record supersedes stops being effective without either record's bytes changing.",
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_validation_alone_establishes_effective_authority",
+        "effective_authority_rule",
+        "status_rewrite_permitted",
+        "superseded_record_edit_permitted",
+        "resolvable_legacy_references",
+        "algorithm",
+        "errors"
+      ],
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.adr-supersession-resolution.v1",
+          "description": "The named resolver. An implementation that resolves supersession by any other procedure is not this kernel and does not discharge the obligation."
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_validation_alone_establishes_effective_authority": {
+          "const": false,
+          "description": "Article 41: a record validating against adr-v2 is not a demonstration that it still binds."
+        },
+        "effective_authority_rule": {
+          "const": "unique-effective-accepted-head-per-supersession-lineage",
+          "description": "An accepted record superseded directly or transitively by an accepted record is non-effective. A lineage that does not resolve to exactly one effective accepted head is a failure, not a choice."
+        },
+        "status_rewrite_permitted": {
+          "const": false,
+          "description": "Non-effective is a computed property. The superseded record keeps its recorded accepted status and its bytes."
+        },
+        "superseded_record_edit_permitted": {
+          "const": false
+        },
+        "resolvable_legacy_references": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "The exact pre-v2 identities a supersedes entry may resolve to. Each must name a preserved-pre-v2-record entry present in exception_catalog.entries by exact path; a legacy reference outside this list is unresolved.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "path", "disposition"],
+            "properties": {
+              "reference": {
+                "type": "string",
+                "pattern": "^ADR-[0-9]{3,}$"
+              },
+              "path": {
+                "$ref": "#/$defs/relative_path"
+              },
+              "disposition": {
+                "const": "preserved-pre-v2-record"
+              }
+            }
+          }
+        },
+        "algorithm": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "items": false,
+          "description": "The frozen ordered procedure. Steps are evaluated in this order and a rejection at any step ends the resolution; no step is optional, reorderable, or replaceable by a weaker check.",
+          "prefixItems": [
+            {
+              "const": "collect-every-scanned-record-with-its-declared-id-status-and-supersedes-list"
+            },
+            {
+              "const": "reject-when-two-scanned-records-declare-the-same-id"
+            },
+            {
+              "const": "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference"
+            },
+            {
+              "const": "reject-when-a-supersedes-entry-resolves-to-nothing"
+            },
+            {
+              "const": "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself"
+            },
+            {
+              "const": "build-one-directed-edge-from-each-superseding-record-to-each-resolved-target"
+            },
+            {
+              "const": "reject-when-the-supersession-graph-contains-any-cycle"
+            },
+            {
+              "const": "reject-when-one-target-has-more-than-one-accepted-direct-successor"
+            },
+            {
+              "const": "compute-the-transitive-closure-of-supersession-over-accepted-records"
+            },
+            {
+              "const": "mark-every-accepted-record-superseded-directly-or-transitively-by-an-accepted-record-as-non-effective"
+            },
+            {
+              "const": "define-the-effective-accepted-head-of-a-lineage-as-an-accepted-record-in-that-lineage-not-marked-non-effective"
+            },
+            {
+              "const": "reject-when-a-lineage-has-more-than-one-effective-accepted-head"
+            },
+            {
+              "const": "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": false,
+          "description": "The exact codes this kernel may report. An implementation reporting a different code, or passing where one of these applies, is not this kernel.",
+          "prefixItems": [
+            {
+              "const": "adr-duplicate-id"
+            },
+            {
+              "const": "adr-unresolved-supersedes-reference"
+            },
+            {
+              "const": "adr-uncatalogued-legacy-reference"
+            },
+            {
+              "const": "adr-self-supersedes-reference"
+            },
+            {
+              "const": "adr-supersession-cycle"
+            },
+            {
+              "const": "adr-multiple-accepted-direct-successors"
+            },
+            {
+              "const": "adr-conflicting-supersession-branch"
+            },
+            {
+              "const": "adr-multiple-effective-accepted-heads"
+            },
+            {
+              "const": "adr-superseded-record-edited"
+            },
+            {
+              "const": "adr-semantic-resolution-not-performed"
+            }
+          ]
+        }
+      }
+    },
     "exception_catalog": {
       "type": "object",
       "additionalProperties": false,
@@ -314,6 +464,42 @@
         "edit_superseded_record": false,
         "unresolved_reference_behavior": "fail",
         "self_reference_behavior": "fail"
+      },
+      "semantic_resolver": {
+        "kernel_id": "devai.kernel.adr-supersession-resolution.v1",
+        "mandatory": true,
+        "schema_validation_alone_establishes_effective_authority": false,
+        "effective_authority_rule": "unique-effective-accepted-head-per-supersession-lineage",
+        "status_rewrite_permitted": false,
+        "superseded_record_edit_permitted": false,
+        "resolvable_legacy_references": [],
+        "algorithm": [
+          "collect-every-scanned-record-with-its-declared-id-status-and-supersedes-list",
+          "reject-when-two-scanned-records-declare-the-same-id",
+          "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
+          "reject-when-a-supersedes-entry-resolves-to-nothing",
+          "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself",
+          "build-one-directed-edge-from-each-superseding-record-to-each-resolved-target",
+          "reject-when-the-supersession-graph-contains-any-cycle",
+          "reject-when-one-target-has-more-than-one-accepted-direct-successor",
+          "compute-the-transitive-closure-of-supersession-over-accepted-records",
+          "mark-every-accepted-record-superseded-directly-or-transitively-by-an-accepted-record-as-non-effective",
+          "define-the-effective-accepted-head-of-a-lineage-as-an-accepted-record-in-that-lineage-not-marked-non-effective",
+          "reject-when-a-lineage-has-more-than-one-effective-accepted-head",
+          "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
+        ],
+        "errors": [
+          "adr-duplicate-id",
+          "adr-unresolved-supersedes-reference",
+          "adr-uncatalogued-legacy-reference",
+          "adr-self-supersedes-reference",
+          "adr-supersession-cycle",
+          "adr-multiple-accepted-direct-successors",
+          "adr-conflicting-supersession-branch",
+          "adr-multiple-effective-accepted-heads",
+          "adr-superseded-record-edited",
+          "adr-semantic-resolution-not-performed"
+        ]
       },
       "exception_catalog": {
         "digest_algorithm": "sha256",

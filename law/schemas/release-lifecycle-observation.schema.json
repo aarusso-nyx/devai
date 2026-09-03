@@ -12,6 +12,7 @@
     "observation_id",
     "repository",
     "candidate",
+    "verification_kernel",
     "head",
     "derived_states",
     "published",
@@ -37,6 +38,28 @@
     },
     "candidate": {
       "$ref": "#/$defs/candidate"
+    },
+    "verification_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "policy_source",
+        "schema_validation_alone_derives_published"
+      ],
+      "description": "The named kernel that produced this observation. Its ordered algorithm and its exact error codes are frozen in the canonical release lifecycle policy; this field binds the observation to that procedure so a document asserting published cannot have been produced by a looser one.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.release-lifecycle-observation.v1"
+        },
+        "policy_source": {
+          "const": "law/policy/release-lifecycle.json#/observation_kernel"
+        },
+        "schema_validation_alone_derives_published": {
+          "const": false,
+          "description": "This observation validating against this schema derives nothing. published is derived only by a completed run of the kernel over the recorded dispatch and the signed receipt."
+        }
+      }
     },
     "head": {
       "type": ["object", "null"],
@@ -473,6 +496,11 @@
         "commit": "5461ba500000000000000000000000000000aaaa",
         "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
       },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "policy_source": "law/policy/release-lifecycle.json#/observation_kernel",
+        "schema_validation_alone_derives_published": false
+      },
       "head": {
         "state": "publication_dispatched",
         "state_id": "RLS-fedcba9876543210",
@@ -482,8 +510,8 @@
         {
           "state": "published",
           "receipt_kind": "release-publication-receipt",
-          "receipt_id": "RPU-0123456789abcdef",
-          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "receipt_id": "RPU-9f86d081884c7d65",
+          "receipt_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c",
           "verified": true
         }
       ],
@@ -491,8 +519,8 @@
         "observed": true,
         "receipt": {
           "kind": "release-publication-receipt",
-          "receipt_id": "RPU-0123456789abcdef",
-          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "receipt_id": "RPU-9f86d081884c7d65",
+          "receipt_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c",
           "trust_root_id": "devai-publication-receipt-root",
           "key_id": "publication-receipt-2026-09",
           "signature_verified": true
@@ -541,6 +569,11 @@
         "version": "1.5.0",
         "commit": "5461ba500000000000000000000000000000aaaa",
         "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "policy_source": "law/policy/release-lifecycle.json#/observation_kernel",
+        "schema_validation_alone_derives_published": false
       },
       "head": {
         "state": "exported",

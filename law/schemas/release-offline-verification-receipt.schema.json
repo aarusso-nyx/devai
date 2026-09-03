@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-offline-verification-receipt.schema.json",
   "title": "Release offline verification receipt",
-  "description": "The deterministic document emitted to stdout by release offline-verify. It verifies an exported artifact and its evidence bundle without network access and writes nothing: no state record, no evidence, no receipt file. A passing receipt observes the derived state offline_verified, which is never persisted. The receipt binds the exact exported state it verified against, the exact artifacts it hashed, and the exact verifier package identity that produced it. It grants no authority and satisfies no prior state: release evidence-publish must bind a passing receipt as checkable evidence, and binding it is not the same as being permitted by it.",
+  "description": "The deterministic document emitted to stdout by release offline-verify. It verifies an exported artifact and its evidence bundle without network access and writes nothing: no state record, no evidence, no receipt file. A passing receipt observes the derived state offline_verified, which is never persisted. The receipt binds the exact exported state it verified against, the exact artifacts it hashed, and the exact verifier package identity that produced it. It reports the complete ordered verification roster by fixed identifier, so a receipt that omits, reorders, substitutes, or invents a check is rejected rather than read as a shorter pass. It grants no authority and satisfies no prior state: release evidence-publish must bind a passing receipt as checkable evidence, and binding it is not the same as being permitted by it.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -17,6 +17,7 @@
     "verified_state",
     "artifacts",
     "verifier",
+    "verification_kernel",
     "checks",
     "network_access",
     "emitted_by",
@@ -134,27 +135,180 @@
         }
       }
     },
-    "checks": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["check_id", "status", "result_digest_sha256"],
-        "properties": {
-          "check_id": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9-]{0,63}$"
-          },
-          "status": {
-            "enum": ["pass", "fail"]
-          },
-          "result_digest_sha256": {
-            "$ref": "#/$defs/sha256"
-          }
+    "verification_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_validation_alone_establishes_pass",
+        "roster",
+        "roster_complete",
+        "unknown_check_permitted",
+        "not_applicable_permitted_for",
+        "algorithm",
+        "errors"
+      ],
+      "description": "The named verifier that produced this roster and the exact roster it is obliged to run. A verification that ran a shorter list is not a weaker verification; it is a different one, and this receipt is not the document it may emit.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.offline-verification-receipt.v1"
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_validation_alone_establishes_pass": {
+          "const": false
+        },
+        "roster": {
+          "const": [
+            "candidate-tree-identity",
+            "receipt-envelope-canonicality",
+            "signer-trust",
+            "policy-identity",
+            "result-dag-integrity",
+            "artifact-population",
+            "artifact-digests",
+            "artifact-safety",
+            "mutation-semantics"
+          ],
+          "description": "The complete ordered roster. checks reports exactly these nine identifiers in exactly this order: none omitted, none added, none reordered, none substituted."
+        },
+        "roster_complete": {
+          "const": true
+        },
+        "unknown_check_permitted": {
+          "const": false,
+          "description": "A check identifier outside the roster is not an extra assurance; it is an unrecognised claim and fails the receipt."
+        },
+        "not_applicable_permitted_for": {
+          "const": ["mutation-semantics"],
+          "description": "Exactly one check may report not-applicable, and only with a reason the canonical mutation policy permits. The other eight have no such status."
+        },
+        "algorithm": {
+          "const": [
+            "resolve-the-candidate-policy-verifier-artifacts-and-all-nine-check-results",
+            "recompute-every-resolved-identity-and-digest-and-reject-any-mismatch",
+            "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
+            "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
+            "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
+            "recompute-receipt_digest_sha256-and-receipt_id-from-the-canonical-receipt-projection",
+            "reject-pass-when-any-preceding-step-fails"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "rov-check-roster-incomplete"
+            },
+            {
+              "const": "rov-check-roster-reordered"
+            },
+            {
+              "const": "rov-unknown-check-id"
+            },
+            {
+              "const": "rov-placeholder-check-result"
+            },
+            {
+              "const": "rov-required-check-not-passed"
+            },
+            {
+              "const": "rov-mutation-semantics-not-applicable-not-permitted"
+            },
+            {
+              "const": "rov-artifact-digest-mismatch"
+            },
+            {
+              "const": "rov-receipt-digest-mismatch"
+            },
+            {
+              "const": "rov-semantic-verification-not-performed"
+            }
+          ]
         }
       }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": false,
+      "description": "The complete ordered verification roster. Position is the identity of each check: the first eight are the checks a pass requires, and the ninth is the mutation-semantics check, which may be typed not-applicable only when the canonical mutation policy permits that reason.",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "candidate-tree-identity"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "receipt-envelope-canonicality"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "signer-trust"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "policy-identity"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "result-dag-integrity"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "artifact-population"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "artifact-digests"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "artifact-safety"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/mutation_semantics_check"
+        }
+      ]
     },
     "network_access": {
       "const": false,
@@ -258,13 +412,40 @@
             "const": "offline_verified"
           },
           "checks": {
-            "items": {
-              "properties": {
-                "status": {
-                  "const": "pass"
+            "description": "A pass requires all eight required checks to have passed and the mutation-semantics check to have passed or to be typed not-applicable under the canonical mutation policy. There is no ninth outcome and no skipped check.",
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "enum": ["pass", "not-applicable"]
+                  }
                 }
               }
-            }
+            ]
           }
         }
       },
@@ -281,6 +462,108 @@
   "$defs": {
     "sha256": {
       "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "result_digest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ],
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "description": "The digest of what the check actually computed. The all-zero digest is the shape a placeholder takes and is rejected: a check that computed nothing did not run."
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "result_digest_sha256"],
+      "description": "One required check. It passed or it failed; it has no third outcome and no absent result.",
+      "properties": {
+        "check_id": {
+          "enum": [
+            "candidate-tree-identity",
+            "receipt-envelope-canonicality",
+            "signer-trust",
+            "policy-identity",
+            "result-dag-integrity",
+            "artifact-population",
+            "artifact-digests",
+            "artifact-safety"
+          ]
+        },
+        "status": {
+          "enum": ["pass", "fail"]
+        },
+        "result_digest_sha256": {
+          "$ref": "#/$defs/result_digest"
+        }
+      }
+    },
+    "passed_check": {
+      "properties": {
+        "status": {
+          "const": "pass"
+        }
+      }
+    },
+    "mutation_semantics_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "result_digest_sha256"],
+      "description": "The mutation-semantics check. It is the only roster entry that may be typed not-applicable, and only for a reason the canonical mutation policy already permits. Silence is not one of its outcomes.",
+      "properties": {
+        "check_id": {
+          "const": "mutation-semantics"
+        },
+        "status": {
+          "enum": ["pass", "fail", "not-applicable"]
+        },
+        "result_digest_sha256": {
+          "$ref": "#/$defs/result_digest"
+        },
+        "not_applicable_reason": {
+          "enum": [
+            "documentation-only-change",
+            "metadata-only-change",
+            "no-behavioral-surface-selected"
+          ]
+        },
+        "not_applicable_permitted_by": {
+          "const": "law/policy/mutation-assurance-v2.json#/not_required/permitted_reasons"
+        },
+        "mutation_report_id": {
+          "type": "string",
+          "pattern": "^MA2-[0-9a-f]{16}$"
+        },
+        "mutation_report_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not-applicable"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["not_applicable_reason", "not_applicable_permitted_by"],
+            "not": {
+              "required": ["mutation_report_id"]
+            }
+          },
+          "else": {
+            "required": ["mutation_report_id", "mutation_report_digest_sha256"],
+            "not": {
+              "required": ["not_applicable_reason"]
+            }
+          }
+        }
+      ]
     },
     "git_object": {
       "type": "string",
@@ -372,16 +655,92 @@
         "provenance_sha256": "8ebafff53524031a3207a2256ebcd0fa6e0cc4271fd4bb6bca5aa003395034bd",
         "source_commit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de"
       },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.offline-verification-receipt.v1",
+        "mandatory": true,
+        "schema_validation_alone_establishes_pass": false,
+        "roster": [
+          "candidate-tree-identity",
+          "receipt-envelope-canonicality",
+          "signer-trust",
+          "policy-identity",
+          "result-dag-integrity",
+          "artifact-population",
+          "artifact-digests",
+          "artifact-safety",
+          "mutation-semantics"
+        ],
+        "roster_complete": true,
+        "unknown_check_permitted": false,
+        "not_applicable_permitted_for": ["mutation-semantics"],
+        "algorithm": [
+          "resolve-the-candidate-policy-verifier-artifacts-and-all-nine-check-results",
+          "recompute-every-resolved-identity-and-digest-and-reject-any-mismatch",
+          "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
+          "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
+          "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
+          "recompute-receipt_digest_sha256-and-receipt_id-from-the-canonical-receipt-projection",
+          "reject-pass-when-any-preceding-step-fails"
+        ],
+        "errors": [
+          "rov-check-roster-incomplete",
+          "rov-check-roster-reordered",
+          "rov-unknown-check-id",
+          "rov-placeholder-check-result",
+          "rov-required-check-not-passed",
+          "rov-mutation-semantics-not-applicable-not-permitted",
+          "rov-artifact-digest-mismatch",
+          "rov-receipt-digest-mismatch",
+          "rov-semantic-verification-not-performed"
+        ]
+      },
       "checks": [
         {
-          "check_id": "artifact-digest",
+          "check_id": "candidate-tree-identity",
+          "status": "pass",
+          "result_digest_sha256": "2cad519aba8117a1850eee85d41eae452d51a141a1850eee85d41eae452d51a1"
+        },
+        {
+          "check_id": "receipt-envelope-canonicality",
+          "status": "pass",
+          "result_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
+        },
+        {
+          "check_id": "signer-trust",
+          "status": "pass",
+          "result_digest_sha256": "7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730"
+        },
+        {
+          "check_id": "policy-identity",
+          "status": "pass",
+          "result_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        },
+        {
+          "check_id": "result-dag-integrity",
+          "status": "pass",
+          "result_digest_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+        },
+        {
+          "check_id": "artifact-population",
+          "status": "pass",
+          "result_digest_sha256": "6b51d431df5d7f141cbececcf79edf3dd861c3b4069f0b11661a3eefacbba918"
+        },
+        {
+          "check_id": "artifact-digests",
           "status": "pass",
           "result_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
         },
         {
-          "check_id": "evidence-bundle-integrity",
+          "check_id": "artifact-safety",
           "status": "pass",
-          "result_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          "result_digest_sha256": "d10b4c3ff123b26dc068d43a8bef2d23767c4270dcfa8c357cf1f5c8e5ad1d47"
+        },
+        {
+          "check_id": "mutation-semantics",
+          "status": "not-applicable",
+          "result_digest_sha256": "8722616204217eddb39e7df969e0698aed8e599ba62ed2de1ce49b03ade0fede",
+          "not_applicable_reason": "documentation-only-change",
+          "not_applicable_permitted_by": "law/policy/mutation-assurance-v2.json#/not_required/permitted_reasons"
         }
       ],
       "network_access": false,

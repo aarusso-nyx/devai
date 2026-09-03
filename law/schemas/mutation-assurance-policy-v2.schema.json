@@ -20,6 +20,7 @@
     "reuse",
     "not_required",
     "thresholds",
+    "semantic_verifier",
     "prohibitions"
   ],
   "properties": {
@@ -238,6 +239,105 @@
         }
       }
     },
+    "semantic_verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The mandatory recomputation pass over a report. A report can assert a score, a survivor count, and a met threshold in a shape that validates perfectly; validation confirms the assertion is well formed and never that it is true. A pass is established only by recomputing those values from the report's own declared execution artifacts and finding them identical.",
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_assertion_establishes_pass",
+        "required_report_references",
+        "algorithm",
+        "errors"
+      ],
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.mutation-assurance-v2.v1"
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_assertion_establishes_pass": {
+          "const": false,
+          "description": "Article 41: a schema assertion alone never establishes a pass."
+        },
+        "required_report_references": {
+          "const": [
+            "mutant-roster",
+            "per-mutant-outcome-log",
+            "runner-output",
+            "score-computation",
+            "threshold-snapshot"
+          ],
+          "description": "The execution artifact kinds a passing report must reference by exact path and digest. A report that names none of them is not independently checkable."
+        },
+        "algorithm": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "resolve-every-declared-execution-artifact-and-recompute-its-sha256"
+            },
+            {
+              "const": "recompute-killed-survived-timeout-runtime-error-and-infrastructure-error-counts-from-the-per-mutant-outcome-log"
+            },
+            {
+              "const": "recompute-score-from-the-recomputed-counts"
+            },
+            {
+              "const": "load-the-canonical-thresholds-and-compare-them-to-thresholds_applied"
+            },
+            {
+              "const": "recompute-thresholds_met-from-the-recomputed-score-and-survivor-count-under-the-canonical-operators"
+            },
+            {
+              "const": "recompute-verdict-from-disposition-recomputed-thresholds_met-and-recomputed-error-counts"
+            },
+            {
+              "const": "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "ma2-execution-artifact-unresolved"
+            },
+            {
+              "const": "ma2-execution-artifact-digest-mismatch"
+            },
+            {
+              "const": "ma2-survivor-count-mismatch"
+            },
+            {
+              "const": "ma2-score-mismatch"
+            },
+            {
+              "const": "ma2-threshold-source-mismatch"
+            },
+            {
+              "const": "ma2-threshold-value-mismatch"
+            },
+            {
+              "const": "ma2-thresholds-met-mismatch"
+            },
+            {
+              "const": "ma2-verdict-mismatch"
+            },
+            {
+              "const": "ma2-semantic-verification-not-performed"
+            }
+          ]
+        }
+      }
+    },
     "prohibitions": {
       "type": "array",
       "minItems": 1,
@@ -327,6 +427,38 @@
         "source": "law/policy/thresholds.json#/mutation",
         "score_operator": ">=",
         "survived_operator": "<="
+      },
+      "semantic_verifier": {
+        "kernel_id": "devai.kernel.mutation-assurance-v2.v1",
+        "mandatory": true,
+        "schema_assertion_establishes_pass": false,
+        "required_report_references": [
+          "mutant-roster",
+          "per-mutant-outcome-log",
+          "runner-output",
+          "score-computation",
+          "threshold-snapshot"
+        ],
+        "algorithm": [
+          "resolve-every-declared-execution-artifact-and-recompute-its-sha256",
+          "recompute-killed-survived-timeout-runtime-error-and-infrastructure-error-counts-from-the-per-mutant-outcome-log",
+          "recompute-score-from-the-recomputed-counts",
+          "load-the-canonical-thresholds-and-compare-them-to-thresholds_applied",
+          "recompute-thresholds_met-from-the-recomputed-score-and-survivor-count-under-the-canonical-operators",
+          "recompute-verdict-from-disposition-recomputed-thresholds_met-and-recomputed-error-counts",
+          "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
+        ],
+        "errors": [
+          "ma2-execution-artifact-unresolved",
+          "ma2-execution-artifact-digest-mismatch",
+          "ma2-survivor-count-mismatch",
+          "ma2-score-mismatch",
+          "ma2-threshold-source-mismatch",
+          "ma2-threshold-value-mismatch",
+          "ma2-thresholds-met-mismatch",
+          "ma2-verdict-mismatch",
+          "ma2-semantic-verification-not-performed"
+        ]
       },
       "prohibitions": ["empty-selection-pass"]
     }

@@ -16,6 +16,8 @@
     "candidate",
     "inputs",
     "plan",
+    "determination",
+    "verification_kernel",
     "emitted_by",
     "grants",
     "determinism",
@@ -59,33 +61,276 @@
     },
     "plan": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 9,
       "maxItems": 9,
       "uniqueItems": true,
-      "description": "The resolved lifecycle steps in order. The plan describes what would have to happen; it permits none of it.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["order", "action_id", "produces_state"],
-        "properties": {
-          "order": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9
-          },
-          "action_id": {
-            "$ref": "#/$defs/lifecycle_action"
-          },
-          "produces_state": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/$defs/persisted_state"
-              }
-            ]
+      "items": false,
+      "description": "All nine lifecycle actions in order, each with the state it produces and the state it derives stated explicitly. A step that produces nothing derives something, and the plan says which: an action whose outcome is left unstated is the gap a later reader fills with an assumption.",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 1
+            },
+            "action_id": {
+              "const": "release plan"
+            },
+            "produces_state": {
+              "type": "null"
+            },
+            "derives_state": {
+              "const": "planned"
+            }
           }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 2
+            },
+            "action_id": {
+              "const": "release preflight"
+            },
+            "produces_state": {
+              "const": "preflight_passed"
+            },
+            "derives_state": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 3
+            },
+            "action_id": {
+              "const": "release certify"
+            },
+            "produces_state": {
+              "const": "certified"
+            },
+            "derives_state": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 4
+            },
+            "action_id": {
+              "const": "release prepare"
+            },
+            "produces_state": {
+              "const": "prepared"
+            },
+            "derives_state": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 5
+            },
+            "action_id": {
+              "const": "release export"
+            },
+            "produces_state": {
+              "const": "exported"
+            },
+            "derives_state": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 6
+            },
+            "action_id": {
+              "const": "release offline-verify"
+            },
+            "produces_state": {
+              "type": "null"
+            },
+            "derives_state": {
+              "const": "offline_verified"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 7
+            },
+            "action_id": {
+              "const": "release evidence-publish"
+            },
+            "produces_state": {
+              "const": "evidence_published"
+            },
+            "derives_state": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 8
+            },
+            "action_id": {
+              "const": "release publish"
+            },
+            "produces_state": {
+              "const": "publication_dispatched",
+              "description": "A dispatch is not an outcome. No step of any plan produces published."
+            },
+            "derives_state": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/plan_step",
+          "properties": {
+            "order": {
+              "const": 9
+            },
+            "action_id": {
+              "const": "release resume"
+            },
+            "produces_state": {
+              "type": "null"
+            },
+            "derives_state": {
+              "const": "published"
+            }
+          }
+        }
+      ]
+    },
+    "determination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semver_bump", "support", "impact", "risk_classes"],
+      "description": "The classifications the plan was resolved under, each recomputable from the bound inputs. They are reported so the semantic kernel can recompute them; a receipt that only asserts them asserts something nobody can check.",
+      "properties": {
+        "semver_bump": {
+          "enum": ["major", "minor", "patch"],
+          "description": "Recomputed from the release intent's current_version and target_version. A declared bump that disagrees with the versions is a mismatch, not an override."
+        },
+        "support": {
+          "enum": ["preview", "current", "lts"]
+        },
+        "impact": {
+          "enum": ["documentation", "metadata", "behavioral"]
+        },
+        "risk_classes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          }
+        }
+      }
+    },
+    "verification_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_assertion_establishes_pass",
+        "algorithm",
+        "errors"
+      ],
+      "description": "The named kernel that must recompute this receipt before any action binds it. A receipt is a claim about a deterministic computation; the only way to believe it is to redo the computation.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.release-plan-receipt.v1"
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_assertion_establishes_pass": {
+          "const": false,
+          "description": "This receipt validating against this schema is not a pass verdict. A verdict of pass that the kernel cannot reproduce is rejected."
+        },
+        "algorithm": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "resolve-every-declared-input-and-recompute-its-sha256"
+            },
+            {
+              "const": "reject-when-the-declared-input-set-differs-from-the-input-set-the-lifecycle-policy-requires"
+            },
+            {
+              "const": "recompute-semver_bump-support-impact-and-risk_classes-from-the-resolved-inputs-and-compare-to-determination"
+            },
+            {
+              "const": "recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan"
+            },
+            {
+              "const": "recompute-receipt_digest_sha256-over-the-canonical-receipt-projection-excluding-receipt_id-and-receipt_digest_sha256"
+            },
+            {
+              "const": "recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest"
+            },
+            {
+              "const": "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "rpl-input-unresolved"
+            },
+            {
+              "const": "rpl-input-digest-mismatch"
+            },
+            {
+              "const": "rpl-input-set-mismatch"
+            },
+            {
+              "const": "rpl-determination-mismatch"
+            },
+            {
+              "const": "rpl-plan-mismatch"
+            },
+            {
+              "const": "rpl-receipt-digest-mismatch"
+            },
+            {
+              "const": "rpl-receipt-id-mismatch"
+            },
+            {
+              "const": "rpl-semantic-verification-not-performed"
+            }
+          ]
         }
       }
     },
@@ -153,6 +398,45 @@
         "evidence_published",
         "publication_dispatched"
       ]
+    },
+    "derived_state": {
+      "enum": ["planned", "offline_verified", "published"]
+    },
+    "plan_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "action_id", "produces_state", "derives_state"],
+      "description": "One lifecycle action and its exact outcome. produces_state names the record it appends; derives_state names the state a receipt lets a reader observe. Exactly one of the two is non-null for every action.",
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "action_id": {
+          "$ref": "#/$defs/lifecycle_action"
+        },
+        "produces_state": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/persisted_state"
+            }
+          ]
+        },
+        "derives_state": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/derived_state"
+            }
+          ]
+        }
+      }
     },
     "lifecycle_action": {
       "enum": [
@@ -340,45 +624,89 @@
       "plan": [
         {
           "order": 1,
-          "action_id": "release preflight",
-          "produces_state": "preflight_passed"
+          "action_id": "release plan",
+          "produces_state": null,
+          "derives_state": "planned"
         },
         {
           "order": 2,
-          "action_id": "release certify",
-          "produces_state": "certified"
+          "action_id": "release preflight",
+          "produces_state": "preflight_passed",
+          "derives_state": null
         },
         {
           "order": 3,
-          "action_id": "release prepare",
-          "produces_state": "prepared"
+          "action_id": "release certify",
+          "produces_state": "certified",
+          "derives_state": null
         },
         {
           "order": 4,
-          "action_id": "release export",
-          "produces_state": "exported"
+          "action_id": "release prepare",
+          "produces_state": "prepared",
+          "derives_state": null
         },
         {
           "order": 5,
-          "action_id": "release offline-verify",
-          "produces_state": null
+          "action_id": "release export",
+          "produces_state": "exported",
+          "derives_state": null
         },
         {
           "order": 6,
-          "action_id": "release evidence-publish",
-          "produces_state": "evidence_published"
+          "action_id": "release offline-verify",
+          "produces_state": null,
+          "derives_state": "offline_verified"
         },
         {
           "order": 7,
-          "action_id": "release publish",
-          "produces_state": "publication_dispatched"
+          "action_id": "release evidence-publish",
+          "produces_state": "evidence_published",
+          "derives_state": null
         },
         {
           "order": 8,
+          "action_id": "release publish",
+          "produces_state": "publication_dispatched",
+          "derives_state": null
+        },
+        {
+          "order": 9,
           "action_id": "release resume",
-          "produces_state": null
+          "produces_state": null,
+          "derives_state": "published"
         }
       ],
+      "determination": {
+        "semver_bump": "minor",
+        "support": "current",
+        "impact": "behavioral",
+        "risk_classes": ["release-surface"]
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-plan-receipt.v1",
+        "mandatory": true,
+        "schema_assertion_establishes_pass": false,
+        "algorithm": [
+          "resolve-every-declared-input-and-recompute-its-sha256",
+          "reject-when-the-declared-input-set-differs-from-the-input-set-the-lifecycle-policy-requires",
+          "recompute-semver_bump-support-impact-and-risk_classes-from-the-resolved-inputs-and-compare-to-determination",
+          "recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan",
+          "recompute-receipt_digest_sha256-over-the-canonical-receipt-projection-excluding-receipt_id-and-receipt_digest_sha256",
+          "recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest",
+          "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
+        ],
+        "errors": [
+          "rpl-input-unresolved",
+          "rpl-input-digest-mismatch",
+          "rpl-input-set-mismatch",
+          "rpl-determination-mismatch",
+          "rpl-plan-mismatch",
+          "rpl-receipt-digest-mismatch",
+          "rpl-receipt-id-mismatch",
+          "rpl-semantic-verification-not-performed"
+        ]
+      },
       "emitted_by": {
         "action_id": "release plan",
         "effect": "read",

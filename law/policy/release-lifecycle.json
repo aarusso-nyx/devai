@@ -369,6 +369,40 @@
       "trust"
     ]
   },
+  "observation_kernel": {
+    "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+    "mandatory": true,
+    "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",
+    "receipt_canonicalization_kernel_id": "devai.kernel.publication-receipt-canonicalization.v1",
+    "schema_validation_alone_derives_published": false,
+    "mismatch_behavior": "derive-no-published",
+    "algorithm": [
+      "load-the-recorded-persisted-head-for-the-exact-observed-candidate",
+      "require-the-head-state-to-be-publication_dispatched",
+      "require-published-verified_against-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256",
+      "require-the-publication-receipt-dispatched_state-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256",
+      "require-published-receipt-receipt_id-and-receipt_digest_sha256-to-equal-the-published-derived-state-entry-receipt_id-and-receipt_digest_sha256",
+      "recompute-the-publication-receipt-signed-payload-digest-receipt-id-and-receipt-digest-under-the-receipt-canonicalization-kernel-and-compare",
+      "require-the-receipt-candidate-release_unit-version-commit-and-tree-to-equal-the-observed-candidate",
+      "require-the-receipt-artifact-set-to-equal-the-dispatched-artifact-set-by-kind-path-sha256-and-size_bytes",
+      "require-the-receipt-workflow-repository-workflow_path-workflow_sha-run_id-run_attempt-and-protected-to-equal-the-recorded-dispatch-workflow-identity",
+      "require-the-receipt-trust_root_id-key_id-and-signature_algorithm-to-be-declared-trusted-and-the-signature-to-verify-over-the-recomputed-signed-payload-digest",
+      "derive-published-only-when-every-preceding-step-holds-and-otherwise-derive-no-published"
+    ],
+    "errors": [
+      "rlo-head-not-publication-dispatched",
+      "rlo-head-verified-against-mismatch",
+      "rlo-receipt-dispatched-state-mismatch",
+      "rlo-derived-state-receipt-mismatch",
+      "rlo-receipt-digest-mismatch",
+      "rlo-candidate-identity-mismatch",
+      "rlo-artifact-identity-mismatch",
+      "rlo-workflow-identity-mismatch",
+      "rlo-trust-identity-mismatch",
+      "rlo-signature-invalid",
+      "rlo-semantic-verification-not-performed"
+    ]
+  },
   "fail_closed": [
     "missing-prior-state",
     "prior-state-digest-mismatch",
@@ -417,6 +451,17 @@
     "observation-treated-as-transition",
     "unknown-receipt-kind",
     "unknown-action-id",
-    "unknown-state"
+    "unknown-state",
+    "rlo-head-not-publication-dispatched",
+    "rlo-head-verified-against-mismatch",
+    "rlo-receipt-dispatched-state-mismatch",
+    "rlo-derived-state-receipt-mismatch",
+    "rlo-receipt-digest-mismatch",
+    "rlo-candidate-identity-mismatch",
+    "rlo-artifact-identity-mismatch",
+    "rlo-workflow-identity-mismatch",
+    "rlo-trust-identity-mismatch",
+    "rlo-signature-invalid",
+    "rlo-semantic-verification-not-performed"
   ]
 }

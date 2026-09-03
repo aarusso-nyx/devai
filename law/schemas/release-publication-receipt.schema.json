@@ -2,13 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-publication-receipt.schema.json",
   "title": "Signed release publication receipt",
-  "description": "The signed attestation emitted by the protected external workflow after a dispatched publication completes. No DEVAI action emits it. It binds the exact publication_dispatched state it answers, the exact candidate and artifacts that were published, the exact workflow identity that observed the publication, and the exact trust identity that signed it. release resume may derive the observation-only state published from it, and only when every one of those bindings matches the recorded dispatch. The receipt grants no authority: it is evidence that a publication happened, never permission for one, and it is never appended as a state record.",
+  "description": "The signed attestation emitted by the protected external workflow after a dispatched publication completes. No DEVAI action emits it. It binds the exact publication_dispatched state it answers, the exact candidate and artifacts that were published, the exact workflow identity that observed the publication, and the exact trust identity that signed it. release resume may derive the observation-only state published from it, and only when every one of those bindings matches the recorded dispatch. The receipt grants no authority: it is evidence that a publication happened, never permission for one, and it is never appended as a state record. Every digest it carries is computed under one frozen canonicalization kernel in one computable order, so no digest is an input to itself.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "receipt_kind",
+    "canonicalization",
     "receipt_id",
     "attests_state",
     "outcome",
@@ -31,10 +32,74 @@
     "receipt_kind": {
       "const": "release-publication-receipt"
     },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "encoding",
+        "json_form",
+        "digest_algorithm",
+        "signed_payload_projection_excludes",
+        "whole_receipt_projection_excludes",
+        "calculation_order"
+      ],
+      "description": "The frozen projection and calculation order every digest in this receipt is computed under. The two projections are nested rather than mutual: the signed payload excludes all three derived fields, and the whole-receipt projection excludes only the field being computed. No digest in this receipt is an input to itself.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.publication-receipt-canonicalization.v1",
+          "description": "Named canonicalization kernel. A receipt computed under any other kernel is a different document and does not verify."
+        },
+        "encoding": {
+          "const": "utf-8"
+        },
+        "json_form": {
+          "const": "rfc8785-jcs",
+          "description": "RFC 8785 JSON Canonicalization Scheme: lexicographic member ordering, no insignificant whitespace, canonical number and string escaping."
+        },
+        "digest_algorithm": {
+          "const": "sha256"
+        },
+        "signed_payload_projection_excludes": {
+          "const": [
+            "receipt_id",
+            "trust.signature",
+            "trust.signed_payload_digest_sha256",
+            "receipt_digest_sha256"
+          ],
+          "description": "The signed payload omits every derived field, including the identity derived from it. Signing a payload that contained receipt_id or its own digest would be circular."
+        },
+        "whole_receipt_projection_excludes": {
+          "const": ["receipt_digest_sha256"],
+          "description": "The whole-receipt projection omits only the field being computed. receipt_id, trust.signed_payload_digest_sha256, and trust.signature are all present in it, so the receipt digest covers the identity and the signature."
+        },
+        "calculation_order": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": false,
+          "description": "The four steps in the only order in which they are computable. Each step consumes only values fixed by an earlier step.",
+          "prefixItems": [
+            {
+              "const": "compute-signed-payload-digest-sha256-over-the-signed-payload-projection"
+            },
+            {
+              "const": "derive-receipt-id-as-RPU-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-signed-payload-digest"
+            },
+            {
+              "const": "sign-the-signed-payload-digest-into-trust-signature"
+            },
+            {
+              "const": "compute-receipt-digest-sha256-over-the-whole-receipt-projection"
+            }
+          ]
+        }
+      }
+    },
     "receipt_id": {
       "type": "string",
       "pattern": "^RPU-[0-9a-f]{16}$",
-      "description": "Content-derived identity: canonical sha256 over every field of this receipt except receipt_id, trust.signature, and receipt_digest_sha256, truncated to 16 hex characters."
+      "description": "Content-derived identity: RPU- followed by the first 16 lowercase hex characters of trust.signed_payload_digest_sha256. It is derived from the signed payload digest and is never an input to it."
     },
     "attests_state": {
       "type": ["string", "null"],
@@ -185,11 +250,11 @@
           "minLength": 1,
           "maxLength": 4096,
           "pattern": "^[A-Za-z0-9+/]+={0,2}$",
-          "description": "Base64 signature over signed_payload_digest_sha256."
+          "description": "Base64 signature over the exact bytes of trust.signed_payload_digest_sha256. The signature covers the payload digest, never the receipt digest."
         },
         "signed_payload_digest_sha256": {
           "$ref": "#/$defs/sha256",
-          "description": "Canonical digest of this receipt with trust.signature and receipt_digest_sha256 omitted."
+          "description": "Canonical sha256 over the signed payload projection: this receipt with receipt_id, trust.signature, trust.signed_payload_digest_sha256, and receipt_digest_sha256 omitted. receipt_id is derived from this value."
         }
       }
     },
@@ -242,7 +307,7 @@
     },
     "receipt_digest_sha256": {
       "$ref": "#/$defs/sha256",
-      "description": "Canonical digest of this receipt with receipt_id and this field omitted. Identity and integrity only; it is never a capability."
+      "description": "Canonical sha256 over the whole-receipt projection: this receipt with only this field omitted. It covers receipt_id, trust.signed_payload_digest_sha256, and trust.signature. Identity and integrity only; it is never a capability."
     }
   },
   "allOf": [
@@ -331,7 +396,26 @@
     {
       "schemaVersion": "1.0.0",
       "receipt_kind": "release-publication-receipt",
-      "receipt_id": "RPU-0123456789abcdef",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.publication-receipt-canonicalization.v1",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "signed_payload_projection_excludes": [
+          "receipt_id",
+          "trust.signature",
+          "trust.signed_payload_digest_sha256",
+          "receipt_digest_sha256"
+        ],
+        "whole_receipt_projection_excludes": ["receipt_digest_sha256"],
+        "calculation_order": [
+          "compute-signed-payload-digest-sha256-over-the-signed-payload-projection",
+          "derive-receipt-id-as-RPU-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-signed-payload-digest",
+          "sign-the-signed-payload-digest-into-trust-signature",
+          "compute-receipt-digest-sha256-over-the-whole-receipt-projection"
+        ]
+      },
+      "receipt_id": "RPU-9f86d081884c7d65",
       "attests_state": "published",
       "outcome": "published",
       "repository": {
@@ -391,7 +475,7 @@
         "appended_as_state_record": false
       },
       "emitted_at": "2026-09-03T00:00:00.000Z",
-      "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "receipt_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
     }
   ]
 }

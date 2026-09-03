@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/mutation-assurance-v2.schema.json",
   "title": "Mutation assurance report v2",
-  "description": "Additive v2 mutation assurance record. Every report binds the exact candidate, source, test, config, toolchain, roster, threshold, sanitizer, orchestration, and lockfile identity it was produced under. Targeted and full assurance are distinct results and neither substitutes for the other. A not-required disposition is never a pass, and a prior result may be reused only when every declared identity matches exactly.",
+  "description": "Additive v2 mutation assurance record. Every report binds the exact candidate, source, test, config, toolchain, roster, threshold, sanitizer, orchestration, and lockfile identity it was produced under. Targeted and full assurance are distinct results and neither substitutes for the other. A not-required disposition is never a pass, and a prior result may be reused only when every declared identity matches exactly. A report that claims a result declares the execution artifacts it is recomputable from: this schema validating is never itself a pass.",
   "schema_version": "2.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -184,7 +184,94 @@
       }
     },
     "thresholds_met": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Reported, and never believed on report. The semantic verifier recomputes it from the recomputed score and survivor count under the canonical operators."
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "artifacts",
+        "recomputed_from_artifacts",
+        "schema_assertion_establishes_pass"
+      ],
+      "description": "The exact execution artifacts every reported count, score, and threshold outcome is recomputable from. Required wherever this report claims a result: a claim no one can recompute is not independently checkable.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.mutation-assurance-v2.v1",
+          "description": "The named verifier that must recompute this report. An implementation that reads the reported values instead is not this kernel."
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "description": "At least one artifact of each kind the canonical policy requires, pinned by exact path and content digest.",
+          "items": {
+            "$ref": "#/$defs/execution_artifact"
+          },
+          "allOf": [
+            {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "mutant-roster"
+                  }
+                },
+                "required": ["kind"]
+              }
+            },
+            {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "per-mutant-outcome-log"
+                  }
+                },
+                "required": ["kind"]
+              }
+            },
+            {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "runner-output"
+                  }
+                },
+                "required": ["kind"]
+              }
+            },
+            {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "score-computation"
+                  }
+                },
+                "required": ["kind"]
+              }
+            },
+            {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "threshold-snapshot"
+                  }
+                },
+                "required": ["kind"]
+              }
+            }
+          ]
+        },
+        "recomputed_from_artifacts": {
+          "const": true,
+          "description": "The reported counts and score were produced by reading these artifacts, not asserted alongside them."
+        },
+        "schema_assertion_establishes_pass": {
+          "const": false,
+          "description": "This report validating against this schema is not a pass. A pass exists only after the kernel recomputes every reported value and finds it identical."
+        }
+      }
     },
     "reuse": {
       "type": "object",
@@ -320,7 +407,7 @@
         "required": ["disposition"]
       },
       "then": {
-        "required": ["reuse", "results"]
+        "required": ["reuse", "results", "execution"]
       },
       "else": {
         "not": {
@@ -338,7 +425,7 @@
         "required": ["disposition"]
       },
       "then": {
-        "required": ["results"],
+        "required": ["results", "execution"],
         "properties": {
           "verdict": {
             "enum": ["pass", "fail", "unknown"]
@@ -420,7 +507,7 @@
             }
           }
         },
-        "required": ["results", "thresholds_met"]
+        "required": ["results", "thresholds_met", "execution"]
       }
     },
     {
@@ -461,6 +548,31 @@
     "count": {
       "type": "integer",
       "minimum": 0
+    },
+    "execution_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "mutant-roster",
+            "per-mutant-outcome-log",
+            "runner-output",
+            "score-computation",
+            "threshold-snapshot"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     },
     "sha256": {
       "$ref": "common-defs.schema.json#/$defs/sha256"

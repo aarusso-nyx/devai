@@ -46,6 +46,48 @@
     "unresolved_reference_behavior": "fail",
     "self_reference_behavior": "fail"
   },
+  "semantic_resolver": {
+    "kernel_id": "devai.kernel.adr-supersession-resolution.v1",
+    "mandatory": true,
+    "schema_validation_alone_establishes_effective_authority": false,
+    "effective_authority_rule": "unique-effective-accepted-head-per-supersession-lineage",
+    "status_rewrite_permitted": false,
+    "superseded_record_edit_permitted": false,
+    "resolvable_legacy_references": [
+      {
+        "reference": "ADR-014",
+        "path": "ADR-014-release-verification-profiles.md",
+        "disposition": "preserved-pre-v2-record"
+      }
+    ],
+    "algorithm": [
+      "collect-every-scanned-record-with-its-declared-id-status-and-supersedes-list",
+      "reject-when-two-scanned-records-declare-the-same-id",
+      "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
+      "reject-when-a-supersedes-entry-resolves-to-nothing",
+      "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself",
+      "build-one-directed-edge-from-each-superseding-record-to-each-resolved-target",
+      "reject-when-the-supersession-graph-contains-any-cycle",
+      "reject-when-one-target-has-more-than-one-accepted-direct-successor",
+      "compute-the-transitive-closure-of-supersession-over-accepted-records",
+      "mark-every-accepted-record-superseded-directly-or-transitively-by-an-accepted-record-as-non-effective",
+      "define-the-effective-accepted-head-of-a-lineage-as-an-accepted-record-in-that-lineage-not-marked-non-effective",
+      "reject-when-a-lineage-has-more-than-one-effective-accepted-head",
+      "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
+    ],
+    "errors": [
+      "adr-duplicate-id",
+      "adr-unresolved-supersedes-reference",
+      "adr-uncatalogued-legacy-reference",
+      "adr-self-supersedes-reference",
+      "adr-supersession-cycle",
+      "adr-multiple-accepted-direct-successors",
+      "adr-conflicting-supersession-branch",
+      "adr-multiple-effective-accepted-heads",
+      "adr-superseded-record-edited",
+      "adr-semantic-resolution-not-performed"
+    ]
+  },
   "exception_catalog": {
     "digest_algorithm": "sha256",
     "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline",
@@ -85,6 +127,16 @@
     "catalog-digest-mismatch",
     "unresolved-supersedes-reference",
     "self-supersedes-reference",
-    "superseded-record-edited"
+    "superseded-record-edited",
+    "adr-duplicate-id",
+    "adr-unresolved-supersedes-reference",
+    "adr-uncatalogued-legacy-reference",
+    "adr-self-supersedes-reference",
+    "adr-supersession-cycle",
+    "adr-multiple-accepted-direct-successors",
+    "adr-conflicting-supersession-branch",
+    "adr-multiple-effective-accepted-heads",
+    "adr-superseded-record-edited",
+    "adr-semantic-resolution-not-performed"
   ]
 }

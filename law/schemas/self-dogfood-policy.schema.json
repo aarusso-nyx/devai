@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/self-dogfood-policy.schema.json",
   "title": "Constrained self-dogfood policy",
-  "description": "Contract for DEVAI running its own governed checks against the DEVAI source repository. Self-consumption is verification configuration only: every run is human-invoked, no run performs autonomous work, no run widens a role, and no run carries publication authority. The role and effect matrix states, per role, exactly which effects a self-dogfood run may initiate; remote-write is forbidden for every role without exception.",
+  "description": "Contract for DEVAI running its own governed checks against the DEVAI source repository. Self-consumption is verification configuration only: every run is human-invoked, no run performs autonomous work, no run widens a role, and no run carries publication authority. The role and effect matrix states, per role, exactly which effects a self-dogfood run may initiate; remote-write is forbidden for every role without exception. The check roster and the role rows are frozen by position and by exact value, so a duplicated, reordered, or substituted identifier, effect, or role fails rather than resolving to the entry it resembles.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -141,95 +141,292 @@
     },
     "permitted_checks": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 9,
+      "maxItems": 9,
       "uniqueItems": true,
-      "description": "The exact check identifiers a self-dogfood run may execute. Anything absent is not permitted by default.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["check_id", "effect", "initiator_roles"],
-        "properties": {
-          "check_id": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9-]*(:[a-z0-9][a-z0-9-]*)*$"
-          },
-          "effect": {
-            "enum": ["read", "harness-write", "local-write"]
-          },
-          "initiator_roles": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "$ref": "#/$defs/role"
+      "items": false,
+      "description": "The exact check identifiers a self-dogfood run may execute, in exactly this order, each with exactly the effect and initiator roles frozen here. Anything absent is not permitted by default, and a duplicated, reordered, or substituted identifier fails rather than resolving to the entry it resembles.",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "action-registry:check"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "error-codes:check"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "format:check"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "lint"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "release:closure"
+            },
+            "effect": {
+              "const": "local-write"
+            },
+            "initiator_roles": {
+              "const": ["architect"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "release:static-integrity"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "test-task-selectors:check"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "test:schemas"
+            },
+            "effect": {
+              "const": "local-write"
+            },
+            "initiator_roles": {
+              "const": ["inspector"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "typecheck"
+            },
+            "effect": {
+              "const": "local-write"
+            },
+            "initiator_roles": {
+              "const": ["architect", "engineer"]
             }
           }
         }
-      }
+      ]
     },
     "role_effect_matrix": {
       "type": "array",
       "minItems": 5,
       "maxItems": 5,
       "uniqueItems": true,
-      "description": "One row per declared human role. The matrix is total: a role absent from a row's permitted list may not initiate that effect.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["role", "permitted_effects", "forbidden_effects", "may_initiate"],
-        "properties": {
-          "role": {
-            "$ref": "#/$defs/role"
-          },
-          "permitted_effects": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "enum": ["read", "harness-write", "local-write"]
-            }
-          },
-          "forbidden_effects": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "contains": {
-              "const": "remote-write"
+      "items": false,
+      "description": "Exactly five rows, one per declared human role, in exactly this order, each carrying exactly the effects and actions frozen here. The matrix is total: a role absent from a row's permitted list may not initiate that effect, and a row that substitutes another role's arrays fails rather than widening quietly.",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/role_row",
+          "properties": {
+            "role": {
+              "const": "owner"
             },
-            "description": "Every row forbids remote-write. Publication is never a self-dogfood effect.",
-            "items": {
-              "enum": ["read", "harness-write", "local-write", "remote-write"]
-            }
-          },
-          "may_initiate": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+            "permitted_effects": {
+              "const": ["read"]
+            },
+            "forbidden_effects": {
+              "const": ["harness-write", "local-write", "remote-write"]
+            },
+            "may_initiate": {
+              "const": [
+                "audit scorecard",
+                "catalog actions",
+                "doctor",
+                "evidence verify",
+                "init plan",
+                "release offline-verify",
+                "release plan",
+                "release resume",
+                "release status",
+                "round status"
+              ]
             }
           }
         },
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "role": {
-                  "const": "auditor"
-                }
-              },
-              "required": ["role"]
+        {
+          "$ref": "#/$defs/role_row",
+          "properties": {
+            "role": {
+              "const": "architect"
             },
-            "then": {
-              "properties": {
-                "permitted_effects": {
-                  "const": ["read"]
-                }
-              }
+            "permitted_effects": {
+              "const": ["read", "local-write"]
+            },
+            "forbidden_effects": {
+              "const": ["harness-write", "remote-write"]
+            },
+            "may_initiate": {
+              "const": [
+                "audit scorecard",
+                "catalog actions",
+                "check",
+                "doctor",
+                "evidence verify",
+                "init plan",
+                "release offline-verify",
+                "release plan",
+                "release resume",
+                "release status",
+                "round status"
+              ]
             }
           }
-        ]
-      }
+        },
+        {
+          "$ref": "#/$defs/role_row",
+          "properties": {
+            "role": {
+              "const": "inspector"
+            },
+            "permitted_effects": {
+              "const": ["read", "harness-write", "local-write"]
+            },
+            "forbidden_effects": {
+              "const": ["remote-write"]
+            },
+            "may_initiate": {
+              "const": [
+                "audit scorecard",
+                "catalog actions",
+                "check",
+                "doctor",
+                "evidence record",
+                "evidence verify",
+                "init plan",
+                "release offline-verify",
+                "release plan",
+                "release resume",
+                "release status",
+                "round status"
+              ]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/role_row",
+          "properties": {
+            "role": {
+              "const": "engineer"
+            },
+            "permitted_effects": {
+              "const": ["read"]
+            },
+            "forbidden_effects": {
+              "const": ["harness-write", "local-write", "remote-write"]
+            },
+            "may_initiate": {
+              "const": [
+                "audit scorecard",
+                "catalog actions",
+                "doctor",
+                "evidence verify",
+                "init plan",
+                "release offline-verify",
+                "release plan",
+                "release resume",
+                "release status",
+                "round status"
+              ]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/role_row",
+          "properties": {
+            "role": {
+              "const": "auditor"
+            },
+            "permitted_effects": {
+              "const": ["read"]
+            },
+            "forbidden_effects": {
+              "const": ["harness-write", "local-write", "remote-write"]
+            },
+            "may_initiate": {
+              "const": [
+                "audit scorecard",
+                "catalog actions",
+                "doctor",
+                "evidence verify",
+                "init plan",
+                "release offline-verify",
+                "release plan",
+                "release resume",
+                "release status",
+                "round status"
+              ]
+            }
+          }
+        }
+      ]
     },
     "fail_closed": {
       "type": "array",
@@ -245,6 +442,67 @@
   "$defs": {
     "role": {
       "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    "permitted_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "effect", "initiator_roles"],
+      "properties": {
+        "check_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(:[a-z0-9][a-z0-9-]*)*$"
+        },
+        "effect": {
+          "enum": ["read", "harness-write", "local-write"],
+          "description": "remote-write is absent from this enum. No self-dogfood check carries a remote effect."
+        },
+        "initiator_roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/role"
+          }
+        }
+      }
+    },
+    "role_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "permitted_effects", "forbidden_effects", "may_initiate"],
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "permitted_effects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["read", "harness-write", "local-write"]
+          }
+        },
+        "forbidden_effects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "contains": {
+            "const": "remote-write"
+          },
+          "description": "Every row forbids remote-write. Publication is never a self-dogfood effect.",
+          "items": {
+            "enum": ["read", "harness-write", "local-write", "remote-write"]
+          }
+        },
+        "may_initiate": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+          }
+        }
+      }
     }
   },
   "examples": [
@@ -282,9 +540,49 @@
       },
       "permitted_checks": [
         {
-          "check_id": "check:schemas",
+          "check_id": "action-registry:check",
           "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "error-codes:check",
+          "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "format:check",
+          "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "lint",
+          "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "release:closure",
+          "effect": "local-write",
           "initiator_roles": ["architect"]
+        },
+        {
+          "check_id": "release:static-integrity",
+          "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "test-task-selectors:check",
+          "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "test:schemas",
+          "effect": "local-write",
+          "initiator_roles": ["inspector"]
+        },
+        {
+          "check_id": "typecheck",
+          "effect": "local-write",
+          "initiator_roles": ["architect", "engineer"]
         }
       ],
       "role_effect_matrix": [
@@ -292,31 +590,89 @@
           "role": "owner",
           "permitted_effects": ["read"],
           "forbidden_effects": ["harness-write", "local-write", "remote-write"],
-          "may_initiate": []
+          "may_initiate": [
+            "audit scorecard",
+            "catalog actions",
+            "doctor",
+            "evidence verify",
+            "init plan",
+            "release offline-verify",
+            "release plan",
+            "release resume",
+            "release status",
+            "round status"
+          ]
         },
         {
           "role": "architect",
-          "permitted_effects": ["read"],
-          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
-          "may_initiate": []
+          "permitted_effects": ["read", "local-write"],
+          "forbidden_effects": ["harness-write", "remote-write"],
+          "may_initiate": [
+            "audit scorecard",
+            "catalog actions",
+            "check",
+            "doctor",
+            "evidence verify",
+            "init plan",
+            "release offline-verify",
+            "release plan",
+            "release resume",
+            "release status",
+            "round status"
+          ]
         },
         {
           "role": "inspector",
-          "permitted_effects": ["read"],
-          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
-          "may_initiate": []
+          "permitted_effects": ["read", "harness-write", "local-write"],
+          "forbidden_effects": ["remote-write"],
+          "may_initiate": [
+            "audit scorecard",
+            "catalog actions",
+            "check",
+            "doctor",
+            "evidence record",
+            "evidence verify",
+            "init plan",
+            "release offline-verify",
+            "release plan",
+            "release resume",
+            "release status",
+            "round status"
+          ]
         },
         {
           "role": "engineer",
           "permitted_effects": ["read"],
           "forbidden_effects": ["harness-write", "local-write", "remote-write"],
-          "may_initiate": []
+          "may_initiate": [
+            "audit scorecard",
+            "catalog actions",
+            "doctor",
+            "evidence verify",
+            "init plan",
+            "release offline-verify",
+            "release plan",
+            "release resume",
+            "release status",
+            "round status"
+          ]
         },
         {
           "role": "auditor",
           "permitted_effects": ["read"],
           "forbidden_effects": ["harness-write", "local-write", "remote-write"],
-          "may_initiate": ["audit scorecard"]
+          "may_initiate": [
+            "audit scorecard",
+            "catalog actions",
+            "doctor",
+            "evidence verify",
+            "init plan",
+            "release offline-verify",
+            "release plan",
+            "release resume",
+            "release status",
+            "round status"
+          ]
         }
       ],
       "fail_closed": ["undeclared-check-id"]
