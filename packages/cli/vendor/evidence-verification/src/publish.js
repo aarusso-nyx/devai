@@ -1,24 +1,18 @@
 import { execFileSync } from 'node:child_process';
-import {
-  cpSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  rmSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import {
   VerificationError,
   assertExactKeys,
   assertString,
   assertUniqueStrings,
   canonicalize,
-  readJson,
   sha256Hex,
 } from './canonical.js';
-import { loadAndVerify } from './verify.js';
+import { mutationContractVersion } from './mutation.js';
+import { readAbsoluteRegularFile, readRootRelativeRegularFile } from './safe-path.js';
+import { validateTaskPolicy, verifyCandidateEvidence } from './verify.js';
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
@@ -32,11 +26,8 @@ function exec(command, args, options = {}) {
       maxBuffer: 64 * 1024 * 1024,
       ...options,
     }).trim();
-  } catch (error) {
-    throw new VerificationError(
-      'PUBLISH_COMMAND_FAILED',
-      `${command} ${args[0] ?? ''} failed: ${error.message}`,
-    );
+  } catch {
+    throw new VerificationError('PUBLISH_COMMAND_FAILED', `${command} command failed`);
   }
 }
 
@@ -56,13 +47,50 @@ function validatePortablePath(path, label) {
   }
 }
 
-function canonicalJson(path, label) {
-  const value = readJson(path, label);
-  const text = readFileSync(path, 'utf8');
+function canonicalJson(root, path, label) {
+  const bytes = readRootRelativeRegularFile(root, path, label);
+  const text = bytes.toString('utf8');
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new VerificationError('MALFORMED_JSON', `${label} is not valid JSON`);
+  }
   if (text !== canonicalize(value) && text !== `${canonicalize(value)}\n`) {
     throw new VerificationError('NON_CANONICAL_JSON', `${label} is not canonical JSON`);
   }
-  return value;
+  return { bytes, value };
+}
+
+function readExternalJson(path, label) {
+  const bytes = readAbsoluteRegularFile(path, label);
+  try {
+    return { bytes, value: JSON.parse(bytes.toString('utf8')) };
+  } catch {
+    throw new VerificationError('MALFORMED_JSON', `${label} is not valid JSON`);
+  }
+}
+
+function writeSnapshotFile(root, path, bytes) {
+  const target = join(root, path);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, bytes, { flag: 'wx' });
+}
+
+export function assertMutationWriteBoundary(taskPolicy, action = 'published') {
+  for (const node of taskPolicy.requiredNodes ?? []) {
+    const contract = node?.outputContract;
+    if (typeof contract?.kind !== 'string' || !contract.kind.startsWith('mutation-')) continue;
+    if (
+      mutationContractVersion(contract.kind, 'mutation output contract') !== 2 ||
+      contract.schemaVersion !== '2.1.0'
+    ) {
+      throw new VerificationError(
+        'MUTATION_VERSION_UNSUPPORTED',
+        `legacy mutation evidence is read-only and cannot be ${action}`,
+      );
+    }
+  }
 }
 
 function filesBelow(root, current = root) {
@@ -74,7 +102,8 @@ function filesBelow(root, current = root) {
     }
     if (entry.isDirectory()) files.push(...filesBelow(root, absolute));
     else if (entry.isFile()) files.push(relative(root, absolute).split(sep).join('/'));
-    else throw new VerificationError('BUNDLE_INVALID', 'evidence bundle contains a non-regular file');
+    else
+      throw new VerificationError('BUNDLE_INVALID', 'evidence bundle contains a non-regular file');
   }
   return files;
 }
@@ -106,7 +135,9 @@ function validateManifest(manifest) {
   assertString(manifest.taskPolicyDigest, 'manifest taskPolicyDigest', SHA256);
   assertString(manifest.envelopeDigest, 'manifest envelopeDigest', SHA256);
   assertUniqueStrings(manifest.resultDigests, 'manifest resultDigests');
-  manifest.resultDigests.forEach((digest) => assertString(digest, 'manifest result digest', SHA256));
+  manifest.resultDigests.forEach((digest) =>
+    assertString(digest, 'manifest result digest', SHA256),
+  );
   if (!Array.isArray(manifest.artifacts)) {
     throw new VerificationError('SCHEMA_INVALID', 'manifest artifacts must be an array');
   }
@@ -129,17 +160,54 @@ export function verifyPreparedBundle({
   expectedCommit,
   expectedTree,
   expectedPolicyDigest,
+  expectedSignerId,
+  expectedTrustRootId,
+  expectedTrustStoreDigest,
+  expectedKeyId,
   bindingMode = 'exact-commit',
 }) {
-  const bundle = realpathSync(bundleDir);
-  const manifest = canonicalJson(join(bundle, 'manifest.json'), 'evidence manifest');
+  // Do not canonicalize the supplied directory: realpath would silently follow
+  // a bundle-root symlink before the identity-pinned readers can reject it.
+  const bundle = resolve(bundleDir);
+  const manifestSnapshot = canonicalJson(bundle, 'manifest.json', 'evidence manifest');
+  const manifest = manifestSnapshot.value;
   validateManifest(manifest);
+  const taskPolicySnapshot = canonicalJson(bundle, 'task-policy.json', 'task policy');
+  const taskPolicy = taskPolicySnapshot.value;
+  validateTaskPolicy(taskPolicy);
+  const requiresV21Expectations = taskPolicy.requiredNodes?.some(
+    (node) =>
+      node.outputContract?.kind === 'mutation-report-set-v2' &&
+      node.outputContract?.schemaVersion === '2.1.0',
+  );
+  if (requiresV21Expectations) {
+    for (const [name, value] of Object.entries({
+      expectedRepository,
+      expectedCommit,
+      expectedTree,
+      expectedPolicyDigest,
+      expectedSignerId,
+      expectedTrustRootId,
+      expectedTrustStoreDigest,
+      expectedKeyId,
+    })) {
+      if (typeof value !== 'string' || value.length === 0) {
+        throw new VerificationError(
+          'MUTATION_OFFLINE_EXPECTATION_MISSING',
+          `${name} is required for mutation v2.1 offline verification`,
+        );
+      }
+    }
+  }
   const repository = expectedRepository ?? manifest.repositoryId;
   const commit = expectedCommit ?? manifest.commit;
   const tree = expectedTree ?? manifest.tree;
   const policyDigest = expectedPolicyDigest ?? manifest.taskPolicyDigest;
   if (manifest.repositoryId !== repository) {
-    throw new VerificationError('REPOSITORY_MISMATCH', 'manifest repository differs from candidate');
+    throw new VerificationError(
+      'REPOSITORY_MISMATCH',
+      'manifest repository differs from candidate',
+    );
   }
   if (bindingMode === 'exact-commit' && manifest.commit !== commit) {
     throw new VerificationError('COMMIT_MISMATCH', 'manifest commit differs from candidate');
@@ -148,7 +216,10 @@ export function verifyPreparedBundle({
     throw new VerificationError('TREE_MISMATCH', 'manifest tree differs from candidate');
   }
   if (manifest.taskPolicyDigest !== policyDigest) {
-    throw new VerificationError('POLICY_DIGEST_MISMATCH', 'manifest policy differs from expected policy');
+    throw new VerificationError(
+      'POLICY_DIGEST_MISMATCH',
+      'manifest policy differs from expected policy',
+    );
   }
   const expectedFiles = [
     'envelope.json',
@@ -162,41 +233,89 @@ export function verifyPreparedBundle({
     actualFiles.length !== expectedFiles.length ||
     actualFiles.some((path, index) => path !== expectedFiles[index])
   ) {
-    throw new VerificationError('BUNDLE_POPULATION_MISMATCH', 'evidence bundle file population differs');
+    throw new VerificationError(
+      'BUNDLE_POPULATION_MISMATCH',
+      'evidence bundle file population differs',
+    );
   }
-  const envelope = canonicalJson(join(bundle, 'envelope.json'), 'signed envelope');
-  const taskPolicy = canonicalJson(join(bundle, 'task-policy.json'), 'task policy');
+  const envelopeSnapshot = canonicalJson(bundle, 'envelope.json', 'signed envelope');
+  const envelope = envelopeSnapshot.value;
   if (sha256Hex(envelope) !== manifest.envelopeDigest) {
     throw new VerificationError('ENVELOPE_DIGEST_MISMATCH', 'manifest envelope digest differs');
   }
   if (sha256Hex(taskPolicy) !== manifest.taskPolicyDigest) {
     throw new VerificationError('POLICY_DIGEST_MISMATCH', 'manifest task-policy digest differs');
   }
+  const resultSnapshots = new Map();
   for (const digest of manifest.resultDigests) {
-    canonicalJson(join(bundle, 'results', `${digest}.json`), `task result ${digest}`);
+    const path = `results/${digest}.json`;
+    resultSnapshots.set(path, canonicalJson(bundle, path, `task result ${digest}`).bytes);
   }
+  const artifactSnapshots = new Map();
   for (const artifact of manifest.artifacts) {
-    const actual = sha256Hex(readFileSync(join(bundle, 'artifacts', artifact.path)));
+    const path = `artifacts/${artifact.path}`;
+    const bytes = readRootRelativeRegularFile(bundle, path, `artifact ${artifact.path}`);
+    const actual = sha256Hex(bytes);
     if (actual !== artifact.sha256) {
-      throw new VerificationError('ARTIFACT_DIGEST_MISMATCH', `manifest artifact ${artifact.path} differs`);
+      throw new VerificationError(
+        'ARTIFACT_DIGEST_MISMATCH',
+        `manifest artifact ${artifact.path} differs`,
+      );
     }
+    artifactSnapshots.set(path, bytes);
   }
-  const verified = loadAndVerify({
-    envelopePath: join(bundle, 'envelope.json'),
-    resultsDir: join(bundle, 'results'),
-    artifactsDir: join(bundle, 'artifacts'),
-    taskPolicyPath: join(bundle, 'task-policy.json'),
-    trustStorePath,
-    expectedRepository: repository,
-    expectedCommit: commit,
-    expectedTree: tree,
-    expectedPolicyDigest: policyDigest,
-    bindingMode,
-  });
+  // Retain every candidate-controlled byte that determines the published proof.
+  // Publication must never reopen the source bundle after this point.
+  const capturedFiles = new Map([
+    ['manifest.json', manifestSnapshot.bytes],
+    ['task-policy.json', taskPolicySnapshot.bytes],
+    ['envelope.json', envelopeSnapshot.bytes],
+    ...resultSnapshots,
+    ...artifactSnapshots,
+  ]);
+  const trustStore = readExternalJson(trustStorePath, 'trust store').value;
+  const snapshot = mkdtempSync(join(tmpdir(), 'devai-evidence-verify-'));
+  let verified;
+  try {
+    writeSnapshotFile(snapshot, 'envelope.json', envelopeSnapshot.bytes);
+    writeSnapshotFile(snapshot, 'task-policy.json', taskPolicySnapshot.bytes);
+    for (const [path, bytes] of resultSnapshots) writeSnapshotFile(snapshot, path, bytes);
+    for (const [path, bytes] of artifactSnapshots) writeSnapshotFile(snapshot, path, bytes);
+    verified = verifyCandidateEvidence({
+      envelope,
+      resultsDir: join(snapshot, 'results'),
+      artifactsDir: join(snapshot, 'artifacts'),
+      taskPolicy,
+      trustStore,
+      expectedRepository: repository,
+      expectedCommit: commit,
+      expectedTree: tree,
+      expectedPolicyDigest: policyDigest,
+      expectedSignerId,
+      expectedTrustRootId,
+      expectedTrustStoreDigest,
+      expectedKeyId,
+      expectedResultDigests: manifest.resultDigests,
+      bindingMode,
+    });
+  } finally {
+    rmSync(snapshot, { recursive: true, force: true });
+  }
   if (verified.signerId !== manifest.signerId) {
     throw new VerificationError('SIGNER_MISMATCH', 'manifest signer differs from signed envelope');
   }
-  return { manifest, verified, bundle };
+  return { manifest, taskPolicy, verified, bundle, capturedFiles };
+}
+
+/**
+ * Materialize precisely the population that was just verified.  Do not use a
+ * recursive copy here: a bundle directory is untrusted until every individual
+ * member is opened through the identity-pinned reader.  This also makes the
+ * proof repository independent of files that appear after verification.
+ */
+function materializeVerifiedBundle(capturedFiles, destination) {
+  mkdirSync(destination, { recursive: false });
+  for (const [path, bytes] of capturedFiles) writeSnapshotFile(destination, path, bytes);
 }
 
 function githubRepositoryId(remoteUrl) {
@@ -222,6 +341,14 @@ export function publishCandidateEvidence({
   repo,
   bundleDir,
   trustStorePath,
+  expectedRepository,
+  expectedCommit,
+  expectedTree,
+  expectedPolicyDigest,
+  expectedSignerId,
+  expectedTrustRootId,
+  expectedTrustStoreDigest,
+  expectedKeyId,
   remote = 'origin',
   tagPrefix = TAG_PREFIX,
   workflow = 'devai-local-rc-verify.yml',
@@ -230,12 +357,28 @@ export function publishCandidateEvidence({
   resolveRemoteRepositoryId = githubRepositoryId,
 }) {
   const repository = realpathSync(repo);
-  const { manifest } = verifyPreparedBundle({ bundleDir, trustStorePath });
+  const prepared = verifyPreparedBundle({
+    bundleDir,
+    trustStorePath,
+    expectedRepository,
+    expectedCommit,
+    expectedTree,
+    expectedPolicyDigest,
+    expectedSignerId,
+    expectedTrustRootId,
+    expectedTrustStoreDigest,
+    expectedKeyId,
+  });
+  assertMutationWriteBoundary(prepared.taskPolicy, 'published');
+  const { manifest } = prepared;
   if (!tagPrefix.endsWith('/') || !tagPrefix.startsWith('devai-local-evidence/')) {
     throw new VerificationError('TAG_PREFIX_INVALID', 'evidence tag prefix is invalid');
   }
   if (git(repository, ['status', '--porcelain=v1', '--untracked-files=all']) !== '') {
-    throw new VerificationError('DIRTY_CANDIDATE', 'candidate repository must be clean before publication');
+    throw new VerificationError(
+      'DIRTY_CANDIDATE',
+      'candidate repository must be clean before publication',
+    );
   }
   if (git(repository, ['rev-parse', 'HEAD']) !== manifest.commit) {
     throw new VerificationError('COMMIT_MISMATCH', 'candidate HEAD differs from evidence commit');
@@ -252,7 +395,19 @@ export function publishCandidateEvidence({
   const temporary = mkdtempSync(join(tmpdir(), 'devai-evidence-publish-'));
   try {
     const proofRepo = join(temporary, 'proof');
-    cpSync(resolve(bundleDir), proofRepo, { recursive: true, dereference: false, errorOnExist: true });
+    materializeVerifiedBundle(prepared.capturedFiles, proofRepo);
+    verifyPreparedBundle({
+      bundleDir: proofRepo,
+      trustStorePath,
+      expectedRepository,
+      expectedCommit,
+      expectedTree,
+      expectedPolicyDigest,
+      expectedSignerId,
+      expectedTrustRootId,
+      expectedTrustStoreDigest,
+      expectedKeyId,
+    });
     git(proofRepo, ['init', '--quiet', '-b', 'evidence']);
     git(proofRepo, ['config', 'user.name', 'DEVAI Inspector Evidence']);
     git(proofRepo, ['config', 'user.email', 'devai-evidence@invalid']);
@@ -269,10 +424,19 @@ export function publishCandidateEvidence({
     ]);
     let published = false;
     if (existing !== '') {
-      git(proofRepo, ['fetch', '--quiet', '--no-tags', remoteUrl, `refs/tags/${tagName}:refs/tags/existing-evidence`]);
+      git(proofRepo, [
+        'fetch',
+        '--quiet',
+        '--no-tags',
+        remoteUrl,
+        `refs/tags/${tagName}:refs/tags/existing-evidence`,
+      ]);
       const existingTree = git(proofRepo, ['rev-parse', 'refs/tags/existing-evidence^{tree}']);
       if (existingTree !== proofTree) {
-        throw new VerificationError('TAG_COLLISION', `evidence tag ${tagName} already contains different bytes`);
+        throw new VerificationError(
+          'TAG_COLLISION',
+          `evidence tag ${tagName} already contains different bytes`,
+        );
       }
     } else {
       git(proofRepo, ['push', remoteUrl, `refs/tags/${tagName}:refs/tags/${tagName}`]);

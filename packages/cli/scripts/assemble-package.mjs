@@ -43,6 +43,7 @@ const policyFiles = [
   'github-issues-tracking.json',
   'glob-guards.json',
   'model-runtime-registry.json',
+  'mutation-evidence-v2.json',
   'mutation-strength.json',
   'round-execution.json',
   'release-verification.json',
@@ -105,7 +106,7 @@ function validateVerifierAssets() {
   const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
   if (
     provenance.schemaVersion !== '1.0.0' ||
-    provenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de' ||
+    provenance.sourceCommit !== '098d090013dda34e38d1045ba06274d99bd5aec1' ||
     !Array.isArray(provenance.files)
   ) {
     throw new Error('PACKAGE_VERIFIER_PROVENANCE_INVALID');
@@ -116,11 +117,20 @@ function validateVerifierAssets() {
   // Upstream verifier tests remain source-owned regression assets. They are
   // deliberately outside the provenance-declared runtime and npm package.
   const sourceOnlyTests = actualPopulation.filter((path) => path.startsWith('test/'));
+  const expectedSourceOnlyTests = [
+    'artifact-safety.test.js',
+    'export.test.js',
+    'mutation-v21-contract.test.js',
+    'mutation.test.js',
+    'policy-builder.test.js',
+    'publish.test.js',
+    'verifier.test.js',
+  ].map((name) => `test/${name}`);
   const runtimePopulation = actualPopulation.filter((path) => !path.startsWith('test/'));
   if (
-    declared.length !== 21 ||
+    declared.length !== 24 ||
     new Set(declared).size !== declared.length ||
-    sourceOnlyTests.some((path) => !/^test\/[a-z0-9-]+\.test\.js$/u.test(path)) ||
+    JSON.stringify(sourceOnlyTests) !== JSON.stringify(expectedSourceOnlyTests) ||
     declared.some((path) => path.startsWith('test/')) ||
     JSON.stringify(runtimePopulation) !== JSON.stringify(expectedPopulation)
   ) {

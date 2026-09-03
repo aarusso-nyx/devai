@@ -86,9 +86,9 @@ for (const [name, path] of Object.entries(SECONDARY_BINS)) {
 const verifierRoot = join(ROOT, 'packages/cli/dist/runtime/evidence-verification');
 const verifierProvenance = json('packages/cli/dist/runtime/evidence-verification/provenance.json');
 if (
-  verifierProvenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de' ||
+  verifierProvenance.sourceCommit !== '098d090013dda34e38d1045ba06274d99bd5aec1' ||
   !Array.isArray(verifierProvenance.files) ||
-  verifierProvenance.files.length !== 21
+  verifierProvenance.files.length !== 24
 ) {
   fail('PUBLISHABLE_VERIFIER_PROVENANCE_INVALID', String(verifierProvenance.sourceCommit));
 }
@@ -249,5 +249,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: actionCount, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: 21, secondary_bins: 5 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: actionCount, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: verifierProvenance.files.length, secondary_bins: 5 })}\n`,
 );

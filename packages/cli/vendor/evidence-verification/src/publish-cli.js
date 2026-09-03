@@ -3,7 +3,20 @@ import { VerificationError } from './canonical.js';
 import { publishCandidateEvidence } from './publish.js';
 
 const required = new Set(['repo', 'bundle', 'trust']);
-const optional = new Set(['default-branch', 'remote', 'tag-prefix', 'workflow']);
+const optional = new Set([
+  'default-branch',
+  'remote',
+  'tag-prefix',
+  'workflow',
+  'repository',
+  'commit',
+  'tree',
+  'policy-digest',
+  'signer-id',
+  'trust-root-id',
+  'trust-store-digest',
+  'key-id',
+]);
 
 function parse(argv) {
   const values = {};
@@ -21,7 +34,10 @@ function parse(argv) {
   }
   const missing = [...required].filter((name) => values[name] === undefined);
   if (missing.length > 0) {
-    throw new VerificationError('USAGE', `missing arguments: ${missing.map((name) => `--${name}`).join(', ')}`);
+    throw new VerificationError(
+      'USAGE',
+      `missing arguments: ${missing.map((name) => `--${name}`).join(', ')}`,
+    );
   }
   return values;
 }
@@ -32,6 +48,14 @@ try {
     repo: values.repo,
     bundleDir: values.bundle,
     trustStorePath: values.trust,
+    expectedRepository: values.repository,
+    expectedCommit: values.commit,
+    expectedTree: values.tree,
+    expectedPolicyDigest: values['policy-digest'],
+    expectedSignerId: values['signer-id'],
+    expectedTrustRootId: values['trust-root-id'],
+    expectedTrustStoreDigest: values['trust-store-digest'],
+    expectedKeyId: values['key-id'],
     remote: values.remote,
     tagPrefix: values['tag-prefix'],
     workflow: values.workflow,
@@ -40,10 +64,14 @@ try {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 } catch (error) {
   if (error instanceof VerificationError) {
-    process.stderr.write(`${JSON.stringify({ ok: false, code: error.code, message: error.message })}\n`);
+    process.stderr.write(
+      `${JSON.stringify({ ok: false, code: error.code, message: error.message })}\n`,
+    );
     process.exitCode = error.code === 'USAGE' ? 64 : 2;
   } else {
-    process.stderr.write(`${JSON.stringify({ ok: false, code: 'INTERNAL_ERROR', message: String(error) })}\n`);
+    process.stderr.write(
+      `${JSON.stringify({ ok: false, code: 'INTERNAL_ERROR', message: String(error) })}\n`,
+    );
     process.exitCode = 70;
   }
 }
