@@ -109,7 +109,7 @@
       "items": {
         "oneOf": [
           { "$ref": "#/$defs/legacy_aggregate_artifact_ref" },
-          { "$ref": "#/$defs/opaque_artifact_ref" }
+          { "$ref": "#/$defs/v3_opaque_artifact_ref" }
         ]
       }
     },
@@ -211,7 +211,7 @@
           "const": "for-a-v2-receipt-recompute-the-v2-canonicalization-and-require-the-release-unit-package-roster-to-close-exactly-over-manifest-tarball-sbom-evidence-manifest-provider-result-and-trust-root-trust-store-digest-key-id-and-signature-algorithm"
         },
         "v3_sink_handle_closure": {
-          "const": "for-a-v2.1-receipt-resolve-every-aggregate-and-per-package-opaque-handle-through-the-external-sink-rehash-byte-digest-and-size-require-one-identical-complete-set-and-artifact-sink-commit-identity-as-the-exported-state-and-verify-external-trust-inputs"
+          "const": "for-a-v2.1-receipt-resolve-every-aggregate-and-per-package-opaque-handle-through-the-external-sink-rehash-byte-digest-and-size-require-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-with-the-exported-state-and-evidence-publish-input-and-verify-artifact-sink-commit-and-external-trust-inputs"
         },
         "v3_sink_handle_errors": {
           "const": [
@@ -517,7 +517,7 @@
               "kernel_id": { "const": "devai.kernel.offline-verification-receipt.v3" }
             }
           },
-          "artifacts": { "items": { "$ref": "#/$defs/opaque_artifact_ref" } },
+          "artifacts": { "items": { "$ref": "#/$defs/v3_opaque_artifact_ref" } },
           "artifact_sink_commit": { "$ref": "#/$defs/artifact_sink_commit" },
           "release_units": { "items": { "$ref": "#/$defs/release_unit_handle_evidence" } }
         }
@@ -644,21 +644,18 @@
         "size_bytes": { "type": "integer", "minimum": 0 }
       }
     },
-    "opaque_artifact_ref": {
+    "v3_opaque_artifact_ref": {
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "sink_id", "opaque_handle", "sha256", "size_bytes"],
       "properties": {
         "kind": {
           "enum": [
+            "package-manifest",
             "package-tarball",
-            "evidence-bundle",
-            "manifest",
-            "sbom",
-            "attestation",
+            "package-sbom",
             "evidence-manifest",
-            "provider-result",
-            "committed-manifest"
+            "provider-result"
           ]
         },
         "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
@@ -716,33 +713,33 @@
       "additionalProperties": false,
       "required": [
         "package_id",
-        "manifest",
-        "tarball",
-        "sbom",
+        "package_manifest",
+        "package_tarball",
+        "package_sbom",
         "evidence_manifest",
         "provider_result",
         "trust"
       ],
       "properties": {
         "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "manifest": {
-          "allOf": [{ "$ref": "#/$defs/opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "manifest" } }
+        "package_manifest": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-manifest" } }
         },
-        "tarball": {
-          "allOf": [{ "$ref": "#/$defs/opaque_artifact_ref" }],
+        "package_tarball": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
           "properties": { "kind": { "const": "package-tarball" } }
         },
-        "sbom": {
-          "allOf": [{ "$ref": "#/$defs/opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "sbom" } }
+        "package_sbom": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-sbom" } }
         },
         "evidence_manifest": {
-          "allOf": [{ "$ref": "#/$defs/opaque_artifact_ref" }],
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
           "properties": { "kind": { "const": "evidence-manifest" } }
         },
         "provider_result": {
-          "allOf": [{ "$ref": "#/$defs/opaque_artifact_ref" }],
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
           "properties": { "kind": { "const": "provider-result" } }
         },
         "trust": { "$ref": "#/$defs/trust_identity" }

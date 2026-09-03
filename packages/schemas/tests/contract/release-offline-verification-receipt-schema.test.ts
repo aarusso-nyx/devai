@@ -36,16 +36,16 @@ const artifact = (kind: string, handle: string, digest: string) => ({
 
 function currentReceipt(): CurrentReceipt {
   const receipt = structuredClone(receiptSchema.examples[0]) as CurrentReceipt;
-  const manifest = artifact('manifest', 'manifest-1', 'a');
+  const packageManifest = artifact('package-manifest', 'package-manifest-1', 'a');
   const tarball = artifact('package-tarball', 'tarball-1', 'b');
-  const sbom = artifact('sbom', 'sbom-1', 'c');
+  const packageSbom = artifact('package-sbom', 'package-sbom-1', 'c');
   const evidenceManifest = artifact('evidence-manifest', 'evidence-manifest-1', 'd');
   const providerResult = artifact('provider-result', 'provider-result-1', 'e');
 
   receipt.schemaVersion = '2.1.0';
   receipt.canonicalization.kernel_id =
     'devai.kernel.release-offline-verification-receipt-canonicalization.v3';
-  receipt.artifacts = [manifest, tarball, sbom, evidenceManifest, providerResult];
+  receipt.artifacts = [packageManifest, tarball, packageSbom, evidenceManifest, providerResult];
   receipt.artifact_sink_commit = {
     sink_id: 'trusted-sink',
     transaction_handle: 'transaction-1',
@@ -61,9 +61,9 @@ function currentReceipt(): CurrentReceipt {
       packages: [
         {
           package_id: '@aarusso-nyx/devai',
-          manifest,
-          tarball,
-          sbom,
+          package_manifest: packageManifest,
+          package_tarball: tarball,
+          package_sbom: packageSbom,
           evidence_manifest: evidenceManifest,
           provider_result: providerResult,
           trust: {
@@ -83,7 +83,7 @@ function currentReceipt(): CurrentReceipt {
     'devai.kernel.release-offline-verification-receipt-canonicalization.v3',
   ];
   receipt.verification_kernel.v3_sink_handle_closure =
-    'for-a-v2.1-receipt-resolve-every-aggregate-and-per-package-opaque-handle-through-the-external-sink-rehash-byte-digest-and-size-require-one-identical-complete-set-and-artifact-sink-commit-identity-as-the-exported-state-and-verify-external-trust-inputs';
+    'for-a-v2.1-receipt-resolve-every-aggregate-and-per-package-opaque-handle-through-the-external-sink-rehash-byte-digest-and-size-require-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-with-the-exported-state-and-evidence-publish-input-and-verify-artifact-sink-commit-and-external-trust-inputs';
   receipt.verification_kernel.v3_sink_handle_errors = [
     'rov-v3-opaque-artifact-closure-invalid',
     'rov-v3-artifact-sink-commit-mismatch',
@@ -109,7 +109,7 @@ describe('release offline verification receipt schema', () => {
     const validate = getValidator('release-offline-verification-receipt.schema.json');
     const pathname = currentReceipt();
     pathname.artifacts[0] = {
-      kind: 'manifest',
+      kind: 'package-manifest',
       path: 'dist/manifest.json',
       sha256: sha('a'),
       size_bytes: 1,
@@ -129,12 +129,12 @@ describe('release offline verification receipt schema', () => {
 
     const substitutedKind = currentReceipt();
     const substitutedUnits = substitutedKind.release_units as Array<{
-      packages: Array<{ manifest: { kind: string } }>;
+      packages: Array<{ package_manifest: { kind: string } }>;
     }>;
     const firstPackage = substitutedUnits[0]?.packages[0];
     expect(firstPackage).toBeDefined();
     if (firstPackage === undefined) return;
-    firstPackage.manifest.kind = 'sbom';
+    firstPackage.package_manifest.kind = 'package-sbom';
     expect(validate(substitutedKind)).toBe(false);
   });
 });

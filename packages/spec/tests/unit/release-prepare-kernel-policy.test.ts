@@ -89,7 +89,7 @@ describe('release prepare v3 policy', () => {
     expect(createHash('sha256').update(kernel.pack.pack_spec_canonical_bytes).digest('hex')).toBe(
       kernel.pack.pack_spec_digest_sha256,
     );
-    expect(kernel.pack.outputs).toEqual(['package-tarball', 'sbom', 'manifest']);
+    expect(kernel.pack.outputs).toEqual(['package-tarball', 'package-sbom', 'package-manifest']);
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
       'block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block',
     );
@@ -236,9 +236,9 @@ describe('release prepare v3 policy', () => {
         independently_checkable: true,
       },
       artifacts: [
-        artifact('manifest', 'f'),
+        artifact('package-manifest', 'f'),
         artifact('package-tarball', '1'),
-        artifact('sbom', '2'),
+        artifact('package-sbom', '2'),
       ],
       artifact_sink: {
         sink_id: 'trusted-sink',
@@ -267,9 +267,9 @@ describe('release prepare v3 policy', () => {
           packages: [
             {
               package_id: 'pkg',
-              manifest: artifact('manifest', 'f'),
-              tarball: artifact('package-tarball', '1'),
-              sbom: artifact('sbom', '2'),
+              package_manifest: artifact('package-manifest', 'f'),
+              package_tarball: artifact('package-tarball', '1'),
+              package_sbom: artifact('package-sbom', '2'),
               evidence_manifest: null,
               provider_result: null,
               trust: null,
@@ -287,7 +287,7 @@ describe('release prepare v3 policy', () => {
     expect(validate(state), JSON.stringify(validate.errors)).toBe(true);
     const pathnameBypass = structuredClone(state) as { artifacts: Array<Record<string, unknown>> };
     pathnameBypass.artifacts[0] = {
-      kind: 'manifest',
+      kind: 'package-manifest',
       path: 'release/manifest.json',
       sha256: sha('f'),
       size_bytes: 1,

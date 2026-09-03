@@ -244,7 +244,12 @@
       "minItems": 1,
       "uniqueItems": true,
       "description": "The exact multi-package release-unit roster. The v2 semantic kernel requires a sorted unique bijection to candidate, request, state artifacts, evidence, provider results, and trust identities.",
-      "items": { "$ref": "#/$defs/release_unit_evidence" }
+      "items": {
+        "anyOf": [
+          { "$ref": "#/$defs/release_unit_evidence" },
+          { "$ref": "#/$defs/v3_release_unit_evidence" }
+        ]
+      }
     },
     "storage": {
       "type": "object",
@@ -273,6 +278,24 @@
         "required": ["schemaVersion"]
       },
       "then": { "required": ["canonicalization", "release_units", "storage"] }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "enum": ["1.0.0", "2.0.0"] } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "oneOf": [
+                { "$ref": "#/$defs/legacy_state_artifact_ref" },
+                { "$ref": "#/$defs/opaque_artifact_ref" }
+              ]
+            }
+          }
+        }
+      }
     },
     {
       "properties": {
@@ -523,11 +546,16 @@
               {
                 "contains": {
                   "required": ["kind"],
-                  "properties": { "kind": { "const": "manifest" } }
+                  "properties": {
+                    "kind": { "enum": ["manifest", "package-manifest"] }
+                  }
                 }
               },
               {
-                "contains": { "required": ["kind"], "properties": { "kind": { "const": "sbom" } } }
+                "contains": {
+                  "required": ["kind"],
+                  "properties": { "kind": { "enum": ["sbom", "package-sbom"] } }
+                }
               }
             ]
           }
@@ -560,7 +588,9 @@
               {
                 "contains": {
                   "required": ["kind"],
-                  "properties": { "kind": { "const": "evidence-bundle" } }
+                  "properties": {
+                    "kind": { "enum": ["evidence-bundle", "evidence-manifest"] }
+                  }
                 }
               },
               {
@@ -593,7 +623,7 @@
         "required": ["artifact_sink"],
         "properties": {
           "artifact_sink": { "$ref": "#/$defs/artifact_sink_commit" },
-          "artifacts": { "items": { "$ref": "#/$defs/opaque_artifact_ref" } },
+          "artifacts": { "items": { "$ref": "#/$defs/v3_opaque_artifact_ref" } },
           "release_units": {
             "items": {
               "properties": {
@@ -616,7 +646,7 @@
         "required": ["artifact_sink"],
         "properties": {
           "artifact_sink": { "$ref": "#/$defs/artifact_sink_commit" },
-          "artifacts": { "items": { "$ref": "#/$defs/opaque_artifact_ref" } },
+          "artifacts": { "items": { "$ref": "#/$defs/v3_opaque_artifact_ref" } },
           "release_units": {
             "items": {
               "properties": {
@@ -869,6 +899,7 @@
       }
     },
     "opaque_artifact_ref": {
+      "description": "Legacy opaque artifact names, retained only for wire-compatible v1/v2 reads.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "sink_id", "opaque_handle", "sha256", "size_bytes"],
@@ -880,6 +911,27 @@
             "manifest",
             "sbom",
             "attestation",
+            "provider-result"
+          ]
+        },
+        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "v3_opaque_artifact_ref": {
+      "description": "Current v3 opaque handle. Its kind is the canonical projection key across state, offline receipt, and evidence publication.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sink_id", "opaque_handle", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "package-manifest",
+            "package-tarball",
+            "package-sbom",
+            "evidence-manifest",
             "provider-result"
           ]
         },
@@ -914,9 +966,10 @@
       }
     },
     "state_artifact_ref": {
-      "oneOf": [
+      "anyOf": [
         { "$ref": "#/$defs/legacy_state_artifact_ref" },
-        { "$ref": "#/$defs/opaque_artifact_ref" }
+        { "$ref": "#/$defs/opaque_artifact_ref" },
+        { "$ref": "#/$defs/v3_opaque_artifact_ref" }
       ]
     },
     "artifact_sink_commit": {
@@ -950,9 +1003,9 @@
       "additionalProperties": false,
       "required": [
         "package_id",
-        "manifest",
-        "tarball",
-        "sbom",
+        "package_manifest",
+        "package_tarball",
+        "package_sbom",
         "evidence_manifest",
         "provider_result",
         "trust",
@@ -960,13 +1013,37 @@
       ],
       "properties": {
         "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "manifest": { "$ref": "#/$defs/opaque_artifact_ref" },
-        "tarball": { "$ref": "#/$defs/opaque_artifact_ref" },
-        "sbom": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "package_manifest": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-manifest" } }
+        },
+        "package_tarball": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-tarball" } }
+        },
+        "package_sbom": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-sbom" } }
+        },
         "evidence_manifest": { "type": "null" },
         "provider_result": { "type": "null" },
         "trust": { "type": "null" },
         "certification_manifest": { "$ref": "#/$defs/certification_package_entry_manifest" }
+      }
+    },
+    "v3_release_unit_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "packages"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/v3_handle_package_evidence" }
+        }
       }
     },
     "v3_handle_package_evidence": {
@@ -974,9 +1051,9 @@
       "additionalProperties": false,
       "required": [
         "package_id",
-        "manifest",
-        "tarball",
-        "sbom",
+        "package_manifest",
+        "package_tarball",
+        "package_sbom",
         "evidence_manifest",
         "provider_result",
         "trust",
@@ -984,14 +1061,35 @@
       ],
       "properties": {
         "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "manifest": { "$ref": "#/$defs/opaque_artifact_ref" },
-        "tarball": { "$ref": "#/$defs/opaque_artifact_ref" },
-        "sbom": { "$ref": "#/$defs/opaque_artifact_ref" },
+        "package_manifest": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-manifest" } }
+        },
+        "package_tarball": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-tarball" } }
+        },
+        "package_sbom": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-sbom" } }
+        },
         "evidence_manifest": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/opaque_artifact_ref" }]
+          "oneOf": [
+            { "type": "null" },
+            {
+              "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+              "properties": { "kind": { "const": "evidence-manifest" } }
+            }
+          ]
         },
         "provider_result": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/opaque_artifact_ref" }]
+          "oneOf": [
+            { "type": "null" },
+            {
+              "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+              "properties": { "kind": { "const": "provider-result" } }
+            }
+          ]
         },
         "trust": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trust_identity" }] },
         "certification_manifest": { "$ref": "#/$defs/certification_package_entry_manifest" }

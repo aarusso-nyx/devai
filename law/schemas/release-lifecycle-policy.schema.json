@@ -899,7 +899,7 @@
                 "pack_spec_digest_sha256": {
                   "const": "d287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd"
                 },
-                "outputs": { "const": ["package-tarball", "sbom", "manifest"] },
+                "outputs": { "const": ["package-tarball", "package-sbom", "package-manifest"] },
                 "determinism": {
                   "const": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec"
                 },
@@ -996,39 +996,41 @@
               "const": {
                 "release preflight": [],
                 "release certify": [],
-                "release prepare": ["manifest", "package-tarball", "sbom"],
+                "release prepare": ["package-manifest", "package-tarball", "package-sbom"],
                 "release export": [
-                  "manifest",
+                  "package-manifest",
                   "package-tarball",
-                  "sbom",
+                  "package-sbom",
                   "evidence-manifest",
                   "provider-result",
                   "trust"
                 ],
                 "release evidence-publish": [
-                  "manifest",
+                  "package-manifest",
                   "package-tarball",
-                  "sbom",
+                  "package-sbom",
                   "evidence-manifest",
                   "provider-result",
                   "trust"
                 ],
                 "release publish": [
-                  "manifest",
+                  "package-manifest",
                   "package-tarball",
-                  "sbom",
+                  "package-sbom",
                   "evidence-manifest",
                   "provider-result",
                   "trust"
                 ]
               }
             },
-            "prepare": { "const": "each-package-has-exactly-one-manifest-tarball-and-sbom" },
+            "prepare": {
+              "const": "each-package-has-exactly-one-package-manifest-package-tarball-and-package-sbom"
+            },
             "export": {
               "const": "each-package-has-exactly-one-evidence-manifest-and-provider-result"
             },
             "offline_verify": {
-              "const": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-exact-exported-state-release-unit-artifact-sink-commit-and-external-trust-identity-continuity;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch"
+              "const": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-across-exported-state-per-package-evidence-offline-receipt-and-evidence-publish-input;current-kinds-are-package-manifest-package-tarball-package-sbom-evidence-manifest-provider-result;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch"
             },
             "trust": {
               "const": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
@@ -1058,6 +1060,7 @@
                 "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
                 "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
                 "require-package-artifact-and-evidence-bijections-for-the-action",
+                "require-current-v3-artifact-projection-to-use-only-package-manifest-package-tarball-package-sbom-evidence-manifest-provider-result-and-to-be-sorted-duplicate-free-and-one-to-one-equal-by-kind-sink_id-opaque_handle-sha256-size_bytes-across-state-package-evidence-offline-receipt-and-evidence-publish-input",
                 "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results",
                 "require-a-remote-attempt-to-be-durable-before-consumption-and-dispatch-and-reject-fabricated-absent-handles-after-a-dispatch-could-have-occurred",
                 "require-the-v2-consumed-authorization-binding-to-equal-the-attempt-request-repository-candidate-action-destination-grant-and-ledger-predecessor-before-dispatch"
@@ -3367,7 +3370,7 @@
             "pack_spec_id": "devai.pure-npm-compatible-pack.v3",
             "pack_spec_canonical_bytes": "devai.pure-npm-compatible-pack.v3\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;utf-8;no-backslash;maximum-100-bytes;no-pax\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=archive-path;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=empty\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n",
             "pack_spec_digest_sha256": "d287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd",
-            "outputs": ["package-tarball", "sbom", "manifest"],
+            "outputs": ["package-tarball", "package-sbom", "package-manifest"],
             "determinism": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec",
             "forbidden_execution": [
               "npm-subprocess",
@@ -3421,35 +3424,35 @@
           "artifact_requirements": {
             "release preflight": [],
             "release certify": [],
-            "release prepare": ["manifest", "package-tarball", "sbom"],
+            "release prepare": ["package-manifest", "package-tarball", "package-sbom"],
             "release export": [
-              "manifest",
+              "package-manifest",
               "package-tarball",
-              "sbom",
+              "package-sbom",
               "evidence-manifest",
               "provider-result",
               "trust"
             ],
             "release evidence-publish": [
-              "manifest",
+              "package-manifest",
               "package-tarball",
-              "sbom",
+              "package-sbom",
               "evidence-manifest",
               "provider-result",
               "trust"
             ],
             "release publish": [
-              "manifest",
+              "package-manifest",
               "package-tarball",
-              "sbom",
+              "package-sbom",
               "evidence-manifest",
               "provider-result",
               "trust"
             ]
           },
-          "prepare": "each-package-has-exactly-one-manifest-tarball-and-sbom",
+          "prepare": "each-package-has-exactly-one-package-manifest-package-tarball-and-package-sbom",
           "export": "each-package-has-exactly-one-evidence-manifest-and-provider-result",
-          "offline_verify": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-exact-exported-state-release-unit-artifact-sink-commit-and-external-trust-identity-continuity;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch",
+          "offline_verify": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-across-exported-state-per-package-evidence-offline-receipt-and-evidence-publish-input;current-kinds-are-package-manifest-package-tarball-package-sbom-evidence-manifest-provider-result;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch",
           "trust": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
         },
         "state_semantic_kernel": {
@@ -3464,6 +3467,7 @@
             "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
             "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
             "require-package-artifact-and-evidence-bijections-for-the-action",
+            "require-current-v3-artifact-projection-to-use-only-package-manifest-package-tarball-package-sbom-evidence-manifest-provider-result-and-to-be-sorted-duplicate-free-and-one-to-one-equal-by-kind-sink_id-opaque_handle-sha256-size_bytes-across-state-package-evidence-offline-receipt-and-evidence-publish-input",
             "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results",
             "require-a-remote-attempt-to-be-durable-before-consumption-and-dispatch-and-reject-fabricated-absent-handles-after-a-dispatch-could-have-occurred",
             "require-the-v2-consumed-authorization-binding-to-equal-the-attempt-request-repository-candidate-action-destination-grant-and-ledger-predecessor-before-dispatch"
