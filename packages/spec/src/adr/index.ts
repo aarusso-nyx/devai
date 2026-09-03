@@ -55,7 +55,7 @@ interface AdrValidationPolicy {
     resolvable_legacy_references: readonly Readonly<{
       reference: string;
       path: string;
-      disposition: 'preserved-pre-v2-record';
+      disposition: 'preserved-pre-v2-record' | 'preserved-invalid-accepted-record';
     }>[];
   }>;
   readonly exception_catalog: Readonly<{
@@ -63,7 +63,7 @@ interface AdrValidationPolicy {
     entries: readonly Readonly<{
       path: string;
       sha256: string;
-      disposition: 'non-record' | 'preserved-pre-v2-record';
+      disposition: 'non-record' | 'preserved-pre-v2-record' | 'preserved-invalid-accepted-record';
       reason: string;
       legacy_record?: Readonly<{
         reference: string;
@@ -75,7 +75,8 @@ interface AdrValidationPolicy {
           | 'date-id-frontmatter'
           | 'scoped-id-frontmatter'
           | 'no-frontmatter'
-          | 'adr_id-frontmatter';
+          | 'adr_id-frontmatter'
+          | 'v2-record-missing-required-section';
         supersedes: readonly string[];
         affected_rules: readonly string[];
       }>;
@@ -437,7 +438,8 @@ function semanticResolution(
         if (
           allowed === undefined ||
           targetRecord.catalogPath !== allowed.path ||
-          allowed.disposition !== 'preserved-pre-v2-record'
+          (allowed.disposition !== 'preserved-pre-v2-record' &&
+            allowed.disposition !== 'preserved-invalid-accepted-record')
         ) {
           issue(
             errors,
@@ -670,7 +672,10 @@ export function validateAdrs(options: ValidateAdrsOptions): AdrValidationResult 
         issue(errors, 'adr-superseded-record-edited', file, 'catalogued bytes differ');
         continue;
       }
-      if (exception.disposition === 'preserved-pre-v2-record') {
+      if (
+        exception.disposition === 'preserved-pre-v2-record' ||
+        exception.disposition === 'preserved-invalid-accepted-record'
+      ) {
         const legacy = exception.legacy_record;
         if (legacy === undefined) {
           issue(
@@ -768,10 +773,13 @@ export function validateAdrs(options: ValidateAdrsOptions): AdrValidationResult 
   }
   const materializedLegacyPairs = parsedRecords
     .filter((record) => record.format === 'legacy-catalog')
-    .map((record) => `${record.id}\u0000${record.catalogPath ?? ''}`)
+    .map((record) => {
+      const entry = catalog.get(record.catalogPath ?? '');
+      return `${record.id}\u0000${record.catalogPath ?? ''}\u0000${entry?.disposition ?? ''}`;
+    })
     .sort();
   const allowlistedLegacyPairs = [...resolvableLegacyReferences.values()]
-    .map((entry) => `${entry.reference}\u0000${entry.path}`)
+    .map((entry) => `${entry.reference}\u0000${entry.path}\u0000${entry.disposition}`)
     .sort();
   if (
     materializedLegacyPairs.length !== allowlistedLegacyPairs.length ||

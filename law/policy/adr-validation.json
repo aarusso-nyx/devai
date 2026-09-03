@@ -4,7 +4,7 @@
   "id": "adr-validation",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.5.0",
+  "policy_version": "2.6.0",
   "record_schema": "law/schemas/adr-v2.schema.json",
   "scan": {
     "root": "law/adr",
@@ -174,11 +174,16 @@
         "reference": "ADR-014",
         "path": "ADR-014-release-verification-profiles.md",
         "disposition": "preserved-pre-v2-record"
+      },
+      {
+        "reference": "ADR-MUT-0005",
+        "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+        "disposition": "preserved-invalid-accepted-record"
       }
     ],
     "algorithm": [
       "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
-      "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
+      "materialize-each-catalogued-accepted-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
       "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
       "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects",
       "validate-every-affected-rule-subject-as-an-already-nfc-canonical-repository-relative-posix-governed-or-review-subject-without-filesystem-or-git-access-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
@@ -221,7 +226,7 @@
     "digest_algorithm": "sha256",
     "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
     "ordering": "utf8-bytes-ascending-by-path",
-    "catalog_digest_sha256": "4108278443fa79d39db7f0f4b0237b385d5a0116b28e474d2b3500add63c9e6d",
+    "catalog_digest_sha256": "97b3606f309a26f065afe6593db996d94628b72b5b3e4b365e52b8c2fc36698d",
     "entries": [
       {
         "path": "ADR-014-release-verification-profiles.md",
@@ -238,6 +243,25 @@
           "affected_rules": [
             "law/policy/release-verification.json",
             "law/schemas/release-verification-profile.schema.json"
+          ]
+        }
+      },
+      {
+        "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+        "sha256": "9329c112b76028340cabacf9e9499586e4bb0d34465f8f94152c3353bfe2e13b",
+        "disposition": "preserved-invalid-accepted-record",
+        "reason": "Accepted historical record preserved byte-for-byte after a post-acceptance body-section defect was discovered. Its catalog metadata is the only materialized authority; ADR-MUT-0006 supersedes it forward. This one digest-pinned classification does not authorize repair in place or a general invalid-record exception.",
+        "legacy_record": {
+          "reference": "ADR-MUT-0005",
+          "title": "Unambiguous mutation digest and verification boundaries",
+          "status": "accepted",
+          "date": "2026-09-03",
+          "source_format": "v2-record-missing-required-section",
+          "supersedes": ["ADR-MUT-0004"],
+          "affected_rules": [
+            "law/policy/mutation-evidence-v2.json",
+            "law/schemas/mutation-evidence-policy-v2.schema.json",
+            "law/schemas/mutation-report-set-v2.schema.json"
           ]
         }
       },

@@ -236,7 +236,7 @@
         "resolvable_legacy_references": {
           "type": "array",
           "uniqueItems": true,
-          "description": "The exact pre-v2 identities a supersedes entry may resolve to. This list is a bijection with preserved-pre-v2-record catalog entries by reference and path; catalog presence alone never makes a legacy identity resolvable.",
+          "description": "The exact digest-pinned historical identities a supersedes entry may resolve to. This list is a bijection with catalogued accepted-record entries by reference, path, and disposition; catalog presence alone never makes a historical identity resolvable.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -249,7 +249,7 @@
                 "$ref": "#/$defs/relative_path"
               },
               "disposition": {
-                "const": "preserved-pre-v2-record"
+                "enum": ["preserved-pre-v2-record", "preserved-invalid-accepted-record"]
               }
             }
           }
@@ -265,7 +265,7 @@
               "const": "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field"
             },
             {
-              "const": "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match"
+              "const": "materialize-each-catalogued-accepted-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match"
             },
             {
               "const": "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references"
@@ -426,7 +426,11 @@
                 "$ref": "#/$defs/sha256"
               },
               "disposition": {
-                "enum": ["non-record", "preserved-pre-v2-record"]
+                "enum": [
+                  "non-record",
+                  "preserved-pre-v2-record",
+                  "preserved-invalid-accepted-record"
+                ]
               },
               "reason": {
                 "type": "string",
@@ -440,11 +444,34 @@
             "allOf": [
               {
                 "if": {
-                  "properties": { "disposition": { "const": "preserved-pre-v2-record" } },
+                  "properties": {
+                    "disposition": {
+                      "enum": ["preserved-pre-v2-record", "preserved-invalid-accepted-record"]
+                    }
+                  },
                   "required": ["disposition"]
                 },
                 "then": { "required": ["legacy_record"] },
                 "else": { "not": { "required": ["legacy_record"] } }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "disposition": { "const": "preserved-invalid-accepted-record" }
+                  },
+                  "required": ["disposition"]
+                },
+                "then": {
+                  "properties": {
+                    "legacy_record": {
+                      "required": ["status", "source_format"],
+                      "properties": {
+                        "status": { "const": "accepted" },
+                        "source_format": { "const": "v2-record-missing-required-section" }
+                      }
+                    }
+                  }
+                }
               }
             ]
           }
@@ -485,8 +512,8 @@
     },
     "legacy_reference": {
       "type": "string",
-      "pattern": "^(?:ADR-[0-9]{3,}|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$",
-      "description": "Stable catalog-supplied identity for a preserved pre-v2 record. LEGACY: provides a collision-free namespace for date-, scoped-, no-frontmatter-, and adr_id-era records."
+      "pattern": "^(?:ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$",
+      "description": "Stable catalog-supplied identity for one exact digest-pinned historical record. It may name a pre-v2 record or the explicitly classified accepted record whose invalid body must remain byte-preserved; catalog presence never permits a general repair-in-place exception."
     },
     "adr_reference": {
       "type": "string",
@@ -516,7 +543,8 @@
             "date-id-frontmatter",
             "scoped-id-frontmatter",
             "no-frontmatter",
-            "adr_id-frontmatter"
+            "adr_id-frontmatter",
+            "v2-record-missing-required-section"
           ]
         },
         "supersedes": {
@@ -1183,7 +1211,7 @@
         "resolvable_legacy_references": [],
         "algorithm": [
           "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
-          "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
+          "materialize-each-catalogued-accepted-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
           "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
           "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects",
           "validate-every-affected-rule-subject-as-an-already-nfc-canonical-repository-relative-posix-governed-or-review-subject-without-filesystem-or-git-access-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
