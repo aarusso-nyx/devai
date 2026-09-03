@@ -29,6 +29,7 @@ import {
 } from '../../services/release-lifecycle-execution.js';
 import { buildReleasePlanReceipt } from '../../services/release-lifecycle.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../services/release-lifecycle-local-adapters.js';
+import { createReleaseCertificationProvider } from '../../services/release-lifecycle-certification.js';
 import {
   createReleasePrepareProvider,
   type ImmutableReleaseContentSource,
@@ -69,6 +70,9 @@ interface OfflineVerifyOptions {
 }
 
 export interface ReleaseLifecycleCommandAdapters {
+  readonly certification_provider?: (
+    request: ReleaseLifecycleRequest,
+  ) => Parameters<typeof createReleaseCertificationProvider>[0] | undefined;
   readonly provider: (
     action: PersistedReleaseAction,
     request: ReleaseLifecycleRequest,
@@ -296,7 +300,12 @@ function lifecycleAction(
               request,
             );
             let provider: ReleaseProvider | undefined;
-            if (name === 'release prepare') {
+            if (name === 'release certify') {
+              const certification = adapters?.certification_provider?.(request);
+              if (certification === undefined)
+                throw new Error('release-certification-provider-unavailable');
+              provider = createReleaseCertificationProvider(certification);
+            } else if (name === 'release prepare') {
               const contentSource = adapters?.prepare_content_source?.(request);
               const artifactSink = adapters?.artifact_sink?.(request);
               if (contentSource !== undefined && artifactSink !== undefined) {

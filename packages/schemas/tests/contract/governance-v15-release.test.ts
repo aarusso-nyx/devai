@@ -44,10 +44,12 @@ describe('release lifecycle state and refusal contracts', () => {
     read_action_purity: Record<string, unknown>;
     publication_separation: Record<string, unknown>;
   }>('law/policy/release-lifecycle.json');
+  // The store record must compile from a cold registry: its state-schema refs
+  // are a real package dependency, not an accidental side effect of validation order.
+  const validateStoreRecord = getValidator('release-lifecycle-store-record.schema.json');
   const validateState = getValidator('release-lifecycle-state.schema.json');
   getValidator('release-intent.schema.json');
   const validatePlan = getValidator('release-plan-receipt.schema.json');
-  const validateStoreRecord = getValidator('release-lifecycle-store-record.schema.json');
 
   const blockedCases = [
     [

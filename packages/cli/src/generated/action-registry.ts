@@ -925,7 +925,7 @@ export const ACTION_REGISTRY = [
     effect: 'harness-write',
     authority: 'release_controller',
     description:
-      'Record the Inspector verification transition from preflight_passed to certified for one exact candidate; it grants no packaging or publication authority.',
+      'Record the Inspector certification transition only through the protected v3 certification provider and its content-addressed evidence sink for one exact candidate; it grants no packaging or publication authority.',
     output_contract: {
       schemaVersion: '1.0.0',
       mode: 'action-envelope',
@@ -945,7 +945,12 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'release certify',
       effect: 'harness-write',
-      capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+      capabilities: [
+        'fs:f5-state',
+        'fs:proofs',
+        'protected-certification-provider-v3:execute',
+        'certification-evidence-sink:write',
+      ],
       subject: {
         kind: 'derived-machine',
         actor: 'harness',
@@ -963,7 +968,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'release-certify-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'protected-certification-provider', 'certification-evidence-sink'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -973,7 +978,11 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: [
+          'fs-authority-boundary',
+          'protected-certification-provider-v3',
+          'trusted-certification-evidence-sink-v1',
+        ],
         final_reverification: true,
       },
       readiness: {

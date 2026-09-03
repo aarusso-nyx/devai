@@ -20,6 +20,7 @@ import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { verifyReleasePlanReceipt } from './release-lifecycle.js';
 import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
+import { isProtectedReleaseCertificationProvider } from './release-lifecycle-certification.js';
 
 export const RELEASE_ACTIONS = [
   'release plan',
@@ -82,10 +83,11 @@ export interface CertificationPackageEntry {
   readonly size_bytes: number;
   readonly sha256: string;
   readonly immutable_blob_locator:
-    | { readonly kind: 'git-object'; readonly object_id: string }
+    | GitReleaseBlobLocator
     | {
         readonly kind: 'generated-output';
         readonly output_blob_sha256: string;
+        readonly output_blob_handle: CertificationOutputBlobHandle;
         readonly certification_evidence_receipt: {
           readonly kind: 'release-certification-evidence-receipt-v1';
           readonly receipt_digest_sha256: string;
@@ -96,9 +98,30 @@ export interface CertificationPackageEntry {
             readonly task_policy_digest_sha256: string;
             readonly package_id: string;
             readonly output_blob_sha256: string;
+            readonly output_blob_handle: CertificationOutputBlobHandle;
           };
         };
       };
+}
+
+export interface GitReleaseBlobLocator {
+  readonly kind: 'git-object';
+  readonly repository: string;
+  readonly commit: string;
+  readonly tree: string;
+  readonly object_format: 'sha1' | 'sha256';
+  readonly path: string;
+  readonly mode: '100644' | '100755';
+  readonly object_id: string;
+  readonly size_bytes: number;
+  readonly content_digest_sha256: string;
+}
+
+export interface CertificationOutputBlobHandle {
+  readonly evidence_sink_id: string;
+  readonly opaque_handle: string;
+  readonly sha256: string;
+  readonly size_bytes: number;
 }
 
 export interface CertificationPackageEntryManifest {
@@ -252,6 +275,7 @@ export interface ReleaseLifecycleStateV2 extends Readonly<Record<string, unknown
     readonly tree: string;
   };
   readonly release_units: readonly ReleaseUnitEvidence[];
+  readonly inputs: ReleaseStateMaterial['inputs'];
   readonly prior_state: StateReference | null;
   readonly storage: { readonly generation: number; readonly head_before: StateStorageHead | null };
   readonly record_digest_sha256: string;
@@ -307,6 +331,8 @@ export interface StoreRecord extends Readonly<Record<string, unknown>> {
   readonly unknown: {
     readonly code: 'release-provider-result-unknown';
     readonly redispatch_permitted: false;
+    readonly artifact_sink?: ArtifactSinkCommitIdentity;
+    readonly artifacts?: readonly OpaqueArtifactIdentity[];
   } | null;
 }
 
@@ -896,7 +922,7 @@ export function reduceStoreRecords(values: readonly unknown[]): StoreReduction {
       }
       if (
         record.record_kind === 'unknown-provider-result' &&
-        record.provider_dispatch.status !== 'unknown'
+        record.provider_dispatch.status !== (remote ? 'unknown' : 'not-dispatched')
       ) {
         errors.add('release-store-completion-unknown-conflict');
       }
@@ -1641,7 +1667,7 @@ function buildStoreRecord(
     provider_dispatch:
       kind === 'attempt'
         ? { status: 'not-dispatched', handle_observed: false }
-        : kind === 'unknown-provider-result'
+        : kind === 'unknown-provider-result' && remote
           ? { status: 'unknown', handle_observed: handle !== null }
           : remote
             ? {
@@ -1663,7 +1689,16 @@ function buildStoreRecord(
         : null,
     unknown:
       kind === 'unknown-provider-result'
-        ? { code: 'release-provider-result-unknown', redispatch_permitted: false }
+        ? {
+            code: 'release-provider-result-unknown',
+            redispatch_permitted: false,
+            ...(request.action_id === 'release prepare' && result?.material?.artifact_sink != null
+              ? {
+                  artifact_sink: result.material.artifact_sink,
+                  artifacts: result.material.artifacts,
+                }
+              : {}),
+          }
         : null,
   } as never);
 }
@@ -2179,6 +2214,12 @@ export async function executeReleaseLifecycleAction(input: {
     };
   }
   const remote = EFFECT_BY_ACTION[request.action_id] === 'remote-write';
+  if (
+    request.action_id === 'release certify' &&
+    !isProtectedReleaseCertificationProvider(input.provider)
+  ) {
+    return { ok: false, phase: 'provider', code: 'release-certification-provider-unavailable' };
+  }
   if (!remote && input.provider === undefined) {
     return { ok: false, phase: 'provider', code: 'release-provider-unavailable' };
   }
@@ -2446,7 +2487,7 @@ export async function executeReleaseLifecycleAction(input: {
           : { outcome: 'failure', code: 'release-provider-failed' };
       }
       if (result.outcome !== 'success') {
-        if (!remote && result.transaction !== undefined) {
+        if (!remote && result.outcome !== 'unknown' && result.transaction !== undefined) {
           try {
             await result.transaction.rollback();
           } finally {
@@ -2600,29 +2641,54 @@ export async function executeReleaseLifecycleAction(input: {
       try {
         await result.transaction?.commit();
       } catch {
-        try {
-          await result.transaction?.rollback();
-        } finally {
-          await result.transaction?.dispose();
+        if (request.action_id !== 'release prepare') {
+          try {
+            await result.transaction?.rollback();
+          } finally {
+            await result.transaction?.dispose();
+          }
+          const failure = buildStoreRecord(
+            request,
+            attempt,
+            head,
+            attemptId,
+            'failure',
+            authorizationEventId,
+            {
+              outcome: 'failure',
+              dispatch_status: 'failed-before-dispatch',
+              code: 'release-provider-commit-failed',
+            },
+          );
+          input.store.appendStoreRecord(failure);
+          return {
+            ok: false,
+            phase: 'provider',
+            code: 'release-provider-commit-failed',
+            record: failure,
+          };
         }
+        // A dispatched commit is not proven absent merely because its response was lost.
+        // Preserve its transaction and all opaque handles for external reconciliation.
         const failure = buildStoreRecord(
           request,
           attempt,
           head,
           attemptId,
-          'failure',
+          'unknown-provider-result',
           authorizationEventId,
           {
-            outcome: 'failure',
-            dispatch_status: 'failed-before-dispatch',
-            code: 'release-provider-commit-failed',
+            ...result,
+            outcome: 'unknown',
+            dispatch_status: 'unknown',
+            code: 'release-provider-result-unknown',
           },
         );
         input.store.appendStoreRecord(failure);
         return {
           ok: false,
-          phase: 'provider',
-          code: 'release-provider-commit-failed',
+          phase: 'ambiguous',
+          code: 'release-artifact-sink-commit-unknown',
           record: failure,
         };
       }
@@ -2630,10 +2696,13 @@ export async function executeReleaseLifecycleAction(input: {
         input.store.appendStoreRecord(completion);
         input.store.appendStateAndAdvanceHead(state, completion, head);
       } catch (error) {
-        try {
-          await result.transaction?.rollback();
-        } finally {
-          await result.transaction?.dispose();
+        // The sink has committed. An append failure cannot authorize rollback or abort.
+        if (request.action_id !== 'release prepare') {
+          try {
+            await result.transaction?.rollback();
+          } finally {
+            await result.transaction?.dispose();
+          }
         }
         return {
           ok: false,
@@ -3226,6 +3295,12 @@ export async function resumeReleaseLifecycleExecution(input: {
     published,
     next_action: nextAction,
     next_outcome: nextOutcome,
+    ...(nextOutcome === 'ambiguous' &&
+    lastStore?.record_kind === 'unknown-provider-result' &&
+    lastStore.action_id === 'release prepare' &&
+    lastStore.unknown?.artifact_sink !== undefined
+      ? { reconciliation_requirements: ['external_sink_commit_reconciliation_required'] }
+      : {}),
     ...(nextOutcome === 'blocked'
       ? {
           blocked_reason: blockedReason,

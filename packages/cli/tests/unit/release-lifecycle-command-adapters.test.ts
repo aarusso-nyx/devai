@@ -22,10 +22,12 @@ import {
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release-lifecycle-local-adapters.js';
 import type {
   ArtifactSinkObject,
   ArtifactSinkObjectReceipt,
+  CertificationOutputClosureBinding,
 } from '../../src/services/release-prepare-kernel.js';
 
 const { runChecks, declaredRole } = vi.hoisted(() => ({
@@ -407,6 +409,107 @@ describe('release lifecycle command adapter composition', () => {
         exitCode: 0,
       });
     output.mockClear();
+    const certificationPolicy = { nodes: ['certify'] };
+    const certificationPolicyDigest = canonicalSha256(certificationPolicy);
+    const uninstallCertify = installReleaseLifecycleCommandAdapters({
+      certification_provider: (certifyRequest) => ({
+        provider: {
+          kind: 'protected-certification-provider-v3',
+          certify: () => ({
+            outcome: 'success',
+            material: {
+              release_units: [
+                {
+                  release_unit: '@aarusso-nyx/devai',
+                  version: '1.5.0',
+                  packages: [
+                    {
+                      package_id: '@aarusso-nyx/devai',
+                      manifest: {
+                        path: 'packages/cli/package.json',
+                        sha256: manifestDigest,
+                        size_bytes: Buffer.byteLength(manifestBytes),
+                      },
+                      tarball: null,
+                      sbom: null,
+                      evidence_manifest: null,
+                      provider_result: null,
+                      trust: null,
+                      certification_manifest: finalizeCertificationManifest({
+                        candidate: {
+                          commit: certifyRequest.candidate_locator.commit,
+                          tree: certifyRequest.candidate_locator.tree,
+                        },
+                        task_policy_digest_sha256: certificationPolicyDigest,
+                        package_id: '@aarusso-nyx/devai',
+                        package_version: '1.5.0',
+                        entry_order: 'ascending-utf-8-byte-collation-by-path;duplicates-refuse',
+                        manifest_digest_contract: {
+                          domain: 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0',
+                          payload: 'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes',
+                          canonicalization: 'rfc8785-jcs',
+                          algorithm: 'sha256',
+                        },
+                        entries: [
+                          {
+                            path: 'package.json',
+                            mode: '100644',
+                            size_bytes: Buffer.byteLength(manifestBytes),
+                            sha256: manifestDigest,
+                            immutable_blob_locator: {
+                              kind: 'git-object',
+                              repository: certifyRequest.repository_locator.id,
+                              commit: certifyRequest.candidate_locator.commit,
+                              tree: certifyRequest.candidate_locator.tree,
+                              object_format: 'sha1',
+                              path: 'packages/cli/package.json',
+                              mode: '100644',
+                              object_id: git(root, ['rev-parse', 'HEAD:packages/cli/package.json']),
+                              size_bytes: Buffer.byteLength(manifestBytes),
+                              content_digest_sha256: manifestDigest,
+                            },
+                          },
+                        ],
+                      }),
+                    },
+                  ],
+                },
+              ],
+              inputs: [{ kind: 'task-policy', path: 'host/certify-policy.json', sha256: certificationPolicyDigest }],
+              evidence: { manifest_digest_sha256: manifestDigest, receipt_digests: [], independently_checkable: true },
+              artifacts: [],
+            },
+          }),
+        },
+        evidence_sink: {
+          kind: 'certification-evidence-sink-v3',
+          protocol: 'two-phase-content-addressed',
+          begin: () => undefined as never,
+          readCertificationEvidenceReceipt: () => { throw new Error('no generated outputs'); },
+          readCertificationOutputClosure: binding => ({ ...binding, outputs: [] }),
+          readGeneratedBlob: () => { throw new Error('no generated outputs'); },
+        },
+        content_source: {
+          readGitObject: ({ type, object_id }) => {
+            const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
+            if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) throw new Error('missing git object');
+            return result.stdout;
+          },
+          readGitBlob: ({ object_id }) => {
+            const result = spawnSync('git', ['-C', root, 'cat-file', 'blob', object_id]);
+            if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) throw new Error('missing git blob');
+            return result.stdout;
+          },
+        },
+        task_policies: [{ release_unit: '@aarusso-nyx/devai', task_policy_digest_sha256: certificationPolicyDigest, document: certificationPolicy }],
+      }),
+      provider: () => undefined,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+    });
+    cleanups.push(uninstallCertify);
     await withAuthorityHostTestScope(() =>
       captureAction(releaseCertify)({
         request: certifyRequestPath,
@@ -417,6 +520,7 @@ describe('release lifecycle command adapter composition', () => {
     expect(output.mock.calls, JSON.stringify(errorOutput.mock.calls)).toContainEqual([
       expect.stringContaining('"state":"certified"'),
     ]);
+    uninstallCertify();
 
     const prepareRequestPath = join(root, 'prepare-request.json');
     writeFileSync(
@@ -493,6 +597,13 @@ describe('release lifecycle command adapter composition', () => {
       offline_receipt_verifier: () => undefined,
       publication_controls: () => undefined,
       prepare_content_source: () => ({
+        readGitObject: ({ type, object_id }) => {
+          const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
+          if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+            throw new Error('missing git object');
+          }
+          return result.stdout;
+        },
         readGitBlob: ({ object_id }) => {
           const result = spawnSync('git', ['-C', root, 'cat-file', 'blob', object_id]);
           if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
@@ -503,6 +614,10 @@ describe('release lifecycle command adapter composition', () => {
         readCertificationEvidenceReceipt: () => {
           throw new Error('unexpected certification receipt');
         },
+        readCertificationOutputClosure: (binding: CertificationOutputClosureBinding) => ({
+          ...binding,
+          outputs: [],
+        }),
         readGeneratedBlob: () => {
           throw new Error('unexpected generated blob');
         },

@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '@devai-nyx/utils';
 import type {
   ArtifactSinkCommitIdentity,
+  CertificationOutputBlobHandle,
   CertificationPackageEntryManifest,
+  GitReleaseBlobLocator,
   OpaqueArtifactIdentity,
   PackageEvidence,
   ReleaseLifecycleRequest,
@@ -30,26 +32,56 @@ const CERTIFICATION_MANIFEST_DIGEST_CONTRACT = {
 const ENTRY_ORDER = 'ascending-utf-8-byte-collation-by-path;duplicates-refuse' as const;
 const COMMIT_PROTOCOL = 'devai.artifact-sink.two-phase.v1' as const;
 
-type CertificationReceipt = Extract<
+export type CertificationReceipt = Extract<
   CertificationPackageEntryManifest['entries'][number]['immutable_blob_locator'],
   { readonly kind: 'generated-output' }
 >['certification_evidence_receipt'];
 
 export interface ImmutableReleaseContentSource {
+  /** Raw immutable objects; the kernel independently verifies their framing and tree links. */
+  readonly readGitObject: (input: {
+    readonly repository: ReleaseLifecycleRequest['repository_locator'];
+    readonly object_format: 'sha1' | 'sha256';
+    readonly object_id: string;
+    readonly type: 'commit' | 'tree';
+  }) => Buffer | Promise<Buffer>;
   readonly readGitBlob: (input: {
     readonly repository: ReleaseLifecycleRequest['repository_locator'];
     readonly candidate: ReleaseLifecycleRequest['candidate_locator'];
     readonly object_id: string;
+    readonly locator: GitReleaseBlobLocator;
   }) => Buffer | Promise<Buffer>;
   readonly readCertificationEvidenceReceipt: (input: {
     readonly receipt_digest_sha256: string;
+    readonly evidence_sink_id: string;
   }) => unknown | Promise<unknown>;
+  readonly readCertificationOutputClosure: (
+    input: CertificationOutputClosureBinding,
+  ) => CertificationOutputClosure | Promise<CertificationOutputClosure>;
   readonly readGeneratedBlob: (input: {
     readonly repository: ReleaseLifecycleRequest['repository_locator'];
     readonly candidate: ReleaseLifecycleRequest['candidate_locator'];
     readonly receipt: CertificationReceipt;
     readonly output_blob_sha256: string;
+    readonly output_blob_handle: CertificationOutputBlobHandle;
   }) => Buffer | Promise<Buffer>;
+}
+
+export interface CertificationOutputClosureBinding {
+  readonly repository: ReleaseLifecycleRequest['repository_locator'];
+  readonly candidate: Pick<ReleaseLifecycleRequest['candidate_locator'], 'commit' | 'tree'>;
+  readonly task_policy_digest_sha256: string;
+  readonly package_id: string;
+}
+
+/** Finalized independently by the protected evidence sink, including packages with no outputs. */
+export interface CertificationOutputClosure extends CertificationOutputClosureBinding {
+  readonly outputs: readonly {
+    readonly path: string;
+    readonly mode: '100644' | '100755';
+    readonly output_blob_handle: CertificationOutputBlobHandle;
+    readonly certification_evidence_receipt: CertificationReceipt;
+  }[];
 }
 
 export interface ArtifactSinkObject {
@@ -133,9 +165,13 @@ function sha256(bytes: Buffer | string): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function sha1GitBlob(bytes: Buffer): string {
-  return createHash('sha1')
-    .update(Buffer.from(`blob ${String(bytes.byteLength)}\0`, 'utf8'))
+function gitObjectDigest(
+  bytes: Buffer,
+  type: 'blob' | 'commit' | 'tree',
+  format: 'sha1' | 'sha256',
+): string {
+  return createHash(format)
+    .update(Buffer.from(`${type} ${String(bytes.byteLength)}\0`, 'utf8'))
     .update(bytes)
     .digest('hex');
 }
@@ -290,6 +326,7 @@ export function finalizeCertificationManifest(
   return { ...manifest, manifest_digest_sha256: certificationManifestDigest(manifest) };
 }
 
+/** Canonicalizes bytes only; this does not prove external finalization or producer provenance. */
 export function finalizeCertificationReceipt(
   referent: CertificationReceipt['referent'],
 ): CertificationReceipt {
@@ -330,14 +367,144 @@ export function verifyCertificationManifest(
     value.entries.some(
       (entry) =>
         !/^[0-9a-f]{64}$/u.test(entry.sha256) ||
+        !Number.isSafeInteger(entry.size_bytes) ||
+        entry.size_bytes < 0 ||
+        !['100644', '100755'].includes(entry.mode) ||
         (entry.immutable_blob_locator.kind === 'git-object' &&
-          !/^[0-9a-f]{40}$/u.test(entry.immutable_blob_locator.object_id)),
+          !gitLocatorMatches(entry, input.request, input.package_id)),
     ) ||
     !paths.includes('package.json')
   ) {
     throw new Error('release-prepare-certification-manifest-invalid');
   }
   return value;
+}
+
+function gitLocatorMatches(
+  entry: CertificationPackageEntryManifest['entries'][number],
+  request: ReleaseLifecycleRequest,
+  packageId: string,
+): boolean {
+  const locator = entry.immutable_blob_locator;
+  if (locator.kind !== 'git-object') return false;
+  const pkg = request.candidate_locator.release_units
+    .flatMap((unit) => unit.package_roster)
+    .find((value) => value.package_id === packageId);
+  const prefix = pkg?.manifest_path.slice(0, -'package.json'.length);
+  const length =
+    locator.object_format === 'sha1' ? 40 : locator.object_format === 'sha256' ? 64 : 0;
+  return (
+    prefix !== undefined &&
+    length > 0 &&
+    [locator.commit, locator.tree, locator.object_id].every(
+      (id) => typeof id === 'string' && id.length === length && /^[0-9a-f]+$/u.test(id),
+    ) &&
+    locator.repository === request.repository_locator.id &&
+    locator.commit === request.candidate_locator.commit &&
+    locator.tree === request.candidate_locator.tree &&
+    locator.path === `${prefix}${entry.path}` &&
+    safeRelativePath(locator.path) &&
+    locator.mode === entry.mode &&
+    locator.size_bytes === entry.size_bytes &&
+    locator.content_digest_sha256 === entry.sha256
+  );
+}
+
+async function verifyGitMembership(
+  source: ImmutableReleaseContentSource,
+  request: ReleaseLifecycleRequest,
+  locator: GitReleaseBlobLocator,
+): Promise<void> {
+  const read = async (type: 'commit' | 'tree', objectId: string): Promise<Buffer> => {
+    const bytes = await source.readGitObject({
+      repository: request.repository_locator,
+      object_format: locator.object_format,
+      object_id: objectId,
+      type,
+    });
+    if (!Buffer.isBuffer(bytes) || gitObjectDigest(bytes, type, locator.object_format) !== objectId)
+      throw new Error('release-prepare-git-tree-membership-invalid');
+    return Buffer.from(bytes);
+  };
+  try {
+    const commit = await read('commit', locator.commit);
+    const firstLine = commit.subarray(0, commit.indexOf(10)).toString('utf8');
+    if (firstLine !== `tree ${locator.tree}`) throw new Error('membership');
+    let tree = locator.tree;
+    const parts = locator.path.split('/');
+    const oidBytes = locator.object_format === 'sha1' ? 20 : 32;
+    for (const [index, part] of parts.entries()) {
+      const bytes = await read('tree', tree);
+      const entries = new Map<string, { mode: string; id: string }>();
+      let offset = 0;
+      while (offset < bytes.length) {
+        const space = bytes.indexOf(32, offset);
+        const nul = bytes.indexOf(0, space + 1);
+        if (space <= offset || nul <= space + 1 || nul + 1 + oidBytes > bytes.length)
+          throw new Error('tree');
+        const mode = bytes.subarray(offset, space).toString('ascii');
+        const nameBytes = bytes.subarray(space + 1, nul);
+        const name = nameBytes.toString('utf8');
+        if (
+          !nameBytes.equals(Buffer.from(name)) ||
+          !safeRelativePath(name) ||
+          name.includes('/') ||
+          entries.has(name)
+        )
+          throw new Error('tree');
+        entries.set(name, {
+          mode,
+          id: bytes.subarray(nul + 1, nul + 1 + oidBytes).toString('hex'),
+        });
+        offset = nul + 1 + oidBytes;
+      }
+      const entry = entries.get(part);
+      if (entry === undefined) throw new Error('membership');
+      if (index === parts.length - 1) {
+        if (entry.mode !== locator.mode || entry.id !== locator.object_id)
+          throw new Error('membership');
+      } else {
+        if (entry.mode !== '40000') throw new Error('membership');
+        tree = entry.id;
+      }
+    }
+  } catch {
+    throw new Error('release-prepare-git-tree-membership-invalid');
+  }
+}
+
+export async function verifyCertificationOutputClosure(
+  source: Pick<ImmutableReleaseContentSource, 'readCertificationOutputClosure'>,
+  request: ReleaseLifecycleRequest,
+  manifest: CertificationPackageEntryManifest,
+): Promise<void> {
+  const binding: CertificationOutputClosureBinding = {
+    repository: request.repository_locator,
+    candidate: { commit: request.candidate_locator.commit, tree: request.candidate_locator.tree },
+    task_policy_digest_sha256: manifest.task_policy_digest_sha256,
+    package_id: manifest.package_id,
+  };
+  const outputs = manifest.entries.flatMap((entry) =>
+    entry.immutable_blob_locator.kind === 'generated-output'
+      ? [
+          {
+            path: entry.path,
+            mode: entry.mode,
+            output_blob_handle: entry.immutable_blob_locator.output_blob_handle,
+            certification_evidence_receipt:
+              entry.immutable_blob_locator.certification_evidence_receipt,
+          },
+        ]
+      : [],
+  );
+  let observed: CertificationOutputClosure;
+  try {
+    observed = await source.readCertificationOutputClosure(binding);
+  } catch {
+    throw new Error('release-certification-generated-output-untrusted');
+  }
+  if (!same(observed, { ...binding, outputs }))
+    throw new Error('release-certification-output-closure-invalid');
 }
 
 function verifyCertificationReceipt(
@@ -362,7 +529,7 @@ function verifyCertificationReceipt(
 async function verifyPackage(
   source: ImmutableReleaseContentSource,
   request: ReleaseLifecycleRequest,
-  state: ReleaseLifecycleStateV2,
+  state: Pick<ReleaseStateMaterial, 'release_units' | 'inputs'>,
   unitIndex: number,
   packageIndex: number,
 ): Promise<VerifiedPackage> {
@@ -392,21 +559,27 @@ async function verifyPackage(
     task_policy_digests: taskPolicyDigests,
   });
   const entries: Array<VerifiedPackage['entries'][number]> = [];
+  await verifyCertificationOutputClosure(source, request, manifest);
   for (const entry of manifest.entries) {
     let bytes: Buffer;
     if (entry.immutable_blob_locator.kind === 'git-object') {
+      await verifyGitMembership(source, request, entry.immutable_blob_locator);
       try {
         bytes = Buffer.from(
           await source.readGitBlob({
             repository: request.repository_locator,
             candidate: request.candidate_locator,
             object_id: entry.immutable_blob_locator.object_id,
+            locator: entry.immutable_blob_locator,
           }),
         );
       } catch {
         throw new Error('release-prepare-immutable-blob-locator-invalid');
       }
-      if (sha1GitBlob(bytes) !== entry.immutable_blob_locator.object_id) {
+      if (
+        gitObjectDigest(bytes, 'blob', entry.immutable_blob_locator.object_format) !==
+        entry.immutable_blob_locator.object_id
+      ) {
         throw new Error('release-prepare-immutable-blob-locator-invalid');
       }
     } else {
@@ -417,9 +590,14 @@ async function verifyPackage(
         task_policy_digest_sha256: manifest.task_policy_digest_sha256,
         package_id: requestPackage.package_id,
         output_blob_sha256: entry.sha256,
+        output_blob_handle: locator.output_blob_handle,
       };
       if (
         locator.output_blob_sha256 !== entry.sha256 ||
+        locator.output_blob_handle?.sha256 !== entry.sha256 ||
+        locator.output_blob_handle?.size_bytes !== entry.size_bytes ||
+        !safeOpaqueIdentity(locator.output_blob_handle?.evidence_sink_id ?? '') ||
+        !safeOpaqueIdentity(locator.output_blob_handle?.opaque_handle ?? '') ||
         !same(locator.certification_evidence_receipt.referent, expectedReferent)
       ) {
         throw new Error('release-prepare-immutable-blob-locator-invalid');
@@ -427,6 +605,7 @@ async function verifyPackage(
       try {
         const receipt = await source.readCertificationEvidenceReceipt({
           receipt_digest_sha256: locator.certification_evidence_receipt.receipt_digest_sha256,
+          evidence_sink_id: locator.output_blob_handle.evidence_sink_id,
         });
         verifyCertificationReceipt(receipt, locator.certification_evidence_receipt);
         bytes = Buffer.from(
@@ -435,6 +614,7 @@ async function verifyPackage(
             candidate: request.candidate_locator,
             receipt: locator.certification_evidence_receipt,
             output_blob_sha256: locator.output_blob_sha256,
+            output_blob_handle: locator.output_blob_handle,
           }),
         );
       } catch (error) {
@@ -479,6 +659,29 @@ async function verifyPackage(
     certification_manifest: manifest,
     entries,
   };
+}
+
+export async function verifyCertificationMaterial(
+  request: ReleaseLifecycleRequest,
+  material: ReleaseStateMaterial,
+  source: ImmutableReleaseContentSource,
+): Promise<void> {
+  const expected = request.candidate_locator.release_units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.package_roster.map((pkg) => pkg.package_id),
+  }));
+  const observed = material.release_units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.packages.map((pkg) => pkg.package_id),
+  }));
+  if (!same(expected, observed)) throw new Error('release-certification-output-closure-invalid');
+  for (const [unitIndex, unit] of request.candidate_locator.release_units.entries()) {
+    for (const packageIndex of unit.package_roster.keys()) {
+      await verifyPackage(source, request, material, unitIndex, packageIndex);
+    }
+  }
 }
 
 function sinkObject(
@@ -839,20 +1042,20 @@ export function createReleasePrepareProvider(input: {
             let receipt: ArtifactSinkCommitReceipt;
             try {
               receipt = await transaction.commit(commitManifestReceipt);
+              if (
+                record(receipt) === undefined ||
+                receipt.committed !== true ||
+                !same(receipt, { committed: true, ...artifactSink })
+              ) {
+                throw new Error('release-artifact-sink-verification-failed');
+              }
+              await verifyReceiptBytes(transaction, commitManifestReceipt);
+              for (const artifactReceipt of receipts)
+                await verifyReceiptBytes(transaction, artifactReceipt);
+              committed = true;
             } catch {
-              throw new Error('release-artifact-sink-commit-failed');
+              throw new Error('release-artifact-sink-commit-unknown');
             }
-            if (
-              record(receipt) === undefined ||
-              receipt.committed !== true ||
-              !same(receipt, { committed: true, ...artifactSink })
-            ) {
-              throw new Error('release-artifact-sink-verification-failed');
-            }
-            await verifyReceiptBytes(transaction, commitManifestReceipt);
-            for (const artifactReceipt of receipts)
-              await verifyReceiptBytes(transaction, artifactReceipt);
-            committed = true;
           },
           rollback: async () => {
             if (transaction !== undefined && !committed && open) {

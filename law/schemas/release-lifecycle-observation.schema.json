@@ -309,6 +309,10 @@
       },
       "description": "Closed requirements for a blocked observation. The sole non-empty value identifies the one fresh exact Owner authorization required before a new remote attempt may be authorized."
     },
+    "reconciliation_requirements": {
+      "const": ["external_sink_commit_reconciliation_required"],
+      "description": "Emitted only when the semantic kernel verifies an unknown terminal release prepare record retaining its ArtifactSink transaction and opaque handles. External reconciliation is the sole next requirement; this observation grants no reconciliation, rollback, retry, or redispatch authority. Omitted for an unterminated attempt or a remote provider unknown result."
+    },
     "emitted_by": {
       "type": "object",
       "additionalProperties": false,
@@ -388,6 +392,21 @@
     }
   },
   "allOf": [
+    {
+      "if": { "required": ["reconciliation_requirements"] },
+      "then": {
+        "properties": {
+          "next_outcome": { "const": "ambiguous" },
+          "next_action": { "type": "null" },
+          "head": {
+            "type": "object",
+            "properties": { "state": { "const": "certified" } }
+          },
+          "published": { "properties": { "observed": { "const": false } } },
+          "blocked_requirements": false
+        }
+      }
+    },
     {
       "if": {
         "properties": { "next_outcome": { "enum": ["complete", "ambiguous"] } },
