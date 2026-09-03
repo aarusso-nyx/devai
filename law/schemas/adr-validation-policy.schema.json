@@ -596,6 +596,7 @@
         "effective_authorities",
         "subject_authorities",
         "downstream_coverage_subject_source",
+        "result_state",
         "semantic_rules"
       ],
       "properties": {
@@ -657,6 +658,7 @@
             "adr_order",
             "adr_id_field",
             "public_fields",
+            "format_values",
             "preserved_declared_fields",
             "affected_rules_order",
             "effective_affected_rules",
@@ -666,6 +668,13 @@
             "array_field": { "const": "adrs" },
             "adr_order": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" },
             "adr_id_field": { "const": "adr_id" },
+            "format_values": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": false,
+              "prefixItems": [{ "const": "v2" }, { "const": "legacy-catalog" }]
+            },
             "public_fields": {
               "type": "array",
               "minItems": 10,
@@ -788,10 +797,24 @@
           }
         },
         "downstream_coverage_subject_source": { "const": "adrs[].effective_affected_rules" },
+        "result_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ok_true_iff", "semantic_resolution_false", "ok_false_authority"],
+          "properties": {
+            "ok_true_iff": { "const": "semantic-resolution-performed-and-errors-empty" },
+            "semantic_resolution_false": {
+              "const": "ok-false-and-at-least-one-adr-semantic-resolution-not-performed-error"
+            },
+            "ok_false_authority": {
+              "const": "all-adrs-non-effective-with-empty-effective-affected-rules-and-empty-top-level-authorities"
+            }
+          }
+        },
         "semantic_rules": {
           "type": "array",
-          "minItems": 7,
-          "maxItems": 7,
+          "minItems": 8,
+          "maxItems": 8,
           "items": false,
           "prefixItems": [
             {
@@ -814,6 +837,9 @@
             },
             {
               "const": "effective-authorities-must-equal-the-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-set-of-subject-authority-effective-heads-and-of-adr-ids-with-nonempty-effective-affected-rules"
+            },
+            {
+              "const": "result-state-must-enforce-ok-iff-semantic-resolution-performed-and-errors-empty-and-ok-false-must-grant-no-effective-authority"
             }
           ]
         }
@@ -852,7 +878,77 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/adrValidationSubjectAuthority" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+          "then": {
+            "properties": {
+              "semantic_resolution_performed": { "const": true },
+              "errors": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "semantic_resolution_performed": { "const": true },
+              "errors": { "maxItems": 0 }
+            },
+            "required": ["semantic_resolution_performed", "errors"]
+          },
+          "then": { "properties": { "ok": { "const": true } } }
+        },
+        {
+          "if": {
+            "properties": { "semantic_resolution_performed": { "const": false } },
+            "required": ["semantic_resolution_performed"]
+          },
+          "then": {
+            "properties": {
+              "ok": { "const": false },
+              "errors": {
+                "contains": {
+                  "type": "object",
+                  "required": ["code"],
+                  "properties": { "code": { "const": "adr-semantic-resolution-not-performed" } }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
+          "then": {
+            "properties": {
+              "effective_authorities": { "maxItems": 0 },
+              "subject_authorities": { "maxItems": 0 },
+              "adrs": {
+                "items": {
+                  "properties": {
+                    "effective": { "const": false },
+                    "effective_affected_rules": { "maxItems": 0 }
+                  }
+                }
+              }
+            },
+            "anyOf": [
+              { "properties": { "semantic_resolution_performed": { "const": false } } },
+              { "properties": { "errors": { "minItems": 1 } } }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "semantic_resolution_performed": { "const": true },
+              "errors": { "minItems": 1 }
+            },
+            "required": ["semantic_resolution_performed", "errors"]
+          },
+          "then": { "properties": { "ok": { "const": false } } }
+        }
+      ]
     },
     "adrValidationResultAdr": {
       "type": "object",
@@ -875,7 +971,7 @@
         "title": { "type": "string", "minLength": 1, "maxLength": 200 },
         "status": { "enum": ["proposed", "accepted", "rejected", "superseded"] },
         "date": { "type": ["string", "null"], "format": "date" },
-        "format": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "format": { "enum": ["v2", "legacy-catalog"] },
         "supersedes": {
           "type": "array",
           "uniqueItems": true,
@@ -927,7 +1023,7 @@
       "id": "adr-validation",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.4.0",
+      "policy_version": "2.5.0",
       "record_schema": "law/schemas/adr-v2.schema.json",
       "scan": {
         "root": "law/adr",
@@ -1012,6 +1108,7 @@
             "array_field": "adrs",
             "adr_order": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
             "adr_id_field": "adr_id",
+            "format_values": ["v2", "legacy-catalog"],
             "public_fields": [
               "file",
               "adr_id",
@@ -1067,6 +1164,11 @@
             "definition": "one entry for every deterministic weakly connected accepted subject-lineage"
           },
           "downstream_coverage_subject_source": "adrs[].effective_affected_rules",
+          "result_state": {
+            "ok_true_iff": "semantic-resolution-performed-and-errors-empty",
+            "semantic_resolution_false": "ok-false-and-at-least-one-adr-semantic-resolution-not-performed-error",
+            "ok_false_authority": "all-adrs-non-effective-with-empty-effective-affected-rules-and-empty-top-level-authorities"
+          },
           "semantic_rules": [
             "adrs-must-be-sorted-by-adr-id-rfc8785-jcs-utf8-byte-lexicographic-ascending-and-adr-id-must-be-unique",
             "each-effective-affected-rules-array-must-be-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-and-a-subset-of-that-adrs-declared-affected-rules",
@@ -1074,7 +1176,8 @@
             "subject-authorities-must-be-sorted-by-subject-then-lineage-members-rfc8785-jcs-utf8-byte-lexicographic-ascending-each-lineage-members-array-must-be-sorted-unique-and-contain-its-effective-head",
             "each-subject-authority-member-and-head-must-reference-a-known-adr-member-must-declare-the-subject-and-members-must-exactly-equal-that-subjects-weak-component",
             "each-subject-authority-head-must-be-the-unique-effective-adr-for-its-subject-lineage-and-biject-with-that-heads-effective-affected-rules-subject",
-            "effective-authorities-must-equal-the-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-set-of-subject-authority-effective-heads-and-of-adr-ids-with-nonempty-effective-affected-rules"
+            "effective-authorities-must-equal-the-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-set-of-subject-authority-effective-heads-and-of-adr-ids-with-nonempty-effective-affected-rules",
+            "result-state-must-enforce-ok-iff-semantic-resolution-performed-and-errors-empty-and-ok-false-must-grant-no-effective-authority"
           ]
         },
         "resolvable_legacy_references": [],
