@@ -81,3 +81,7 @@ export function installReleaseLifecycleCommandAdapters(
     dispose();
   };
 }
+export {
+  createReleaseCertificationEvidenceStore,
+  type ReleaseCertificationEvidenceStoreOptions,
+} from './services/release-evidence-store.js';
