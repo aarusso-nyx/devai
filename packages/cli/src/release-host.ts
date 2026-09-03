@@ -85,3 +85,7 @@ export {
   createReleaseCertificationEvidenceStore,
   type ReleaseCertificationEvidenceStoreOptions,
 } from './services/release-evidence-store.js';
+export {
+  createReleaseArtifactStore,
+  type ReleaseArtifactStoreOptions,
+} from './services/release-artifact-store.js';

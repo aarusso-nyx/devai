@@ -88,6 +88,88 @@ const protectedOperations = new WeakMap<
 >();
 let protectedOperationSequence = 0;
 
+export interface ProtectedArtifactSinkBinding {
+  readonly action_id: 'release prepare';
+  readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
+  readonly plan_receipt_digest_sha256: string;
+  readonly pack_spec_digest_sha256: string;
+  readonly sink_id: string;
+}
+
+const artifactOperations = new WeakMap<
+  object,
+  Readonly<{
+    binding: ProtectedArtifactSinkBinding;
+    scope: AuthorityHostEffectScope;
+    kind: 'artifact-sink';
+    operation_id: string;
+  }>
+>();
+
+export function protectedArtifactSinkHostEffect(request: AuthorityHostEffectRequest) {
+  if (request.kind !== 'protected-release' || request.symbol !== 'protectedArtifactSinkOperation')
+    return undefined;
+  const token = request.arguments[0];
+  if (token === null || typeof token !== 'object') return undefined;
+  const operation = artifactOperations.get(token);
+  return operation?.scope === scopes.getStore() ? operation : undefined;
+}
+
+/** Separate prepare-only capability. No execution or certification authority is exposed. */
+export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSinkBinding) {
+  const selected = Object.freeze({
+    ...binding,
+    repository: Object.freeze({ ...binding.repository }),
+  });
+  if (
+    selected.action_id !== 'release prepare' ||
+    typeof selected.repository.id !== 'string' ||
+    selected.repository.id.length === 0 ||
+    ![selected.repository.commit, selected.repository.tree].every((value) =>
+      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+    ) ||
+    selected.repository.commit.length !== selected.repository.tree.length ||
+    ![selected.plan_receipt_digest_sha256, selected.pack_spec_digest_sha256].every((value) =>
+      /^[0-9a-f]{64}$/u.test(value),
+    ) ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(selected.sink_id)
+  )
+    throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+  const invoke = <T>(callback: () => T): T => {
+    const scope = requireScope('mutation');
+    if (scope.action_id !== selected.action_id)
+      throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+    const token = Object.freeze({});
+    protectedOperationSequence += 1;
+    const operation = Object.freeze({
+      binding: selected,
+      scope,
+      kind: 'artifact-sink' as const,
+      operation_id: `${scope.invocation_id}-${String(protectedOperationSequence)}`,
+    });
+    artifactOperations.set(token, operation);
+    try {
+      return scope.apply_effect(
+        { kind: 'protected-release', symbol: 'protectedArtifactSinkOperation', arguments: [token] },
+        () => {
+          if (artifactOperations.get(token) !== operation || scopes.getStore() !== scope)
+            throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+          artifactOperations.delete(token);
+          return callback();
+        },
+      ) as T;
+    } finally {
+      artifactOperations.delete(token);
+    }
+  };
+  return Object.freeze({
+    invokeSink: <T>(callback: () => T): T => {
+      const scope = requireScope('mutation');
+      return invoke(() => protectedSinkScopes.run({ scope, apply: invoke }, callback));
+    },
+  });
+}
+
 /** Broker-only inspection of a live, single-use, process-local protected operation. */
 export function protectedReleaseHostEffect(request: AuthorityHostEffectRequest) {
   if (request.kind !== 'protected-release' || request.symbol !== 'protectedReleaseHostOperation')

@@ -20,6 +20,7 @@ import {
   type AuthorityHostEffectScope,
   type AtomicAuthorityHostEffect,
   protectedReleaseHostEffect,
+  protectedArtifactSinkHostEffect,
   protectedReleaseBoundaryAdapterId,
 } from '@devai-nyx/authority';
 import {
@@ -827,6 +828,17 @@ function targetOperation(target: JsonRecord): string {
 }
 
 function boundedSelectors(kind: string, repositoryId: string, actionName: string): JsonRecord[] {
+  if (actionName === 'release prepare' && kind === 'artifact-sink') {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'trusted-artifact-sink-v3',
+        endpoint_ids: ['host'],
+        operation_ids: ['write'],
+        publication: false,
+      },
+    ];
+  }
   if (
     (actionName === 'release certify' || actionName === 'release preflight') &&
     kind === 'protected-certification-provider'
@@ -1329,21 +1341,30 @@ export function createAuthorityHostBroker(input: BrokerInput): {
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     if (request.kind === 'protected-release') {
-      const operation = protectedReleaseHostEffect(request);
+      const operation =
+        protectedReleaseHostEffect(request) ?? protectedArtifactSinkHostEffect(request);
+      const artifact = operation?.kind === 'artifact-sink';
       const provider = operation?.kind === 'provider';
-      const requiredCapability = provider
-        ? 'protected-certification-provider-v3:execute'
-        : 'certification-evidence-sink:write';
-      const requiredKind = provider
-        ? 'protected-certification-provider'
-        : 'certification-evidence-sink';
-      const requiredAdapter = provider
-        ? 'protected-certification-provider-v3'
-        : 'trusted-certification-evidence-sink-v1';
+      const requiredCapability = artifact
+        ? 'artifact-sink:write'
+        : provider
+          ? 'protected-certification-provider-v3:execute'
+          : 'certification-evidence-sink:write';
+      const requiredKind = artifact
+        ? 'artifact-sink'
+        : provider
+          ? 'protected-certification-provider'
+          : 'certification-evidence-sink';
+      const requiredAdapter = artifact
+        ? 'trusted-artifact-sink-v3'
+        : provider
+          ? 'protected-certification-provider-v3'
+          : 'trusted-certification-evidence-sink-v1';
       if (
         operation === undefined ||
+        input.entry.effects === 'read' ||
         operation.binding.action_id !== input.entry.name ||
-        input.role !== 'inspector' ||
+        input.role !== (artifact ? 'architect' : 'inspector') ||
         !input.argv.includes('--write') ||
         !input.entry.authority_contract.capabilities.some(
           (capability) => capability === requiredCapability,
@@ -1376,9 +1397,11 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       const target: JsonRecord = {
         kind: 'remote',
         id: `protected-release:${operation.operation_id}`,
-        system_id: provider
-          ? 'devai-protected-certification-provider-v3'
-          : 'trusted-certification-evidence-sink-v1',
+        system_id: artifact
+          ? 'trusted-artifact-sink-v3'
+          : provider
+            ? 'devai-protected-certification-provider-v3'
+            : 'trusted-certification-evidence-sink-v1',
         endpoint_id: 'host',
         operation_id: provider ? 'execute' : 'write',
         publication: false,
@@ -1388,7 +1411,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       return authorizeTarget(
         {
           name: input.entry.name,
-          effects: input.entry.effects as 'harness-write',
+          effects: input.entry.effects,
           authority_contract: input.entry.authority_contract,
         },
         target,

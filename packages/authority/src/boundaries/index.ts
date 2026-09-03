@@ -105,30 +105,43 @@ export function protectedReleaseBoundaryAdapterId(
   const sink =
     target.system_id === 'trusted-certification-evidence-sink-v1' &&
     target.operation_id === 'write';
-  if (!provider && !sink) return undefined;
+  const artifact =
+    target.system_id === 'trusted-artifact-sink-v3' && target.operation_id === 'write';
+  if (!provider && !sink && !artifact) return undefined;
   const binding = target.protected_release_binding;
   if (
     !isRecord(binding) ||
     !isRecord(binding.repository) ||
-    !['release preflight', 'release certify'].includes(binding.action_id) ||
+    !(artifact
+      ? binding.action_id === 'release prepare'
+      : ['release preflight', 'release certify'].includes(binding.action_id)) ||
     (sink && binding.action_id !== 'release certify') ||
     typeof binding.repository.id !== 'string' ||
     binding.repository.id.length === 0 ||
     ![binding.repository.commit, binding.repository.tree].every(
       (value) => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
     ) ||
-    ![
-      binding.task_policy_digest_sha256,
-      binding.plan_receipt_digest_sha256,
-      binding.helper_identity_sha256,
-    ].every((value) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value)) ||
+    !(
+      artifact
+        ? [binding.plan_receipt_digest_sha256, binding.pack_spec_digest_sha256]
+        : [
+            binding.task_policy_digest_sha256,
+            binding.plan_receipt_digest_sha256,
+            binding.helper_identity_sha256,
+          ]
+    ).every((value) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value)) ||
+    (artifact &&
+      (typeof binding.sink_id !== 'string' ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(binding.sink_id))) ||
     typeof target.protected_operation_id !== 'string' ||
     target.protected_operation_id.length === 0
   )
     return undefined;
-  return provider
-    ? 'protected-certification-provider-v3'
-    : 'trusted-certification-evidence-sink-v1';
+  return artifact
+    ? 'trusted-artifact-sink-v3'
+    : provider
+      ? 'protected-certification-provider-v3'
+      : 'trusted-certification-evidence-sink-v1';
 }
 
 export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
@@ -243,6 +256,7 @@ export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
       [
         'devai-protected-certification-provider-v3',
         'trusted-certification-evidence-sink-v1',
+        'trusted-artifact-sink-v3',
       ].includes(input.system_id) &&
       protectedReleaseBoundaryAdapterId(input) === undefined
     ) {
