@@ -17,13 +17,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rolldown } from 'rolldown';
+import ts from 'typescript';
 import { ROSTER as schemaRoots } from '../../schemas/dist/roster.js';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(packageRoot, '../..');
 const distRoot = join(packageRoot, 'dist');
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-cli-assembly-'));
-const bundlePath = join(temporaryRoot, 'bin.js');
+const bundlePath = join(temporaryRoot, 'release-host.js');
+const executablePath = join(temporaryRoot, 'bin.js');
+const declarationsRoot = join(temporaryRoot, 'types/cli');
 const scaffoldModule = join(repositoryRoot, 'packages/skills/dist/operations/scaffold/index.js');
 const verifierSourceRoot = join(packageRoot, 'vendor/evidence-verification');
 const verifierRuntimeRoot = join(distRoot, 'runtime/evidence-verification');
@@ -156,10 +159,57 @@ const external = (id) =>
   id.startsWith('node:') ||
   (!id.startsWith('.') && !id.startsWith('/') && !id.startsWith('#') && !workspacePackage.test(id));
 
+function stageHostDeclarations() {
+  const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+  const pending = ['release-host.d.ts'];
+  const copied = new Set();
+  while (pending.length > 0) {
+    const name = pending.pop();
+    if (copied.has(name)) continue;
+    const source = join(distRoot, name);
+    if (!existsSync(source)) throw new Error(`PACKAGE_HOST_DECLARATION_MISSING:${name}`);
+    const document = readFileSync(source, 'utf8').replace(/^\/\/# sourceMappingURL=.*$/gmu, '');
+    const references = ts.preProcessFile(document, true, true);
+    for (const reference of [...references.importedFiles, ...references.referencedFiles]) {
+      const specifier = reference.fileName;
+      if (specifier.startsWith('.')) {
+        const dependency = resolve(dirname(source), specifier.replace(/\.js$/u, '.d.ts'));
+        const relativePath = relative(distRoot, dependency).split(sep).join('/');
+        if (relativePath.startsWith('../') || !relativePath.endsWith('.d.ts')) {
+          throw new Error(`PACKAGE_HOST_DECLARATION_ESCAPE:${name}:${specifier}`);
+        }
+        pending.push(relativePath);
+      } else {
+        const dependency = specifier.startsWith('@')
+          ? specifier.split('/').slice(0, 2).join('/')
+          : specifier.split('/')[0];
+        if (
+          !specifier.startsWith('node:') &&
+          (workspacePackage.test(specifier) || manifest.dependencies?.[dependency] === undefined)
+        ) {
+          throw new Error(`PACKAGE_HOST_DECLARATION_PRIVATE_IMPORT:${name}:${specifier}`);
+        }
+      }
+    }
+    const target = join(declarationsRoot, name);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(
+      target,
+      (name === 'release-host.d.ts' ? '/// <reference types="node" />\n' : '') + document,
+    );
+    copied.add(name);
+  }
+}
+
 try {
   const verifierProvenance = validateVerifierAssets();
+  stageHostDeclarations();
+  writeFileSync(
+    executablePath,
+    readFileSync(join(distRoot, 'bin.js'), 'utf8').replace(/^\/\/# sourceMappingURL=.*$/gmu, ''),
+  );
   const bundle = await rolldown({
-    input: join(distRoot, 'bin.js'),
+    input: join(distRoot, 'release-host.js'),
     external,
     plugins: [
       {
@@ -187,18 +237,22 @@ try {
     comments: false,
     sourcemap: false,
   });
-  const reachableSources = output.output
-    .flatMap((item) => (item.type === 'chunk' ? item.moduleIds : []))
-    .filter((id) => id.startsWith(repositoryRoot))
-    .map((id) => {
-      const sourceBase = id.replace('/dist/', '/src/').replace(/\.js$/u, '');
-      const source = ['.ts', '.tsx', '.js', '.mjs', '.cjs']
-        .map((extension) => sourceBase + extension)
-        .find((candidate) => existsSync(candidate));
-      if (source === undefined) throw new Error(`PACKAGE_SOURCE_MAPPING_MISSING:${id}`);
-      return source.slice(repositoryRoot.length + 1);
-    })
-    .sort();
+  const reachableSources = [
+    ...new Set([
+      'packages/cli/src/bin.ts',
+      ...output.output
+        .flatMap((item) => (item.type === 'chunk' ? item.moduleIds : []))
+        .filter((id) => id.startsWith(repositoryRoot))
+        .map((id) => {
+          const sourceBase = id.replace('/dist/', '/src/').replace(/\.js$/u, '');
+          const source = ['.ts', '.tsx', '.js', '.mjs', '.cjs']
+            .map((extension) => sourceBase + extension)
+            .find((candidate) => existsSync(candidate));
+          if (source === undefined) throw new Error(`PACKAGE_SOURCE_MAPPING_MISSING:${id}`);
+          return source.slice(repositoryRoot.length + 1);
+        }),
+    ]),
+  ].sort();
   const coverageManifest = join(repositoryRoot, 'scratch/coverage/rc-reachable-sources.json');
   mkdirSync(dirname(coverageManifest), { recursive: true });
   writeFileSync(
@@ -211,7 +265,9 @@ try {
   const runtimeRoot = join(distRoot, 'runtime');
   const runtimeIndex = join(runtimeRoot, 'index');
   mkdirSync(runtimeIndex, { recursive: true });
-  cpSync(bundlePath, join(runtimeIndex, 'bin.js'));
+  cpSync(bundlePath, join(runtimeIndex, 'release-host.js'));
+  cpSync(executablePath, join(runtimeIndex, 'bin.js'));
+  cpSync(declarationsRoot, join(runtimeRoot, 'types/cli'), { recursive: true });
   chmodSync(join(runtimeIndex, 'bin.js'), 0o755);
 
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
@@ -250,6 +306,8 @@ try {
 
   const required = [
     join(runtimeIndex, 'bin.js'),
+    join(runtimeIndex, 'release-host.js'),
+    join(runtimeRoot, 'types/cli/release-host.d.ts'),
     join(runtimeIndex, 'schemas/action-result.schema.json'),
     join(runtimeIndex, 'sensor-registry.json'),
     join(runtimeIndex, 'round-execution.json'),

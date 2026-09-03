@@ -16,6 +16,15 @@
     "devai-evidence-export": "./dist/runtime/evidence-verification/src/export-cli.js",
     "devai-evidence-publish": "./dist/runtime/evidence-verification/src/publish-cli.js"
   },
+  "exports": {
+    "./release-host": {
+      "types": "./dist/runtime/types/cli/release-host.d.ts",
+      "import": "./dist/runtime/index/release-host.js",
+      "default": "./dist/runtime/index/release-host.js"
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
+  },
   "files": [
     "dist"
   ],
@@ -26,6 +35,7 @@
     "test": "pnpm --dir ../.. run test:cli"
   },
   "dependencies": {
+    "@types/node": "^24.0.0",
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.1",
     "cac": "^6.7.0",
@@ -49,7 +59,6 @@
     "@devai-nyx/spec": "workspace:*",
     "@devai-nyx/utils": "workspace:*",
     "@types/istanbul-lib-coverage": "^2.0.6",
-    "@types/node": "^24.0.0",
     "istanbul-lib-coverage": "^3.2.2",
     "rolldown": "1.1.5",
     "typescript": "^5.6.0",
