@@ -21,6 +21,7 @@
     "dispositions",
     "statusModel",
     "scoreModel",
+    "digestModel",
     "composition",
     "semanticReceiptModel",
     "compatibility",
@@ -97,7 +98,7 @@
     },
     "inputIdentity": {
       "const": {
-        "digest": "sha256-domain-devai-mutation-input-v2.1-nul-u64be-length-rfc8785-jcs-input-projection",
+        "digest": "sha256-domain-devai-mutation-input-v2.1-framed-rfc8785-jcs-complete-inputProjection",
         "bindings": [
           "source",
           "tests",
@@ -120,6 +121,11 @@
         ],
         "rawEnvironmentOrToolchainValuesPermitted": false,
         "wholeRosterBindingInEveryPackage": true,
+        "equalityScope": "output-contract-equals-package-result-equals-evidence-reference-equals-composition-entry-equals-semantic-receipt",
+        "errorPrecedence": [
+          "missing-required-binding=>MUTATION_INPUT_IDENTITY_MISSING",
+          "present-but-divergent-identity=>MUTATION_INPUT_DIGEST_MISMATCH"
+        ],
         "missingBehavior": "deny-reuse",
         "mismatchBehavior": "deny-reuse",
         "additionalBehavior": "deny-reuse"
@@ -191,13 +197,27 @@
         "reportedComparison": "samevalue-and-not-negative-zero"
       }
     },
+    "digestModel": {
+      "const": {
+        "canonicalJsonBytes": "rfc8785-jcs-utf8",
+        "framing": "utf8-domain-bytes-then-00-then-u64be-payload-byte-length-then-payload-bytes",
+        "artifactByteDigest": "sha256-exact-rfc8785-jcs-utf8-document-bytes-with-no-domain-or-framing",
+        "outputContractDigest": "sha256-domain-devai-mutation-output-contract-v2.1-framed-rfc8785-jcs-complete-output-contract",
+        "packageResultSetDigest": "sha256-domain-devai-mutation-package-result-set-v2.1-framed-rfc8785-jcs-ordered-array-of-packageName-resultDigest",
+        "compositionEntryDigest": "sha256-domain-devai-mutation-composition-entry-v2.1-framed-rfc8785-jcs-complete-entry",
+        "evidenceRefDigest": "sha256-domain-devai-mutation-evidence-ref-v2.1-framed-rfc8785-jcs-complete-reference",
+        "inputDigest": "sha256-domain-devai-mutation-input-v2.1-framed-rfc8785-jcs-complete-inputProjection",
+        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-framed-rfc8785-jcs-complete-ordered-package-entry-array",
+        "semanticReceiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-framed-rfc8785-jcs-receipt-without-receiptDigest"
+      }
+    },
     "composition": {
       "const": {
         "candidateSpecific": true,
         "exactRosterBijection": true,
         "packageOrder": "output-contract-order",
-        "inputDigestEquality": "package-result-equals-evidence-reference-equals-composition-entry",
-        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-nul-u64be-length-rfc8785-jcs-complete-ordered-package-entry-array",
+        "inputDigestEquality": "output-contract-equals-package-result-equals-evidence-reference-equals-composition-entry-equals-semantic-receipt",
+        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-framed-rfc8785-jcs-complete-ordered-package-entry-array",
         "aggregateCounts": [
           "packageCount",
           "executedPackageCount",
@@ -211,7 +231,7 @@
       "const": {
         "requiredForExportAndOfflineVerification": true,
         "receiptDigestBoundBySignedArtifactManifest": true,
-        "receiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-nul-u64be-length-rfc8785-jcs-receipt-without-receiptDigest",
+        "receiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-framed-rfc8785-jcs-receipt-without-receiptDigest",
         "receiptBinds": [
           "candidate",
           "outputContractDigest",
@@ -289,7 +309,9 @@
           "for-every-required-package-read-exactly-one-canonical-normalized-stryker-report-and-one-canonical-package-result-from-the-input-keyed-artifact-addressed-write-once-store",
           "reject-host-paths-credential-material-private-material-unknown-fields-and-unknown-versions-before-scoring",
           "recompute-every-report-and-result-byte-digest-and-require-equality-with-the-output-contract-composition-evidence-reference-and-store-address",
-          "recompute-each-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-as-sha256-over-domain-devai-mutation-input-v2.1-nul-u64be-length-and-rfc8785-jcs-inputProjection",
+          "during-certify-recompute-each-source-derived-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-from-the-complete-embedded-inputProjection",
+          "during-offline-verification-do-not-recompute-source-derived-populations-or-selection-rules-and-instead-recompute-only-inputDigest-from-the-embedded-inputProjection-then-require-the-signed-semantic-receipt-that-proves-source-derivation",
+          "compute-every-named-digest-with-the-exact-digestModel-domain-framing-payload-order-and-artifact-byte-rule-with-no-generic-canonical-sha256-substitution",
           "require-the-exact-same-inputDigest-in-the-output-contract-package-result-evidence-reference-composition-entry-and-semantic-receipt",
           "deny-reuse-if-any-required-input-binding-is-missing-mismatched-or-additional-and-invalidate-every-package-on-whole-roster-drift",
           "recompute-all-eight-raw-stryker-status-counts-from-the-strict-normalized-report-as-nonnegative-safe-integers",
@@ -350,7 +372,10 @@
         "portable-path-control-character",
         "portable-path-non-nfc-alias",
         "mutation-unknown-kind-generic-fallthrough",
-        "symlinked-trust-store-ancestor"
+        "symlinked-trust-store-ancestor",
+        "offline-source-population-recomputation-without-members",
+        "digest-domain-or-framing-substitution",
+        "missing-binding-reported-as-digest-mismatch"
       ]
     }
   },
@@ -490,7 +515,7 @@
         "verbatimRunnerOutputPermitted": false
       },
       "inputIdentity": {
-        "digest": "sha256-domain-devai-mutation-input-v2.1-nul-u64be-length-rfc8785-jcs-input-projection",
+        "digest": "sha256-domain-devai-mutation-input-v2.1-framed-rfc8785-jcs-complete-inputProjection",
         "bindings": [
           "source",
           "tests",
@@ -513,6 +538,11 @@
         ],
         "rawEnvironmentOrToolchainValuesPermitted": false,
         "wholeRosterBindingInEveryPackage": true,
+        "equalityScope": "output-contract-equals-package-result-equals-evidence-reference-equals-composition-entry-equals-semantic-receipt",
+        "errorPrecedence": [
+          "missing-required-binding=>MUTATION_INPUT_IDENTITY_MISSING",
+          "present-but-divergent-identity=>MUTATION_INPUT_DIGEST_MISMATCH"
+        ],
         "missingBehavior": "deny-reuse",
         "mismatchBehavior": "deny-reuse",
         "additionalBehavior": "deny-reuse"
@@ -575,12 +605,24 @@
         "score": "scored-binary64-equals-zero-question-100-colon-binary64-multiply(binary64-divide(detected,scored),100)",
         "reportedComparison": "samevalue-and-not-negative-zero"
       },
+      "digestModel": {
+        "canonicalJsonBytes": "rfc8785-jcs-utf8",
+        "framing": "utf8-domain-bytes-then-00-then-u64be-payload-byte-length-then-payload-bytes",
+        "artifactByteDigest": "sha256-exact-rfc8785-jcs-utf8-document-bytes-with-no-domain-or-framing",
+        "outputContractDigest": "sha256-domain-devai-mutation-output-contract-v2.1-framed-rfc8785-jcs-complete-output-contract",
+        "packageResultSetDigest": "sha256-domain-devai-mutation-package-result-set-v2.1-framed-rfc8785-jcs-ordered-array-of-packageName-resultDigest",
+        "compositionEntryDigest": "sha256-domain-devai-mutation-composition-entry-v2.1-framed-rfc8785-jcs-complete-entry",
+        "evidenceRefDigest": "sha256-domain-devai-mutation-evidence-ref-v2.1-framed-rfc8785-jcs-complete-reference",
+        "inputDigest": "sha256-domain-devai-mutation-input-v2.1-framed-rfc8785-jcs-complete-inputProjection",
+        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-framed-rfc8785-jcs-complete-ordered-package-entry-array",
+        "semanticReceiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-framed-rfc8785-jcs-receipt-without-receiptDigest"
+      },
       "composition": {
         "candidateSpecific": true,
         "exactRosterBijection": true,
         "packageOrder": "output-contract-order",
-        "inputDigestEquality": "package-result-equals-evidence-reference-equals-composition-entry",
-        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-nul-u64be-length-rfc8785-jcs-complete-ordered-package-entry-array",
+        "inputDigestEquality": "output-contract-equals-package-result-equals-evidence-reference-equals-composition-entry-equals-semantic-receipt",
+        "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-framed-rfc8785-jcs-complete-ordered-package-entry-array",
         "aggregateCounts": [
           "packageCount",
           "executedPackageCount",
@@ -592,7 +634,7 @@
       "semanticReceiptModel": {
         "requiredForExportAndOfflineVerification": true,
         "receiptDigestBoundBySignedArtifactManifest": true,
-        "receiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-nul-u64be-length-rfc8785-jcs-receipt-without-receiptDigest",
+        "receiptDigest": "sha256-domain-devai-mutation-semantic-receipt-v2.1-framed-rfc8785-jcs-receipt-without-receiptDigest",
         "receiptBinds": [
           "candidate",
           "outputContractDigest",
@@ -662,7 +704,9 @@
           "for-every-required-package-read-exactly-one-canonical-normalized-stryker-report-and-one-canonical-package-result-from-the-input-keyed-artifact-addressed-write-once-store",
           "reject-host-paths-credential-material-private-material-unknown-fields-and-unknown-versions-before-scoring",
           "recompute-every-report-and-result-byte-digest-and-require-equality-with-the-output-contract-composition-evidence-reference-and-store-address",
-          "recompute-each-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-as-sha256-over-domain-devai-mutation-input-v2.1-nul-u64be-length-and-rfc8785-jcs-inputProjection",
+          "during-certify-recompute-each-source-derived-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-from-the-complete-embedded-inputProjection",
+          "during-offline-verification-do-not-recompute-source-derived-populations-or-selection-rules-and-instead-recompute-only-inputDigest-from-the-embedded-inputProjection-then-require-the-signed-semantic-receipt-that-proves-source-derivation",
+          "compute-every-named-digest-with-the-exact-digestModel-domain-framing-payload-order-and-artifact-byte-rule-with-no-generic-canonical-sha256-substitution",
           "require-the-exact-same-inputDigest-in-the-output-contract-package-result-evidence-reference-composition-entry-and-semantic-receipt",
           "deny-reuse-if-any-required-input-binding-is-missing-mismatched-or-additional-and-invalidate-every-package-on-whole-roster-drift",
           "recompute-all-eight-raw-stryker-status-counts-from-the-strict-normalized-report-as-nonnegative-safe-integers",
@@ -721,7 +765,10 @@
         "portable-path-control-character",
         "portable-path-non-nfc-alias",
         "mutation-unknown-kind-generic-fallthrough",
-        "symlinked-trust-store-ancestor"
+        "symlinked-trust-store-ancestor",
+        "offline-source-population-recomputation-without-members",
+        "digest-domain-or-framing-substitution",
+        "missing-binding-reported-as-digest-mismatch"
       ]
     }
   ]
