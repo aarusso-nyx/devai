@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-request.schema.json",
   "title": "Release lifecycle execution request",
-  "description": "Closed untrusted invocation projection for one DEVAI release action. It is a locator document, never a lifecycle record, authorization, actor declaration, state selection, digest assertion, or provider result. The core resolves and rehashes every locator before it can append state or contact a provider.",
+  "description": "Closed untrusted invocation projection for one DEVAI release action. It is a locator document, never a lifecycle record, authorization, actor declaration, state selection, digest assertion, provider result, ArtifactSink, or sink handle. The core resolves and rehashes every locator before it can append state or contact a provider. V3 release prepare receives a trusted ArtifactSink only by dependency injection and rejects a caller-selected destination.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -72,9 +72,8 @@
         "required": ["action_id"]
       },
       "then": {
-        "required": ["receipt_locators", "destination"],
-        "properties": { "destination": { "properties": { "kind": { "const": "local-staging" } } } },
-        "not": { "required": ["provider"] }
+        "required": ["receipt_locators"],
+        "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["destination"] }] }
       }
     },
     {

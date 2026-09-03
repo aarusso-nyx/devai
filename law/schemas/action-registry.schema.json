@@ -357,6 +357,10 @@
               },
               {
                 "type": "string",
+                "pattern": "^artifact-sink:[a-z][a-z0-9-]*$"
+              },
+              {
+                "type": "string",
                 "pattern": "^proc:[a-z][a-z0-9-]*$"
               },
               {
@@ -539,7 +543,7 @@
                   "minItems": 1,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["fs", "git-ref", "db", "remote"]
+                    "enum": ["fs", "git-ref", "db", "remote", "artifact-sink"]
                   }
                 },
                 "atomicity": {
@@ -564,7 +568,7 @@
                   "minItems": 1,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["fs", "git-ref", "db", "remote"]
+                    "enum": ["fs", "git-ref", "db", "remote", "artifact-sink"]
                   }
                 },
                 "bounds": {

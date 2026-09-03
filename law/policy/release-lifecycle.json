@@ -4,7 +4,7 @@
   "id": "release-lifecycle",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.3.1",
+  "policy_version": "2.4.0",
   "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
   "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
   "receipt_schemas": {
@@ -604,6 +604,79 @@
       "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
       "retry": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
     },
+    "prepare_kernel": {
+      "kernel_id": "devai.kernel.release-prepare.v3",
+      "compatibility": {
+        "v2_local_path_and_npm_adapter": "deprecated-read-only-v2-compatibility-only;it-must-never-be-selected-for-a-v3-prepare",
+        "v3_prepare": "pure-in-memory-and-sink-mediated-only"
+      },
+      "stock_composition": {
+        "built_in_actions": [
+          "release plan",
+          "release preflight",
+          "release certify",
+          "release resume"
+        ],
+        "prepare": "requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink"
+      },
+      "certification_manifest": {
+        "produced_by": "release certify",
+        "schema": "law/schemas/release-lifecycle-state.schema.json#/$defs/certification_package_entry_manifest",
+        "binding": [
+          "repository.commit",
+          "repository.tree",
+          "candidate.commit",
+          "candidate.tree",
+          "task-policy-digest-sha256",
+          "release-unit-and-package-roster"
+        ],
+        "coverage": "one-complete-sorted-unique-package-entry-manifest-per-package-including-all-certified-generated-outputs",
+        "entry_fields": ["path", "mode", "size_bytes", "sha256", "immutable_blob_locator"],
+        "entry_origins": ["git-object", "generated-output"],
+        "missing_or_extra_entry": "fail-closed"
+      },
+      "content_source": {
+        "git_object": "read-the-exact-candidate-tree-object-by-immutable-object-id-recompute-the-git-object-id-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use",
+        "generated_output": "read-only-from-the-certified-immutable-output-blob-locator-and-recompute-sha256-over-the-returned-bytes-before-use",
+        "locator_rule": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-and-ambient-worktree-reads-are-forbidden",
+        "mismatch": "fail-closed"
+      },
+      "pack": {
+        "implementation": "pure-in-memory-npm-compatible-tar-gzip",
+        "pack_spec_id": "devai.pure-npm-compatible-pack.v1",
+        "pack_spec_canonical_bytes": "devai.pure-npm-compatible-pack.v1\nutf-8\nrfc8785-jcs\ntar-ustar\ngzip-mtime-zero\n",
+        "pack_spec_digest_sha256": "cc6b8ecd03c470a658b4a6f40c9adca37158d05700f69d780b9e12e12a6b092b",
+        "outputs": ["package-tarball", "sbom", "manifest"],
+        "determinism": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec",
+        "forbidden_execution": [
+          "npm-subprocess",
+          "tool-subprocess",
+          "shell",
+          "ambient-path-resolution"
+        ],
+        "unsupported_semantics": "fail-closed-before-any-sink-effect"
+      },
+      "artifact_sink": {
+        "required": true,
+        "trust_boundary": "injected-trusted-artifact-sink-outside-the-candidate-repository",
+        "forbidden_implementations": [
+          "built-in-pathname-sink",
+          "repository-contained-sink",
+          "direct-filesystem-destination"
+        ],
+        "protocol": [
+          "begin-transaction-and-receive-opaque-transaction-handle",
+          "put-verified-in-memory-artifacts-and-receive-opaque-artifact-handles",
+          "sink-verifies-each-artifact-byte-digest-size-and-pack-spec-binding",
+          "core-reverifies-the-sink-reported-handles-and-digests",
+          "commit-one-complete-manifest-atomically-once",
+          "abort-the-open-transaction-on-every-pre-commit-failure"
+        ],
+        "missing_sink": "fail-before-package-generation-or-exposure",
+        "partial_or_unverifiable_commit": "fail-closed-and-preserve-the-sink-transaction-for-inspection-without-reuse"
+      },
+      "downstream_reverification": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-recompute-byte-digest-size-and-manifest-membership-before-use"
+    },
     "release_unit_bijection": {
       "state_schema": "law/schemas/release-lifecycle-state.schema.json",
       "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
@@ -650,6 +723,7 @@
         "accept-v1-only-for-wire-compatible-read-and-never-as-a-v2-write",
         "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
         "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
+        "require-release-certify-to-emit-one-complete-candidate-tree-task-policy-bound-package-entry-manifest-per-package-before-a-v3-prepare",
         "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
         "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
         "require-package-artifact-and-evidence-bijections-for-the-action",
@@ -1159,6 +1233,19 @@
     "release-store-retry-authorization-reuse",
     "release-store-resume-history-divergence",
     "release-store-legacy-seam-authority-conflict",
-    "release-store-head-state-generation-mismatch"
+    "release-store-head-state-generation-mismatch",
+    "release-prepare-certification-manifest-invalid",
+    "release-prepare-package-entry-coverage-invalid",
+    "release-prepare-immutable-blob-locator-invalid",
+    "release-prepare-content-digest-mismatch",
+    "release-prepare-pack-spec-digest-mismatch",
+    "release-prepare-unsupported-package-semantics",
+    "release-prepare-subprocess-forbidden",
+    "release-artifact-sink-unavailable",
+    "release-artifact-sink-protocol-invalid",
+    "release-artifact-sink-verification-failed",
+    "release-artifact-sink-commit-failed",
+    "release-artifact-sink-abort-failed",
+    "release-downstream-artifact-reverification-failed"
   ]
 }
