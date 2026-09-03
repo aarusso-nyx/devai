@@ -328,6 +328,10 @@ export const releaseOfflineVerify = defineCommand({
           return;
         }
         try {
+          const state =
+            options.exportedState === undefined
+              ? undefined
+              : verifyReleaseStateIdentity(readJson(options.exportedState));
           if (options.request === undefined || options.exportedState === undefined) {
             fail(
               'release offline-verify',
@@ -341,7 +345,7 @@ export const releaseOfflineVerify = defineCommand({
             readJson(options.request),
             'release offline-verify',
           );
-          const state = verifyReleaseStateIdentity(readJson(options.exportedState));
+          if (state === undefined) throw new Error('release-offline-state-missing');
           if (state.state !== 'exported') throw new Error('release-offline-state-mismatch');
           const provider = commandAdapters?.offline_verification_provider(request);
           if (provider === undefined) {
