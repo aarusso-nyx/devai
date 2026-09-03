@@ -2,7 +2,7 @@
   "$schema": "../schemas/mutation-evidence-policy-v2.schema.json",
   "schemaVersion": "2.1.0",
   "id": "mutation-evidence-v2",
-  "status": "frozen-pending-canonical-verifier",
+  "status": "active",
   "authority": "Architect",
   "contractSchema": "law/schemas/mutation-report-set-v2.schema.json",
   "sourceBaseline": {
@@ -10,19 +10,83 @@
     "commit": "fcefd0ad9b1210f5d460509f801a16fc3c4dcbd1",
     "tree": "ad06a07074428af47e2fd33ad1115efc7b1feb1e"
   },
-  "approvedSource": null,
+  "approvedSource": {
+    "repository": "devai-nyx/devai-verifier",
+    "commit": "098d090013dda34e38d1045ba06274d99bd5aec1",
+    "tree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209"
+  },
   "activation": {
-    "provenanceProof": null,
-    "emissionPermitted": false,
-    "verificationPermitted": false
+    "provenanceProof": {
+      "source": {
+        "repository": "devai-nyx/devai-verifier",
+        "commit": "098d090013dda34e38d1045ba06274d99bd5aec1",
+        "tree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209"
+      },
+      "vendor": {
+        "root": "packages/cli/vendor/evidence-verification",
+        "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
+        "manifestDigest": "5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b",
+        "sourceCommit": "098d090013dda34e38d1045ba06274d99bd5aec1",
+        "sourceTree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209",
+        "byteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e"
+      },
+      "sourceByteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e",
+      "byteEqual": true
+    },
+    "emissionPermitted": true,
+    "verificationPermitted": true
   },
   "activationModel": {
-    "currentState": "inactive",
+    "currentState": "active",
     "futureActivationRequiresForwardAdrPolicyAndSchema": true,
     "approvedSourceRequirement": "non-null-exact-const-repository-commit-tree",
     "provenanceSourceEquality": "provenanceProof.source-equals-approvedSource",
+    "policyDigestRequirement": "before-emission-or-verification-require-output-contract-and-current-and-every-reused-producing-semantic-receipt-policyDigest-to-equal-sha256-of-rfc8785-jcs-utf8-of-the-complete-canonical-law-policy-mutation-evidence-v2-json-document-with-no-excluded-members;distinct-from-taskPolicyDigest;compute-at-runtime-and-never-store-the-actual-policy-digest-inside-this-policy",
+    "semanticReceiptRepositoryBinding": {
+      "approvedRepository": "devai-nyx/devai-verifier",
+      "canonicalRemote": "https://github.com/devai-nyx/devai-verifier.git",
+      "wireRepository": "devai-verifier",
+      "requireEqualCommitAndTree": true,
+      "otherAliasesPermitted": false
+    },
     "vendorProofRequirement": "vendor-root-manifestPath-manifestDigest-sourceCommit-sourceTree-byteSetDigest-and-source-vendor-byte-equality",
-    "sourceBaselineGrantsActivationAuthority": false
+    "manifestDigestRule": "sha256-of-exact-provenance-manifest-file-bytes",
+    "byteSetDigestRule": "sha256-of-rfc8785-jcs-utf8-provenance-files-array-in-manifest-order-with-exact-path-and-sha256-members",
+    "runtimeEqualityRequired": "before-emission-or-verification-validate-the-constant-policy-and-recompute-manifest-digest-sourceCommit-exact-runtime-file-population-each-file-sha256-and-byteSetDigest-against-provenanceProof-and-approvedSource;missing-mismatched-symlinked-or-extra-runtime-files-refuse;policy-booleans-and-byteEqual-alone-grant-nothing",
+    "installedVendorRoot": "dist/runtime/evidence-verification",
+    "runtimeFileCount": 24,
+    "sourceOnlyTests": "seven-byte-equal-upstream-test-files-remain-source-regressions-and-are-excluded-from-the-runtime-manifest-and-installed-package",
+    "sourceBaselineGrantsActivationAuthority": false,
+    "semanticReceiptProvenance": {
+      "source": {
+        "repository": "devai-verifier",
+        "commit": "098d090013dda34e38d1045ba06274d99bd5aec1",
+        "tree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209",
+        "byteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e"
+      },
+      "vendor": {
+        "root": "packages/cli/vendor/evidence-verification",
+        "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
+        "manifestDigest": "5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b",
+        "sourceCommit": "098d090013dda34e38d1045ba06274d99bd5aec1",
+        "sourceTree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209",
+        "byteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e"
+      },
+      "byteEquality": true
+    },
+    "semanticReceiptProvenanceRequirement": "require-exact-object-equality-with-semanticReceiptProvenance-for-the-current-receipt-and-every-reused-producing-receipt;generic-self-consistency-or-an-unapproved-producing-verifier-refuses",
+    "portableVendorPathRule": "emitted-semantic-receipt-vendor-root-and-manifestPath-always-equal-activation-provenanceProof-vendor-source-relative-values;installedVendorRoot-is-only-a-physical-execution-locator-and-never-emitted-provenance",
+    "runtimePopulation": "exactly-provenance.json-plus-the-24-manifest-declared-runtime-files;source-layout-additionally-permits-only-sourceOnlyTestPaths;installed-layout-permits-no-tests-or-additional-files",
+    "noFollowScope": "vendor-root-and-every-ancestor-of-vendor-root-manifest-and-each-runtime-or-source-test-file-including-every-final-component;symlinks-nonregular-files-or-path-identity-changes-refuse",
+    "sourceOnlyTestPaths": [
+      "test/artifact-safety.test.js",
+      "test/export.test.js",
+      "test/mutation-v21-contract.test.js",
+      "test/mutation.test.js",
+      "test/policy-builder.test.js",
+      "test/publish.test.js",
+      "test/verifier.test.js"
+    ]
   },
   "documents": {
     "outputContract": "mutation-report-set-v2",
@@ -351,7 +415,7 @@
       "pool-only-required-package-status-totals-by-checked-safe-integer-addition-then-recompute-binary64-detected-scored-and-score-and-require-unknown-if-any-required-is-incomplete-pass-only-if-at-least-one-required-and-every-required-is-complete-and-passed-and-fail-otherwise",
       "recompute-target-census-all-three-disposition-counts-and-evidenceSetDigest-without-opening-a-subprocess-or-reading-time-cwd-or-unrelated-environment",
       "return-not-applicable-and-passed-false-for-an-all-not-required-composition-and-never-derive-a-vacuous-pass",
-      "keep-approvedSource-null-and-emission-and-verification-disabled-until-a-forward-adr-policy-and-schema-update-pins-approvedSource-repository-commit-tree-as-constants-then-require-provenanceProof-source-equality-and-vendor-manifest-and-byte-set-equality-before-active-state",
+      "require-the-forward-activated-approvedSource-and-provenanceProof-exact-constants-and-recompute-runtime-manifest-file-population-per-file-digests-and-byte-set-equality-before-emission-or-verification;missing-or-divergent-provenance-refuses-without-fallback-to-sourceBaseline-or-legacy-assurance-v2",
       "emit-a-semantic-verification-receipt-binding-the-candidate-contract-plan-profile-policy-verifier-provenance-package-result-set-evidence-set-and-verdict-and-recompute-its-receiptDigest-with-receiptDigest-omitted",
       "offline-verify-the-signed-semantic-receipt-and-exact-result-set-closure-and-require-every-required-normalized-report-and-package-result-exactly-once-in-the-signed-manifest-and-bundle-with-no-additional-mutation-v2-evidence-artifact-using-only-required-external-repository-candidate-policy-signer-trust-root-trust-store-digest-and-key-expectations"
     ],
