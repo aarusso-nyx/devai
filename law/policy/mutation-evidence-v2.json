@@ -1,0 +1,210 @@
+{
+  "$schema": "../schemas/mutation-evidence-policy-v2.schema.json",
+  "schemaVersion": "2.1.0",
+  "id": "mutation-evidence-v2",
+  "status": "frozen-pending-canonical-verifier",
+  "authority": "Architect",
+  "contractSchema": "law/schemas/mutation-report-set-v2.schema.json",
+  "sourceBaseline": {
+    "repository": "devai-verifier",
+    "commit": "fcefd0ad9b1210f5d460509f801a16fc3c4dcbd1",
+    "tree": "ad06a07074428af47e2fd33ad1115efc7b1feb1e"
+  },
+  "activation": {
+    "canonicalVerifierCommit": null,
+    "canonicalVerifierTree": null,
+    "emissionPermitted": false,
+    "verificationPermitted": false,
+    "vendorBeforeActivation": true
+  },
+  "documents": {
+    "outputContract": "mutation-report-set-v2",
+    "packageResult": "mutation-package-result-v2",
+    "composition": "mutation-composed-report-set-v2",
+    "schemaVersion": "2.1.0"
+  },
+  "artifactModel": {
+    "authoritativeArtifacts": ["normalized-stryker-report", "package-result"],
+    "canonicalization": "rfc8785-jcs-utf8",
+    "contentAddress": "sha256-of-canonical-artifact-bytes",
+    "storeLayout": ".devai/state/mutation/v2/store/sha256/<inputDigest>/{report.json,result.json}",
+    "candidateSpecificPackageBytes": false,
+    "compositionWritesExecutionArtifacts": false,
+    "refinalizationMutationProcessCount": 0,
+    "refinalizationDeterministicAcross": [
+      "time",
+      "cwd",
+      "unrelated-environment",
+      "ambient-host-state"
+    ],
+    "verbatimRunnerOutputPermitted": false
+  },
+  "inputIdentity": {
+    "digest": "sha256-domain-devai-mutation-input-v2.1-nul-u64be-length-rfc8785-jcs-input-projection",
+    "bindings": [
+      "source",
+      "tests",
+      "manifests",
+      "mutationConfiguration",
+      "runner",
+      "roster",
+      "thresholds",
+      "sanitizer",
+      "lockfile",
+      "environment",
+      "toolchain",
+      "semanticRebind"
+    ],
+    "bindingFields": ["canonicalization", "memberCount", "populationDigest", "selectionRuleDigest"],
+    "rawEnvironmentOrToolchainValuesPermitted": false,
+    "missingBehavior": "deny-reuse",
+    "mismatchBehavior": "deny-reuse",
+    "additionalBehavior": "deny-reuse"
+  },
+  "dispositions": {
+    "declared": ["executed", "reused", "not-required"],
+    "provenanceCompatibility": {
+      "executed": "fresh",
+      "reused": "reused",
+      "not-required": null
+    },
+    "notRequired": {
+      "isPass": false,
+      "artifactReferencePermitted": false,
+      "permittedReasons": [
+        "no-mutatable-production-surface",
+        "package-excluded-by-approved-release-profile"
+      ]
+    },
+    "aggregatePreservesCounts": true
+  },
+  "statusModel": {
+    "rawStatuses": [
+      "CompileError",
+      "Ignored",
+      "Killed",
+      "NoCoverage",
+      "Pending",
+      "RuntimeError",
+      "Survived",
+      "Timeout"
+    ],
+    "detectedScored": ["Killed", "Timeout"],
+    "undetectedScored": ["Survived", "NoCoverage"],
+    "preservedNonScored": ["CompileError", "Ignored"],
+    "completionBlocking": ["Pending"],
+    "passBlocking": ["RuntimeError", "infrastructure-failure"],
+    "compileErrorThresholdAdded": false,
+    "ignoredRulesBoundBy": "mutationConfiguration"
+  },
+  "scoreModel": {
+    "numericModel": "ieee-754-binary64-round-to-nearest-ties-to-even",
+    "detected": "binary64-add(Killed,Timeout)",
+    "scored": "binary64-add(binary64-add(detected,Survived),NoCoverage)",
+    "score": "scored-binary64-equals-zero-question-100-colon-binary64-multiply(binary64-divide(detected,scored),100)",
+    "reportedComparison": "samevalue-and-not-negative-zero",
+    "thresholds": ["break", "high", "low"],
+    "passThreshold": "score-greater-than-or-equal-to-break"
+  },
+  "composition": {
+    "candidateSpecific": true,
+    "exactRosterBijection": true,
+    "packageOrder": "output-contract-order",
+    "evidenceSetDigest": "sha256-domain-devai-mutation-composition-v2.1-nul-u64be-length-rfc8785-jcs-complete-ordered-package-entry-array",
+    "aggregateCounts": [
+      "packageCount",
+      "executedPackageCount",
+      "reusedPackageCount",
+      "notRequiredPackageCount"
+    ],
+    "pureFinalizer": true
+  },
+  "compatibility": {
+    "v1ReadOnly": true,
+    "v1ReuseEligible": false,
+    "v1ExportPermitted": false,
+    "v1PublicationPermitted": false,
+    "v1ReuseIntoV2": false,
+    "v1TranslationIntoV2": false,
+    "draftV2SchemaVersionAccepted": false,
+    "dualWritePermitted": false,
+    "assuranceV2WriterPermitted": false,
+    "assuranceV2KernelPermitted": false
+  },
+  "contentSafety": {
+    "reservedKindPrefix": "mutation-",
+    "portablePathsRequired": true,
+    "hostPathsForbidden": true,
+    "symlinkEscapesForbidden": true,
+    "noFollowScope": "final-component-and-every-ancestor",
+    "credentialMaterialForbidden": true,
+    "privateMaterialForbidden": true,
+    "unknownFieldsForbidden": true,
+    "unknownVersionsForbidden": true
+  },
+  "offlineVerification": {
+    "externalExpectationsRequired": [
+      "repository",
+      "candidateCommit",
+      "candidateTree",
+      "taskPolicyDigest",
+      "signerId",
+      "trustRootId",
+      "trustStoreDigest",
+      "keyId"
+    ],
+    "candidateDefaultsPermitted": false,
+    "exactResultSetClosure": "signed-receipt-results-equals-manifest-resultDigests-equals-supplied-result-files",
+    "trustStoreNoFollowRequired": true,
+    "artifactNoFollowRequired": true,
+    "nativePathInErrorPermitted": false
+  },
+  "semanticKernel": {
+    "id": "devai.kernel.mutation-report-set-v2.v1",
+    "mandatory": true,
+    "schemaValidationEstablishesPass": false,
+    "algorithm": [
+      "validate-the-output-contract-as-schema-version-2.1.0-and-require-one-ordered-entry-for-every-declared-package",
+      "for-every-required-package-read-exactly-one-canonical-portable-normalized-stryker-report-and-one-canonical-package-result",
+      "reject-host-paths-credential-material-private-material-unknown-fields-and-unknown-versions-before-scoring",
+      "reserve-every-mutation-prefix-kind-and-reject-unknown-spellings-or-versions-before-generic-artifact-handling",
+      "recompute-every-report-and-result-byte-digest-and-require-equality-with-the-contract-composition-and-evidence-reference",
+      "recompute-each-input-binding-population-and-selection-rule-digest-then-recompute-inputDigest-as-sha256-over-domain-devai-mutation-input-v2.1-nul-u64be-length-and-rfc8785-jcs-inputProjection",
+      "deny-reuse-if-any-required-input-binding-is-missing-mismatched-or-additional-and-never-translate-v1-evidence",
+      "recompute-all-eight-raw-stryker-status-counts-from-the-normalized-report-as-nonnegative-safe-integers",
+      "preserve-CompileError-and-Ignored-as-non-scored-require-Pending-zero-for-completion-and-require-RuntimeError-zero-for-pass",
+      "require-process-errorAbsent-true-signal-null-and-status-zero-for-completion-and-treat-any-other-process-outcome-as-infrastructure-failure",
+      "recompute-detected-scored-score-and-threshold-verdict-under-the-exact-binary64-operation-order",
+      "require-the-output-contract-to-bind-the-exact-verified-release-plan-receipt-and-release-profile-digests-and-recompute-every-package-requirement-from-those-inputs",
+      "require-every-composition-package-to-biject-with-the-output-contract-and-declare-exactly-executed-reused-or-not-required",
+      "require-executed-to-map-to-fresh-reused-to-map-to-reused-and-not-required-to-have-no-artifact-reference-and-no-pass",
+      "recompute-package-duration-metrics-status-totals-target-census-and-all-three-disposition-counts-without-opening-a-subprocess",
+      "recompute-evidenceSetDigest-over-domain-devai-mutation-composition-v2.1-nul-u64be-length-and-rfc8785-jcs-complete-ordered-package-entry-array-and-reject-any-add-drop-reorder-or-substitution",
+      "return-pass-only-for-a-complete-composition-whose-required-packages-pass-and-whose-not-required-entries-are-policy-permitted",
+      "offline-verify-with-only-external-expected-repository-candidate-policy-signer-trust-root-trust-store-digest-and-key-identities-and-require-exact-result-set-closure-with-no-follow-reads"
+    ],
+    "errors": [
+      "MUTATION_VERSION_UNSUPPORTED",
+      "MUTATION_ROSTER_MISMATCH",
+      "MUTATION_INPUT_IDENTITY_MISSING",
+      "MUTATION_INPUT_DIGEST_MISMATCH",
+      "MUTATION_REUSE_DENIED",
+      "MUTATION_NOT_REQUIRED_MISMATCH",
+      "MUTATION_REPORT_INVALID",
+      "MUTATION_INCOMPLETE",
+      "MUTATION_RUNTIME_FAILURE",
+      "MUTATION_INFRASTRUCTURE_FAILURE",
+      "MUTATION_METRIC_MISMATCH",
+      "MUTATION_THRESHOLD_MISMATCH",
+      "MUTATION_THRESHOLD_FAILED",
+      "MUTATION_SUMMARY_MISMATCH",
+      "ARTIFACT_DIGEST_MISMATCH",
+      "ARTIFACT_HOST_PATH",
+      "ARTIFACT_CREDENTIAL_MATERIAL",
+      "NON_CANONICAL_JSON",
+      "MUTATION_OFFLINE_EXPECTATION_MISSING",
+      "RESULT_SET_MISMATCH",
+      "ARTIFACT_SYMLINK_ESCAPE"
+    ]
+  }
+}

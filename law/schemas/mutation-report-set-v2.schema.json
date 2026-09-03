@@ -1,0 +1,484 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/mutation-report-set-v2.schema.json",
+  "title": "Canonical mutation report set v2",
+  "description": "The sole forward mutation-v2 contract. It validates a declared package roster, an immutable package result bound to its complete input projection, or a candidate-specific composition that records executed, reused, and not-required packages without rewriting execution artifacts. Semantic verification and digest recomputation remain mandatory.",
+  "schema_version": "2.1.0",
+  "oneOf": [
+    { "$ref": "#/$defs/output_contract" },
+    { "$ref": "#/$defs/package_result" },
+    { "$ref": "#/$defs/composition" }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^(?!0+$)(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "portable_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+    },
+    "package_name": {
+      "type": "string",
+      "pattern": "^@[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["break", "high", "low"],
+      "properties": {
+        "break": { "type": "number", "minimum": 0, "maximum": 100 },
+        "high": { "type": "number", "minimum": 0, "maximum": 100 },
+        "low": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "population_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Identity of both a selected population and the rule that selected it. The semantic kernel recomputes both digests; absent or additional members deny reuse.",
+      "required": ["canonicalization", "memberCount", "populationDigest", "selectionRuleDigest"],
+      "properties": {
+        "canonicalization": { "const": "rfc8785-jcs-utf8" },
+        "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "populationDigest": { "$ref": "#/$defs/sha256" },
+        "selectionRuleDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "input_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "packageName", "workspace", "bindings"],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-input-projection-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "tests",
+            "manifests",
+            "mutationConfiguration",
+            "runner",
+            "roster",
+            "thresholds",
+            "sanitizer",
+            "lockfile",
+            "environment",
+            "toolchain",
+            "semanticRebind"
+          ],
+          "properties": {
+            "source": { "$ref": "#/$defs/population_binding" },
+            "tests": { "$ref": "#/$defs/population_binding" },
+            "manifests": { "$ref": "#/$defs/population_binding" },
+            "mutationConfiguration": { "$ref": "#/$defs/population_binding" },
+            "runner": { "$ref": "#/$defs/population_binding" },
+            "roster": { "$ref": "#/$defs/population_binding" },
+            "thresholds": { "$ref": "#/$defs/population_binding" },
+            "sanitizer": { "$ref": "#/$defs/population_binding" },
+            "lockfile": { "$ref": "#/$defs/population_binding" },
+            "environment": { "$ref": "#/$defs/population_binding" },
+            "toolchain": { "$ref": "#/$defs/population_binding" },
+            "semanticRebind": { "$ref": "#/$defs/population_binding" }
+          }
+        }
+      }
+    },
+    "status_totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "CompileError",
+        "Ignored",
+        "Killed",
+        "NoCoverage",
+        "Pending",
+        "RuntimeError",
+        "Survived",
+        "Timeout"
+      ],
+      "properties": {
+        "CompileError": { "$ref": "#/$defs/count" },
+        "Ignored": { "$ref": "#/$defs/count" },
+        "Killed": { "$ref": "#/$defs/count" },
+        "NoCoverage": { "$ref": "#/$defs/count" },
+        "Pending": { "$ref": "#/$defs/count" },
+        "RuntimeError": { "$ref": "#/$defs/count" },
+        "Survived": { "$ref": "#/$defs/count" },
+        "Timeout": { "$ref": "#/$defs/count" }
+      }
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Bounded process metadata only. Stdout, stderr, commands, environment values, and host paths are never evidence fields.",
+      "required": ["errorAbsent", "signal", "status"],
+      "properties": {
+        "errorAbsent": { "type": "boolean" },
+        "signal": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^SIG[A-Z0-9]{1,20}$" }]
+        },
+        "status": {
+          "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0, "maximum": 255 }]
+        }
+      }
+    },
+    "target_census": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetFileCount", "totalMutants"],
+      "properties": {
+        "targetFileCount": { "$ref": "#/$defs/count" },
+        "totalMutants": { "$ref": "#/$defs/count" }
+      }
+    },
+    "tool_versions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:-]*$"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseUnit", "commit", "tree"],
+      "properties": {
+        "releaseUnit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "required_package_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "reportPath",
+        "resultPath",
+        "thresholds"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "thresholds": { "$ref": "#/$defs/thresholds" }
+      }
+    },
+    "not_required_package_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packageName", "workspace", "requirement", "reasonCode"],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "not-required" },
+        "reasonCode": {
+          "enum": [
+            "no-mutatable-production-surface",
+            "package-excluded-by-approved-release-profile"
+          ]
+        }
+      }
+    },
+    "output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "expectedPackageCount",
+        "summaryPath",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "packages",
+        "paths"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-report-set-v2" },
+        "expectedPackageCount": { "type": "integer", "minimum": 1 },
+        "summaryPath": { "$ref": "#/$defs/portable_path" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/required_package_contract" },
+              { "$ref": "#/$defs/not_required_package_contract" }
+            ]
+          }
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/portable_path" }
+        }
+      }
+    },
+    "package_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "packageName",
+        "workspace",
+        "inputProjection",
+        "inputDigest",
+        "reportDigest",
+        "durationMs",
+        "toolVersions",
+        "process",
+        "thresholds",
+        "statusTotals",
+        "targetCensus",
+        "score",
+        "complete",
+        "passed"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-package-result-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "inputProjection": { "$ref": "#/$defs/input_projection" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "durationMs": { "$ref": "#/$defs/count" },
+        "toolVersions": { "$ref": "#/$defs/tool_versions" },
+        "process": { "$ref": "#/$defs/process" },
+        "thresholds": { "$ref": "#/$defs/thresholds" },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "targetCensus": { "$ref": "#/$defs/target_census" },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "complete": { "type": "boolean" },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "packageName",
+        "workspace",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputProjectionDigest",
+        "provenance",
+        "baselineCommit",
+        "baselineTree"
+      ],
+      "properties": {
+        "kind": { "const": "mutation-package-evidence-ref-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputProjectionDigest": { "$ref": "#/$defs/sha256" },
+        "provenance": { "enum": ["fresh", "reused"] },
+        "baselineCommit": {
+          "oneOf": [{ "$ref": "#/$defs/git_object" }, { "type": "null" }]
+        },
+        "baselineTree": {
+          "oneOf": [{ "$ref": "#/$defs/git_object" }, { "type": "null" }]
+        }
+      }
+    },
+    "evidence_package_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "disposition",
+        "verdict",
+        "passed",
+        "complete",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputProjectionDigest",
+        "evidenceRef",
+        "evidenceRefDigest",
+        "durationMs",
+        "thresholds",
+        "statusTotals",
+        "targetCensus",
+        "score"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "disposition": { "enum": ["executed", "reused"] },
+        "verdict": { "enum": ["pass", "fail", "unknown"] },
+        "passed": { "type": "boolean" },
+        "complete": { "type": "boolean" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputProjectionDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceRef": { "$ref": "#/$defs/evidence_ref" },
+        "evidenceRefDigest": { "$ref": "#/$defs/sha256" },
+        "durationMs": { "$ref": "#/$defs/count" },
+        "thresholds": { "$ref": "#/$defs/thresholds" },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "targetCensus": { "$ref": "#/$defs/target_census" },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "not_required_package_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "disposition",
+        "verdict",
+        "passed",
+        "reasonCode"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "not-required" },
+        "disposition": { "const": "not-required" },
+        "verdict": { "const": "not-applicable" },
+        "passed": { "const": false },
+        "reasonCode": {
+          "enum": [
+            "no-mutatable-production-surface",
+            "package-excluded-by-approved-release-profile"
+          ]
+        }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageCount",
+        "executedPackageCount",
+        "reusedPackageCount",
+        "notRequiredPackageCount",
+        "durationMs",
+        "executedDurationMs",
+        "reusedDurationMs",
+        "score",
+        "statusTotals",
+        "evidenceSetDigest"
+      ],
+      "properties": {
+        "packageCount": { "$ref": "#/$defs/count" },
+        "executedPackageCount": { "$ref": "#/$defs/count" },
+        "reusedPackageCount": { "$ref": "#/$defs/count" },
+        "notRequiredPackageCount": { "$ref": "#/$defs/count" },
+        "durationMs": { "$ref": "#/$defs/count" },
+        "executedDurationMs": { "$ref": "#/$defs/count" },
+        "reusedDurationMs": { "$ref": "#/$defs/count" },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "candidate",
+        "complete",
+        "passed",
+        "packages",
+        "aggregate"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-composed-report-set-v2" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "complete": { "type": "boolean" },
+        "passed": { "type": "boolean" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/evidence_package_entry" },
+              { "$ref": "#/$defs/not_required_package_entry" }
+            ]
+          }
+        },
+        "aggregate": { "$ref": "#/$defs/aggregate" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "2.1.0",
+      "kind": "mutation-report-set-v2",
+      "expectedPackageCount": 2,
+      "summaryPath": "mutation/summary.json",
+      "releasePlanReceiptDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "releaseProfileDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "packages": [
+        {
+          "packageName": "@devai-nyx/spec",
+          "workspace": "packages/spec",
+          "requirement": "required",
+          "reportPath": "mutation/packages-spec.stryker.json",
+          "resultPath": "mutation/packages-spec.result.json",
+          "thresholds": { "break": 90, "high": 90, "low": 80 }
+        },
+        {
+          "packageName": "@devai-nyx/schemas",
+          "workspace": "packages/schemas",
+          "requirement": "not-required",
+          "reasonCode": "no-mutatable-production-surface"
+        }
+      ],
+      "paths": [
+        "mutation/summary.json",
+        "mutation/packages-spec.stryker.json",
+        "mutation/packages-spec.result.json"
+      ]
+    }
+  ]
+}
