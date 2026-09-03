@@ -437,13 +437,21 @@
         "compatibility": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["v1_state_read", "v2_state_write", "client_drafted_state"],
+          "required": [
+            "v1_state_read",
+            "v2_state_write",
+            "v1_execution_seams",
+            "client_drafted_state"
+          ],
           "properties": {
             "v1_state_read": {
               "const": "accept-wire-compatible-v1-state-records-for-observation-only"
             },
             "v2_state_write": {
               "const": "all-new-persisted-state-records-must-satisfy-the-v2-semantic-kernel"
+            },
+            "v1_execution_seams": {
+              "const": "legacy-v1-observation-only-and-ignored-by-v2-and-v3-active-kernels-for-generation-head-and-cas-semantics"
             },
             "client_drafted_state": { "const": "never-trusted" }
           }
@@ -555,7 +563,7 @@
                     "completion-alone-advances-HEAD-by-compare-and-swap-from-observed_head_before;-failure-leaves-HEAD-unchanged-but-advances-the-append-log-tail;-unknown-is-terminal-leaves-HEAD-unchanged-and-is-non-retriable",
                     "a-failed-remote-attempt-may-be-followed-only-by-a-new-attempt-bound-to-a-fresh-exact-owner-authorization-and-the-failed-attempt-is-never-redispatched",
                     "resume-validates-the-single-append-chain-and-full-v2-canonical-head-then-derives-the-exact-next-action-or-blocked-reason-from-both-the-log-tail-and-head-without-writing-or-repairing",
-                    "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
+                    "the-head-names-exactly-one-completion-record-with-the-same-candidate-and-repository-and-head.state_id-and-head.state_digest_sha256-equal-completion.state_id-and-completion.state_digest_sha256;head.generation-equals-the-generation-of-that-separately-verified-state-document;head.completion_record.sequence-is-only-the-append-log-sequence"
                   ]
                 },
                 "errors": {
@@ -572,6 +580,8 @@
                     "release-store-attempt-redispatch",
                     "release-store-retry-authorization-reuse",
                     "release-store-resume-history-divergence",
+                    "release-store-legacy-seam-authority-conflict",
+                    "release-store-head-state-generation-mismatch",
                     "release-store-head-completion-mismatch"
                   ]
                 },
@@ -612,6 +622,14 @@
                     {
                       "fixture": "resume-derives-blocked-reason-from-log-tail-without-validating-head",
                       "expected_error": "release-store-resume-history-divergence"
+                    },
+                    {
+                      "fixture": "active-v3-store-applies-legacy-v1-generation-head-or-cas-constraint",
+                      "expected_error": "release-store-legacy-seam-authority-conflict"
+                    },
+                    {
+                      "fixture": "head-generation-is-copied-from-completion-record-sequence-instead-of-the-verified-state-document-generation",
+                      "expected_error": "release-store-head-state-generation-mismatch"
                     }
                   ]
                 }
@@ -875,7 +893,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "status",
         "kernel_id",
+        "applicability",
         "request_projection",
         "state_store",
         "filesystem_safety",
@@ -888,6 +908,13 @@
       "properties": {
         "status": { "const": "deprecated-read-only-v1-non-authoritative" },
         "kernel_id": { "const": "devai.kernel.release-execution-seams.v1" },
+        "applicability": {
+          "const": {
+            "read_scope": "wire-compatible-legacy-v1-observation-only",
+            "write_or_execution_authority": "none-for-v2-or-v3",
+            "active_kernel_rule": "v2-and-v3-active-kernels-must-ignore-execution_seams.state_store-generation-head-and-cas-constraints"
+          }
+        },
         "request_projection": {
           "type": "object",
           "additionalProperties": false,
@@ -2472,7 +2499,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.2.0",
+      "policy_version": "2.3.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -2701,6 +2728,11 @@
       "execution_seams": {
         "status": "deprecated-read-only-v1-non-authoritative",
         "kernel_id": "devai.kernel.release-execution-seams.v1",
+        "applicability": {
+          "read_scope": "wire-compatible-legacy-v1-observation-only",
+          "write_or_execution_authority": "none-for-v2-or-v3",
+          "active_kernel_rule": "v2-and-v3-active-kernels-must-ignore-execution_seams.state_store-generation-head-and-cas-constraints"
+        },
         "request_projection": {
           "allowed_fields": [
             "candidate_locator",
@@ -2878,6 +2910,7 @@
         "compatibility": {
           "v1_state_read": "accept-wire-compatible-v1-state-records-for-observation-only",
           "v2_state_write": "all-new-persisted-state-records-must-satisfy-the-v2-semantic-kernel",
+          "v1_execution_seams": "legacy-v1-observation-only-and-ignored-by-v2-and-v3-active-kernels-for-generation-head-and-cas-semantics",
           "client_drafted_state": "never-trusted"
         },
         "request": {
@@ -2937,7 +2970,7 @@
               "completion-alone-advances-HEAD-by-compare-and-swap-from-observed_head_before;-failure-leaves-HEAD-unchanged-but-advances-the-append-log-tail;-unknown-is-terminal-leaves-HEAD-unchanged-and-is-non-retriable",
               "a-failed-remote-attempt-may-be-followed-only-by-a-new-attempt-bound-to-a-fresh-exact-owner-authorization-and-the-failed-attempt-is-never-redispatched",
               "resume-validates-the-single-append-chain-and-full-v2-canonical-head-then-derives-the-exact-next-action-or-blocked-reason-from-both-the-log-tail-and-head-without-writing-or-repairing",
-              "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
+              "the-head-names-exactly-one-completion-record-with-the-same-candidate-and-repository-and-head.state_id-and-head.state_digest_sha256-equal-completion.state_id-and-completion.state_digest_sha256;head.generation-equals-the-generation-of-that-separately-verified-state-document;head.completion_record.sequence-is-only-the-append-log-sequence"
             ],
             "errors": [
               "release-store-opening-attempt-invalid",
@@ -2952,6 +2985,8 @@
               "release-store-attempt-redispatch",
               "release-store-retry-authorization-reuse",
               "release-store-resume-history-divergence",
+              "release-store-legacy-seam-authority-conflict",
+              "release-store-head-state-generation-mismatch",
               "release-store-head-completion-mismatch"
             ],
             "negative_fixtures": [
@@ -2990,6 +3025,14 @@
               {
                 "fixture": "resume-derives-blocked-reason-from-log-tail-without-validating-head",
                 "expected_error": "release-store-resume-history-divergence"
+              },
+              {
+                "fixture": "active-v3-store-applies-legacy-v1-generation-head-or-cas-constraint",
+                "expected_error": "release-store-legacy-seam-authority-conflict"
+              },
+              {
+                "fixture": "head-generation-is-copied-from-completion-record-sequence-instead-of-the-verified-state-document-generation",
+                "expected_error": "release-store-head-state-generation-mismatch"
               }
             ]
           }
