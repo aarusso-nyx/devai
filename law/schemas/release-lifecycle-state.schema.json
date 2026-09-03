@@ -726,8 +726,8 @@
       "bound_receipts": [
         {
           "kind": "release-plan-receipt",
-          "receipt_id": "RPL-b0d5ce2dbb6e9667",
-          "receipt_digest_sha256": "b0d5ce2dbb6e96675f20834e5d982dba33bb6e22c8c5c1f17924b69ba38d2d91",
+          "receipt_id": "RPL-418d33102c29ac15",
+          "receipt_digest_sha256": "418d33102c29ac15837cb24284b83d6334eb5c2f3dfc40d59a9eacc3c4888ca6",
           "verdict": "pass"
         }
       ],
@@ -746,7 +746,7 @@
         {
           "kind": "release-lifecycle-policy",
           "path": "law/policy/release-lifecycle.json",
-          "sha256": "de93ffd12e8aa4cb3c15a47223d0d3d9f525b7e69c72af7470c9100f6fdf2f64"
+          "sha256": "a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872881ce68d5"
         }
       ],
       "evidence": {
@@ -768,7 +768,7 @@
       "authorization_event_id": null,
       "publication_expectation": null,
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "record_digest_sha256": "bee2f60e45a52a54dc19d7441a005dfef5eda8b2f03856066bea7bde674de8a5"
+      "record_digest_sha256": "f90611253c61944031c1283152234bfffcfea6b4df132a426d3e87f9e0b3ab16"
     },
     {
       "schemaVersion": "1.0.0",
@@ -797,7 +797,7 @@
         {
           "kind": "release-lifecycle-policy",
           "path": "law/policy/release-lifecycle.json",
-          "sha256": "de93ffd12e8aa4cb3c15a47223d0d3d9f525b7e69c72af7470c9100f6fdf2f64"
+          "sha256": "a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872881ce68d5"
         }
       ],
       "evidence": {
@@ -848,7 +848,7 @@
         }
       },
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
+      "record_digest_sha256": "2b53ce99283c106be6514c7f4f7bf8a5f5bcf3bb33d827b17f6c36694fced03a"
     }
   ]
 }

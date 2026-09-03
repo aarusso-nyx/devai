@@ -151,8 +151,8 @@
     },
     "adr_reference": {
       "type": "string",
-      "pattern": "^ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})$",
-      "description": "A v2 scoped identity, or a legacy numeric identity retained so a v2 decision can supersede a preserved pre-v2 record without touching its bytes."
+      "pattern": "^(?:ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$",
+      "description": "A v2 scoped identity, a legacy numeric identity, or an explicitly catalogued LEGACY: identity. A LEGACY: reference resolves only through the validation policy's exact reference allowlist."
     }
   },
   "examples": [

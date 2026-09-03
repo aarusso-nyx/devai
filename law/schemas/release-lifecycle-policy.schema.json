@@ -399,7 +399,7 @@
   "$defs": {
     "plan_determination": {
       "const": {
-        "kernel_id": "devai.kernel.release-plan-determination.v1",
+        "kernel_id": "devai.kernel.release-plan-determination.v2",
         "required_inputs": [
           {"order": 1, "kind": "release-intent", "source": "invocation-provided-release-intent-document", "schema": "law/schemas/release-intent.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
           {"order": 2, "kind": "release-verification-profile", "source": "law/policy/release-verification.json", "schema": "law/schemas/release-verification-profile.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
@@ -410,6 +410,25 @@
           "grammar": "semver-2.0.0",
           "transition_order": ["patch", "minor", "major", "prerelease", "support-promotion"],
           "block_conditions": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"]
+        },
+        "blocked_receipt": {
+          "verdict": "block",
+          "state_observed": null,
+          "plan": [],
+          "profile_verdict": "block",
+          "transition": null,
+          "capabilities": [],
+          "mutation": "none",
+          "mutation_disposition_status": "blocked",
+          "bindable_by_mutating_action": false,
+          "lifecycle_transition": false,
+          "semver_reason_precedence": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"],
+          "semver_outcomes": [
+            {"condition": "invalid-semver", "blocking_reasons": ["invalid-semver"], "mutation_disposition_reason": "invalid-semver"},
+            {"condition": "downgrade", "blocking_reasons": ["downgrade"], "mutation_disposition_reason": "downgrade"},
+            {"condition": "same-version-without-support-promotion", "blocking_reasons": ["same-version-without-support-promotion"], "mutation_disposition_reason": "same-version-without-support-promotion"},
+            {"condition": "support-promotion-requires-lts", "blocking_reasons": ["support-promotion-requires-lts"], "mutation_disposition_reason": "support-promotion-requires-lts"}
+          ]
         },
         "support": {"source": "release-intent.support", "values": ["preview", "current", "lts"], "lts_requires_nonempty_mutation_roster": true},
         "impact": {"source": "release-intent.change_kind", "values": ["documentation", "metadata", "behavioral"], "missing_defaults_to": "behavioral"},
@@ -1325,7 +1344,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.0.0",
+      "policy_version": "2.1.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -1335,7 +1354,7 @@
         "lifecycle_observation_schema": "law/schemas/release-lifecycle-observation.schema.json"
       },
       "plan_determination": {
-        "kernel_id": "devai.kernel.release-plan-determination.v1",
+        "kernel_id": "devai.kernel.release-plan-determination.v2",
         "required_inputs": [
           {"order": 1, "kind": "release-intent", "source": "invocation-provided-release-intent-document", "schema": "law/schemas/release-intent.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
           {"order": 2, "kind": "release-verification-profile", "source": "law/policy/release-verification.json", "schema": "law/schemas/release-verification-profile.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
@@ -1343,6 +1362,25 @@
           {"order": 4, "kind": "action-registry-policy", "source": "law/policy/action-registry.json", "schema": "law/schemas/action-registry.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"}
         ],
         "semver": {"grammar": "semver-2.0.0", "transition_order": ["patch", "minor", "major", "prerelease", "support-promotion"], "block_conditions": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"]},
+        "blocked_receipt": {
+          "verdict": "block",
+          "state_observed": null,
+          "plan": [],
+          "profile_verdict": "block",
+          "transition": null,
+          "capabilities": [],
+          "mutation": "none",
+          "mutation_disposition_status": "blocked",
+          "bindable_by_mutating_action": false,
+          "lifecycle_transition": false,
+          "semver_reason_precedence": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"],
+          "semver_outcomes": [
+            {"condition": "invalid-semver", "blocking_reasons": ["invalid-semver"], "mutation_disposition_reason": "invalid-semver"},
+            {"condition": "downgrade", "blocking_reasons": ["downgrade"], "mutation_disposition_reason": "downgrade"},
+            {"condition": "same-version-without-support-promotion", "blocking_reasons": ["same-version-without-support-promotion"], "mutation_disposition_reason": "same-version-without-support-promotion"},
+            {"condition": "support-promotion-requires-lts", "blocking_reasons": ["support-promotion-requires-lts"], "mutation_disposition_reason": "support-promotion-requires-lts"}
+          ]
+        },
         "support": {"source": "release-intent.support", "values": ["preview", "current", "lts"], "lts_requires_nonempty_mutation_roster": true},
         "impact": {"source": "release-intent.change_kind", "values": ["documentation", "metadata", "behavioral"], "missing_defaults_to": "behavioral"},
         "known_risks": ["authentication", "authorization", "tenancy", "rls", "cryptography", "secrets", "credentials", "database", "migration", "release-integrity", "evidence", "provenance", "publication", "ledger", "mutation-policy", "test-policy", "test-configuration", "sanitization", "public-api", "export-map", "package-boundary", "lockfile", "toolchain", "cross-package", "large-change", "protected-resource"],

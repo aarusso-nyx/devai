@@ -204,7 +204,7 @@
       ],
       "properties": {
         "kernel_id": {
-          "const": "devai.kernel.adr-supersession-resolution.v1",
+          "const": "devai.kernel.adr-supersession-resolution.v2",
           "description": "The named resolver. An implementation that resolves supersession by any other procedure is not this kernel and does not discharge the obligation."
         },
         "mandatory": {
@@ -228,15 +228,14 @@
         "resolvable_legacy_references": {
           "type": "array",
           "uniqueItems": true,
-          "description": "The exact pre-v2 identities a supersedes entry may resolve to. Each must name a preserved-pre-v2-record entry present in exception_catalog.entries by exact path; a legacy reference outside this list is unresolved.",
+          "description": "The exact pre-v2 identities a supersedes entry may resolve to. This list is a bijection with preserved-pre-v2-record catalog entries by reference and path; catalog presence alone never makes a legacy identity resolvable.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["reference", "path", "disposition"],
             "properties": {
               "reference": {
-                "type": "string",
-                "pattern": "^ADR-[0-9]{3,}$"
+                "$ref": "#/$defs/legacy_reference"
               },
               "path": {
                 "$ref": "#/$defs/relative_path"
@@ -249,13 +248,22 @@
         },
         "algorithm": {
           "type": "array",
-          "minItems": 13,
-          "maxItems": 13,
+          "minItems": 16,
+          "maxItems": 16,
           "items": false,
           "description": "The frozen ordered procedure. Steps are evaluated in this order and a rejection at any step ends the resolution; no step is optional, reorderable, or replaceable by a weaker check.",
           "prefixItems": [
             {
-              "const": "collect-every-scanned-record-with-its-declared-id-status-and-supersedes-list"
+              "const": "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field"
+            },
+            {
+              "const": "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match"
+            },
+            {
+              "const": "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references"
+            },
+            {
+              "const": "collect-every-v2-and-materialized-legacy-record-with-its-id-status-and-supersedes-list"
             },
             {
               "const": "reject-when-two-scanned-records-declare-the-same-id"
@@ -297,11 +305,17 @@
         },
         "errors": {
           "type": "array",
-          "minItems": 10,
-          "maxItems": 10,
+          "minItems": 12,
+          "maxItems": 12,
           "items": false,
           "description": "The exact codes this kernel may report. An implementation reporting a different code, or passing where one of these applies, is not this kernel.",
           "prefixItems": [
+            {
+              "const": "adr-legacy-catalog-metadata-invalid"
+            },
+            {
+              "const": "adr-legacy-reference-allowlist-mismatch"
+            },
             {
               "const": "adr-duplicate-id"
             },
@@ -353,8 +367,8 @@
           "const": "sha256"
         },
         "canonical_form": {
-          "const": "utf8-lines-of-<relative_path>-space-<sha256>-newline",
-          "description": "One line per entry: the path relative to scan.root, a single U+0020, the lowercase hex sha256 of the file bytes, and a single U+000A. Lines are concatenated with no separator and no trailing content."
+          "const": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
+          "description": "The UTF-8 RFC 8785 canonical JSON bytes of the complete entries array after sorting entries by path as UTF-8 bytes. This binds disposition, reason, and every catalog-supplied legacy metadata field as well as path and file digest."
         },
         "ordering": {
           "const": "utf8-bytes-ascending-by-path"
@@ -386,8 +400,21 @@
                 "type": "string",
                 "minLength": 8,
                 "maxLength": 500
+              },
+              "legacy_record": {
+                "$ref": "#/$defs/legacy_record"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "disposition": { "const": "preserved-pre-v2-record" } },
+                  "required": ["disposition"]
+                },
+                "then": { "required": ["legacy_record"] },
+                "else": { "not": { "required": ["legacy_record"] } }
+              }
+            ]
           }
         },
         "digest_mismatch_behavior": {
@@ -423,6 +450,54 @@
       "minLength": 1,
       "maxLength": 500,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    },
+    "legacy_reference": {
+      "type": "string",
+      "pattern": "^(?:ADR-[0-9]{3,}|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$",
+      "description": "Stable catalog-supplied identity for a preserved pre-v2 record. LEGACY: provides a collision-free namespace for date-, scoped-, no-frontmatter-, and adr_id-era records."
+    },
+    "adr_reference": {
+      "type": "string",
+      "pattern": "^(?:ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$"
+    },
+    "legacy_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "title",
+        "status",
+        "date",
+        "source_format",
+        "supersedes",
+        "affected_rules"
+      ],
+      "description": "Architect-supplied normalized metadata for one immutable historical record. Validators do not infer missing identity or lifecycle data from historical bytes.",
+      "properties": {
+        "reference": { "$ref": "#/$defs/legacy_reference" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["proposed", "accepted", "rejected", "superseded"] },
+        "date": { "type": ["string", "null"], "format": "date" },
+        "source_format": {
+          "enum": [
+            "numeric-id-frontmatter",
+            "date-id-frontmatter",
+            "scoped-id-frontmatter",
+            "no-frontmatter",
+            "adr_id-frontmatter"
+          ]
+        },
+        "supersedes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/adr_reference" }
+        },
+        "affected_rules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
     }
   },
   "examples": [
@@ -431,7 +506,7 @@
       "id": "adr-validation",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "1.0.0",
+      "policy_version": "2.0.0",
       "record_schema": "law/schemas/adr-v2.schema.json",
       "scan": {
         "root": "law/adr",
@@ -466,7 +541,7 @@
         "self_reference_behavior": "fail"
       },
       "semantic_resolver": {
-        "kernel_id": "devai.kernel.adr-supersession-resolution.v1",
+        "kernel_id": "devai.kernel.adr-supersession-resolution.v2",
         "mandatory": true,
         "schema_validation_alone_establishes_effective_authority": false,
         "effective_authority_rule": "unique-effective-accepted-head-per-supersession-lineage",
@@ -474,7 +549,10 @@
         "superseded_record_edit_permitted": false,
         "resolvable_legacy_references": [],
         "algorithm": [
-          "collect-every-scanned-record-with-its-declared-id-status-and-supersedes-list",
+          "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
+          "materialize-each-preserved-pre-v2-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
+          "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
+          "collect-every-v2-and-materialized-legacy-record-with-its-id-status-and-supersedes-list",
           "reject-when-two-scanned-records-declare-the-same-id",
           "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
           "reject-when-a-supersedes-entry-resolves-to-nothing",
@@ -489,6 +567,8 @@
           "emit-the-unique-effective-accepted-head-of-every-lineage-as-the-effective-authority"
         ],
         "errors": [
+          "adr-legacy-catalog-metadata-invalid",
+          "adr-legacy-reference-allowlist-mismatch",
           "adr-duplicate-id",
           "adr-unresolved-supersedes-reference",
           "adr-uncatalogued-legacy-reference",
@@ -503,9 +583,9 @@
       },
       "exception_catalog": {
         "digest_algorithm": "sha256",
-        "canonical_form": "utf8-lines-of-<relative_path>-space-<sha256>-newline",
+        "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
         "ordering": "utf8-bytes-ascending-by-path",
-        "catalog_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "catalog_digest_sha256": "5d948df6b23171e42f9e1da200380acb5adf59dbc20f5e9247d968d2a570d9cf",
         "entries": [
           {
             "path": "README.md",

@@ -80,11 +80,11 @@
     },
     "plan": {
       "type": "array",
-      "minItems": 9,
+      "minItems": 0,
       "maxItems": 9,
       "uniqueItems": true,
       "items": false,
-      "description": "All nine lifecycle actions in order, each with the state it produces and the state it derives stated explicitly. A step that produces nothing derives something, and the plan says which: an action whose outcome is left unstated is the gap a later reader fills with an assumption.",
+      "description": "All nine lifecycle actions in order for a passing plan, or the empty array for a blocked plan. A block is not a partial plan and exposes no action sequence a mutating action could mistake for permission.",
       "prefixItems": [
         {
           "$ref": "#/$defs/plan_step",
@@ -250,8 +250,8 @@
       "properties": {
         "profile_verdict": {"enum": ["ready", "block"]},
         "transition": {
-          "enum": ["patch", "minor", "major", "prerelease", "support-promotion"],
-          "description": "Recomputed from the release intent's current_version and target_version. A declared bump that disagrees with the versions is a mismatch, not an override."
+          "enum": [null, "patch", "minor", "major", "prerelease", "support-promotion"],
+          "description": "Recomputed from the release intent's current_version and target_version. Null is reserved for a blocked plan: an invalid, downward, or otherwise forbidden version relation is not a transition."
         },
         "support": {
           "enum": ["preview", "current", "lts"]
@@ -303,7 +303,7 @@
       "description": "The named kernel that must recompute this receipt before any action binds it. A receipt is a claim about a deterministic computation; the only way to believe it is to redo the computation.",
       "properties": {
         "kernel_id": {
-          "const": "devai.kernel.release-plan-receipt.v1"
+          "const": "devai.kernel.release-plan-receipt.v2"
         },
         "mandatory": {
           "const": true
@@ -328,10 +328,10 @@
               "const": "require-the-exact-four-ordered-input-kinds-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination"
             },
             {
-              "const": "recompute-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-determination"
+              "const": "recompute-verdict-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-the-reported-values"
             },
             {
-              "const": "recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan"
+              "const": "recompute-the-nine-ordered-plan-steps-for-pass-or-the-empty-plan-for-block-from-the-lifecycle-policy-and-compare-to-plan"
             },
             {
               "const": "recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1"
@@ -406,6 +406,27 @@
         "properties": {
           "state_observed": {
             "const": "planned"
+          },
+          "plan": {
+            "minItems": 9,
+            "maxItems": 9
+          },
+          "determination": {
+            "properties": {
+              "profile_verdict": {"const": "ready"},
+              "transition": {"enum": ["patch", "minor", "major", "prerelease", "support-promotion"]},
+              "mutation_disposition": {
+                "properties": {
+                  "status": {"enum": ["required", "not-required"]}
+                }
+              },
+              "blocking_reasons": {"maxItems": 0}
+            }
+          },
+          "candidate": {
+            "properties": {
+              "version": {"minLength": 1}
+            }
           }
         }
       },
@@ -414,6 +435,23 @@
           "state_observed": {
             "type": "null",
             "description": "A blocked plan observes no state. It is a reason to stop, never a weaker plan."
+          },
+          "plan": {
+            "maxItems": 0
+          },
+          "determination": {
+            "properties": {
+              "profile_verdict": {"const": "block"},
+              "transition": {"type": "null"},
+              "capabilities": {"maxItems": 0},
+              "mutation": {"const": "none"},
+              "mutation_disposition": {
+                "properties": {
+                  "status": {"const": "blocked"}
+                }
+              },
+              "blocking_reasons": {"minItems": 1}
+            }
           }
         }
       }
@@ -524,8 +562,8 @@
         },
         "version": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 100
+          "maxLength": 100,
+          "description": "The raw target_version supplied to planning. It may be empty only on a blocked invalid-semver receipt; passing receipts require at least one character and the semantic kernel requires valid SemVer."
         },
         "commit": {
           "$ref": "#/$defs/git_object"
@@ -652,7 +690,7 @@
         "receipt_projection_excludes": ["receipt_id", "receipt_digest_sha256"],
         "calculation_order": ["compute-receipt_digest_sha256-over-the-receipt-projection", "derive-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"]
       },
-      "receipt_id": "RPL-b0d5ce2dbb6e9667",
+      "receipt_id": "RPL-418d33102c29ac15",
       "state_observed": "planned",
       "verdict": "pass",
       "repository": {
@@ -704,7 +742,7 @@
           "schema": "law/schemas/release-lifecycle-policy.schema.json",
           "path": "law/policy/release-lifecycle.json",
           "canonical_bytes": "utf-8-rfc8785-jcs",
-          "sha256": "de93ffd12e8aa4cb3c15a47223d0d3d9f525b7e69c72af7470c9100f6fdf2f64"
+          "sha256": "a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872881ce68d5"
         },
         {
           "kind": "action-registry-policy",
@@ -783,15 +821,15 @@
         "blocking_reasons": []
       },
       "verification_kernel": {
-        "kernel_id": "devai.kernel.release-plan-receipt.v1",
+        "kernel_id": "devai.kernel.release-plan-receipt.v2",
         "mandatory": true,
         "determination_contract": "law/policy/release-lifecycle.json#/plan_determination",
         "schema_assertion_establishes_pass": false,
         "algorithm": [
           "resolve-every-declared-input-and-recompute-its-sha256",
           "require-the-exact-four-ordered-input-kinds-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination",
-          "recompute-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-determination",
-          "recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan",
+          "recompute-verdict-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-the-reported-values",
+          "recompute-the-nine-ordered-plan-steps-for-pass-or-the-empty-plan-for-block-from-the-lifecycle-policy-and-compare-to-plan",
           "recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1",
           "recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest",
           "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
@@ -826,7 +864,7 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "receipt_digest_sha256": "b0d5ce2dbb6e96675f20834e5d982dba33bb6e22c8c5c1f17924b69ba38d2d91"
+      "receipt_digest_sha256": "418d33102c29ac15837cb24284b83d6334eb5c2f3dfc40d59a9eacc3c4888ca6"
     }
   ]
 }
