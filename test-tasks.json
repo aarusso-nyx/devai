@@ -62,6 +62,10 @@
         {
           "kind": "exact",
           "pattern": "vitest.config.ts"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/schemas/"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
