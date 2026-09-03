@@ -94,4 +94,35 @@ describe('action registry schema', () => {
     certify.authority_contract.capabilities = ['fs:f5-state', 'fs:proofs', 'proc:git'];
     expect(validators.actionRegistry(malformed)).toBe(false);
   });
+
+  it('pins preflight to its execution-only protected provider boundary', () => {
+    const malformed = structuredClone(registry);
+    const preflight = malformed.entries.find((entry) => entry.action_id === 'release preflight');
+    expect(preflight, 'current registry must contain release preflight').toBeDefined();
+    if (preflight === undefined) return;
+
+    expect(preflight.authority_contract).toMatchObject({
+      capabilities: [
+        'fs:f5-state',
+        'fs:proofs',
+        'proc:git',
+        'protected-certification-provider-v3:execute',
+      ],
+      subject: { kind: 'derived-machine', actor: 'harness', transition: 'harness-write' },
+      consent: { write: true, allow_publish: false, experimental: false },
+      planner: { target_kinds: ['fs', 'protected-certification-provider'] },
+      boundary: {
+        adapter_ids: ['fs-authority-boundary', 'protected-certification-provider-v3'],
+        final_reverification: true,
+      },
+    });
+    preflight.authority_contract.capabilities = [
+      'fs:f5-state',
+      'fs:proofs',
+      'proc:git',
+      'protected-certification-provider-v3:execute',
+      'certification-evidence-sink:write',
+    ];
+    expect(validators.actionRegistry(malformed)).toBe(false);
+  });
 });

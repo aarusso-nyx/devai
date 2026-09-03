@@ -162,6 +162,53 @@ describe('release lifecycle state and refusal contracts', () => {
     });
   });
 
+  it('closes protected preflight to its immutable execution-only boundary', () => {
+    const validateLifecyclePolicy = getValidator('release-lifecycle-policy.schema.json');
+    const executionContract = (policy as unknown as Json).execution_contract as Json;
+    const protectedPreflight = executionContract.protected_preflight as Json;
+    expect(protectedPreflight).toMatchObject({
+      action_id: 'release preflight',
+      stage: 'preflight',
+      boundary: 'protected-certification-provider-v3',
+      capability: 'protected-certification-provider-v3:execute',
+      binding: [
+        'action_id',
+        'repository-id-commit-tree',
+        'candidate-commit-tree',
+        'plan-receipt-digest',
+        'task-policy-digest-sha256',
+        'helper-identity-sha256',
+      ],
+      projection: {
+        kind: 'remote',
+        system_id: 'devai-protected-certification-provider-v3',
+        endpoint_id: 'host',
+        operation_id: 'execute',
+        publication: false,
+        adapter_id: 'protected-certification-provider-v3',
+      },
+      permitted_transition:
+        'only-the-existing-planned-to-preflight_passed-transition-after-core-verification',
+      missing_or_mismatched_provider:
+        'refuse-before-task-execution-or-success-state-append;no-ambient-or-unprotected-fallback',
+    });
+    expect(protectedPreflight.forbidden).toEqual(
+      expect.arrayContaining([
+        'certification-evidence-sink',
+        'certified-state-promotion',
+        'artifact-sink',
+        'remote-publication',
+        'generic-process-execution',
+      ]),
+    );
+
+    const altered = structuredClone(policy) as Json;
+    const alteredContract = altered.execution_contract as Json;
+    const alteredPreflight = alteredContract.protected_preflight as Json;
+    alteredPreflight.stage = 'certify';
+    expect(validateLifecyclePolicy(altered)).toBe(false);
+  });
+
   it('pins v2 plan kernels and the exact deterministic SemVer refusal contract', () => {
     expect(policy.plan_determination.kernel_id).toBe('devai.kernel.release-plan-determination.v2');
     expect(policy.plan_determination.blocked_receipt).toMatchObject({
