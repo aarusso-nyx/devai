@@ -38,7 +38,15 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/u;
 interface AdrValidationPolicy {
   readonly scan: Readonly<{ root: string }>;
   readonly body: Readonly<{ required_sections: readonly string[] }>;
-  readonly semantic_resolver: Readonly<{ kernel_id: string; mandatory: boolean }>;
+  readonly semantic_resolver: Readonly<{
+    kernel_id: string;
+    mandatory: boolean;
+    resolvable_legacy_references: readonly Readonly<{
+      reference: string;
+      path: string;
+      disposition: 'preserved-pre-v2-record';
+    }>[];
+  }>;
   readonly exception_catalog: Readonly<{
     catalog_digest_sha256: string;
     entries: readonly Readonly<{
@@ -124,6 +132,28 @@ function issue(
 }
 
 function loadPolicy(path: string, errors: AdrValidationError[]): AdrValidationPolicy | undefined {
+  try {
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      issue(
+        errors,
+        'adr-semantic-resolution-not-performed',
+        path,
+        stat.isSymbolicLink()
+          ? 'symlinked ADR validation policy is forbidden'
+          : 'ADR validation policy is not a regular file',
+      );
+      return undefined;
+    }
+  } catch (error) {
+    issue(
+      errors,
+      'adr-semantic-resolution-not-performed',
+      path,
+      `cannot inspect validation policy: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
   let policy: unknown;
   try {
     policy = JSON.parse(readFileSync(path, 'utf8')) as unknown;
@@ -272,6 +302,10 @@ function addSchemaErrors(
 
 function semanticResolution(
   records: readonly ParsedAdr[],
+  resolvableLegacyReferences: ReadonlyMap<
+    string,
+    AdrValidationPolicy['semantic_resolver']['resolvable_legacy_references'][number]
+  >,
   errors: AdrValidationError[],
 ): ReadonlySet<string> {
   const byId = new Map<string, ParsedAdr>();
@@ -306,6 +340,22 @@ function semanticResolution(
           `${record.id} supersedes unresolved identity '${target}'`,
         );
         continue;
+      }
+      if (targetRecord.format === 'legacy-catalog') {
+        const allowed = resolvableLegacyReferences.get(target);
+        if (
+          allowed === undefined ||
+          basename(targetRecord.file) !== allowed.path ||
+          allowed.disposition !== 'preserved-pre-v2-record'
+        ) {
+          issue(
+            errors,
+            'adr-uncatalogued-legacy-reference',
+            record.file,
+            `${record.id} supersedes uncatalogued legacy identity '${target}'`,
+          );
+          continue;
+        }
       }
       successors.set(target, [...(successors.get(target) ?? []), record.id]);
       adjacency.get(record.id)?.add(target);
@@ -403,6 +453,26 @@ export function validateAdrs(options: ValidateAdrsOptions): AdrValidationResult 
     issue(errors, 'adr-semantic-resolution-not-performed', options.adrsDir, 'ADR root is absent');
     return empty();
   }
+  try {
+    const stat = lstatSync(options.adrsDir);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      issue(
+        errors,
+        'adr-semantic-resolution-not-performed',
+        options.adrsDir,
+        stat.isSymbolicLink() ? 'symlinked ADR root is forbidden' : 'ADR root is not a directory',
+      );
+      return empty();
+    }
+  } catch (error) {
+    issue(
+      errors,
+      'adr-semantic-resolution-not-performed',
+      options.adrsDir,
+      `cannot inspect ADR root: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return empty();
+  }
 
   const catalog = validateExceptionCatalog(policy, policyPath, errors);
   const files = markdownFiles(options.adrsDir, errors);
@@ -464,7 +534,7 @@ export function validateAdrs(options: ValidateAdrsOptions): AdrValidationResult 
     if (document === undefined) continue;
     for (const section of policy.body.required_sections) {
       const escaped = section.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-      if (!new RegExp(`^##\\s+${escaped}(?:\\s|$)`, 'mu').test(document.body)) {
+      if (!new RegExp(`^##[ \\t]+${escaped}[ \\t]*\\r?$`, 'mu').test(document.body)) {
         issue(
           errors,
           'adr-semantic-resolution-not-performed',
@@ -515,7 +585,10 @@ export function validateAdrs(options: ValidateAdrsOptions): AdrValidationResult 
     }
   }
 
-  const effective = semanticResolution(parsedRecords, errors);
+  const resolvableLegacyReferences = new Map(
+    policy.semantic_resolver.resolvable_legacy_references.map((entry) => [entry.reference, entry]),
+  );
+  const effective = semanticResolution(parsedRecords, resolvableLegacyReferences, errors);
   const adrs = parsedRecords
     .map((record): AdrValidationRecord => ({
       file: record.file,
