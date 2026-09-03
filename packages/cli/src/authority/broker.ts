@@ -9,7 +9,6 @@ import {
   materializeAuthorityPolicy,
   resolveAuthorityDeclaration,
   resolveAuthorityPolicy,
-  readExactGitTreeSync,
 } from '@devai-nyx/authority';
 import { createAuthorityBoundaryRuntime } from '@devai-nyx/authority';
 import { assertAuthorityPathCapability } from '@devai-nyx/authority';
@@ -35,9 +34,7 @@ import {
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
   matchDeclaredReleaseTaskProcess,
-  trustedReleaseToolProcessBinding,
 } from '../services/check-runner/authority-process.js';
-import { resolveTaskExecutable } from '../services/check-runner/executable.js';
 import { matchDeclaredRoundTaskProcess } from '../services/round-run/authority-process.js';
 import {
   buildTrustedAuthoritySources,
@@ -591,79 +588,6 @@ function processTarget(
         operation: 'update',
       };
     }
-  }
-
-  if (
-    actionName === 'release prepare' &&
-    JSON.stringify(args.slice(0, 4)) ===
-      JSON.stringify(['pack', '--json', '--ignore-scripts', '--pack-destination']) &&
-    typeof args[4] === 'string' &&
-    args.length === 5
-  ) {
-    const rawOptions = request.arguments[2];
-    if (
-      rawOptions === null ||
-      typeof rawOptions !== 'object' ||
-      Array.isArray(rawOptions) ||
-      typeof (rawOptions as JsonRecord).cwd !== 'string' ||
-      (rawOptions as JsonRecord).shell !== false
-    ) {
-      return undefined;
-    }
-    const toolBinding = trustedReleaseToolProcessBinding(
-      rawOptions as Readonly<Record<PropertyKey, unknown>>,
-    );
-    if (toolBinding?.tool !== 'npm') return undefined;
-    try {
-      const descriptorEntries = readExactGitTreeSync(
-        root,
-        toolBinding.candidate.commit,
-        toolBinding.candidate.tree,
-        'test-tasks.json',
-      );
-      if (
-        descriptorEntries.length !== 1 ||
-        descriptorEntries[0]?.path !== 'test-tasks.json' ||
-        descriptorEntries[0].mode === '120000'
-      ) {
-        return undefined;
-      }
-    } catch {
-      return undefined;
-    }
-    let npmIdentity;
-    try {
-      // Node has no fd-based exec seam: rehash immediately at dispatch, then invoke this exact
-      // absolute path with shell:false. A privileged pathname swap during execve remains an OS race.
-      npmIdentity = resolveTaskExecutable(root, 'npm');
-    } catch {
-      return undefined;
-    }
-    if (
-      executableValue !== npmIdentity.path ||
-      toolBinding.executable.path !== npmIdentity.path ||
-      toolBinding.executable.sha256 !== npmIdentity.sha256
-    ) {
-      return undefined;
-    }
-    const cwd = realpathSync(resolve(String((rawOptions as JsonRecord).cwd)));
-    const output = realpathSync(resolve(args[4]));
-    if (
-      !within(root, cwd) ||
-      !within(root, output) ||
-      toolBinding.cwd !== cwd ||
-      toolBinding.output !== output
-    ) {
-      return undefined;
-    }
-    const path = canonicalRelativePath(root, output);
-    return {
-      kind: 'fs',
-      id: `fs:${path}`,
-      repository_id: repositoryId,
-      canonical_relative_path: path,
-      operation: 'update',
-    };
   }
 
   if (actionName === 'round run') {

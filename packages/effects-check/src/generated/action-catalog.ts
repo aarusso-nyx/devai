@@ -163,7 +163,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'release prepare',
     public_action_id: 'release prepare',
     effect: 'local-write',
-    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:workspace', 'proc:git', 'proc:pnpm'],
+    capabilities: ['fs:f5-state', 'fs:proofs', 'artifact-sink:write'],
   },
   {
     action_id: 'release publish',

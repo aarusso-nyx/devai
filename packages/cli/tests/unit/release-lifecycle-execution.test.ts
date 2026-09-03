@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { existsSync, linkSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
   ReleaseLifecycleFileStore,
@@ -25,8 +27,13 @@ import {
 
 const COMMIT = '5461ba500000000000000000000000000000aaaa';
 const TREE = '2cad519aba8117a1850eee85d41eae452d51a141';
-const MANIFEST_DIGEST = 'a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872881ce68d5';
+const ARTIFACT_BYTES = Buffer.from('x');
+const MANIFEST_DIGEST = createHash('sha256').update(ARTIFACT_BYTES).digest('hex');
 const EVIDENCE_DIGEST = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08';
+const TASK_POLICY_DIGEST = 'c'.repeat(64);
+const SINK_ID = 'release-test-sink';
+const TRANSACTION_HANDLE = 'release-test-transaction';
+const COMMIT_MANIFEST_HANDLE = 'release-test-commit-manifest';
 
 function planReceipt(): Readonly<Record<string, unknown>> {
   return buildReleasePlanReceipt({
@@ -113,7 +120,6 @@ function request(
     return {
       ...base,
       receipt_locators: [receiptLocator(receipt)],
-      destination: { kind: 'local-staging', exact_identifier: 'staging/devai-1.5.0' },
     } as ReleaseLifecycleRequest;
   }
   if (action === 'release export') {
@@ -208,6 +214,11 @@ function material(): ReleaseStateMaterial {
         path: 'law/policy/release-lifecycle.json',
         sha256: MANIFEST_DIGEST,
       },
+      {
+        kind: 'task-policy',
+        path: 'task-policy/certify/selection',
+        sha256: TASK_POLICY_DIGEST,
+      },
     ],
     evidence: {
       manifest_digest_sha256: EVIDENCE_DIGEST,
@@ -218,36 +229,115 @@ function material(): ReleaseStateMaterial {
   };
 }
 
+function certificationManifest() {
+  return finalizeCertificationManifest({
+    candidate: { commit: COMMIT, tree: TREE },
+    task_policy_digest_sha256: TASK_POLICY_DIGEST,
+    package_id: '@aarusso-nyx/devai',
+    package_version: '1.5.0',
+    entry_order: 'ascending-utf-8-byte-collation-by-path;duplicates-refuse',
+    manifest_digest_contract: {
+      domain: 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0',
+      payload:
+        'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes',
+      canonicalization: 'rfc8785-jcs',
+      algorithm: 'sha256',
+    },
+    entries: [
+      {
+        path: 'package.json',
+        mode: '100644',
+        size_bytes: ARTIFACT_BYTES.byteLength,
+        sha256: MANIFEST_DIGEST,
+        immutable_blob_locator: { kind: 'git-object', object_id: 'd'.repeat(40) },
+      },
+    ],
+  });
+}
+
+function opaqueArtifact(
+  kind:
+    | 'package-manifest'
+    | 'package-tarball'
+    | 'package-sbom'
+    | 'evidence-manifest'
+    | 'provider-result',
+  handle: string,
+) {
+  return {
+    kind,
+    sink_id: SINK_ID,
+    opaque_handle: handle,
+    sha256: MANIFEST_DIGEST,
+    size_bytes: ARTIFACT_BYTES.byteLength,
+  } as const;
+}
+
+function committedSink(artifacts: ReleaseStateMaterial['artifacts']) {
+  const manifest = Buffer.from(
+    JSON.stringify({
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: SINK_ID,
+      transaction_handle: TRANSACTION_HANDLE,
+      repository: { id: 'aarusso-nyx/devai', commit: COMMIT, tree: TREE },
+      candidate: { commit: COMMIT, tree: TREE },
+      pack_spec_id: 'devai.pure-npm-compatible-pack.v3',
+      pack_spec_digest_sha256: 'd287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd',
+      artifacts,
+    }),
+  );
+  return {
+    manifest,
+    identity: {
+      sink_id: SINK_ID,
+      transaction_handle: TRANSACTION_HANDLE,
+      committed_manifest_handle: COMMIT_MANIFEST_HANDLE,
+      committed_manifest_sha256: createHash('sha256').update(manifest).digest('hex'),
+      committed_manifest_size_bytes: manifest.byteLength,
+      commit_protocol: 'devai.artifact-sink.two-phase.v1' as const,
+    },
+  };
+}
+
 function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseStateMaterial {
   const base = material();
   const baseUnit = required(base.release_units[0], 'missing base unit');
   const packageEvidence = required(baseUnit.packages[0], 'missing base package');
-  const artifact = (path: string): { path: string; sha256: string; size_bytes: number } => ({
-    path,
-    sha256: MANIFEST_DIGEST,
-    size_bytes: 1,
-  });
-  if (action === 'release preflight' || action === 'release certify') return base;
-  const prepared = {
+  if (action === 'release preflight') return base;
+  const certified = {
     ...packageEvidence,
-    tarball: artifact('dist/devai.tgz'),
-    sbom: artifact('dist/devai.sbom.json'),
+    certification_manifest: certificationManifest(),
+  };
+  if (action === 'release certify') {
+    return {
+      ...base,
+      release_units: [{ ...baseUnit, packages: [certified] }],
+    };
+  }
+  const prepared = {
+    package_id: certified.package_id,
+    package_manifest: opaqueArtifact('package-manifest', 'package-manifest'),
+    package_tarball: opaqueArtifact('package-tarball', 'package-tarball'),
+    package_sbom: opaqueArtifact('package-sbom', 'package-sbom'),
+    evidence_manifest: null,
+    provider_result: null,
+    trust: null,
+    certification_manifest: certified.certification_manifest,
   };
   if (action === 'release prepare') {
+    const artifacts = [prepared.package_manifest, prepared.package_sbom, prepared.package_tarball];
     return {
       ...base,
       release_units: [{ ...baseUnit, packages: [prepared] }],
-      artifacts: [
-        { kind: 'manifest', ...artifact('package.json') },
-        { kind: 'package-tarball', ...artifact('dist/devai.tgz') },
-        { kind: 'sbom', ...artifact('dist/devai.sbom.json') },
-      ],
+      artifacts,
+      artifact_sink: committedSink(artifacts).identity,
     };
   }
   const exported = {
     ...prepared,
-    evidence_manifest: artifact('evidence/manifest.json'),
-    provider_result: artifact('evidence/provider-result.json'),
+    evidence_manifest: opaqueArtifact('evidence-manifest', 'evidence-manifest'),
+    provider_result: opaqueArtifact('provider-result', 'provider-result'),
     trust: {
       trust_root_id: 'release-root',
       trust_store_digest_sha256: 'b'.repeat(64),
@@ -255,17 +345,27 @@ function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseState
       signature_algorithm: 'ed25519' as const,
     },
   };
+  const artifacts = [
+    exported.evidence_manifest,
+    prepared.package_manifest,
+    prepared.package_sbom,
+    prepared.package_tarball,
+    exported.provider_result,
+  ];
   return {
     ...base,
     release_units: [{ ...baseUnit, packages: [exported] }],
-    artifacts: [
-      { kind: 'manifest', ...artifact('package.json') },
-      { kind: 'package-tarball', ...artifact('dist/devai.tgz') },
-      { kind: 'sbom', ...artifact('dist/devai.sbom.json') },
-      { kind: 'manifest', ...artifact('evidence/manifest.json') },
-      { kind: 'evidence-bundle', ...artifact('evidence/bundle.tgz') },
-      { kind: 'provider-result', ...artifact('evidence/provider-result.json') },
-    ],
+    artifacts,
+    artifact_sink: committedSink(artifacts).identity,
+  };
+}
+
+function artifactReaderFor(action: ReleaseLifecycleRequest['action_id']) {
+  const material = materialFor(action);
+  const sink = committedSink(material.artifacts);
+  return {
+    readArtifact: ({ opaque_handle }: { readonly opaque_handle: string }) =>
+      opaque_handle === COMMIT_MANIFEST_HANDLE ? sink.manifest : ARTIFACT_BYTES,
   };
 }
 
@@ -468,6 +568,9 @@ function authorizationBridge(
 }
 
 function offlineArtifacts(exported: Readonly<Record<string, unknown>>): readonly unknown[] {
+  if (exported['schemaVersion'] === '2.1.0') {
+    return exported['artifacts'] as readonly unknown[];
+  }
   const units = exported['release_units'] as readonly {
     readonly packages: readonly Record<string, unknown>[];
   }[];
@@ -493,6 +596,28 @@ function offlineArtifacts(exported: Readonly<Record<string, unknown>>): readonly
   );
 }
 
+function offlineReleaseUnits(exported: Readonly<Record<string, unknown>>): readonly unknown[] {
+  const units = exported['release_units'] as readonly {
+    readonly release_unit: string;
+    readonly version: string;
+    readonly packages: readonly Readonly<Record<string, unknown>>[];
+  }[];
+  if (exported['schemaVersion'] !== '2.1.0') return units;
+  return units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.packages.map((pkg) => ({
+      package_id: pkg['package_id'],
+      package_manifest: pkg['package_manifest'],
+      package_tarball: pkg['package_tarball'],
+      package_sbom: pkg['package_sbom'],
+      evidence_manifest: pkg['evidence_manifest'],
+      provider_result: pkg['provider_result'],
+      trust: pkg['trust'],
+    })),
+  }));
+}
+
 function objectValue(value: unknown): Readonly<Record<string, unknown>> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('expected object');
@@ -506,10 +631,27 @@ function boundOfflineReceipt(
   const legacy = offlineReceipt();
   const draft: Readonly<Record<string, unknown>> = {
     ...legacy,
-    schemaVersion: '2.0.0',
+    schemaVersion: '2.1.0',
     canonicalization: {
       ...(legacy['canonicalization'] as Readonly<Record<string, unknown>>),
-      kernel_id: 'devai.kernel.release-offline-verification-receipt-canonicalization.v2',
+      kernel_id: 'devai.kernel.release-offline-verification-receipt-canonicalization.v3',
+    },
+    verification_kernel: {
+      ...(legacy['verification_kernel'] as Readonly<Record<string, unknown>>),
+      kernel_id: 'devai.kernel.offline-verification-receipt.v3',
+      supported_canonicalization_kernels: [
+        'devai.kernel.release-offline-verification-receipt-canonicalization.v1',
+        'devai.kernel.release-offline-verification-receipt-canonicalization.v2',
+        'devai.kernel.release-offline-verification-receipt-canonicalization.v3',
+      ],
+      v3_sink_handle_closure:
+        'for-a-v2.1-receipt-resolve-every-aggregate-and-per-package-opaque-handle-through-the-external-sink-rehash-byte-digest-and-size-require-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-with-the-exported-state-and-evidence-publish-input-and-verify-artifact-sink-commit-and-external-trust-inputs',
+      v3_sink_handle_errors: [
+        'rov-v3-opaque-artifact-closure-invalid',
+        'rov-v3-artifact-sink-commit-mismatch',
+        'rov-v3-external-sink-reverification-failed',
+        'rov-v3-evidence-publish-continuity-invalid',
+      ],
     },
     repository: exported['repository'],
     candidate: exported['candidate'],
@@ -518,8 +660,9 @@ function boundOfflineReceipt(
       state_id: exported['state_id'],
       record_digest_sha256: exported['record_digest_sha256'],
     },
-    release_units: exported['release_units'],
+    release_units: offlineReleaseUnits(exported),
     artifacts: offlineArtifacts(exported),
+    artifact_sink_commit: exported['artifact_sink'],
   };
   const { receipt_id: _receiptId, receipt_digest_sha256: _receiptDigest, ...projection } = draft;
   const digest = canonicalSha256(projection);
@@ -562,6 +705,8 @@ async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
         provider: () => ({ outcome: 'success', material: materialFor(action) }),
+        artifactReader:
+          action === 'release export' ? artifactReaderFor('release prepare') : undefined,
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
     );
@@ -583,6 +728,7 @@ async function advanceToEvidencePublished(store: ReleaseLifecycleFileStore): Pro
       resolveReceipt: () => receipt,
       resolvePlanInput,
       offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+      artifactReader: artifactReaderFor('release export'),
       authorization: authorizationBridge(),
       provider: () => ({
         outcome: 'success',
@@ -766,6 +912,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        artifactReader: artifactReaderFor('release export'),
         authorization: {
           resolve: () => ({ ok: false, code: 'authorization-identity-mismatch' }),
           consume: () => {
@@ -791,6 +938,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        artifactReader: artifactReaderFor('release export'),
         authorization: {
           resolve: () => ({ ok: false, code: 'authorization-identity-mismatch' }),
           consume: () => {
@@ -828,6 +976,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        artifactReader: artifactReaderFor('release export'),
         authorization: authorizationBridge(() => {
           order.push(store.readStoreRecords().at(-1)?.record_kind ?? 'missing');
         }),
@@ -867,6 +1016,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        artifactReader: artifactReaderFor('release export'),
         authorization: authorizationBridge(),
         provider,
         recorded_at: '2026-09-03T00:00:01.000Z',
@@ -1050,6 +1200,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        artifactReader: artifactReaderFor('release export'),
         authorization: {
           ...valid,
           consume: async (binding) => {
@@ -1121,6 +1272,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => driftedReceipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        artifactReader: artifactReaderFor('release export'),
         authorization: authorizationBridge(),
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
@@ -1196,6 +1348,7 @@ describe('release lifecycle execution kernel', () => {
         inputs: prior['inputs'],
         evidence: prior['evidence'],
         artifacts: prior['artifacts'],
+        artifact_sink: prior.artifact_sink,
         publication_expectation: { destination: { exact_identifier: 'attacker' } },
       } as ReleaseStateMaterial,
     }));
@@ -1213,6 +1366,7 @@ describe('release lifecycle execution kernel', () => {
       store,
       resolveReceipt: () => planReceipt(),
       resolvePlanInput,
+      artifactReader: artifactReaderFor('release evidence-publish'),
       authorization: authorizationBridge(),
       provider,
       recorded_at: '2026-09-03T00:00:00.000Z',
@@ -1228,6 +1382,7 @@ describe('release lifecycle execution kernel', () => {
         store,
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
+        artifactReader: artifactReaderFor('release evidence-publish'),
         authorization: authorizationBridge(),
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
@@ -1289,7 +1444,11 @@ describe('release lifecycle execution kernel', () => {
     const exported = required(store.readStateRecords().at(-1), 'missing exported state');
     const offlineRequest = request('release offline-verify');
     expect(
-      await executeOfflineVerification({ request: offlineRequest, exported_state: exported }),
+      await executeOfflineVerification({
+        request: offlineRequest,
+        exported_state: exported,
+        artifactReader: artifactReaderFor('release export'),
+      }),
     ).toMatchObject({
       ok: false,
       phase: 'provider',
@@ -1301,6 +1460,7 @@ describe('release lifecycle execution kernel', () => {
       await executeOfflineVerification({
         request: offlineRequest,
         exported_state: exported,
+        artifactReader: artifactReaderFor('release export'),
         provider,
       }),
     ).toMatchObject({ ok: true });
@@ -1319,6 +1479,7 @@ describe('release lifecycle execution kernel', () => {
       await executeOfflineVerification({
         request: mismatched,
         exported_state: exported,
+        artifactReader: artifactReaderFor('release export'),
         provider,
       }),
     ).toMatchObject({ ok: false, code: 'release-offline-receipt-binding-invalid' });
@@ -1405,6 +1566,7 @@ describe('release lifecycle execution kernel', () => {
       offlineReceiptVerifier: {
         verify: ({ receipt: document }: { receipt: typeof receipt }) => document,
       },
+      artifactReader: artifactReaderFor('release export'),
       recorded_at: '2026-09-03T00:00:00.000Z',
     };
     const first = await withAuthorityHostTestScope(() =>
@@ -1495,7 +1657,11 @@ describe('release lifecycle execution kernel', () => {
     const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
     const authorization = authorizationBridge();
     const resolve = vi.spyOn(authorization, 'resolve');
-    const verifier = vi.fn(() => offlineReceipt());
+    const verifier = vi.fn(() =>
+      rehashReceipt(receipt, {
+        candidate: { ...objectValue(receipt['candidate']), tree: 'f'.repeat(40) },
+      }),
+    );
     const result = await withAuthorityHostTestScope(() =>
       executeReleaseLifecycleAction({
         request: value,
@@ -1505,6 +1671,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: verifier },
+        artifactReader: artifactReaderFor('release export'),
         authorization,
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
@@ -1551,6 +1718,7 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => receipt,
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+        artifactReader: artifactReaderFor('release export'),
         authorization: forged,
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',

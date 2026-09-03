@@ -24,10 +24,16 @@ import {
   type ReleaseLifecycleRequest,
   type ReleasePlanInputResolver,
   type ReleaseProvider,
+  type TrustedArtifactReader,
   type TrustedOfflineReceiptVerifier,
 } from '../../services/release-lifecycle-execution.js';
 import { buildReleasePlanReceipt } from '../../services/release-lifecycle.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../services/release-lifecycle-local-adapters.js';
+import {
+  createReleasePrepareProvider,
+  type ImmutableReleaseContentSource,
+  type TrustedArtifactSink,
+} from '../../services/release-prepare-kernel.js';
 
 interface PlanOptions {
   readonly repoRoot?: string;
@@ -77,6 +83,13 @@ export interface ReleaseLifecycleCommandAdapters {
   readonly publication_controls: (
     request: ReleaseLifecycleRequest,
   ) => PublicationControls | undefined;
+  readonly prepare_content_source?: (
+    request: ReleaseLifecycleRequest,
+  ) => ImmutableReleaseContentSource | undefined;
+  readonly artifact_sink?: (request: ReleaseLifecycleRequest) => TrustedArtifactSink | undefined;
+  readonly artifact_reader?: (
+    request: ReleaseLifecycleRequest,
+  ) => TrustedArtifactReader | undefined;
 }
 
 let commandAdapters: ReleaseLifecycleCommandAdapters | undefined;
@@ -278,59 +291,81 @@ function lifecycleAction(
             const resolvers = localResolvers(root);
             const adapters = commandAdapters;
             const remote = name === 'release evidence-publish' || name === 'release publish';
-            const provider =
-              adapters?.provider(name, request) ??
-              builtInReleaseLifecycleLocalProvider(
-                {
-                  repo_root: root,
-                  resolve_receipt: resolvers.receipt,
-                  resolve_plan_input: resolvers.plan,
-                  read_contained_bytes: (path) => readContainedBytes(root, path),
-                },
-                name,
-              );
+            const store = new ReleaseLifecycleFileStore(
+              resolve(options.stateRoot ?? join(root, '.devai/state/release-lifecycle')),
+              request,
+            );
+            let provider: ReleaseProvider | undefined;
+            if (name === 'release prepare') {
+              const contentSource = adapters?.prepare_content_source?.(request);
+              const artifactSink = adapters?.artifact_sink?.(request);
+              if (contentSource !== undefined && artifactSink !== undefined) {
+                const certifiedState = store.readStateRecords().at(-1);
+                if (certifiedState === undefined || certifiedState.state !== 'certified') {
+                  throw new Error('release-prepare-certification-manifest-invalid');
+                }
+                provider = createReleasePrepareProvider({
+                  certified_state: certifiedState,
+                  content_source: contentSource,
+                  artifact_sink: artifactSink,
+                });
+              }
+            } else {
+              provider =
+                adapters?.provider(name, request) ??
+                builtInReleaseLifecycleLocalProvider(
+                  {
+                    repo_root: root,
+                    resolve_receipt: resolvers.receipt,
+                    resolve_plan_input: resolvers.plan,
+                    read_contained_bytes: (path) => readContainedBytes(root, path),
+                  },
+                  name,
+                );
+            }
             const authorization = remote ? adapters?.authorization(request) : undefined;
             const offlineReceiptVerifier =
               name === 'release evidence-publish'
                 ? adapters?.offline_receipt_verifier(request)
                 : undefined;
+            const requiresArtifactReader =
+              name === 'release export' ||
+              name === 'release evidence-publish' ||
+              name === 'release publish';
+            const artifactReader = requiresArtifactReader
+              ? adapters?.artifact_reader?.(request)
+              : undefined;
             if (
               provider === undefined ||
               (remote && authorization === undefined) ||
-              (name === 'release evidence-publish' && offlineReceiptVerifier === undefined)
+              (name === 'release evidence-publish' && offlineReceiptVerifier === undefined) ||
+              (requiresArtifactReader && artifactReader === undefined)
             ) {
               fail(
                 name,
-                remote
-                  ? 'RELEASE_AUTHORIZATION_PROVIDER_UNAVAILABLE'
-                  : 'RELEASE_ACTION_PROVIDER_UNAVAILABLE',
+                name === 'release prepare'
+                  ? 'RELEASE_ARTIFACT_SINK_UNAVAILABLE'
+                  : remote && authorization === undefined
+                    ? 'RELEASE_AUTHORIZATION_PROVIDER_UNAVAILABLE'
+                    : 'RELEASE_ACTION_PROVIDER_UNAVAILABLE',
                 'the exact lifecycle adapter set is not installed; no store or provider effect occurred',
                 EXIT_REVIEW,
               );
               return;
             }
-            const actor = declaredInvocationAuthority();
-            if (actor === undefined) throw new Error('release-authority-context-invalid');
+            const authority = declaredInvocationAuthority();
+            if (authority === undefined) throw new Error('release-authority-context-invalid');
             const result = await executeReleaseLifecycleAction({
               request,
               action: name,
-              store: new ReleaseLifecycleFileStore(
-                resolve(options.stateRoot ?? join(root, '.devai/state/release-lifecycle')),
-                request,
-              ),
+              store,
               provider,
-              authority: {
-                actor,
-                consent: {
-                  write: true,
-                  allow_publish: remote,
-                  experimental: false,
-                },
-              },
+              authority,
               resolveReceipt: resolvers.receipt,
               resolvePlanInput: resolvers.plan,
               ...(authorization === undefined ? {} : { authorization }),
               ...(offlineReceiptVerifier === undefined ? {} : { offlineReceiptVerifier }),
+              ...(artifactReader === undefined ? {} : { artifactReader }),
               ...(name === 'release publish'
                 ? { publication_controls: adapters?.publication_controls(request) }
                 : {}),
@@ -426,7 +461,8 @@ export const releaseOfflineVerify = defineCommand({
           if (state === undefined) throw new Error('release-offline-state-missing');
           if (state.state !== 'exported') throw new Error('release-offline-state-mismatch');
           const provider = commandAdapters?.offline_verification_provider(request);
-          if (provider === undefined) {
+          const artifactReader = commandAdapters?.artifact_reader?.(request);
+          if (provider === undefined || artifactReader === undefined) {
             fail(
               'release offline-verify',
               'OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE',
@@ -439,6 +475,7 @@ export const releaseOfflineVerify = defineCommand({
             request,
             exported_state: state,
             provider,
+            artifactReader,
           });
           if (!result.ok) {
             fail('release offline-verify', result.code, result.phase, EXIT_REVIEW);

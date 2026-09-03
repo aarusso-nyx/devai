@@ -18,6 +18,7 @@ export type ActionCapability =
   | 'db:write'
   | 'db:unclassified'
   | 'host-cache:write'
+  | 'artifact-sink:write'
   | `proc:${string}`
   | `net:${string}`;
 export type AdoptionProfile = 'tier1' | 'tier2' | 'tier3';
@@ -54,7 +55,7 @@ export interface CommandMetadata {
 }
 
 export type HumanRole = 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
-export type AuthorityTargetKind = 'fs' | 'git-ref' | 'db' | 'remote';
+export type AuthorityTargetKind = 'fs' | 'git-ref' | 'db' | 'remote' | 'artifact-sink';
 
 export interface AuthorityActionContract {
   readonly schemaVersion: '1.0.0';
@@ -139,6 +140,7 @@ export function deriveActionEffectFromCapabilities(
         'db:write',
         'db:unclassified',
         'host-cache:write',
+        'artifact-sink:write',
       ].includes(capability),
     )
   ) {

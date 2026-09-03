@@ -3,15 +3,11 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
-  existsSync,
-  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   rmSync,
   symlinkSync,
-  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,6 +23,10 @@ import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release-lifecycle-local-adapters.js';
+import type {
+  ArtifactSinkObject,
+  ArtifactSinkObjectReceipt,
+} from '../../src/services/release-prepare-kernel.js';
 
 const { runChecks, declaredRole } = vi.hoisted(() => ({
   runChecks: vi.fn(),
@@ -40,15 +40,23 @@ vi.mock('../../src/services/check-runner/index.js', async (importOriginal) => ({
 vi.mock('../../src/authority/index.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/authority/index.js')>()),
   declaredInvocationAuthority: () => ({
-    kind: 'human',
-    role: declaredRole.value,
-    declaration_source: 'cli-flag',
+    actor: {
+      kind: 'human',
+      role: declaredRole.value,
+      declaration_source: 'cli-flag',
+    },
+    consent: {
+      write: true,
+      allow_publish: false,
+      experimental: false,
+    },
   }),
 }));
 
 const {
   installReleaseLifecycleCommandAdapters,
   releaseCertify,
+  releaseExport,
   releasePreflight,
   releasePrepare,
   releaseResume,
@@ -126,6 +134,7 @@ describe('release lifecycle command adapter composition', () => {
     const manifestBytes = `${canonicalJson({
       name: '@aarusso-nyx/devai',
       version: '1.5.0',
+      files: ['bin'],
       bin: { 'mode-fixture': 'bin/mode-fixture.mjs' },
     })}\n`;
     mkdirSync(join(root, 'packages/cli'), { recursive: true });
@@ -405,7 +414,9 @@ describe('release lifecycle command adapter composition', () => {
         stateRoot: join(root, 'stock-state'),
       }),
     );
-    expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"certified"'));
+    expect(output.mock.calls, JSON.stringify(errorOutput.mock.calls)).toContainEqual([
+      expect.stringContaining('"state":"certified"'),
+    ]);
 
     const prepareRequestPath = join(root, 'prepare-request.json');
     writeFileSync(
@@ -413,23 +424,11 @@ describe('release lifecycle command adapter composition', () => {
       `${canonicalJson({
         ...request,
         action_id: 'release prepare',
-        destination: {
-          kind: 'local-staging',
-          exact_identifier: '.devai/state/release-staging',
-        },
       })}\n`,
     );
-    writeFileSync(
-      join(root, 'packages/cli/package.json'),
-      `${canonicalJson({
-        name: '@aarusso-nyx/devai',
-        version: '1.5.0',
-        private_live_mutation: true,
-      })}\n`,
-    );
-    chmodSync(join(root, 'packages/cli/bin/mode-fixture.mjs'), 0o644);
     declaredRole.value = 'architect';
     output.mockClear();
+    errorOutput.mockClear();
     await withLocalMutationScope(() =>
       captureAction(releasePrepare)({
         request: prepareRequestPath,
@@ -437,86 +436,132 @@ describe('release lifecycle command adapter composition', () => {
         stateRoot: join(root, 'stock-state'),
       }),
     );
-    expect(output.mock.calls, JSON.stringify(errorOutput.mock.calls)).toContainEqual([
-      expect.stringContaining('"state":"prepared"'),
-    ]);
-    expect(
-      readFileSync(join(root, '.devai/state/release-staging/aarusso-nyx-devai-1.5.0.cdx.json')),
-    ).toBeInstanceOf(Buffer);
-    const tarballPath = join(root, '.devai/state/release-staging/aarusso-nyx-devai-1.5.0.tgz');
-    const packedManifest = spawnSync('tar', ['-xOf', tarballPath, 'package/package.json'], {
-      encoding: 'utf8',
-    });
-    expect(packedManifest.status).toBe(0);
-    expect(packedManifest.stdout).toBe(manifestBytes);
-    const packedModes = spawnSync('tar', ['-tvzf', tarballPath], { encoding: 'utf8' });
-    expect(packedModes.status).toBe(0);
-    expect(packedModes.stdout).toMatch(/^-rwxr-xr-x .* package\/bin\/mode-fixture\.mjs$/mu);
-    expect(
-      readdirSync(join(root, '.devai/state')).filter((name) =>
-        name.startsWith('.devai-release-prepare-'),
-      ),
-    ).toEqual([]);
-
-    symlinkSync('state', join(root, '.devai/linked-state'));
-    const directPrepare = builtInReleaseLifecycleLocalProvider(
-      {
-        repo_root: root,
-        resolve_receipt: () => receipt,
-        resolve_plan_input: (input) => json(join(root, String(input['path']))),
-        read_contained_bytes: (path) => readFileSync(join(root, path)),
-      },
-      'release prepare',
+    expect(output).not.toHaveBeenCalled();
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('RELEASE_ARTIFACT_SINK_UNAVAILABLE'),
     );
-    if (directPrepare === undefined) throw new Error('stock prepare adapter missing');
-    const unsafePreparation = await directPrepare({
-      ...request,
-      action_id: 'release prepare',
-      destination: { kind: 'local-staging', exact_identifier: '.devai/linked-state/escape' },
-    });
-    expect(unsafePreparation).toMatchObject({
-      outcome: 'failure',
-      code: 'release-destination-path-unsafe',
-    });
-    expect(readdirSync(join(root, '.devai/state'))).not.toContain('escape');
+    expect(
+      builtInReleaseLifecycleLocalProvider(
+        {
+          repo_root: root,
+          resolve_receipt: () => receipt,
+          resolve_plan_input: (input) => json(join(root, String(input['path']))),
+          read_contained_bytes: (path) => readFileSync(join(root, path)),
+        },
+        'release prepare',
+      ),
+    ).toBeUndefined();
 
-    const adversarial = await withLocalMutationScope(async () =>
-      directPrepare({
-        ...request,
-        action_id: 'release prepare',
-        destination: {
-          kind: 'local-staging',
-          exact_identifier: '.devai/state/adversarial-release',
+    const sinkBytes = new Map<string, Buffer>();
+    const sinkCommit = vi.fn((manifest: ArtifactSinkObjectReceipt) => ({
+      committed: true as const,
+      sink_id: 'public-cli-sink',
+      transaction_handle: 'public-cli-transaction',
+      committed_manifest_handle: manifest.opaque_handle,
+      committed_manifest_sha256: manifest.sha256,
+      committed_manifest_size_bytes: manifest.size_bytes,
+      commit_protocol: 'devai.artifact-sink.two-phase.v1' as const,
+    }));
+    const sinkAbort = vi.fn();
+    const sinkBegin = vi.fn(() => ({
+      sink_id: 'public-cli-sink',
+      transaction_handle: 'public-cli-transaction',
+      put: (artifact: ArtifactSinkObject) => {
+        const opaque_handle = `object-${artifact.sha256}`;
+        sinkBytes.set(opaque_handle, Buffer.from(artifact.bytes));
+        return {
+          sink_id: 'public-cli-sink',
+          transaction_handle: 'public-cli-transaction',
+          opaque_handle,
+          kind: artifact.kind,
+          logical_name: artifact.logical_name,
+          sha256: artifact.sha256,
+          size_bytes: artifact.size_bytes,
+          pack_spec_id: artifact.pack_spec_id,
+          pack_spec_digest_sha256: artifact.pack_spec_digest_sha256,
+        };
+      },
+      readArtifact: ({ opaque_handle }: { readonly opaque_handle: string }) =>
+        sinkBytes.get(opaque_handle) ?? Buffer.alloc(0),
+      commit: sinkCommit,
+      abort: sinkAbort,
+    }));
+    const uninstallPrepare = installReleaseLifecycleCommandAdapters({
+      provider: () => undefined,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+      prepare_content_source: () => ({
+        readGitBlob: ({ object_id }) => {
+          const result = spawnSync('git', ['-C', root, 'cat-file', 'blob', object_id]);
+          if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+            throw new Error('missing blob');
+          }
+          return result.stdout;
+        },
+        readCertificationEvidenceReceipt: () => {
+          throw new Error('unexpected certification receipt');
+        },
+        readGeneratedBlob: () => {
+          throw new Error('unexpected generated blob');
         },
       }),
+      artifact_sink: () => ({ begin: sinkBegin }),
+    });
+    cleanups.push(uninstallPrepare);
+    output.mockClear();
+    errorOutput.mockClear();
+    await withLocalMutationScope(() =>
+      captureAction(releasePrepare)({
+        request: prepareRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
     );
-    expect(adversarial).toMatchObject({ outcome: 'success' });
-    if (adversarial.outcome !== 'success' || adversarial.transaction === undefined) {
-      throw new Error('adversarial prepare transaction missing');
-    }
-    const stageName = readdirSync(join(root, '.devai/state')).find((name) =>
-      name.startsWith('.devai-release-prepare-'),
+    expect(errorOutput.mock.calls).toEqual([]);
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"prepared"'));
+    expect(sinkBegin).toHaveBeenCalledOnce();
+    expect(sinkCommit).toHaveBeenCalledOnce();
+    expect(sinkAbort).not.toHaveBeenCalled();
+    expect(sinkBytes.size).toBe(4);
+    uninstallPrepare();
+
+    const exportRequestPath = join(root, 'export-request.json');
+    writeFileSync(
+      exportRequestPath,
+      `${canonicalJson({
+        ...request,
+        action_id: 'release export',
+        provider: { kind: 'evidence-export', provider_id: 'canonical-verifier' },
+        destination: {
+          kind: 'evidence-destination',
+          exact_identifier: 'external/devai-1.5.0',
+        },
+      })}\n`,
     );
-    if (stageName === undefined) throw new Error('private prepare stage missing');
-    const stagedTarball = join(
-      root,
-      '.devai/state',
-      stageName,
-      'publish/aarusso-nyx-devai-1.5.0.tgz',
+    const exportProvider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const uninstallExport = installReleaseLifecycleCommandAdapters({
+      provider: () => exportProvider,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+    });
+    cleanups.push(uninstallExport);
+    errorOutput.mockClear();
+    await withAuthorityHostTestScope(() =>
+      captureAction(releaseExport)({
+        request: exportRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
     );
-    const hostileLink = join(root, '.devai/state/hostile-hardlink.tgz');
-    linkSync(stagedTarball, hostileLink);
-    await expect(
-      withLocalMutationScope(async () => adversarial.transaction?.commit()),
-    ).rejects.toThrow('release-staging-file-identity-invalid');
-    await withLocalMutationScope(async () => adversarial.transaction?.dispose());
-    unlinkSync(hostileLink);
-    expect(existsSync(join(root, '.devai/state/adversarial-release'))).toBe(false);
-    expect(
-      readdirSync(join(root, '.devai/state')).filter((name) =>
-        name.startsWith('.devai-release-prepare-'),
-      ),
-    ).toEqual([]);
+    expect(exportProvider).not.toHaveBeenCalled();
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('RELEASE_ACTION_PROVIDER_UNAVAILABLE'),
+    );
+    uninstallExport();
     declaredRole.value = 'inspector';
 
     output.mockClear();

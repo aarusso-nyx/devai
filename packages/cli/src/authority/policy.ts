@@ -393,7 +393,7 @@ export function buildTrustedAuthoritySources(
       subjects: [machineSubject('harness')],
       rationale: 'Article 6 verb-attributed harness state directory transition.',
     }),
-    ...['.devai/state', '.devai/state/**', 'record/proofs', 'record/proofs/**'].map((path, index) =>
+    ...['.devai/state/release-lifecycle', '.devai/state/release-lifecycle/**'].map((path, index) =>
       rule({
         id: `core-architect-release-prepare-output-${String(index + 1)}`,
         origin: 'immutable-core',
@@ -402,7 +402,7 @@ export function buildTrustedAuthoritySources(
         selector: fsSelector(repositoryId, path),
         subjects: human('architect'),
         rationale:
-          'Release prepare stages new package and proof artifacts only in canonical state or proof namespaces.',
+          'Release prepare may append only lifecycle state; artifact bytes cross the trusted sink boundary.',
       }),
     ),
     rule({

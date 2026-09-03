@@ -1,42 +1,26 @@
 import { createHash } from 'node:crypto';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import {
-  chmodSync,
-  closeReadOnlySync,
-  closeSync,
-  existsSync,
-  fileOpenConstants,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  openReadOnlyNoFollowSync,
-  openSync,
-  readFileSync,
-  readExactGitTreeSync,
-  readdirSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  spawnSync,
-  writeFileSync,
-} from '@devai-nyx/authority';
+import { dirname, relative, resolve, sep } from 'node:path';
+import { lstatSync, readExactGitTreeSync, readdirSync } from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import {
-  bindReleaseToolProcessOptions,
   parseTaskDescriptor,
   runCheckTasks,
   type CheckRunnerReport,
   type TaskDescriptor,
 } from './check-runner/index.js';
-import { resolveTaskExecutable, type ResolvedTaskExecutable } from './check-runner/executable.js';
 import type {
+  CertificationPackageEntry,
+  CertificationPackageEntryManifest,
+  PackageEvidence,
   ReleaseLifecycleRequest,
   ReleaseProvider,
   ReleaseProviderResult,
   ReleaseStateMaterial,
 } from './release-lifecycle-execution.js';
+import {
+  finalizeCertificationManifest,
+  finalizeCertificationReceipt,
+} from './release-prepare-kernel.js';
 
 type Json = Readonly<Record<string, unknown>>;
 
@@ -94,45 +78,8 @@ function receiptInput(receipt: Json, kind: string): Json {
   return matches[0] as Json;
 }
 
-function artifact(
-  path: string,
-  bytes: Buffer,
-): {
-  readonly path: string;
-  readonly sha256: string;
-  readonly size_bytes: number;
-} {
+function artifact(path: string, bytes: Buffer) {
   return { path, sha256: sha256(bytes), size_bytes: bytes.byteLength };
-}
-
-function manifestEvidence(
-  context: BuiltInReleaseLifecycleLocalContext,
-  request: ReleaseLifecycleRequest,
-) {
-  return request.candidate_locator.release_units.map((unit) => ({
-    release_unit: unit.release_unit,
-    version: unit.version,
-    packages: unit.package_roster.map((pkg) => {
-      const bytes = context.read_contained_bytes(pkg.manifest_path);
-      const manifest = object(JSON.parse(bytes.toString('utf8')) as unknown);
-      if (
-        sha256(bytes) !== pkg.manifest_digest_sha256 ||
-        manifest['name'] !== pkg.package_id ||
-        manifest['version'] !== unit.version
-      ) {
-        throw new Error('release-package-manifest-identity-mismatch');
-      }
-      return {
-        package_id: pkg.package_id,
-        manifest: artifact(pkg.manifest_path, bytes),
-        tarball: null,
-        sbom: null,
-        evidence_manifest: null,
-        provider_result: null,
-        trust: null,
-      };
-    }),
-  }));
 }
 
 function materialInputs(
@@ -267,6 +214,228 @@ function runStage(
   ];
 }
 
+function safeRelative(path: string): boolean {
+  return (
+    path.length > 0 &&
+    !path.startsWith('/') &&
+    !path.includes('\\') &&
+    path.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
+  );
+}
+
+function selectedByFiles(path: string, files: readonly string[]): boolean {
+  return (
+    path === 'package.json' || files.some((root) => path === root || path.startsWith(`${root}/`))
+  );
+}
+
+function packageFiles(manifest: Json): readonly string[] {
+  const files = manifest['files'];
+  if (
+    !Array.isArray(files) ||
+    files.length === 0 ||
+    files.some(
+      (path) =>
+        typeof path !== 'string' ||
+        !safeRelative(path) ||
+        /[*?[\]{}!]/u.test(path) ||
+        path.endsWith('/'),
+    ) ||
+    new Set(files).size !== files.length
+  ) {
+    throw new Error('release-prepare-unsupported-package-semantics');
+  }
+  return [...files].sort() as string[];
+}
+
+function walkSelectedFiles(
+  context: BuiltInReleaseLifecycleLocalContext,
+  packagePrefix: string,
+  files: readonly string[],
+): readonly {
+  readonly path: string;
+  readonly bytes: Buffer;
+  readonly mode: '100644' | '100755';
+}[] {
+  const result: { path: string; bytes: Buffer; mode: '100644' | '100755' }[] = [];
+  const root = resolve(context.repo_root, packagePrefix);
+  const visit = (relativePath: string): void => {
+    const absolute = resolve(root, relativePath);
+    const escaped = relative(root, absolute);
+    if (escaped === '..' || escaped.startsWith(`..${sep}`)) {
+      throw new Error('release-candidate-snapshot-path-invalid');
+    }
+    const stat = lstatSync(absolute);
+    if (stat.isSymbolicLink()) throw new Error('release-candidate-snapshot-unsupported-entry');
+    if (stat.isDirectory()) {
+      for (const name of readdirSync(absolute).sort()) visit(`${relativePath}/${name}`);
+      return;
+    }
+    if (!stat.isFile() || stat.nlink !== 1) {
+      throw new Error('release-candidate-snapshot-unsupported-entry');
+    }
+    const normalized = relativePath.replace(/^\.\//u, '');
+    result.push({
+      path: normalized,
+      bytes: context.read_contained_bytes(
+        packagePrefix === '.' ? normalized : `${packagePrefix}/${normalized}`,
+      ),
+      mode: (stat.mode & 0o111) === 0 ? '100644' : '100755',
+    });
+  };
+  for (const file of files) visit(file);
+  return result;
+}
+
+function certificationPackages(
+  context: BuiltInReleaseLifecycleLocalContext,
+  request: ReleaseLifecycleRequest,
+  reportGroups: readonly (readonly CheckRunnerReport[])[],
+): readonly {
+  readonly release_unit: string;
+  readonly version: string;
+  readonly packages: readonly PackageEvidence[];
+}[] {
+  return request.candidate_locator.release_units.map((unit, unitIndex) => {
+    const reports = reportGroups[unitIndex];
+    const certified = reports?.at(-1);
+    if (certified?.receipt === undefined) throw new Error('release-certify-failed');
+    return {
+      release_unit: unit.release_unit,
+      version: unit.version,
+      packages: unit.package_roster.map((pkg) => {
+        const packagePrefix = dirname(pkg.manifest_path).replaceAll('\\', '/');
+        const gitEntries = readExactGitTreeSync(
+          context.repo_root,
+          request.candidate_locator.commit,
+          request.candidate_locator.tree,
+          packagePrefix,
+        );
+        if (gitEntries.some((entry) => entry.mode !== '100644' && entry.mode !== '100755')) {
+          throw new Error('release-candidate-snapshot-unsupported-entry');
+        }
+        const manifestEntry = gitEntries.find((entry) => entry.path === pkg.manifest_path);
+        if (
+          manifestEntry === undefined ||
+          sha256(manifestEntry.bytes) !== pkg.manifest_digest_sha256
+        ) {
+          throw new Error('release-package-manifest-identity-mismatch');
+        }
+        const manifestDocument = object(
+          JSON.parse(manifestEntry.bytes.toString('utf8')) as unknown,
+        );
+        if (
+          manifestDocument['name'] !== pkg.package_id ||
+          manifestDocument['version'] !== unit.version
+        ) {
+          throw new Error('release-package-manifest-identity-mismatch');
+        }
+        const files = packageFiles(manifestDocument);
+        const packageRelative = (path: string): string =>
+          packagePrefix === '.' ? path : path.slice(packagePrefix.length + 1);
+        const entries = new Map<string, CertificationPackageEntry>();
+        for (const entry of gitEntries) {
+          const path = packageRelative(entry.path);
+          if (!selectedByFiles(path, files)) continue;
+          entries.set(path, {
+            path,
+            mode: entry.mode as '100644' | '100755',
+            size_bytes: entry.bytes.byteLength,
+            sha256: sha256(entry.bytes),
+            immutable_blob_locator: { kind: 'git-object', object_id: entry.object_id },
+          });
+        }
+        for (const entry of walkSelectedFiles(context, packagePrefix, files)) {
+          if (entries.has(entry.path)) continue;
+          const digest = sha256(entry.bytes);
+          const certificationEvidenceReceipt = finalizeCertificationReceipt({
+            candidate_commit: request.candidate_locator.commit,
+            candidate_tree: request.candidate_locator.tree,
+            task_policy_digest_sha256: certified.plan.taskPolicyDigest,
+            package_id: pkg.package_id,
+            output_blob_sha256: digest,
+          });
+          entries.set(entry.path, {
+            path: entry.path,
+            mode: entry.mode,
+            size_bytes: entry.bytes.byteLength,
+            sha256: digest,
+            immutable_blob_locator: {
+              kind: 'generated-output',
+              output_blob_sha256: digest,
+              certification_evidence_receipt: certificationEvidenceReceipt,
+            },
+          });
+        }
+        const sortedEntries = [...entries.values()].sort((left, right) =>
+          Buffer.compare(Buffer.from(left.path, 'utf8'), Buffer.from(right.path, 'utf8')),
+        );
+        const draft = {
+          candidate: {
+            commit: request.candidate_locator.commit,
+            tree: request.candidate_locator.tree,
+          },
+          task_policy_digest_sha256: certified.plan.taskPolicyDigest,
+          package_id: pkg.package_id,
+          package_version: unit.version,
+          entry_order: 'ascending-utf-8-byte-collation-by-path;duplicates-refuse' as const,
+          manifest_digest_contract: {
+            domain: 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0' as const,
+            payload:
+              'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes' as const,
+            canonicalization: 'rfc8785-jcs' as const,
+            algorithm: 'sha256' as const,
+          },
+          entries: sortedEntries,
+        };
+        const certificationManifest: CertificationPackageEntryManifest =
+          finalizeCertificationManifest(draft);
+        return {
+          package_id: pkg.package_id,
+          manifest: artifact(pkg.manifest_path, manifestEntry.bytes),
+          tarball: null,
+          sbom: null,
+          evidence_manifest: null,
+          provider_result: null,
+          trust: null,
+          certification_manifest: certificationManifest,
+        };
+      }),
+    };
+  });
+}
+
+function preflightPackages(
+  context: BuiltInReleaseLifecycleLocalContext,
+  request: ReleaseLifecycleRequest,
+) {
+  return request.candidate_locator.release_units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.package_roster.map((pkg) => {
+      const entries = readExactGitTreeSync(
+        context.repo_root,
+        request.candidate_locator.commit,
+        request.candidate_locator.tree,
+        pkg.manifest_path,
+      );
+      const manifest = entries.find((entry) => entry.path === pkg.manifest_path);
+      if (manifest === undefined || sha256(manifest.bytes) !== pkg.manifest_digest_sha256) {
+        throw new Error('release-package-manifest-identity-mismatch');
+      }
+      return {
+        package_id: pkg.package_id,
+        manifest: artifact(pkg.manifest_path, manifest.bytes),
+        tarball: null,
+        sbom: null,
+        evidence_manifest: null,
+        provider_result: null,
+        trust: null,
+      };
+    }),
+  }));
+}
+
 function checkProvider(
   context: BuiltInReleaseLifecycleLocalContext,
   action: 'release preflight' | 'release certify',
@@ -275,10 +444,11 @@ function checkProvider(
     try {
       const receipts = planReceipts(request, context.resolve_receipt);
       const stage = action === 'release preflight' ? 'preflight' : 'certify';
-      const reports = receipts.flatMap((receipt) => runStage(context, request, receipt, stage));
+      const groups = receipts.map((receipt) => runStage(context, request, receipt, stage));
+      const reports = groups.flat();
       if (
         reports.some(
-          (report) => !checkPassed(report, report.preflightReceipt ? 'preflight' : 'certify'),
+          (report) => !checkPassed(report, report.receipt === undefined ? 'preflight' : 'certify'),
         )
       ) {
         return { outcome: 'failure', code: `release-${stage}-failed` };
@@ -294,7 +464,10 @@ function checkProvider(
       return {
         outcome: 'success',
         material: {
-          release_units: manifestEvidence(context, request),
+          release_units:
+            action === 'release certify'
+              ? certificationPackages(context, request, groups)
+              : preflightPackages(context, request),
           inputs: materialInputs(receipts, reports),
           evidence: {
             manifest_digest_sha256: canonicalSha256(reports),
@@ -305,624 +478,12 @@ function checkProvider(
         },
       };
     } catch (error) {
-      return {
-        outcome: 'failure',
-        code: localErrorCode(error, 'release-local-adapter-failed'),
-      };
+      return { outcome: 'failure', code: localErrorCode(error, 'release-local-adapter-failed') };
     }
   };
 }
 
-type FileStat = NonNullable<ReturnType<typeof lstatSync>>;
-type DescriptorStat = NonNullable<ReturnType<typeof fstatSync>>;
-
-interface PinnedDirectory {
-  readonly path: string;
-  readonly descriptor: number;
-  readonly identity: DescriptorStat;
-}
-
-function sameIdentity(left: FileStat, right: DescriptorStat | FileStat): boolean {
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.mode === right.mode &&
-    left.uid === right.uid &&
-    left.gid === right.gid
-  );
-}
-
-function pinDirectory(path: string): PinnedDirectory {
-  const before = lstatSync(path);
-  if (before.isSymbolicLink() || !before.isDirectory()) {
-    throw new Error('release-destination-path-unsafe');
-  }
-  const descriptor = openReadOnlyNoFollowSync(path, true);
-  const identity = fstatSync(descriptor);
-  if (!sameIdentity(before, identity)) {
-    closeReadOnlySync(descriptor);
-    throw new Error('release-destination-identity-race');
-  }
-  return { path, descriptor, identity };
-}
-
-function assertPinnedDirectory(pin: PinnedDirectory): void {
-  const descriptorIdentity = fstatSync(pin.descriptor);
-  const pathIdentity = lstatSync(pin.path);
-  if (
-    !sameIdentity(pathIdentity, pin.identity) ||
-    !sameIdentity(pathIdentity, descriptorIdentity)
-  ) {
-    throw new Error('release-destination-identity-race');
-  }
-}
-
-function closePins(pins: readonly PinnedDirectory[]): void {
-  for (const pin of pins.toReversed()) closeReadOnlySync(pin.descriptor);
-}
-
-function destinationPins(
-  repoRoot: string,
-  requested: string,
-): {
-  readonly root: string;
-  readonly destination: string;
-  readonly parent: PinnedDirectory;
-  readonly pins: readonly PinnedDirectory[];
-} {
-  const root = realpathSync(resolve(repoRoot));
-  if (isAbsolute(requested)) throw new Error('release-destination-path-unsafe');
-  const destination = resolve(root, requested);
-  const escaped = relative(root, destination);
-  if (escaped === '' || escaped === '..' || escaped.startsWith(`..${sep}`) || isAbsolute(escaped)) {
-    throw new Error('release-destination-path-unsafe');
-  }
-  try {
-    lstatSync(destination);
-    throw new Error('release-destination-already-exists');
-  } catch (error) {
-    if (error instanceof Error && error.message === 'release-destination-already-exists')
-      throw error;
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
-  const parentPath = dirname(destination);
-  const parentRelative = relative(root, parentPath);
-  const pins: PinnedDirectory[] = [];
-  let cursor = root;
-  try {
-    pins.push(pinDirectory(cursor));
-    for (const part of parentRelative.split(sep)) {
-      if (part.length === 0) continue;
-      cursor = join(cursor, part);
-      pins.push(pinDirectory(cursor));
-    }
-    const parent = pins.at(-1);
-    if (parent === undefined || parent.path !== parentPath) {
-      throw new Error('release-destination-path-unsafe');
-    }
-    return { root, destination, parent, pins };
-  } catch (error) {
-    closePins(pins);
-    throw error;
-  }
-}
-
-function fsyncPath(path: string, directory = false): void {
-  const descriptor = openSync(
-    path,
-    fileOpenConstants.O_RDONLY |
-      (fileOpenConstants.O_NOFOLLOW ?? 0) |
-      (directory ? (fileOpenConstants.O_DIRECTORY ?? 0) : 0),
-  );
-  try {
-    fsyncSync(descriptor);
-  } finally {
-    closeSync(descriptor);
-  }
-}
-
-function createPinnedChildDirectory(
-  parent: PinnedDirectory,
-  name: string,
-  pins: PinnedDirectory[],
-): PinnedDirectory {
-  if (name.length === 0 || name === '.' || name === '..' || basename(name) !== name) {
-    throw new Error('release-destination-path-unsafe');
-  }
-  assertPinnedDirectory(parent);
-  const path = join(parent.path, name);
-  mkdirSync(path, { mode: 0o700 });
-  const pin = pinDirectory(path);
-  pins.push(pin);
-  assertPinnedDirectory(parent);
-  return pin;
-}
-
-function writePinnedFile(
-  parent: PinnedDirectory,
-  name: string,
-  bytes: Buffer,
-  executable = false,
-): void {
-  if (name.length === 0 || name === '.' || name === '..' || basename(name) !== name) {
-    throw new Error('release-candidate-snapshot-path-invalid');
-  }
-  assertPinnedDirectory(parent);
-  const path = join(parent.path, name);
-  writeFileSync(path, bytes, { flag: 'wx', mode: executable ? 0o755 : 0o644 });
-  chmodSync(path, executable ? 0o755 : 0o644);
-  const before = lstatSync(path);
-  if (before.isSymbolicLink() || !before.isFile() || before.nlink !== 1) {
-    throw new Error('release-staging-file-identity-invalid');
-  }
-  const descriptor = openReadOnlyNoFollowSync(path);
-  try {
-    const opened = fstatSync(descriptor);
-    if (!sameIdentity(before, opened) || sha256(readFileSync(descriptor)) !== sha256(bytes)) {
-      throw new Error('release-staging-file-identity-invalid');
-    }
-  } finally {
-    closeReadOnlySync(descriptor);
-  }
-  fsyncPath(path);
-  assertPinnedDirectory(parent);
-}
-
-function readPinnedFile(parent: PinnedDirectory, name: string): Buffer {
-  if (name.length === 0 || basename(name) !== name) {
-    throw new Error('release-staging-file-identity-invalid');
-  }
-  assertPinnedDirectory(parent);
-  const path = join(parent.path, name);
-  const before = lstatSync(path);
-  if (before.isSymbolicLink() || !before.isFile() || before.nlink !== 1) {
-    throw new Error('release-staging-file-identity-invalid');
-  }
-  const descriptor = openReadOnlyNoFollowSync(path);
-  try {
-    const opened = fstatSync(descriptor);
-    if (!sameIdentity(before, opened) || opened.nlink !== 1) {
-      throw new Error('release-staging-file-identity-invalid');
-    }
-    const bytes = readFileSync(descriptor);
-    if (!sameIdentity(lstatSync(path), opened)) {
-      throw new Error('release-staging-file-identity-invalid');
-    }
-    return bytes;
-  } finally {
-    closeReadOnlySync(descriptor);
-  }
-}
-
-function safeRemoveDirectory(path: string, identity: FileStat): void {
-  let observed: FileStat;
-  try {
-    observed = lstatSync(path);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-    throw error;
-  }
-  if (!sameIdentity(observed, identity) || observed.isSymbolicLink() || !observed.isDirectory()) {
-    throw new Error('release-destination-identity-race');
-  }
-  rmSync(path, { recursive: true, force: false });
-}
-
-function packedFilename(stdout: string): string {
-  const parsed = JSON.parse(stdout) as unknown;
-  if (!Array.isArray(parsed)) throw new Error('release-pack-output-invalid');
-  const first = object(parsed[0]);
-  if (typeof first['filename'] !== 'string' || first['filename'].length === 0) {
-    throw new Error('release-pack-output-invalid');
-  }
-  return first['filename'];
-}
-
-function packOnce(
-  npm: ResolvedTaskExecutable,
-  candidate: ReleaseLifecycleRequest['candidate_locator'],
-  packageRoot: string,
-  output: PinnedDirectory,
-): { readonly path: string; readonly bytes: Buffer } {
-  const result = spawnSync(
-    npm.path,
-    ['pack', '--json', '--ignore-scripts', '--pack-destination', output.path],
-    bindReleaseToolProcessOptions(
-      {
-        cwd: packageRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: false,
-      },
-      {
-        candidate: { commit: candidate.commit, tree: candidate.tree },
-        tool: 'npm',
-        executable: npm,
-        cwd: packageRoot,
-        output: output.path,
-      },
-    ),
-  );
-  if (result.status !== 0 || typeof result.stdout !== 'string') {
-    throw new Error('release-pack-failed');
-  }
-  const filename = basename(packedFilename(result.stdout));
-  const path = join(output.path, filename);
-  if (!existsSync(path)) throw new Error('release-pack-output-missing');
-  return { path, bytes: readPinnedFile(output, filename) };
-}
-
-interface CandidatePackageSnapshot {
-  readonly release_unit: string;
-  readonly package_id: string;
-  readonly version: string;
-  readonly manifest_path: string;
-  readonly package_prefix: string;
-  readonly manifest_bytes: Buffer;
-  readonly entries: ReturnType<typeof readExactGitTreeSync>;
-  readonly projection_digest: string;
-}
-
-function exactCandidatePackages(
-  context: BuiltInReleaseLifecycleLocalContext,
-  request: ReleaseLifecycleRequest,
-): readonly CandidatePackageSnapshot[] {
-  const snapshots: CandidatePackageSnapshot[] = [];
-  for (const unit of request.candidate_locator.release_units) {
-    for (const pkg of unit.package_roster) {
-      const packagePrefix = dirname(pkg.manifest_path).replaceAll('\\', '/');
-      const entries = readExactGitTreeSync(
-        context.repo_root,
-        request.candidate_locator.commit,
-        request.candidate_locator.tree,
-        packagePrefix,
-      );
-      if (entries.some((entry) => entry.mode === '120000')) {
-        throw new Error('release-candidate-snapshot-unsupported-entry');
-      }
-      const manifest = entries.find((entry) => entry.path === pkg.manifest_path);
-      if (manifest === undefined || sha256(manifest.bytes) !== pkg.manifest_digest_sha256) {
-        throw new Error('release-package-manifest-identity-mismatch');
-      }
-      const manifestDocument = object(JSON.parse(manifest.bytes.toString('utf8')) as unknown);
-      if (
-        manifestDocument['name'] !== pkg.package_id ||
-        manifestDocument['version'] !== unit.version
-      ) {
-        throw new Error('release-package-manifest-identity-mismatch');
-      }
-      const projection = entries.map((entry) => ({
-        path: entry.path,
-        mode: entry.mode,
-        object_id: entry.object_id,
-        sha256: sha256(entry.bytes),
-        size_bytes: entry.bytes.byteLength,
-      }));
-      snapshots.push({
-        release_unit: unit.release_unit,
-        package_id: pkg.package_id,
-        version: unit.version,
-        manifest_path: pkg.manifest_path,
-        package_prefix: packagePrefix,
-        manifest_bytes: manifest.bytes,
-        entries,
-        projection_digest: canonicalSha256({
-          candidate: {
-            commit: request.candidate_locator.commit,
-            tree: request.candidate_locator.tree,
-          },
-          release_unit: unit.release_unit,
-          package_id: pkg.package_id,
-          entries: projection,
-        }),
-      });
-    }
-  }
-  return snapshots;
-}
-
-function snapshotKey(releaseUnit: string, packageId: string): string {
-  return `${releaseUnit}\0${packageId}`;
-}
-
-function verifyStagedPopulation(
-  publishRoot: PinnedDirectory,
-  artifacts: readonly ReleaseStateMaterial['artifacts'][number][],
-): void {
-  const expected = artifacts
-    .filter((value) => value.kind === 'package-tarball' || value.kind === 'sbom')
-    .map((value) => ({
-      filename: basename(value.path),
-      sha256: value.sha256,
-      size_bytes: value.size_bytes,
-    }))
-    .sort((left, right) => left.filename.localeCompare(right.filename, 'en'));
-  assertPinnedDirectory(publishRoot);
-  const observed = readdirSync(publishRoot.path, { withFileTypes: true })
-    .map((entry) => {
-      if (!entry.isFile() || entry.isSymbolicLink()) {
-        throw new Error('release-staging-file-identity-invalid');
-      }
-      const path = join(publishRoot.path, entry.name);
-      const stat = lstatSync(path);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) {
-        throw new Error('release-staging-file-identity-invalid');
-      }
-      const bytes = readPinnedFile(publishRoot, entry.name);
-      return { filename: entry.name, sha256: sha256(bytes), size_bytes: bytes.byteLength };
-    })
-    .sort((left, right) => left.filename.localeCompare(right.filename, 'en'));
-  if (canonicalSha256(observed) !== canonicalSha256(expected)) {
-    throw new Error('release-staging-population-mismatch');
-  }
-}
-
-function materializePackageSnapshot(
-  snapshot: CandidatePackageSnapshot,
-  root: PinnedDirectory,
-  pins: PinnedDirectory[],
-): void {
-  for (const entry of snapshot.entries) {
-    const relativePath =
-      snapshot.package_prefix === '.'
-        ? entry.path
-        : entry.path.slice(snapshot.package_prefix.length + 1);
-    if (
-      relativePath.length === 0 ||
-      relativePath.startsWith('/') ||
-      relativePath.split('/').some((part) => part === '' || part === '.' || part === '..')
-    ) {
-      throw new Error('release-candidate-snapshot-path-invalid');
-    }
-    const parts = relativePath.split('/');
-    const filename = parts.pop();
-    if (filename === undefined) throw new Error('release-candidate-snapshot-path-invalid');
-    let parent = root;
-    for (const part of parts) {
-      const path = join(parent.path, part);
-      const existing = pins.find((pin) => pin.path === path);
-      parent = existing ?? createPinnedChildDirectory(parent, part, pins);
-      assertPinnedDirectory(parent);
-    }
-    writePinnedFile(parent, filename, entry.bytes, entry.mode === '100755');
-  }
-}
-
-function safeArtifactName(packageId: string): string {
-  return packageId
-    .replace(/^@/u, '')
-    .replaceAll('/', '-')
-    .replaceAll(/[^A-Za-z0-9._-]/gu, '-');
-}
-
-function prepareProvider(context: BuiltInReleaseLifecycleLocalContext): ReleaseProvider {
-  return (request): ReleaseProviderResult => {
-    let stageRoot = '';
-    let stageIdentity: FileStat | undefined;
-    let destinationIdentity: FileStat | undefined;
-    let committed = false;
-    let pins: PinnedDirectory[] = [];
-    try {
-      const receipts = planReceipts(request, context.resolve_receipt);
-      const destination = request.destination;
-      if (destination?.kind !== 'local-staging') {
-        throw new Error('release-destination-path-unsafe');
-      }
-      const target = destinationPins(context.repo_root, destination.exact_identifier);
-      pins = [...target.pins];
-      const destinationPath = relative(target.root, target.destination).replaceAll('\\', '/');
-      const snapshots = exactCandidatePackages(context, request);
-      const names = snapshots.map(
-        (snapshot) => `${safeArtifactName(snapshot.package_id)}-${snapshot.version}`,
-      );
-      if (new Set(names).size !== names.length) {
-        throw new Error('release-artifact-name-collision');
-      }
-      const npm = resolveTaskExecutable(target.root, 'npm');
-      stageRoot = mkdtempSync(join(target.parent.path, '.devai-release-prepare-'));
-      chmodSync(stageRoot, 0o700);
-      stageIdentity = lstatSync(stageRoot);
-      const stagePin = pinDirectory(stageRoot);
-      pins.push(stagePin);
-      const publishPin = createPinnedChildDirectory(stagePin, 'publish', pins);
-      const snapshotsPin = createPinnedChildDirectory(stagePin, 'snapshots', pins);
-      const publishRoot = publishPin.path;
-      const snapshotRoots = new Map<string, PinnedDirectory>();
-      snapshots.forEach((snapshot, index) => {
-        const snapshotRoot = createPinnedChildDirectory(
-          snapshotsPin,
-          String(index).padStart(4, '0'),
-          pins,
-        );
-        materializePackageSnapshot(snapshot, snapshotRoot, pins);
-        snapshotRoots.set(snapshotKey(snapshot.release_unit, snapshot.package_id), snapshotRoot);
-      });
-      const artifacts: ReleaseStateMaterial['artifacts'][number][] = [];
-      const preparedUnits = request.candidate_locator.release_units.map((unit) => ({
-        release_unit: unit.release_unit,
-        version: unit.version,
-        packages: unit.package_roster.map((pkg) => {
-          const snapshot = snapshots.find(
-            (value) =>
-              value.release_unit === unit.release_unit && value.package_id === pkg.package_id,
-          );
-          const packageRoot = snapshotRoots.get(snapshotKey(unit.release_unit, pkg.package_id));
-          if (snapshot === undefined || packageRoot === undefined) {
-            throw new Error('release-release-unit-bijection-invalid');
-          }
-          const firstRoot = createPinnedChildDirectory(
-            stagePin,
-            `pack-${safeArtifactName(pkg.package_id)}-first`,
-            pins,
-          );
-          const secondRoot = createPinnedChildDirectory(
-            stagePin,
-            `pack-${safeArtifactName(pkg.package_id)}-second`,
-            pins,
-          );
-          const first = packOnce(npm, request.candidate_locator, packageRoot.path, firstRoot);
-          const second = packOnce(npm, request.candidate_locator, packageRoot.path, secondRoot);
-          const observedNpm = resolveTaskExecutable(target.root, 'npm');
-          if (observedNpm.path !== npm.path || observedNpm.sha256 !== npm.sha256) {
-            throw new Error('release-toolchain-identity-mismatch');
-          }
-          const firstBytes = first.bytes;
-          const secondBytes = second.bytes;
-          if (sha256(firstBytes) !== sha256(secondBytes)) {
-            throw new Error('release-pack-nondeterministic');
-          }
-          const name = `${safeArtifactName(pkg.package_id)}-${unit.version}`;
-          writePinnedFile(publishPin, `${name}.tgz`, firstBytes);
-          const tarball = artifact(`${destinationPath}/${name}.tgz`, firstBytes);
-          const sbomDocument = {
-            bomFormat: 'CycloneDX',
-            specVersion: '1.6',
-            version: 1,
-            metadata: {
-              component: {
-                type: 'library',
-                name: pkg.package_id,
-                version: unit.version,
-                hashes: [
-                  { alg: 'SHA-256', content: tarball.sha256 },
-                  { alg: 'SHA-256', content: snapshot.projection_digest },
-                  { alg: 'SHA-256', content: npm.sha256 },
-                ],
-              },
-            },
-          };
-          const sbomBytes = Buffer.from(`${canonicalJson(sbomDocument)}\n`);
-          writePinnedFile(publishPin, `${name}.cdx.json`, sbomBytes);
-          const sbom = artifact(`${destinationPath}/${name}.cdx.json`, sbomBytes);
-          artifacts.push(
-            {
-              kind: 'manifest',
-              ...artifact(snapshot.manifest_path, snapshot.manifest_bytes),
-            },
-            { kind: 'package-tarball', ...tarball },
-            { kind: 'sbom', ...sbom },
-          );
-          return {
-            package_id: pkg.package_id,
-            manifest: artifact(snapshot.manifest_path, snapshot.manifest_bytes),
-            tarball,
-            sbom,
-            evidence_manifest: null,
-            provider_result: null,
-            trust: null,
-          };
-        }),
-      }));
-      const sortedArtifacts = artifacts.sort((left, right) =>
-        `${left.kind}\0${left.path}`.localeCompare(`${right.kind}\0${right.path}`, 'en'),
-      );
-      const snapshotBinding = snapshots.map((snapshot) => ({
-        release_unit: snapshot.release_unit,
-        package_id: snapshot.package_id,
-        projection_digest: snapshot.projection_digest,
-      }));
-      verifyStagedPopulation(publishPin, sortedArtifacts);
-      fsyncPath(publishRoot, true);
-      assertPinnedDirectory(target.parent);
-      if (lstatSync(stageRoot).dev !== target.parent.identity.dev) {
-        throw new Error('release-destination-cross-device');
-      }
-      const dispose = (): void => {
-        try {
-          if (stageIdentity !== undefined) safeRemoveDirectory(stageRoot, stageIdentity);
-        } finally {
-          closePins(pins);
-          pins = [];
-        }
-      };
-      const rollback = (): void => {
-        if (committed && destinationIdentity !== undefined) {
-          safeRemoveDirectory(target.destination, destinationIdentity);
-          fsyncPath(target.parent.path, true);
-          committed = false;
-        }
-      };
-      return {
-        outcome: 'success',
-        material: {
-          release_units: preparedUnits,
-          inputs: [
-            ...materialInputs(receipts),
-            {
-              kind: 'toolchain',
-              path: 'toolchain/npm',
-              sha256: npm.sha256,
-            },
-          ].sort((left, right) =>
-            `${left.kind}\0${left.path}`.localeCompare(`${right.kind}\0${right.path}`, 'en'),
-          ),
-          evidence: {
-            manifest_digest_sha256: canonicalSha256({
-              candidate: request.candidate_locator,
-              snapshots: snapshotBinding,
-              npm,
-              artifacts: sortedArtifacts,
-            }),
-            receipt_digests: receipts
-              .map((receipt) => String(receipt['receipt_digest_sha256']))
-              .sort(),
-            independently_checkable: true,
-          },
-          artifacts: sortedArtifacts,
-        },
-        transaction: {
-          commit: () => {
-            for (const pin of pins) assertPinnedDirectory(pin);
-            verifyStagedPopulation(publishPin, sortedArtifacts);
-            try {
-              lstatSync(target.destination);
-              throw new Error('release-destination-already-exists');
-            } catch (error) {
-              if (
-                error instanceof Error &&
-                error.message === 'release-destination-already-exists'
-              ) {
-                throw error;
-              }
-              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-            }
-            const publishIdentity = lstatSync(publishRoot);
-            if (publishIdentity.isSymbolicLink() || !publishIdentity.isDirectory()) {
-              throw new Error('release-destination-path-unsafe');
-            }
-            renameSync(publishRoot, target.destination);
-            destinationIdentity = publishIdentity;
-            committed = true;
-            const observedDestination = lstatSync(target.destination);
-            if (!sameIdentity(observedDestination, publishIdentity)) {
-              throw new Error('release-destination-identity-race');
-            }
-            fsyncPath(target.parent.path, true);
-            assertPinnedDirectory(target.parent);
-          },
-          rollback,
-          dispose,
-        },
-      };
-    } catch (error) {
-      try {
-        if (committed && destinationIdentity !== undefined && request.destination !== undefined) {
-          const destination = resolve(context.repo_root, request.destination.exact_identifier);
-          safeRemoveDirectory(destination, destinationIdentity);
-        }
-        if (stageIdentity !== undefined) safeRemoveDirectory(stageRoot, stageIdentity);
-      } finally {
-        closePins(pins);
-      }
-      return {
-        outcome: 'failure',
-        code: localErrorCode(error, 'release-prepare-failed'),
-      };
-    }
-  };
-}
-
-/** Production local adapters. Protected providers are intentionally absent. */
+/** Production local adapters. Prepare and protected providers require trusted host injection. */
 export function builtInReleaseLifecycleLocalProvider(
   context: BuiltInReleaseLifecycleLocalContext,
   action: ReleaseLifecycleRequest['action_id'],
@@ -930,6 +491,5 @@ export function builtInReleaseLifecycleLocalProvider(
   if (action === 'release preflight' || action === 'release certify') {
     return checkProvider(context, action);
   }
-  if (action === 'release prepare') return prepareProvider(context);
   return undefined;
 }

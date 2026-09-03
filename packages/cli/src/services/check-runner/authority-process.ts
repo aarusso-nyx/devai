@@ -23,16 +23,6 @@ export interface ReleaseTaskProcessBinding {
 
 const releaseTaskTokens = new WeakMap<object, ReleaseTaskProcessBinding>();
 const releaseTaskToken = Symbol('devai.release-task-process-binding');
-const releaseToolTokens = new WeakMap<object, ReleaseToolProcessBinding>();
-const releaseToolToken = Symbol('devai.release-tool-process-binding');
-
-export interface ReleaseToolProcessBinding {
-  readonly candidate: { readonly commit: string; readonly tree: string };
-  readonly tool: 'npm';
-  readonly executable: { readonly path: string; readonly sha256: string };
-  readonly cwd: string;
-  readonly output: string;
-}
 
 export function bindReleaseTaskProcessOptions<T extends object>(
   options: T,
@@ -55,35 +45,6 @@ export function bindReleaseTaskProcessOptions<T extends object>(
     value: token,
   });
   return options;
-}
-
-export function bindReleaseToolProcessOptions<T extends object>(
-  options: T,
-  binding: ReleaseToolProcessBinding,
-): T {
-  const token = Object.freeze({});
-  releaseToolTokens.set(
-    token,
-    Object.freeze({
-      ...binding,
-      candidate: Object.freeze({ ...binding.candidate }),
-      executable: Object.freeze({ ...binding.executable }),
-    }),
-  );
-  Object.defineProperty(options, releaseToolToken, {
-    configurable: false,
-    enumerable: false,
-    writable: false,
-    value: token,
-  });
-  return options;
-}
-
-export function trustedReleaseToolProcessBinding(
-  options: Readonly<Record<PropertyKey, unknown>>,
-): ReleaseToolProcessBinding | undefined {
-  const token = options[releaseToolToken];
-  return token !== null && typeof token === 'object' ? releaseToolTokens.get(token) : undefined;
 }
 
 function trustedReleaseBinding(options: Readonly<Record<PropertyKey, unknown>>) {

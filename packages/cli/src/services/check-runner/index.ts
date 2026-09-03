@@ -41,7 +41,6 @@ export {
 export { canonicalBytes, canonicalize, sha256Hex } from './canonical.js';
 export {
   bindReleaseTaskProcessOptions,
-  bindReleaseToolProcessOptions,
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
   matchDeclaredReleaseTaskProcess,

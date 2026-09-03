@@ -6,13 +6,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
 import {
   bindReleaseTaskProcessOptions,
-  bindReleaseToolProcessOptions,
   matchDeclaredReleaseTaskProcess,
   readTaskDescriptor,
   sha256Hex,
@@ -129,6 +129,43 @@ function git(root: string, args: readonly string[]): string {
 }
 
 describe('authority broker production boundary depth', () => {
+  it('exposes only the exact consent admitted by the production authority boundary', () => {
+    const allowed = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'init',
+        'bind',
+        '--constitution',
+        '--as-role',
+        'architect',
+        '--write',
+      ],
+      entries,
+    );
+    expect(allowed).toBeUndefined();
+    expect(declaredInvocationAuthority()).toEqual({
+      actor: { kind: 'human', role: 'architect', declaration_source: 'cli-flag' },
+      consent: { write: true, allow_publish: false, experimental: false },
+    });
+
+    const refused = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'init',
+        'bind',
+        '--constitution',
+        '--as-role',
+        'engineer',
+        '--write',
+      ],
+      entries,
+    );
+    expect(refused).toMatchObject({ exit_code: 2 });
+    expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
   it('admits only exact declared check tasks for stock release preflight execution', () => {
     const host = broker('release preflight', 'inspector', [
       process.execPath,
@@ -203,7 +240,7 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
-  it('admits only the exact contained package command for stock release preparation', () => {
+  it('admits no process execution for pure release preparation', () => {
     const host = broker('release prepare', 'architect', [
       process.execPath,
       'devai',
@@ -215,62 +252,16 @@ describe('authority broker production boundary depth', () => {
       'architect',
       '--write',
     ]);
-    const exact = [
-      'pack',
-      '--json',
-      '--ignore-scripts',
-      '--pack-destination',
-      join(ROOT, '.devai/state'),
-    ];
-    const npm = resolveTaskExecutable(ROOT, 'npm');
-    const packCwd = realpathSync(join(ROOT, 'packages/cli'));
-    const packOutput = realpathSync(join(ROOT, '.devai/state'));
-    const candidate = {
-      commit: git(ROOT, ['rev-parse', 'HEAD']),
-      tree: git(ROOT, ['rev-parse', 'HEAD^{tree}']),
-    };
-    const options = bindReleaseToolProcessOptions(
-      { cwd: packCwd, shell: false },
-      { candidate, tool: 'npm', executable: npm, cwd: packCwd, output: packOutput },
-    );
     try {
-      expect(
-        host.scope.apply_effect(
-          effect('spawnSync', [npm.path, exact, options], 'process'),
-          () => 'applied',
-        ),
-      ).toBe('applied');
-      const forgedIdentityOptions = bindReleaseToolProcessOptions(
-        { cwd: packCwd, shell: false },
-        {
-          candidate,
-          tool: 'npm',
-          executable: { ...npm, sha256: '0'.repeat(64) },
-          cwd: packCwd,
-          output: packOutput,
-        },
-      );
-      expect(() =>
-        host.scope.apply_effect(
-          effect('spawnSync', [npm.path, exact, forgedIdentityOptions], 'process'),
-          () => 'forbidden',
-        ),
-      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
       expect(() =>
         host.scope.apply_effect(
           effect(
             'spawnSync',
-            ['npm', [...exact, '--foreground-scripts'], { cwd: join(ROOT, 'packages/cli') }],
-            'process',
-          ),
-          () => 'forbidden',
-        ),
-      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
-      expect(() =>
-        host.scope.apply_effect(
-          effect(
-            'spawnSync',
-            ['npm', exact, { cwd: join(ROOT, 'packages/cli'), shell: true }],
+            [
+              'npm',
+              ['pack', '--ignore-scripts'],
+              { cwd: join(ROOT, 'packages/cli'), shell: false },
+            ],
             'process',
           ),
           () => 'forbidden',

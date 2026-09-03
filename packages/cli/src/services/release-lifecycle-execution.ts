@@ -19,6 +19,7 @@ import { parsers } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { verifyReleasePlanReceipt } from './release-lifecycle.js';
+import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
 
 export const RELEASE_ACTIONS = [
   'release plan',
@@ -45,10 +46,75 @@ export type PersistedReleaseState =
   | 'evidence_published'
   | 'publication_dispatched';
 
-export interface ArtifactIdentity {
+export interface LegacyArtifactIdentity {
   readonly path: string;
   readonly sha256: string;
   readonly size_bytes: number;
+}
+
+export interface OpaqueArtifactIdentity {
+  readonly kind:
+    | 'package-manifest'
+    | 'package-tarball'
+    | 'package-sbom'
+    | 'evidence-manifest'
+    | 'provider-result';
+  readonly sink_id: string;
+  readonly opaque_handle: string;
+  readonly sha256: string;
+  readonly size_bytes: number;
+}
+
+export type ArtifactIdentity = LegacyArtifactIdentity | OpaqueArtifactIdentity;
+
+export interface ArtifactSinkCommitIdentity {
+  readonly sink_id: string;
+  readonly transaction_handle: string;
+  readonly committed_manifest_handle: string;
+  readonly committed_manifest_sha256: string;
+  readonly committed_manifest_size_bytes: number;
+  readonly commit_protocol: 'devai.artifact-sink.two-phase.v1';
+}
+
+export interface CertificationPackageEntry {
+  readonly path: string;
+  readonly mode: '100644' | '100755';
+  readonly size_bytes: number;
+  readonly sha256: string;
+  readonly immutable_blob_locator:
+    | { readonly kind: 'git-object'; readonly object_id: string }
+    | {
+        readonly kind: 'generated-output';
+        readonly output_blob_sha256: string;
+        readonly certification_evidence_receipt: {
+          readonly kind: 'release-certification-evidence-receipt-v1';
+          readonly receipt_digest_sha256: string;
+          readonly canonicalization: 'utf-8-rfc8785-jcs-sha256';
+          readonly referent: {
+            readonly candidate_commit: string;
+            readonly candidate_tree: string;
+            readonly task_policy_digest_sha256: string;
+            readonly package_id: string;
+            readonly output_blob_sha256: string;
+          };
+        };
+      };
+}
+
+export interface CertificationPackageEntryManifest {
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly task_policy_digest_sha256: string;
+  readonly package_id: string;
+  readonly package_version: string;
+  readonly entry_order: 'ascending-utf-8-byte-collation-by-path;duplicates-refuse';
+  readonly manifest_digest_contract: {
+    readonly domain: 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0';
+    readonly payload: 'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes';
+    readonly canonicalization: 'rfc8785-jcs';
+    readonly algorithm: 'sha256';
+  };
+  readonly entries: readonly CertificationPackageEntry[];
+  readonly manifest_digest_sha256: string;
 }
 
 export interface TrustIdentity {
@@ -96,12 +162,28 @@ export interface ReleaseLifecycleRequest extends Readonly<Record<string, unknown
 
 export interface PackageEvidence {
   readonly package_id: string;
-  readonly manifest: ArtifactIdentity | null;
-  readonly tarball: ArtifactIdentity | null;
-  readonly sbom: ArtifactIdentity | null;
+  readonly manifest?: LegacyArtifactIdentity | null;
+  readonly tarball?: LegacyArtifactIdentity | null;
+  readonly sbom?: LegacyArtifactIdentity | null;
+  readonly package_manifest?: OpaqueArtifactIdentity | null;
+  readonly package_tarball?: OpaqueArtifactIdentity | null;
+  readonly package_sbom?: OpaqueArtifactIdentity | null;
   readonly evidence_manifest: ArtifactIdentity | null;
   readonly provider_result: ArtifactIdentity | null;
   readonly trust: TrustIdentity | null;
+  readonly certification_manifest?: CertificationPackageEntryManifest | null;
+}
+
+function packageManifest(pkg: PackageEvidence): ArtifactIdentity | null {
+  return pkg.package_manifest ?? pkg.manifest ?? null;
+}
+
+function packageTarball(pkg: PackageEvidence): ArtifactIdentity | null {
+  return pkg.package_tarball ?? pkg.tarball ?? null;
+}
+
+function packageSbom(pkg: PackageEvidence): ArtifactIdentity | null {
+  return pkg.package_sbom ?? pkg.sbom ?? null;
 }
 
 export interface ReleaseUnitEvidence {
@@ -122,12 +204,10 @@ export interface ReleaseStateMaterial {
     readonly receipt_digests: readonly string[];
     readonly independently_checkable: true;
   };
-  readonly artifacts: readonly {
-    readonly kind: string;
-    readonly path: string;
-    readonly sha256: string;
-    readonly size_bytes: number;
-  }[];
+  readonly artifacts: readonly (
+    (LegacyArtifactIdentity & { readonly kind: string }) | OpaqueArtifactIdentity
+  )[];
+  readonly artifact_sink?: ArtifactSinkCommitIdentity | null;
 }
 
 export interface TrustedReleaseAuthority {
@@ -160,7 +240,7 @@ export interface PublicationControls {
 }
 
 export interface ReleaseLifecycleStateV2 extends Readonly<Record<string, unknown>> {
-  readonly schemaVersion: '2.0.0';
+  readonly schemaVersion: '2.0.0' | '2.1.0';
   readonly state_id: string;
   readonly state: PersistedReleaseState;
   readonly action_id: PersistedReleaseAction;
@@ -175,6 +255,7 @@ export interface ReleaseLifecycleStateV2 extends Readonly<Record<string, unknown
   readonly prior_state: StateReference | null;
   readonly storage: { readonly generation: number; readonly head_before: StateStorageHead | null };
   readonly record_digest_sha256: string;
+  readonly artifact_sink?: ArtifactSinkCommitIdentity | null;
 }
 
 export interface StateReference {
@@ -251,6 +332,13 @@ export interface ReleaseProviderResult {
 export type ReleaseProvider = (
   request: ReleaseLifecycleRequest,
 ) => ReleaseProviderResult | Promise<ReleaseProviderResult>;
+
+export interface TrustedArtifactReader {
+  readonly readArtifact: (input: {
+    readonly sink_id: string;
+    readonly opaque_handle: string;
+  }) => Buffer | Promise<Buffer>;
+}
 
 export type OfflineVerificationProvider = (
   request: ReleaseLifecycleRequest,
@@ -443,6 +531,7 @@ export function validateReleaseLifecycleRequest(
     request.candidate_locator.release_units.map((unit) => `${unit.release_unit}\0${unit.version}`),
     'release-release-unit-bijection-invalid',
   );
+
   for (const unit of request.candidate_locator.release_units) {
     assertSortedUnique(
       unit.package_roster.map((pkg) => pkg.package_id),
@@ -635,10 +724,12 @@ export function verifyReleaseStateIdentity(value: unknown, write = false): Relea
   const parsed = parsers.releaseLifecycleState.safeParse<ReleaseLifecycleStateV2>(value);
   if (!parsed.ok) throw new Error('release-state-schema-invalid');
   const state = parsed.value;
-  if (write && state.schemaVersion !== '2.0.0') throw new Error('release-state-v1-write-refused');
+  if (write && state.schemaVersion !== '2.0.0' && state.schemaVersion !== '2.1.0') {
+    throw new Error('release-state-v1-write-refused');
+  }
   const projection = without(
     state,
-    state.schemaVersion === '2.0.0'
+    state.schemaVersion === '2.0.0' || state.schemaVersion === '2.1.0'
       ? ['state_id', 'record_digest_sha256']
       : ['record_digest_sha256'],
   );
@@ -646,7 +737,10 @@ export function verifyReleaseStateIdentity(value: unknown, write = false): Relea
   if (state.record_digest_sha256 !== digest) {
     throw new Error('release-state-id-or-digest-mismatch');
   }
-  if (state.schemaVersion === '2.0.0' && state.state_id !== `RLS-${digest.slice(0, 16)}`) {
+  if (
+    (state.schemaVersion === '2.0.0' || state.schemaVersion === '2.1.0') &&
+    state.state_id !== `RLS-${digest.slice(0, 16)}`
+  ) {
     throw new Error('release-state-id-or-digest-mismatch');
   }
   return state;
@@ -1587,6 +1681,15 @@ function assertMaterialBijection(
   action: PersistedReleaseAction,
   material: ReleaseStateMaterial,
 ): void {
+  if (
+    (action === 'release prepare' || action === 'release export') &&
+    material.artifact_sink == null
+  ) {
+    throw new Error('release-artifact-sink-protocol-invalid');
+  }
+  const taskPolicyDigests = new Set(
+    material.inputs.filter((entry) => entry.kind === 'task-policy').map((entry) => entry.sha256),
+  );
   const requested = request.candidate_locator.release_units.map((unit) => ({
     release_unit: unit.release_unit,
     version: unit.version,
@@ -1603,20 +1706,62 @@ function assertMaterialBijection(
     if (requestUnit === undefined) throw new Error('release-release-unit-bijection-invalid');
     for (const [packageIndex, pkg] of unit.packages.entries()) {
       const requestPackage = requestUnit.package_roster[packageIndex];
+      const manifestIdentity = packageManifest(pkg);
+      const tarballIdentity = packageTarball(pkg);
+      const sbomIdentity = packageSbom(pkg);
+      if (requestPackage === undefined || manifestIdentity === null) {
+        throw new Error('release-release-unit-bijection-invalid');
+      }
+      const certifiedPackageManifest = pkg.certification_manifest?.entries.find(
+        (entry) => entry.path === 'package.json',
+      );
       if (
-        requestPackage === undefined ||
-        pkg.manifest === null ||
-        pkg.manifest.path !== requestPackage.manifest_path ||
-        pkg.manifest.sha256 !== requestPackage.manifest_digest_sha256
+        action === 'release preflight' ||
+        (action === 'release certify' && pkg.certification_manifest === undefined)
+      ) {
+        if (
+          !('path' in manifestIdentity) ||
+          manifestIdentity.path !== requestPackage.manifest_path ||
+          manifestIdentity.sha256 !== requestPackage.manifest_digest_sha256
+        ) {
+          throw new Error('release-release-unit-bijection-invalid');
+        }
+      } else if (
+        certifiedPackageManifest?.sha256 !== requestPackage.manifest_digest_sha256 ||
+        ('kind' in manifestIdentity && manifestIdentity.kind !== 'package-manifest')
       ) {
         throw new Error('release-release-unit-bijection-invalid');
+      }
+      if (
+        action !== 'release preflight' &&
+        action !== 'release certify' &&
+        (pkg.manifest !== undefined ||
+          pkg.tarball !== undefined ||
+          pkg.sbom !== undefined ||
+          pkg.package_manifest?.kind !== 'package-manifest' ||
+          pkg.package_tarball?.kind !== 'package-tarball' ||
+          pkg.package_sbom?.kind !== 'package-sbom')
+      ) {
+        throw new Error('release-release-unit-bijection-invalid');
+      }
+      if (
+        action === 'release certify' &&
+        pkg.certification_manifest !== undefined &&
+        pkg.certification_manifest !== null
+      ) {
+        verifyCertificationManifest(pkg.certification_manifest, {
+          request,
+          package_id: requestPackage.package_id,
+          package_version: requestUnit.version,
+          task_policy_digests: taskPolicyDigests,
+        });
       }
       if (
         (action === 'release prepare' ||
           action === 'release export' ||
           action === 'release evidence-publish' ||
           action === 'release publish') &&
-        (pkg.tarball === null || pkg.sbom === null)
+        (tarballIdentity === null || sbomIdentity === null)
       ) {
         throw new Error('release-release-unit-bijection-invalid');
       }
@@ -1624,36 +1769,90 @@ function assertMaterialBijection(
         (action === 'release export' ||
           action === 'release evidence-publish' ||
           action === 'release publish') &&
-        (pkg.evidence_manifest === null || pkg.provider_result === null || pkg.trust === null)
+        (pkg.evidence_manifest == null || pkg.provider_result == null || pkg.trust === null)
+      ) {
+        throw new Error('release-release-unit-bijection-invalid');
+      }
+      if (
+        (action === 'release export' ||
+          action === 'release evidence-publish' ||
+          action === 'release publish') &&
+        (pkg.evidence_manifest == null ||
+          !('kind' in pkg.evidence_manifest) ||
+          pkg.evidence_manifest.kind !== 'evidence-manifest' ||
+          pkg.provider_result == null ||
+          !('kind' in pkg.provider_result) ||
+          pkg.provider_result.kind !== 'provider-result')
       ) {
         throw new Error('release-release-unit-bijection-invalid');
       }
     }
   }
   if (action === 'release preflight' || action === 'release certify') return;
-  const topByKey = new Map<string, Readonly<Record<string, unknown>>>();
+  const topByKey = new Map<string, unknown>();
   for (const artifact of material.artifacts) {
-    const key = `${artifact.kind}\0${artifact.path}`;
+    const key =
+      'opaque_handle' in artifact
+        ? `${artifact.kind}\0${artifact.sink_id}\0${artifact.opaque_handle}`
+        : `${artifact.kind}\0${artifact.path}`;
     if (topByKey.has(key)) throw new Error('release-release-unit-bijection-invalid');
     topByKey.set(key, artifact);
   }
-  const requiredTop: Readonly<Record<string, unknown>>[] = [];
+  const requiredTop: unknown[] = [];
   for (const unit of material.release_units) {
     for (const pkg of unit.packages) {
-      if (pkg.manifest !== null) requiredTop.push({ kind: 'manifest', ...pkg.manifest });
-      if (pkg.tarball !== null) requiredTop.push({ kind: 'package-tarball', ...pkg.tarball });
-      if (pkg.sbom !== null) requiredTop.push({ kind: 'sbom', ...pkg.sbom });
+      const manifestIdentity = packageManifest(pkg);
+      const tarballIdentity = packageTarball(pkg);
+      const sbomIdentity = packageSbom(pkg);
+      if (manifestIdentity !== null)
+        requiredTop.push(
+          'kind' in manifestIdentity ? manifestIdentity : { kind: 'manifest', ...manifestIdentity },
+        );
+      if (tarballIdentity !== null)
+        requiredTop.push(
+          'kind' in tarballIdentity
+            ? tarballIdentity
+            : { kind: 'package-tarball', ...tarballIdentity },
+        );
+      if (sbomIdentity !== null)
+        requiredTop.push('kind' in sbomIdentity ? sbomIdentity : { kind: 'sbom', ...sbomIdentity });
       if (pkg.evidence_manifest !== null)
-        requiredTop.push({ kind: 'manifest', ...pkg.evidence_manifest });
+        requiredTop.push(
+          'kind' in pkg.evidence_manifest
+            ? pkg.evidence_manifest
+            : { kind: 'manifest', ...pkg.evidence_manifest },
+        );
       if (pkg.provider_result !== null)
-        requiredTop.push({ kind: 'provider-result', ...pkg.provider_result });
+        requiredTop.push(
+          'kind' in pkg.provider_result
+            ? pkg.provider_result
+            : { kind: 'provider-result', ...pkg.provider_result },
+        );
     }
   }
   for (const artifact of requiredTop) {
-    const key = `${String(artifact['kind'])}\0${String(artifact['path'])}`;
+    const artifactRecord = object(artifact);
+    const key =
+      typeof artifactRecord['opaque_handle'] === 'string'
+        ? `${String(artifactRecord['kind'])}\0${String(artifactRecord['sink_id'])}\0${artifactRecord['opaque_handle']}`
+        : `${String(artifactRecord['kind'])}\0${String(artifactRecord['path'])}`;
     if (!same(topByKey.get(key), artifact)) {
       throw new Error('release-release-unit-bijection-invalid');
     }
+  }
+  const projectionKey = (value: unknown): string => {
+    const artifact = object(value);
+    return `${String(artifact['kind'])}\0${String(artifact['sink_id'])}\0${String(artifact['opaque_handle'])}\0${String(artifact['sha256'])}\0${String(artifact['size_bytes'])}`;
+  };
+  const expected = [...requiredTop].sort((left, right) =>
+    Buffer.compare(Buffer.from(projectionKey(left)), Buffer.from(projectionKey(right))),
+  );
+  if (
+    material.artifacts.length !== expected.length ||
+    new Set(material.artifacts.map(projectionKey)).size !== material.artifacts.length ||
+    !same(material.artifacts, expected)
+  ) {
+    throw new Error('release-release-unit-bijection-invalid');
   }
 }
 
@@ -1673,11 +1872,22 @@ function assertStateMatchesRequest(
   const observed = state.release_units.map((unit) => ({
     release_unit: unit.release_unit,
     version: unit.version,
-    packages: unit.packages.map((pkg) => ({
-      package_id: pkg.package_id,
-      manifest_path: pkg.manifest?.path,
-      manifest_digest_sha256: pkg.manifest?.sha256,
-    })),
+    packages: unit.packages.map((pkg) => {
+      const identity = packageManifest(pkg);
+      return {
+        package_id: pkg.package_id,
+        manifest_path:
+          identity !== null && 'path' in identity
+            ? identity.path
+            : request.candidate_locator.release_units
+                .find((candidate) => candidate.release_unit === unit.release_unit)
+                ?.package_roster.find((candidate) => candidate.package_id === pkg.package_id)
+                ?.manifest_path,
+        manifest_digest_sha256:
+          pkg.certification_manifest?.entries.find((entry) => entry.path === 'package.json')
+            ?.sha256 ?? identity?.sha256,
+      };
+    }),
   }));
   if (
     !same(state.repository, request.repository_locator) ||
@@ -1695,20 +1905,54 @@ function sortedArtifacts(values: readonly unknown[]): readonly unknown[] {
 }
 
 function offlineArtifactProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
+  if (state.schemaVersion === '2.1.0') {
+    return state['artifacts'] as readonly unknown[];
+  }
   const allowed = new Set(['package-tarball', 'evidence-bundle', 'manifest', 'attestation']);
   const artifacts: unknown[] = (state['artifacts'] as readonly Readonly<Record<string, unknown>>[])
     .filter((artifact) => allowed.has(String(artifact['kind'])))
     .map((artifact) => artifact);
   for (const unit of state.release_units) {
     for (const pkg of unit.packages) {
-      if (pkg.manifest !== null) artifacts.push({ kind: 'manifest', ...pkg.manifest });
-      if (pkg.tarball !== null) artifacts.push({ kind: 'package-tarball', ...pkg.tarball });
+      const manifestIdentity = packageManifest(pkg);
+      const tarballIdentity = packageTarball(pkg);
+      if (manifestIdentity !== null)
+        artifacts.push(
+          'kind' in manifestIdentity ? manifestIdentity : { kind: 'manifest', ...manifestIdentity },
+        );
+      if (tarballIdentity !== null)
+        artifacts.push(
+          'kind' in tarballIdentity
+            ? tarballIdentity
+            : { kind: 'package-tarball', ...tarballIdentity },
+        );
       if (pkg.evidence_manifest !== null)
-        artifacts.push({ kind: 'manifest', ...pkg.evidence_manifest });
+        artifacts.push(
+          'kind' in pkg.evidence_manifest
+            ? pkg.evidence_manifest
+            : { kind: 'manifest', ...pkg.evidence_manifest },
+        );
     }
   }
   const unique = new Map(artifacts.map((artifact) => [canonicalJson(artifact), artifact]));
   return sortedArtifacts([...unique.values()]);
+}
+
+function offlineReleaseUnitsProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
+  if (state.schemaVersion !== '2.1.0') return state.release_units;
+  return state.release_units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.packages.map((pkg) => ({
+      package_id: pkg.package_id,
+      package_manifest: pkg.package_manifest,
+      package_tarball: pkg.package_tarball,
+      package_sbom: pkg.package_sbom,
+      evidence_manifest: pkg.evidence_manifest,
+      provider_result: pkg.provider_result,
+      trust: pkg.trust,
+    })),
+  }));
 }
 
 function assertPriorMaterialContinuity(
@@ -1722,7 +1966,8 @@ function assertPriorMaterialContinuity(
       !same(material.release_units, prior.release_units) ||
       !same(material.inputs, prior['inputs']) ||
       !same(material.evidence, prior['evidence']) ||
-      !same(material.artifacts, prior['artifacts'])
+      !same(material.artifacts, prior['artifacts']) ||
+      !same(material.artifact_sink, prior.artifact_sink)
     ) {
       throw new Error('release-evidence-binding-invalid');
     }
@@ -1738,11 +1983,25 @@ function assertPriorMaterialContinuity(
         'manifest',
         'tarball',
         'sbom',
+        'package_manifest',
+        'package_tarball',
+        'package_sbom',
         'evidence_manifest',
         'provider_result',
         'trust',
+        'certification_manifest',
       ] as const) {
-        if (priorPackage[key] !== null && !same(priorPackage[key], nextPackage[key])) {
+        if (
+          action === 'release prepare' &&
+          (key === 'manifest' || key === 'tarball' || key === 'sbom')
+        ) {
+          continue;
+        }
+        if (
+          priorPackage[key] !== null &&
+          priorPackage[key] !== undefined &&
+          !same(priorPackage[key], nextPackage[key])
+        ) {
           throw new Error('release-evidence-binding-invalid');
         }
       }
@@ -1773,13 +2032,11 @@ function assertReceiptContinuity(
   const receipt = offline[0]?.value;
   if (
     receipt === undefined ||
-    receipt['schemaVersion'] !== '2.0.0' ||
+    receipt['schemaVersion'] !== prior.schemaVersion ||
     !same(receipt['verified_state'], stateReference(prior)) ||
-    !same(receipt['release_units'], prior.release_units) ||
-    !same(
-      sortedArtifacts(receipt['artifacts'] as readonly unknown[]),
-      offlineArtifactProjection(prior),
-    ) ||
+    !same(receipt['release_units'], offlineReleaseUnitsProjection(prior)) ||
+    !same(receipt['artifacts'], offlineArtifactProjection(prior)) ||
+    !same(receipt['artifact_sink_commit'], prior.artifact_sink) ||
     !Array.isArray(receipt['release_units']) ||
     !(receipt['release_units'] as readonly unknown[]).every((unit, unitIndex) => {
       const packages = object(unit)['packages'];
@@ -1830,8 +2087,13 @@ function buildState(
     receipt_digest_sha256: receipt.receipt_digest_sha256,
     verdict: 'pass' as const,
   }));
+  const artifactSink = material.artifact_sink ?? prior?.artifact_sink ?? null;
+  const schemaVersion =
+    request.action_id === 'release prepare' || prior?.schemaVersion === '2.1.0'
+      ? ('2.1.0' as const)
+      : ('2.0.0' as const);
   return finalizeReleaseStateV2({
-    schemaVersion: '2.0.0',
+    schemaVersion,
     canonicalization: STATE_CANONICALIZATION,
     state,
     action_id: request.action_id,
@@ -1849,6 +2111,7 @@ function buildState(
     inputs: material.inputs,
     evidence: material.evidence,
     artifacts: material.artifacts,
+    ...(schemaVersion === '2.1.0' ? { artifact_sink: artifactSink } : {}),
     actor: authority.actor,
     consent: authority.consent,
     authorization_event_id: authorizationEventId,
@@ -1885,6 +2148,7 @@ export async function executeReleaseLifecycleAction(input: {
   readonly resolveReceipt?: ReceiptResolver;
   readonly resolvePlanInput?: ReleasePlanInputResolver;
   readonly offlineReceiptVerifier?: TrustedOfflineReceiptVerifier;
+  readonly artifactReader?: TrustedArtifactReader;
   readonly recorded_at: string;
 }): Promise<ExecuteReleaseResult> {
   let request: ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction };
@@ -2003,6 +2267,14 @@ export async function executeReleaseLifecycleAction(input: {
           return { ok: false, phase: 'validation', code: 'release-state-transition-invalid' };
         }
         assertReceiptContinuity(request, receipts, stateHead);
+        if (
+          stateHead !== null &&
+          (request.action_id === 'release export' ||
+            request.action_id === 'release evidence-publish' ||
+            request.action_id === 'release publish')
+        ) {
+          await reverifySinkArtifacts(stateHead, input.artifactReader);
+        }
         if (request.action_id === 'release evidence-publish') {
           const offline = receipts.find(
             (receipt) => receipt.kind === 'release-offline-verification-receipt',
@@ -2391,6 +2663,7 @@ export async function executeOfflineVerification(input: {
   readonly request: unknown;
   readonly exported_state: unknown;
   readonly provider?: OfflineVerificationProvider;
+  readonly artifactReader?: TrustedArtifactReader;
 }): Promise<OfflineVerificationResult> {
   let request: ReleaseLifecycleRequest;
   let state: ReleaseLifecycleStateV2;
@@ -2414,7 +2687,9 @@ export async function executeOfflineVerification(input: {
         independently_checkable: true,
       },
       artifacts: state['artifacts'] as ReleaseStateMaterial['artifacts'],
+      artifact_sink: state.artifact_sink,
     });
+    await reverifySinkArtifacts(state, input.artifactReader);
   } catch (error) {
     return {
       ok: false,
@@ -2448,7 +2723,7 @@ export async function executeOfflineVerification(input: {
       return Array.isArray(packages) && packages.every((pkg) => same(object(pkg)['trust'], trust));
     });
   if (
-    receipt['schemaVersion'] !== '2.0.0' ||
+    receipt['schemaVersion'] !== state.schemaVersion ||
     receipt['receipt_digest_sha256'] !== digest ||
     receipt['receipt_id'] !== `ROV-${digest.slice(0, 16)}` ||
     receipt['verdict'] !== 'pass' ||
@@ -2456,11 +2731,9 @@ export async function executeOfflineVerification(input: {
     !same(receipt['repository'], state.repository) ||
     !same(receipt['candidate'], state.candidate) ||
     !same(receipt['verified_state'], expectedState) ||
-    !same(releaseUnits, state.release_units) ||
-    !same(
-      sortedArtifacts(receipt['artifacts'] as readonly unknown[]),
-      offlineArtifactProjection(state),
-    ) ||
+    !same(releaseUnits, offlineReleaseUnitsProjection(state)) ||
+    !same(receipt['artifacts'], offlineArtifactProjection(state)) ||
+    !same(receipt['artifact_sink_commit'], state.artifact_sink) ||
     !trustMatches
   ) {
     return { ok: false, phase: 'validation', code: 'release-offline-receipt-binding-invalid' };
@@ -2491,12 +2764,17 @@ export function reduceReleaseStates(values: readonly unknown[]): StateReduction 
       }
       if (!same(state.prior_state, stateReference(prior)))
         errors.add('release-state-predecessor-mismatch');
-      const stateGeneration = state.schemaVersion === '2.0.0' ? state.storage.generation : index;
+      const stateGeneration =
+        state.schemaVersion === '2.0.0' || state.schemaVersion === '2.1.0'
+          ? state.storage.generation
+          : index;
       const priorGeneration =
-        prior.schemaVersion === '2.0.0' ? prior.storage.generation : index - 1;
+        prior.schemaVersion === '2.0.0' || prior.schemaVersion === '2.1.0'
+          ? prior.storage.generation
+          : index - 1;
       if (
         stateGeneration !== priorGeneration + 1 ||
-        (state.schemaVersion === '2.0.0' &&
+        ((state.schemaVersion === '2.0.0' || state.schemaVersion === '2.1.0') &&
           !same(state.storage.head_before, {
             generation: priorGeneration,
             record_digest_sha256: prior.record_digest_sha256,
@@ -2780,11 +3058,9 @@ export async function resumeReleaseLifecycleExecution(input: {
         exported !== undefined &&
         exported !== null &&
         same(receipt['candidate'], exported.candidate) &&
-        same(receipt['release_units'], exported.release_units) &&
-        same(
-          sortedArtifacts(receipt['artifacts'] as readonly unknown[]),
-          offlineArtifactProjection(exported),
-        ) &&
+        same(receipt['release_units'], offlineReleaseUnitsProjection(exported)) &&
+        same(receipt['artifacts'], offlineArtifactProjection(exported)) &&
+        same(receipt['artifact_sink_commit'], exported.artifact_sink) &&
         input.offline_receipt_verifier !== undefined &&
         same(
           verifyReceiptDocument(
@@ -2798,11 +3074,22 @@ export async function resumeReleaseLifecycleExecution(input: {
                     release_unit: input.candidate.release_unit,
                     version: input.candidate.version,
                     package_roster:
-                      exported.release_units[0]?.packages.map((pkg) => ({
-                        package_id: pkg.package_id,
-                        manifest_path: pkg.manifest?.path ?? 'package.json',
-                        manifest_digest_sha256: pkg.manifest?.sha256 ?? '0'.repeat(64),
-                      })) ?? [],
+                      exported.release_units[0]?.packages.map((pkg) => {
+                        const identity = packageManifest(pkg);
+                        return {
+                          package_id: pkg.package_id,
+                          manifest_path:
+                            identity !== null && 'path' in identity
+                              ? identity.path
+                              : 'package.json',
+                          manifest_digest_sha256:
+                            pkg.certification_manifest?.entries.find(
+                              (entry) => entry.path === 'package.json',
+                            )?.sha256 ??
+                            identity?.sha256 ??
+                            '0'.repeat(64),
+                        };
+                      }) ?? [],
                   },
                 ],
               },

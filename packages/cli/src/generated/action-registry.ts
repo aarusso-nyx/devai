@@ -1414,7 +1414,7 @@ export const ACTION_REGISTRY = [
     effect: 'local-write',
     authority: 'release_controller',
     description:
-      'Package the certified candidate into local release material under Architect authority; it performs no remote effect.',
+      'Purely compose certified candidate release material in memory and expose it only through an injected trusted two-phase ArtifactSink under Architect authority; it performs no remote effect and accepts no pathname destination or npm/tool subprocess.',
     output_contract: {
       schemaVersion: '1.0.0',
       mode: 'action-envelope',
@@ -1434,7 +1434,7 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'release prepare',
       effect: 'local-write',
-      capabilities: ['fs:f5-state', 'fs:proofs', 'fs:workspace', 'proc:git', 'proc:pnpm'],
+      capabilities: ['fs:f5-state', 'fs:proofs', 'artifact-sink:write'],
       subject: {
         kind: 'human',
         allowed_roles: ['architect'],
@@ -1447,7 +1447,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'release-prepare-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'artifact-sink'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -1457,7 +1457,7 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: ['fs-authority-boundary', 'trusted-artifact-sink-v3'],
         final_reverification: true,
       },
       readiness: {
