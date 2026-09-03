@@ -31,6 +31,7 @@ export type {
   EffectAuthorizationCandidate,
   EffectAuthorizationConsent,
   EffectAuthorizationEvent,
+  EffectAuthorizationEventResolver,
   EffectAuthorizationGrantRequest,
   EffectAuthorizationLedger,
   EffectAuthorizationLedgerEntry,

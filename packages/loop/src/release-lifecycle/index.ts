@@ -1,5 +1,12 @@
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import {
+  executeAuthorizedEffect,
+  type EffectAuthorizationEvent,
+  type EffectAuthorizationEventResolver,
+  type EffectAuthorizationGrantRequest,
+  type EffectAuthorizationLedger,
+} from '@devai-nyx/authority';
 
 export type PersistedReleaseState =
   | 'preflight_passed'
@@ -502,4 +509,118 @@ export async function resumeReleaseLifecycle(input: {
       published,
     }),
   );
+}
+
+export type ReleaseTransitionResult<T> =
+  | {
+      readonly ok: true;
+      readonly state: ReleaseLifecycleStateRecord;
+      readonly adapter_result: T;
+    }
+  | {
+      readonly ok: false;
+      readonly phase: 'validation' | 'authorization' | 'adapter' | 'append';
+      readonly code: string;
+      readonly cause?: unknown;
+    };
+
+/**
+ * Local/harness transition boundary. The candidate state is fully reduced
+ * before the adapter runs, and is appended only after the adapter succeeds.
+ */
+export async function executeReleaseTransition<T>(input: {
+  readonly records: readonly unknown[];
+  readonly draft: Omit<ReleaseLifecycleStateRecord, 'record_digest_sha256'>;
+  readonly adapter?: () => T | Promise<T>;
+  readonly appendState: (state: ReleaseLifecycleStateRecord) => void | Promise<void>;
+}): Promise<ReleaseTransitionResult<T>> {
+  let state: ReleaseLifecycleStateRecord;
+  try {
+    state = finalizeReleaseLifecycleState(input.draft);
+    const reduction = reduceReleaseLifecycle([...input.records, state]);
+    if (!reduction.ok) {
+      return {
+        ok: false,
+        phase: 'validation',
+        code: reduction.errors.join(','),
+      };
+    }
+  } catch (cause) {
+    return { ok: false, phase: 'validation', code: 'release-state-schema-invalid', cause };
+  }
+  if (input.adapter === undefined) {
+    return { ok: false, phase: 'adapter', code: 'release-action-provider-unavailable' };
+  }
+  let adapterResult: T;
+  try {
+    adapterResult = await input.adapter();
+  } catch (cause) {
+    return { ok: false, phase: 'adapter', code: 'release-action-provider-failed', cause };
+  }
+  try {
+    await input.appendState(state);
+  } catch (cause) {
+    return { ok: false, phase: 'append', code: 'release-state-append-failed', cause };
+  }
+  return { ok: true, state, adapter_result: adapterResult };
+}
+
+/**
+ * Remote transition boundary. Exact one-time authorization is consumed before
+ * the adapter is entered. No missing, stale, replayed, or mismatched grant can
+ * reach the adapter, and state advances only after the protected adapter
+ * returns successfully.
+ */
+export async function executeAuthorizedReleaseTransition<T>(input: {
+  readonly records: readonly unknown[];
+  readonly draft: Omit<ReleaseLifecycleStateRecord, 'record_digest_sha256'>;
+  readonly authorizationLedger: unknown;
+  readonly resolveAuthorizationEvent: EffectAuthorizationEventResolver;
+  readonly authorizationRequest: EffectAuthorizationGrantRequest;
+  readonly appendAuthorizationConsumption: (
+    event: EffectAuthorizationEvent,
+    ledger: EffectAuthorizationLedger,
+  ) => void | Promise<void>;
+  readonly adapter?: () => T | Promise<T>;
+  readonly appendState: (state: ReleaseLifecycleStateRecord) => void | Promise<void>;
+}): Promise<ReleaseTransitionResult<T>> {
+  let state: ReleaseLifecycleStateRecord;
+  try {
+    state = finalizeReleaseLifecycleState(input.draft);
+    const reduction = reduceReleaseLifecycle([...input.records, state]);
+    if (!reduction.ok || state.effect !== 'remote-write') {
+      return {
+        ok: false,
+        phase: 'validation',
+        code: reduction.ok ? 'release-state-effect-mismatch' : reduction.errors.join(','),
+      };
+    }
+  } catch (cause) {
+    return { ok: false, phase: 'validation', code: 'release-state-schema-invalid', cause };
+  }
+  if (input.adapter === undefined) {
+    return { ok: false, phase: 'adapter', code: 'release-action-provider-unavailable' };
+  }
+  const authorized = await executeAuthorizedEffect({
+    ledger: input.authorizationLedger,
+    resolveEvent: input.resolveAuthorizationEvent,
+    request: input.authorizationRequest,
+    consumed_by_state_id: state.state_id,
+    appendConsumption: input.appendAuthorizationConsumption,
+    adapter: input.adapter,
+  });
+  if (!authorized.ok) {
+    return {
+      ok: false,
+      phase: authorized.phase === 'authorization' ? 'authorization' : 'adapter',
+      code: authorized.code,
+      ...(authorized.cause === undefined ? {} : { cause: authorized.cause }),
+    };
+  }
+  try {
+    await input.appendState(state);
+  } catch (cause) {
+    return { ok: false, phase: 'append', code: 'release-state-append-failed', cause };
+  }
+  return { ok: true, state, adapter_result: authorized.value };
 }
