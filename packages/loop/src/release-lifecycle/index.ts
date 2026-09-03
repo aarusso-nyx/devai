@@ -436,7 +436,16 @@ export async function resumeReleaseLifecycle(input: {
   readonly verifySignature: PublicationSignatureVerifier;
 }): Promise<ReleaseLifecycleObservation> {
   const reduction = reduceReleaseLifecycle(input.records);
-  const head = reduction.ok ? reduction.head : null;
+  if (!reduction.ok) {
+    throw new Error(`RELEASE_LIFECYCLE_CHAIN_INVALID:${reduction.errors.join(',')}`);
+  }
+  const head = reduction.head;
+  if (
+    head !== null &&
+    (!same(head.repository, input.repository) || !same(head.candidate, input.candidate))
+  ) {
+    throw new Error('RELEASE_LIFECYCLE_OBSERVATION_IDENTITY_MISMATCH');
+  }
   const derived = [...(input.derived_receipts ?? [])];
   let published: Readonly<Record<string, unknown>> = {
     observed: false,
