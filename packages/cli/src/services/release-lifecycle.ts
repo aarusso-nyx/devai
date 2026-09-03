@@ -1,0 +1,233 @@
+import { parsers } from '@devai-nyx/schemas';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import {
+  finalizeReleasePlanReceipt,
+  verifyReleasePlanReceiptIdentity,
+  type ReleaseCandidateIdentity,
+  type ReleaseIdentity,
+  type ReleasePlanReceipt,
+} from '@devai-nyx/loop';
+import { resolveReleaseVerification } from './release-profile.js';
+
+export interface ReleaseIntentDocument {
+  readonly schemaVersion: '1.0.0';
+  readonly release_unit: string;
+  readonly current_version: string;
+  readonly target_version: string;
+  readonly support: 'preview' | 'current' | 'lts';
+  readonly support_promotion?: boolean;
+  readonly change_kind?: 'documentation' | 'metadata' | 'behavioral';
+  readonly changed_paths: readonly string[];
+  readonly changed_packages: readonly string[];
+  readonly risks?: readonly string[];
+  readonly owner_escalations?: readonly string[];
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly base: { readonly commit: string; readonly tree: string };
+}
+
+interface ReleaseVerificationProfileDocument {
+  readonly risk_capabilities?: Readonly<Record<string, readonly never[]>>;
+  readonly mutation_roster: readonly unknown[];
+}
+
+interface ReleaseLifecyclePolicyDocument {
+  readonly plan_determination: {
+    readonly required_inputs: readonly {
+      readonly order: number;
+      readonly kind: string;
+      readonly source: string;
+      readonly schema: string;
+      readonly canonical_bytes: string;
+    }[];
+  };
+  readonly states: readonly {
+    readonly state: string;
+    readonly order: number;
+    readonly produced_by_action: string | null;
+    readonly derived_by_action: string | null;
+  }[];
+}
+
+const PLAN_CANONICALIZATION = {
+  kernel_id: 'devai.kernel.release-plan-receipt-canonicalization.v1',
+  encoding: 'utf-8',
+  json_form: 'rfc8785-jcs',
+  digest_algorithm: 'sha256',
+  receipt_projection_excludes: ['receipt_id', 'receipt_digest_sha256'],
+  calculation_order: [
+    'compute-receipt_digest_sha256-over-the-receipt-projection',
+    'derive-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256',
+  ],
+} as const;
+
+const PLAN_KERNEL = {
+  kernel_id: 'devai.kernel.release-plan-receipt.v1',
+  mandatory: true,
+  determination_contract: 'law/policy/release-lifecycle.json#/plan_determination',
+  schema_assertion_establishes_pass: false,
+  algorithm: [
+    'resolve-every-declared-input-and-recompute-its-sha256',
+    'require-the-exact-four-ordered-input-kinds-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination',
+    'recompute-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-determination',
+    'recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan',
+    'recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1',
+    'recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest',
+    'reject-pass-when-any-recomputed-value-differs-from-the-reported-value',
+  ],
+  errors: [
+    'rpl-input-unresolved',
+    'rpl-input-digest-mismatch',
+    'rpl-input-set-mismatch',
+    'rpl-determination-mismatch',
+    'rpl-plan-mismatch',
+    'rpl-receipt-digest-mismatch',
+    'rpl-receipt-id-mismatch',
+    'rpl-semantic-verification-not-performed',
+  ],
+} as const;
+
+function inputPath(kind: string, intentPath: string, source: string): string {
+  return kind === 'release-intent' ? intentPath : source;
+}
+
+export function buildReleasePlanReceipt(input: {
+  readonly repository_id: string;
+  readonly intent_path: string;
+  readonly intent: unknown;
+  readonly release_verification_profile: unknown;
+  readonly release_lifecycle_policy: unknown;
+  readonly action_registry: unknown;
+}): ReleasePlanReceipt {
+  const intent = parsers.releaseIntent.parse<ReleaseIntentDocument>(input.intent);
+  const profile = parsers.releaseVerificationProfile.parse<ReleaseVerificationProfileDocument>(
+    input.release_verification_profile,
+  );
+  const lifecycle = parsers.releaseLifecyclePolicy.parse<ReleaseLifecyclePolicyDocument>(
+    input.release_lifecycle_policy,
+  );
+  parsers.actionRegistry.parse(input.action_registry);
+
+  const documents = new Map<string, unknown>([
+    ['release-intent', intent],
+    ['release-verification-profile', input.release_verification_profile],
+    ['release-lifecycle-policy', lifecycle],
+    ['action-registry-policy', input.action_registry],
+  ]);
+  const requiredInputs = [...lifecycle.plan_determination.required_inputs].sort(
+    (left, right) => left.order - right.order,
+  );
+  const inputs = requiredInputs.map((required) => {
+    const document = documents.get(required.kind);
+    if (document === undefined) throw new Error(`RELEASE_PLAN_INPUT_UNRESOLVED:${required.kind}`);
+    return {
+      kind: required.kind,
+      source: required.source,
+      schema: required.schema,
+      path: inputPath(required.kind, input.intent_path, required.source),
+      canonical_bytes: required.canonical_bytes,
+      ...(required.kind === 'release-intent' ? { inline_document: intent } : {}),
+      sha256: canonicalSha256(document),
+    };
+  });
+  const decision = resolveReleaseVerification({
+    currentVersion: intent.current_version,
+    targetVersion: intent.target_version,
+    support: intent.support,
+    mutationRosterSize: profile.mutation_roster.length,
+    riskCapabilities: profile.risk_capabilities,
+    ...(intent.support_promotion === undefined
+      ? {}
+      : { supportPromotion: intent.support_promotion }),
+    ...(intent.change_kind === undefined ? {} : { changeKind: intent.change_kind }),
+    ...(intent.risks === undefined ? {} : { risks: intent.risks }),
+    ...(intent.owner_escalations === undefined
+      ? {}
+      : { ownerEscalations: intent.owner_escalations as never[] }),
+  });
+  if (decision.transition === undefined) {
+    throw new Error('RELEASE_PLAN_BLOCK_TRANSITION_UNREPRESENTABLE');
+  }
+  const repository: ReleaseIdentity = {
+    id: input.repository_id,
+    commit: intent.candidate.commit,
+    tree: intent.candidate.tree,
+  };
+  const candidate: ReleaseCandidateIdentity = {
+    release_unit: intent.release_unit,
+    version: intent.target_version,
+    commit: intent.candidate.commit,
+    tree: intent.candidate.tree,
+  };
+  const plan = [...lifecycle.states]
+    .sort((left, right) => left.order - right.order)
+    .map((state) => ({
+      order: state.order,
+      action_id: state.produced_by_action ?? state.derived_by_action,
+      produces_state: state.produced_by_action === null ? null : state.state,
+      derives_state: state.derived_by_action === null ? null : state.state,
+    }));
+  return finalizeReleasePlanReceipt({
+    schemaVersion: '1.0.0',
+    receipt_kind: 'release-plan-receipt',
+    canonicalization: PLAN_CANONICALIZATION,
+    state_observed: decision.verdict === 'ready' ? 'planned' : null,
+    verdict: decision.verdict === 'ready' ? 'pass' : 'block',
+    repository,
+    candidate,
+    inputs,
+    plan,
+    determination: {
+      profile_verdict: decision.verdict === 'ready' ? 'ready' : 'block',
+      transition: decision.transition,
+      support: decision.support,
+      impact: intent.change_kind ?? 'behavioral',
+      risk_classes: [...(intent.risks ?? [])].sort(),
+      capabilities: decision.capabilities,
+      mutation: decision.mutation,
+      mutation_disposition: {
+        status: decision.mutationDisposition.status,
+        reason: decision.mutationDisposition.reason,
+      },
+      blocking_reasons: decision.blockingReasons,
+    },
+    verification_kernel: PLAN_KERNEL,
+    emitted_by: {
+      action_id: 'release plan',
+      effect: 'read',
+      output_channel: 'stdout',
+      persists_repository_state: false,
+      appends_state_record: false,
+      writes_receipt_file: false,
+    },
+    grants: {
+      authority: false,
+      publication_authority: false,
+      lifecycle_transition: false,
+      satisfies_state: false,
+    },
+    determinism: {
+      deterministic: true,
+      derived_from_bound_inputs_only: true,
+      contains_wall_clock_time: false,
+    },
+  } as never);
+}
+
+export function verifyReleasePlanReceipt(input: {
+  readonly receipt: unknown;
+  readonly repository_id: string;
+  readonly intent_path: string;
+  readonly intent: unknown;
+  readonly release_verification_profile: unknown;
+  readonly release_lifecycle_policy: unknown;
+  readonly action_registry: unknown;
+}): boolean {
+  if (!verifyReleasePlanReceiptIdentity(input.receipt)) return false;
+  let expected: ReleasePlanReceipt;
+  try {
+    expected = buildReleasePlanReceipt(input);
+  } catch {
+    return false;
+  }
+  return canonicalSha256(expected) === canonicalSha256(input.receipt);
+}

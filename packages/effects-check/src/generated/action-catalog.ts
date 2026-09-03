@@ -112,6 +112,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: [],
   },
   {
+    action_id: 'release certify',
+    public_action_id: 'release certify',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+  },
+  {
     action_id: 'release check',
     public_action_id: 'release check',
     effect: 'harness-write',
@@ -122,6 +128,54 @@ export const ACTION_EFFECT_CONTRACTS = [
     public_action_id: 'release drift',
     effect: 'harness-write',
     capabilities: ['fs:f5-state', 'fs:proofs'],
+  },
+  {
+    action_id: 'release evidence-publish',
+    public_action_id: 'release evidence-publish',
+    effect: 'remote-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git', 'net:evidence-registry'],
+  },
+  {
+    action_id: 'release export',
+    public_action_id: 'release export',
+    effect: 'local-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:workspace', 'proc:git'],
+  },
+  {
+    action_id: 'release offline-verify',
+    public_action_id: 'release offline-verify',
+    effect: 'read',
+    capabilities: ['proc:git'],
+  },
+  {
+    action_id: 'release plan',
+    public_action_id: 'release plan',
+    effect: 'read',
+    capabilities: ['proc:git'],
+  },
+  {
+    action_id: 'release preflight',
+    public_action_id: 'release preflight',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
+  },
+  {
+    action_id: 'release prepare',
+    public_action_id: 'release prepare',
+    effect: 'local-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:workspace', 'proc:git', 'proc:pnpm'],
+  },
+  {
+    action_id: 'release publish',
+    public_action_id: 'release publish',
+    effect: 'remote-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git', 'proc:pnpm', 'net:package-registry'],
+  },
+  {
+    action_id: 'release resume',
+    public_action_id: 'release resume',
+    effect: 'read',
+    capabilities: ['proc:git'],
   },
   {
     action_id: 'release status',

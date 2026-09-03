@@ -96,9 +96,36 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
       return [initApplyArchitect, initApplyHarness, initApplyOwner, initBind, initPlan];
     }
     case 'release': {
-      const { releaseCheck, releaseDrift, releaseStatus, releaseVerify } =
-        await import('./commands/release/facade.js');
-      return [releaseCheck, releaseDrift, releaseStatus, releaseVerify];
+      const {
+        releaseCertify,
+        releaseCheck,
+        releaseDrift,
+        releaseEvidencePublish,
+        releaseExport,
+        releaseOfflineVerify,
+        releasePlan,
+        releasePreflight,
+        releasePrepare,
+        releasePublish,
+        releaseResume,
+        releaseStatus,
+        releaseVerify,
+      } = await import('./commands/release/facade.js');
+      return [
+        releaseCertify,
+        releaseCheck,
+        releaseDrift,
+        releaseEvidencePublish,
+        releaseExport,
+        releaseOfflineVerify,
+        releasePlan,
+        releasePreflight,
+        releasePrepare,
+        releasePublish,
+        releaseResume,
+        releaseStatus,
+        releaseVerify,
+      ];
     }
     case 'round': {
       const [

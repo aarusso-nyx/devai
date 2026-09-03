@@ -16,6 +16,18 @@ import { executeRuntimeProbe, type RuntimeProbeCharter } from '@devai-nyx/sensor
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 
+export {
+  releaseCertify,
+  releaseEvidencePublish,
+  releaseExport,
+  releaseOfflineVerify,
+  releasePlan,
+  releasePreflight,
+  releasePrepare,
+  releasePublish,
+  releaseResume,
+} from './lifecycle.js';
+
 const DEFAULT_REPO_ROOT = process.cwd();
 const KNOWN_ENVS = ['dev', 'staging', 'stage', 'prod', 'preview', 'other'] as const;
 const RELEASE_KINDS = ['gate', 'postdeploy-verify', 'runtime-drift'] as const;

@@ -29,6 +29,9 @@ export const DEPLOY_PAGES_COMMIT = 'd6db90164ac5ed86f2b6aed7e0febac5b3c0c03e';
 export const CANDIDATE_SHA_EXPRESSION = '${{ github.event.pull_request.head.sha || github.sha }}';
 export const RELEASE_TAG_EXPRESSION =
   "${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}";
+const EXPECTED_ACTION_COUNT = JSON.parse(
+  readFileSync(new URL('../law/policy/action-registry.json', import.meta.url), 'utf8'),
+).counts.total;
 
 const OLD_WORKFLOW_MARKERS = [
   'cold-sentinel',
@@ -592,7 +595,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
-    environment.EXPECTED_ACTION_COUNT !== 48 ||
+    environment.EXPECTED_ACTION_COUNT !== EXPECTED_ACTION_COUNT ||
     environment.PACKAGE_VERSION !== undefined ||
     environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION
   ) {

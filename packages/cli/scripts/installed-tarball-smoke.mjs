@@ -19,6 +19,9 @@ import { parseDocument } from 'yaml';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
+const expectedActionCount = JSON.parse(
+  readFileSync(join(packageRoot, 'dist/law/policy/action-registry.json'), 'utf8'),
+).counts.total;
 const smokeRoot = mkdtempSync(join(tmpdir(), 'devai installed çandidate-'));
 const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
@@ -116,7 +119,7 @@ try {
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
 
   const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
-  if (unboundCatalog?.result?.value?.length !== 48) {
+  if (unboundCatalog?.result?.value?.length !== expectedActionCount) {
     throw new Error('INSTALLED_UNBOUND_CATALOG_INVALID');
   }
   const unboundPlan = JSON.parse(
@@ -238,7 +241,7 @@ try {
 
   const envelope = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
   const actions = envelope?.result?.value;
-  if (!Array.isArray(actions) || actions.length !== 48) {
+  if (!Array.isArray(actions) || actions.length !== expectedActionCount) {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
@@ -1183,7 +1186,7 @@ try {
     existsSync(join(projectRoot, '.agents/skills/devai-assess')) ||
     existsSync(join(projectRoot, '.devai')) ||
     JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']))?.result?.value?.length !==
-      48
+      expectedActionCount
   ) {
     throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }
