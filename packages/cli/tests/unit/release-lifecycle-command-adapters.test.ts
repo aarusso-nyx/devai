@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CAC } from 'cac';
@@ -6,6 +6,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+
+const { runChecks } = vi.hoisted(() => ({ runChecks: vi.fn() }));
+vi.mock('../../src/services/check-runner/index.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/check-runner/index.js')>()),
+  runCheckTasks: runChecks,
+}));
 
 vi.mock('../../src/authority/index.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/authority/index.js')>()),
@@ -16,7 +22,7 @@ vi.mock('../../src/authority/index.js', async (importOriginal) => ({
   }),
 }));
 
-const { installReleaseLifecycleCommandAdapters, releasePreflight } =
+const { installReleaseLifecycleCommandAdapters, releasePreflight, releaseResume } =
   await import('../../src/commands/release/lifecycle.js');
 
 const cleanups: (() => void)[] = [];
@@ -25,7 +31,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function captureAction() {
+function captureAction(definition = releasePreflight) {
   let handler: ((options: Record<string, unknown>) => Promise<void>) | undefined;
   const command = {
     option: () => command,
@@ -34,8 +40,8 @@ function captureAction() {
       return command;
     },
   };
-  releasePreflight.register({ command: () => command } as unknown as CAC);
-  if (handler === undefined) throw new Error('release preflight handler was not registered');
+  definition.register({ command: () => command } as unknown as CAC);
+  if (handler === undefined) throw new Error(`${definition.name} handler was not registered`);
   return handler;
 }
 
@@ -57,6 +63,8 @@ describe('release lifecycle command adapter composition', () => {
     }
     const commit = '5'.repeat(40);
     const tree = '6'.repeat(40);
+    const manifestBytes = `${canonicalJson({ name: '@aarusso-nyx/devai', version: '1.5.0' })}\n`;
+    writeFileSync(join(root, 'package.json'), manifestBytes);
     const intent = {
       schemaVersion: '1.0.0',
       release_unit: '@aarusso-nyx/devai',
@@ -79,7 +87,7 @@ describe('release lifecycle command adapter composition', () => {
       action_registry: json(join(root, 'law/policy/action-registry.json')),
     });
     writeFileSync(join(root, 'receipts/plan.json'), `${canonicalJson(receipt)}\n`);
-    const manifestDigest = 'a'.repeat(64);
+    const manifestDigest = createHash('sha256').update(manifestBytes).digest('hex');
     const request = {
       schemaVersion: '1.0.0',
       request_kind: 'release-lifecycle-request',
@@ -148,20 +156,107 @@ describe('release lifecycle command adapter composition', () => {
         artifacts: [],
       },
     }));
-    cleanups.push(
-      installReleaseLifecycleCommandAdapters({
-        provider: () => provider,
-        offline_verification_provider: () => undefined,
-        authorization: () => undefined,
-        offline_receipt_verifier: () => undefined,
-        publication_controls: () => undefined,
-      }),
-    );
+    const uninstall = installReleaseLifecycleCommandAdapters({
+      provider: () => provider,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+    });
+    cleanups.push(uninstall);
     const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await withAuthorityHostTestScope(() =>
       captureAction()({ request: requestPath, repoRoot: root, stateRoot: join(root, 'state') }),
     );
     expect(provider).toHaveBeenCalledOnce();
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"preflight_passed"'));
+
+    uninstall();
+    output.mockClear();
+    const errorOutput = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    runChecks.mockReturnValue({
+      schemaVersion: '1.0.0',
+      operation: 'run',
+      plan: {},
+      execution: [
+        {
+          nodeId: 'format',
+          taskKey: 'format',
+          disposition: 'executed',
+          outcome: 'PASS',
+          reason: 'required-floor',
+          durationMs: 1,
+        },
+      ],
+      preflightReceipt: {
+        digest: 'd'.repeat(64),
+        path: '.devai/cache/preflight-receipts/test.json',
+        value: {},
+      },
+      exitCode: 0,
+    });
+    await withAuthorityHostTestScope(() =>
+      captureAction()({
+        request: requestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
+    );
+    expect(runChecks).toHaveBeenCalledOnce();
+    expect(errorOutput.mock.calls, JSON.stringify(errorOutput.mock.calls)).toEqual([]);
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"preflight_passed"'));
+
+    const resumeRequestPath = join(root, 'resume-request.json');
+    writeFileSync(
+      resumeRequestPath,
+      `${canonicalJson({
+        schemaVersion: '1.0.0',
+        request_kind: 'release-lifecycle-request',
+        action_id: 'release resume',
+        repository_locator: request.repository_locator,
+        candidate_locator: request.candidate_locator,
+      })}\n`,
+    );
+    output.mockClear();
+    await captureAction(releaseResume)({
+      request: resumeRequestPath,
+      repoRoot: root,
+      stateRoot: join(root, 'stock-state'),
+    });
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('"next_action":"release certify"'));
+
+    output.mockClear();
+    errorOutput.mockClear();
+    symlinkSync('plan.json', join(root, 'receipts/plan-link.json'));
+    const unsafeRequestPath = join(root, 'unsafe-request.json');
+    writeFileSync(
+      unsafeRequestPath,
+      `${canonicalJson({
+        ...request,
+        receipt_locators: [{ ...request.receipt_locators[0], path: 'receipts/plan-link.json' }],
+      })}\n`,
+    );
+    const unsafeProvider = vi.fn(() => ({ outcome: 'failure' as const }));
+    cleanups.push(
+      installReleaseLifecycleCommandAdapters({
+        provider: () => unsafeProvider,
+        offline_verification_provider: () => undefined,
+        authorization: () => undefined,
+        offline_receipt_verifier: () => undefined,
+        publication_controls: () => undefined,
+      }),
+    );
+    await withAuthorityHostTestScope(() =>
+      captureAction()({
+        request: unsafeRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'unsafe-state'),
+      }),
+    );
+    expect(unsafeProvider).not.toHaveBeenCalled();
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('release-receipt-path-unsafe'),
+    );
   });
 });
+import { createHash } from 'node:crypto';

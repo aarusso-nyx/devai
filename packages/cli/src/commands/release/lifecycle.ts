@@ -1,4 +1,10 @@
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  closeReadOnlySync,
+  fstatSync,
+  lstatSync,
+  openReadOnlyNoFollowSync,
+  readFileSync,
+} from '@devai-nyx/authority';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CAC } from 'cac';
 import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
@@ -21,6 +27,7 @@ import {
   type TrustedOfflineReceiptVerifier,
 } from '../../services/release-lifecycle-execution.js';
 import { buildReleasePlanReceipt } from '../../services/release-lifecycle.js';
+import { builtInReleaseLifecycleLocalProvider } from '../../services/release-lifecycle-local-adapters.js';
 
 interface PlanOptions {
   readonly repoRoot?: string;
@@ -32,6 +39,7 @@ interface PlanOptions {
 interface ResumeOptions {
   readonly request?: string;
   readonly repoRoot?: string;
+  readonly stateRoot?: string;
   readonly stateChain?: string;
   readonly storeRecords?: string;
   readonly storeHead?: string;
@@ -85,22 +93,82 @@ export function installReleaseLifecycleCommandAdapters(
   };
 }
 
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+function sameFileSnapshot(
+  left: ReturnType<typeof lstatSync>,
+  right: ReturnType<typeof fstatSync>,
+): boolean {
+  return (
+    left !== undefined &&
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.mode === right.mode &&
+    left.uid === right.uid &&
+    left.gid === right.gid &&
+    left.nlink === right.nlink &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs &&
+    left.ctimeMs === right.ctimeMs
+  );
 }
 
-function containedFile(root: string, path: string): string {
-  const absoluteRoot = realpathSync(resolve(root));
+function readPinnedBytes(path: string): Buffer {
+  const absolute = resolve(path);
+  const before = lstatSync(absolute);
+  if (before.isSymbolicLink() || !before.isFile() || before.nlink !== 1) {
+    throw new Error('release-receipt-path-unsafe');
+  }
+  const descriptor = openReadOnlyNoFollowSync(absolute);
+  try {
+    const openedBefore = fstatSync(descriptor);
+    if (!openedBefore.isFile() || !sameFileSnapshot(before, openedBefore)) {
+      throw new Error('release-receipt-path-unsafe');
+    }
+    const bytes = readFileSync(descriptor);
+    const openedAfter = fstatSync(descriptor);
+    const after = lstatSync(absolute);
+    if (!sameFileSnapshot(openedBefore, openedAfter) || !sameFileSnapshot(openedAfter, after)) {
+      throw new Error('release-receipt-path-unsafe');
+    }
+    return bytes;
+  } finally {
+    closeReadOnlySync(descriptor);
+  }
+}
+
+function assertDirectoryChain(root: string, candidate: string): void {
+  const absoluteRoot = resolve(root);
+  const relativePath = relative(absoluteRoot, candidate);
+  let cursor = absoluteRoot;
+  for (const part of relativePath.split(sep).slice(0, -1)) {
+    cursor = join(cursor, part);
+    const stat = lstatSync(cursor);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      throw new Error('release-receipt-path-unsafe');
+    }
+  }
+}
+
+function readContainedBytes(root: string, path: string): Buffer {
+  const absoluteRoot = resolve(root);
   const candidate = resolve(absoluteRoot, path);
   const escaped = relative(absoluteRoot, candidate);
   if (escaped === '..' || escaped.startsWith(`..${sep}`) || isAbsolute(escaped)) {
     throw new Error('release-receipt-path-unsafe');
   }
-  const stat = lstatSync(candidate);
-  if (stat.isSymbolicLink() || !stat.isFile() || realpathSync(candidate) !== candidate) {
+  const rootStat = lstatSync(absoluteRoot);
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
     throw new Error('release-receipt-path-unsafe');
   }
-  return candidate;
+  assertDirectoryChain(absoluteRoot, candidate);
+  return readPinnedBytes(candidate);
+}
+
+function readPinnedJson(path: string): unknown {
+  return JSON.parse(readPinnedBytes(path).toString('utf8')) as unknown;
+}
+
+function readContainedJson(root: string, path: string): unknown {
+  return JSON.parse(readContainedBytes(root, path).toString('utf8')) as unknown;
 }
 
 function localResolvers(root: string): {
@@ -110,10 +178,10 @@ function localResolvers(root: string): {
   readonly plan: ReleasePlanInputResolver;
 } {
   return {
-    receipt: (locator) => readJson(containedFile(root, locator.path)),
+    receipt: (locator) => readContainedJson(root, locator.path),
     plan: (input) => {
       if (typeof input['path'] !== 'string') throw new Error('rpl-input-unresolved');
-      return readJson(containedFile(root, input['path']));
+      return readContainedJson(root, input['path']);
     },
   };
 }
@@ -149,12 +217,13 @@ export const releasePlan = defineCommand({
           const receipt = buildReleasePlanReceipt({
             repository_id: options.repository,
             intent_path: relative(root, resolve(options.intent)).replaceAll('\\', '/'),
-            intent: readJson(options.intent),
-            release_verification_profile: readJson(
-              join(root, 'law/policy/release-verification.json'),
+            intent: readContainedJson(root, options.intent),
+            release_verification_profile: readContainedJson(
+              root,
+              'law/policy/release-verification.json',
             ),
-            release_lifecycle_policy: readJson(join(root, 'law/policy/release-lifecycle.json')),
-            action_registry: readJson(join(root, 'law/policy/action-registry.json')),
+            release_lifecycle_policy: readContainedJson(root, 'law/policy/release-lifecycle.json'),
+            action_registry: readContainedJson(root, 'law/policy/action-registry.json'),
           });
           process.stdout.write(
             options.human === true
@@ -202,19 +271,30 @@ function lifecycleAction(
           }
           try {
             const request = validateReleaseLifecycleRequest(
-              readJson(options.request),
+              readPinnedJson(options.request),
               name,
             ) as ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction };
+            const root = resolve(options.repoRoot ?? process.cwd());
+            const resolvers = localResolvers(root);
             const adapters = commandAdapters;
-            const provider = adapters?.provider(name, request);
             const remote = name === 'release evidence-publish' || name === 'release publish';
+            const provider =
+              adapters?.provider(name, request) ??
+              builtInReleaseLifecycleLocalProvider(
+                {
+                  repo_root: root,
+                  resolve_receipt: resolvers.receipt,
+                  resolve_plan_input: resolvers.plan,
+                  read_contained_bytes: (path) => readContainedBytes(root, path),
+                },
+                name,
+              );
             const authorization = remote ? adapters?.authorization(request) : undefined;
             const offlineReceiptVerifier =
               name === 'release evidence-publish'
                 ? adapters?.offline_receipt_verifier(request)
                 : undefined;
             if (
-              adapters === undefined ||
               provider === undefined ||
               (remote && authorization === undefined) ||
               (name === 'release evidence-publish' && offlineReceiptVerifier === undefined)
@@ -231,8 +311,6 @@ function lifecycleAction(
             }
             const actor = declaredInvocationAuthority();
             if (actor === undefined) throw new Error('release-authority-context-invalid');
-            const root = resolve(options.repoRoot ?? process.cwd());
-            const resolvers = localResolvers(root);
             const result = await executeReleaseLifecycleAction({
               request,
               action: name,
@@ -254,7 +332,7 @@ function lifecycleAction(
               ...(authorization === undefined ? {} : { authorization }),
               ...(offlineReceiptVerifier === undefined ? {} : { offlineReceiptVerifier }),
               ...(name === 'release publish'
-                ? { publication_controls: adapters.publication_controls(request) }
+                ? { publication_controls: adapters?.publication_controls(request) }
                 : {}),
               recorded_at: new Date().toISOString(),
             });
@@ -331,7 +409,7 @@ export const releaseOfflineVerify = defineCommand({
           const state =
             options.exportedState === undefined
               ? undefined
-              : verifyReleaseStateIdentity(readJson(options.exportedState));
+              : verifyReleaseStateIdentity(readPinnedJson(options.exportedState));
           if (options.request === undefined || options.exportedState === undefined) {
             fail(
               'release offline-verify',
@@ -342,7 +420,7 @@ export const releaseOfflineVerify = defineCommand({
             return;
           }
           const request = validateReleaseLifecycleRequest(
-            readJson(options.request),
+            readPinnedJson(options.request),
             'release offline-verify',
           );
           if (state === undefined) throw new Error('release-offline-state-missing');
@@ -396,6 +474,7 @@ export const releaseResume = defineCommand({
         'Exact release resume request (required for an empty state chain)',
       )
       .option('--repo-root <path>', 'Repository root containing bound receipt inputs')
+      .option('--state-root <path>', 'Protected append-only release state root')
       .option('--state-chain <path>', 'JSON array containing the persisted state chain')
       .option(
         '--store-records <path>',
@@ -416,15 +495,32 @@ export const releaseResume = defineCommand({
           return;
         }
         try {
-          const states = options.stateChain === undefined ? [] : readJson(options.stateChain);
-          if (!Array.isArray(states)) throw new Error('state chain must be a JSON array');
-          const first = states.length === 0 ? undefined : verifyReleaseStateIdentity(states[0]);
           const request =
             options.request === undefined
               ? undefined
-              : validateReleaseLifecycleRequest(readJson(options.request), 'release resume');
+              : validateReleaseLifecycleRequest(readPinnedJson(options.request), 'release resume');
           const root = resolve(options.repoRoot ?? process.cwd());
           const resolvers = localResolvers(root);
+          const useBuiltInStore =
+            request !== undefined &&
+            options.stateChain === undefined &&
+            options.storeRecords === undefined &&
+            options.storeHead === undefined;
+          const store =
+            useBuiltInStore && request !== undefined
+              ? new ReleaseLifecycleFileStore(
+                  resolve(options.stateRoot ?? join(root, '.devai/state/release-lifecycle')),
+                  request,
+                )
+              : undefined;
+          const states =
+            store === undefined
+              ? options.stateChain === undefined
+                ? []
+                : readPinnedJson(options.stateChain)
+              : store.readStateRecords();
+          if (!Array.isArray(states)) throw new Error('state chain must be a JSON array');
+          const first = states.length === 0 ? undefined : verifyReleaseStateIdentity(states[0]);
           if (first === undefined && request === undefined) {
             throw new Error('an empty state chain requires an exact release resume request');
           }
@@ -444,14 +540,22 @@ export const releaseResume = defineCommand({
             throw new Error('release resume identity is unavailable');
           }
           const storeRecords =
-            options.storeRecords === undefined ? [] : readJson(options.storeRecords);
+            store === undefined
+              ? options.storeRecords === undefined
+                ? []
+                : readPinnedJson(options.storeRecords)
+              : store.readStoreRecords();
           if (!Array.isArray(storeRecords)) throw new Error('store records must be a JSON array');
-          const receipts = options.receipts === undefined ? [] : readJson(options.receipts);
+          const receipts = options.receipts === undefined ? [] : readPinnedJson(options.receipts);
           if (!Array.isArray(receipts)) throw new Error('receipts must be a JSON array');
           const observation = await resumeReleaseLifecycleExecution({
             states,
             store_records: storeRecords,
-            ...(options.storeHead === undefined ? {} : { store_head: readJson(options.storeHead) }),
+            ...(store === undefined
+              ? options.storeHead === undefined
+                ? {}
+                : { store_head: readPinnedJson(options.storeHead) }
+              : { store_head: store.readHead() }),
             repository,
             candidate,
             ...(request === undefined ? {} : { candidate_locator: request.candidate_locator }),
@@ -465,7 +569,7 @@ export const releaseResume = defineCommand({
             ...(options.publicationReceipt === undefined
               ? {}
               : {
-                  publication_receipt: readJson(options.publicationReceipt),
+                  publication_receipt: readPinnedJson(options.publicationReceipt),
                   // Trust material is deliberately external. The stock CLI
                   // cannot derive published without an injected verifier.
                   verify_signature: () => false,
