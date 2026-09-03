@@ -2,7 +2,6 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
-  cpSync,
   linkSync,
   mkdirSync,
   mkdtempSync,
@@ -51,6 +50,9 @@ const VERIFIER_POLICY = JSON.parse(
   };
   verifier: { provenance_sha256: string; root: string };
 };
+const PACKAGE_OWNED_VERIFIER_SOURCE_COMMIT = JSON.parse(
+  readFileSync(join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'), 'utf8'),
+).sourceCommit as string;
 const roots: string[] = [];
 const EXPLICIT_PUBLISH_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
@@ -117,20 +119,28 @@ function executablePackageMaterializationFixture(
   mkdirSync(verifierRoot, { recursive: true });
   mkdirSync(runnerTemp, { recursive: true });
   mkdirSync(mockBin, { recursive: true });
-  cpSync(
-    join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
-    join(verifierRoot, 'provenance.json'),
+  // This fixture models the published 1.4.4 package, whose frozen control has
+  // 21 runtime files. It must not inherit the current package's v2.1 vendor.
+  const historicalArchive = join(root, 'published-1.4.4-verifier.tar');
+  writeFileSync(
+    historicalArchive,
+    execFileSync(
+      'git',
+      [
+        'archive',
+        '--format=tar',
+        VERIFIER_POLICY.package.release_source.commit,
+        'packages/cli/vendor/evidence-verification',
+      ],
+      { cwd: ROOT },
+    ),
   );
-  cpSync(
-    join(ROOT, 'packages/cli/vendor/evidence-verification/schemas'),
-    join(verifierRoot, 'schemas'),
-    {
-      recursive: true,
-    },
+  execFileSync(
+    'tar',
+    ['-xf', historicalArchive, '--strip-components=4', '--directory', verifierRoot],
+    { cwd: root },
   );
-  cpSync(join(ROOT, 'packages/cli/vendor/evidence-verification/src'), join(verifierRoot, 'src'), {
-    recursive: true,
-  });
+  rmSync(join(verifierRoot, 'test'), { recursive: true, force: true });
   writeFileSync(
     join(packageRoot, 'package.json'),
     `${JSON.stringify({
@@ -474,7 +484,8 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'wrong package-owned verifier provenance',
-      mutate: (source: string) => source.replaceAll(VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
+      mutate: (source: string) =>
+        source.replaceAll(PACKAGE_OWNED_VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
@@ -521,7 +532,9 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_VERIFIER_BINDING_MODE_INVALID',
     },
   ])('rejects $name', ({ mutate, diagnostic }) => {
-    const result = check(fixture(mutate(CHECKED_IN_LEDGER)));
+    const mutated = mutate(CHECKED_IN_LEDGER);
+    expect(mutated).not.toBe(CHECKED_IN_LEDGER);
+    const result = check(fixture(mutated));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
   });

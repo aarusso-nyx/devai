@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 
 const packageRoot = resolve(import.meta.dirname, '..');
@@ -1099,11 +1099,17 @@ try {
   );
   const verifierFiles = filesUnder(verifierRoot)
     .filter((path) => !path.endsWith('/provenance.json'))
+    .map((path) => relative(verifierRoot, path))
     .sort();
+  const declaredVerifierFiles = verifierProvenance.files?.map((entry) => entry.path).sort();
   if (
-    verifierProvenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de' ||
-    verifierProvenance.files?.length !== 21 ||
-    verifierFiles.length !== 21
+    verifierProvenance.sourceCommit !== '098d090013dda34e38d1045ba06274d99bd5aec1' ||
+    digest(join(verifierRoot, 'provenance.json')) !==
+      '5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b' ||
+    verifierProvenance.files?.length !== 24 ||
+    verifierFiles.length !== 24 ||
+    JSON.stringify(verifierFiles) !== JSON.stringify(declaredVerifierFiles) ||
+    verifierFiles.some((path) => path.startsWith('test/'))
   ) {
     throw new Error('INSTALLED_VERIFIER_POPULATION_INVALID');
   }
