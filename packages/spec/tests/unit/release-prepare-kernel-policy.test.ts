@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import Ajv2020 from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import { getValidator } from '../../../schemas/src/index.js';
 
@@ -43,8 +44,15 @@ describe('release prepare v3 policy', () => {
     const policySchema = readJson<{
       examples: Array<{ execution_contract: { prepare_kernel: unknown } }>;
     }>('law/schemas/release-lifecycle-policy.schema.json');
+    const common = readJson<Record<string, unknown>>('law/schemas/common-defs.schema.json');
+    const recordMeta = readJson<Record<string, unknown>>('law/schemas/record-meta.schema.json');
+    const ajv = new Ajv2020({ strict: false });
+    ajv.addSchema(common, 'common-defs.schema.json');
+    ajv.addSchema(recordMeta, 'record-meta.schema.json');
+    const validatePolicy = ajv.compile(policySchema);
 
     const kernel = policy.execution_contract.prepare_kernel;
+    expect(validatePolicy(policy), JSON.stringify(validatePolicy.errors)).toBe(true);
     expect(policySchema.examples[0]?.execution_contract.prepare_kernel).toEqual(kernel);
     expect(kernel.kernel_id).toBe('devai.kernel.release-prepare.v3');
     expect(kernel.stock_composition).toEqual({
@@ -76,7 +84,7 @@ describe('release prepare v3 policy', () => {
     );
     expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v3');
     expect(kernel.pack.pack_spec_digest_sha256).toBe(
-      'b907f43c9d203f3c8aaacb51c0eb9ae4f17be640dc4d3447b6249e9194bddbfb',
+      '7337bde13c87c3b1add64cc8e7d849311874272788fe4813c1b3f14d9e1ea2ec',
     );
     expect(createHash('sha256').update(kernel.pack.pack_spec_canonical_bytes).digest('hex')).toBe(
       kernel.pack.pack_spec_digest_sha256,
@@ -89,13 +97,13 @@ describe('release prepare v3 policy', () => {
       'BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
-      'package.downloadLocation=NOASSERTION;package.filesAnalyzed=true',
+      'creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-reviews-snippets-builds=absent',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
-      'package.packageVerificationCode.value=SHA1-of-utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-in-entry-order',
+      'package.packageVerificationCode.value=SHA1-of-utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
-      'file.SPDXID=SPDXRef-File-<sha256-of-utf8-archive-path>',
+      'file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256]',
     );
     expect(kernel.pack.forbidden_execution).toEqual([
       'npm-subprocess',
