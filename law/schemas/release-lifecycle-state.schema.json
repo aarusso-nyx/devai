@@ -23,6 +23,7 @@
     "consent",
     "authorization_event_id",
     "publication_expectation",
+    "storage",
     "recorded_at",
     "record_digest_sha256"
   ],
@@ -178,7 +179,14 @@
         "required": ["kind", "path", "sha256", "size_bytes"],
         "properties": {
           "kind": {
-            "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
+            "enum": [
+              "package-tarball",
+              "evidence-bundle",
+              "manifest",
+              "sbom",
+              "attestation",
+              "provider-result"
+            ]
           },
           "path": {
             "$ref": "#/$defs/relative_path"
@@ -231,11 +239,20 @@
       "description": "The exact one-time authorization consumed by this transition. Null for every non-remote effect; a non-null value on a non-remote transition is a violation."
     },
     "publication_expectation": {
-      "oneOf": [
-        {"type": "null"},
-        {"$ref": "#/$defs/publication_expectation"}
-      ],
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/publication_expectation" }],
       "description": "Authoritative expected publication destination, protected workflow/environment, external trust identities, and exact Owner grant. Present only on release publish/publication_dispatched and contains no key material."
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation", "head_before"],
+      "description": "Core-derived compare-and-swap observation. Semantic validation requires agreement with prior_state and the persisted head; this object is never supplied by a client request.",
+      "properties": {
+        "generation": { "type": "integer", "minimum": 0 },
+        "head_before": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/storage_head" }]
+        }
+      }
     },
     "recorded_at": {
       "$ref": "common-defs.schema.json#/$defs/timestamp"
@@ -270,6 +287,12 @@
           "prior_state": {
             "type": "null"
           },
+          "storage": {
+            "properties": {
+              "generation": { "const": 0 },
+              "head_before": { "type": "null" }
+            }
+          },
           "action_id": {
             "const": "release preflight"
           }
@@ -279,6 +302,12 @@
         "properties": {
           "prior_state": {
             "type": "object"
+          },
+          "storage": {
+            "properties": {
+              "generation": { "minimum": 1 },
+              "head_before": { "$ref": "#/$defs/storage_head" }
+            }
           }
         }
       }
@@ -471,6 +500,25 @@
                 "const": "certified"
               }
             }
+          },
+          "artifacts": {
+            "allOf": [
+              {
+                "contains": {
+                  "required": ["kind"],
+                  "properties": { "kind": { "const": "package-tarball" } }
+                }
+              },
+              {
+                "contains": {
+                  "required": ["kind"],
+                  "properties": { "kind": { "const": "manifest" } }
+                }
+              },
+              {
+                "contains": { "required": ["kind"], "properties": { "kind": { "const": "sbom" } } }
+              }
+            ]
           }
         }
       }
@@ -495,6 +543,22 @@
                 "const": "prepared"
               }
             }
+          },
+          "artifacts": {
+            "allOf": [
+              {
+                "contains": {
+                  "required": ["kind"],
+                  "properties": { "kind": { "const": "evidence-bundle" } }
+                }
+              },
+              {
+                "contains": {
+                  "required": ["kind"],
+                  "properties": { "kind": { "const": "provider-result" } }
+                }
+              }
+            ]
           }
         }
       }
@@ -570,43 +634,66 @@
     }
   ],
   "$defs": {
+    "storage_head": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation", "record_digest_sha256"],
+      "properties": {
+        "generation": { "type": "integer", "minimum": 0 },
+        "record_digest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "publication_expectation": {
       "type": "object",
       "additionalProperties": false,
       "required": ["authorization_event_id", "destination", "workflow", "trust"],
       "properties": {
-        "authorization_event_id": {"type": "string", "pattern": "^EA-[0-9a-f]{16}$"},
+        "authorization_event_id": { "type": "string", "pattern": "^EA-[0-9a-f]{16}$" },
         "destination": {
           "type": "object",
           "additionalProperties": false,
           "required": ["system_id", "exact_identifier", "operation"],
           "properties": {
-            "system_id": {"type": "string", "minLength": 1, "maxLength": 200},
-            "exact_identifier": {"type": "string", "minLength": 1, "maxLength": 500},
-            "operation": {"const": "publish"}
+            "system_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "exact_identifier": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "operation": { "const": "publish" }
           }
         },
         "workflow": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["repository", "workflow_path", "workflow_sha", "protected_environment", "protected"],
+          "required": [
+            "repository",
+            "workflow_path",
+            "workflow_sha",
+            "protected_environment",
+            "protected"
+          ],
           "properties": {
-            "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"},
-            "workflow_path": {"$ref": "#/$defs/relative_path"},
-            "workflow_sha": {"$ref": "#/$defs/git_object"},
-            "protected_environment": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
-            "protected": {"const": true}
+            "repository": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+            "workflow_path": { "$ref": "#/$defs/relative_path" },
+            "workflow_sha": { "$ref": "#/$defs/git_object" },
+            "protected_environment": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+            },
+            "protected": { "const": true }
           }
         },
         "trust": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["trust_root_id", "trust_store_digest_sha256", "key_id", "signature_algorithm"],
+          "required": [
+            "trust_root_id",
+            "trust_store_digest_sha256",
+            "key_id",
+            "signature_algorithm"
+          ],
           "properties": {
-            "trust_root_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"},
-            "trust_store_digest_sha256": {"$ref": "#/$defs/sha256"},
-            "key_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"},
-            "signature_algorithm": {"enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"]}
+            "trust_root_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+            "trust_store_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "key_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+            "signature_algorithm": { "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"] }
           }
         }
       }
@@ -767,6 +854,10 @@
       },
       "authorization_event_id": null,
       "publication_expectation": null,
+      "storage": {
+        "generation": 0,
+        "head_before": null
+      },
       "recorded_at": "2026-09-03T00:00:00.000Z",
       "record_digest_sha256": "f90611253c61944031c1283152234bfffcfea6b4df132a426d3e87f9e0b3ab16"
     },
@@ -802,9 +893,7 @@
       ],
       "evidence": {
         "manifest_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-        "receipt_digests": [
-          "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
-        ],
+        "receipt_digests": ["3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"],
         "independently_checkable": true
       },
       "artifacts": [
@@ -845,6 +934,13 @@
           "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
           "key_id": "publication-receipt-2026-09",
           "signature_algorithm": "ed25519"
+        }
+      },
+      "storage": {
+        "generation": 4,
+        "head_before": {
+          "generation": 3,
+          "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
         }
       },
       "recorded_at": "2026-09-03T00:00:00.000Z",

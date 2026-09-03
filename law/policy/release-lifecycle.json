@@ -16,15 +16,44 @@
   "plan_determination": {
     "kernel_id": "devai.kernel.release-plan-determination.v2",
     "required_inputs": [
-      {"order": 1, "kind": "release-intent", "source": "invocation-provided-release-intent-document", "schema": "law/schemas/release-intent.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
-      {"order": 2, "kind": "release-verification-profile", "source": "law/policy/release-verification.json", "schema": "law/schemas/release-verification-profile.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
-      {"order": 3, "kind": "release-lifecycle-policy", "source": "law/policy/release-lifecycle.json", "schema": "law/schemas/release-lifecycle-policy.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
-      {"order": 4, "kind": "action-registry-policy", "source": "law/policy/action-registry.json", "schema": "law/schemas/action-registry.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"}
+      {
+        "order": 1,
+        "kind": "release-intent",
+        "source": "invocation-provided-release-intent-document",
+        "schema": "law/schemas/release-intent.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs"
+      },
+      {
+        "order": 2,
+        "kind": "release-verification-profile",
+        "source": "law/policy/release-verification.json",
+        "schema": "law/schemas/release-verification-profile.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs"
+      },
+      {
+        "order": 3,
+        "kind": "release-lifecycle-policy",
+        "source": "law/policy/release-lifecycle.json",
+        "schema": "law/schemas/release-lifecycle-policy.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs"
+      },
+      {
+        "order": 4,
+        "kind": "action-registry-policy",
+        "source": "law/policy/action-registry.json",
+        "schema": "law/schemas/action-registry.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs"
+      }
     ],
     "semver": {
       "grammar": "semver-2.0.0",
       "transition_order": ["patch", "minor", "major", "prerelease", "support-promotion"],
-      "block_conditions": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"]
+      "block_conditions": [
+        "invalid-semver",
+        "downgrade",
+        "same-version-without-support-promotion",
+        "support-promotion-requires-lts"
+      ]
     },
     "blocked_receipt": {
       "verdict": "block",
@@ -37,12 +66,33 @@
       "mutation_disposition_status": "blocked",
       "bindable_by_mutating_action": false,
       "lifecycle_transition": false,
-      "semver_reason_precedence": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"],
+      "semver_reason_precedence": [
+        "invalid-semver",
+        "downgrade",
+        "same-version-without-support-promotion",
+        "support-promotion-requires-lts"
+      ],
       "semver_outcomes": [
-        {"condition": "invalid-semver", "blocking_reasons": ["invalid-semver"], "mutation_disposition_reason": "invalid-semver"},
-        {"condition": "downgrade", "blocking_reasons": ["downgrade"], "mutation_disposition_reason": "downgrade"},
-        {"condition": "same-version-without-support-promotion", "blocking_reasons": ["same-version-without-support-promotion"], "mutation_disposition_reason": "same-version-without-support-promotion"},
-        {"condition": "support-promotion-requires-lts", "blocking_reasons": ["support-promotion-requires-lts"], "mutation_disposition_reason": "support-promotion-requires-lts"}
+        {
+          "condition": "invalid-semver",
+          "blocking_reasons": ["invalid-semver"],
+          "mutation_disposition_reason": "invalid-semver"
+        },
+        {
+          "condition": "downgrade",
+          "blocking_reasons": ["downgrade"],
+          "mutation_disposition_reason": "downgrade"
+        },
+        {
+          "condition": "same-version-without-support-promotion",
+          "blocking_reasons": ["same-version-without-support-promotion"],
+          "mutation_disposition_reason": "same-version-without-support-promotion"
+        },
+        {
+          "condition": "support-promotion-requires-lts",
+          "blocking_reasons": ["support-promotion-requires-lts"],
+          "mutation_disposition_reason": "support-promotion-requires-lts"
+        }
       ]
     },
     "support": {
@@ -55,24 +105,120 @@
       "values": ["documentation", "metadata", "behavioral"],
       "missing_defaults_to": "behavioral"
     },
-    "known_risks": ["authentication", "authorization", "tenancy", "rls", "cryptography", "secrets", "credentials", "database", "migration", "release-integrity", "evidence", "provenance", "publication", "ledger", "mutation-policy", "test-policy", "test-configuration", "sanitization", "public-api", "export-map", "package-boundary", "lockfile", "toolchain", "cross-package", "large-change", "protected-resource"],
+    "known_risks": [
+      "authentication",
+      "authorization",
+      "tenancy",
+      "rls",
+      "cryptography",
+      "secrets",
+      "credentials",
+      "database",
+      "migration",
+      "release-integrity",
+      "evidence",
+      "provenance",
+      "publication",
+      "ledger",
+      "mutation-policy",
+      "test-policy",
+      "test-configuration",
+      "sanitization",
+      "public-api",
+      "export-map",
+      "package-boundary",
+      "lockfile",
+      "toolchain",
+      "cross-package",
+      "large-change",
+      "protected-resource"
+    ],
     "unknown_risk_behavior": "block",
-    "unconditional_floor": ["formatting-hygiene", "lint", "type-integrity", "schema-consistency", "secret-scan", "path-portability", "package-integrity", "exact-candidate"],
+    "unconditional_floor": [
+      "formatting-hygiene",
+      "lint",
+      "type-integrity",
+      "schema-consistency",
+      "secret-scan",
+      "path-portability",
+      "package-integrity",
+      "exact-candidate"
+    ],
     "transition_capabilities": {
       "patch": ["affected-checks", "dependent-checks", "build-integrity"],
       "prerelease": ["affected-checks", "dependent-checks", "build-integrity"],
-      "minor": ["unit", "integration", "e2e", "consumer", "api-compatibility", "adopter-materialization"],
-      "major": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility"],
-      "support-promotion": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility", "operational-matrix"]
+      "minor": [
+        "unit",
+        "integration",
+        "e2e",
+        "consumer",
+        "api-compatibility",
+        "adopter-materialization"
+      ],
+      "major": [
+        "unit",
+        "integration",
+        "e2e",
+        "consumer",
+        "api-compatibility",
+        "migration",
+        "rollback",
+        "adopter-materialization",
+        "security",
+        "database",
+        "tenancy",
+        "provenance",
+        "reproducibility"
+      ],
+      "support-promotion": [
+        "unit",
+        "integration",
+        "e2e",
+        "consumer",
+        "api-compatibility",
+        "migration",
+        "rollback",
+        "adopter-materialization",
+        "security",
+        "database",
+        "tenancy",
+        "provenance",
+        "reproducibility",
+        "operational-matrix"
+      ]
     },
-    "lts_capabilities": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility", "operational-matrix"],
+    "lts_capabilities": [
+      "unit",
+      "integration",
+      "e2e",
+      "consumer",
+      "api-compatibility",
+      "migration",
+      "rollback",
+      "adopter-materialization",
+      "security",
+      "database",
+      "tenancy",
+      "provenance",
+      "reproducibility",
+      "operational-matrix"
+    ],
     "risk_capability_rules": [
-      {"when_any_risk": true, "add": ["security", "integration"]},
-      {"risks": ["tenancy", "rls"], "add": ["tenancy"]},
-      {"risks": ["database", "migration"], "add": ["database"]},
-      {"risks": ["public-api", "export-map", "package-boundary"], "add": ["api-compatibility", "consumer"]},
-      {"risks": ["release-integrity", "evidence", "provenance", "publication", "ledger"], "add": ["provenance", "reproducibility"]},
-      {"risks": ["lockfile", "toolchain", "cross-package", "large-change"], "add": ["integration", "consumer"]}
+      { "when_any_risk": true, "add": ["security", "integration"] },
+      { "risks": ["tenancy", "rls"], "add": ["tenancy"] },
+      { "risks": ["database", "migration"], "add": ["database"] },
+      {
+        "risks": ["public-api", "export-map", "package-boundary"],
+        "add": ["api-compatibility", "consumer"]
+      },
+      {
+        "risks": ["release-integrity", "evidence", "provenance", "publication", "ledger"],
+        "add": ["provenance", "reproducibility"]
+      },
+      {
+        "risks": ["lockfile", "toolchain", "cross-package", "large-change"],
+        "add": ["integration", "consumer"]
+      }
     ],
     "capability_selection": "sorted-unique-union-of-unconditional-floor-transition-support-risk-profile-risk-and-owner-escalation-capabilities",
     "missing_capability_or_unknown_task_behavior": "block",
@@ -82,6 +228,175 @@
       "otherwise-behavioral-selects-affected",
       "otherwise-selects-none",
       "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"
+    ]
+  },
+  "execution_seams": {
+    "kernel_id": "devai.kernel.release-execution-seams.v1",
+    "request_projection": {
+      "allowed_fields": [
+        "candidate_locator",
+        "repository_locator",
+        "receipt_locators",
+        "provider",
+        "destination"
+      ],
+      "forbidden_fields": [
+        "state_id",
+        "generation",
+        "head",
+        "digest",
+        "record_digest_sha256",
+        "actor",
+        "role",
+        "authority",
+        "authorization",
+        "consent",
+        "effective_authorities"
+      ],
+      "actions": [
+        { "action_id": "release plan", "fields": ["candidate_locator", "repository_locator"] },
+        {
+          "action_id": "release preflight",
+          "fields": ["candidate_locator", "repository_locator", "receipt_locators"]
+        },
+        {
+          "action_id": "release certify",
+          "fields": ["candidate_locator", "repository_locator", "receipt_locators"]
+        },
+        {
+          "action_id": "release prepare",
+          "fields": ["candidate_locator", "repository_locator", "receipt_locators", "destination"]
+        },
+        {
+          "action_id": "release export",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release offline-verify",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release evidence-publish",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release publish",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release resume",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        }
+      ]
+    },
+    "state_store": {
+      "root": ".devai/state/release/v1",
+      "campaign_path": "{root}/{repository-id-sha256}/{candidate-commit}",
+      "head_path": "{campaign-path}/HEAD.json",
+      "record_path": "{campaign-path}/records/{generation}-{record-digest-sha256}.json",
+      "attempt_path": "{campaign-path}/attempts/{attempt-id}.json",
+      "failure_path": "{campaign-path}/failures/{attempt-id}.json",
+      "head_fields": ["generation", "record_digest_sha256"],
+      "record_fields": ["generation", "head_before"],
+      "record_layout": "each-record-carries-its-nonnegative-generation-and-the-exact-head-observed-before-cas;core-requires-generation-zero-and-null-head-before-for-the-opening-record-and-successor-generation-equals-head-before-generation-plus-one",
+      "generation": "nonnegative-integer-starting-at-zero-and-incrementing-by-one-only-on-successful-cas",
+      "cas": "read-head-recheck-candidate-and-predecessor-atomic-create-record-atomic-replace-head-then-fsync-directory",
+      "crash_recovery": "resume-scans-regular-records-recomputes-chain-and-reports-next-action-without-repairing-or-overwriting"
+    },
+    "filesystem_safety": [
+      "lstat-every-parent-and-target",
+      "reject-symlink",
+      "require-regular-file-for-existing-record-or-head",
+      "mkdir-new-private-directories-only",
+      "atomic-create-with-o_excl",
+      "no-overwrite",
+      "atomic-rename-only-for-head-replacement",
+      "fsync-file-and-parent-before-success"
+    ],
+    "producer_boundary": {
+      "adapters_return": ["bounded-raw-output", "opaque-provider-handle"],
+      "adapters_may_not_return": [
+        "lifecycle-record",
+        "state-id",
+        "state-digest",
+        "authority-decision"
+      ],
+      "core": "revalidates-locators-candidate-receipts-and-provider-output-then-composes-and-hashes-record"
+    },
+    "attempts": {
+      "append_before_adapter": true,
+      "success_advances_state": true,
+      "failure_record": "append-only-and-never-advances-state",
+      "replay": "same-request-and-consumed-authorization-refuses"
+    },
+    "evidence_binding": {
+      "check_runner": "core-rehashes-output-and-binds-manifest-and-receipt-digests-into-state-evidence",
+      "prepare_artifacts": ["package-tarball", "manifest", "sbom"],
+      "export": ["evidence-bundle", "provider-result"],
+      "offline_verify": "requires-external-trust-inputs-and-emits-no-state-record"
+    },
+    "remote_order": {
+      "evidence_publish": [
+        "revalidate-state-and-offline-receipt",
+        "verify-unconsumed-exact-authorization-in-ledger",
+        "append-durable-attempt-record",
+        "consume-authorization-in-ledger",
+        "dispatch-provider",
+        "append-success-record",
+        "fsync-success-record-and-head"
+      ],
+      "publish": [
+        "revalidate-state-and-offline-receipt",
+        "verify-unconsumed-exact-authorization-in-ledger",
+        "append-durable-attempt-record",
+        "consume-authorization-in-ledger",
+        "dispatch-protected-provider",
+        "append-publication-dispatched-record",
+        "fsync-success-record-and-head"
+      ],
+      "provider_unavailable": "fail-without-state-advance",
+      "provider_failure": "append-failure-without-state-advance-and-require-fresh-exact-authorization",
+      "crash_after_authorization_consumption": "resume-must-not-dispatch-with-the-consumed-authorization"
+    },
+    "errors": [
+      "release-request-projection-invalid",
+      "release-state-store-unsafe",
+      "release-state-cas-stale-head",
+      "release-adapter-output-invalid",
+      "release-provider-unavailable",
+      "release-provider-failed",
+      "release-authorization-replay",
+      "release-evidence-binding-invalid"
     ]
   },
   "states": [
@@ -246,14 +561,7 @@
       "emits_receipt": null,
       "observational": false,
       "grants_publication_authority": false,
-      "binds_identity": [
-        "repository",
-        "candidate",
-        "input",
-        "evidence",
-        "artifact",
-        "prior-state"
-      ],
+      "binds_identity": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"],
       "authorization": {
         "required": false,
         "authorized_by": null,
@@ -273,7 +581,14 @@
       "emits_receipt": "release-offline-verification-receipt",
       "observational": true,
       "grants_publication_authority": false,
-      "binds_identity": ["repository", "candidate", "evidence", "artifact", "prior-state", "verifier"],
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "evidence",
+        "artifact",
+        "prior-state",
+        "verifier"
+      ],
       "authorization": {
         "required": false,
         "authorized_by": null,
@@ -333,14 +648,7 @@
       "emits_receipt": null,
       "observational": false,
       "grants_publication_authority": false,
-      "binds_identity": [
-        "repository",
-        "candidate",
-        "input",
-        "evidence",
-        "artifact",
-        "prior-state"
-      ],
+      "binds_identity": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"],
       "authorization": {
         "required": false,
         "authorized_by": null,
@@ -360,14 +668,7 @@
       "emits_receipt": null,
       "observational": false,
       "grants_publication_authority": true,
-      "binds_identity": [
-        "repository",
-        "candidate",
-        "input",
-        "evidence",
-        "artifact",
-        "prior-state"
-      ],
+      "binds_identity": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"],
       "authorization": {
         "required": true,
         "authorized_by": "owner",
@@ -447,7 +748,17 @@
         "require-publication_expectation-trust-root-trust-store-digest-key-id-and-signature-algorithm-with-no-key-material",
         "deny-and-append-no-state-when-any-preceding-step-fails"
       ],
-      "errors": ["rpd-action-state-effect-role-mismatch", "rpd-owner-grant-id-mismatch", "rpd-owner-grant-unresolved", "rpd-owner-grant-not-live", "rpd-owner-grant-identity-mismatch", "rpd-destination-mismatch", "rpd-workflow-expectation-invalid", "rpd-trust-expectation-invalid", "rpd-semantic-verification-not-performed"]
+      "errors": [
+        "rpd-action-state-effect-role-mismatch",
+        "rpd-owner-grant-id-mismatch",
+        "rpd-owner-grant-unresolved",
+        "rpd-owner-grant-not-live",
+        "rpd-owner-grant-identity-mismatch",
+        "rpd-destination-mismatch",
+        "rpd-workflow-expectation-invalid",
+        "rpd-trust-expectation-invalid",
+        "rpd-semantic-verification-not-performed"
+      ]
     },
     "receipt_binds_identity": [
       "publication-dispatched-state",
