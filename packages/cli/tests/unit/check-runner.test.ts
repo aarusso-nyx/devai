@@ -24,6 +24,7 @@ import {
   buildTaskPlan,
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
+  matchDeclaredReleaseTaskProcess,
   readTaskDescriptor,
   runCheckTasks,
   sha256Hex,
@@ -1324,6 +1325,39 @@ describe('content-addressed check runner', () => {
         ),
       ),
     ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        request(
+          'node',
+          ['-e', "process.stdout.write('local test dependency closure complete\\n')"],
+          state.root,
+          false,
+        ),
+      ),
+    ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        request(
+          'node',
+          ['-e', "process.stdout.write('local test dependency closure complete\\n')", '--extra'],
+          state.root,
+          false,
+        ),
+      ),
+    ).toBeUndefined();
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        request(
+          'node',
+          ['-e', "process.stdout.write('local test dependency closure complete\\n')"],
+          state.root,
+          true,
+        ),
+      ),
+    ).toBeUndefined();
     expect(
       matchDeclaredCheckTaskProcess(
         state.root,

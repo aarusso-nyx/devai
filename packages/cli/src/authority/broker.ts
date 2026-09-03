@@ -33,6 +33,7 @@ import type { RegistryEntry } from '../define-command.js';
 import {
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
+  matchDeclaredReleaseTaskProcess,
 } from '../services/check-runner/authority-process.js';
 import { matchDeclaredRoundTaskProcess } from '../services/round-run/authority-process.js';
 import {
@@ -572,6 +573,50 @@ function processTarget(
         operation: 'update',
       };
     }
+  }
+
+  if (actionName === 'release preflight' || actionName === 'release certify') {
+    const task = matchDeclaredReleaseTaskProcess(root, request);
+    if (task !== undefined) {
+      return {
+        kind: 'fs',
+        id: `fs:.devai/state/check-cache/v1:${safeLogical(task.nodeId, 'task')}`,
+        repository_id: repositoryId,
+        canonical_relative_path: '.devai/state/check-cache/v1',
+        operation: 'update',
+      };
+    }
+  }
+
+  if (
+    actionName === 'release prepare' &&
+    executable === 'npm' &&
+    JSON.stringify(args.slice(0, 4)) ===
+      JSON.stringify(['pack', '--json', '--ignore-scripts', '--pack-destination']) &&
+    typeof args[4] === 'string' &&
+    args.length === 5
+  ) {
+    const rawOptions = request.arguments[2];
+    if (
+      rawOptions === null ||
+      typeof rawOptions !== 'object' ||
+      Array.isArray(rawOptions) ||
+      typeof (rawOptions as JsonRecord).cwd !== 'string' ||
+      ((rawOptions as JsonRecord).shell !== undefined && (rawOptions as JsonRecord).shell !== false)
+    ) {
+      return undefined;
+    }
+    const cwd = realpathSync(resolve(String((rawOptions as JsonRecord).cwd)));
+    const output = realpathSync(resolve(args[4]));
+    if (!within(root, cwd) || !within(root, output)) return undefined;
+    const path = canonicalRelativePath(root, output);
+    return {
+      kind: 'fs',
+      id: `fs:${path}`,
+      repository_id: repositoryId,
+      canonical_relative_path: path,
+      operation: 'update',
+    };
   }
 
   if (actionName === 'round run') {

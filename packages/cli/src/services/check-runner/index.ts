@@ -37,6 +37,7 @@ export { canonicalBytes, canonicalize, sha256Hex } from './canonical.js';
 export {
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
+  matchDeclaredReleaseTaskProcess,
 } from './authority-process.js';
 export type {
   CandidateReceipt,

@@ -114,6 +114,109 @@ function effect(
 }
 
 describe('authority broker production boundary depth', () => {
+  it('admits only exact declared check tasks for stock release preflight execution', () => {
+    const host = broker('release preflight', 'inspector', [
+      process.execPath,
+      'devai',
+      'release',
+      'preflight',
+      '--request',
+      'request.json',
+      '--as-role',
+      'inspector',
+      '--write',
+    ]);
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare'], { cwd: ROOT, shell: false }],
+            'process',
+          ),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare', '--extra'], { cwd: ROOT, shell: false }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare'], { cwd: ROOT, shell: true }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('admits only the exact contained package command for stock release preparation', () => {
+    const host = broker('release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    const exact = [
+      'pack',
+      '--json',
+      '--ignore-scripts',
+      '--pack-destination',
+      join(ROOT, '.devai/state'),
+    ];
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['npm', exact, { cwd: join(ROOT, 'packages/cli'), shell: false }],
+            'process',
+          ),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['npm', [...exact, '--foreground-scripts'], { cwd: join(ROOT, 'packages/cli') }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['npm', exact, { cwd: join(ROOT, 'packages/cli'), shell: true }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('bootstraps only the exact installed-Constitution binding in an unbound adopter', () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-init-bind-bootstrap-'));
     const entry = entries.find((candidate) => candidate.name === 'init bind');

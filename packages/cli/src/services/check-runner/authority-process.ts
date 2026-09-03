@@ -48,26 +48,11 @@ function matchesDeclaredExecutable(root: string, declared: string, requested: st
   }
 }
 
-export function matchDeclaredCheckTaskProcess(
+function exactDeclaredTask(
   repoRoot: string,
-  invocationArgv: readonly string[],
   request: AuthorityHostEffectRequest,
 ): DeclaredCheckTaskProcess | undefined {
   if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
-  const targets = ['--affected', '--local', '--rc', '--release-intent'].filter((flag) =>
-    invocationArgv.includes(flag),
-  );
-  const suiteIndex = invocationArgv.indexOf('--suite');
-  const suite = suiteIndex < 0 ? undefined : invocationArgv[suiteIndex + 1];
-  const onlyIndex = invocationArgv.indexOf('--only');
-  const only = onlyIndex < 0 ? undefined : invocationArgv[onlyIndex + 1];
-  const suiteRun =
-    only === undefined &&
-    targets.length === 0 &&
-    (suite === undefined || ['quick', 'standard', 'full', 'release'].includes(suite));
-  const ledgerOnlyRun = ['ledger-local', 'ledger-rc'].includes(only ?? '');
-  const explicitTaskRun = invocationArgv.includes('--run') && targets.length === 1;
-  if (!explicitTaskRun && !suiteRun && !ledgerOnlyRun) return undefined;
   const executable = request.arguments[0];
   const argv = request.arguments[1];
   const rawOptions = request.arguments[2];
@@ -88,8 +73,7 @@ export function matchDeclaredCheckTaskProcess(
   if (!existsSync(resolve(options.cwd))) return undefined;
   const cwd = realpathSync(resolve(options.cwd));
   if (!within(root, cwd)) return undefined;
-  const descriptor = readTaskDescriptor(resolve(root, 'test-tasks.json'));
-  const task = descriptor.tasks.find(
+  const task = readTaskDescriptor(resolve(root, 'test-tasks.json')).tasks.find(
     (candidate) =>
       matchesDeclaredExecutable(root, candidate.argv[0] ?? '', executable) &&
       JSON.stringify(candidate.argv.slice(1)) === JSON.stringify(argv) &&
@@ -97,6 +81,37 @@ export function matchDeclaredCheckTaskProcess(
       realpathSync(resolve(root, candidate.cwd)) === cwd,
   );
   return task === undefined ? undefined : { nodeId: task.nodeId, cwd };
+}
+
+/** Exact descriptor-only matcher for lifecycle-owned check-runner execution. */
+export function matchDeclaredReleaseTaskProcess(
+  repoRoot: string,
+  request: AuthorityHostEffectRequest,
+): DeclaredCheckTaskProcess | undefined {
+  return exactDeclaredTask(repoRoot, request);
+}
+
+export function matchDeclaredCheckTaskProcess(
+  repoRoot: string,
+  invocationArgv: readonly string[],
+  request: AuthorityHostEffectRequest,
+): DeclaredCheckTaskProcess | undefined {
+  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  const targets = ['--affected', '--local', '--rc', '--release-intent'].filter((flag) =>
+    invocationArgv.includes(flag),
+  );
+  const suiteIndex = invocationArgv.indexOf('--suite');
+  const suite = suiteIndex < 0 ? undefined : invocationArgv[suiteIndex + 1];
+  const onlyIndex = invocationArgv.indexOf('--only');
+  const only = onlyIndex < 0 ? undefined : invocationArgv[onlyIndex + 1];
+  const suiteRun =
+    only === undefined &&
+    targets.length === 0 &&
+    (suite === undefined || ['quick', 'standard', 'full', 'release'].includes(suite));
+  const ledgerOnlyRun = ['ledger-local', 'ledger-rc'].includes(only ?? '');
+  const explicitTaskRun = invocationArgv.includes('--run') && targets.length === 1;
+  if (!explicitTaskRun && !suiteRun && !ledgerOnlyRun) return undefined;
+  return exactDeclaredTask(repoRoot, request);
 }
 
 export function describeDeclaredCheckTaskRefusal(

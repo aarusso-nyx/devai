@@ -1,13 +1,29 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CAC } from 'cac';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createAuthorityDecisionIssuer,
+  runWithAuthorityHostEffects,
+  type AuthorityHostEffectScope,
+} from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
 
-const { runChecks } = vi.hoisted(() => ({ runChecks: vi.fn() }));
+const { runChecks, declaredRole } = vi.hoisted(() => ({
+  runChecks: vi.fn(),
+  declaredRole: { value: 'inspector' as 'architect' | 'inspector' },
+}));
 vi.mock('../../src/services/check-runner/index.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/services/check-runner/index.js')>()),
   runCheckTasks: runChecks,
@@ -17,17 +33,23 @@ vi.mock('../../src/authority/index.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/authority/index.js')>()),
   declaredInvocationAuthority: () => ({
     kind: 'human',
-    role: 'inspector',
+    role: declaredRole.value,
     declaration_source: 'cli-flag',
   }),
 }));
 
-const { installReleaseLifecycleCommandAdapters, releasePreflight, releaseResume } =
-  await import('../../src/commands/release/lifecycle.js');
+const {
+  installReleaseLifecycleCommandAdapters,
+  releaseCertify,
+  releasePreflight,
+  releasePrepare,
+  releaseResume,
+} = await import('../../src/commands/release/lifecycle.js');
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup());
+  declaredRole.value = 'inspector';
   vi.restoreAllMocks();
 });
 
@@ -49,9 +71,35 @@ function json(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 
+async function withLocalMutationScope<T>(callback: () => Promise<T>): Promise<T> {
+  let ordinal = 0;
+  const issuer = createAuthorityDecisionIssuer({
+    issuer_id: 'release-local-adapter-test',
+    issuer_version: '1.0.0',
+    invocation_id: 'release-local-adapter-test',
+    canonicalSha256,
+    randomId: () => `release-local-adapter-test-${String(++ordinal)}`,
+    now: () => '2026-09-03T00:00:00.000Z',
+    receipt_ttl_ms: 30_000,
+  });
+  const scope: AuthorityHostEffectScope = {
+    action_id: 'release prepare',
+    invocation_id: 'release-local-adapter-test',
+    effect: 'local-write',
+    receipt_store: issuer,
+    apply_effect: (_request, apply) => apply(),
+  };
+  try {
+    return await runWithAuthorityHostEffects(scope, callback);
+  } finally {
+    issuer.dispose();
+  }
+}
+
 describe('release lifecycle command adapter composition', () => {
   it('executes the public preflight through the installed local provider', async () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-release-command-'));
+    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
     mkdirSync(join(root, 'law/policy'), { recursive: true });
     mkdirSync(join(root, 'receipts'), { recursive: true });
     for (const name of [
@@ -64,7 +112,8 @@ describe('release lifecycle command adapter composition', () => {
     const commit = '5'.repeat(40);
     const tree = '6'.repeat(40);
     const manifestBytes = `${canonicalJson({ name: '@aarusso-nyx/devai', version: '1.5.0' })}\n`;
-    writeFileSync(join(root, 'package.json'), manifestBytes);
+    mkdirSync(join(root, 'packages/cli'), { recursive: true });
+    writeFileSync(join(root, 'packages/cli/package.json'), manifestBytes);
     const intent = {
       schemaVersion: '1.0.0',
       release_unit: '@aarusso-nyx/devai',
@@ -103,7 +152,7 @@ describe('release lifecycle command adapter composition', () => {
             package_roster: [
               {
                 package_id: '@aarusso-nyx/devai',
-                manifest_path: 'package.json',
+                manifest_path: 'packages/cli/package.json',
                 manifest_digest_sha256: manifestDigest,
               },
             ],
@@ -131,7 +180,11 @@ describe('release lifecycle command adapter composition', () => {
             packages: [
               {
                 package_id: '@aarusso-nyx/devai',
-                manifest: { path: 'package.json', sha256: manifestDigest, size_bytes: 1 },
+                manifest: {
+                  path: 'packages/cli/package.json',
+                  sha256: manifestDigest,
+                  size_bytes: 1,
+                },
                 tarball: null,
                 sbom: null,
                 evidence_manifest: null,
@@ -224,6 +277,93 @@ describe('release lifecycle command adapter composition', () => {
       stateRoot: join(root, 'stock-state'),
     });
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"next_action":"release certify"'));
+
+    const certifyRequestPath = join(root, 'certify-request.json');
+    writeFileSync(
+      certifyRequestPath,
+      `${canonicalJson({ ...request, action_id: 'release certify' })}\n`,
+    );
+    runChecks
+      .mockReturnValueOnce({
+        schemaVersion: '1.0.0',
+        operation: 'run',
+        plan: {},
+        execution: [
+          {
+            nodeId: 'format',
+            taskKey: 'format',
+            disposition: 'reused',
+            outcome: 'PASS',
+            reason: 'required-floor',
+            durationMs: 0,
+          },
+        ],
+        preflightReceipt: {
+          digest: 'e'.repeat(64),
+          path: '.devai/cache/preflight-receipts/certify.json',
+          value: {},
+        },
+        exitCode: 0,
+      })
+      .mockReturnValueOnce({
+        schemaVersion: '1.0.0',
+        operation: 'run',
+        plan: {},
+        execution: [
+          {
+            nodeId: 'test',
+            taskKey: 'test',
+            disposition: 'executed',
+            outcome: 'PASS',
+            reason: 'selected',
+            durationMs: 1,
+          },
+        ],
+        receipt: {
+          digest: 'f'.repeat(64),
+          path: '.devai/cache/receipts/certify.json',
+          value: {},
+        },
+        exitCode: 0,
+      });
+    output.mockClear();
+    await withAuthorityHostTestScope(() =>
+      captureAction(releaseCertify)({
+        request: certifyRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
+    );
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"certified"'));
+
+    const prepareRequestPath = join(root, 'prepare-request.json');
+    writeFileSync(
+      prepareRequestPath,
+      `${canonicalJson({
+        ...request,
+        action_id: 'release prepare',
+        destination: {
+          kind: 'local-staging',
+          exact_identifier: '.devai/state/release-staging',
+        },
+      })}\n`,
+    );
+    declaredRole.value = 'architect';
+    output.mockClear();
+    await withLocalMutationScope(() =>
+      captureAction(releasePrepare)({
+        request: prepareRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
+    );
+    expect(output.mock.calls, JSON.stringify(errorOutput.mock.calls)).toContainEqual([
+      expect.stringContaining('"state":"prepared"'),
+    ]);
+    expect(
+      readFileSync(join(root, '.devai/state/release-staging/aarusso-nyx-devai-1.5.0.cdx.json')),
+    ).toBeInstanceOf(Buffer);
+    declaredRole.value = 'inspector';
 
     output.mockClear();
     errorOutput.mockClear();

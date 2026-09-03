@@ -2636,6 +2636,12 @@ export async function resumeReleaseLifecycleExecution(input: {
     locatorMismatch ||
     receiptInvalid;
   const ambiguous = !blocked && storeReduction.ambiguous;
+  const remoteFailure =
+    !blocked &&
+    !ambiguous &&
+    storeReduction.failed &&
+    lastStore !== null &&
+    EFFECT_BY_ACTION[lastStore.action_id] === 'remote-write';
   let published: Readonly<Record<string, unknown>> = {
     observed: false,
     receipt: null,
@@ -2781,12 +2787,40 @@ export async function resumeReleaseLifecycleExecution(input: {
   const hasOffline = derived.some((entry) => entry['state'] === 'offline_verified');
   let nextAction: ReleaseAction | null;
   let nextOutcome: 'ready' | 'awaiting-external-receipt' | 'complete' | 'blocked' | 'ambiguous';
+  let blockedReason:
+    | 'broken-chain'
+    | 'stale-head'
+    | 'orphan-record'
+    | 'unterminated-attempt'
+    | 'unknown-provider-result'
+    | 'authorization-consumed'
+    | 'fresh-exact-authorization-required'
+    | 'candidate-identity-mismatch'
+    | 'receipt-identity-mismatch'
+    | null = null;
+  let blockedRequirements: readonly 'fresh_exact_owner_authorization_required'[] = [];
   if (blocked || receiptInvalid) {
     nextAction = null;
     nextOutcome = 'blocked';
+    blockedReason = receiptInvalid
+      ? 'receipt-identity-mismatch'
+      : storeIdentityMismatch || identityMismatch || locatorMismatch
+        ? 'candidate-identity-mismatch'
+        : completionMismatch
+          ? 'orphan-record'
+          : headMismatch
+            ? 'stale-head'
+            : !storeReduction.ok || !stateReduction.ok
+              ? 'broken-chain'
+              : 'receipt-identity-mismatch';
   } else if (ambiguous) {
     nextAction = null;
     nextOutcome = 'ambiguous';
+  } else if (remoteFailure) {
+    nextAction = lastStore.action_id;
+    nextOutcome = 'blocked';
+    blockedReason = 'fresh-exact-authorization-required';
+    blockedRequirements = ['fresh_exact_owner_authorization_required'];
   } else if (publishedObserved) {
     nextAction = null;
     nextOutcome = 'complete';
@@ -2827,6 +2861,12 @@ export async function resumeReleaseLifecycleExecution(input: {
     published,
     next_action: nextAction,
     next_outcome: nextOutcome,
+    ...(nextOutcome === 'blocked'
+      ? {
+          blocked_reason: blockedReason,
+          blocked_requirements: blockedRequirements,
+        }
+      : {}),
     emitted_by: {
       action_id: 'release resume',
       effect: 'read',

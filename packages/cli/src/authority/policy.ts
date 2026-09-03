@@ -393,6 +393,18 @@ export function buildTrustedAuthoritySources(
       subjects: [machineSubject('harness')],
       rationale: 'Article 6 verb-attributed harness state directory transition.',
     }),
+    ...['.devai/state', '.devai/state/**', 'record/proofs', 'record/proofs/**'].map((path, index) =>
+      rule({
+        id: `core-architect-release-prepare-output-${String(index + 1)}`,
+        origin: 'immutable-core',
+        precedence: 900,
+        actionIds: groups.architect.includes('release prepare') ? ['release prepare'] : [],
+        selector: fsSelector(repositoryId, path),
+        subjects: human('architect'),
+        rationale:
+          'Release prepare stages new package and proof artifacts only in canonical state or proof namespaces.',
+      }),
+    ),
     rule({
       id: 'core-harness-worktrees',
       origin: 'immutable-core',

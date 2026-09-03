@@ -768,6 +768,19 @@ describe('release lifecycle execution kernel', () => {
     expect(first).toMatchObject({ ok: false, phase: 'ambiguous' });
     expect(order.at(-2)).toBe('attempt');
     expect(order.at(-1)).toBe('provider');
+    const unknownObservation = await resumeReleaseLifecycleExecution({
+      states: store.readStateRecords(),
+      store_records: store.readStoreRecords(),
+      store_head: store.readHead(),
+      repository: value.repository_locator,
+      candidate: required(store.readStateRecords().at(-1), 'missing exported state').candidate,
+      candidate_locator: value.candidate_locator,
+      receipt_documents: [receipt],
+      resolve_plan_input: resolvePlanInput,
+      offline_receipt_verifier: { verify: ({ receipt: document }) => document },
+    });
+    expect(unknownObservation).toMatchObject({ next_action: null, next_outcome: 'ambiguous' });
+    expect(unknownObservation).not.toHaveProperty('blocked_requirements');
     expect(
       store
         .readStoreRecords()
@@ -1257,6 +1270,25 @@ describe('release lifecycle execution kernel', () => {
       }),
     );
     expect(failed, JSON.stringify(failed)).toMatchObject({ ok: false, phase: 'provider' });
+    const localFailureObservation = await resumeReleaseLifecycleExecution({
+      states: store.readStateRecords(),
+      store_records: store.readStoreRecords(),
+      store_head: store.readHead(),
+      repository: value.repository_locator,
+      candidate: {
+        release_unit: value.candidate_locator.release_units[0]?.release_unit ?? '',
+        version: value.candidate_locator.release_units[0]?.version ?? '',
+        commit: value.candidate_locator.commit,
+        tree: value.candidate_locator.tree,
+      },
+      candidate_locator: value.candidate_locator,
+      receipt_documents: [planReceipt()],
+      resolve_plan_input: resolvePlanInput,
+    });
+    expect(localFailureObservation).toMatchObject({
+      next_action: 'release preflight',
+      next_outcome: 'ready',
+    });
     const passed = await withAuthorityHostTestScope(() =>
       executeReleaseLifecycleAction({
         request: value,
@@ -1317,6 +1349,23 @@ describe('release lifecycle execution kernel', () => {
       }),
     );
     expect(first, JSON.stringify(first)).toMatchObject({ ok: false, phase: 'provider' });
+    const blockedRetry = await resumeReleaseLifecycleExecution({
+      states: store.readStateRecords(),
+      store_records: store.readStoreRecords(),
+      store_head: store.readHead(),
+      repository: value.repository_locator,
+      candidate: exported.candidate,
+      candidate_locator: value.candidate_locator,
+      receipt_documents: [receipt],
+      resolve_plan_input: resolvePlanInput,
+      offline_receipt_verifier: { verify: ({ receipt: document }) => document },
+    });
+    expect(blockedRetry).toMatchObject({
+      next_action: 'release evidence-publish',
+      next_outcome: 'blocked',
+      blocked_reason: 'fresh-exact-authorization-required',
+      blocked_requirements: ['fresh_exact_owner_authorization_required'],
+    });
     const sameGrantProvider = vi.fn(() => ({ outcome: 'unknown' as const }));
     const stale = await withAuthorityHostTestScope(() =>
       executeReleaseLifecycleAction({

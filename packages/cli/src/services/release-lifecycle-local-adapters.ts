@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   existsSync,
@@ -293,7 +292,7 @@ function prepareProvider(context: BuiltInReleaseLifecycleLocalContext): ReleaseP
         throw new Error('release-destination-path-unsafe');
       }
       const outputRoot = ensureContainedDirectory(context.repo_root, destination.exact_identifier);
-      temporary = mkdtempSync(join(tmpdir(), 'devai-release-prepare-'));
+      temporary = mkdtempSync(join(outputRoot, '.prepare-'));
       const releaseUnits = manifestEvidence(context, request);
       const artifacts: ReleaseStateMaterial['artifacts'][number][] = [];
       const preparedUnits = releaseUnits.map((unit) => ({
