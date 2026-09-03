@@ -123,7 +123,35 @@ export interface ReleaseStateMaterial {
     readonly sha256: string;
     readonly size_bytes: number;
   }[];
-  readonly publication_expectation?: unknown;
+}
+
+export interface TrustedReleaseAuthority {
+  readonly actor: {
+    readonly kind: 'human';
+    readonly role: 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
+    readonly declaration_source: 'cli-flag' | 'session-state';
+  };
+  readonly consent: {
+    readonly write: true;
+    readonly allow_publish: boolean;
+    readonly experimental: false;
+  };
+}
+
+export interface PublicationControls {
+  readonly destination: {
+    readonly system_id: string;
+    readonly exact_identifier: string;
+    readonly operation: 'publish';
+  };
+  readonly workflow: {
+    readonly repository: string;
+    readonly workflow_path: string;
+    readonly workflow_sha: string;
+    readonly protected_environment: string;
+    readonly protected: true;
+  };
+  readonly trust: TrustIdentity;
 }
 
 export interface ReleaseLifecycleStateV2 extends Readonly<Record<string, unknown>> {
@@ -140,7 +168,7 @@ export interface ReleaseLifecycleStateV2 extends Readonly<Record<string, unknown
   };
   readonly release_units: readonly ReleaseUnitEvidence[];
   readonly prior_state: StateReference | null;
-  readonly storage: { readonly generation: number; readonly head_before: StoreHead | null };
+  readonly storage: { readonly generation: number; readonly head_before: StateStorageHead | null };
   readonly record_digest_sha256: string;
 }
 
@@ -150,9 +178,21 @@ export interface StateReference {
   readonly record_digest_sha256: string;
 }
 
-export interface StoreHead {
+export interface StateStorageHead {
   readonly generation: number;
   readonly record_digest_sha256: string;
+}
+
+export interface StoreHead extends Readonly<Record<string, unknown>> {
+  readonly schemaVersion: '2.0.0';
+  readonly canonicalization: Readonly<Record<string, unknown>>;
+  readonly repository: ReleaseLifecycleRequest['repository_locator'];
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly generation: number;
+  readonly state_id: string;
+  readonly state_digest_sha256: string;
+  readonly completion_record: StoreRecordReference & { readonly attempt_id: string };
+  readonly head_digest_sha256: string;
 }
 
 export interface StoreRecord extends Readonly<Record<string, unknown>> {
@@ -206,10 +246,28 @@ export type OfflineVerificationProvider = (
   exportedState: ReleaseLifecycleStateV2,
 ) => unknown | Promise<unknown>;
 
-export interface AuthorizationResolution {
-  readonly ok: boolean;
-  readonly grant_event_id?: string;
-  readonly code?: string;
+interface AuthorizationLedgerHead {
+  readonly ledger_id: string;
+  readonly sequence: number;
+  readonly event_id: string;
+  readonly event_digest_sha256: string;
+}
+
+export type AuthorizationResolution =
+  | {
+      readonly ok: true;
+      readonly grant_event: unknown;
+      readonly grant_event_digest_sha256: string;
+      readonly ledger_head: AuthorizationLedgerHead;
+      readonly semantic_verification_performed: true;
+    }
+  | { readonly ok: false; readonly code: string };
+
+export interface AuthorizationConsumptionProof {
+  readonly durable: true;
+  readonly consumed_event: unknown;
+  readonly consumed_event_digest_sha256: string;
+  readonly ledger_head: AuthorizationLedgerHead;
 }
 
 export interface AuthorizationBridge {
@@ -218,7 +276,7 @@ export interface AuthorizationBridge {
   ) => AuthorizationResolution | Promise<AuthorizationResolution>;
   readonly consume: (
     binding: AuthorizationAttemptBinding & { readonly grant_event_id: string },
-  ) => void | Promise<void>;
+  ) => AuthorizationConsumptionProof | Promise<AuthorizationConsumptionProof>;
 }
 
 export interface AuthorizationAttemptBinding {
@@ -226,8 +284,12 @@ export interface AuthorizationAttemptBinding {
   readonly action_id: PersistedReleaseAction;
   readonly request_digest_sha256: string;
   readonly repository: ReleaseLifecycleRequest['repository_locator'];
-  readonly candidate: ReleaseLifecycleRequest['candidate_locator'];
-  readonly destination: NonNullable<ReleaseLifecycleRequest['destination']>;
+  readonly candidate: ReleaseLifecycleStateV2['candidate'];
+  readonly destination: {
+    readonly system_id: string;
+    readonly exact_identifier: string;
+    readonly operation: 'create' | 'publish';
+  };
 }
 
 export type ReceiptResolver = (
@@ -277,14 +339,14 @@ const EFFECT_BY_ACTION = {
   'release publish': 'remote-write',
 } as const;
 
-const ROLE_BY_ACTION = {
-  'release preflight': 'inspector',
-  'release certify': 'inspector',
-  'release prepare': 'architect',
-  'release export': 'architect',
-  'release evidence-publish': 'owner',
-  'release publish': 'owner',
-} as const;
+const ROLES_BY_ACTION: Readonly<Record<PersistedReleaseAction, readonly string[]>> = {
+  'release preflight': ['inspector'],
+  'release certify': ['inspector'],
+  'release prepare': ['architect'],
+  'release export': ['architect'],
+  'release evidence-publish': ['owner'],
+  'release publish': ['owner'],
+};
 
 const STATE_CANONICALIZATION = {
   kernel_id: 'devai.kernel.release-lifecycle-state.v2',
@@ -301,6 +363,14 @@ const STORE_CANONICALIZATION = {
   digest_algorithm: 'sha256',
   projection_excludes: ['record_id', 'record_digest_sha256'],
   id_derivation: 'RLE-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256',
+} as const;
+
+const HEAD_CANONICALIZATION = {
+  kernel_id: 'devai.kernel.release-lifecycle-store-head.v2',
+  encoding: 'utf-8',
+  json_form: 'rfc8785-jcs',
+  digest_algorithm: 'sha256',
+  projection_excludes: ['head_digest_sha256'],
 } as const;
 
 function object(value: unknown): Readonly<Record<string, unknown>> {
@@ -367,12 +437,18 @@ export function validateReleaseLifecycleRequest(
     );
   }
   const receiptKinds = request.receipt_locators?.map((receipt) => receipt.kind) ?? [];
-  if (request.action_id === 'release preflight' && !same(receiptKinds, ['release-plan-receipt'])) {
+  if (
+    request.action_id !== 'release plan' &&
+    request.action_id !== 'release evidence-publish' &&
+    request.action_id !== 'release resume' &&
+    (receiptKinds.length !== request.candidate_locator.release_units.length ||
+      receiptKinds.some((kind) => kind !== 'release-plan-receipt'))
+  ) {
     throw new Error('release-receipt-identity-mismatch');
   }
   if (
     request.action_id === 'release evidence-publish' &&
-    !same(receiptKinds, ['release-offline-verification-receipt'])
+    (receiptKinds.length !== 1 || receiptKinds[0] !== 'release-offline-verification-receipt')
   ) {
     throw new Error('release-receipt-identity-mismatch');
   }
@@ -388,40 +464,96 @@ function without(value: Readonly<Record<string, unknown>>, keys: readonly string
   return Object.fromEntries(Object.entries(value).filter(([key]) => !excluded.has(key)));
 }
 
-function verifyBoundReceipts(request: ReleaseLifecycleRequest, resolver?: ReceiptResolver): void {
+interface VerifiedReceipt {
+  readonly kind: 'release-plan-receipt' | 'release-offline-verification-receipt';
+  readonly value: Readonly<Record<string, unknown>>;
+}
+
+function verifyReceiptDocument(valueInput: unknown): VerifiedReceipt {
+  const value = object(valueInput);
+  const kind = value['receipt_kind'];
+  if (kind !== 'release-plan-receipt' && kind !== 'release-offline-verification-receipt') {
+    throw new Error('release-receipt-identity-mismatch');
+  }
+  const parsed =
+    kind === 'release-plan-receipt'
+      ? parsers.releasePlanReceipt.safeParse<Readonly<Record<string, unknown>>>(value)
+      : parsers.releaseOfflineVerificationReceipt.safeParse<Readonly<Record<string, unknown>>>(
+          value,
+        );
+  if (!parsed.ok) throw new Error('release-receipt-identity-mismatch');
+  const receipt = parsed.value;
+  const digest = canonicalSha256(without(receipt, ['receipt_id', 'receipt_digest_sha256']));
+  const prefix = kind === 'release-plan-receipt' ? 'RPL' : 'ROV';
+  if (
+    receipt['receipt_digest_sha256'] !== digest ||
+    receipt['receipt_id'] !== `${prefix}-${digest.slice(0, 16)}` ||
+    receipt['verdict'] !== 'pass'
+  ) {
+    throw new Error(
+      receipt['verdict'] === 'pass'
+        ? 'release-receipt-identity-mismatch'
+        : 'release-receipt-verdict-invalid',
+    );
+  }
+  return { kind, value: receipt };
+}
+
+function verifyBoundReceipts(
+  request: ReleaseLifecycleRequest,
+  resolver?: ReceiptResolver,
+): readonly VerifiedReceipt[] {
   const locators = request.receipt_locators ?? [];
-  if (locators.length === 0) return;
+  if (locators.length === 0) return [];
   if (resolver === undefined) throw new Error('release-receipt-provider-unavailable');
+  const verified: VerifiedReceipt[] = [];
   for (const locator of locators) {
-    const value = object(resolver(locator));
-    const parsed =
-      locator.kind === 'release-plan-receipt'
-        ? parsers.releasePlanReceipt.safeParse(value)
-        : parsers.releaseOfflineVerificationReceipt.safeParse(value);
-    if (!parsed.ok) throw new Error('release-receipt-identity-mismatch');
-    const digest = canonicalSha256(without(value, ['receipt_id', 'receipt_digest_sha256']));
+    const receipt = verifyReceiptDocument(resolver(locator));
+    const value = receipt.value;
     if (
+      receipt.kind !== locator.kind ||
       value['receipt_id'] !== locator.receipt_id ||
-      value['receipt_digest_sha256'] !== locator.receipt_digest_sha256 ||
-      digest !== locator.receipt_digest_sha256
+      value['receipt_digest_sha256'] !== locator.receipt_digest_sha256
     ) {
       throw new Error('release-receipt-identity-mismatch');
     }
     const repository = object(value['repository']);
     const candidate = object(value['candidate']);
-    const primary = request.candidate_locator.release_units[0];
+    const candidateMatch = request.candidate_locator.release_units.some(
+      (unit) =>
+        candidate['release_unit'] === unit.release_unit && candidate['version'] === unit.version,
+    );
     if (
-      primary === undefined ||
       !same(repository, request.repository_locator) ||
       candidate['commit'] !== request.candidate_locator.commit ||
       candidate['tree'] !== request.candidate_locator.tree ||
-      candidate['release_unit'] !== primary.release_unit ||
-      candidate['version'] !== primary.version
+      !candidateMatch
     ) {
       throw new Error('release-receipt-identity-mismatch');
     }
-    if (value['verdict'] !== 'pass') throw new Error('release-receipt-verdict-invalid');
+    verified.push(receipt);
   }
+  const planCandidates = verified
+    .filter((receipt) => receipt.kind === 'release-plan-receipt')
+    .map((receipt) => receipt.value['candidate'])
+    .sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right), 'en'));
+  if (
+    planCandidates.length > 0 &&
+    !same(
+      planCandidates,
+      request.candidate_locator.release_units
+        .map((unit) => ({
+          release_unit: unit.release_unit,
+          version: unit.version,
+          commit: request.candidate_locator.commit,
+          tree: request.candidate_locator.tree,
+        }))
+        .sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right), 'en')),
+    )
+  ) {
+    throw new Error('release-receipt-identity-mismatch');
+  }
+  return verified;
 }
 
 export function finalizeReleaseStateV2(
@@ -500,7 +632,6 @@ export interface StoreReduction {
 export function reduceStoreRecords(values: readonly unknown[]): StoreReduction {
   const records: StoreRecord[] = [];
   const errors = new Set<string>();
-  const terminals = new Map<string, StoreRecord>();
   let prior: StoreRecord | null = null;
   let repositoryDigest: string | undefined;
   let candidateDigest: string | undefined;
@@ -524,22 +655,75 @@ export function reduceStoreRecords(values: readonly unknown[]): StoreReduction {
       errors.add('release-state-store-repository-mismatch');
     if (candidateDigest !== canonicalSha256(record['candidate']))
       errors.add('release-state-store-candidate-mismatch');
-    if (record.record_kind !== 'attempt') {
-      if (terminals.has(record.attempt_id)) errors.add('release-state-store-duplicate-terminal');
-      terminals.set(record.attempt_id, record);
+
+    const remote = EFFECT_BY_ACTION[record.action_id] === 'remote-write';
+    if (record.record_kind === 'attempt') {
+      if (prior === null) {
+        if (record.predecessor_record !== null) errors.add('release-store-opening-attempt-invalid');
+      } else if (prior.record_kind !== 'completion') {
+        errors.add('release-store-attempt-predecessor-invalid');
+      }
+      const expectedAttempt = deriveAttemptId({
+        request_digest_sha256: record.request_digest_sha256,
+        action_id: record.action_id,
+        sequence: record.sequence,
+        predecessor_record: record.predecessor_record,
+      });
+      if (record.attempt_id !== expectedAttempt)
+        errors.add('release-store-opening-attempt-invalid');
+      if (
+        record.provider_handle !== null ||
+        record.provider_dispatch.status !== 'not-dispatched' ||
+        record.provider_dispatch.handle_observed
+      ) {
+        errors.add('release-provider-handle-observation-invalid');
+      }
+      if (remote !== (record.authorization_event_id !== null)) {
+        errors.add('release-authorization-attempt-binding-invalid');
+      }
+    } else {
+      if (
+        prior === null ||
+        prior.record_kind !== 'attempt' ||
+        record.predecessor_record === null ||
+        !same(record.predecessor_record, storeRecordReference(prior)) ||
+        record.attempt_id !== prior.attempt_id ||
+        record.action_id !== prior.action_id ||
+        record.request_digest_sha256 !== prior.request_digest_sha256 ||
+        record.authorization_event_id !== prior.authorization_event_id ||
+        !same(record.repository, prior.repository) ||
+        !same(record.candidate, prior.candidate)
+      ) {
+        errors.add('release-store-terminal-attempt-link-invalid');
+      }
+      if (
+        record.record_kind === 'completion' &&
+        (record.completion?.state !== STATE_BY_ACTION[record.action_id] ||
+          (remote &&
+            (record.provider_dispatch.status !== 'dispatched' ||
+              !record.provider_dispatch.handle_observed ||
+              record.provider_handle === null)))
+      ) {
+        errors.add('release-store-terminal-attempt-link-invalid');
+      }
+      if (
+        record.record_kind === 'failure' &&
+        remote &&
+        record.provider_dispatch.status !== 'failed-before-dispatch'
+      ) {
+        errors.add('release-store-terminal-attempt-link-invalid');
+      }
+      if (
+        record.record_kind === 'unknown-provider-result' &&
+        record.provider_dispatch.status !== 'unknown'
+      ) {
+        errors.add('release-store-completion-unknown-conflict');
+      }
     }
     prior = record;
   }
-  const attempts = records.filter((record) => record.record_kind === 'attempt');
-  for (const terminal of terminals.values()) {
-    if (!attempts.some((attempt) => attempt.attempt_id === terminal.attempt_id)) {
-      errors.add('release-state-store-terminal-without-attempt');
-    }
-  }
-  const pending = attempts.some((attempt) => !terminals.has(attempt.attempt_id));
-  const unknown = [...terminals.values()].some(
-    (record) => record.record_kind === 'unknown-provider-result',
-  );
+  const pending = prior?.record_kind === 'attempt';
+  const unknown = records.some((record) => record.record_kind === 'unknown-provider-result');
   return {
     ok: errors.size === 0,
     records,
@@ -599,11 +783,250 @@ function readRegularJson(path: string): unknown {
 }
 
 function same(left: unknown, right: unknown): boolean {
+  if (left === undefined || right === undefined) return left === right;
   return canonicalSha256(left) === canonicalSha256(right);
+}
+
+function primaryCandidate(request: ReleaseLifecycleRequest): ReleaseLifecycleStateV2['candidate'] {
+  const unit = request.candidate_locator.release_units[0];
+  if (unit === undefined) throw new Error('release-release-unit-bijection-invalid');
+  return {
+    release_unit: unit.release_unit,
+    version: unit.version,
+    commit: request.candidate_locator.commit,
+    tree: request.candidate_locator.tree,
+  };
+}
+
+function authorizationDestination(
+  request: ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction },
+): AuthorizationAttemptBinding['destination'] {
+  if (request.destination === undefined) throw new Error('release-request-projection-invalid');
+  return {
+    system_id: request.destination.kind,
+    exact_identifier: request.destination.exact_identifier,
+    operation: request.action_id === 'release evidence-publish' ? 'create' : 'publish',
+  };
+}
+
+function assertTrustedAuthority(
+  action: PersistedReleaseAction,
+  authority: TrustedReleaseAuthority | undefined,
+): TrustedReleaseAuthority {
+  if (
+    authority === undefined ||
+    authority.actor.kind !== 'human' ||
+    !ROLES_BY_ACTION[action].includes(authority.actor.role) ||
+    !['cli-flag', 'session-state'].includes(authority.actor.declaration_source) ||
+    authority.consent.write !== true ||
+    authority.consent.experimental !== false ||
+    authority.consent.allow_publish !== (EFFECT_BY_ACTION[action] === 'remote-write')
+  ) {
+    throw new Error('release-authority-context-invalid');
+  }
+  return authority;
+}
+
+function assertPublicationControls(
+  request: ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction },
+  controls: PublicationControls | undefined,
+): asserts controls is PublicationControls {
+  const destination = request.destination;
+  const workflowPath = controls?.workflow.workflow_path ?? '';
+  if (
+    controls === undefined ||
+    destination === undefined ||
+    destination.trust === undefined ||
+    controls.destination.system_id !== destination.kind ||
+    controls.destination.exact_identifier !== destination.exact_identifier ||
+    controls.destination.operation !== 'publish' ||
+    controls.workflow.repository !== request.repository_locator.id ||
+    workflowPath.startsWith('/') ||
+    workflowPath.split('/').includes('..') ||
+    workflowPath.includes('\\') ||
+    workflowPath.includes('\0') ||
+    workflowPath.length === 0 ||
+    !/^[a-f0-9]{40}$/u.test(controls.workflow.workflow_sha) ||
+    controls.workflow.protected_environment.length === 0 ||
+    controls.workflow.protected !== true ||
+    !same(controls.trust, destination.trust)
+  ) {
+    throw new Error('rpd-workflow-expectation-invalid');
+  }
+}
+
+function eventIdentity(value: unknown): Readonly<Record<string, unknown>> {
+  const parsed =
+    parsers.effectAuthorizationEvent.safeParse<Readonly<Record<string, unknown>>>(value);
+  if (!parsed.ok) throw new Error('release-authorization-attempt-binding-invalid');
+  const event = parsed.value;
+  const payloadDigest = canonicalSha256(without(event, ['event_id', 'payload_digest_sha256']));
+  if (
+    event['payload_digest_sha256'] !== payloadDigest ||
+    event['event_id'] !== `EA-${payloadDigest.slice(0, 16)}`
+  ) {
+    throw new Error('release-authorization-attempt-binding-invalid');
+  }
+  return event;
+}
+
+function assertLedgerHead(value: AuthorizationLedgerHead): void {
+  if (
+    typeof value.ledger_id !== 'string' ||
+    !Number.isInteger(value.sequence) ||
+    value.sequence < 1 ||
+    !/^EA-[a-f0-9]{16}$/u.test(value.event_id) ||
+    !/^[a-f0-9]{64}$/u.test(value.event_digest_sha256)
+  ) {
+    throw new Error('release-authorization-attempt-binding-invalid');
+  }
+}
+
+function grantResource(binding: AuthorizationAttemptBinding) {
+  return {
+    kind: 'remote',
+    system_id: binding.destination.system_id,
+    exact_identifier: binding.destination.exact_identifier,
+    operations: [binding.destination.operation],
+  } as const;
+}
+
+function verifyGrantResolution(
+  resolution: AuthorizationResolution,
+  binding: AuthorizationAttemptBinding,
+  trustedAuthority: TrustedReleaseAuthority,
+): {
+  readonly grant: Readonly<Record<string, unknown>>;
+  readonly grant_event_id: string;
+  readonly ledger_head: AuthorizationLedgerHead;
+} {
+  if (!resolution.ok) throw new Error(resolution.code);
+  if (resolution.semantic_verification_performed !== true) {
+    throw new Error('release-authorization-attempt-binding-invalid');
+  }
+  assertLedgerHead(resolution.ledger_head);
+  const grant = eventIdentity(resolution.grant_event);
+  const candidate = primaryCandidateFromBinding(binding);
+  if (
+    grant['schemaVersion'] !== '1.0.0' ||
+    grant['kind'] !== 'granted' ||
+    grant['grant_event_id'] !== null ||
+    canonicalSha256(grant) !== resolution.grant_event_digest_sha256 ||
+    grant['ledger_id'] !== resolution.ledger_head.ledger_id ||
+    grant['action_id'] !== binding.action_id ||
+    grant['effect'] !== 'remote-write' ||
+    !same(grant['resource'], grantResource(binding)) ||
+    !same(grant['repository'], binding.repository) ||
+    !same(grant['candidate'], candidate) ||
+    grant['subject_role'] !== trustedAuthority.actor.role ||
+    !same(grant['grantor'], trustedAuthority.actor) ||
+    !same(grant['consent'], trustedAuthority.consent) ||
+    grant['one_time'] !== true ||
+    grant['uses_permitted'] !== 1 ||
+    grant['bearer_transferable'] !== false ||
+    grant['delegable'] !== false
+  ) {
+    throw new Error('release-authorization-attempt-binding-invalid');
+  }
+  return {
+    grant,
+    grant_event_id: String(grant['event_id']),
+    ledger_head: resolution.ledger_head,
+  };
+}
+
+function primaryCandidateFromBinding(
+  binding: AuthorizationAttemptBinding,
+): ReleaseLifecycleStateV2['candidate'] {
+  return binding.candidate;
+}
+
+function verifyConsumptionProof(
+  proof: AuthorizationConsumptionProof,
+  binding: AuthorizationAttemptBinding,
+  grant: Readonly<Record<string, unknown>>,
+  grantEventId: string,
+  predecessor: AuthorizationLedgerHead,
+): string {
+  if (proof.durable !== true) throw new Error('release-authorization-consumption-not-durable');
+  assertLedgerHead(proof.ledger_head);
+  const event = eventIdentity(proof.consumed_event);
+  const eventDigest = canonicalSha256(event);
+  const expectedConsumptionBinding = {
+    ...binding,
+    grant_event_id: grantEventId,
+    ledger_predecessor_digest_sha256: predecessor.event_digest_sha256,
+  };
+  if (
+    event['schemaVersion'] !== '2.0.0' ||
+    event['kind'] !== 'consumed' ||
+    event['consumed_by_state_id'] !== null ||
+    event['grant_event_id'] !== grantEventId ||
+    event['ledger_id'] !== predecessor.ledger_id ||
+    event['sequence'] !== predecessor.sequence + 1 ||
+    event['previous_event_digest_sha256'] !== predecessor.event_digest_sha256 ||
+    event['action_id'] !== binding.action_id ||
+    event['effect'] !== 'remote-write' ||
+    !same(event['resource'], grant['resource']) ||
+    !same(event['repository'], grant['repository']) ||
+    !same(event['candidate'], grant['candidate']) ||
+    !same(event['grantor'], grant['grantor']) ||
+    event['subject_role'] !== grant['subject_role'] ||
+    !same(event['consent'], grant['consent']) ||
+    !same(event['consumption_binding'], expectedConsumptionBinding) ||
+    proof.consumed_event_digest_sha256 !== eventDigest ||
+    proof.ledger_head.ledger_id !== predecessor.ledger_id ||
+    proof.ledger_head.sequence !== event['sequence'] ||
+    proof.ledger_head.event_id !== event['event_id'] ||
+    proof.ledger_head.event_digest_sha256 !== eventDigest
+  ) {
+    throw new Error('release-authorization-consumption-not-durable');
+  }
+  return String(event['event_id']);
+}
+
+export function finalizeStoreHead(draft: Omit<StoreHead, 'head_digest_sha256'>): StoreHead {
+  const head = { ...draft, head_digest_sha256: canonicalSha256(draft) };
+  return parsers.releaseLifecycleStoreHead.parse<StoreHead>(head);
+}
+
+export function verifyStoreHeadIdentity(value: unknown): StoreHead {
+  const parsed = parsers.releaseLifecycleStoreHead.safeParse<StoreHead>(value);
+  if (!parsed.ok) throw new Error('release-state-head-invalid');
+  const head = parsed.value;
+  if (head.head_digest_sha256 !== canonicalSha256(without(head, ['head_digest_sha256']))) {
+    throw new Error('release-state-head-invalid');
+  }
+  return head;
+}
+
+function headForCompletion(state: ReleaseLifecycleStateV2, completion: StoreRecord): StoreHead {
+  if (
+    completion.record_kind !== 'completion' ||
+    completion.attempt_id === '' ||
+    completion.completion?.state_id !== state.state_id ||
+    completion.completion.state_digest_sha256 !== state.record_digest_sha256
+  ) {
+    throw new Error('release-store-head-completion-mismatch');
+  }
+  return finalizeStoreHead({
+    schemaVersion: '2.0.0',
+    canonicalization: HEAD_CANONICALIZATION,
+    repository: state.repository,
+    candidate: { commit: state.candidate.commit, tree: state.candidate.tree },
+    generation: state.storage.generation,
+    state_id: state.state_id,
+    state_digest_sha256: state.record_digest_sha256,
+    completion_record: {
+      ...storeRecordReference(completion),
+      attempt_id: completion.attempt_id,
+    },
+  });
 }
 
 export class ReleaseLifecycleFileStore {
   readonly campaignDirectory: string;
+  private executionLocked = false;
 
   constructor(root: string, request: ReleaseLifecycleRequest) {
     const absoluteRoot = resolve(root);
@@ -620,19 +1043,39 @@ export class ReleaseLifecycleFileStore {
     }
   }
 
+  async withExecutionLock<T>(operation: () => T | Promise<T>): Promise<T> {
+    this.initialize();
+    const path = join(this.campaignDirectory, '.EXECUTION.lock');
+    let descriptor: number | undefined;
+    try {
+      descriptor = openSync(path, 'wx', 0o600);
+      writeSync(descriptor, 'release-lifecycle-v2\n');
+      fsyncSync(descriptor);
+      closeSync(descriptor);
+      descriptor = undefined;
+      fsyncDirectory(this.campaignDirectory);
+    } catch (error) {
+      if (descriptor !== undefined) closeSync(descriptor);
+      throw new Error(
+        (error as NodeJS.ErrnoException).code === 'EEXIST'
+          ? 'release-state-store-concurrent-writer'
+          : 'release-state-store-unsafe',
+      );
+    }
+    this.executionLocked = true;
+    try {
+      return await operation();
+    } finally {
+      this.executionLocked = false;
+      unlinkSync(path);
+      fsyncDirectory(this.campaignDirectory);
+    }
+  }
+
   readHead(): StoreHead | null {
     const path = join(this.campaignDirectory, 'HEAD.json');
     if (!existsSync(path)) return null;
-    const value = object(readRegularJson(path));
-    if (
-      !Number.isInteger(value['generation']) ||
-      typeof value['record_digest_sha256'] !== 'string' ||
-      !/^[a-f0-9]{64}$/u.test(value['record_digest_sha256']) ||
-      Object.keys(value).length !== 2
-    ) {
-      throw new Error('release-state-store-unsafe');
-    }
-    return value as unknown as StoreHead;
+    return verifyStoreHeadIdentity(readRegularJson(path));
   }
 
   readStateRecords(): ReleaseLifecycleStateV2[] {
@@ -667,6 +1110,7 @@ export class ReleaseLifecycleFileStore {
         'completions',
         'failures',
         'unknown',
+        ...(this.executionLocked ? ['.EXECUTION.lock'] : []),
       ]);
       if (readdirSync(this.campaignDirectory).some((entry) => !allowed.has(entry))) {
         throw new Error('release-state-store-unsafe');
@@ -694,6 +1138,7 @@ export class ReleaseLifecycleFileStore {
   }
 
   appendStoreRecord(record: StoreRecord): void {
+    if (!this.executionLocked) throw new Error('release-state-store-lock-required');
     verifyStoreRecordIdentity(record);
     this.initialize();
     const directoryName =
@@ -714,7 +1159,12 @@ export class ReleaseLifecycleFileStore {
     );
   }
 
-  appendStateAndAdvanceHead(state: ReleaseLifecycleStateV2, expected: StoreHead | null): void {
+  appendStateAndAdvanceHead(
+    state: ReleaseLifecycleStateV2,
+    completion: StoreRecord,
+    expected: StoreHead | null,
+  ): void {
+    if (!this.executionLocked) throw new Error('release-state-store-lock-required');
     verifyReleaseStateIdentity(state, true);
     this.initialize();
     const statePath = join(
@@ -725,10 +1175,7 @@ export class ReleaseLifecycleFileStore {
     exclusiveWrite(statePath, state);
     const observed = this.readHead();
     if (!same(observed, expected)) throw new Error('release-state-cas-stale-head');
-    const next = {
-      generation: state.storage.generation,
-      record_digest_sha256: state.record_digest_sha256,
-    };
+    const next = headForCompletion(state, completion);
     const headPath = join(this.campaignDirectory, 'HEAD.json');
     const temporary = join(this.campaignDirectory, `.HEAD-${state.state_id}.tmp`);
     try {
@@ -877,6 +1324,159 @@ function assertMaterialBijection(
       }
     }
   }
+  if (action === 'release preflight' || action === 'release certify') return;
+  const topByKey = new Map<string, Readonly<Record<string, unknown>>>();
+  for (const artifact of material.artifacts) {
+    const key = `${artifact.kind}\0${artifact.path}`;
+    if (topByKey.has(key)) throw new Error('release-release-unit-bijection-invalid');
+    topByKey.set(key, artifact);
+  }
+  const requiredTop: Readonly<Record<string, unknown>>[] = [];
+  for (const unit of material.release_units) {
+    for (const pkg of unit.packages) {
+      if (pkg.manifest !== null) requiredTop.push({ kind: 'manifest', ...pkg.manifest });
+      if (pkg.tarball !== null) requiredTop.push({ kind: 'package-tarball', ...pkg.tarball });
+      if (pkg.sbom !== null) requiredTop.push({ kind: 'sbom', ...pkg.sbom });
+      if (pkg.evidence_manifest !== null)
+        requiredTop.push({ kind: 'manifest', ...pkg.evidence_manifest });
+      if (pkg.provider_result !== null)
+        requiredTop.push({ kind: 'provider-result', ...pkg.provider_result });
+    }
+  }
+  for (const artifact of requiredTop) {
+    const key = `${String(artifact['kind'])}\0${String(artifact['path'])}`;
+    if (!same(topByKey.get(key), artifact)) {
+      throw new Error('release-release-unit-bijection-invalid');
+    }
+  }
+}
+
+function assertStateMatchesRequest(
+  request: ReleaseLifecycleRequest,
+  state: ReleaseLifecycleStateV2,
+): void {
+  const requested = request.candidate_locator.release_units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.package_roster.map((pkg) => ({
+      package_id: pkg.package_id,
+      manifest_path: pkg.manifest_path,
+      manifest_digest_sha256: pkg.manifest_digest_sha256,
+    })),
+  }));
+  const observed = state.release_units.map((unit) => ({
+    release_unit: unit.release_unit,
+    version: unit.version,
+    packages: unit.packages.map((pkg) => ({
+      package_id: pkg.package_id,
+      manifest_path: pkg.manifest?.path,
+      manifest_digest_sha256: pkg.manifest?.sha256,
+    })),
+  }));
+  if (
+    !same(state.repository, request.repository_locator) ||
+    !same(state.candidate, primaryCandidate(request)) ||
+    !same(requested, observed)
+  ) {
+    throw new Error('release-state-identity-mismatch');
+  }
+}
+
+function sortedArtifacts(values: readonly unknown[]): readonly unknown[] {
+  return [...values].sort((left, right) =>
+    canonicalJson(left).localeCompare(canonicalJson(right), 'en'),
+  );
+}
+
+function offlineArtifactProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
+  const allowed = new Set(['package-tarball', 'evidence-bundle', 'manifest', 'attestation']);
+  const artifacts: unknown[] = (state['artifacts'] as readonly Readonly<Record<string, unknown>>[])
+    .filter((artifact) => allowed.has(String(artifact['kind'])))
+    .map((artifact) => artifact);
+  for (const unit of state.release_units) {
+    for (const pkg of unit.packages) {
+      if (pkg.manifest !== null) artifacts.push({ kind: 'manifest', ...pkg.manifest });
+      if (pkg.tarball !== null) artifacts.push({ kind: 'package-tarball', ...pkg.tarball });
+      if (pkg.evidence_manifest !== null)
+        artifacts.push({ kind: 'manifest', ...pkg.evidence_manifest });
+    }
+  }
+  const unique = new Map(artifacts.map((artifact) => [canonicalJson(artifact), artifact]));
+  return sortedArtifacts([...unique.values()]);
+}
+
+function assertPriorMaterialContinuity(
+  action: PersistedReleaseAction,
+  material: ReleaseStateMaterial,
+  prior: ReleaseLifecycleStateV2 | null,
+): void {
+  if (prior === null) return;
+  if (action === 'release evidence-publish' || action === 'release publish') {
+    if (
+      !same(material.release_units, prior.release_units) ||
+      !same(material.inputs, prior['inputs']) ||
+      !same(material.evidence, prior['evidence']) ||
+      !same(material.artifacts, prior['artifacts'])
+    ) {
+      throw new Error('release-evidence-binding-invalid');
+    }
+    return;
+  }
+  for (const [unitIndex, priorUnit] of prior.release_units.entries()) {
+    const nextUnit = material.release_units[unitIndex];
+    if (nextUnit === undefined) throw new Error('release-evidence-binding-invalid');
+    for (const [packageIndex, priorPackage] of priorUnit.packages.entries()) {
+      const nextPackage = nextUnit.packages[packageIndex];
+      if (nextPackage === undefined) throw new Error('release-evidence-binding-invalid');
+      for (const key of [
+        'manifest',
+        'tarball',
+        'sbom',
+        'evidence_manifest',
+        'provider_result',
+        'trust',
+      ] as const) {
+        if (priorPackage[key] !== null && !same(priorPackage[key], nextPackage[key])) {
+          throw new Error('release-evidence-binding-invalid');
+        }
+      }
+    }
+  }
+  const nextArtifacts = new Set(material.artifacts.map((artifact) => canonicalJson(artifact)));
+  if (
+    (prior['artifacts'] as readonly unknown[]).some(
+      (artifact) => !nextArtifacts.has(canonicalJson(artifact)),
+    )
+  ) {
+    throw new Error('release-evidence-binding-invalid');
+  }
+}
+
+function assertReceiptContinuity(
+  request: ReleaseLifecycleRequest,
+  receipts: readonly VerifiedReceipt[],
+  prior: ReleaseLifecycleStateV2 | null,
+): void {
+  const offline = receipts.filter(
+    (receipt) => receipt.kind === 'release-offline-verification-receipt',
+  );
+  if (request.action_id !== 'release evidence-publish') return;
+  if (prior === null || prior.state !== 'exported' || offline.length !== 1) {
+    throw new Error('release-offline-receipt-binding-invalid');
+  }
+  const receipt = offline[0]?.value;
+  if (
+    receipt === undefined ||
+    receipt['schemaVersion'] !== '2.0.0' ||
+    !same(receipt['verified_state'], stateReference(prior)) ||
+    !same(receipt['release_units'], prior.release_units) ||
+    !same(
+      sortedArtifacts(receipt['artifacts'] as readonly unknown[]),
+      offlineArtifactProjection(prior),
+    )
+  ) {
+    throw new Error('release-offline-receipt-binding-invalid');
+  }
 }
 
 function buildState(
@@ -884,9 +1484,12 @@ function buildState(
   material: ReleaseStateMaterial,
   prior: ReleaseLifecycleStateV2 | null,
   authorizationEventId: string | null,
+  authority: TrustedReleaseAuthority,
+  publicationControls: PublicationControls | undefined,
   recordedAt: string,
 ): ReleaseLifecycleStateV2 {
   assertMaterialBijection(request, request.action_id, material);
+  assertPriorMaterialContinuity(request.action_id, material, prior);
   const primary = request.candidate_locator.release_units[0];
   if (primary === undefined) throw new Error('release-release-unit-bijection-invalid');
   const state = STATE_BY_ACTION[request.action_id];
@@ -922,18 +1525,13 @@ function buildState(
     inputs: material.inputs,
     evidence: material.evidence,
     artifacts: material.artifacts,
-    actor: {
-      kind: 'human',
-      role: ROLE_BY_ACTION[request.action_id],
-      declaration_source: 'cli-flag',
-    },
-    consent: {
-      write: true,
-      allow_publish: EFFECT_BY_ACTION[request.action_id] === 'remote-write',
-      experimental: false,
-    },
+    actor: authority.actor,
+    consent: authority.consent,
     authorization_event_id: authorizationEventId,
-    publication_expectation: material.publication_expectation ?? null,
+    publication_expectation:
+      request.action_id === 'release publish' && publicationControls !== undefined
+        ? { authorization_event_id: authorizationEventId, ...publicationControls }
+        : null,
     storage: { generation, head_before: headBefore },
     recorded_at: recordedAt,
   } as never);
@@ -958,10 +1556,14 @@ export async function executeReleaseLifecycleAction(input: {
   readonly store: ReleaseLifecycleFileStore;
   readonly provider?: ReleaseProvider;
   readonly authorization?: AuthorizationBridge;
+  readonly authority?: TrustedReleaseAuthority;
+  readonly publication_controls?: PublicationControls;
   readonly resolveReceipt?: ReceiptResolver;
   readonly recorded_at: string;
 }): Promise<ExecuteReleaseResult> {
   let request: ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction };
+  let authority: TrustedReleaseAuthority;
+  let receipts: readonly VerifiedReceipt[];
   try {
     request = validateReleaseLifecycleRequest(
       input.request,
@@ -977,7 +1579,8 @@ export async function executeReleaseLifecycleAction(input: {
     };
   }
   try {
-    verifyBoundReceipts(request, input.resolveReceipt);
+    authority = assertTrustedAuthority(request.action_id, input.authority);
+    receipts = verifyBoundReceipts(request, input.resolveReceipt);
   } catch (error) {
     return {
       ok: false,
@@ -985,51 +1588,334 @@ export async function executeReleaseLifecycleAction(input: {
       code: error instanceof Error ? error.message : 'release-receipt-identity-mismatch',
     };
   }
-  let storeRecords: StoreRecord[];
-  let states: ReleaseLifecycleStateV2[];
-  let head: StoreHead | null;
-  try {
-    storeRecords = input.store.readStoreRecords();
-    states = input.store.readStateRecords();
-    head = input.store.readHead();
-    const reduced = reduceStoreRecords(storeRecords);
-    if (!reduced.ok || reduced.ambiguous) {
+  const remote = EFFECT_BY_ACTION[request.action_id] === 'remote-write';
+  if (remote && input.authorization === undefined) {
+    return {
+      ok: false,
+      phase: 'authorization',
+      code: 'release-authorization-provider-unavailable',
+    };
+  }
+  if (request.action_id === 'release publish') {
+    try {
+      assertPublicationControls(request, input.publication_controls);
+    } catch (error) {
       return {
         ok: false,
-        phase: 'reconciliation',
-        code: reduced.ambiguous
-          ? 'release-provider-result-unknown'
-          : (reduced.errors[0] ?? 'release-state-store-unsafe'),
+        phase: 'validation',
+        code: error instanceof Error ? error.message : 'rpd-workflow-expectation-invalid',
       };
     }
-    const stateHead = states.at(-1) ?? null;
-    const completions = storeRecords.filter((record) => record.record_kind === 'completion');
-    if (
-      completions.length !== states.length ||
-      completions.some((record, index) => {
-        const state = states[index];
-        return (
-          state === undefined ||
-          record.completion?.state_id !== state.state_id ||
-          record.completion.state_digest_sha256 !== state.record_digest_sha256
-        );
-      })
-    ) {
-      return { ok: false, phase: 'reconciliation', code: 'release-state-store-orphan-record' };
-    }
-    const expectedHead =
-      stateHead === null
-        ? null
-        : {
-            generation: stateHead.storage.generation,
-            record_digest_sha256: stateHead.record_digest_sha256,
+  }
+  try {
+    return await input.store.withExecutionLock(async () => {
+      let storeRecords: StoreRecord[];
+      let states: ReleaseLifecycleStateV2[];
+      let head: StoreHead | null;
+      try {
+        storeRecords = input.store.readStoreRecords();
+        states = input.store.readStateRecords();
+        head = input.store.readHead();
+        const reduced = reduceStoreRecords(storeRecords);
+        if (!reduced.ok || reduced.ambiguous) {
+          return {
+            ok: false,
+            phase: 'reconciliation',
+            code: reduced.ambiguous
+              ? 'release-provider-result-unknown'
+              : (reduced.errors[0] ?? 'release-state-store-unsafe'),
           };
-    if (!same(head, expectedHead))
-      return { ok: false, phase: 'reconciliation', code: 'release-state-head-mismatch' };
-    const expectedPrior = PRIOR_BY_STATE[STATE_BY_ACTION[request.action_id]];
-    if (expectedPrior !== (stateHead?.state ?? null)) {
-      return { ok: false, phase: 'validation', code: 'release-state-transition-invalid' };
-    }
+        }
+        const stateReduction = reduceReleaseStates(states);
+        if (!stateReduction.ok) {
+          return {
+            ok: false,
+            phase: 'reconciliation',
+            code: stateReduction.errors[0] ?? 'release-state-store-unsafe',
+          };
+        }
+        const stateHead = stateReduction.head;
+        if (stateHead !== null) assertStateMatchesRequest(request, stateHead);
+        const completions = storeRecords.filter((record) => record.record_kind === 'completion');
+        if (
+          completions.length !== states.length ||
+          completions.some((record, index) => {
+            const state = states[index];
+            return (
+              state === undefined ||
+              record.completion?.state_id !== state.state_id ||
+              record.completion.state_digest_sha256 !== state.record_digest_sha256
+            );
+          })
+        ) {
+          return { ok: false, phase: 'reconciliation', code: 'release-state-store-orphan-record' };
+        }
+        const expectedHead =
+          stateHead === null
+            ? null
+            : headForCompletion(stateHead, completions[completions.length - 1] as StoreRecord);
+        if (!same(head, expectedHead))
+          return { ok: false, phase: 'reconciliation', code: 'release-state-head-mismatch' };
+        const expectedPrior = PRIOR_BY_STATE[STATE_BY_ACTION[request.action_id]];
+        if (expectedPrior !== (stateHead?.state ?? null)) {
+          return { ok: false, phase: 'validation', code: 'release-state-transition-invalid' };
+        }
+        assertReceiptContinuity(request, receipts, stateHead);
+      } catch (error) {
+        return {
+          ok: false,
+          phase: 'reconciliation',
+          code: error instanceof Error ? error.message : 'release-state-store-unsafe',
+        };
+      }
+
+      const priorRecord = storeRecords.at(-1) ?? null;
+      const nextSequence = priorRecord === null ? 0 : priorRecord.sequence + 1;
+      const requestDigest = computeReleaseRequestDigest(request);
+      const attemptId = deriveAttemptId({
+        request_digest_sha256: requestDigest,
+        action_id: request.action_id,
+        sequence: nextSequence,
+        predecessor_record: priorRecord === null ? null : storeRecordReference(priorRecord),
+      });
+      let authorizationEventId: string | null = null;
+      let binding: AuthorizationAttemptBinding | undefined;
+      let grantProof:
+        | {
+            readonly grant: Readonly<Record<string, unknown>>;
+            readonly grant_event_id: string;
+            readonly ledger_head: AuthorizationLedgerHead;
+          }
+        | undefined;
+      if (remote) {
+        binding = {
+          attempt_id: attemptId,
+          action_id: request.action_id,
+          request_digest_sha256: requestDigest,
+          repository: request.repository_locator,
+          candidate: primaryCandidate(request),
+          destination: authorizationDestination(request),
+        };
+        try {
+          const resolution = await input.authorization?.resolve(binding);
+          if (resolution === undefined)
+            throw new Error('release-authorization-provider-unavailable');
+          grantProof = verifyGrantResolution(resolution, binding, authority);
+          authorizationEventId = grantProof.grant_event_id;
+        } catch (error) {
+          return {
+            ok: false,
+            phase: 'authorization',
+            code:
+              error instanceof Error
+                ? error.message
+                : 'release-authorization-attempt-binding-invalid',
+          };
+        }
+      }
+      if (input.provider === undefined) {
+        return { ok: false, phase: 'provider', code: 'release-provider-unavailable' };
+      }
+
+      const attempt = buildStoreRecord(
+        request,
+        priorRecord,
+        attemptId,
+        'attempt',
+        authorizationEventId,
+      );
+      try {
+        input.store.appendStoreRecord(attempt);
+      } catch (error) {
+        return {
+          ok: false,
+          phase: 'append',
+          code: error instanceof Error ? error.message : 'release-state-store-unsafe',
+        };
+      }
+
+      if (remote && binding !== undefined && authorizationEventId !== null) {
+        try {
+          const refreshed = await input.authorization?.resolve(binding);
+          if (refreshed === undefined || grantProof === undefined)
+            throw new Error('release-authorization-consumption-not-durable');
+          const refreshedProof = verifyGrantResolution(refreshed, binding, authority);
+          if (
+            refreshedProof.grant_event_id !== grantProof.grant_event_id ||
+            !same(refreshedProof.ledger_head, grantProof.ledger_head) ||
+            !same(refreshedProof.grant, grantProof.grant)
+          ) {
+            throw new Error('release-authorization-attempt-binding-invalid');
+          }
+          const consumption = await input.authorization?.consume({
+            ...binding,
+            grant_event_id: authorizationEventId,
+          });
+          if (consumption === undefined)
+            throw new Error('release-authorization-consumption-not-durable');
+          verifyConsumptionProof(
+            consumption,
+            binding,
+            grantProof.grant,
+            authorizationEventId,
+            grantProof.ledger_head,
+          );
+        } catch (error) {
+          const failure = buildStoreRecord(
+            request,
+            attempt,
+            attemptId,
+            'failure',
+            authorizationEventId,
+            {
+              outcome: 'failure',
+              dispatch_status: 'failed-before-dispatch',
+              code: 'release-authorization-consumption-failed',
+            },
+          );
+          input.store.appendStoreRecord(failure);
+          return {
+            ok: false,
+            phase: 'authorization',
+            code:
+              error instanceof Error
+                ? error.message
+                : 'release-authorization-consumption-not-durable',
+            record: failure,
+          };
+        }
+      }
+
+      let result: ReleaseProviderResult;
+      try {
+        result = await input.provider(request);
+      } catch {
+        result = remote
+          ? { outcome: 'unknown', code: 'release-provider-result-unknown' }
+          : { outcome: 'failure', code: 'release-provider-failed' };
+      }
+      if (result.outcome !== 'success') {
+        const unsafeRemoteFailure =
+          remote &&
+          result.outcome === 'failure' &&
+          (result.provider_handle !== undefined ||
+            result.dispatch_status !== 'failed-before-dispatch');
+        const terminalResult = unsafeRemoteFailure
+          ? ({ ...result, outcome: 'unknown', code: 'release-provider-result-unknown' } as const)
+          : result;
+        const kind = terminalResult.outcome === 'unknown' ? 'unknown-provider-result' : 'failure';
+        const terminal = buildStoreRecord(
+          request,
+          attempt,
+          attemptId,
+          kind,
+          authorizationEventId,
+          terminalResult,
+        );
+        input.store.appendStoreRecord(terminal);
+        return {
+          ok: false,
+          phase: terminalResult.outcome === 'unknown' ? 'ambiguous' : 'provider',
+          code:
+            terminalResult.outcome === 'unknown'
+              ? 'release-provider-result-unknown'
+              : (terminalResult.code ?? 'release-provider-failed'),
+          record: terminal,
+        };
+      }
+      if (remote && result.provider_handle === undefined) {
+        const unknown = buildStoreRecord(
+          request,
+          attempt,
+          attemptId,
+          'unknown-provider-result',
+          authorizationEventId,
+          { outcome: 'unknown', code: 'release-provider-result-unknown' },
+        );
+        input.store.appendStoreRecord(unknown);
+        return {
+          ok: false,
+          phase: 'ambiguous',
+          code: 'release-provider-handle-observation-invalid',
+          record: unknown,
+        };
+      }
+      if (result.material === undefined) {
+        const terminal = buildStoreRecord(
+          request,
+          attempt,
+          attemptId,
+          remote ? 'unknown-provider-result' : 'failure',
+          authorizationEventId,
+          remote
+            ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
+            : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
+        );
+        input.store.appendStoreRecord(terminal);
+        return {
+          ok: false,
+          phase: remote ? 'ambiguous' : 'validation',
+          code: remote ? 'release-provider-result-unknown' : 'release-adapter-output-invalid',
+          record: terminal,
+        };
+      }
+
+      let state: ReleaseLifecycleStateV2;
+      try {
+        state = buildState(
+          request,
+          result.material,
+          states.at(-1) ?? null,
+          authorizationEventId,
+          authority,
+          input.publication_controls,
+          input.recorded_at,
+        );
+      } catch (error) {
+        const terminal = buildStoreRecord(
+          request,
+          attempt,
+          attemptId,
+          remote ? 'unknown-provider-result' : 'failure',
+          authorizationEventId,
+          remote
+            ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
+            : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
+        );
+        input.store.appendStoreRecord(terminal);
+        return {
+          ok: false,
+          phase: remote ? 'ambiguous' : 'validation',
+          code: remote
+            ? 'release-provider-result-unknown'
+            : error instanceof Error
+              ? error.message
+              : 'release-adapter-output-invalid',
+          record: terminal,
+        };
+      }
+      const completion = buildStoreRecord(
+        request,
+        attempt,
+        attemptId,
+        'completion',
+        authorizationEventId,
+        result,
+        state,
+      );
+      try {
+        input.store.appendStoreRecord(completion);
+        input.store.appendStateAndAdvanceHead(state, completion, head);
+      } catch (error) {
+        return {
+          ok: false,
+          phase: 'append',
+          code: error instanceof Error ? error.message : 'release-state-store-unsafe',
+          record: completion,
+        };
+      }
+      return { ok: true, state, completion };
+    });
   } catch (error) {
     return {
       ok: false,
@@ -1037,207 +1923,6 @@ export async function executeReleaseLifecycleAction(input: {
       code: error instanceof Error ? error.message : 'release-state-store-unsafe',
     };
   }
-
-  const priorRecord = storeRecords.at(-1) ?? null;
-  const nextSequence = priorRecord === null ? 0 : priorRecord.sequence + 1;
-  const requestDigest = computeReleaseRequestDigest(request);
-  const attemptId = deriveAttemptId({
-    request_digest_sha256: requestDigest,
-    action_id: request.action_id,
-    sequence: nextSequence,
-    predecessor_record: priorRecord === null ? null : storeRecordReference(priorRecord),
-  });
-  const remote = EFFECT_BY_ACTION[request.action_id] === 'remote-write';
-  let authorizationEventId: string | null = null;
-  let binding: AuthorizationAttemptBinding | undefined;
-  if (remote) {
-    if (request.destination === undefined)
-      return { ok: false, phase: 'validation', code: 'release-request-projection-invalid' };
-    binding = {
-      attempt_id: attemptId,
-      action_id: request.action_id,
-      request_digest_sha256: requestDigest,
-      repository: request.repository_locator,
-      candidate: request.candidate_locator,
-      destination: request.destination,
-    };
-    if (input.authorization === undefined) {
-      return {
-        ok: false,
-        phase: 'authorization',
-        code: 'release-authorization-provider-unavailable',
-      };
-    }
-    const resolution = await input.authorization.resolve(binding);
-    if (!resolution.ok || resolution.grant_event_id === undefined) {
-      return {
-        ok: false,
-        phase: 'authorization',
-        code: resolution.code ?? 'absent-effect-authorization',
-      };
-    }
-    authorizationEventId = resolution.grant_event_id;
-  }
-  if (input.provider === undefined) {
-    return { ok: false, phase: 'provider', code: 'release-provider-unavailable' };
-  }
-
-  const attempt = buildStoreRecord(
-    request,
-    priorRecord,
-    attemptId,
-    'attempt',
-    authorizationEventId,
-  );
-  try {
-    input.store.appendStoreRecord(attempt);
-  } catch (error) {
-    return {
-      ok: false,
-      phase: 'append',
-      code: error instanceof Error ? error.message : 'release-state-store-unsafe',
-    };
-  }
-
-  if (remote && binding !== undefined && authorizationEventId !== null) {
-    try {
-      await input.authorization?.consume({ ...binding, grant_event_id: authorizationEventId });
-    } catch {
-      const failure = buildStoreRecord(
-        request,
-        attempt,
-        attemptId,
-        'failure',
-        authorizationEventId,
-        {
-          outcome: 'failure',
-          dispatch_status: 'failed-before-dispatch',
-          code: 'release-authorization-consumption-failed',
-        },
-      );
-      input.store.appendStoreRecord(failure);
-      return {
-        ok: false,
-        phase: 'authorization',
-        code: 'release-authorization-consumption-failed',
-        record: failure,
-      };
-    }
-  }
-
-  let result: ReleaseProviderResult;
-  try {
-    result = await input.provider(request);
-  } catch {
-    result = remote
-      ? { outcome: 'unknown', code: 'release-provider-result-unknown' }
-      : { outcome: 'failure', code: 'release-provider-failed' };
-  }
-  if (result.outcome !== 'success') {
-    const unsafeRemoteFailure =
-      remote &&
-      result.outcome === 'failure' &&
-      result.provider_handle === undefined &&
-      result.dispatch_status !== 'failed-before-dispatch';
-    const terminalResult = unsafeRemoteFailure
-      ? ({ outcome: 'unknown', code: 'release-provider-result-unknown' } as const)
-      : result;
-    const kind = terminalResult.outcome === 'unknown' ? 'unknown-provider-result' : 'failure';
-    const terminal = buildStoreRecord(
-      request,
-      attempt,
-      attemptId,
-      kind,
-      authorizationEventId,
-      terminalResult,
-    );
-    input.store.appendStoreRecord(terminal);
-    return {
-      ok: false,
-      phase: terminalResult.outcome === 'unknown' ? 'ambiguous' : 'provider',
-      code:
-        terminalResult.outcome === 'unknown'
-          ? 'release-provider-result-unknown'
-          : (terminalResult.code ?? 'release-provider-failed'),
-      record: terminal,
-    };
-  }
-  if (remote && result.provider_handle === undefined) {
-    const unknown = buildStoreRecord(
-      request,
-      attempt,
-      attemptId,
-      'unknown-provider-result',
-      authorizationEventId,
-      { outcome: 'unknown', code: 'release-provider-result-unknown' },
-    );
-    input.store.appendStoreRecord(unknown);
-    return {
-      ok: false,
-      phase: 'ambiguous',
-      code: 'release-provider-handle-observation-invalid',
-      record: unknown,
-    };
-  }
-  if (result.material === undefined) {
-    const failure = buildStoreRecord(request, attempt, attemptId, 'failure', authorizationEventId, {
-      ...result,
-      outcome: 'failure',
-      code: 'release-adapter-output-invalid',
-    });
-    input.store.appendStoreRecord(failure);
-    return {
-      ok: false,
-      phase: 'validation',
-      code: 'release-adapter-output-invalid',
-      record: failure,
-    };
-  }
-
-  let state: ReleaseLifecycleStateV2;
-  try {
-    state = buildState(
-      request,
-      result.material,
-      states.at(-1) ?? null,
-      authorizationEventId,
-      input.recorded_at,
-    );
-  } catch (error) {
-    const failure = buildStoreRecord(request, attempt, attemptId, 'failure', authorizationEventId, {
-      ...result,
-      outcome: 'failure',
-      code: 'release-adapter-output-invalid',
-    });
-    input.store.appendStoreRecord(failure);
-    return {
-      ok: false,
-      phase: 'validation',
-      code: error instanceof Error ? error.message : 'release-adapter-output-invalid',
-      record: failure,
-    };
-  }
-  const completion = buildStoreRecord(
-    request,
-    attempt,
-    attemptId,
-    'completion',
-    authorizationEventId,
-    result,
-    state,
-  );
-  try {
-    input.store.appendStoreRecord(completion);
-    input.store.appendStateAndAdvanceHead(state, head);
-  } catch (error) {
-    return {
-      ok: false,
-      phase: 'append',
-      code: error instanceof Error ? error.message : 'release-state-store-unsafe',
-      record: completion,
-    };
-  }
-  return { ok: true, state, completion };
 }
 
 export type OfflineVerificationResult =
@@ -1271,7 +1956,7 @@ export async function executeOfflineVerification(input: {
         receipt_digests: [],
         independently_checkable: true,
       },
-      artifacts: [],
+      artifacts: state['artifacts'] as ReleaseStateMaterial['artifacts'],
     });
   } catch (error) {
     return {
@@ -1315,6 +2000,10 @@ export async function executeOfflineVerification(input: {
     !same(receipt['candidate'], state.candidate) ||
     !same(receipt['verified_state'], expectedState) ||
     !same(releaseUnits, state.release_units) ||
+    !same(
+      sortedArtifacts(receipt['artifacts'] as readonly unknown[]),
+      offlineArtifactProjection(state),
+    ) ||
     !trustMatches
   ) {
     return { ok: false, phase: 'validation', code: 'release-offline-receipt-binding-invalid' };
@@ -1465,9 +2154,13 @@ async function verifyPublicationReceipt(
 export async function resumeReleaseLifecycleExecution(input: {
   readonly states: readonly unknown[];
   readonly store_records?: readonly unknown[];
+  readonly store_head?: unknown;
   readonly repository: ReleaseLifecycleRequest['repository_locator'];
   readonly candidate: ReleaseLifecycleStateV2['candidate'];
-  readonly derived_states?: readonly Readonly<Record<string, unknown>>[];
+  readonly candidate_locator?: ReleaseLifecycleRequest['candidate_locator'];
+  readonly receipt_documents?: readonly unknown[];
+  readonly receipt_locators?: NonNullable<ReleaseLifecycleRequest['receipt_locators']>;
+  readonly resolve_receipt?: ReceiptResolver;
   readonly publication_receipt?: unknown;
   readonly verify_signature?: PublicationSignatureVerifier;
 }): Promise<Readonly<Record<string, unknown>>> {
@@ -1502,13 +2195,63 @@ export async function resumeReleaseLifecycleExecution(input: {
   const identityMismatch =
     head !== null &&
     (!same(head.repository, input.repository) || !same(head.candidate, input.candidate));
+  const locatorMismatch =
+    input.candidate_locator !== undefined &&
+    (input.candidate_locator.commit !== input.candidate.commit ||
+      input.candidate_locator.tree !== input.candidate.tree ||
+      input.candidate_locator.release_units[0]?.release_unit !== input.candidate.release_unit ||
+      input.candidate_locator.release_units[0]?.version !== input.candidate.version);
+  let headMismatch = false;
+  const storeHeadProvided = Object.prototype.hasOwnProperty.call(input, 'store_head');
+  if (storeReduction.records.length > 0 && !storeHeadProvided) headMismatch = true;
+  if (storeHeadProvided) {
+    try {
+      const lastCompletion = completions.at(-1);
+      if (input.store_head === null) {
+        headMismatch = head !== null || lastCompletion !== undefined;
+      } else {
+        const observedHead = verifyStoreHeadIdentity(input.store_head);
+        headMismatch =
+          head === null ||
+          lastCompletion === undefined ||
+          !same(observedHead, headForCompletion(head, lastCompletion));
+      }
+    } catch {
+      headMismatch = true;
+    }
+  }
+  const verifiedReceipts: VerifiedReceipt[] = [];
+  let receiptInvalid = false;
+  try {
+    for (const document of input.receipt_documents ?? []) {
+      verifiedReceipts.push(verifyReceiptDocument(document));
+    }
+    for (const locator of input.receipt_locators ?? []) {
+      if (input.resolve_receipt === undefined)
+        throw new Error('release-receipt-provider-unavailable');
+      const receipt = verifyReceiptDocument(input.resolve_receipt(locator));
+      if (
+        receipt.kind !== locator.kind ||
+        receipt.value['receipt_id'] !== locator.receipt_id ||
+        receipt.value['receipt_digest_sha256'] !== locator.receipt_digest_sha256
+      ) {
+        throw new Error('release-receipt-identity-mismatch');
+      }
+      verifiedReceipts.push(receipt);
+    }
+  } catch {
+    receiptInvalid = true;
+  }
   const blocked =
     !stateReduction.ok ||
     !storeReduction.ok ||
     storeReduction.failed ||
     completionMismatch ||
+    headMismatch ||
     storeIdentityMismatch ||
-    identityMismatch;
+    identityMismatch ||
+    locatorMismatch ||
+    receiptInvalid;
   const ambiguous = !blocked && storeReduction.ambiguous;
   const published =
     head !== null && input.publication_receipt !== undefined && input.verify_signature !== undefined
@@ -1519,7 +2262,92 @@ export async function resumeReleaseLifecycleExecution(input: {
         )) ?? { observed: false, receipt: null, verified_against: null })
       : { observed: false, receipt: null, verified_against: null };
   const publishedObserved = published['observed'] === true;
-  const derived = [...(input.derived_states ?? [])];
+  const derived: Readonly<Record<string, unknown>>[] = [];
+  const seenReceiptIds = new Set<string>();
+  const expectedPlanCandidates = (
+    input.candidate_locator?.release_units.map((unit) => ({
+      release_unit: unit.release_unit,
+      version: unit.version,
+      commit: input.candidate_locator?.commit,
+      tree: input.candidate_locator?.tree,
+    })) ?? [input.candidate]
+  ).sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right), 'en'));
+  const observedPlanCandidates: unknown[] = [];
+  for (const verified of verifiedReceipts) {
+    const receipt = verified.value;
+    const receiptId = String(receipt['receipt_id']);
+    if (seenReceiptIds.has(receiptId)) {
+      receiptInvalid = true;
+      continue;
+    }
+    seenReceiptIds.add(receiptId);
+    const repositoryMatches = same(receipt['repository'], input.repository);
+    const candidateMatches = expectedPlanCandidates.some((candidate) =>
+      same(receipt['candidate'], candidate),
+    );
+    if (verified.kind === 'release-plan-receipt' && repositoryMatches && candidateMatches) {
+      observedPlanCandidates.push(receipt['candidate']);
+      derived.push({
+        state: 'planned',
+        receipt_kind: verified.kind,
+        receipt_id: receipt['receipt_id'],
+        receipt_digest_sha256: receipt['receipt_digest_sha256'],
+        verified: true,
+      });
+    } else if (verified.kind === 'release-plan-receipt') {
+      receiptInvalid = true;
+    }
+    if (verified.kind === 'release-offline-verification-receipt' && repositoryMatches) {
+      const exported = stateReduction.ok
+        ? input.states
+            .map((state) => {
+              try {
+                return verifyReleaseStateIdentity(state);
+              } catch {
+                return null;
+              }
+            })
+            .find(
+              (state) =>
+                state?.state === 'exported' &&
+                same(stateReference(state), receipt['verified_state']),
+            )
+        : undefined;
+      if (
+        exported !== undefined &&
+        exported !== null &&
+        same(receipt['candidate'], exported.candidate) &&
+        same(receipt['release_units'], exported.release_units) &&
+        same(
+          sortedArtifacts(receipt['artifacts'] as readonly unknown[]),
+          offlineArtifactProjection(exported),
+        )
+      ) {
+        derived.push({
+          state: 'offline_verified',
+          receipt_kind: verified.kind,
+          receipt_id: receipt['receipt_id'],
+          receipt_digest_sha256: receipt['receipt_digest_sha256'],
+          verified: true,
+        });
+      } else {
+        receiptInvalid = true;
+      }
+    } else if (verified.kind === 'release-offline-verification-receipt') {
+      receiptInvalid = true;
+    }
+  }
+  if (
+    observedPlanCandidates.length > 0 &&
+    !same(
+      observedPlanCandidates.sort((left, right) =>
+        canonicalJson(left).localeCompare(canonicalJson(right), 'en'),
+      ),
+      expectedPlanCandidates,
+    )
+  ) {
+    receiptInvalid = true;
+  }
   if (publishedObserved) {
     const receipt = object(published['receipt']);
     derived.push({
@@ -1534,7 +2362,7 @@ export async function resumeReleaseLifecycleExecution(input: {
   const hasOffline = derived.some((entry) => entry['state'] === 'offline_verified');
   let nextAction: ReleaseAction | null;
   let nextOutcome: 'ready' | 'awaiting-external-receipt' | 'complete' | 'blocked' | 'ambiguous';
-  if (blocked) {
+  if (blocked || receiptInvalid) {
     nextAction = null;
     nextOutcome = 'blocked';
   } else if (ambiguous) {

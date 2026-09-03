@@ -18,8 +18,11 @@ interface PlanOptions {
 }
 
 interface ResumeOptions {
+  readonly request?: string;
   readonly stateChain?: string;
   readonly storeRecords?: string;
+  readonly storeHead?: string;
+  readonly receipts?: string;
   readonly publicationReceipt?: string;
   readonly human?: boolean;
 }
@@ -223,32 +226,68 @@ export const releaseResume = defineCommand({
   register(cli: CAC): void {
     cli
       .command('release-resume', 'Emit a pure release lifecycle observation')
-      .option('--state-chain <path>', 'JSON array containing the exact persisted state chain')
+      .option(
+        '--request <path>',
+        'Exact release resume request (required for an empty state chain)',
+      )
+      .option('--state-chain <path>', 'JSON array containing the persisted state chain')
       .option(
         '--store-records <path>',
         'Optional JSON array containing append-only execution records',
       )
+      .option('--store-head <path>', 'Optional canonical v2 store head')
+      .option('--receipts <path>', 'Optional JSON array of plan/offline receipt documents')
       .option('--publication-receipt <path>', 'Signed external publication receipt')
       .option('--human', 'Human-readable output')
       .action(async (options: ResumeOptions) => {
-        if (options.stateChain === undefined) {
-          fail('release resume', 'RELEASE_RESUME_USAGE', '--state-chain is required', EXIT_USAGE);
+        if (options.stateChain === undefined && options.request === undefined) {
+          fail(
+            'release resume',
+            'RELEASE_RESUME_USAGE',
+            '--state-chain or --request is required',
+            EXIT_USAGE,
+          );
           return;
         }
         try {
-          const states = readJson(options.stateChain);
-          if (!Array.isArray(states) || states.length === 0) {
-            throw new Error('state chain must be a non-empty JSON array');
+          const states = options.stateChain === undefined ? [] : readJson(options.stateChain);
+          if (!Array.isArray(states)) throw new Error('state chain must be a JSON array');
+          const first = states.length === 0 ? undefined : verifyReleaseStateIdentity(states[0]);
+          const request =
+            options.request === undefined
+              ? undefined
+              : validateReleaseLifecycleRequest(readJson(options.request), 'release resume');
+          if (first === undefined && request === undefined) {
+            throw new Error('an empty state chain requires an exact release resume request');
           }
-          const first = verifyReleaseStateIdentity(states[0]);
+          const repository = first?.repository ?? request?.repository_locator;
+          const firstUnit = request?.candidate_locator.release_units[0];
+          const requestedCandidate =
+            request === undefined || firstUnit === undefined
+              ? undefined
+              : {
+                  release_unit: firstUnit.release_unit,
+                  version: firstUnit.version,
+                  commit: request.candidate_locator.commit,
+                  tree: request.candidate_locator.tree,
+                };
+          const candidate = first?.candidate ?? requestedCandidate;
+          if (repository === undefined || candidate === undefined) {
+            throw new Error('release resume identity is unavailable');
+          }
           const storeRecords =
             options.storeRecords === undefined ? [] : readJson(options.storeRecords);
           if (!Array.isArray(storeRecords)) throw new Error('store records must be a JSON array');
+          const receipts = options.receipts === undefined ? [] : readJson(options.receipts);
+          if (!Array.isArray(receipts)) throw new Error('receipts must be a JSON array');
           const observation = await resumeReleaseLifecycleExecution({
             states,
             store_records: storeRecords,
-            repository: first.repository,
-            candidate: first.candidate,
+            ...(options.storeHead === undefined ? {} : { store_head: readJson(options.storeHead) }),
+            repository,
+            candidate,
+            ...(request === undefined ? {} : { candidate_locator: request.candidate_locator }),
+            receipt_documents: receipts,
             ...(options.publicationReceipt === undefined
               ? {}
               : {
