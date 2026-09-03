@@ -8,8 +8,12 @@ function aggregate(
   expectedPackages: readonly string[],
   reports: Readonly<Record<string, Json>>,
 ): 'pass' | 'fail' | 'unknown' | 'not-applicable' {
-  if (expectedPackages.some((name) => reports[name] === undefined)) return 'unknown';
-  const values = expectedPackages.map((name) => reports[name]);
+  const values: Json[] = [];
+  for (const name of expectedPackages) {
+    const report = reports[name];
+    if (report === undefined) return 'unknown';
+    values.push(report);
+  }
   if (values.some((report) => report.verdict === 'fail')) return 'fail';
   if (values.some((report) => report.verdict === 'unknown')) return 'unknown';
   if (values.every((report) => report.disposition === 'not-required')) return 'not-applicable';
@@ -49,12 +53,12 @@ function artifactDigestsMatch(
 ): boolean {
   const execution = report.execution as Json;
   const artifacts = execution.artifacts as Json[];
-  return artifacts.every(
-    (artifact) =>
-      typeof artifact.path === 'string' &&
-      artifactBytes[artifact.path] !== undefined &&
-      sha256(artifactBytes[artifact.path]) === artifact.sha256,
-  );
+  return artifacts.every((artifact) => {
+    const path = artifact.path;
+    if (typeof path !== 'string') return false;
+    const bytes = artifactBytes[path];
+    return bytes !== undefined && sha256(bytes) === artifact.sha256;
+  });
 }
 
 describe('mutation assurance v2 evidence matrix', () => {
