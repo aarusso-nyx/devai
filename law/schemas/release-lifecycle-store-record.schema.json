@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-store-record.schema.json",
   "title": "Release lifecycle append-only store record",
-  "description": "One durable append-only release execution event. predecessor_record is the exact append-log tail; observed_head_before is the exact full v2 canonical completed-state head observed by the attempt and copied by its terminal record. Completion alone may advance that head through compare-and-swap. Failure advances only the log tail. An unknown provider result is terminal and non-retriable.",
+  "description": "One durable append-only release execution event. predecessor_record is the exact append-log tail; observed_head_before is the exact full v2 canonical completed-state head observed by the attempt and copied by its terminal record. Completion alone may advance that head through compare-and-swap. Failure advances only the log tail. An unknown provider or ArtifactSink commit result is terminal and non-retriable; prepare ambiguity retains exact sink transaction, manifest, and opaque artifact identities for external reconciliation without asserting commit success.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -163,6 +163,9 @@
       "then": {
         "required": ["authorization_event_id", "provider_handle", "unknown"],
         "properties": {
+          "action_id": {
+            "enum": ["release prepare", "release evidence-publish", "release publish"]
+          },
           "completion": { "type": "null" },
           "failure": { "type": "null" },
           "unknown": { "type": "object" }
@@ -240,12 +243,36 @@
     },
     {
       "if": {
-        "properties": { "record_kind": { "const": "unknown-provider-result" } },
-        "required": ["record_kind"]
+        "properties": {
+          "record_kind": { "const": "unknown-provider-result" },
+          "action_id": { "enum": ["release evidence-publish", "release publish"] }
+        },
+        "required": ["record_kind", "action_id"]
       },
       "then": {
         "properties": {
           "provider_dispatch": { "properties": { "status": { "const": "unknown" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": { "const": "unknown-provider-result" },
+          "action_id": { "const": "release prepare" }
+        },
+        "required": ["record_kind", "action_id"]
+      },
+      "then": {
+        "properties": {
+          "unknown": { "required": ["artifact_sink", "artifacts"] }
+        }
+      },
+      "else": {
+        "properties": {
+          "unknown": {
+            "properties": { "artifact_sink": false, "artifacts": false }
+          }
         }
       }
     }
@@ -372,7 +399,18 @@
       "required": ["code", "redispatch_permitted"],
       "properties": {
         "code": { "const": "release-provider-result-unknown" },
-        "redispatch_permitted": { "const": false }
+        "redispatch_permitted": { "const": false },
+        "artifact_sink": {
+          "description": "Exact attempted commit identity retained only for prepare ambiguity. The committed_manifest fields identify the submitted manifest, not proof of successful commit.",
+          "$ref": "release-lifecycle-state.schema.json#/$defs/artifact_sink_commit"
+        },
+        "artifacts": {
+          "description": "Complete opaque artifact identities submitted in the attempted manifest, retained without abort or rollback for external reconciliation.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "release-lifecycle-state.schema.json#/$defs/v3_opaque_artifact_ref" }
+        }
       }
     }
   }
