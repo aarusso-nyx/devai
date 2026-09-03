@@ -138,6 +138,96 @@
         "Timeout": { "$ref": "#/$defs/count" }
       }
     },
+    "zero_scored_status_totals": {
+      "type": "object",
+      "required": ["Killed", "Timeout", "Survived", "NoCoverage"],
+      "properties": {
+        "Killed": { "const": 0 },
+        "Timeout": { "const": 0 },
+        "Survived": { "const": 0 },
+        "NoCoverage": { "const": 0 }
+      }
+    },
+    "zero_status_totals": {
+      "const": {
+        "CompileError": 0,
+        "Ignored": 0,
+        "Killed": 0,
+        "NoCoverage": 0,
+        "Pending": 0,
+        "RuntimeError": 0,
+        "Survived": 0,
+        "Timeout": 0
+      }
+    },
+    "required_measurement_is_empty": {
+      "anyOf": [
+        {
+          "properties": {
+            "targetCensus": {
+              "properties": { "totalMutants": { "const": 0 } },
+              "required": ["totalMutants"]
+            }
+          },
+          "required": ["targetCensus"]
+        },
+        {
+          "properties": { "statusTotals": { "$ref": "#/$defs/zero_scored_status_totals" } },
+          "required": ["statusTotals"]
+        }
+      ]
+    },
+    "contains_required_package": {
+      "properties": {
+        "packages": {
+          "contains": {
+            "type": "object",
+            "required": ["requirement"],
+            "properties": { "requirement": { "const": "required" } }
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "contains_incomplete_required_package": {
+      "properties": {
+        "packages": {
+          "contains": {
+            "type": "object",
+            "required": ["requirement", "complete"],
+            "properties": {
+              "requirement": { "const": "required" },
+              "complete": { "const": false }
+            }
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "contains_not_passed_required_package": {
+      "properties": {
+        "packages": {
+          "contains": {
+            "type": "object",
+            "required": ["requirement", "passed"],
+            "properties": {
+              "requirement": { "const": "required" },
+              "passed": { "const": false }
+            }
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "aggregate_scored_is_zero": {
+      "properties": {
+        "aggregate": {
+          "properties": { "statusTotals": { "$ref": "#/$defs/zero_scored_status_totals" } },
+          "required": ["statusTotals"]
+        }
+      },
+      "required": ["aggregate"]
+    },
     "process": {
       "type": "object",
       "additionalProperties": false,
@@ -382,7 +472,23 @@
         "score": { "type": "number", "minimum": 0, "maximum": 100 },
         "complete": { "type": "boolean" },
         "passed": { "type": "boolean" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/required_measurement_is_empty" },
+          "then": {
+            "properties": { "complete": { "const": false }, "passed": { "const": false } }
+          }
+        },
+        {
+          "if": { "properties": { "complete": { "const": false } }, "required": ["complete"] },
+          "then": { "properties": { "passed": { "const": false } } }
+        },
+        {
+          "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
+          "then": { "properties": { "complete": { "const": true } } }
+        }
+      ]
     },
     "reuse_origin": {
       "type": "object",
@@ -512,6 +618,38 @@
           },
           "required": ["disposition", "origin", "evidenceRef"]
         }
+      ],
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/required_measurement_is_empty" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "passed": { "const": false },
+              "verdict": { "const": "unknown" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "complete": { "const": false } }, "required": ["complete"] },
+          "then": {
+            "properties": { "passed": { "const": false }, "verdict": { "const": "unknown" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": true } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "pass" } } }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": false } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "fail" } } }
+        }
       ]
     },
     "not_required_package_entry": {
@@ -603,22 +741,10 @@
       },
       "allOf": [
         {
-          "if": {
-            "properties": {
-              "packages": {
-                "not": {
-                  "contains": {
-                    "type": "object",
-                    "required": ["requirement"],
-                    "properties": { "requirement": { "const": "required" } }
-                  }
-                }
-              }
-            },
-            "required": ["packages"]
-          },
+          "if": { "not": { "$ref": "#/$defs/contains_required_package" } },
           "then": {
             "properties": {
+              "complete": { "const": true },
               "verdict": { "const": "not-applicable" },
               "passed": { "const": false },
               "aggregate": {
@@ -629,7 +755,119 @@
                       "executedPackageCount": { "const": 0 },
                       "reusedPackageCount": { "const": 0 },
                       "score": { "type": "null" },
+                      "statusTotals": { "$ref": "#/$defs/zero_status_totals" },
                       "verdict": { "const": "not-applicable" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "$ref": "#/$defs/aggregate_scored_is_zero" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "null" } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/aggregate_scored_is_zero" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "number", "minimum": 0, "maximum": 100 } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": { "$ref": "#/$defs/contains_incomplete_required_package" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "verdict": { "const": "unknown" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "unknown" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "not": { "$ref": "#/$defs/contains_not_passed_required_package" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "pass" },
+              "passed": { "const": true },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "pass" },
+                      "passed": { "const": true }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "$ref": "#/$defs/contains_not_passed_required_package" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "fail" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "fail" },
                       "passed": { "const": false }
                     }
                   }
@@ -684,11 +922,20 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["packageName", "disposition", "inputDigest", "compositionEntryDigest"],
+          "required": [
+            "packageName",
+            "disposition",
+            "inputDigest",
+            "reportDigest",
+            "resultDigest",
+            "compositionEntryDigest"
+          ],
           "properties": {
             "packageName": { "$ref": "#/$defs/package_name" },
             "disposition": { "enum": ["executed", "reused"] },
             "inputDigest": { "$ref": "#/$defs/sha256" },
+            "reportDigest": { "$ref": "#/$defs/sha256" },
+            "resultDigest": { "$ref": "#/$defs/sha256" },
             "compositionEntryDigest": { "$ref": "#/$defs/sha256" }
           }
         },

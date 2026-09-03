@@ -106,3 +106,11 @@ roster.
   of those constants.
 - `law/schemas/mutation-report-set-v2.schema.json` remains the strict document
   shape consumed by the clarified semantic kernel.
+
+## Inspector Adversarial Acceptance
+
+Each frontmatter case must be exercised against both the strict document schema
+and the mandatory semantic kernel. Acceptance requires certify-only source
+population recomputation, one exact framed digest definition for every named
+digest, five-way input-identity equality, and deterministic precedence between
+missing and divergent input identity failures.
