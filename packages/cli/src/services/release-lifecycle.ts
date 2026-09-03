@@ -61,15 +61,15 @@ const PLAN_CANONICALIZATION = {
 } as const;
 
 const PLAN_KERNEL = {
-  kernel_id: 'devai.kernel.release-plan-receipt.v1',
+  kernel_id: 'devai.kernel.release-plan-receipt.v2',
   mandatory: true,
   determination_contract: 'law/policy/release-lifecycle.json#/plan_determination',
   schema_assertion_establishes_pass: false,
   algorithm: [
     'resolve-every-declared-input-and-recompute-its-sha256',
     'require-the-exact-four-ordered-input-kinds-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination',
-    'recompute-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-determination',
-    'recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan',
+    'recompute-verdict-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-the-reported-values',
+    'recompute-the-nine-ordered-plan-steps-for-pass-or-the-empty-plan-for-block-from-the-lifecycle-policy-and-compare-to-plan',
     'recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1',
     'recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest',
     'reject-pass-when-any-recomputed-value-differs-from-the-reported-value',
@@ -144,9 +144,7 @@ export function buildReleasePlanReceipt(input: {
       ? {}
       : { ownerEscalations: intent.owner_escalations as never[] }),
   });
-  if (decision.transition === undefined) {
-    throw new Error('RELEASE_PLAN_BLOCK_TRANSITION_UNREPRESENTABLE');
-  }
+  const passed = decision.verdict === 'ready';
   const repository: ReleaseIdentity = {
     id: input.repository_id,
     commit: intent.candidate.commit,
@@ -158,35 +156,40 @@ export function buildReleasePlanReceipt(input: {
     commit: intent.candidate.commit,
     tree: intent.candidate.tree,
   };
-  const plan = [...lifecycle.states]
-    .sort((left, right) => left.order - right.order)
-    .map((state) => ({
-      order: state.order,
-      action_id: state.produced_by_action ?? state.derived_by_action,
-      produces_state: state.produced_by_action === null ? null : state.state,
-      derives_state: state.derived_by_action === null ? null : state.state,
-    }));
+  const plan = passed
+    ? [...lifecycle.states]
+        .sort((left, right) => left.order - right.order)
+        .map((state) => ({
+          order: state.order,
+          action_id: state.produced_by_action ?? state.derived_by_action,
+          produces_state: state.produced_by_action === null ? null : state.state,
+          derives_state: state.derived_by_action === null ? null : state.state,
+        }))
+    : [];
+  const blockingReason = decision.blockingReasons[0];
   return finalizeReleasePlanReceipt({
     schemaVersion: '1.0.0',
     receipt_kind: 'release-plan-receipt',
     canonicalization: PLAN_CANONICALIZATION,
-    state_observed: decision.verdict === 'ready' ? 'planned' : null,
-    verdict: decision.verdict === 'ready' ? 'pass' : 'block',
+    state_observed: passed ? 'planned' : null,
+    verdict: passed ? 'pass' : 'block',
     repository,
     candidate,
     inputs,
     plan,
     determination: {
-      profile_verdict: decision.verdict === 'ready' ? 'ready' : 'block',
-      transition: decision.transition,
+      profile_verdict: passed ? 'ready' : 'block',
+      transition: decision.transition ?? null,
       support: decision.support,
       impact: intent.change_kind ?? 'behavioral',
       risk_classes: [...(intent.risks ?? [])].sort(),
-      capabilities: decision.capabilities,
-      mutation: decision.mutation,
+      capabilities: passed ? decision.capabilities : [],
+      mutation: passed ? decision.mutation : 'none',
       mutation_disposition: {
-        status: decision.mutationDisposition.status,
-        reason: decision.mutationDisposition.reason,
+        status: passed ? decision.mutationDisposition.status : 'blocked',
+        reason: passed
+          ? decision.mutationDisposition.reason
+          : (blockingReason ?? decision.mutationDisposition.reason),
       },
       blocking_reasons: decision.blockingReasons,
     },
