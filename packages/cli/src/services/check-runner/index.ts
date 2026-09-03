@@ -4,6 +4,15 @@ export type { ReleaseVerificationDecision, ReleaseVerificationInput } from '../r
 export { selectMutationEvidence } from '../mutation-reuse.js';
 export { authorizeSelfDogfoodCheck } from '../self-dogfood.js';
 export {
+  composeMutationEvidenceV21,
+  finalizeMutationEvidenceV21,
+  verifyMutationEvidenceV21,
+} from '../mutation-evidence-v21.js';
+export type {
+  MutationVerificationOptionsV21,
+  MutationVerifierProvenanceV21,
+} from '../mutation-evidence-v21.js';
+export {
   computeMutationV2Score,
   executeParameterizedMutationRoster,
   verifyMutationAssuranceV2,
