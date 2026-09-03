@@ -27,6 +27,7 @@ import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release
 import type {
   ArtifactSinkObject,
   ArtifactSinkObjectReceipt,
+  CertificationOutputClosureBinding,
 } from '../../src/services/release-prepare-kernel.js';
 
 const { runChecks, declaredRole } = vi.hoisted(() => ({
@@ -613,7 +614,7 @@ describe('release lifecycle command adapter composition', () => {
         readCertificationEvidenceReceipt: () => {
           throw new Error('unexpected certification receipt');
         },
-        readCertificationOutputClosure: (binding: Record<string, unknown>) => ({
+        readCertificationOutputClosure: (binding: CertificationOutputClosureBinding) => ({
           ...binding,
           outputs: [],
         }),

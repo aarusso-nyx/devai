@@ -552,6 +552,7 @@ describe('pure release prepare kernel', () => {
   it('refuses a missing sink before reading or generating package content', async () => {
     const value = fixture();
     const source = {
+      ...value.source,
       readGitBlob: vi.fn(value.source.readGitBlob),
       readCertificationEvidenceReceipt: vi.fn(value.source.readCertificationEvidenceReceipt),
       readGeneratedBlob: vi.fn(value.source.readGeneratedBlob),
