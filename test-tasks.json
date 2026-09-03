@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "descriptorVersion": "v1rc-survivor-3",
+  "descriptorVersion": "v1rc-survivor-4",
   "repositoryId": "aarusso-nyx/devai",
   "fallbackNodeId": "test:local-full",
   "dynamicFallbackSelectors": [],
@@ -566,9 +566,13 @@
         { "kind": "exact", "pattern": "package.json" },
         { "kind": "exact", "pattern": "pnpm-lock.yaml" }
       ],
-      "toolchainKeys": ["node", "pnpm"],
+      "toolchainKeys": ["node", "pnpm", "git"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1"
+      }
     },
     {
       "nodeId": "release:closure",
@@ -586,9 +590,13 @@
         { "kind": "exact", "pattern": "pnpm-lock.yaml" },
         { "kind": "exact", "pattern": "test-tasks.json" }
       ],
-      "toolchainKeys": ["node", "pnpm"],
+      "toolchainKeys": ["node", "pnpm", "git"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1"
+      }
     },
     {
       "nodeId": "release:affected-anchor",
@@ -668,7 +676,88 @@
       "outputContract": {
         "kind": "workspace-build",
         "requiredResult": "pass",
-        "paths": ["scratch/coverage/rc-reachable-sources.json"]
+        "paths": [
+          "scratch/coverage/rc-reachable-sources.json",
+          "packages/authority/tsconfig.tsbuildinfo",
+          "packages/cli/tsconfig.tsbuildinfo",
+          "packages/effects-check/tsconfig.tsbuildinfo",
+          "packages/evidence/tsconfig.tsbuildinfo",
+          "packages/loop/tsconfig.tsbuildinfo",
+          "packages/schemas/tsconfig.tsbuildinfo",
+          "packages/sensors/tsconfig.tsbuildinfo",
+          "packages/skills/tsconfig.tsbuildinfo",
+          "packages/spec/tsconfig.tsbuildinfo",
+          "packages/utils/tsconfig.tsbuildinfo"
+        ],
+        "execution_only_paths": true,
+        "generated_namespaces": [
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/authority/dist",
+            "package_manifest": "packages/authority/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/cli/dist",
+            "package_manifest": "packages/cli/package.json",
+            "required_artifacts": [
+              "runtime/package.json",
+              "runtime/evidence-verification/provenance.json",
+              "law/constitution.md",
+              "runtime/law/constitution.md"
+            ]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/effects-check/dist",
+            "package_manifest": "packages/effects-check/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/evidence/dist",
+            "package_manifest": "packages/evidence/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/loop/dist",
+            "package_manifest": "packages/loop/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/schemas/dist",
+            "package_manifest": "packages/schemas/package.json",
+            "required_artifacts": [
+              "sensor-registry.json",
+              "schemas/release-lifecycle-state.schema.json"
+            ]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/sensors/dist",
+            "package_manifest": "packages/sensors/package.json",
+            "required_artifacts": [
+              "sensor-registry.json",
+              "sense-presets.json",
+              "round-execution.json"
+            ]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/skills/dist",
+            "package_manifest": "packages/skills/package.json",
+            "required_artifacts": ["law/constitution.md", "law/policy/release-verification.json"]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/spec/dist",
+            "package_manifest": "packages/spec/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/utils/dist",
+            "package_manifest": "packages/utils/package.json"
+          }
+        ]
       }
     },
     {
@@ -738,7 +827,15 @@
       "allowlistedEnv": [],
       "outputContract": {
         "kind": "command-result",
-        "requiredResult": "pass"
+        "requiredResult": "pass",
+        "paths": ["scratch/typecheck/cli.tsbuildinfo"],
+        "execution_only_paths": true,
+        "generated_namespaces": [
+          {
+            "derivation": "devai-cli-typecheck-v1",
+            "prefix": "scratch/typecheck/cli"
+          }
+        ]
       }
     },
     {

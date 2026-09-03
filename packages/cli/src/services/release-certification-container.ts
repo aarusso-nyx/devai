@@ -270,6 +270,10 @@ export class ProtectedCertificationContainer {
     readonly source: readonly ContainerArchiveEntry[];
     readonly prior_outputs: ReadonlyMap<string, ContainerArchiveEntry>;
     readonly declared_outputs: readonly string[];
+    readonly declared_namespaces?: readonly {
+      readonly prefix: string;
+      readonly required_paths: readonly string[];
+    }[];
   }): { readonly result: TaskExecutionResult; readonly outputs: readonly ContainerArchiveEntry[] } {
     const c = this.#controls;
     const id = `devai-certify-${randomUUID()}`;
@@ -281,9 +285,28 @@ export class ProtectedCertificationContainer {
     let stopped = false;
     let completed = false;
     const expected = new Set(input.declared_outputs);
+    const namespaces = input.declared_namespaces ?? [];
+    const inNamespace = (path: string) =>
+      namespaces.some(({ prefix }) => path.startsWith(`${prefix}/`));
     if (
       expected.size !== input.declared_outputs.length ||
       [...expected].some((path) => !canonicalContainerPath(path)) ||
+      namespaces.some(
+        ({ prefix, required_paths }, index) =>
+          !canonicalContainerPath(prefix) ||
+          required_paths.length === 0 ||
+          required_paths.some(
+            (path) => !canonicalContainerPath(path) || !path.startsWith(`${prefix}/`),
+          ) ||
+          namespaces
+            .slice(0, index)
+            .some(
+              (previous) =>
+                previous.prefix === prefix ||
+                previous.prefix.startsWith(`${prefix}/`) ||
+                prefix.startsWith(`${previous.prefix}/`),
+            ),
+      ) ||
       (input.task.cwd !== '.' && !canonicalContainerPath(input.task.cwd))
     )
       throw new Error('release-certification-output-closure-invalid');
@@ -297,7 +320,8 @@ export class ProtectedCertificationContainer {
     if (
       sources.size !== input.source.length ||
       [...expected].some((path) => sources.has(path)) ||
-      [...sources.keys(), ...expected].some((path) =>
+      [...sources.keys(), ...input.prior_outputs.keys()].some((path) => inNamespace(path)) ||
+      [...sources.keys(), ...expected, ...namespaces.map(({ prefix }) => prefix)].some((path) =>
         this.#dependencies.some(
           (dependency) =>
             path === dependency.mount_path || path.startsWith(`${dependency.mount_path}/`),
@@ -346,6 +370,9 @@ export class ProtectedCertificationContainer {
           TMPDIR: '/tmp',
           CI: '1',
           NO_COLOR: '1',
+          GIT_CONFIG_NOSYSTEM: '1',
+          GIT_CONFIG_GLOBAL: '/dev/null',
+          GIT_OPTIONAL_LOCKS: '0',
         },
       };
       this.#checked([
@@ -445,6 +472,7 @@ export class ProtectedCertificationContainer {
       );
       const outputs: ContainerArchiveEntry[] = [];
       const observedSources = new Set<string>();
+      const observedOutputs = new Set<string>();
       for (const entry of captured) {
         const source = sources.get(entry.path);
         if (source !== undefined) {
@@ -458,12 +486,24 @@ export class ProtectedCertificationContainer {
         ) {
           // A separately mounted read-only dependency archive is not generated evidence.
         } else {
-          if (!expected.has(entry.path))
+          if (!expected.has(entry.path) && !inNamespace(entry.path))
             throw new Error('release-certification-output-closure-invalid');
+          const predecessor = input.prior_outputs.get(entry.path);
+          if (
+            predecessor !== undefined &&
+            (predecessor.mode !== entry.mode || !predecessor.bytes.equals(entry.bytes))
+          )
+            throw new Error('release-certification-predecessor-output-changed');
+          observedOutputs.add(entry.path);
           outputs.push(entry);
         }
       }
-      if (observedSources.size !== sources.size || outputs.length !== expected.size)
+      if (
+        observedSources.size !== sources.size ||
+        [...expected, ...namespaces.flatMap(({ required_paths }) => required_paths)].some(
+          (path) => !observedOutputs.has(path),
+        )
+      )
         throw new Error('release-certification-output-closure-invalid');
       completed = true;
       return { result, outputs };

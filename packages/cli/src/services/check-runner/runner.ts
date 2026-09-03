@@ -80,6 +80,7 @@ export function resolveRunnerToolchain(
   for (const key of [...new Set(requiredKeys)].sort()) {
     if (key === 'node') resolved[key] = process.version;
     else if (key === 'pnpm') resolved[key] = commandVersion('pnpm', ['--version'], repoRoot);
+    else if (key === 'git') resolved[key] = commandVersion('git', ['--version'], repoRoot);
     else if (key === 'eslint') resolved[key] = packageVersion(repoRoot, 'eslint');
     else if (key === 'vitest') resolved[key] = packageVersion(repoRoot, 'vitest');
     else if (key === 'typescript') resolved[key] = packageVersion(repoRoot, 'typescript');
@@ -149,16 +150,20 @@ function outputDigests(
   task: PlannedTask,
   execution: TaskExecutionResult,
   readTaskOutput?: (path: string) => Buffer,
+  capturedTaskOutputPaths?: (task: PlannedTask) => readonly string[],
 ): Readonly<Record<string, string>> {
   const digests: Record<string, string> = {
     stdout: sha256Hex(Buffer.from(execution.stdout, 'utf8')),
     stderr: sha256Hex(Buffer.from(execution.stderr, 'utf8')),
   };
-  const paths = task.outputContract.paths;
+  const paths = task.outputContract.paths ?? [];
   if (paths !== undefined) {
     if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string'))
       throw new Error(`CHECK_RUNNER_OUTPUT_CONTRACT: ${task.nodeId} has malformed paths`);
-    for (const path of paths as string[]) {
+    for (const path of new Set([
+      ...(paths as string[]),
+      ...(capturedTaskOutputPaths?.(task) ?? []),
+    ])) {
       try {
         digests[path] = sha256Hex(
           readTaskOutput === undefined ? readFileSync(join(repoRoot, path)) : readTaskOutput(path),
@@ -452,7 +457,24 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
   const request = bindReleaseRequest(inputOptions);
   const options = request.options;
+  const protectedOutputCapture =
+    options.protectedExecutionIdentity !== undefined &&
+    options.readTaskOutput !== undefined &&
+    options.capturedTaskOutputPaths !== undefined;
   const requiredEnvironment = requiredEnvironmentKeys(options);
+  // Protected execution binds the complete selected DAG, including dependencies, but does
+  // not require credentials or tools belonging only to unselected task nodes. Refuse before
+  // ambient environment/toolchain resolution; those values are not protected host inputs.
+  if (
+    options.protectedExecutionIdentity !== undefined &&
+    requiredTaskNodes(options, 'selected').some(
+      (task) =>
+        task.allowlistedEnv.some((key) => options.environment?.[key] === undefined) ||
+        task.toolchainKeys.some((key) => options.toolchain?.[key] === undefined),
+    )
+  ) {
+    throw new Error('release-certification-environment-unbound');
+  }
   const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
   if (
     (options.target === 'rc' || options.target === 'release') &&
@@ -477,7 +499,13 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
         'CHECK_AUTHORITY_POLICY_REQUIRED: materialize .devai/config/authority-policy.json before planning release evidence',
       );
     }
-    environment[authorityDigestKey] = sha256Hex(readFileSync(authorityPolicyPath));
+    const authorityDigest = sha256Hex(readFileSync(authorityPolicyPath));
+    if (
+      options.protectedExecutionIdentity !== undefined &&
+      environment[authorityDigestKey] !== authorityDigest
+    )
+      throw new Error('release-certification-environment-unbound');
+    environment[authorityDigestKey] = authorityDigest;
   }
   for (const key of requiredEnvironment) {
     const inheritedValue = process.env[key];
@@ -666,7 +694,13 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
         status: 'PASS',
         inputDigest: task.inputDigest,
         dependencyResultDigests,
-        outputDigests: outputDigests(options.repoRoot, task, result, options.readTaskOutput),
+        outputDigests: outputDigests(
+          options.repoRoot,
+          task,
+          result,
+          options.readTaskOutput,
+          options.capturedTaskOutputPaths,
+        ),
         startedAt,
         finishedAt,
       };
@@ -693,7 +727,10 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
       taskKey: task.taskKey,
       disposition: 'executed',
       outcome: 'PASS',
-      reason: cached.reason,
+      reason:
+        task.outputContract.generated_namespaces !== undefined && !protectedOutputCapture
+          ? 'executed;protected-namespace-closure-unproven'
+          : cached.reason,
       durationMs,
       resultDigest,
       exitCode: 0,
@@ -705,7 +742,12 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
   let receiptRefusal: string | undefined;
   const allPass = execution.every((task) => task.outcome === 'PASS');
   const finalState = repositoryState();
-  if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
+  if (
+    !protectedOutputCapture &&
+    plan.tasks.some((task) => task.outputContract.generated_namespaces !== undefined)
+  )
+    receiptRefusal = 'protected-namespace-closure-unproven';
+  else if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
   else if (!plan.clean || !initialState.clean) receiptRefusal = 'dirty-start';
   else if (!allPass) receiptRefusal = 'task-population-not-pass';
   else if (

@@ -182,5 +182,7 @@ export interface CheckRunnerOptions {
   readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
   /** Protected executors return sealed bytes after namespace quiescence, not worktree reads. */
   readonly readTaskOutput?: (path: string) => Buffer;
+  /** Complete sealed namespace census supplied by the protected executor, not a task path list. */
+  readonly capturedTaskOutputPaths?: (task: PlannedTask) => readonly string[];
   readonly now?: () => string;
 }

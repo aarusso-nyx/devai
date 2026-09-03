@@ -17,6 +17,8 @@ import {
   type ProtectedContainerControls,
   type ProtectedContainerDependency,
 } from './release-certification-container.js';
+import { createProtectedCandidateGitMetadata } from './release-certification-git.js';
+import { resolveProtectedGeneratedNamespaces } from './release-production-outputs.js';
 import { buildReleasePlanReceipt, verifyReleasePlanReceipt } from './release-lifecycle.js';
 import type {
   CertificationPackageEntry,
@@ -105,6 +107,11 @@ function outputPaths(plan: TaskPlan): Map<string, string> {
       paths.some((path) => typeof path !== 'string' || !canonicalContainerPath(path))
     )
       throw new Error('release-certification-output-closure-invalid');
+    if (
+      task.outputContract.execution_only_paths !== undefined &&
+      task.outputContract.execution_only_paths !== true
+    )
+      throw new Error('release-certification-output-closure-invalid');
     if (task.outputContract.kind === 'tracked-files') continue;
     for (const path of paths as string[]) {
       if (result.has(path)) throw new Error('release-certification-output-closure-invalid');
@@ -164,6 +171,7 @@ export function createContainerReleaseCertificationAdapters(
   });
   const bindingIdentity = {
     container: container.identity,
+    candidate_git_metadata: 'verified-candidate-shallow-v1',
     toolchain,
     environment,
     plans: selected.map(({ plan, receipt }) => ({
@@ -219,13 +227,6 @@ export function createContainerReleaseCertificationAdapters(
     const descriptor = parseTaskDescriptor(
       JSON.parse(entries[0].bytes.toString('utf8')) as unknown,
     );
-    for (const task of descriptor.tasks) {
-      if (
-        task.allowlistedEnv.some((key) => environment[key] === undefined) ||
-        task.toolchainKeys.some((key) => toolchain[key] === undefined)
-      )
-        throw new Error('release-certification-environment-unbound');
-    }
     return descriptor;
   }
 
@@ -240,6 +241,16 @@ export function createContainerReleaseCertificationAdapters(
     const base = object(entry.intent.base);
     if (typeof base.commit !== 'string')
       throw new Error('release-certification-plan-binding-invalid');
+    const exactSource = readExactGitTreeSync(
+      root,
+      request.candidate_locator.commit,
+      request.candidate_locator.tree,
+      '.',
+    ).map((entry): ContainerArchiveEntry => {
+      if (entry.mode === '120000') throw new Error('release-certification-source-mode-unsupported');
+      return { path: entry.path, mode: entry.mode, bytes: entry.bytes };
+    });
+    const namespaces = resolveProtectedGeneratedNamespaces(descriptor, exactSource);
     return {
       repoRoot: root,
       target: 'release',
@@ -255,7 +266,7 @@ export function createContainerReleaseCertificationAdapters(
       environment,
       timeoutMs: input.timeout_ms,
       cacheRoot: resolve(root, '.devai/state/check-cache/protected', randomUUID()),
-      protectedExecutionIdentity: bindingIdentity,
+      protectedExecutionIdentity: { ...bindingIdentity, generated_namespaces: namespaces },
       resolveExecutable: (name) => {
         const executable = controls.executables[name];
         if (executable === undefined)
@@ -276,8 +287,6 @@ export function createContainerReleaseCertificationAdapters(
     const locators = new Map<string, GitReleaseBlobLocator>();
     for (const entry of entries) {
       if (entry.mode === '120000') throw new Error('release-certification-source-mode-unsupported');
-      if (['.devai/state/', 'record/', 'scratch/'].some((prefix) => entry.path.startsWith(prefix)))
-        continue;
       const locator: GitReleaseBlobLocator = {
         kind: 'git-object',
         repository: request.repository_locator.id,
@@ -294,16 +303,34 @@ export function createContainerReleaseCertificationAdapters(
       source.push({ path: entry.path, mode: entry.mode, bytes });
       locators.set(entry.path, locator);
     }
-    return { source, locators };
+    const gitMetadata = await createProtectedCandidateGitMetadata({
+      request,
+      source,
+      locators,
+      content_source: input.content_source,
+      maximum_bytes: controls.maximum_archive_bytes,
+    });
+    return { source, gitMetadata, locators };
   }
 
   function execute(
     request: ReleaseLifecycleRequest,
     options: CheckRunnerOptions,
     source: readonly ContainerArchiveEntry[],
+    gitMetadata: readonly ContainerArchiveEntry[],
   ) {
     const planned = runCheckTasks(options).plan;
+    const descriptor = options.descriptorDocument;
+    if (descriptor === undefined) throw new Error('release-task-policy-identity-mismatch');
+    const namespaces = resolveProtectedGeneratedNamespaces(descriptor, source);
+    if (
+      canonicalJson(options.protectedExecutionIdentity?.generated_namespaces) !==
+      canonicalJson(namespaces)
+    )
+      throw new Error('release-task-policy-identity-mismatch');
     const outputs = new Map<string, ContainerArchiveEntry>();
+    const producers = new Map<string, string>();
+    const capturedPaths = new Map<string, readonly string[]>();
     const sourceByPath = new Map(source.map((entry) => [entry.path, entry]));
     const expected = new Set<string>();
     const boundPlan = selected.find(
@@ -316,7 +343,10 @@ export function createContainerReleaseCertificationAdapters(
       task_policy_digest_sha256: planned.taskPolicyDigest,
       plan_receipt_digest_sha256: boundPlan.receipt.receipt_digest_sha256,
       helper_identity_sha256: canonicalSha256({
-        bindingIdentity,
+        bindingIdentity: options.protectedExecutionIdentity,
+        candidate_git_metadata_digest_sha256: canonicalSha256(
+          gitMetadata.map(({ path, bytes }) => ({ path, sha256: digest(bytes) })),
+        ),
         stage: options.releaseStage,
         selected_tasks: planned.tasks.map((task) => ({
           node_id: task.nodeId,
@@ -343,6 +373,9 @@ export function createContainerReleaseCertificationAdapters(
           )
             throw new Error('release-task-policy-identity-mismatch');
           const paths = outputPaths({ ...planned, tasks: [task] });
+          const gitView = task.outputContract.git_view;
+          if (gitView !== undefined && gitView !== 'candidate-local-shallow-v1')
+            throw new Error('release-certification-git-view-unsupported');
           if (task.outputContract.kind === 'tracked-files') {
             const tracked = task.outputContract.paths;
             if (
@@ -356,13 +389,24 @@ export function createContainerReleaseCertificationAdapters(
             task,
             timeout_ms: timeout,
             environment: taskEnvironment,
-            source,
+            source: gitView === undefined ? source : [...source, ...gitMetadata],
             prior_outputs: outputs,
             declared_outputs: [...expected],
+            declared_namespaces: namespaces.filter((entry) => entry.task_node === task.nodeId),
           });
-          for (const output of result.outputs) outputs.set(output.path, output);
+          const produced: string[] = [];
+          for (const output of result.outputs) {
+            if (!outputs.has(output.path)) {
+              producers.set(output.path, task.nodeId);
+              produced.push(output.path);
+            }
+            outputs.set(output.path, output);
+            expected.add(output.path);
+          }
+          capturedPaths.set(task.nodeId, produced.sort(compare));
           return result.result;
         },
+        capturedTaskOutputPaths: (task) => capturedPaths.get(task.nodeId) ?? [],
         readTaskOutput: (path) => {
           const output =
             outputs.get(path) ??
@@ -386,7 +430,15 @@ export function createContainerReleaseCertificationAdapters(
       canonicalJson(report.plan.taskPolicy) !== canonicalJson(planned.taskPolicy)
     )
       throw new Error('release-certification-task-failed');
-    return { report, outputs, binding };
+    return {
+      report,
+      outputs,
+      producers,
+      namespaces: namespaces.filter((entry) =>
+        planned.tasks.some((task) => task.nodeId === entry.task_node),
+      ),
+      binding,
+    };
   }
 
   function material(
@@ -450,8 +502,12 @@ export function createContainerReleaseCertificationAdapters(
       const source = await sourcesFor(request);
       const reports = selected.map(
         (_entry, index) =>
-          execute(request, optionsFor(request, descriptor, index, 'preflight'), source.source)
-            .report,
+          execute(
+            request,
+            optionsFor(request, descriptor, index, 'preflight'),
+            source.source,
+            source.gitMetadata,
+          ).report,
       );
       for (const [index, report] of reports.entries()) {
         if (report.preflightReceipt === undefined)
@@ -500,7 +556,9 @@ export function createContainerReleaseCertificationAdapters(
               if (canonicalJson(call.request) !== canonicalJson(request))
                 throw new Error('release-certification-plan-binding-invalid');
               const source = await sourcesFor(request);
-              const runs = options.map((option) => execute(request, option, source.source));
+              const runs = options.map((option) =>
+                execute(request, option, source.source, source.gitMetadata),
+              );
               if (
                 runs.some(
                   (run, index) =>
@@ -516,6 +574,13 @@ export function createContainerReleaseCertificationAdapters(
                 if (unit === undefined || entry === undefined)
                   throw new Error('release-certification-plan-binding-invalid');
                 const declared = outputPaths(run.report.plan);
+                const executionOnly = new Set(
+                  run.report.plan.tasks.flatMap((task) =>
+                    task.outputContract.execution_only_paths === true
+                      ? [...outputPaths({ ...run.report.plan, tasks: [task] }).keys()]
+                      : [],
+                  ),
+                );
                 const mapped = new Set<string>();
                 const packages = entry.plan.packages.map((pkg, pkgIndex) => {
                   const requested = unit.package_roster[pkgIndex];
@@ -532,14 +597,31 @@ export function createContainerReleaseCertificationAdapters(
                     new Set(paths).size !== paths.length
                   )
                     throw new Error('release-certification-output-closure-invalid');
-                  const generated = pkg.generated_entries
+                  const projected = run.namespaces.filter(
+                    (namespace) =>
+                      namespace.package_manifest === requested.manifest_path &&
+                      namespace.package_id === pkg.package_id,
+                  );
+                  const generatedMapping = [
+                    ...pkg.generated_entries,
+                    ...projected.flatMap((namespace) =>
+                      [...run.outputs.keys()]
+                        .filter((path) => path.startsWith(`${namespace.prefix}/`))
+                        .map((path) => ({
+                          path: path.slice(prefix.length),
+                          task_node: namespace.task_node,
+                        })),
+                    ),
+                  ];
+                  const generated = generatedMapping
                     .map((value) => {
                       const path = `${prefix}${value.path}`;
                       const output = run.outputs.get(path);
                       if (
                         output === undefined ||
-                        declared.get(path) !== value.task_node ||
-                        mapped.has(path)
+                        (declared.get(path) ?? run.producers.get(path)) !== value.task_node ||
+                        mapped.has(path) ||
+                        pkg.source_entries.includes(value.path)
                       )
                         throw new Error('release-certification-output-closure-invalid');
                       mapped.add(path);
@@ -578,7 +660,17 @@ export function createContainerReleaseCertificationAdapters(
                     },
                   };
                 });
-                if (mapped.size !== declared.size)
+                if (
+                  [...run.outputs.keys()].some(
+                    (path) =>
+                      !mapped.has(path) &&
+                      !executionOnly.has(path) &&
+                      !run.namespaces.some(
+                        (namespace) =>
+                          namespace.execution_only && path.startsWith(`${namespace.prefix}/`),
+                      ),
+                  )
+                )
                   throw new Error('release-certification-output-closure-invalid');
                 return packages;
               });
