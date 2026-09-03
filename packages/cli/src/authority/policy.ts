@@ -234,6 +234,27 @@ export function buildTrustedAuthoritySources(
   const human = (role: string) => [{ kind: 'human', roles: [role] }];
   const joint = [{ kind: 'human', roles: ['owner', 'architect'] }];
   const coreRules = defined([
+    rule({
+      id: 'core-protected-release-artifact-sink',
+      origin: 'immutable-core',
+      precedence: 750,
+      actionIds: actionIds(
+        entries,
+        (entry) =>
+          entry.name === 'release prepare' &&
+          entry.authority_contract.capabilities.includes('artifact-sink:write'),
+      ),
+      selector: {
+        kind: 'remote',
+        system_id: 'trusted-artifact-sink-v3',
+        endpoint_ids: ['host'],
+        operation_ids: ['write'],
+        publication: false,
+      },
+      subjects: human('architect'),
+      rationale:
+        'Pure prepare exposes bytes only through the exact host-bound opaque artifact sink; the final boundary rechecks candidate, plan and live prepare capability.',
+    }),
     ...[
       {
         kind: 'provider',
