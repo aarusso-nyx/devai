@@ -932,7 +932,7 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "harness-write",
       "authority": "release_controller",
-      "description": "Record the Inspector verification transition from preflighted to certified for one exact candidate; it grants no packaging or publication authority.",
+      "description": "Record the Inspector verification transition from preflight_passed to certified for one exact candidate; it grants no packaging or publication authority.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
@@ -1127,7 +1127,7 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "remote-write",
       "authority": "release_controller",
-      "description": "Publish the exported evidence bundle for one exact candidate under an Owner-issued one-time authorization; it never publishes the product.",
+      "description": "Publish the exported evidence bundle for one exact candidate under an Owner-issued one-time authorization and a bound passing offline-verification receipt; it never publishes the product.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
@@ -1252,13 +1252,13 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "read",
       "authority": "release_controller",
-      "description": "Verify an exported candidate and its evidence bundle without network access; the result grants no lifecycle transition and no publication authority.",
+      "description": "Verify an exported candidate and its evidence bundle without network access and emit a deterministic offline-verification receipt; it persists no state and grants no lifecycle transition or publication authority.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
         "envelope_schema": "law/schemas/action-result.schema.json",
         "success_channel": "stdout",
-        "payload_schema": null
+        "payload_schema": "law/schemas/release-offline-verification-receipt.schema.json"
       },
       "error_contract": {
         "schemaVersion": "1.0.0",
@@ -1301,13 +1301,13 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "read",
       "authority": "release_controller",
-      "description": "Resolve the release lifecycle plan for one exact candidate from canonical inputs without persisting state or evidence.",
+      "description": "Resolve the release lifecycle plan for one exact candidate from canonical inputs and emit a deterministic plan receipt; it persists no state or evidence.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
         "envelope_schema": "law/schemas/action-result.schema.json",
         "success_channel": "stdout",
-        "payload_schema": null
+        "payload_schema": "law/schemas/release-plan-receipt.schema.json"
       },
       "error_contract": {
         "schemaVersion": "1.0.0",
@@ -1350,13 +1350,13 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "harness-write",
       "authority": "release_controller",
-      "description": "Record the Inspector preflight receipt that opens the release lifecycle for one exact candidate; it grants no packaging or publication authority.",
+      "description": "Record the Inspector preflight_passed state that opens the release lifecycle for one exact candidate against a bound valid plan receipt; it grants no packaging or publication authority.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
         "envelope_schema": "law/schemas/action-result.schema.json",
         "success_channel": "stdout",
-        "payload_schema": "law/schemas/release-preflight-receipt.schema.json"
+        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
       },
       "error_contract": {
         "schemaVersion": "1.0.0",
@@ -1475,7 +1475,7 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "remote-write",
       "authority": "release_controller",
-      "description": "Publish the product for one exact candidate under a separate Owner-issued one-time authorization; published evidence never authorizes it.",
+      "description": "Dispatch the product publication for one exact candidate under a separate Owner-issued one-time authorization and record publication_dispatched; published evidence never authorizes it and a dispatch is never published.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
@@ -1546,13 +1546,13 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "read",
       "authority": "release_controller",
-      "description": "Report the exact recorded lifecycle head for one candidate; the observation advances, repairs, and revives nothing.",
+      "description": "Report the exact recorded lifecycle head for one candidate and the states verifiable from supplied or located receipts, including published from a verified signed publication receipt; the observation advances, repairs, and revives nothing.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
         "envelope_schema": "law/schemas/action-result.schema.json",
         "success_channel": "stdout",
-        "payload_schema": "law/schemas/release-lifecycle-state.schema.json"
+        "payload_schema": "law/schemas/release-lifecycle-observation.schema.json"
       },
       "error_contract": {
         "schemaVersion": "1.0.0",

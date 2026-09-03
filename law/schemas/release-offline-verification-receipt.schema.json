@@ -1,0 +1,410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-offline-verification-receipt.schema.json",
+  "title": "Release offline verification receipt",
+  "description": "The deterministic document emitted to stdout by release offline-verify. It verifies an exported artifact and its evidence bundle without network access and writes nothing: no state record, no evidence, no receipt file. A passing receipt observes the derived state offline_verified, which is never persisted. The receipt binds the exact exported state it verified against, the exact artifacts it hashed, and the exact verifier package identity that produced it. It grants no authority and satisfies no prior state: release evidence-publish must bind a passing receipt as checkable evidence, and binding it is not the same as being permitted by it.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "receipt_kind",
+    "receipt_id",
+    "verdict",
+    "state_observed",
+    "repository",
+    "candidate",
+    "verified_state",
+    "artifacts",
+    "verifier",
+    "checks",
+    "network_access",
+    "emitted_by",
+    "grants",
+    "determinism",
+    "receipt_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "receipt_kind": {
+      "const": "release-offline-verification-receipt"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^ROV-[0-9a-f]{16}$",
+      "description": "Content-derived identity: canonical sha256 over every field of this receipt except receipt_id and receipt_digest_sha256, truncated to 16 hex characters."
+    },
+    "verdict": {
+      "enum": ["pass", "fail"]
+    },
+    "state_observed": {
+      "type": ["string", "null"],
+      "enum": [null, "offline_verified"],
+      "description": "A derived state. It exists in this receipt and never in a state record. Null on a failing verification."
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "verified_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "state_id", "record_digest_sha256"],
+      "description": "The exact exported state record whose artifacts this verification read. A receipt bound to a different exported record is a statement about something else.",
+      "properties": {
+        "state": {
+          "const": "exported"
+        },
+        "state_id": {
+          "type": "string",
+          "pattern": "^RLS-[0-9a-f]{16}$"
+        },
+        "record_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every artifact this verification hashed, pinned by exact path and content digest.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "path", "sha256", "size_bytes"],
+        "properties": {
+          "kind": {
+            "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
+          },
+          "path": {
+            "$ref": "#/$defs/relative_path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_name",
+        "package_version",
+        "registry",
+        "integrity_sri",
+        "provenance_sha256",
+        "source_commit"
+      ],
+      "description": "Exact identity of the verifier package that produced this verdict. An unidentified verifier produces an unattributable verdict, which is not evidence.",
+      "properties": {
+        "package_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "package_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "registry": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "integrity_sri": {
+          "type": "string",
+          "pattern": "^sha512-[A-Za-z0-9+/]+={0,2}$"
+        },
+        "provenance_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "status", "result_digest_sha256"],
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "status": {
+            "enum": ["pass", "fail"]
+          },
+          "result_digest_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "network_access": {
+      "const": false,
+      "description": "Offline is a property of the verification, not a preference. A verification that reached the network is not this receipt."
+    },
+    "emitted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "effect",
+        "output_channel",
+        "persists_repository_state",
+        "appends_state_record",
+        "writes_receipt_file"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "release offline-verify"
+        },
+        "effect": {
+          "const": "read"
+        },
+        "output_channel": {
+          "const": "stdout"
+        },
+        "persists_repository_state": {
+          "const": false
+        },
+        "appends_state_record": {
+          "const": false
+        },
+        "writes_receipt_file": {
+          "const": false
+        }
+      }
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "publication_authority",
+        "lifecycle_transition",
+        "satisfies_state"
+      ],
+      "properties": {
+        "authority": {
+          "const": false
+        },
+        "publication_authority": {
+          "const": false
+        },
+        "lifecycle_transition": {
+          "const": false
+        },
+        "satisfies_state": {
+          "const": false,
+          "description": "A passing verification never satisfies the exported prerequisite it checked, and never authorizes a publication."
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic",
+        "derived_from_bound_inputs_only",
+        "contains_wall_clock_time"
+      ],
+      "properties": {
+        "deterministic": {
+          "const": true
+        },
+        "derived_from_bound_inputs_only": {
+          "const": true
+        },
+        "contains_wall_clock_time": {
+          "const": false
+        }
+      }
+    },
+    "receipt_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest of this receipt with receipt_id and this field omitted. Identity and integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "pass"
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "state_observed": {
+            "const": "offline_verified"
+          },
+          "checks": {
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "pass"
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "state_observed": {
+            "type": "null",
+            "description": "A failing verification observes no state. It is a reason to stop, never a weaker pass."
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "receipt_kind": "release-offline-verification-receipt",
+      "receipt_id": "ROV-0123456789abcdef",
+      "verdict": "pass",
+      "state_observed": "offline_verified",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verified_state": {
+        "state": "exported",
+        "state_id": "RLS-89abcdef01234567",
+        "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      },
+      "artifacts": [
+        {
+          "kind": "package-tarball",
+          "path": "dist/aarusso-nyx-devai-1.5.0.tgz",
+          "sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "size_bytes": 1048576
+        }
+      ],
+      "verifier": {
+        "package_name": "@aarusso-nyx/devai",
+        "package_version": "1.4.4",
+        "registry": "https://npm.pkg.github.com",
+        "integrity_sri": "sha512-B1AJzDAZNw+UM1m7bQjwHT9q0gO3cutNpGPRAXFEBtq3L6AZymI6RvLc4ghh05ssOoREynXKuJyjsayRJbWPEQ==",
+        "provenance_sha256": "8ebafff53524031a3207a2256ebcd0fa6e0cc4271fd4bb6bca5aa003395034bd",
+        "source_commit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de"
+      },
+      "checks": [
+        {
+          "check_id": "artifact-digest",
+          "status": "pass",
+          "result_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+        },
+        {
+          "check_id": "evidence-bundle-integrity",
+          "status": "pass",
+          "result_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        }
+      ],
+      "network_access": false,
+      "emitted_by": {
+        "action_id": "release offline-verify",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "satisfies_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  ]
+}

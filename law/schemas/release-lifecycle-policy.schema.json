@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-policy.schema.json",
   "title": "Release lifecycle policy",
-  "description": "Action and state contract for the release lifecycle. Each action declares exactly one effect ceiling, the single role that may initiate it, the prior states it may consume, and the state it produces. Read actions are observational and produce no state. Remote-write actions require an exact, one-time, Owner-issued effect authorization. Evidence publication and product publication are distinct actions and neither implies the other.",
-  "schema_version": "1.0.0",
+  "description": "Action and state contract for the release lifecycle. The lifecycle has exactly nine states. Six are persisted by the six mutating actions, one state per action. Three are derived and never persisted: planned from a deterministic plan receipt, offline_verified from a passing deterministic offline-verification receipt, and published from a signed publication receipt verified by an observation. Each action declares exactly one effect ceiling, the single role that may initiate it, the prior states it consumes, the read receipts it must bind, and the state it appends. Read actions are pure: they emit a deterministic receipt or observation to stdout and persist no repository state. Remote-write actions require an exact, one-time, Owner-issued effect authorization. Evidence publication and product publication are distinct actions and neither implies the other. release publish appends publication_dispatched and never published.",
+  "schema_version": "2.0.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,9 +14,12 @@
     "policy_version",
     "state_record_schema",
     "authorization_event_schema",
+    "receipt_schemas",
     "states",
     "actions",
+    "read_action_purity",
     "publication_separation",
+    "publication_dispatch",
     "fail_closed"
   ],
   "properties": {
@@ -45,14 +48,39 @@
     "authorization_event_schema": {
       "const": "law/schemas/effect-authorization-event.schema.json"
     },
+    "receipt_schemas": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The four contracts a receipt or observation is validated against. A document that does not validate against its declared contract is not a receipt.",
+      "required": [
+        "plan_receipt_schema",
+        "offline_verification_receipt_schema",
+        "publication_receipt_schema",
+        "lifecycle_observation_schema"
+      ],
+      "properties": {
+        "plan_receipt_schema": {
+          "const": "law/schemas/release-plan-receipt.schema.json"
+        },
+        "offline_verification_receipt_schema": {
+          "const": "law/schemas/release-offline-verification-receipt.schema.json"
+        },
+        "publication_receipt_schema": {
+          "const": "law/schemas/release-publication-receipt.schema.json"
+        },
+        "lifecycle_observation_schema": {
+          "const": "law/schemas/release-lifecycle-observation.schema.json"
+        }
+      }
+    },
     "states": {
       "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
+      "minItems": 9,
+      "maxItems": 9,
       "uniqueItems": true,
-      "description": "The ordered lifecycle. A state is reachable only from its declared predecessor.",
+      "description": "The ordered lifecycle. Each state declares whether it is persisted as an appended record or derived from a receipt, and the exact predecessor it requires.",
       "items": {
-        "$ref": "#/$defs/state"
+        "$ref": "#/$defs/state_declaration"
       }
     },
     "actions": {
@@ -62,6 +90,44 @@
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/action"
+      }
+    },
+    "read_action_purity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The three read actions write nothing. They emit a deterministic document to stdout and leave the repository byte-identical.",
+      "required": [
+        "actions",
+        "persists_repository_state",
+        "appends_state_record",
+        "writes_receipt_file",
+        "emits_to",
+        "deterministic",
+        "grants_authority"
+      ],
+      "properties": {
+        "actions": {
+          "const": ["release plan", "release offline-verify", "release resume"]
+        },
+        "persists_repository_state": {
+          "const": false
+        },
+        "appends_state_record": {
+          "const": false
+        },
+        "writes_receipt_file": {
+          "const": false
+        },
+        "emits_to": {
+          "const": "stdout"
+        },
+        "deterministic": {
+          "const": true,
+          "description": "Identical bound inputs produce identical bytes. A read that varies with wall-clock time or host state is not a receipt."
+        },
+        "grants_authority": {
+          "const": false
+        }
       }
     },
     "publication_separation": {
@@ -93,6 +159,74 @@
         }
       }
     },
+    "publication_dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Publication is a two-party fact. The repository records that it dispatched; only a signed receipt from the protected external workflow lets an observation report that the publication happened.",
+      "required": [
+        "dispatch_action",
+        "dispatch_state",
+        "terminal_state",
+        "terminal_state_persisted",
+        "terminal_state_appendable",
+        "observed_by_action",
+        "observation_schema",
+        "receipt_kind",
+        "receipt_schema",
+        "receipt_emitter",
+        "receipt_emitted_by_devai_action",
+        "receipt_grants_authority",
+        "receipt_binds_identity"
+      ],
+      "properties": {
+        "dispatch_action": {
+          "const": "release publish"
+        },
+        "dispatch_state": {
+          "const": "publication_dispatched"
+        },
+        "terminal_state": {
+          "const": "published"
+        },
+        "terminal_state_persisted": {
+          "const": false
+        },
+        "terminal_state_appendable": {
+          "const": false,
+          "description": "No action appends published. A state record naming it is rejected by the state contract."
+        },
+        "observed_by_action": {
+          "const": "release resume"
+        },
+        "observation_schema": {
+          "const": "law/schemas/release-lifecycle-observation.schema.json"
+        },
+        "receipt_kind": {
+          "const": "release-publication-receipt"
+        },
+        "receipt_schema": {
+          "const": "law/schemas/release-publication-receipt.schema.json"
+        },
+        "receipt_emitter": {
+          "const": "protected-external-workflow"
+        },
+        "receipt_emitted_by_devai_action": {
+          "const": false
+        },
+        "receipt_grants_authority": {
+          "const": false
+        },
+        "receipt_binds_identity": {
+          "const": [
+            "publication-dispatched-state",
+            "candidate",
+            "artifact",
+            "trust"
+          ],
+          "description": "published is derived only by verifying the receipt against the exact recorded publication_dispatched state, candidate, artifact, and trust identity. Any divergence derives nothing."
+        }
+      }
+    },
     "fail_closed": {
       "type": "array",
       "minItems": 1,
@@ -111,16 +245,325 @@
     },
     "state": {
       "enum": [
-        "preflighted",
+        "planned",
+        "preflight_passed",
         "certified",
         "prepared",
         "exported",
-        "evidence-published",
+        "offline_verified",
+        "evidence_published",
+        "publication_dispatched",
         "published"
+      ]
+    },
+    "persisted_state": {
+      "enum": [
+        "preflight_passed",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence_published",
+        "publication_dispatched"
+      ],
+      "description": "The only states an appended lifecycle state record may name."
+    },
+    "mutating_action": {
+      "enum": [
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release evidence-publish",
+        "release publish"
+      ]
+    },
+    "read_action": {
+      "enum": ["release plan", "release offline-verify", "release resume"]
+    },
+    "required_receipt": {
+      "enum": [
+        "release-plan-receipt",
+        "release-offline-verification-receipt"
+      ]
+    },
+    "emitted_document": {
+      "enum": [
+        "release-plan-receipt",
+        "release-offline-verification-receipt",
+        "release-lifecycle-observation"
+      ]
+    },
+    "derived_receipt": {
+      "enum": [
+        "release-plan-receipt",
+        "release-offline-verification-receipt",
+        "release-publication-receipt"
       ]
     },
     "role": {
       "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    "state_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "order",
+        "persisted",
+        "appendable",
+        "derivation",
+        "produced_by_action",
+        "derived_by_action",
+        "derived_from_receipt",
+        "requires_state"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "persisted": {
+          "type": "boolean",
+          "description": "True when the state exists as an appended record. False when it is derived from a receipt and exists only in the emitted document."
+        },
+        "appendable": {
+          "type": "boolean",
+          "description": "True when a lifecycle state record may name this state."
+        },
+        "derivation": {
+          "enum": [
+            "state-record",
+            "plan-receipt",
+            "offline-verification-receipt",
+            "publication-receipt"
+          ]
+        },
+        "produced_by_action": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/mutating_action"
+            }
+          ]
+        },
+        "derived_by_action": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/read_action"
+            }
+          ]
+        },
+        "derived_from_receipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/derived_receipt"
+            }
+          ]
+        },
+        "requires_state": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/state"
+            }
+          ],
+          "description": "The exact predecessor this state requires. Null only for the first state and for the state that opens the persisted chain."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "derivation": {
+                "const": "state-record"
+              }
+            },
+            "required": ["derivation"]
+          },
+          "then": {
+            "properties": {
+              "persisted": {
+                "const": true
+              },
+              "appendable": {
+                "const": true
+              },
+              "state": {
+                "$ref": "#/$defs/persisted_state"
+              },
+              "produced_by_action": {
+                "type": "string"
+              },
+              "derived_by_action": {
+                "type": "null"
+              },
+              "derived_from_receipt": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "persisted": {
+                "const": false
+              },
+              "appendable": {
+                "const": false
+              },
+              "state": {
+                "enum": ["planned", "offline_verified", "published"]
+              },
+              "produced_by_action": {
+                "type": "null"
+              },
+              "derived_by_action": {
+                "type": "string"
+              },
+              "derived_from_receipt": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "published"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "order": {
+                "const": 9
+              },
+              "derivation": {
+                "const": "publication-receipt"
+              },
+              "derived_by_action": {
+                "const": "release resume"
+              },
+              "derived_from_receipt": {
+                "const": "release-publication-receipt"
+              },
+              "requires_state": {
+                "const": "publication_dispatched"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "planned"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "order": {
+                "const": 1
+              },
+              "derivation": {
+                "const": "plan-receipt"
+              },
+              "derived_by_action": {
+                "const": "release plan"
+              },
+              "derived_from_receipt": {
+                "const": "release-plan-receipt"
+              },
+              "requires_state": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "offline_verified"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "derivation": {
+                "const": "offline-verification-receipt"
+              },
+              "derived_by_action": {
+                "const": "release offline-verify"
+              },
+              "derived_from_receipt": {
+                "const": "release-offline-verification-receipt"
+              },
+              "requires_state": {
+                "const": "exported"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "preflight_passed"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "produced_by_action": {
+                "const": "release preflight"
+              },
+              "requires_state": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "publication_dispatched"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "produced_by_action": {
+                "const": "release publish"
+              },
+              "requires_state": {
+                "const": "evidence_published"
+              }
+            }
+          }
+        }
+      ]
     },
     "action": {
       "type": "object",
@@ -130,7 +573,11 @@
         "effect",
         "initiator_roles",
         "requires_prior_state",
+        "requires_receipts",
         "produces_state",
+        "appends_state_record",
+        "persists_repository_state",
+        "emits_receipt",
         "observational",
         "grants_publication_authority",
         "binds_identity",
@@ -164,22 +611,46 @@
         "requires_prior_state": {
           "type": "array",
           "uniqueItems": true,
-          "description": "Empty means the action opens the chain or reads without a required predecessor.",
+          "description": "Empty means the action opens the persisted chain or reads without a required predecessor. Only persisted states are consumable as a predecessor.",
           "items": {
-            "$ref": "#/$defs/state"
+            "$ref": "#/$defs/persisted_state"
+          }
+        },
+        "requires_receipts": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "The read receipts this action must bind before it may act. A receipt is checkable evidence, never an authorization.",
+          "items": {
+            "$ref": "#/$defs/required_receipt"
           }
         },
         "produces_state": {
-          "type": ["string", "null"],
-          "enum": [
-            null,
-            "preflighted",
-            "certified",
-            "prepared",
-            "exported",
-            "evidence-published",
-            "published"
-          ]
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/persisted_state"
+            }
+          ],
+          "description": "The single state this action appends. No action produces planned, offline_verified, or published."
+        },
+        "appends_state_record": {
+          "type": "boolean"
+        },
+        "persists_repository_state": {
+          "type": "boolean"
+        },
+        "emits_receipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/emitted_document"
+            }
+          ],
+          "description": "The deterministic document a read action emits to stdout. Null for every mutating action."
         },
         "observational": {
           "type": "boolean",
@@ -200,7 +671,13 @@
               "input",
               "evidence",
               "artifact",
-              "prior-state"
+              "prior-state",
+              "plan-receipt",
+              "offline-verification-receipt",
+              "publication-receipt",
+              "verifier",
+              "workflow",
+              "trust"
             ]
           }
         },
@@ -237,11 +714,26 @@
           },
           "then": {
             "properties": {
+              "action_id": {
+                "$ref": "#/$defs/read_action"
+              },
               "observational": {
                 "const": true
               },
               "produces_state": {
                 "type": "null"
+              },
+              "appends_state_record": {
+                "const": false
+              },
+              "persists_repository_state": {
+                "const": false
+              },
+              "emits_receipt": {
+                "type": "string"
+              },
+              "requires_receipts": {
+                "maxItems": 0
               },
               "grants_publication_authority": {
                 "const": false
@@ -263,11 +755,23 @@
           },
           "else": {
             "properties": {
+              "action_id": {
+                "$ref": "#/$defs/mutating_action"
+              },
               "observational": {
                 "const": false
               },
               "produces_state": {
                 "type": "string"
+              },
+              "appends_state_record": {
+                "const": true
+              },
+              "persists_repository_state": {
+                "const": true
+              },
+              "emits_receipt": {
+                "type": "null"
               }
             }
           }
@@ -319,6 +823,9 @@
               "grants_publication_authority": {
                 "const": false
               },
+              "requires_prior_state": {
+                "minItems": 1
+              },
               "authorization": {
                 "properties": {
                   "required": {
@@ -367,6 +874,249 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release plan"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              },
+              "emits_receipt": {
+                "const": "release-plan-receipt"
+              },
+              "requires_prior_state": {
+                "const": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release offline-verify"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              },
+              "emits_receipt": {
+                "const": "release-offline-verification-receipt"
+              },
+              "requires_prior_state": {
+                "const": ["exported"]
+              },
+              "binds_identity": {
+                "contains": {
+                  "const": "prior-state"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release resume"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              },
+              "emits_receipt": {
+                "const": "release-lifecycle-observation"
+              },
+              "requires_prior_state": {
+                "const": ["publication_dispatched"]
+              },
+              "binds_identity": {
+                "allOf": [
+                  {
+                    "contains": {
+                      "const": "prior-state"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "publication-receipt"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release preflight"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "harness-write"
+              },
+              "produces_state": {
+                "const": "preflight_passed"
+              },
+              "requires_prior_state": {
+                "const": []
+              },
+              "requires_receipts": {
+                "const": ["release-plan-receipt"]
+              },
+              "binds_identity": {
+                "contains": {
+                  "const": "plan-receipt"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release certify"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "harness-write"
+              },
+              "produces_state": {
+                "const": "certified"
+              },
+              "requires_prior_state": {
+                "const": ["preflight_passed"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release prepare"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "local-write"
+              },
+              "produces_state": {
+                "const": "prepared"
+              },
+              "requires_prior_state": {
+                "const": ["certified"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release export"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "local-write"
+              },
+              "produces_state": {
+                "const": "exported"
+              },
+              "requires_prior_state": {
+                "const": ["prepared"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release evidence-publish"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "remote-write"
+              },
+              "produces_state": {
+                "const": "evidence_published"
+              },
+              "requires_prior_state": {
+                "const": ["exported"]
+              },
+              "requires_receipts": {
+                "const": ["release-offline-verification-receipt"]
+              },
+              "binds_identity": {
+                "contains": {
+                  "const": "offline-verification-receipt"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action_id": {
+                "const": "release publish"
+              }
+            },
+            "required": ["action_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "remote-write"
+              },
+              "produces_state": {
+                "const": "publication_dispatched",
+                "description": "A dispatch is not an outcome. release publish never produces published."
+              },
+              "requires_prior_state": {
+                "const": ["evidence_published"]
+              }
+            }
+          }
         }
       ]
     }
@@ -377,24 +1127,127 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "1.0.0",
+      "policy_version": "2.0.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+      "receipt_schemas": {
+        "plan_receipt_schema": "law/schemas/release-plan-receipt.schema.json",
+        "offline_verification_receipt_schema": "law/schemas/release-offline-verification-receipt.schema.json",
+        "publication_receipt_schema": "law/schemas/release-publication-receipt.schema.json",
+        "lifecycle_observation_schema": "law/schemas/release-lifecycle-observation.schema.json"
+      },
       "states": [
-        "preflighted",
-        "certified",
-        "prepared",
-        "exported",
-        "evidence-published",
-        "published"
+        {
+          "state": "planned",
+          "order": 1,
+          "persisted": false,
+          "appendable": false,
+          "derivation": "plan-receipt",
+          "produced_by_action": null,
+          "derived_by_action": "release plan",
+          "derived_from_receipt": "release-plan-receipt",
+          "requires_state": null
+        },
+        {
+          "state": "preflight_passed",
+          "order": 2,
+          "persisted": true,
+          "appendable": true,
+          "derivation": "state-record",
+          "produced_by_action": "release preflight",
+          "derived_by_action": null,
+          "derived_from_receipt": null,
+          "requires_state": null
+        },
+        {
+          "state": "certified",
+          "order": 3,
+          "persisted": true,
+          "appendable": true,
+          "derivation": "state-record",
+          "produced_by_action": "release certify",
+          "derived_by_action": null,
+          "derived_from_receipt": null,
+          "requires_state": "preflight_passed"
+        },
+        {
+          "state": "prepared",
+          "order": 4,
+          "persisted": true,
+          "appendable": true,
+          "derivation": "state-record",
+          "produced_by_action": "release prepare",
+          "derived_by_action": null,
+          "derived_from_receipt": null,
+          "requires_state": "certified"
+        },
+        {
+          "state": "exported",
+          "order": 5,
+          "persisted": true,
+          "appendable": true,
+          "derivation": "state-record",
+          "produced_by_action": "release export",
+          "derived_by_action": null,
+          "derived_from_receipt": null,
+          "requires_state": "prepared"
+        },
+        {
+          "state": "offline_verified",
+          "order": 6,
+          "persisted": false,
+          "appendable": false,
+          "derivation": "offline-verification-receipt",
+          "produced_by_action": null,
+          "derived_by_action": "release offline-verify",
+          "derived_from_receipt": "release-offline-verification-receipt",
+          "requires_state": "exported"
+        },
+        {
+          "state": "evidence_published",
+          "order": 7,
+          "persisted": true,
+          "appendable": true,
+          "derivation": "state-record",
+          "produced_by_action": "release evidence-publish",
+          "derived_by_action": null,
+          "derived_from_receipt": null,
+          "requires_state": "exported"
+        },
+        {
+          "state": "publication_dispatched",
+          "order": 8,
+          "persisted": true,
+          "appendable": true,
+          "derivation": "state-record",
+          "produced_by_action": "release publish",
+          "derived_by_action": null,
+          "derived_from_receipt": null,
+          "requires_state": "evidence_published"
+        },
+        {
+          "state": "published",
+          "order": 9,
+          "persisted": false,
+          "appendable": false,
+          "derivation": "publication-receipt",
+          "produced_by_action": null,
+          "derived_by_action": "release resume",
+          "derived_from_receipt": "release-publication-receipt",
+          "requires_state": "publication_dispatched"
+        }
       ],
       "actions": [
         {
           "action_id": "release certify",
           "effect": "harness-write",
           "initiator_roles": ["inspector"],
-          "requires_prior_state": ["preflighted"],
+          "requires_prior_state": ["preflight_passed"],
+          "requires_receipts": [],
           "produces_state": "certified",
+          "appends_state_record": true,
+          "persists_repository_state": true,
+          "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
           "binds_identity": ["candidate"],
@@ -410,10 +1263,14 @@
           "effect": "remote-write",
           "initiator_roles": ["owner"],
           "requires_prior_state": ["exported"],
-          "produces_state": "evidence-published",
+          "requires_receipts": ["release-offline-verification-receipt"],
+          "produces_state": "evidence_published",
+          "appends_state_record": true,
+          "persists_repository_state": true,
+          "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": true,
-          "binds_identity": ["candidate"],
+          "binds_identity": ["candidate", "offline-verification-receipt"],
           "authorization": {
             "required": true,
             "authorized_by": "owner",
@@ -426,7 +1283,11 @@
           "effect": "local-write",
           "initiator_roles": ["architect"],
           "requires_prior_state": ["prepared"],
+          "requires_receipts": [],
           "produces_state": "exported",
+          "appends_state_record": true,
+          "persists_repository_state": true,
+          "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
           "binds_identity": ["candidate"],
@@ -441,11 +1302,15 @@
           "action_id": "release offline-verify",
           "effect": "read",
           "initiator_roles": ["auditor"],
-          "requires_prior_state": [],
+          "requires_prior_state": ["exported"],
+          "requires_receipts": [],
           "produces_state": null,
+          "appends_state_record": false,
+          "persists_repository_state": false,
+          "emits_receipt": "release-offline-verification-receipt",
           "observational": true,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate"],
+          "binds_identity": ["candidate", "prior-state", "verifier"],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -458,7 +1323,11 @@
           "effect": "read",
           "initiator_roles": ["architect"],
           "requires_prior_state": [],
+          "requires_receipts": [],
           "produces_state": null,
+          "appends_state_record": false,
+          "persists_repository_state": false,
+          "emits_receipt": "release-plan-receipt",
           "observational": true,
           "grants_publication_authority": false,
           "binds_identity": ["repository", "candidate", "input"],
@@ -474,10 +1343,14 @@
           "effect": "harness-write",
           "initiator_roles": ["inspector"],
           "requires_prior_state": [],
-          "produces_state": "preflighted",
+          "requires_receipts": ["release-plan-receipt"],
+          "produces_state": "preflight_passed",
+          "appends_state_record": true,
+          "persists_repository_state": true,
+          "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate"],
+          "binds_identity": ["candidate", "plan-receipt"],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -490,7 +1363,11 @@
           "effect": "local-write",
           "initiator_roles": ["architect"],
           "requires_prior_state": ["certified"],
+          "requires_receipts": [],
           "produces_state": "prepared",
+          "appends_state_record": true,
+          "persists_repository_state": true,
+          "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": false,
           "binds_identity": ["candidate"],
@@ -505,8 +1382,12 @@
           "action_id": "release publish",
           "effect": "remote-write",
           "initiator_roles": ["owner"],
-          "requires_prior_state": ["evidence-published"],
-          "produces_state": "published",
+          "requires_prior_state": ["evidence_published"],
+          "requires_receipts": [],
+          "produces_state": "publication_dispatched",
+          "appends_state_record": true,
+          "persists_repository_state": true,
+          "emits_receipt": null,
           "observational": false,
           "grants_publication_authority": true,
           "binds_identity": ["candidate"],
@@ -521,11 +1402,15 @@
           "action_id": "release resume",
           "effect": "read",
           "initiator_roles": ["architect"],
-          "requires_prior_state": [],
+          "requires_prior_state": ["publication_dispatched"],
+          "requires_receipts": [],
           "produces_state": null,
+          "appends_state_record": false,
+          "persists_repository_state": false,
+          "emits_receipt": "release-lifecycle-observation",
           "observational": true,
           "grants_publication_authority": false,
-          "binds_identity": ["candidate"],
+          "binds_identity": ["candidate", "prior-state", "publication-receipt"],
           "authorization": {
             "required": false,
             "authorized_by": null,
@@ -534,12 +1419,41 @@
           }
         }
       ],
+      "read_action_purity": {
+        "actions": ["release plan", "release offline-verify", "release resume"],
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false,
+        "emits_to": "stdout",
+        "deterministic": true,
+        "grants_authority": false
+      },
       "publication_separation": {
         "evidence_action": "release evidence-publish",
         "product_action": "release publish",
         "evidence_implies_product": false,
         "product_implies_evidence": false,
         "shared_authorization": false
+      },
+      "publication_dispatch": {
+        "dispatch_action": "release publish",
+        "dispatch_state": "publication_dispatched",
+        "terminal_state": "published",
+        "terminal_state_persisted": false,
+        "terminal_state_appendable": false,
+        "observed_by_action": "release resume",
+        "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",
+        "receipt_kind": "release-publication-receipt",
+        "receipt_schema": "law/schemas/release-publication-receipt.schema.json",
+        "receipt_emitter": "protected-external-workflow",
+        "receipt_emitted_by_devai_action": false,
+        "receipt_grants_authority": false,
+        "receipt_binds_identity": [
+          "publication-dispatched-state",
+          "candidate",
+          "artifact",
+          "trust"
+        ]
       },
       "fail_closed": ["missing-prior-state"]
     }

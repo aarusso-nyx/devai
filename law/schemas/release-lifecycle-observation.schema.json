@@ -1,0 +1,586 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-observation.schema.json",
+  "title": "Release lifecycle observation",
+  "description": "The deterministic document emitted to stdout by release resume. It reports the exact recorded persisted head for one candidate, and the derived states it could verify from supplied or located receipts. It writes nothing: no state record, no evidence, no receipt file. It advances, repairs, and revives nothing. published is reported only when a signed publication receipt verifies against the exact recorded publication_dispatched state, candidate, artifact, and trust identity; an unverifiable receipt derives nothing, and the observation never appends published.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "observation_kind",
+    "observation_id",
+    "repository",
+    "candidate",
+    "head",
+    "derived_states",
+    "published",
+    "emitted_by",
+    "grants",
+    "determinism",
+    "observation_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "observation_kind": {
+      "const": "release-lifecycle-observation"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^RLO-[0-9a-f]{16}$",
+      "description": "Content-derived identity: canonical sha256 over every field of this observation except observation_id and observation_digest_sha256, truncated to 16 hex characters."
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "head": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["state", "state_id", "record_digest_sha256"],
+      "description": "The exact recorded persisted head. Null when no state record exists for this candidate. A blocked or stale lifecycle reports its actual head and nothing more.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/persisted_state"
+        },
+        "state_id": {
+          "type": "string",
+          "pattern": "^RLS-[0-9a-f]{16}$"
+        },
+        "record_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "derived_states": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Derived states this observation verified from receipts. A derived state is reported, never recorded.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "receipt_kind", "receipt_id", "receipt_digest_sha256", "verified"],
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/derived_state"
+          },
+          "receipt_kind": {
+            "$ref": "#/$defs/receipt_kind"
+          },
+          "receipt_id": {
+            "type": "string",
+            "pattern": "^(?:RPL|ROV|RPU)-[0-9a-f]{16}$"
+          },
+          "receipt_digest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "verified": {
+            "const": true,
+            "description": "Only a verified receipt yields a derived state. An unverifiable receipt is not weaker evidence; it is no evidence and is omitted."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "planned"
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "receipt_kind": {
+                  "const": "release-plan-receipt"
+                },
+                "receipt_id": {
+                  "pattern": "^RPL-[0-9a-f]{16}$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "offline_verified"
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "receipt_kind": {
+                  "const": "release-offline-verification-receipt"
+                },
+                "receipt_id": {
+                  "pattern": "^ROV-[0-9a-f]{16}$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "published"
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "receipt_kind": {
+                  "const": "release-publication-receipt"
+                },
+                "receipt_id": {
+                  "pattern": "^RPU-[0-9a-f]{16}$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "published": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed", "receipt", "verified_against"],
+      "description": "The only route to published. It requires a verified signed publication receipt bound to the exact recorded dispatch.",
+      "properties": {
+        "observed": {
+          "type": "boolean"
+        },
+        "receipt": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "receipt_id",
+            "receipt_digest_sha256",
+            "trust_root_id",
+            "key_id",
+            "signature_verified"
+          ],
+          "properties": {
+            "kind": {
+              "const": "release-publication-receipt"
+            },
+            "receipt_id": {
+              "type": "string",
+              "pattern": "^RPU-[0-9a-f]{16}$"
+            },
+            "receipt_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "trust_root_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+            },
+            "key_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+            },
+            "signature_verified": {
+              "const": true
+            }
+          }
+        },
+        "verified_against": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "state_id",
+            "record_digest_sha256",
+            "candidate_identity_verified",
+            "artifact_identity_verified",
+            "trust_identity_verified"
+          ],
+          "description": "The exact publication_dispatched record the receipt was checked against. Every binding must verify; a near match is a mismatch.",
+          "properties": {
+            "state": {
+              "const": "publication_dispatched"
+            },
+            "state_id": {
+              "type": "string",
+              "pattern": "^RLS-[0-9a-f]{16}$"
+            },
+            "record_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_identity_verified": {
+              "const": true
+            },
+            "artifact_identity_verified": {
+              "const": true
+            },
+            "trust_identity_verified": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "emitted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "effect",
+        "output_channel",
+        "persists_repository_state",
+        "appends_state_record",
+        "writes_receipt_file"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "release resume"
+        },
+        "effect": {
+          "const": "read"
+        },
+        "output_channel": {
+          "const": "stdout"
+        },
+        "persists_repository_state": {
+          "const": false
+        },
+        "appends_state_record": {
+          "const": false
+        },
+        "writes_receipt_file": {
+          "const": false
+        }
+      }
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "publication_authority",
+        "lifecycle_transition",
+        "appends_published_state"
+      ],
+      "properties": {
+        "authority": {
+          "const": false
+        },
+        "publication_authority": {
+          "const": false
+        },
+        "lifecycle_transition": {
+          "const": false
+        },
+        "appends_published_state": {
+          "const": false,
+          "description": "Deriving published is reporting a verified fact. It is never a write."
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic",
+        "derived_from_bound_inputs_only",
+        "contains_wall_clock_time"
+      ],
+      "properties": {
+        "deterministic": {
+          "const": true
+        },
+        "derived_from_bound_inputs_only": {
+          "const": true
+        },
+        "contains_wall_clock_time": {
+          "const": false
+        }
+      }
+    },
+    "observation_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest of this observation with observation_id and this field omitted. Audit integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "published": {
+            "properties": {
+              "observed": {
+                "const": true
+              }
+            },
+            "required": ["observed"]
+          }
+        },
+        "required": ["published"]
+      },
+      "then": {
+        "properties": {
+          "head": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "publication_dispatched",
+                "description": "published is observable only over a recorded dispatch. Any other head means there is nothing to have completed."
+              }
+            }
+          },
+          "published": {
+            "properties": {
+              "receipt": {
+                "type": "object"
+              },
+              "verified_against": {
+                "type": "object"
+              }
+            }
+          },
+          "derived_states": {
+            "contains": {
+              "type": "object",
+              "required": ["state"],
+              "properties": {
+                "state": {
+                  "const": "published"
+                }
+              }
+            },
+            "minContains": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "published": {
+            "properties": {
+              "receipt": {
+                "type": "null"
+              },
+              "verified_against": {
+                "type": "null"
+              }
+            }
+          },
+          "derived_states": {
+            "not": {
+              "contains": {
+                "type": "object",
+                "required": ["state"],
+                "properties": {
+                  "state": {
+                    "const": "published"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "persisted_state": {
+      "enum": [
+        "preflight_passed",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence_published",
+        "publication_dispatched"
+      ]
+    },
+    "derived_state": {
+      "enum": ["planned", "offline_verified", "published"]
+    },
+    "receipt_kind": {
+      "enum": [
+        "release-plan-receipt",
+        "release-offline-verification-receipt",
+        "release-publication-receipt"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "observation_kind": "release-lifecycle-observation",
+      "observation_id": "RLO-0123456789abcdef",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "head": {
+        "state": "publication_dispatched",
+        "state_id": "RLS-fedcba9876543210",
+        "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+      },
+      "derived_states": [
+        {
+          "state": "published",
+          "receipt_kind": "release-publication-receipt",
+          "receipt_id": "RPU-0123456789abcdef",
+          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "verified": true
+        }
+      ],
+      "published": {
+        "observed": true,
+        "receipt": {
+          "kind": "release-publication-receipt",
+          "receipt_id": "RPU-0123456789abcdef",
+          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "trust_root_id": "devai-publication-receipt-root",
+          "key_id": "publication-receipt-2026-09",
+          "signature_verified": true
+        },
+        "verified_against": {
+          "state": "publication_dispatched",
+          "state_id": "RLS-fedcba9876543210",
+          "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "candidate_identity_verified": true,
+          "artifact_identity_verified": true,
+          "trust_identity_verified": true
+        }
+      },
+      "emitted_by": {
+        "action_id": "release resume",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appends_published_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "observation_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "observation_kind": "release-lifecycle-observation",
+      "observation_id": "RLO-fedcba9876543210",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "head": {
+        "state": "exported",
+        "state_id": "RLS-89abcdef01234567",
+        "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      },
+      "derived_states": [
+        {
+          "state": "offline_verified",
+          "receipt_kind": "release-offline-verification-receipt",
+          "receipt_id": "ROV-0123456789abcdef",
+          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "verified": true
+        }
+      ],
+      "published": {
+        "observed": false,
+        "receipt": null,
+        "verified_against": null
+      },
+      "emitted_by": {
+        "action_id": "release resume",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appends_published_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "observation_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+    }
+  ]
+}

@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-plan-receipt.schema.json",
+  "title": "Release plan receipt",
+  "description": "The deterministic document emitted to stdout by release plan. It resolves the lifecycle plan for one exact candidate from pinned inputs and writes nothing: no state record, no evidence, no receipt file. It observes the derived state planned, which is never persisted. The receipt grants no authority, no publication consent, and no lifecycle transition; a later mutating action may bind it as checkable evidence by exact digest, and binding it is not the same as being permitted by it.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "receipt_kind",
+    "receipt_id",
+    "state_observed",
+    "verdict",
+    "repository",
+    "candidate",
+    "inputs",
+    "plan",
+    "emitted_by",
+    "grants",
+    "determinism",
+    "receipt_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "receipt_kind": {
+      "const": "release-plan-receipt"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^RPL-[0-9a-f]{16}$",
+      "description": "Content-derived identity: canonical sha256 over every field of this receipt except receipt_id and receipt_digest_sha256, truncated to 16 hex characters."
+    },
+    "state_observed": {
+      "type": ["string", "null"],
+      "enum": [null, "planned"],
+      "description": "A derived state. It exists in this receipt and never in a state record. Null when the plan could not be resolved."
+    },
+    "verdict": {
+      "enum": ["pass", "block"],
+      "description": "block means the plan could not be resolved from the bound inputs. A blocked receipt is not bindable by any mutating action."
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every governed input the plan was resolved from, pinned by exact path and content digest. A plan resolved from an unpinned input is not deterministic.",
+      "items": {
+        "$ref": "#/$defs/input"
+      }
+    },
+    "plan": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "description": "The resolved lifecycle steps in order. The plan describes what would have to happen; it permits none of it.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order", "action_id", "produces_state"],
+        "properties": {
+          "order": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9
+          },
+          "action_id": {
+            "$ref": "#/$defs/lifecycle_action"
+          },
+          "produces_state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/persisted_state"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "emitted_by": {
+      "$ref": "#/$defs/pure_read_emitter"
+    },
+    "grants": {
+      "$ref": "#/$defs/grants_nothing"
+    },
+    "determinism": {
+      "$ref": "#/$defs/determinism"
+    },
+    "receipt_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest of this receipt with receipt_id and this field omitted. Identity and integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "pass"
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "state_observed": {
+            "const": "planned"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "state_observed": {
+            "type": "null",
+            "description": "A blocked plan observes no state. It is a reason to stop, never a weaker plan."
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    },
+    "persisted_state": {
+      "enum": [
+        "preflight_passed",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence_published",
+        "publication_dispatched"
+      ]
+    },
+    "lifecycle_action": {
+      "enum": [
+        "release plan",
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release offline-verify",
+        "release evidence-publish",
+        "release publish",
+        "release resume"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "release-intent",
+            "release-profile",
+            "release-lifecycle-policy",
+            "task-policy",
+            "toolchain",
+            "lockfile",
+            "action-registry",
+            "threshold"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "pure_read_emitter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "effect",
+        "output_channel",
+        "persists_repository_state",
+        "appends_state_record",
+        "writes_receipt_file"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "release plan"
+        },
+        "effect": {
+          "const": "read"
+        },
+        "output_channel": {
+          "const": "stdout"
+        },
+        "persists_repository_state": {
+          "const": false
+        },
+        "appends_state_record": {
+          "const": false
+        },
+        "writes_receipt_file": {
+          "const": false
+        }
+      }
+    },
+    "grants_nothing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "publication_authority",
+        "lifecycle_transition",
+        "satisfies_state"
+      ],
+      "properties": {
+        "authority": {
+          "const": false
+        },
+        "publication_authority": {
+          "const": false
+        },
+        "lifecycle_transition": {
+          "const": false
+        },
+        "satisfies_state": {
+          "const": false,
+          "description": "A receipt never stands in for a state it did not produce."
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic",
+        "derived_from_bound_inputs_only",
+        "contains_wall_clock_time"
+      ],
+      "properties": {
+        "deterministic": {
+          "const": true,
+          "description": "Identical bound inputs produce identical receipt bytes."
+        },
+        "derived_from_bound_inputs_only": {
+          "const": true
+        },
+        "contains_wall_clock_time": {
+          "const": false,
+          "description": "No emission timestamp. A field that varies per invocation would make two receipts over one candidate incomparable."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "receipt_kind": "release-plan-receipt",
+      "receipt_id": "RPL-0123456789abcdef",
+      "state_observed": "planned",
+      "verdict": "pass",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "inputs": [
+        {
+          "kind": "release-lifecycle-policy",
+          "path": "law/policy/release-lifecycle.json",
+          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        }
+      ],
+      "plan": [
+        {
+          "order": 1,
+          "action_id": "release preflight",
+          "produces_state": "preflight_passed"
+        },
+        {
+          "order": 2,
+          "action_id": "release certify",
+          "produces_state": "certified"
+        },
+        {
+          "order": 3,
+          "action_id": "release prepare",
+          "produces_state": "prepared"
+        },
+        {
+          "order": 4,
+          "action_id": "release export",
+          "produces_state": "exported"
+        },
+        {
+          "order": 5,
+          "action_id": "release offline-verify",
+          "produces_state": null
+        },
+        {
+          "order": 6,
+          "action_id": "release evidence-publish",
+          "produces_state": "evidence_published"
+        },
+        {
+          "order": 7,
+          "action_id": "release publish",
+          "produces_state": "publication_dispatched"
+        },
+        {
+          "order": 8,
+          "action_id": "release resume",
+          "produces_state": null
+        }
+      ],
+      "emitted_by": {
+        "action_id": "release plan",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "satisfies_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  ]
+}

@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-state.schema.json",
   "title": "Release lifecycle state record",
-  "description": "One appended release lifecycle state transition. Every record binds exact repository, candidate, input, evidence, artifact, and prior-state identity, so a state is never inherited from an unnamed predecessor or a differently identified tree. Records are appended, never edited; a correction is a new record. Remote-write transitions additionally cite the exact one-time effect authorization they consumed.",
-  "schema_version": "1.0.0",
+  "description": "One appended release lifecycle state transition. Only the six persisted states are appendable: preflight_passed, certified, prepared, exported, evidence_published, and publication_dispatched. The three derived states are never persisted, so a record naming planned, offline_verified, or published is rejected. Every record binds exact repository, candidate, input, evidence, artifact, and prior-state identity, so a state is never inherited from an unnamed predecessor or a differently identified tree. A record additionally binds, by exact digest, every read receipt its action requires: release preflight binds a valid plan receipt and release evidence-publish binds a passing offline-verification receipt. A bound receipt is checkable evidence and never an authorization. Records are appended, never edited; a correction is a new record. Remote-write transitions additionally cite the exact one-time effect authorization they consumed. release publish records publication_dispatched, which asserts that a publication was dispatched and never that it completed.",
+  "schema_version": "2.0.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,6 +13,7 @@
     "action_id",
     "effect",
     "prior_state",
+    "bound_receipts",
     "repository",
     "candidate",
     "inputs",
@@ -33,7 +34,7 @@
       "pattern": "^RLS-[0-9a-f]{16}$"
     },
     "state": {
-      "$ref": "#/$defs/state"
+      "$ref": "#/$defs/persisted_state"
     },
     "action_id": {
       "enum": [
@@ -44,7 +45,7 @@
         "release evidence-publish",
         "release publish"
       ],
-      "description": "Read actions are observational and never produce a state record."
+      "description": "Read actions are pure: they emit a deterministic receipt or observation to stdout and never produce a state record."
     },
     "effect": {
       "enum": ["harness-write", "local-write", "remote-write"]
@@ -56,7 +57,7 @@
       "description": "Exact identity of the consumed predecessor. Null only for the record that opens the chain.",
       "properties": {
         "state": {
-          "$ref": "#/$defs/state"
+          "$ref": "#/$defs/persisted_state"
         },
         "state_id": {
           "type": "string",
@@ -65,6 +66,14 @@
         "record_digest_sha256": {
           "$ref": "#/$defs/sha256"
         }
+      }
+    },
+    "bound_receipts": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Every read receipt this transition required, pinned by exact receipt identity and canonical digest. Only passing receipts are bindable. Possession of a receipt authorizes nothing; it evidences a check that the transition depended on.",
+      "items": {
+        "$ref": "#/$defs/bound_receipt"
       }
     },
     "repository": {
@@ -230,10 +239,20 @@
   },
   "allOf": [
     {
+      "properties": {
+        "state": {
+          "not": {
+            "$ref": "#/$defs/derived_state"
+          },
+          "description": "planned, offline_verified, and published are derived from receipts and are never appended. published in particular is observation-only: it is derived by release resume from a verified signed publication receipt."
+        }
+      }
+    },
+    {
       "if": {
         "properties": {
           "state": {
-            "const": "preflighted"
+            "const": "preflight_passed"
           }
         },
         "required": ["state"]
@@ -369,18 +388,259 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_id": {
+            "const": "release preflight"
+          }
+        },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "preflight_passed"
+          },
+          "effect": {
+            "const": "harness-write"
+          },
+          "bound_receipts": {
+            "minItems": 1,
+            "maxItems": 1,
+            "contains": {
+              "$ref": "#/$defs/plan_receipt_binding"
+            },
+            "minContains": 1,
+            "maxContains": 1,
+            "description": "A preflight that cannot name the exact plan receipt it acted on opens the chain on an unstated basis."
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_id": {
+            "const": "release certify"
+          }
+        },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "certified"
+          },
+          "prior_state": {
+            "properties": {
+              "state": {
+                "const": "preflight_passed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_id": {
+            "const": "release prepare"
+          }
+        },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "prepared"
+          },
+          "prior_state": {
+            "properties": {
+              "state": {
+                "const": "certified"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_id": {
+            "const": "release export"
+          }
+        },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "exported"
+          },
+          "prior_state": {
+            "properties": {
+              "state": {
+                "const": "prepared"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_id": {
+            "const": "release evidence-publish"
+          }
+        },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "evidence_published"
+          },
+          "prior_state": {
+            "properties": {
+              "state": {
+                "const": "exported"
+              }
+            }
+          },
+          "bound_receipts": {
+            "minItems": 1,
+            "maxItems": 1,
+            "contains": {
+              "$ref": "#/$defs/offline_verification_receipt_binding"
+            },
+            "minContains": 1,
+            "maxContains": 1,
+            "description": "Evidence publication requires a passing offline verification of the exported artifact. The receipt evidences the check; it never authorizes the publication."
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_id": {
+            "const": "release publish"
+          }
+        },
+        "required": ["action_id"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "publication_dispatched",
+            "description": "A dispatch is not an outcome. published is derived only by observing a verified signed publication receipt and is never appended here."
+          },
+          "prior_state": {
+            "properties": {
+              "state": {
+                "const": "evidence_published"
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
-    "state": {
+    "persisted_state": {
       "enum": [
-        "preflighted",
+        "preflight_passed",
         "certified",
         "prepared",
         "exported",
-        "evidence-published",
-        "published"
+        "evidence_published",
+        "publication_dispatched"
       ]
+    },
+    "derived_state": {
+      "enum": ["planned", "offline_verified", "published"],
+      "description": "States that exist only in a receipt or an observation. No state record may name one."
+    },
+    "bound_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt_id", "receipt_digest_sha256", "verdict"],
+      "properties": {
+        "kind": {
+          "enum": ["release-plan-receipt", "release-offline-verification-receipt"]
+        },
+        "receipt_id": {
+          "type": "string",
+          "pattern": "^(?:RPL|ROV)-[0-9a-f]{16}$"
+        },
+        "receipt_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Canonical digest of the exact receipt document this transition relied on. A different digest is a different receipt."
+        },
+        "verdict": {
+          "const": "pass",
+          "description": "Only a passing receipt is bindable. A failing receipt is a reason to stop, never a weaker permission."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "release-plan-receipt"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "receipt_id": {
+                "pattern": "^RPL-[0-9a-f]{16}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "release-offline-verification-receipt"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "receipt_id": {
+                "pattern": "^ROV-[0-9a-f]{16}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "plan_receipt_binding": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "const": "release-plan-receipt"
+        }
+      }
+    },
+    "offline_verification_receipt_binding": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "const": "release-offline-verification-receipt"
+        }
+      }
     },
     "sha256": {
       "$ref": "common-defs.schema.json#/$defs/sha256"
@@ -400,10 +660,18 @@
     {
       "schemaVersion": "1.0.0",
       "state_id": "RLS-0123456789abcdef",
-      "state": "preflighted",
+      "state": "preflight_passed",
       "action_id": "release preflight",
       "effect": "harness-write",
       "prior_state": null,
+      "bound_receipts": [
+        {
+          "kind": "release-plan-receipt",
+          "receipt_id": "RPL-0123456789abcdef",
+          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "verdict": "pass"
+        }
+      ],
       "repository": {
         "id": "aarusso-nyx/devai",
         "commit": "5461ba500000000000000000000000000000aaaa",
@@ -441,6 +709,65 @@
       "authorization_event_id": null,
       "recorded_at": "2026-09-03T00:00:00.000Z",
       "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "state_id": "RLS-fedcba9876543210",
+      "state": "publication_dispatched",
+      "action_id": "release publish",
+      "effect": "remote-write",
+      "prior_state": {
+        "state": "evidence_published",
+        "state_id": "RLS-89abcdef01234567",
+        "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      },
+      "bound_receipts": [],
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "inputs": [
+        {
+          "kind": "release-lifecycle-policy",
+          "path": "law/policy/release-lifecycle.json",
+          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        }
+      ],
+      "evidence": {
+        "manifest_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "receipt_digests": [
+          "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+        ],
+        "independently_checkable": true
+      },
+      "artifacts": [
+        {
+          "kind": "package-tarball",
+          "path": "dist/aarusso-nyx-devai-1.5.0.tgz",
+          "sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "size_bytes": 1048576
+        }
+      ],
+      "actor": {
+        "kind": "human",
+        "role": "owner",
+        "declaration_source": "cli-flag"
+      },
+      "consent": {
+        "write": true,
+        "allow_publish": true,
+        "experimental": false
+      },
+      "authorization_event_id": "EA-0123456789abcdef",
+      "recorded_at": "2026-09-03T00:00:00.000Z",
+      "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
     }
   ]
 }
