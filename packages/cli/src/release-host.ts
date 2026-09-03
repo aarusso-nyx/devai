@@ -7,6 +7,13 @@ import {
 export { invokeDevaiCli, startDevaiCli, type CliInvocationResult } from './cli-runtime.js';
 export type { ReleaseLifecycleCommandAdapters } from './commands/release/lifecycle.js';
 export {
+  composeMutationEvidenceV21,
+  finalizeMutationEvidenceV21,
+  verifyMutationEvidenceV21,
+  type MutationVerificationOptionsV21,
+  type MutationVerifierProvenanceV21,
+} from './services/mutation-evidence-v21.js';
+export {
   createReleaseCertificationProvider,
   type CertificationEvidenceTransaction,
   type ImmutableCertificationTaskPolicy,
