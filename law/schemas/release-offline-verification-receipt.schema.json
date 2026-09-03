@@ -9,6 +9,7 @@
   "required": [
     "schemaVersion",
     "receipt_kind",
+    "canonicalization",
     "receipt_id",
     "verdict",
     "state_observed",
@@ -31,6 +32,19 @@
     },
     "receipt_kind": {
       "const": "release-offline-verification-receipt"
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "receipt_projection_excludes", "calculation_order"],
+      "properties": {
+        "kernel_id": {"const": "devai.kernel.release-offline-verification-receipt-canonicalization.v1"},
+        "encoding": {"const": "utf-8"},
+        "json_form": {"const": "rfc8785-jcs"},
+        "digest_algorithm": {"const": "sha256"},
+        "receipt_projection_excludes": {"const": ["receipt_id", "receipt_digest_sha256"]},
+        "calculation_order": {"const": ["compute-receipt_digest_sha256-over-the-receipt-projection", "derive-receipt_id-as-ROV-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"]}
+      }
     },
     "receipt_id": {
       "type": "string",
@@ -192,7 +206,7 @@
             "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
             "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
             "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
-            "recompute-receipt_digest_sha256-and-receipt_id-from-the-canonical-receipt-projection",
+            "recompute-receipt_digest_sha256-and-receipt_id-under-devai.kernel.release-offline-verification-receipt-canonicalization.v1",
             "reject-pass-when-any-preceding-step-fails"
           ]
         },
@@ -620,7 +634,18 @@
     {
       "schemaVersion": "1.0.0",
       "receipt_kind": "release-offline-verification-receipt",
-      "receipt_id": "ROV-0123456789abcdef",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "receipt_projection_excludes": ["receipt_id", "receipt_digest_sha256"],
+        "calculation_order": [
+          "compute-receipt_digest_sha256-over-the-receipt-projection",
+          "derive-receipt_id-as-ROV-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"
+        ]
+      },
+      "receipt_id": "ROV-0eca1bdad698a5db",
       "verdict": "pass",
       "state_observed": "offline_verified",
       "repository": {
@@ -679,7 +704,7 @@
           "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
           "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
           "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
-          "recompute-receipt_digest_sha256-and-receipt_id-from-the-canonical-receipt-projection",
+          "recompute-receipt_digest_sha256-and-receipt_id-under-devai.kernel.release-offline-verification-receipt-canonicalization.v1",
           "reject-pass-when-any-preceding-step-fails"
         ],
         "errors": [
@@ -763,7 +788,7 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "receipt_digest_sha256": "0eca1bdad698a5db560528da47fa11bd5129f3e9ddb0fe1220bec789740b1e5c"
     }
   ]
 }

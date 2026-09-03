@@ -377,15 +377,16 @@
               "const": "engineer"
             },
             "permitted_effects": {
-              "const": ["read"]
+              "const": ["read", "local-write"]
             },
             "forbidden_effects": {
-              "const": ["harness-write", "local-write", "remote-write"]
+              "const": ["harness-write", "remote-write"]
             },
             "may_initiate": {
               "const": [
                 "audit scorecard",
                 "catalog actions",
+                "check",
                 "doctor",
                 "evidence verify",
                 "init plan",
@@ -642,11 +643,12 @@
         },
         {
           "role": "engineer",
-          "permitted_effects": ["read"],
-          "forbidden_effects": ["harness-write", "local-write", "remote-write"],
+          "permitted_effects": ["read", "local-write"],
+          "forbidden_effects": ["harness-write", "remote-write"],
           "may_initiate": [
             "audit scorecard",
             "catalog actions",
+            "check",
             "doctor",
             "evidence verify",
             "init plan",

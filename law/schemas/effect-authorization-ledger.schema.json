@@ -107,12 +107,18 @@
         },
         "algorithm": {
           "type": "array",
-          "minItems": 11,
-          "maxItems": 11,
+          "minItems": 16,
+          "maxItems": 16,
           "items": false,
           "prefixItems": [
             {
               "const": "resolve-every-entry-to-the-content-of-the-event-record-it-references"
+            },
+            {
+              "const": "require-each-resolved-event-ledger_id-to-equal-the-ledger-ledger_id"
+            },
+            {
+              "const": "require-each-entry-sequence-event_id-previous_event_digest_sha256-kind-and-references_event_id-to-equal-the-resolved-event-sequence-event_id-previous_event_digest_sha256-kind-and-grant_event_id"
             },
             {
               "const": "recompute-each-event-payload-digest-over-the-canonical-payload-projection-and-compare-to-the-event-record"
@@ -136,7 +142,16 @@
               "const": "verify-the-referenced-grant-identity-equals-the-terminal-event-identity-across-action-effect-resource-repository-candidate-consuming-role-and-consent"
             },
             {
-              "const": "verify-no-granted-entry-is-consumed-by-more-than-one-consumed-entry"
+              "const": "verify-each-grant-not_before-is-strictly-earlier-than-its-expires_at"
+            },
+            {
+              "const": "verify-each-grant-has-at-most-one-terminal-event-total-across-consumed-revoked-expired-and-rejected"
+            },
+            {
+              "const": "reject-every-terminal-event-whose-grant-already-has-an-earlier-terminal-event"
+            },
+            {
+              "const": "verify-each-consumed-recorded_at-is-greater-than-or-equal-to-the-grant-not_before-and-strictly-less-than-the-grant-expires_at"
             },
             {
               "const": "verify-head-sequence-event-id-and-event-digest-equal-the-final-entry"
@@ -148,12 +163,27 @@
         },
         "errors": {
           "type": "array",
-          "minItems": 13,
-          "maxItems": 13,
+          "minItems": 22,
+          "maxItems": 22,
           "items": false,
           "prefixItems": [
             {
               "const": "eal-event-content-unresolved"
+            },
+            {
+              "const": "eal-event-ledger-id-mismatch"
+            },
+            {
+              "const": "eal-entry-event-sequence-mismatch"
+            },
+            {
+              "const": "eal-entry-event-previous-digest-mismatch"
+            },
+            {
+              "const": "eal-entry-event-kind-mismatch"
+            },
+            {
+              "const": "eal-entry-event-grant-reference-mismatch"
             },
             {
               "const": "eal-event-payload-digest-mismatch"
@@ -184,6 +214,18 @@
             },
             {
               "const": "eal-grant-consumed-more-than-once"
+            },
+            {
+              "const": "eal-grant-live-window-invalid"
+            },
+            {
+              "const": "eal-grant-has-multiple-terminal-events"
+            },
+            {
+              "const": "eal-terminal-after-terminal"
+            },
+            {
+              "const": "eal-consume-outside-live-window"
             },
             {
               "const": "eal-head-not-final-entry"
@@ -409,6 +451,8 @@
         },
         "algorithm": [
           "resolve-every-entry-to-the-content-of-the-event-record-it-references",
+          "require-each-resolved-event-ledger_id-to-equal-the-ledger-ledger_id",
+          "require-each-entry-sequence-event_id-previous_event_digest_sha256-kind-and-references_event_id-to-equal-the-resolved-event-sequence-event_id-previous_event_digest_sha256-kind-and-grant_event_id",
           "recompute-each-event-payload-digest-over-the-canonical-payload-projection-and-compare-to-the-event-record",
           "recompute-each-event-id-from-the-recomputed-payload-digest-and-compare-to-the-entry-and-to-the-event-record",
           "recompute-each-ledger-event-digest-over-the-complete-event-record-and-compare-to-the-entry",
@@ -416,12 +460,20 @@
           "verify-the-first-entry-previous-event-digest-is-null-and-every-later-entry-previous-event-digest-equals-the-preceding-entry-event-digest",
           "verify-every-consumed-revoked-expired-and-rejected-entry-references-an-earlier-granted-entry-in-this-ledger",
           "verify-the-referenced-grant-identity-equals-the-terminal-event-identity-across-action-effect-resource-repository-candidate-consuming-role-and-consent",
-          "verify-no-granted-entry-is-consumed-by-more-than-one-consumed-entry",
+          "verify-each-grant-not_before-is-strictly-earlier-than-its-expires_at",
+          "verify-each-grant-has-at-most-one-terminal-event-total-across-consumed-revoked-expired-and-rejected",
+          "reject-every-terminal-event-whose-grant-already-has-an-earlier-terminal-event",
+          "verify-each-consumed-recorded_at-is-greater-than-or-equal-to-the-grant-not_before-and-strictly-less-than-the-grant-expires_at",
           "verify-head-sequence-event-id-and-event-digest-equal-the-final-entry",
           "deny-when-any-preceding-step-fails"
         ],
         "errors": [
           "eal-event-content-unresolved",
+          "eal-event-ledger-id-mismatch",
+          "eal-entry-event-sequence-mismatch",
+          "eal-entry-event-previous-digest-mismatch",
+          "eal-entry-event-kind-mismatch",
+          "eal-entry-event-grant-reference-mismatch",
           "eal-event-payload-digest-mismatch",
           "eal-event-digest-mismatch",
           "eal-event-id-mismatch",
@@ -432,20 +484,24 @@
           "eal-grant-reference-unresolved",
           "eal-grant-identity-mismatch",
           "eal-grant-consumed-more-than-once",
+          "eal-grant-live-window-invalid",
+          "eal-grant-has-multiple-terminal-events",
+          "eal-terminal-after-terminal",
+          "eal-consume-outside-live-window",
           "eal-head-not-final-entry",
           "eal-semantic-verification-not-performed"
         ]
       },
       "head": {
         "sequence": 1,
-        "event_id": "EA-0123456789abcdef",
-        "event_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        "event_id": "EA-e89cbc4066830b47",
+        "event_digest_sha256": "c306e87b07f2c39ae999ba30007a9bdb4afefa9fca10871f54fe06df04df8442"
       },
       "entries": [
         {
           "sequence": 1,
-          "event_id": "EA-0123456789abcdef",
-          "event_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "event_id": "EA-e89cbc4066830b47",
+          "event_digest_sha256": "c306e87b07f2c39ae999ba30007a9bdb4afefa9fca10871f54fe06df04df8442",
           "previous_event_digest_sha256": null,
           "kind": "granted",
           "references_event_id": null

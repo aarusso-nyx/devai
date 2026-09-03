@@ -22,6 +22,7 @@
     "actor",
     "consent",
     "authorization_event_id",
+    "publication_expectation",
     "recorded_at",
     "record_digest_sha256"
   ],
@@ -228,6 +229,13 @@
       "type": ["string", "null"],
       "pattern": "^EA-[0-9a-f]{16}$",
       "description": "The exact one-time authorization consumed by this transition. Null for every non-remote effect; a non-null value on a non-remote transition is a violation."
+    },
+    "publication_expectation": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/publication_expectation"}
+      ],
+      "description": "Authoritative expected publication destination, protected workflow/environment, external trust identities, and exact Owner grant. Present only on release publish/publication_dispatched and contains no key material."
     },
     "recorded_at": {
       "$ref": "common-defs.schema.json#/$defs/timestamp"
@@ -546,12 +554,63 @@
                 "const": "evidence_published"
               }
             }
+          },
+          "publication_expectation": {
+            "$ref": "#/$defs/publication_expectation"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "publication_expectation": {
+            "type": "null"
           }
         }
       }
     }
   ],
   "$defs": {
+    "publication_expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorization_event_id", "destination", "workflow", "trust"],
+      "properties": {
+        "authorization_event_id": {"type": "string", "pattern": "^EA-[0-9a-f]{16}$"},
+        "destination": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["system_id", "exact_identifier", "operation"],
+          "properties": {
+            "system_id": {"type": "string", "minLength": 1, "maxLength": 200},
+            "exact_identifier": {"type": "string", "minLength": 1, "maxLength": 500},
+            "operation": {"const": "publish"}
+          }
+        },
+        "workflow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "workflow_path", "workflow_sha", "protected_environment", "protected"],
+          "properties": {
+            "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"},
+            "workflow_path": {"$ref": "#/$defs/relative_path"},
+            "workflow_sha": {"$ref": "#/$defs/git_object"},
+            "protected_environment": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+            "protected": {"const": true}
+          }
+        },
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["trust_root_id", "trust_store_digest_sha256", "key_id", "signature_algorithm"],
+          "properties": {
+            "trust_root_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"},
+            "trust_store_digest_sha256": {"$ref": "#/$defs/sha256"},
+            "key_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"},
+            "signature_algorithm": {"enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"]}
+          }
+        }
+      }
+    },
     "persisted_state": {
       "enum": [
         "preflight_passed",
@@ -667,8 +726,8 @@
       "bound_receipts": [
         {
           "kind": "release-plan-receipt",
-          "receipt_id": "RPL-0123456789abcdef",
-          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "receipt_id": "RPL-b0d5ce2dbb6e9667",
+          "receipt_digest_sha256": "b0d5ce2dbb6e96675f20834e5d982dba33bb6e22c8c5c1f17924b69ba38d2d91",
           "verdict": "pass"
         }
       ],
@@ -687,7 +746,7 @@
         {
           "kind": "release-lifecycle-policy",
           "path": "law/policy/release-lifecycle.json",
-          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          "sha256": "de93ffd12e8aa4cb3c15a47223d0d3d9f525b7e69c72af7470c9100f6fdf2f64"
         }
       ],
       "evidence": {
@@ -707,8 +766,9 @@
         "experimental": false
       },
       "authorization_event_id": null,
+      "publication_expectation": null,
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "record_digest_sha256": "bee2f60e45a52a54dc19d7441a005dfef5eda8b2f03856066bea7bde674de8a5"
     },
     {
       "schemaVersion": "1.0.0",
@@ -737,7 +797,7 @@
         {
           "kind": "release-lifecycle-policy",
           "path": "law/policy/release-lifecycle.json",
-          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          "sha256": "de93ffd12e8aa4cb3c15a47223d0d3d9f525b7e69c72af7470c9100f6fdf2f64"
         }
       ],
       "evidence": {
@@ -766,8 +826,29 @@
         "experimental": false
       },
       "authorization_event_id": "EA-0123456789abcdef",
+      "publication_expectation": {
+        "authorization_event_id": "EA-0123456789abcdef",
+        "destination": {
+          "system_id": "npm.pkg.github.com",
+          "exact_identifier": "@aarusso-nyx/devai@1.5.0",
+          "operation": "publish"
+        },
+        "workflow": {
+          "repository": "aarusso-nyx/devai",
+          "workflow_path": ".github/workflows/publication-receipt.yml",
+          "workflow_sha": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
+          "protected_environment": "release",
+          "protected": true
+        },
+        "trust": {
+          "trust_root_id": "devai-publication-receipt-root",
+          "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
+          "key_id": "publication-receipt-2026-09",
+          "signature_algorithm": "ed25519"
+        }
+      },
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+      "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
     }
   ]
 }

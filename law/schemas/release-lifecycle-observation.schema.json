@@ -187,7 +187,9 @@
             "receipt_id",
             "receipt_digest_sha256",
             "trust_root_id",
+            "trust_store_digest_sha256",
             "key_id",
+            "signature_algorithm",
             "signature_verified"
           ],
           "properties": {
@@ -205,9 +207,15 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
             },
+            "trust_store_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
             "key_id": {
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+            },
+            "signature_algorithm": {
+              "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"]
             },
             "signature_verified": {
               "const": true
@@ -223,6 +231,8 @@
             "record_digest_sha256",
             "candidate_identity_verified",
             "artifact_identity_verified",
+            "destination_identity_verified",
+            "workflow_identity_verified",
             "trust_identity_verified"
           ],
           "description": "The exact publication_dispatched record the receipt was checked against. Every binding must verify; a near match is a mismatch.",
@@ -241,6 +251,12 @@
               "const": true
             },
             "artifact_identity_verified": {
+              "const": true
+            },
+            "destination_identity_verified": {
+              "const": true
+            },
+            "workflow_identity_verified": {
               "const": true
             },
             "trust_identity_verified": {
@@ -484,7 +500,7 @@
     {
       "schemaVersion": "1.0.0",
       "observation_kind": "release-lifecycle-observation",
-      "observation_id": "RLO-0123456789abcdef",
+      "observation_id": "RLO-1ee74bef7b4ac1bd",
       "repository": {
         "id": "aarusso-nyx/devai",
         "commit": "5461ba500000000000000000000000000000aaaa",
@@ -504,14 +520,14 @@
       "head": {
         "state": "publication_dispatched",
         "state_id": "RLS-fedcba9876543210",
-        "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+        "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
       },
       "derived_states": [
         {
           "state": "published",
           "receipt_kind": "release-publication-receipt",
-          "receipt_id": "RPU-9f86d081884c7d65",
-          "receipt_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c",
+          "receipt_id": "RPU-edcb1c9d7bf4e5ce",
+          "receipt_digest_sha256": "61d9347d6740ebc6a53dcbd2e5d803c6dea891dfc6d0b65c1cab51edf5ef313f",
           "verified": true
         }
       ],
@@ -519,18 +535,22 @@
         "observed": true,
         "receipt": {
           "kind": "release-publication-receipt",
-          "receipt_id": "RPU-9f86d081884c7d65",
-          "receipt_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c",
+          "receipt_id": "RPU-edcb1c9d7bf4e5ce",
+          "receipt_digest_sha256": "61d9347d6740ebc6a53dcbd2e5d803c6dea891dfc6d0b65c1cab51edf5ef313f",
           "trust_root_id": "devai-publication-receipt-root",
+          "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
           "key_id": "publication-receipt-2026-09",
+          "signature_algorithm": "ed25519",
           "signature_verified": true
         },
         "verified_against": {
           "state": "publication_dispatched",
           "state_id": "RLS-fedcba9876543210",
-          "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64",
           "candidate_identity_verified": true,
           "artifact_identity_verified": true,
+          "destination_identity_verified": true,
+          "workflow_identity_verified": true,
           "trust_identity_verified": true
         }
       },
@@ -553,12 +573,12 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "observation_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "observation_digest_sha256": "1ee74bef7b4ac1bda925bc9fe9b39257d1c08d7865bec1a3c6a6a1ef6af6e247"
     },
     {
       "schemaVersion": "1.0.0",
       "observation_kind": "release-lifecycle-observation",
-      "observation_id": "RLO-fedcba9876543210",
+      "observation_id": "RLO-9846bd2b588ff8b3",
       "repository": {
         "id": "aarusso-nyx/devai",
         "commit": "5461ba500000000000000000000000000000aaaa",
@@ -584,8 +604,8 @@
         {
           "state": "offline_verified",
           "receipt_kind": "release-offline-verification-receipt",
-          "receipt_id": "ROV-0123456789abcdef",
-          "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "receipt_id": "ROV-0eca1bdad698a5db",
+          "receipt_digest_sha256": "0eca1bdad698a5db560528da47fa11bd5129f3e9ddb0fe1220bec789740b1e5c",
           "verified": true
         }
       ],
@@ -613,7 +633,7 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "observation_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+      "observation_digest_sha256": "9846bd2b588ff8b33c1b1dab50360d769cdbaf86c477eddb90fed04cba22186c"
     }
   ]
 }

@@ -136,6 +136,7 @@
         "killed",
         "survived",
         "timeout",
+        "no_coverage",
         "runtime_error",
         "infrastructure_error",
         "score"
@@ -148,6 +149,9 @@
           "$ref": "#/$defs/count"
         },
         "timeout": {
+          "$ref": "#/$defs/count"
+        },
+        "no_coverage": {
           "$ref": "#/$defs/count"
         },
         "runtime_error": {

@@ -3,6 +3,7 @@
   "$id": "https://devai.nyxk.com.br/schemas/release-publication-receipt.schema.json",
   "title": "Signed release publication receipt",
   "description": "The signed attestation emitted by the protected external workflow after a dispatched publication completes. No DEVAI action emits it. It binds the exact publication_dispatched state it answers, the exact candidate and artifacts that were published, the exact workflow identity that observed the publication, and the exact trust identity that signed it. release resume may derive the observation-only state published from it, and only when every one of those bindings matches the recorded dispatch. The receipt grants no authority: it is evidence that a publication happened, never permission for one, and it is never appended as a state record. Every digest it carries is computed under one frozen canonicalization kernel in one computable order, so no digest is an input to itself.",
+  "$comment": "The embedded example signature is verified only with the external fixture devai-publication-receipt-example-trust-fixture-v1, identified by trust_root_id, trust_store_digest_sha256, and key_id. Its signed-payload, receipt-id, and whole-receipt digests remain exact without embedding key material.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -187,6 +188,7 @@
         "repository",
         "workflow_path",
         "workflow_sha",
+        "protected_environment",
         "run_id",
         "run_attempt",
         "protected",
@@ -204,6 +206,10 @@
         "workflow_sha": {
           "$ref": "#/$defs/git_object",
           "description": "The immutable commit the workflow ran from. A branch or tag name would let the attested logic change under a stable label."
+        },
+        "protected_environment": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
         },
         "run_id": {
           "type": "string",
@@ -227,6 +233,7 @@
       "additionalProperties": false,
       "required": [
         "trust_root_id",
+        "trust_store_digest_sha256",
         "key_id",
         "signature_algorithm",
         "signature",
@@ -237,6 +244,10 @@
         "trust_root_id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "trust_store_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the exact external public trust store expected by the recorded dispatch; no key material is embedded."
         },
         "key_id": {
           "type": "string",
@@ -415,7 +426,7 @@
           "compute-receipt-digest-sha256-over-the-whole-receipt-projection"
         ]
       },
-      "receipt_id": "RPU-9f86d081884c7d65",
+      "receipt_id": "RPU-edcb1c9d7bf4e5ce",
       "attests_state": "published",
       "outcome": "published",
       "repository": {
@@ -432,7 +443,7 @@
       "dispatched_state": {
         "state": "publication_dispatched",
         "state_id": "RLS-fedcba9876543210",
-        "record_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+        "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
       },
       "artifacts": [
         {
@@ -449,19 +460,21 @@
       },
       "workflow": {
         "repository": "aarusso-nyx/devai",
-        "workflow_path": ".github/workflows/publication-receipt.yml",
-        "workflow_sha": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
-        "run_id": "1234567890",
+      "workflow_path": ".github/workflows/publication-receipt.yml",
+      "workflow_sha": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
+      "protected_environment": "release",
+      "run_id": "1234567890",
         "run_attempt": 1,
         "protected": true,
         "candidate_product_execution": false
       },
-      "trust": {
-        "trust_root_id": "devai-publication-receipt-root",
-        "key_id": "publication-receipt-2026-09",
+    "trust": {
+      "trust_root_id": "devai-publication-receipt-root",
+      "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
+      "key_id": "publication-receipt-2026-09",
         "signature_algorithm": "ed25519",
-        "signature": "SGVsbG9EZXZhaVB1YmxpY2F0aW9uUmVjZWlwdFNpZ25hdHVyZQ==",
-        "signed_payload_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "signature": "CQZvCofbrH4NqollqwazLetn3079dq9FbNIjnJa/WgR2O3IfdjhU617iXteBFFSUE+kERf1aNdmLlFYuhWbuBg==",
+      "signed_payload_digest_sha256": "edcb1c9d7bf4e5ce50a9849f8895af9cf51b796fd6012ff7f04ad4d6a3a951bf"
       },
       "emitted_by": {
         "emitter": "protected-external-workflow",
@@ -475,7 +488,7 @@
         "appended_as_state_record": false
       },
       "emitted_at": "2026-09-03T00:00:00.000Z",
-      "receipt_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
+      "receipt_digest_sha256": "61d9347d6740ebc6a53dcbd2e5d803c6dea891dfc6d0b65c1cab51edf5ef313f"
     }
   ]
 }

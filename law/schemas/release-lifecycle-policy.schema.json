@@ -15,6 +15,7 @@
     "state_record_schema",
     "authorization_event_schema",
     "receipt_schemas",
+    "plan_determination",
     "states",
     "actions",
     "read_action_purity",
@@ -73,6 +74,9 @@
           "const": "law/schemas/release-lifecycle-observation.schema.json"
         }
       }
+    },
+    "plan_determination": {
+      "$ref": "#/$defs/plan_determination"
     },
     "states": {
       "type": "array",
@@ -177,6 +181,8 @@
         "receipt_emitter",
         "receipt_emitted_by_devai_action",
         "receipt_grants_authority",
+        "state_expectation_field",
+        "state_binding_kernel",
         "receipt_binds_identity"
       ],
       "properties": {
@@ -217,11 +223,33 @@
         "receipt_grants_authority": {
           "const": false
         },
+        "state_expectation_field": {
+          "const": "publication_expectation"
+        },
+        "state_binding_kernel": {
+          "const": {
+            "kernel_id": "devai.kernel.release-publication-dispatch-binding.v1",
+            "mandatory": true,
+            "schema_validation_alone_establishes_binding": false,
+            "algorithm": [
+              "require-action-release-publish-state-publication_dispatched-effect-remote-write-and-owner-actor",
+              "require-publication_expectation-authorization_event_id-to-equal-state-authorization_event_id",
+              "resolve-the-authorization-event-through-the-verified-exact-effect-authorization-ledger",
+              "require-the-live-unconsumed-grant-to-bind-owner-release-publish-remote-write-repository-candidate-destination-and-publish-operation-exactly",
+              "require-publication_expectation-workflow-repository-path-sha-protected-environment-and-protected-true",
+              "require-publication_expectation-trust-root-trust-store-digest-key-id-and-signature-algorithm-with-no-key-material",
+              "deny-and-append-no-state-when-any-preceding-step-fails"
+            ],
+            "errors": ["rpd-action-state-effect-role-mismatch", "rpd-owner-grant-id-mismatch", "rpd-owner-grant-unresolved", "rpd-owner-grant-not-live", "rpd-owner-grant-identity-mismatch", "rpd-destination-mismatch", "rpd-workflow-expectation-invalid", "rpd-trust-expectation-invalid", "rpd-semantic-verification-not-performed"]
+          }
+        },
         "receipt_binds_identity": {
           "const": [
             "publication-dispatched-state",
             "candidate",
             "artifact",
+            "destination",
+            "workflow",
             "trust"
           ],
           "description": "published is derived only by verifying the receipt against the exact recorded publication_dispatched state, candidate, artifact, and trust identity. Any divergence derives nothing."
@@ -266,8 +294,8 @@
         },
         "algorithm": {
           "type": "array",
-          "minItems": 11,
-          "maxItems": 11,
+          "minItems": 12,
+          "maxItems": 12,
           "items": false,
           "prefixItems": [
             {
@@ -295,10 +323,13 @@
               "const": "require-the-receipt-artifact-set-to-equal-the-dispatched-artifact-set-by-kind-path-sha256-and-size_bytes"
             },
             {
-              "const": "require-the-receipt-workflow-repository-workflow_path-workflow_sha-run_id-run_attempt-and-protected-to-equal-the-recorded-dispatch-workflow-identity"
+              "const": "require-the-receipt-publication-system_id-exact_identifier-and-operation-to-equal-the-publication_expectation-destination"
             },
             {
-              "const": "require-the-receipt-trust_root_id-key_id-and-signature_algorithm-to-be-declared-trusted-and-the-signature-to-verify-over-the-recomputed-signed-payload-digest"
+              "const": "require-the-receipt-workflow-repository-workflow_path-workflow_sha-protected_environment-and-protected-to-equal-the-publication_expectation-workflow"
+            },
+            {
+              "const": "require-the-receipt-trust_root_id-trust_store_digest_sha256-key_id-and-signature_algorithm-to-equal-the-publication_expectation-trust-and-verify-the-signature-with-that-exact-trust-store-and-key"
             },
             {
               "const": "derive-published-only-when-every-preceding-step-holds-and-otherwise-derive-no-published"
@@ -307,8 +338,8 @@
         },
         "errors": {
           "type": "array",
-          "minItems": 11,
-          "maxItems": 11,
+          "minItems": 13,
+          "maxItems": 13,
           "items": false,
           "prefixItems": [
             {
@@ -333,7 +364,13 @@
               "const": "rlo-artifact-identity-mismatch"
             },
             {
+              "const": "rlo-destination-identity-mismatch"
+            },
+            {
               "const": "rlo-workflow-identity-mismatch"
+            },
+            {
+              "const": "rlo-trust-store-digest-mismatch"
             },
             {
               "const": "rlo-trust-identity-mismatch"
@@ -360,6 +397,46 @@
     }
   },
   "$defs": {
+    "plan_determination": {
+      "const": {
+        "kernel_id": "devai.kernel.release-plan-determination.v1",
+        "required_inputs": [
+          {"order": 1, "kind": "release-intent", "source": "invocation-provided-release-intent-document", "schema": "law/schemas/release-intent.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
+          {"order": 2, "kind": "release-verification-profile", "source": "law/policy/release-verification.json", "schema": "law/schemas/release-verification-profile.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
+          {"order": 3, "kind": "release-lifecycle-policy", "source": "law/policy/release-lifecycle.json", "schema": "law/schemas/release-lifecycle-policy.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
+          {"order": 4, "kind": "action-registry-policy", "source": "law/policy/action-registry.json", "schema": "law/schemas/action-registry.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"}
+        ],
+        "semver": {
+          "grammar": "semver-2.0.0",
+          "transition_order": ["patch", "minor", "major", "prerelease", "support-promotion"],
+          "block_conditions": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"]
+        },
+        "support": {"source": "release-intent.support", "values": ["preview", "current", "lts"], "lts_requires_nonempty_mutation_roster": true},
+        "impact": {"source": "release-intent.change_kind", "values": ["documentation", "metadata", "behavioral"], "missing_defaults_to": "behavioral"},
+        "known_risks": ["authentication", "authorization", "tenancy", "rls", "cryptography", "secrets", "credentials", "database", "migration", "release-integrity", "evidence", "provenance", "publication", "ledger", "mutation-policy", "test-policy", "test-configuration", "sanitization", "public-api", "export-map", "package-boundary", "lockfile", "toolchain", "cross-package", "large-change", "protected-resource"],
+        "unknown_risk_behavior": "block",
+        "unconditional_floor": ["formatting-hygiene", "lint", "type-integrity", "schema-consistency", "secret-scan", "path-portability", "package-integrity", "exact-candidate"],
+        "transition_capabilities": {
+          "patch": ["affected-checks", "dependent-checks", "build-integrity"],
+          "prerelease": ["affected-checks", "dependent-checks", "build-integrity"],
+          "minor": ["unit", "integration", "e2e", "consumer", "api-compatibility", "adopter-materialization"],
+          "major": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility"],
+          "support-promotion": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility", "operational-matrix"]
+        },
+        "lts_capabilities": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility", "operational-matrix"],
+        "risk_capability_rules": [
+          {"when_any_risk": true, "add": ["security", "integration"]},
+          {"risks": ["tenancy", "rls"], "add": ["tenancy"]},
+          {"risks": ["database", "migration"], "add": ["database"]},
+          {"risks": ["public-api", "export-map", "package-boundary"], "add": ["api-compatibility", "consumer"]},
+          {"risks": ["release-integrity", "evidence", "provenance", "publication", "ledger"], "add": ["provenance", "reproducibility"]},
+          {"risks": ["lockfile", "toolchain", "cross-package", "large-change"], "add": ["integration", "consumer"]}
+        ],
+        "capability_selection": "sorted-unique-union-of-unconditional-floor-transition-support-risk-profile-risk-and-owner-escalation-capabilities",
+        "missing_capability_or_unknown_task_behavior": "block",
+        "mutation_selection": ["lts-selects-full-roster", "otherwise-any-risk-or-major-or-minor-selects-targeted", "otherwise-behavioral-selects-affected", "otherwise-selects-none", "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"]
+      }
+    },
     "semver": {
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
@@ -1257,6 +1334,40 @@
         "publication_receipt_schema": "law/schemas/release-publication-receipt.schema.json",
         "lifecycle_observation_schema": "law/schemas/release-lifecycle-observation.schema.json"
       },
+      "plan_determination": {
+        "kernel_id": "devai.kernel.release-plan-determination.v1",
+        "required_inputs": [
+          {"order": 1, "kind": "release-intent", "source": "invocation-provided-release-intent-document", "schema": "law/schemas/release-intent.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
+          {"order": 2, "kind": "release-verification-profile", "source": "law/policy/release-verification.json", "schema": "law/schemas/release-verification-profile.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
+          {"order": 3, "kind": "release-lifecycle-policy", "source": "law/policy/release-lifecycle.json", "schema": "law/schemas/release-lifecycle-policy.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"},
+          {"order": 4, "kind": "action-registry-policy", "source": "law/policy/action-registry.json", "schema": "law/schemas/action-registry.schema.json", "canonical_bytes": "utf-8-rfc8785-jcs"}
+        ],
+        "semver": {"grammar": "semver-2.0.0", "transition_order": ["patch", "minor", "major", "prerelease", "support-promotion"], "block_conditions": ["invalid-semver", "downgrade", "same-version-without-support-promotion", "support-promotion-requires-lts"]},
+        "support": {"source": "release-intent.support", "values": ["preview", "current", "lts"], "lts_requires_nonempty_mutation_roster": true},
+        "impact": {"source": "release-intent.change_kind", "values": ["documentation", "metadata", "behavioral"], "missing_defaults_to": "behavioral"},
+        "known_risks": ["authentication", "authorization", "tenancy", "rls", "cryptography", "secrets", "credentials", "database", "migration", "release-integrity", "evidence", "provenance", "publication", "ledger", "mutation-policy", "test-policy", "test-configuration", "sanitization", "public-api", "export-map", "package-boundary", "lockfile", "toolchain", "cross-package", "large-change", "protected-resource"],
+        "unknown_risk_behavior": "block",
+        "unconditional_floor": ["formatting-hygiene", "lint", "type-integrity", "schema-consistency", "secret-scan", "path-portability", "package-integrity", "exact-candidate"],
+        "transition_capabilities": {
+          "patch": ["affected-checks", "dependent-checks", "build-integrity"],
+          "prerelease": ["affected-checks", "dependent-checks", "build-integrity"],
+          "minor": ["unit", "integration", "e2e", "consumer", "api-compatibility", "adopter-materialization"],
+          "major": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility"],
+          "support-promotion": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility", "operational-matrix"]
+        },
+        "lts_capabilities": ["unit", "integration", "e2e", "consumer", "api-compatibility", "migration", "rollback", "adopter-materialization", "security", "database", "tenancy", "provenance", "reproducibility", "operational-matrix"],
+        "risk_capability_rules": [
+          {"when_any_risk": true, "add": ["security", "integration"]},
+          {"risks": ["tenancy", "rls"], "add": ["tenancy"]},
+          {"risks": ["database", "migration"], "add": ["database"]},
+          {"risks": ["public-api", "export-map", "package-boundary"], "add": ["api-compatibility", "consumer"]},
+          {"risks": ["release-integrity", "evidence", "provenance", "publication", "ledger"], "add": ["provenance", "reproducibility"]},
+          {"risks": ["lockfile", "toolchain", "cross-package", "large-change"], "add": ["integration", "consumer"]}
+        ],
+        "capability_selection": "sorted-unique-union-of-unconditional-floor-transition-support-risk-profile-risk-and-owner-escalation-capabilities",
+        "missing_capability_or_unknown_task_behavior": "block",
+        "mutation_selection": ["lts-selects-full-roster", "otherwise-any-risk-or-major-or-minor-selects-targeted", "otherwise-behavioral-selects-affected", "otherwise-selects-none", "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"]
+      },
       "states": [
         {
           "state": "planned",
@@ -1569,10 +1680,28 @@
         "receipt_emitter": "protected-external-workflow",
         "receipt_emitted_by_devai_action": false,
         "receipt_grants_authority": false,
+        "state_expectation_field": "publication_expectation",
+        "state_binding_kernel": {
+          "kernel_id": "devai.kernel.release-publication-dispatch-binding.v1",
+          "mandatory": true,
+          "schema_validation_alone_establishes_binding": false,
+          "algorithm": [
+            "require-action-release-publish-state-publication_dispatched-effect-remote-write-and-owner-actor",
+            "require-publication_expectation-authorization_event_id-to-equal-state-authorization_event_id",
+            "resolve-the-authorization-event-through-the-verified-exact-effect-authorization-ledger",
+            "require-the-live-unconsumed-grant-to-bind-owner-release-publish-remote-write-repository-candidate-destination-and-publish-operation-exactly",
+            "require-publication_expectation-workflow-repository-path-sha-protected-environment-and-protected-true",
+            "require-publication_expectation-trust-root-trust-store-digest-key-id-and-signature-algorithm-with-no-key-material",
+            "deny-and-append-no-state-when-any-preceding-step-fails"
+          ],
+          "errors": ["rpd-action-state-effect-role-mismatch", "rpd-owner-grant-id-mismatch", "rpd-owner-grant-unresolved", "rpd-owner-grant-not-live", "rpd-owner-grant-identity-mismatch", "rpd-destination-mismatch", "rpd-workflow-expectation-invalid", "rpd-trust-expectation-invalid", "rpd-semantic-verification-not-performed"]
+        },
         "receipt_binds_identity": [
           "publication-dispatched-state",
           "candidate",
           "artifact",
+          "destination",
+          "workflow",
           "trust"
         ]
       },
@@ -1592,8 +1721,9 @@
           "recompute-the-publication-receipt-signed-payload-digest-receipt-id-and-receipt-digest-under-the-receipt-canonicalization-kernel-and-compare",
           "require-the-receipt-candidate-release_unit-version-commit-and-tree-to-equal-the-observed-candidate",
           "require-the-receipt-artifact-set-to-equal-the-dispatched-artifact-set-by-kind-path-sha256-and-size_bytes",
-          "require-the-receipt-workflow-repository-workflow_path-workflow_sha-run_id-run_attempt-and-protected-to-equal-the-recorded-dispatch-workflow-identity",
-          "require-the-receipt-trust_root_id-key_id-and-signature_algorithm-to-be-declared-trusted-and-the-signature-to-verify-over-the-recomputed-signed-payload-digest",
+          "require-the-receipt-publication-system_id-exact_identifier-and-operation-to-equal-the-publication_expectation-destination",
+          "require-the-receipt-workflow-repository-workflow_path-workflow_sha-protected_environment-and-protected-to-equal-the-publication_expectation-workflow",
+          "require-the-receipt-trust_root_id-trust_store_digest_sha256-key_id-and-signature_algorithm-to-equal-the-publication_expectation-trust-and-verify-the-signature-with-that-exact-trust-store-and-key",
           "derive-published-only-when-every-preceding-step-holds-and-otherwise-derive-no-published"
         ],
         "errors": [
@@ -1604,7 +1734,9 @@
           "rlo-receipt-digest-mismatch",
           "rlo-candidate-identity-mismatch",
           "rlo-artifact-identity-mismatch",
+          "rlo-destination-identity-mismatch",
           "rlo-workflow-identity-mismatch",
+          "rlo-trust-store-digest-mismatch",
           "rlo-trust-identity-mismatch",
           "rlo-signature-invalid",
           "rlo-semantic-verification-not-performed"

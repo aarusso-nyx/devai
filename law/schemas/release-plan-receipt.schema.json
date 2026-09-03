@@ -9,6 +9,7 @@
   "required": [
     "schemaVersion",
     "receipt_kind",
+    "canonicalization",
     "receipt_id",
     "state_observed",
     "verdict",
@@ -29,6 +30,19 @@
     },
     "receipt_kind": {
       "const": "release-plan-receipt"
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "receipt_projection_excludes", "calculation_order"],
+      "properties": {
+        "kernel_id": {"const": "devai.kernel.release-plan-receipt-canonicalization.v1"},
+        "encoding": {"const": "utf-8"},
+        "json_form": {"const": "rfc8785-jcs"},
+        "digest_algorithm": {"const": "sha256"},
+        "receipt_projection_excludes": {"const": ["receipt_id", "receipt_digest_sha256"]},
+        "calculation_order": {"const": ["compute-receipt_digest_sha256-over-the-receipt-projection", "derive-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"]}
+      }
     },
     "receipt_id": {
       "type": "string",
@@ -52,12 +66,17 @@
     },
     "inputs": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 4,
+      "maxItems": 4,
       "uniqueItems": true,
-      "description": "Every governed input the plan was resolved from, pinned by exact path and content digest. A plan resolved from an unpinned input is not deterministic.",
-      "items": {
-        "$ref": "#/$defs/input"
-      }
+      "items": false,
+      "description": "The exact ordered four-input plan contract. Each digest is over the UTF-8 RFC 8785 canonical JSON bytes of the resolved document.",
+      "prefixItems": [
+        {"$ref": "#/$defs/input", "required": ["inline_document"], "properties": {"kind": {"const": "release-intent"}, "source": {"const": "invocation-provided-release-intent-document"}, "schema": {"const": "law/schemas/release-intent.schema.json"}, "inline_document": {"$ref": "release-intent.schema.json"}}},
+        {"$ref": "#/$defs/input", "not": {"required": ["inline_document"]}, "properties": {"kind": {"const": "release-verification-profile"}, "source": {"const": "law/policy/release-verification.json"}, "schema": {"const": "law/schemas/release-verification-profile.schema.json"}, "path": {"const": "law/policy/release-verification.json"}}},
+        {"$ref": "#/$defs/input", "not": {"required": ["inline_document"]}, "properties": {"kind": {"const": "release-lifecycle-policy"}, "source": {"const": "law/policy/release-lifecycle.json"}, "schema": {"const": "law/schemas/release-lifecycle-policy.schema.json"}, "path": {"const": "law/policy/release-lifecycle.json"}}},
+        {"$ref": "#/$defs/input", "not": {"required": ["inline_document"]}, "properties": {"kind": {"const": "action-registry-policy"}, "source": {"const": "law/policy/action-registry.json"}, "schema": {"const": "law/schemas/action-registry.schema.json"}, "path": {"const": "law/policy/action-registry.json"}}}
+      ]
     },
     "plan": {
       "type": "array",
@@ -226,11 +245,12 @@
     "determination": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["semver_bump", "support", "impact", "risk_classes"],
+      "required": ["profile_verdict", "transition", "support", "impact", "risk_classes", "capabilities", "mutation", "mutation_disposition", "blocking_reasons"],
       "description": "The classifications the plan was resolved under, each recomputable from the bound inputs. They are reported so the semantic kernel can recompute them; a receipt that only asserts them asserts something nobody can check.",
       "properties": {
-        "semver_bump": {
-          "enum": ["major", "minor", "patch"],
+        "profile_verdict": {"enum": ["ready", "block"]},
+        "transition": {
+          "enum": ["patch", "minor", "major", "prerelease", "support-promotion"],
           "description": "Recomputed from the release intent's current_version and target_version. A declared bump that disagrees with the versions is a mismatch, not an override."
         },
         "support": {
@@ -246,6 +266,26 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{0,63}$"
           }
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"}
+        },
+        "mutation": {"enum": ["none", "affected", "targeted", "full-roster"]},
+        "mutation_disposition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reason"],
+          "properties": {
+            "status": {"enum": ["required", "not-required", "blocked"]},
+            "reason": {"type": "string", "minLength": 1, "maxLength": 200}
+          }
+        },
+        "blocking_reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 200}
         }
       }
     },
@@ -255,6 +295,7 @@
       "required": [
         "kernel_id",
         "mandatory",
+        "determination_contract",
         "schema_assertion_establishes_pass",
         "algorithm",
         "errors"
@@ -266,6 +307,9 @@
         },
         "mandatory": {
           "const": true
+        },
+        "determination_contract": {
+          "const": "law/policy/release-lifecycle.json#/plan_determination"
         },
         "schema_assertion_establishes_pass": {
           "const": false,
@@ -281,16 +325,16 @@
               "const": "resolve-every-declared-input-and-recompute-its-sha256"
             },
             {
-              "const": "reject-when-the-declared-input-set-differs-from-the-input-set-the-lifecycle-policy-requires"
+              "const": "require-the-exact-four-ordered-input-kinds-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination"
             },
             {
-              "const": "recompute-semver_bump-support-impact-and-risk_classes-from-the-resolved-inputs-and-compare-to-determination"
+              "const": "recompute-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-determination"
             },
             {
               "const": "recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan"
             },
             {
-              "const": "recompute-receipt_digest_sha256-over-the-canonical-receipt-projection-excluding-receipt_id-and-receipt_digest_sha256"
+              "const": "recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1"
             },
             {
               "const": "recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest"
@@ -494,23 +538,23 @@
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "path", "sha256"],
+      "required": ["kind", "source", "schema", "path", "canonical_bytes", "sha256"],
       "properties": {
         "kind": {
           "enum": [
             "release-intent",
-            "release-profile",
+            "release-verification-profile",
             "release-lifecycle-policy",
-            "task-policy",
-            "toolchain",
-            "lockfile",
-            "action-registry",
-            "threshold"
+            "action-registry-policy"
           ]
         },
+        "source": {"type": "string", "minLength": 1, "maxLength": 500},
+        "schema": {"type": "string", "minLength": 1, "maxLength": 500},
         "path": {
           "$ref": "#/$defs/relative_path"
         },
+        "canonical_bytes": {"const": "utf-8-rfc8785-jcs"},
+        "inline_document": {"type": "object"},
         "sha256": {
           "$ref": "#/$defs/sha256"
         }
@@ -600,7 +644,15 @@
     {
       "schemaVersion": "1.0.0",
       "receipt_kind": "release-plan-receipt",
-      "receipt_id": "RPL-0123456789abcdef",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.release-plan-receipt-canonicalization.v1",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "receipt_projection_excludes": ["receipt_id", "receipt_digest_sha256"],
+        "calculation_order": ["compute-receipt_digest_sha256-over-the-receipt-projection", "derive-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"]
+      },
+      "receipt_id": "RPL-b0d5ce2dbb6e9667",
       "state_observed": "planned",
       "verdict": "pass",
       "repository": {
@@ -616,9 +668,51 @@
       },
       "inputs": [
         {
+          "kind": "release-intent",
+          "source": "invocation-provided-release-intent-document",
+          "schema": "law/schemas/release-intent.schema.json",
+          "path": "release-intent.json",
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "inline_document": {
+            "schemaVersion": "1.0.0",
+            "release_unit": "@aarusso-nyx/devai",
+            "current_version": "1.4.5",
+            "target_version": "1.5.0",
+            "support": "current",
+            "support_promotion": false,
+            "change_kind": "behavioral",
+            "changed_paths": ["law/policy/release-lifecycle.json"],
+            "changed_packages": ["@aarusso-nyx/devai"],
+            "risks": ["release-integrity"],
+            "owner_escalations": [],
+            "candidate": {"commit": "5461ba500000000000000000000000000000aaaa", "tree": "2cad519aba8117a1850eee85d41eae452d51a141"},
+            "base": {"commit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de", "tree": "1111111111111111111111111111111111111111"}
+          },
+          "sha256": "96c991f919212bd4516996b1359fbd20078a1e5be0212a0ada9eee3b4d06d6bd"
+        },
+        {
+          "kind": "release-verification-profile",
+          "source": "law/policy/release-verification.json",
+          "schema": "law/schemas/release-verification-profile.schema.json",
+          "path": "law/policy/release-verification.json",
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "sha256": "d116fe46b30c6bde0523a22a28aab6c8a7a8212ebcab884a51b5bd8d12454f11"
+        },
+        {
           "kind": "release-lifecycle-policy",
+          "source": "law/policy/release-lifecycle.json",
+          "schema": "law/schemas/release-lifecycle-policy.schema.json",
           "path": "law/policy/release-lifecycle.json",
-          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "sha256": "de93ffd12e8aa4cb3c15a47223d0d3d9f525b7e69c72af7470c9100f6fdf2f64"
+        },
+        {
+          "kind": "action-registry-policy",
+          "source": "law/policy/action-registry.json",
+          "schema": "law/schemas/action-registry.schema.json",
+          "path": "law/policy/action-registry.json",
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "sha256": "5c40603c65ca0a263c11a9d02f297782711b7fb67ac8ff0ae5ae68a72ffbf06f"
         }
       ],
       "plan": [
@@ -678,21 +772,27 @@
         }
       ],
       "determination": {
-        "semver_bump": "minor",
+        "profile_verdict": "ready",
+        "transition": "minor",
         "support": "current",
         "impact": "behavioral",
-        "risk_classes": ["release-surface"]
+        "risk_classes": ["release-integrity"],
+        "capabilities": ["adopter-materialization", "api-compatibility", "consumer", "e2e", "exact-candidate", "formatting-hygiene", "integration", "lint", "package-integrity", "path-portability", "provenance", "reproducibility", "schema-consistency", "secret-scan", "security", "type-integrity", "unit"],
+        "mutation": "none",
+        "mutation_disposition": {"status": "not-required", "reason": "mutation-roster-empty"},
+        "blocking_reasons": []
       },
       "verification_kernel": {
         "kernel_id": "devai.kernel.release-plan-receipt.v1",
         "mandatory": true,
+        "determination_contract": "law/policy/release-lifecycle.json#/plan_determination",
         "schema_assertion_establishes_pass": false,
         "algorithm": [
           "resolve-every-declared-input-and-recompute-its-sha256",
-          "reject-when-the-declared-input-set-differs-from-the-input-set-the-lifecycle-policy-requires",
-          "recompute-semver_bump-support-impact-and-risk_classes-from-the-resolved-inputs-and-compare-to-determination",
+          "require-the-exact-four-ordered-input-kinds-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination",
+          "recompute-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-determination",
           "recompute-the-nine-ordered-plan-steps-from-the-lifecycle-policy-and-compare-to-plan",
-          "recompute-receipt_digest_sha256-over-the-canonical-receipt-projection-excluding-receipt_id-and-receipt_digest_sha256",
+          "recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1",
           "recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest",
           "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
         ],
@@ -726,7 +826,7 @@
         "derived_from_bound_inputs_only": true,
         "contains_wall_clock_time": false
       },
-      "receipt_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "receipt_digest_sha256": "b0d5ce2dbb6e96675f20834e5d982dba33bb6e22c8c5c1f17924b69ba38d2d91"
     }
   ]
 }

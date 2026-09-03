@@ -27,7 +27,8 @@
     "bearer_transferable",
     "delegable",
     "recorded_at",
-    "payload_digest_sha256"
+    "payload_digest_sha256",
+    "grant_event_id"
   ],
   "properties": {
     "schemaVersion": {
@@ -224,9 +225,9 @@
       "description": "SHA-256 over the RFC 8785 canonical event projection excluding only event_id and payload_digest_sha256."
     },
     "grant_event_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "pattern": "^EA-[0-9a-f]{16}$",
-      "description": "The grant this terminal event resolves. Required on consumed, revoked, expired, and rejected events."
+      "description": "The grant this event resolves: null on granted and the exact grant id on consumed, revoked, expired, and rejected."
     },
     "consumed_by_state_id": {
       "type": "string",
@@ -249,19 +250,21 @@
       },
       "then": {
         "required": ["not_before", "expires_at"],
+        "properties": {
+          "grant_event_id": {
+            "type": "null"
+          }
+        },
         "not": {
-          "anyOf": [
-            {
-              "required": ["grant_event_id"]
-            },
-            {
-              "required": ["consumed_by_state_id"]
-            }
-          ]
+          "required": ["consumed_by_state_id"]
         }
       },
       "else": {
-        "required": ["grant_event_id"]
+        "properties": {
+          "grant_event_id": {
+            "type": "string"
+          }
+        }
       }
     },
     {
@@ -422,7 +425,7 @@
           "compute-ledger-event-digest-over-the-complete-event-record"
         ]
       },
-      "event_id": "EA-0123456789abcdef",
+      "event_id": "EA-e89cbc4066830b47",
       "ledger_id": "EAL-devai-release",
       "sequence": 1,
       "previous_event_digest_sha256": null,
@@ -464,7 +467,8 @@
       "not_before": "2026-09-03T00:00:00.000Z",
       "expires_at": "2026-09-03T01:00:00.000Z",
       "recorded_at": "2026-09-03T00:00:00.000Z",
-      "payload_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "grant_event_id": null,
+      "payload_digest_sha256": "e89cbc4066830b4722d26250907b14296a5219b1bd4245e5bbf3786431b9fbe4"
     }
   ]
 }
