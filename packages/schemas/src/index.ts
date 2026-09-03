@@ -100,6 +100,12 @@ function ensureSchemaReferences(name: SchemaName): void {
   ) {
     ajv.addSchema(loadSchema('triage.schema.json'), 'triage.schema.json');
   }
+  if (
+    name === 'release-plan-receipt.schema.json' &&
+    ajv.getSchema('release-intent.schema.json') === undefined
+  ) {
+    ajv.addSchema(loadSchema('release-intent.schema.json'), 'release-intent.schema.json');
+  }
 }
 
 const compiled = new Map<SchemaName, ReturnType<typeof ajv.compile>>();
