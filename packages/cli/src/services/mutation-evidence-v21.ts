@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
   constants,
@@ -249,7 +249,10 @@ function loadVerifiedSnapshot(
 ): PinnedModules {
   const cached = pinnedModules.get(byteSetDigest);
   if (cached !== undefined) return cached;
-  const scope = new URL(`./.verified-mutation-${byteSetDigest}/`, import.meta.url).href;
+  // An unguessable first-load namespace prevents pre-populating Node's module
+  // cache at predictable synthetic URLs. It is never included in evidence.
+  const scope = new URL(`./.verified-mutation-${randomUUID()}-${byteSetDigest}/`, import.meta.url)
+    .href;
   const sources = new Map(
     files
       .filter(({ path }) => path.startsWith('src/') && path.endsWith('.js'))
