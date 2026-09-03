@@ -62,6 +62,9 @@ importers:
 
   packages/authority:
     dependencies:
+      '@devai-nyx/schemas':
+        specifier: workspace:*
+        version: link:../schemas
       '@devai-nyx/utils':
         specifier: workspace:*
         version: link:../utils
