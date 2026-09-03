@@ -18,10 +18,10 @@ afterEach(() => {
 });
 
 describe('canonical action registry constructor', () => {
-  it('always constructs the complete 48-action surface without handler registration', () => {
+  it('always constructs the complete 57-action surface without handler registration', () => {
     const first = canonicalRegistry();
     const second = canonicalRegistry();
-    expect(first).toHaveLength(48);
+    expect(first).toHaveLength(57);
     expect(first.map((entry) => entry.name)).toContain('audit observe');
     expect(first.map((entry) => entry.name)).toContain('triage classify');
     expect(second).toEqual(first);

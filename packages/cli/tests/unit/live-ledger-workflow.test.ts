@@ -556,7 +556,7 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 48');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 57');
     expect(release).toContain('pnpm run release:closure');
     const buildIndex = release.indexOf('pnpm run build');
     expect(buildIndex).toBeGreaterThanOrEqual(0);
@@ -684,7 +684,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 48', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 57', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {
