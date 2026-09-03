@@ -1,12 +1,24 @@
-import { readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CAC } from 'cac';
 import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand, type CommandDefinition } from '../../define-command.js';
+import { declaredInvocationAuthority } from '../../authority/index.js';
 import {
+  ReleaseLifecycleFileStore,
+  executeOfflineVerification,
+  executeReleaseLifecycleAction,
   resumeReleaseLifecycleExecution,
   validateReleaseLifecycleRequest,
   verifyReleaseStateIdentity,
+  type AuthorizationBridge,
+  type OfflineVerificationProvider,
+  type PersistedReleaseAction,
+  type PublicationControls,
+  type ReleaseLifecycleRequest,
+  type ReleasePlanInputResolver,
+  type ReleaseProvider,
+  type TrustedOfflineReceiptVerifier,
 } from '../../services/release-lifecycle-execution.js';
 import { buildReleasePlanReceipt } from '../../services/release-lifecycle.js';
 
@@ -19,6 +31,7 @@ interface PlanOptions {
 
 interface ResumeOptions {
   readonly request?: string;
+  readonly repoRoot?: string;
   readonly stateChain?: string;
   readonly storeRecords?: string;
   readonly storeHead?: string;
@@ -29,17 +42,80 @@ interface ResumeOptions {
 
 interface ActionOptions {
   readonly request?: string;
+  readonly repoRoot?: string;
+  readonly stateRoot?: string;
   readonly human?: boolean;
 }
 
 interface OfflineVerifyOptions {
   readonly request?: string;
   readonly exportedState?: string;
+  readonly repoRoot?: string;
   readonly human?: boolean;
+}
+
+export interface ReleaseLifecycleCommandAdapters {
+  readonly provider: (
+    action: PersistedReleaseAction,
+    request: ReleaseLifecycleRequest,
+  ) => ReleaseProvider | undefined;
+  readonly offline_verification_provider: (
+    request: ReleaseLifecycleRequest,
+  ) => OfflineVerificationProvider | undefined;
+  readonly authorization: (request: ReleaseLifecycleRequest) => AuthorizationBridge | undefined;
+  readonly offline_receipt_verifier: (
+    request: ReleaseLifecycleRequest,
+  ) => TrustedOfflineReceiptVerifier | undefined;
+  readonly publication_controls: (
+    request: ReleaseLifecycleRequest,
+  ) => PublicationControls | undefined;
+}
+
+let commandAdapters: ReleaseLifecycleCommandAdapters | undefined;
+
+/** Installed only by the trusted host composition root; CLI requests cannot select code. */
+export function installReleaseLifecycleCommandAdapters(
+  adapters: ReleaseLifecycleCommandAdapters,
+): () => void {
+  if (commandAdapters !== undefined) throw new Error('release-command-adapters-already-installed');
+  const installed = Object.freeze({ ...adapters });
+  commandAdapters = installed;
+  return () => {
+    if (commandAdapters === installed) commandAdapters = undefined;
+  };
 }
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+}
+
+function containedFile(root: string, path: string): string {
+  const absoluteRoot = realpathSync(resolve(root));
+  const candidate = resolve(absoluteRoot, path);
+  const escaped = relative(absoluteRoot, candidate);
+  if (escaped === '..' || escaped.startsWith(`..${sep}`) || isAbsolute(escaped)) {
+    throw new Error('release-receipt-path-unsafe');
+  }
+  const stat = lstatSync(candidate);
+  if (stat.isSymbolicLink() || !stat.isFile() || realpathSync(candidate) !== candidate) {
+    throw new Error('release-receipt-path-unsafe');
+  }
+  return candidate;
+}
+
+function localResolvers(root: string): {
+  readonly receipt: (
+    locator: NonNullable<ReleaseLifecycleRequest['receipt_locators']>[number],
+  ) => unknown;
+  readonly plan: ReleasePlanInputResolver;
+} {
+  return {
+    receipt: (locator) => readJson(containedFile(root, locator.path)),
+    plan: (input) => {
+      if (typeof input['path'] !== 'string') throw new Error('rpl-input-unresolved');
+      return readJson(containedFile(root, input['path']));
+    },
+  };
 }
 
 function fail(action: string, code: string, detail: string, exit = EXIT_FAIL): void {
@@ -98,7 +174,7 @@ export const releasePlan = defineCommand({
   },
 });
 
-function unavailableAction(
+function lifecycleAction(
   name:
     | 'release preflight'
     | 'release certify'
@@ -116,25 +192,82 @@ function unavailableAction(
       cli
         .command(name.replace(' ', '-'), description)
         .option('--request <path>', 'Exact candidate-bound action request JSON')
+        .option('--repo-root <path>', 'Repository root containing bound receipt inputs')
+        .option('--state-root <path>', 'Protected append-only release state root')
         .option('--human', 'Human-readable output')
-        .action((options: ActionOptions) => {
+        .action(async (options: ActionOptions) => {
           if (options.request === undefined) {
             fail(name, 'RELEASE_ACTION_USAGE', '--request is required', EXIT_USAGE);
             return;
           }
           try {
-            validateReleaseLifecycleRequest(readJson(options.request), name);
-            const remote = name === 'release evidence-publish' || name === 'release publish';
-            fail(
+            const request = validateReleaseLifecycleRequest(
+              readJson(options.request),
               name,
-              remote
-                ? 'RELEASE_AUTHORIZATION_PROVIDER_UNAVAILABLE'
-                : 'RELEASE_ACTION_PROVIDER_UNAVAILABLE',
-              remote
-                ? 'no protected authorization ledger provider is installed; the action provider was not consulted'
-                : 'no protected injectable action provider is installed; no state was appended',
-              EXIT_REVIEW,
+            ) as ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction };
+            const adapters = commandAdapters;
+            const provider = adapters?.provider(name, request);
+            const remote = name === 'release evidence-publish' || name === 'release publish';
+            const authorization = remote ? adapters?.authorization(request) : undefined;
+            const offlineReceiptVerifier =
+              name === 'release evidence-publish'
+                ? adapters?.offline_receipt_verifier(request)
+                : undefined;
+            if (
+              adapters === undefined ||
+              provider === undefined ||
+              (remote && authorization === undefined) ||
+              (name === 'release evidence-publish' && offlineReceiptVerifier === undefined)
+            ) {
+              fail(
+                name,
+                remote
+                  ? 'RELEASE_AUTHORIZATION_PROVIDER_UNAVAILABLE'
+                  : 'RELEASE_ACTION_PROVIDER_UNAVAILABLE',
+                'the exact lifecycle adapter set is not installed; no store or provider effect occurred',
+                EXIT_REVIEW,
+              );
+              return;
+            }
+            const actor = declaredInvocationAuthority();
+            if (actor === undefined) throw new Error('release-authority-context-invalid');
+            const root = resolve(options.repoRoot ?? process.cwd());
+            const resolvers = localResolvers(root);
+            const result = await executeReleaseLifecycleAction({
+              request,
+              action: name,
+              store: new ReleaseLifecycleFileStore(
+                resolve(options.stateRoot ?? join(root, '.devai/state/release-lifecycle')),
+                request,
+              ),
+              provider,
+              authority: {
+                actor,
+                consent: {
+                  write: true,
+                  allow_publish: remote,
+                  experimental: false,
+                },
+              },
+              resolveReceipt: resolvers.receipt,
+              resolvePlanInput: resolvers.plan,
+              ...(authorization === undefined ? {} : { authorization }),
+              ...(offlineReceiptVerifier === undefined ? {} : { offlineReceiptVerifier }),
+              ...(name === 'release publish'
+                ? { publication_controls: adapters.publication_controls(request) }
+                : {}),
+              recorded_at: new Date().toISOString(),
+            });
+            if (!result.ok) {
+              fail(name, result.code, result.phase, EXIT_REVIEW);
+              return;
+            }
+            process.stdout.write(
+              options.human === true
+                ? `devai ${name}: ${result.state.state_id} -> ${result.state.state}\n`
+                : `${JSON.stringify(result.state)}\n`,
             );
+            process.exitCode = EXIT_PASS;
           } catch (error) {
             fail(
               name,
@@ -148,27 +281,27 @@ function unavailableAction(
   });
 }
 
-export const releasePreflight = unavailableAction(
+export const releasePreflight = lifecycleAction(
   'release preflight',
   'Run the cheap mandatory floor and bind a passing plan receipt.',
 );
-export const releaseCertify = unavailableAction(
+export const releaseCertify = lifecycleAction(
   'release certify',
   'Run the selected candidate-bound certification DAG.',
 );
-export const releasePrepare = unavailableAction(
+export const releasePrepare = lifecycleAction(
   'release prepare',
   'Prepare deterministic packages, manifests, and software bills of materials.',
 );
-export const releaseExport = unavailableAction(
+export const releaseExport = lifecycleAction(
   'release export',
   'Export release evidence through the authorized verifier-provider boundary.',
 );
-export const releaseEvidencePublish = unavailableAction(
+export const releaseEvidencePublish = lifecycleAction(
   'release evidence-publish',
   'Publish exact offline-verified evidence with one-time Owner authorization.',
 );
-export const releasePublish = unavailableAction(
+export const releasePublish = lifecycleAction(
   'release publish',
   'Dispatch publication through the protected workflow boundary.',
 );
@@ -182,8 +315,9 @@ export const releaseOfflineVerify = defineCommand({
       .command('release-offline-verify', 'Verify exported release artifacts without network access')
       .option('--request <path>', 'Exact candidate-bound offline verification request JSON')
       .option('--exported-state <path>', 'Exact exported lifecycle state record')
+      .option('--repo-root <path>', 'Repository root containing bound inputs')
       .option('--human', 'Human-readable output')
-      .action((options: OfflineVerifyOptions) => {
+      .action(async (options: OfflineVerifyOptions) => {
         if (options.request === undefined && options.exportedState === undefined) {
           fail(
             'release offline-verify',
@@ -194,19 +328,46 @@ export const releaseOfflineVerify = defineCommand({
           return;
         }
         try {
-          if (options.request !== undefined) {
-            validateReleaseLifecycleRequest(readJson(options.request), 'release offline-verify');
+          if (options.request === undefined || options.exportedState === undefined) {
+            fail(
+              'release offline-verify',
+              'RELEASE_OFFLINE_VERIFY_USAGE',
+              '--request and --exported-state are required for semantic verification',
+              EXIT_USAGE,
+            );
+            return;
           }
-          if (options.exportedState !== undefined) {
-            const state = verifyReleaseStateIdentity(readJson(options.exportedState));
-            if (state.state !== 'exported') throw new Error('release-offline-state-mismatch');
-          }
-          fail(
+          const request = validateReleaseLifecycleRequest(
+            readJson(options.request),
             'release offline-verify',
-            'OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE',
-            'canonical verifier source is not installed; no receipt or state was written',
-            EXIT_REVIEW,
           );
+          const state = verifyReleaseStateIdentity(readJson(options.exportedState));
+          if (state.state !== 'exported') throw new Error('release-offline-state-mismatch');
+          const provider = commandAdapters?.offline_verification_provider(request);
+          if (provider === undefined) {
+            fail(
+              'release offline-verify',
+              'OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE',
+              'the trusted offline verifier adapter is not installed; no receipt was emitted',
+              EXIT_REVIEW,
+            );
+            return;
+          }
+          const result = await executeOfflineVerification({
+            request,
+            exported_state: state,
+            provider,
+          });
+          if (!result.ok) {
+            fail('release offline-verify', result.code, result.phase, EXIT_REVIEW);
+            return;
+          }
+          process.stdout.write(
+            options.human === true
+              ? `release offline-verify: ${String(result.receipt['receipt_id'])} -> pass\n`
+              : `${JSON.stringify(result.receipt)}\n`,
+          );
+          process.exitCode = EXIT_PASS;
         } catch (error) {
           fail(
             'release offline-verify',
@@ -230,6 +391,7 @@ export const releaseResume = defineCommand({
         '--request <path>',
         'Exact release resume request (required for an empty state chain)',
       )
+      .option('--repo-root <path>', 'Repository root containing bound receipt inputs')
       .option('--state-chain <path>', 'JSON array containing the persisted state chain')
       .option(
         '--store-records <path>',
@@ -257,6 +419,8 @@ export const releaseResume = defineCommand({
             options.request === undefined
               ? undefined
               : validateReleaseLifecycleRequest(readJson(options.request), 'release resume');
+          const root = resolve(options.repoRoot ?? process.cwd());
+          const resolvers = localResolvers(root);
           if (first === undefined && request === undefined) {
             throw new Error('an empty state chain requires an exact release resume request');
           }
@@ -288,6 +452,12 @@ export const releaseResume = defineCommand({
             candidate,
             ...(request === undefined ? {} : { candidate_locator: request.candidate_locator }),
             receipt_documents: receipts,
+            resolve_plan_input: resolvers.plan,
+            ...(request === undefined
+              ? {}
+              : {
+                  offline_receipt_verifier: commandAdapters?.offline_receipt_verifier(request),
+                }),
             ...(options.publicationReceipt === undefined
               ? {}
               : {

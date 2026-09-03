@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, linkSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
   ReleaseLifecycleFileStore,
@@ -28,12 +29,43 @@ const MANIFEST_DIGEST = 'a4001ab74eae5866fc8a070f305bc4e393da167965cbcc4d2471872
 const EVIDENCE_DIGEST = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08';
 
 function planReceipt(): Readonly<Record<string, unknown>> {
-  const schema = JSON.parse(
-    readFileSync(join(process.cwd(), 'law/schemas/release-plan-receipt.schema.json'), 'utf8'),
-  ) as { examples: readonly Readonly<Record<string, unknown>>[] };
-  const example = schema.examples[0];
-  if (example === undefined) throw new Error('missing release plan fixture');
-  return example;
+  return buildReleasePlanReceipt({
+    repository_id: 'aarusso-nyx/devai',
+    intent_path: 'release-intent.json',
+    intent: {
+      schemaVersion: '1.0.0',
+      release_unit: '@aarusso-nyx/devai',
+      current_version: '1.4.5',
+      target_version: '1.5.0',
+      support: 'current',
+      change_kind: 'behavioral',
+      changed_paths: ['packages/cli/src/services/release-lifecycle-execution.ts'],
+      changed_packages: ['@aarusso-nyx/devai'],
+      candidate: { commit: COMMIT, tree: TREE },
+      base: { commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+    },
+    release_verification_profile: JSON.parse(
+      readFileSync(join(process.cwd(), 'law/policy/release-verification.json'), 'utf8'),
+    ),
+    release_lifecycle_policy: JSON.parse(
+      readFileSync(join(process.cwd(), 'law/policy/release-lifecycle.json'), 'utf8'),
+    ),
+    action_registry: JSON.parse(
+      readFileSync(join(process.cwd(), 'law/policy/action-registry.json'), 'utf8'),
+    ),
+  });
+}
+
+function resolvePlanInput(input: Readonly<Record<string, unknown>>): unknown {
+  if (input['kind'] === 'release-intent') return input['inline_document'];
+  const paths: Readonly<Record<string, string>> = {
+    'release-verification-profile': 'law/policy/release-verification.json',
+    'release-lifecycle-policy': 'law/policy/release-lifecycle.json',
+    'action-registry-policy': 'law/policy/action-registry.json',
+  };
+  const path = paths[String(input['kind'])];
+  if (path === undefined) throw new Error('unknown plan input');
+  return JSON.parse(readFileSync(join(process.cwd(), path), 'utf8')) as unknown;
 }
 
 function offlineReceipt(): Readonly<Record<string, unknown>> {
@@ -286,8 +318,39 @@ function finalizeAuthorizationEvent(draft: Readonly<Record<string, unknown>>) {
   };
 }
 
+function authorizationLedger(events: readonly Readonly<Record<string, unknown>>[]) {
+  const schema = JSON.parse(
+    readFileSync(
+      join(process.cwd(), 'law/schemas/effect-authorization-ledger.schema.json'),
+      'utf8',
+    ),
+  ) as { examples: readonly Readonly<Record<string, unknown>>[] };
+  const template = required(schema.examples[0], 'missing ledger example');
+  const entries = events.map((event) => ({
+    sequence: event['sequence'],
+    event_id: event['event_id'],
+    event_digest_sha256: canonicalSha256(event),
+    previous_event_digest_sha256: event['previous_event_digest_sha256'],
+    kind: event['kind'],
+    references_event_id: event['grant_event_id'],
+  }));
+  const final = required(entries.at(-1), 'missing ledger head');
+  return {
+    ...template,
+    ledger_id: 'EAL-release-test',
+    repository: { id: 'aarusso-nyx/devai' },
+    head: {
+      sequence: final.sequence,
+      event_id: final.event_id,
+      event_digest_sha256: final.event_digest_sha256,
+    },
+    entries,
+  };
+}
+
 function authorizationBridge(
   onConsume?: (binding: AuthorizationAttemptBinding) => void,
+  grantRecordedAt = '2026-09-03T00:00:00.000Z',
 ): AuthorizationBridge {
   let grant:
     | {
@@ -342,7 +405,7 @@ function authorizationBridge(
       delegable: false,
       not_before: '2026-09-03T00:00:00.000Z',
       expires_at: '2026-09-03T01:00:00.000Z',
-      recorded_at: '2026-09-03T00:00:00.000Z',
+      recorded_at: grantRecordedAt,
       grant_event_id: null,
     };
     const event = finalizeAuthorizationEvent(draft);
@@ -363,10 +426,8 @@ function authorizationBridge(
       grant ??= makeGrant(binding);
       return {
         ok: true,
-        grant_event: grant.event,
-        grant_event_digest_sha256: grant.digest,
-        ledger_head: grant.head,
-        semantic_verification_performed: true,
+        ledger: authorizationLedger([grant.event]),
+        events: [grant.event],
       };
     },
     consume: (binding) => {
@@ -397,17 +458,10 @@ function authorizationBridge(
           ledger_predecessor_digest_sha256: grant.digest,
         },
       });
-      const digest = canonicalSha256(event);
       return {
         durable: true,
-        consumed_event: event,
-        consumed_event_digest_sha256: digest,
-        ledger_head: {
-          ledger_id: 'EAL-release-test',
-          sequence: 2,
-          event_id: event.event_id,
-          event_digest_sha256: digest,
-        },
+        ledger: authorizationLedger([grant.event, event]),
+        events: [grant.event, event],
       };
     },
   };
@@ -450,7 +504,7 @@ function boundOfflineReceipt(
   exported: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
   const legacy = offlineReceipt();
-  const draft = {
+  const draft: Readonly<Record<string, unknown>> = {
     ...legacy,
     schemaVersion: '2.0.0',
     canonicalization: {
@@ -467,7 +521,7 @@ function boundOfflineReceipt(
     release_units: exported['release_units'],
     artifacts: offlineArtifacts(exported),
   };
-  const { receipt_id: _id, receipt_digest_sha256: _receiptDigest, ...projection } = draft;
+  const { receipt_id: _receiptId, receipt_digest_sha256: _receiptDigest, ...projection } = draft;
   const digest = canonicalSha256(projection);
   return {
     ...projection,
@@ -506,6 +560,7 @@ async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void
         authority: authorityFor(action),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         provider: () => ({ outcome: 'success', material: materialFor(action) }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -526,6 +581,8 @@ async function advanceToEvidencePublished(store: ReleaseLifecycleFileStore): Pro
       authority: authorityFor('release evidence-publish'),
       store,
       resolveReceipt: () => receipt,
+      resolvePlanInput,
+      offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
       authorization: authorizationBridge(),
       provider: () => ({
         outcome: 'success',
@@ -600,6 +657,7 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release preflight'),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         provider: () => ({ outcome: 'success', material: material() }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -636,6 +694,8 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release evidence-publish'),
         store,
         resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
         authorization: {
           resolve: () => ({ ok: false, code: 'authorization-identity-mismatch' }),
           consume: () => {
@@ -659,6 +719,8 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release evidence-publish'),
         store,
         resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
         authorization: {
           resolve: () => ({ ok: false, code: 'authorization-identity-mismatch' }),
           consume: () => {
@@ -694,6 +756,8 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release evidence-publish'),
         store,
         resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
         authorization: authorizationBridge(() => {
           order.push(store.readStoreRecords().at(-1)?.record_kind ?? 'missing');
         }),
@@ -718,6 +782,8 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release evidence-publish'),
         store,
         resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
         authorization: authorizationBridge(),
         provider,
         recorded_at: '2026-09-03T00:00:01.000Z',
@@ -741,6 +807,7 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release preflight'),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         provider: () => ({ outcome: 'success', material: material() }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -782,6 +849,7 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release preflight'),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         provider: () => ({ outcome: 'success', material: material() }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -804,6 +872,7 @@ describe('release lifecycle execution kernel', () => {
           authority: authorityFor('release preflight'),
           store: unsafe,
           resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
           provider: () => ({ outcome: 'success', material: material() }),
           recorded_at: '2026-09-03T00:00:00.000Z',
         }),
@@ -825,6 +894,7 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release preflight'),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         provider: () => ({ outcome: 'success', material: material() }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -855,6 +925,7 @@ describe('release lifecycle execution kernel', () => {
       action: 'release preflight',
       store: new ReleaseLifecycleFileStore(root(), value),
       resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
       provider,
       recorded_at: '2026-09-03T00:00:00.000Z',
     });
@@ -870,6 +941,7 @@ describe('release lifecycle execution kernel', () => {
       },
       store: new ReleaseLifecycleFileStore(root(), value),
       resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
       provider,
       recorded_at: '2026-09-03T00:00:00.000Z',
     });
@@ -893,7 +965,16 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release evidence-publish'),
         store,
         resolveReceipt: () => receipt,
-        authorization: { ...valid, consume: () => undefined as never },
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
+        authorization: {
+          ...valid,
+          consume: async (binding) => {
+            const stale = await valid.resolve(binding);
+            if (!stale.ok) throw new Error('expected valid grant');
+            return { durable: true, ledger: stale.ledger, events: stale.events };
+          },
+        },
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -955,6 +1036,8 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release evidence-publish'),
         store,
         resolveReceipt: () => driftedReceipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
         authorization: authorizationBridge(),
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
@@ -974,6 +1057,7 @@ describe('release lifecycle execution kernel', () => {
         authority: authorityFor('release preflight'),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         provider: () => ({ outcome: 'success', material: material() }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
@@ -1003,6 +1087,7 @@ describe('release lifecycle execution kernel', () => {
           authority: authorityFor('release preflight'),
           store: competing,
           resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
           provider: () => ({ outcome: 'success', material: material() }),
           recorded_at: '2026-09-03T00:00:00.000Z',
         }),
@@ -1044,6 +1129,7 @@ describe('release lifecycle execution kernel', () => {
       },
       store,
       resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
       authorization: authorizationBridge(),
       provider,
       recorded_at: '2026-09-03T00:00:00.000Z',
@@ -1058,6 +1144,7 @@ describe('release lifecycle execution kernel', () => {
         publication_controls: publicationControls(),
         store,
         resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
         authorization: authorizationBridge(),
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
@@ -1107,6 +1194,7 @@ describe('release lifecycle execution kernel', () => {
       repository: { id: 'aarusso-nyx/devai', commit: COMMIT, tree: TREE },
       candidate,
       receipt_documents: [planReceipt()],
+      resolve_plan_input: resolvePlanInput,
     });
     expect(planned).toMatchObject({ next_action: 'release preflight', next_outcome: 'ready' });
   });
@@ -1151,5 +1239,255 @@ describe('release lifecycle execution kernel', () => {
         provider,
       }),
     ).toMatchObject({ ok: false, code: 'release-offline-receipt-binding-invalid' });
+  });
+
+  it('separates append-log tail from completed-state head and permits a fresh retry', async () => {
+    const value = request('release preflight');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    const failed = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release preflight',
+        authority: authorityFor('release preflight'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: () => ({ outcome: 'failure', code: 'release-preflight-failed' }),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(failed, JSON.stringify(failed)).toMatchObject({ ok: false, phase: 'provider' });
+    const passed = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release preflight',
+        authority: authorityFor('release preflight'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: () => ({ outcome: 'success', material: material() }),
+        recorded_at: '2026-09-03T00:00:01.000Z',
+      }),
+    );
+    expect(passed.ok).toBe(true);
+    const records = store.readStoreRecords();
+    expect(records.map((record) => record.record_kind)).toEqual([
+      'attempt',
+      'failure',
+      'attempt',
+      'completion',
+    ]);
+    expect(records.every((record) => record.observed_head_before === null)).toBe(true);
+    expect(records[2]?.predecessor_record).toMatchObject({ record_id: records[1]?.record_id });
+    expect(reduceStoreRecords(records)).toMatchObject({
+      ok: true,
+      failed: false,
+      ambiguous: false,
+    });
+  });
+
+  it('requires a new exact Owner grant for a remote retry and never retries unknown', async () => {
+    const initial = request('release evidence-publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const receipt = boundOfflineReceipt(exported);
+    const value = request('release evidence-publish', receipt);
+    const common = {
+      request: value,
+      action: 'release evidence-publish' as const,
+      authority: authorityFor('release evidence-publish'),
+      store,
+      resolveReceipt: () => receipt,
+      resolvePlanInput,
+      offlineReceiptVerifier: {
+        verify: ({ receipt: document }: { receipt: typeof receipt }) => document,
+      },
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    };
+    const first = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        ...common,
+        authorization: authorizationBridge(),
+        provider: () => ({
+          outcome: 'failure',
+          dispatch_status: 'failed-before-dispatch',
+          code: 'release-dispatch-refused',
+        }),
+      }),
+    );
+    expect(first, JSON.stringify(first)).toMatchObject({ ok: false, phase: 'provider' });
+    const sameGrantProvider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const stale = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        ...common,
+        authorization: authorizationBridge(),
+        provider: sameGrantProvider,
+      }),
+    );
+    expect(stale).toMatchObject({ ok: false, code: 'fresh-exact-authorization-required' });
+    expect(sameGrantProvider).not.toHaveBeenCalled();
+    const retried = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        ...common,
+        authorization: authorizationBridge(undefined, '2026-09-03T00:00:01.000Z'),
+        provider: () => ({
+          outcome: 'success',
+          provider_handle: 'evidence-retry-2',
+          material: materialFor('release evidence-publish'),
+        }),
+      }),
+    );
+    expect(retried.ok).toBe(true);
+  });
+
+  it('rejects a shape-valid plan receipt unless the semantic plan kernel reproduces it', async () => {
+    const valid = planReceipt();
+    const determination = objectValue(valid['determination']);
+    const forged = rehashReceipt(valid, {
+      determination: { ...determination, capabilities: ['lint'] },
+    });
+    const value = {
+      ...request('release preflight'),
+      receipt_locators: [receiptLocator(forged)],
+    } as ReleaseLifecycleRequest;
+    const provider = vi.fn(() => ({ outcome: 'success' as const, material: material() }));
+    const result = await executeReleaseLifecycleAction({
+      request: value,
+      action: 'release preflight',
+      authority: authorityFor('release preflight'),
+      store: new ReleaseLifecycleFileStore(root(), value),
+      resolveReceipt: () => forged,
+      resolvePlanInput,
+      provider,
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    });
+    expect(result).toMatchObject({ ok: false, code: 'rpl-semantic-verification-not-performed' });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('requires the trusted external verifier before evidence publication authorization', async () => {
+    const initial = request('release evidence-publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const receipt = boundOfflineReceipt(exported);
+    const value = request('release evidence-publish', receipt);
+    const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const authorization = authorizationBridge();
+    const resolve = vi.spyOn(authorization, 'resolve');
+    const verifier = vi.fn(() => offlineReceipt());
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release evidence-publish',
+        authority: authorityFor('release evidence-publish'),
+        store,
+        resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: verifier },
+        authorization,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'rov-semantic-verification-not-performed' });
+    expect(verifier).toHaveBeenCalledOnce();
+    expect(resolve).not.toHaveBeenCalled();
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('recomputes the complete durable authorization ledger chain and exact head', async () => {
+    const initial = request('release evidence-publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const receipt = boundOfflineReceipt(exported);
+    const value = request('release evidence-publish', receipt);
+    const valid = authorizationBridge();
+    const forged: AuthorizationBridge = {
+      ...valid,
+      resolve: async (binding) => {
+        const resolution = await valid.resolve(binding);
+        if (!resolution.ok) return resolution;
+        return {
+          ...resolution,
+          ledger: {
+            ...objectValue(resolution.ledger),
+            head: {
+              ...objectValue(objectValue(resolution.ledger)['head']),
+              event_digest_sha256: 'f'.repeat(64),
+            },
+          },
+        };
+      },
+    };
+    const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release evidence-publish',
+        authority: authorityFor('release evidence-publish'),
+        store,
+        resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+        authorization: forged,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'authorization',
+      code: 'release-authorization-attempt-binding-invalid',
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('refuses hard-linked state records through the no-follow fstat boundary', async () => {
+    const value = request('release preflight');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release preflight',
+        authority: authorityFor('release preflight'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: () => ({ outcome: 'success', material: material() }),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(result.ok).toBe(true);
+    const attempts = join(store.campaignDirectory, 'attempts');
+    const name = required(
+      // The store accepts exactly one opening attempt in this fixture.
+      (await import('node:fs')).readdirSync(attempts)[0],
+      'missing attempt record',
+    );
+    linkSync(join(attempts, name), join(root(), 'linked-record.json'));
+    expect(() => store.readStoreRecords()).toThrow('release-state-store-unsafe');
+  });
+
+  it('fails a missing action adapter before creating the state store', async () => {
+    const value = request('release preflight');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    const result = await executeReleaseLifecycleAction({
+      request: value,
+      action: 'release preflight',
+      authority: authorityFor('release preflight'),
+      store,
+      resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'provider',
+      code: 'release-provider-unavailable',
+    });
+    expect(existsSync(store.campaignDirectory)).toBe(false);
   });
 });

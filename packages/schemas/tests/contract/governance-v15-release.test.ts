@@ -47,6 +47,7 @@ describe('release lifecycle state and refusal contracts', () => {
   const validateState = getValidator('release-lifecycle-state.schema.json');
   getValidator('release-intent.schema.json');
   const validatePlan = getValidator('release-plan-receipt.schema.json');
+  const validateStoreRecord = getValidator('release-lifecycle-store-record.schema.json');
 
   const blockedCases = [
     [
@@ -90,6 +91,7 @@ describe('release lifecycle state and refusal contracts', () => {
   function blockedPlanReceipt(reason: string, intentPatch: Record<string, unknown>): Json {
     const receipt = schemaExample<Json>('release-plan-receipt.schema.json');
     const input = (receipt.inputs as Json[])[0];
+    if (input === undefined) throw new Error('release plan fixture is missing its intent input');
     const inlineDocument = { ...(input.inline_document as Json), ...intentPatch };
     input.inline_document = inlineDocument;
     input.sha256 = canonicalSha256(inlineDocument);
@@ -122,6 +124,11 @@ describe('release lifecycle state and refusal contracts', () => {
       policy.states.filter((entry) => entry.persisted === false).map((entry) => entry.state),
     ).toEqual(['planned', 'offline_verified', 'published']);
     expect(policy.states.filter((entry) => entry.appendable === true)).toHaveLength(6);
+  });
+
+  it('registers the canonical v2 store-head dependency before compiling store records', () => {
+    expect(validateStoreRecord({})).toBe(false);
+    expect(validateStoreRecord.errors).not.toBeNull();
   });
 
   it('binds each mutating action to one exact state transition', () => {

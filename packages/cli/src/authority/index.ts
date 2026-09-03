@@ -77,9 +77,26 @@ const SESSION_ID = /^AUTH-SESSION-[A-Za-z0-9]{16,}$/u;
  * different answer than the one authority actually allowed.
  */
 let resolvedInvocationRole: HumanRole | undefined;
+let resolvedInvocationDeclarationSource: 'cli-flag' | 'session-state' | undefined;
 
 export function declaredInvocationRole(): HumanRole | undefined {
   return resolvedInvocationRole;
+}
+
+export function declaredInvocationAuthority():
+  | Readonly<{
+      kind: 'human';
+      role: HumanRole;
+      declaration_source: 'cli-flag' | 'session-state';
+    }>
+  | undefined {
+  return resolvedInvocationRole === undefined || resolvedInvocationDeclarationSource === undefined
+    ? undefined
+    : Object.freeze({
+        kind: 'human',
+        role: resolvedInvocationRole,
+        declaration_source: resolvedInvocationDeclarationSource,
+      });
 }
 
 let pendingHostScope: AuthorityHostEffectScope | undefined;
@@ -968,6 +985,8 @@ export function authorizeCliArgv(
   const role =
     asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
   resolvedInvocationRole = role as HumanRole | undefined;
+  resolvedInvocationDeclarationSource =
+    role === undefined ? undefined : sessionId === undefined ? 'cli-flag' : 'session-state';
   if (!role || !routeRoles(entry, argv).includes(role as HumanRole)) {
     return renderAuthorityResult(
       taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {

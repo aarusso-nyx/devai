@@ -1,12 +1,14 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { dirname } from 'node:path';
 import {
+  constants as nodeFileConstants,
   appendFileSync as nodeAppendFileSync,
   chmodSync as nodeChmodSync,
   closeSync as nodeCloseSync,
   copyFileSync as nodeCopyFileSync,
   cpSync as nodeCpSync,
   existsSync,
+  fstatSync,
   fsyncSync as nodeFsyncSync,
   lstatSync,
   mkdirSync as nodeMkdirSync,
@@ -232,6 +234,7 @@ export function runAuthorityHostEffectsWithRollback<T>(
 }
 
 export {
+  fstatSync,
   existsSync,
   lstatSync,
   readFileSync,
@@ -241,6 +244,28 @@ export {
   statSync,
   type SpawnSyncOptions,
 };
+
+/** Read-only open flags exposed without handing callers the mutable fs module. */
+export const fileOpenConstants = Object.freeze({
+  O_RDONLY: nodeFileConstants.O_RDONLY,
+  O_DIRECTORY: nodeFileConstants.O_DIRECTORY,
+  O_NOFOLLOW: nodeFileConstants.O_NOFOLLOW,
+});
+
+/** Narrow non-mutating descriptor seam for race-resistant store inspection. */
+export function openReadOnlyNoFollowSync(path: string, directory = false): number {
+  return nodeOpenSync(
+    path,
+    nodeFileConstants.O_RDONLY |
+      (nodeFileConstants.O_NOFOLLOW ?? 0) |
+      (directory ? (nodeFileConstants.O_DIRECTORY ?? 0) : 0),
+  );
+}
+
+/** Closes a descriptor created by openReadOnlyNoFollowSync. */
+export function closeReadOnlySync(descriptor: number): void {
+  nodeCloseSync(descriptor);
+}
 
 export const appendFileSync = guarded('appendFileSync', nodeAppendFileSync, 'mutation');
 export const chmodSync = guarded('chmodSync', nodeChmodSync, 'mutation');
