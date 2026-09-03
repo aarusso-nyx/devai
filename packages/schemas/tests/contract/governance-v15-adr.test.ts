@@ -596,22 +596,26 @@ describe('ADR-v3 public result and semantic authority', () => {
     ]);
   });
 
-  it('freezes the current 17-record authority graph and complete result instance', () => {
+  it('freezes the current 25-record authority graph and complete result instance', () => {
     const policy = readJson<AdrPolicy>('law/policy/adr-validation.json');
     const adrRoot = resolve(ROOT, 'law/adr');
     const records = currentRecordFixtures(policy, adrRoot);
     const result = resolveAdrFixture(records, markdownFiles(adrRoot).length);
-    expect(records).toHaveLength(17);
-    expect(result.files_scanned).toBe(18);
-    expect(result.subject_authorities).toHaveLength(25);
+    expect(records).toHaveLength(25);
+    expect(result.files_scanned).toBe(26);
+    expect(result.subject_authorities).toHaveLength(35);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
       'ADR-GOV-0002',
       'ADR-GOV-0004',
-      'ADR-GOV-0005',
       'ADR-GOV-0007',
       'ADR-GOV-0011',
+      'ADR-GOV-0013',
+      'ADR-GOV-0014',
+      'ADR-GOV-0015',
+      'ADR-MUT-0004',
+      'ADR-MUT-0005',
       'ADR-REL-0002',
     ]);
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
