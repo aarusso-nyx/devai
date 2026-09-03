@@ -22,6 +22,36 @@ type Artifact = {
   size_bytes: number;
 };
 
+type PackageEvidence = ReturnType<typeof packageArtifacts> & {
+  package_id: string;
+  trust: Record<string, unknown>;
+};
+
+interface ReceiptFixture {
+  schemaVersion: string;
+  canonicalization: { kernel_id: string };
+  verified_state: unknown;
+  artifacts: Artifact[];
+  artifact_sink_commit: unknown;
+  release_units: Array<{
+    release_unit: string;
+    version: string;
+    packages: PackageEvidence[];
+  }>;
+  verification_kernel: {
+    kernel_id: string;
+    supported_canonicalization_kernels: string[];
+    v3_sink_handle_closure: string;
+    v3_sink_handle_errors: string[];
+  };
+}
+
+function first<T>(values: readonly T[], context: string): T {
+  const value = values[0];
+  if (value === undefined) throw new Error(`${context} must not be empty`);
+  return value;
+}
+
 const artifact = (kind: string, suffix: string): Artifact => ({
   kind,
   sink_id: 'trusted-sink',
@@ -147,7 +177,9 @@ function fixtures() {
     recorded_at: '2026-09-03T00:00:00Z',
     record_digest_sha256: sha('7'),
   };
-  const receipt = structuredClone(receiptSchema.examples[0]) as Record<string, any>;
+  const receipt = structuredClone(
+    first(receiptSchema.examples, 'receipt schema examples'),
+  ) as ReceiptFixture;
   receipt.schemaVersion = '2.1.0';
   receipt.canonicalization.kernel_id =
     'devai.kernel.release-offline-verification-receipt-canonicalization.v3';
@@ -199,7 +231,9 @@ describe('release v3 artifact projection schemas', () => {
     expect(JSON.stringify(receipt.artifacts)).toBe(JSON.stringify(state.artifacts));
     expect(projection(aggregate)).toEqual(
       projection(
-        Object.values(state.release_units[0]!.packages[0]!).filter(
+        Object.values(
+          first(first(state.release_units, 'state release units').packages, 'state packages'),
+        ).filter(
           (value): value is Artifact =>
             typeof value === 'object' && value !== null && 'kind' in value,
         ),
@@ -220,15 +254,23 @@ describe('release v3 artifact projection schemas', () => {
 
     for (const [field, wrongKind] of fields) {
       const { state, receipt } = fixtures();
-      state.release_units[0]!.packages[0]![field].kind = wrongKind;
-      receipt.release_units[0].packages[0][field].kind = wrongKind;
+      first(first(state.release_units, 'state release units').packages, 'state packages')[
+        field
+      ].kind = wrongKind;
+      first(first(receipt.release_units, 'receipt release units').packages, 'receipt packages')[
+        field
+      ].kind = wrongKind;
       expect(validateState(state)).toBe(false);
       expect(validateReceipt(receipt)).toBe(false);
     }
 
     const duplicate = fixtures();
-    duplicate.state.artifacts.push(structuredClone(duplicate.state.artifacts[0]!));
-    duplicate.receipt.artifacts.push(structuredClone(duplicate.receipt.artifacts[0]!));
+    duplicate.state.artifacts.push(
+      structuredClone(first(duplicate.state.artifacts, 'state aggregate artifacts')),
+    );
+    duplicate.receipt.artifacts.push(
+      structuredClone(first(duplicate.receipt.artifacts, 'receipt aggregate artifacts')),
+    );
     expect(validateState(duplicate.state)).toBe(false);
     expect(validateReceipt(duplicate.receipt)).toBe(false);
 

@@ -302,13 +302,18 @@ describe('release prepare v3 policy', () => {
         }>;
       }>;
     };
-    circularReceipt.release_units[0]!.packages[0]!.certification_manifest.entries[0]!.immutable_blob_locator.certification_evidence_receipt =
-      {
-        kind: 'release-certification-evidence-receipt-v1',
-        receipt_digest_sha256: sha('c'),
-        canonicalization: 'utf-8-rfc8785-jcs-sha256',
-        referent: { candidate_commit: git },
-      };
+    const releaseUnit = circularReceipt.release_units[0];
+    if (releaseUnit === undefined) throw new Error('fixture has no release unit');
+    const packageEvidence = releaseUnit.packages[0];
+    if (packageEvidence === undefined) throw new Error('fixture has no package evidence');
+    const entry = packageEvidence.certification_manifest.entries[0];
+    if (entry === undefined) throw new Error('fixture has no certification entry');
+    entry.immutable_blob_locator.certification_evidence_receipt = {
+      kind: 'release-certification-evidence-receipt-v1',
+      receipt_digest_sha256: sha('c'),
+      canonicalization: 'utf-8-rfc8785-jcs-sha256',
+      referent: { candidate_commit: git },
+    };
     expect(validate(circularReceipt)).toBe(false);
   });
 });
