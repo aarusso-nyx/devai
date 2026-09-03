@@ -38,6 +38,8 @@ interface PolicyBuildOptions {
   readonly releaseTaskBindings?: Readonly<Record<string, unknown>>;
   readonly toolchain: Readonly<Record<string, string>>;
   readonly environment: Readonly<Record<string, string>>;
+  readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;
+  readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
   readonly cacheState: (
     task: Readonly<
       Pick<
@@ -654,7 +656,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     }));
     const executableName = task.argv[0] ?? '';
     const protectedExecutable = taskExecutableFromToolchain(toolchain, executableName);
-    const executable = resolveTaskExecutable(repoRoot, executableName);
+    const executable =
+      options.resolveExecutable?.(executableName) ??
+      resolveTaskExecutable(repoRoot, executableName);
     if (
       protectedExecutable !== undefined &&
       (protectedExecutable.path !== executable.path ||
@@ -676,6 +680,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       environment: selectedEnvironment,
       outputContract: outputContracts.get(task.nodeId),
       ...(releaseBinding === undefined ? {} : { releaseBinding }),
+      ...(options.protectedExecutionIdentity === undefined
+        ? {}
+        : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
       inputs,
       dependencies,
     });

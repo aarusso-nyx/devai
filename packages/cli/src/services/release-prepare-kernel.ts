@@ -411,7 +411,7 @@ function gitLocatorMatches(
 }
 
 async function verifyGitMembership(
-  source: ImmutableReleaseContentSource,
+  source: Pick<ImmutableReleaseContentSource, 'readGitObject'>,
   request: ReleaseLifecycleRequest,
   locator: GitReleaseBlobLocator,
 ): Promise<void> {
@@ -471,6 +471,39 @@ async function verifyGitMembership(
   } catch {
     throw new Error('release-prepare-git-tree-membership-invalid');
   }
+}
+
+/** Protected certification uses the same raw-object membership proof before executing source. */
+export async function verifyGitCertificationSource(
+  source: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'>,
+  request: ReleaseLifecycleRequest,
+  locator: GitReleaseBlobLocator,
+): Promise<Buffer> {
+  if (
+    locator.repository !== request.repository_locator.id ||
+    locator.commit !== request.candidate_locator.commit ||
+    locator.tree !== request.candidate_locator.tree ||
+    !safeRelativePath(locator.path) ||
+    !['100644', '100755'].includes(locator.mode)
+  ) {
+    throw new Error('release-prepare-git-locator-invalid');
+  }
+  await verifyGitMembership(source, request, locator);
+  const bytes = await source.readGitBlob({
+    repository: request.repository_locator,
+    candidate: request.candidate_locator,
+    object_id: locator.object_id,
+    locator,
+  });
+  if (
+    !Buffer.isBuffer(bytes) ||
+    bytes.length !== locator.size_bytes ||
+    sha256(bytes) !== locator.content_digest_sha256 ||
+    gitObjectDigest(bytes, 'blob', locator.object_format) !== locator.object_id
+  ) {
+    throw new Error('release-prepare-content-digest-mismatch');
+  }
+  return Buffer.from(bytes);
 }
 
 export async function verifyCertificationOutputClosure(

@@ -148,6 +148,7 @@ function outputDigests(
   repoRoot: string,
   task: PlannedTask,
   execution: TaskExecutionResult,
+  readTaskOutput?: (path: string) => Buffer,
 ): Readonly<Record<string, string>> {
   const digests: Record<string, string> = {
     stdout: sha256Hex(Buffer.from(execution.stdout, 'utf8')),
@@ -159,7 +160,9 @@ function outputDigests(
       throw new Error(`CHECK_RUNNER_OUTPUT_CONTRACT: ${task.nodeId} has malformed paths`);
     for (const path of paths as string[]) {
       try {
-        digests[path] = sha256Hex(readFileSync(join(repoRoot, path)));
+        digests[path] = sha256Hex(
+          readTaskOutput === undefined ? readFileSync(join(repoRoot, path)) : readTaskOutput(path),
+        );
       } catch {
         throw new Error(`CHECK_RUNNER_OUTPUT_MISSING: ${task.nodeId}: ${path}`);
       }
@@ -193,6 +196,12 @@ function planWithCache(
     }),
     toolchain,
     environment,
+    ...(options.resolveExecutable === undefined
+      ? {}
+      : { resolveExecutable: options.resolveExecutable }),
+    ...(options.protectedExecutionIdentity === undefined
+      ? {}
+      : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
     cacheState(task) {
       const dependencies: Record<string, string> = {};
       for (const dependency of task.dependencies) {
@@ -657,7 +666,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
         status: 'PASS',
         inputDigest: task.inputDigest,
         dependencyResultDigests,
-        outputDigests: outputDigests(options.repoRoot, task, result),
+        outputDigests: outputDigests(options.repoRoot, task, result, options.readTaskOutput),
         startedAt,
         finishedAt,
       };

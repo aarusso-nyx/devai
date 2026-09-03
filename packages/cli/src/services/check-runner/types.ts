@@ -177,5 +177,10 @@ export interface CheckRunnerOptions {
     timeoutMs: number,
     environment: Readonly<Record<string, string>>,
   ) => TaskExecutionResult;
+  /** Trusted host-only execution identity; never populated from CLI documents. */
+  readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;
+  readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
+  /** Protected executors return sealed bytes after namespace quiescence, not worktree reads. */
+  readonly readTaskOutput?: (path: string) => Buffer;
   readonly now?: () => string;
 }

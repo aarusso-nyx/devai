@@ -21,6 +21,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { verifyReleasePlanReceipt } from './release-lifecycle.js';
 import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
 import { isProtectedReleaseCertificationProvider } from './release-lifecycle-certification.js';
+import { isProtectedReleasePreflightProvider } from './release-certification-provider.js';
 
 export const RELEASE_ACTIONS = [
   'release plan',
@@ -2217,6 +2218,12 @@ export async function executeReleaseLifecycleAction(input: {
   if (
     request.action_id === 'release certify' &&
     !isProtectedReleaseCertificationProvider(input.provider)
+  ) {
+    return { ok: false, phase: 'provider', code: 'release-certification-provider-unavailable' };
+  }
+  if (
+    request.action_id === 'release preflight' &&
+    !isProtectedReleasePreflightProvider(input.provider)
   ) {
     return { ok: false, phase: 'provider', code: 'release-certification-provider-unavailable' };
   }

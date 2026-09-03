@@ -5,6 +5,16 @@ import {
 } from './commands/release/lifecycle.js';
 
 export { invokeDevaiCli, startDevaiCli, type CliInvocationResult } from './cli-runtime.js';
+export {
+  createContainerReleaseCertificationAdapters,
+  type ContainerReleaseCertificationAdapters,
+  type ContainerReleaseCertificationOptions,
+  type ProtectedReleasePlanMaterial,
+} from './services/release-certification-provider.js';
+export type {
+  ProtectedContainerControls,
+  ProtectedContainerDependency,
+} from './services/release-certification-container.js';
 export type { ReleaseLifecycleCommandAdapters } from './commands/release/lifecycle.js';
 export {
   composeMutationEvidenceV21,
