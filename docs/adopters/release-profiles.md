@@ -83,3 +83,15 @@ identity invalidates reuse.
 These checks establish verification facts only. Human maintainers still choose
 scope and separately authorize push, merge, tag, release, publication,
 deployment, and rollback effects.
+
+## Protected mutation verifier hosts
+
+Governed mutation v2.1 finalization and verification through the protected
+`@aarusso-nyx/devai/release-host` entry point require Node.js 24 or later on
+Linux or macOS with POSIX `O_NOFOLLOW` support. Hosts without that support,
+including Windows, fail closed; there is no weaker pathname fallback.
+Missing or divergent verifier provenance also refuses before use. This
+limitation applies to the protected mutation verifier, not the generic CLI.
+
+These checks retain the trusted-local evidence boundary. They do not establish
+independent signer/verifier custody or independent attestation.
