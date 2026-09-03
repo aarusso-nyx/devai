@@ -9,7 +9,8 @@ import {
   readdirSync,
 } from 'node:fs';
 import { basename, dirname, join, parse, relative, resolve, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire, registerHooks } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { getValidator } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 
@@ -45,7 +46,12 @@ interface ActivatedPolicy {
       readonly sourceByteSetDigest: string;
     };
   };
-  readonly activationModel: { readonly runtimeFileCount: number };
+  readonly activationModel: {
+    readonly runtimeFileCount: number;
+    readonly sourceOnlyTestPaths: readonly string[];
+    readonly semanticReceiptRepositoryBinding: { readonly wireRepository: 'devai-verifier' };
+    readonly semanticReceiptProvenance: MutationVerifierProvenanceV21;
+  };
 }
 
 export class MutationActivationError extends Error {
@@ -74,6 +80,8 @@ export function validateMutationV21ActivationSnapshot(input: {
     if (!getValidator('mutation-evidence-policy-v2.schema.json')(input.policy)) refuse();
     const policy = input.policy as ActivatedPolicy;
     const proof = policy.activation.provenanceProof;
+    if (canonicalJson(policy.activationModel.sourceOnlyTestPaths) !== canonicalJson(SOURCE_TESTS))
+      refuse();
     if (bytesDigest(input.manifestBytes) !== proof.vendor.manifestDigest) refuse();
     const manifest = JSON.parse(
       new TextDecoder('utf-8', { fatal: true }).decode(input.manifestBytes),
@@ -110,9 +118,9 @@ export function validateMutationV21ActivationSnapshot(input: {
       const actual = input.files.find((entry) => entry.path === file.path);
       if (actual === undefined || bytesDigest(actual.bytes) !== file.sha256) refuse();
     }
-    return {
+    const provenance: MutationVerifierProvenanceV21 = {
       source: {
-        repository: 'devai-verifier',
+        repository: policy.activationModel.semanticReceiptRepositoryBinding.wireRepository,
         commit: policy.approvedSource.commit,
         tree: policy.approvedSource.tree,
         byteSetDigest: proof.sourceByteSetDigest,
@@ -120,6 +128,11 @@ export function validateMutationV21ActivationSnapshot(input: {
       vendor: JSON.parse(canonicalJson(proof.vendor)) as MutationVerifierProvenanceV21['vendor'],
       byteEquality: true,
     };
+    if (
+      canonicalJson(provenance) !== canonicalJson(policy.activationModel.semanticReceiptProvenance)
+    )
+      refuse();
+    return provenance;
   } catch {
     refuse();
   }
@@ -152,7 +165,11 @@ function unchangedPaths(identities: readonly PathIdentity[]): void {
   }
 }
 
-function readProtectedFile(path: string): Buffer {
+function readProtectedFile(path: string): {
+  readonly bytes: Buffer;
+  readonly identities: readonly PathIdentity[];
+} {
+  if (typeof constants.O_NOFOLLOW !== 'number') refuse();
   const ancestors = noFollowAncestors(path);
   const before = lstatSync(path);
   if (!before.isFile()) refuse();
@@ -165,7 +182,7 @@ function readProtectedFile(path: string): Buffer {
     noFollowAncestors(path);
     unchangedPaths(ancestors);
     if (after.dev !== opened.dev || after.ino !== opened.ino || after.isSymbolicLink()) refuse();
-    return bytes;
+    return { bytes, identities: ancestors };
   } finally {
     closeSync(descriptor);
   }
@@ -206,6 +223,85 @@ interface CanonicalMutationModule {
   ) => JsonObject;
 }
 
+interface PinnedModules {
+  readonly kernel: CanonicalMutationModule;
+  readonly safety: {
+    readonly validateArtifactContent: (input: {
+      bytes: Buffer;
+      path: string;
+      mediaType: string;
+    }) => void;
+  };
+  readonly canonical: {
+    readonly canonicalize: (value: unknown) => string;
+    readonly canonicalBytes: (value: unknown) => Buffer;
+    readonly sha256Hex: (value: unknown) => string;
+    readonly framedDigest: (domain: string, value: unknown) => string;
+  };
+}
+
+// Cached code is immutable; every invocation still validates the complete on-disk gate.
+const pinnedModules = new Map<string, PinnedModules>();
+
+function loadVerifiedSnapshot(
+  files: readonly { readonly path: string; readonly bytes: Buffer }[],
+  byteSetDigest: string,
+): PinnedModules {
+  const cached = pinnedModules.get(byteSetDigest);
+  if (cached !== undefined) return cached;
+  const scope = new URL(`./.verified-mutation-${byteSetDigest}/`, import.meta.url).href;
+  const sources = new Map(
+    files
+      .filter(({ path }) => path.startsWith('src/') && path.endsWith('.js'))
+      .map(({ path, bytes }) => [new URL(path, scope).href, Buffer.from(bytes)]),
+  );
+  const filenames = new Map([...sources.keys()].map((url) => [fileURLToPath(url), url]));
+  // The Node loader receives only bytes already covered by the activation proof.
+  // Synthetic locations never fall through to disk; source replacement after
+  // hashing cannot change any byte delivered to the loader.
+  const hooks = registerHooks({
+    resolve(specifier, context, nextResolve) {
+      const parent = context.parentURL;
+      const filenameUrl = filenames.get(specifier);
+      if (filenameUrl !== undefined) return { url: filenameUrl, shortCircuit: true };
+      if (parent?.startsWith(scope)) {
+        if (specifier === 'node:crypto' || specifier === 'node:fs')
+          return { url: specifier, shortCircuit: true };
+        if (!specifier.startsWith('./')) refuse();
+        const url = new URL(specifier, parent).href;
+        if (!sources.has(url)) refuse();
+        return { url, shortCircuit: true };
+      }
+      if (specifier.startsWith(scope)) {
+        if (!sources.has(specifier)) refuse();
+        return { url: specifier, shortCircuit: true };
+      }
+      return nextResolve(specifier, context);
+    },
+    load(url, context, nextLoad) {
+      if (!url.startsWith(scope)) return nextLoad(url, context);
+      const source = sources.get(url);
+      if (source === undefined) refuse();
+      return { format: 'module', source: Buffer.from(source), shortCircuit: true };
+    },
+  });
+  try {
+    // The pinned graph contains no top-level await. Synchronous native ESM loading
+    // also prevents another event-loop task from interleaving loader registration.
+    const load = createRequire(import.meta.url);
+    const kernel = load(fileURLToPath(`${scope}src/mutation-v21.js`)) as PinnedModules['kernel'];
+    const safety = load(fileURLToPath(`${scope}src/artifact-safety.js`)) as PinnedModules['safety'];
+    const canonical = load(
+      fileURLToPath(`${scope}src/canonical-json.js`),
+    ) as PinnedModules['canonical'];
+    const loaded = { kernel, safety, canonical };
+    pinnedModules.set(byteSetDigest, loaded);
+    return loaded;
+  } finally {
+    hooks.deregister();
+  }
+}
+
 async function loadPinnedVerifier() {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -225,8 +321,20 @@ async function loadPinnedVerifier() {
         : '../../../../law/policy/mutation-evidence-v2.json',
     );
     const rootIdentity = noFollowAncestors(vendorRoot);
-    const policy = JSON.parse(readProtectedFile(policyPath).toString('utf8')) as unknown;
-    const manifestBytes = readProtectedFile(join(vendorRoot, 'provenance.json'));
+    const captured: {
+      readonly path: string;
+      readonly bytes: Buffer;
+      readonly identities: readonly PathIdentity[];
+    }[] = [];
+    const capture = (path: string) => {
+      const snapshot = readProtectedFile(path);
+      captured.push({ path, ...snapshot });
+      return snapshot.bytes;
+    };
+    const policy = JSON.parse(
+      new TextDecoder('utf-8', { fatal: true }).decode(capture(policyPath)),
+    ) as unknown;
+    const manifestBytes = capture(join(vendorRoot, 'provenance.json'));
     const names = filesBelow(vendorRoot).sort();
     const runtimeNames = names.filter(
       (path) => path !== 'provenance.json' && !(source && SOURCE_TESTS.includes(path)),
@@ -237,29 +345,25 @@ async function loadPinnedVerifier() {
         canonicalJson([...SOURCE_TESTS].sort())
     )
       refuse();
+    const files = runtimeNames.map((path) => ({ path, bytes: capture(join(vendorRoot, path)) }));
     const provenance = validateMutationV21ActivationSnapshot({
       policy,
       manifestBytes,
-      files: runtimeNames.map((path) => ({
-        path,
-        bytes: readProtectedFile(join(vendorRoot, path)),
-      })),
+      files,
     });
-    if (source) for (const path of SOURCE_TESTS) readProtectedFile(join(vendorRoot, path));
-    unchangedPaths(rootIdentity);
-    const kernel = (await import(
-      pathToFileURL(join(vendorRoot, 'src/mutation-v21.js')).href
-    )) as CanonicalMutationModule;
-    const safety = (await import(
-      pathToFileURL(join(vendorRoot, 'src/artifact-safety.js')).href
-    )) as {
-      validateArtifactContent: (input: { bytes: Buffer; path: string; mediaType: string }) => void;
+    if (source) for (const path of SOURCE_TESTS) capture(join(vendorRoot, path));
+    const recheck = () => {
+      unchangedPaths(rootIdentity);
+      if (canonicalJson(filesBelow(vendorRoot).sort()) !== canonicalJson(names)) refuse();
+      for (const snapshot of captured) {
+        unchangedPaths(snapshot.identities);
+        if (!readProtectedFile(snapshot.path).bytes.equals(snapshot.bytes)) refuse();
+      }
     };
-    const canonical = (await import(
-      pathToFileURL(join(vendorRoot, 'src/canonical-json.js')).href
-    )) as { readonly framedDigest: (domain: string, value: unknown) => string };
-    unchangedPaths(rootIdentity);
-    return { kernel, provenance, safety, canonical, policyDigest: canonicalSha256(policy) };
+    recheck();
+    const modules = loadVerifiedSnapshot(files, provenance.source.byteSetDigest);
+    recheck();
+    return { ...modules, provenance, policyDigest: modules.canonical.sha256Hex(policy) };
   } catch {
     refuse();
   }
@@ -275,11 +379,11 @@ function finalizeCheckedSnapshot(
   input: unknown,
   verifier: Awaited<ReturnType<typeof loadPinnedVerifier>>,
 ) {
-  const { kernel, safety, policyDigest } = verifier;
+  const { kernel, safety, policyDigest, canonical } = verifier;
   const contract = (input as { readonly contract?: unknown } | null)?.contract;
   kernel.validateMutationContractV21(contract);
   requirePolicyDigest(contract, policyDigest);
-  const snapshot = JSON.parse(canonicalJson(input)) as {
+  const snapshot = JSON.parse(canonical.canonicalize(input)) as {
     readonly contract: JsonObject;
     readonly candidate: {
       readonly releaseUnit: string;
@@ -291,7 +395,7 @@ function finalizeCheckedSnapshot(
   const summary = kernel.finalizeMutationReportSetV21(snapshot);
   const inspect = (value: unknown) =>
     safety.validateArtifactContent({
-      bytes: Buffer.from(canonicalJson(value)),
+      bytes: canonical.canonicalBytes(value),
       path: 'mutation-finalization.json',
       mediaType: 'application/json',
     });
@@ -368,7 +472,7 @@ export async function composeMutationEvidenceV21(
   const unsignedReceipt = {
     schemaVersion: '2.1.0',
     kind: 'mutation-semantic-verification-receipt-v2',
-    receiptId: `MSV2-${canonicalSha256({ candidate: snapshot.candidate, outputContractDigest, evidenceSetDigest }).slice(0, 16)}`,
+    receiptId: `MSV2-${canonical.sha256Hex({ candidate: snapshot.candidate, outputContractDigest, evidenceSetDigest }).slice(0, 16)}`,
     candidate: snapshot.candidate,
     outputContractDigest,
     releasePlanReceiptDigest: contract.releasePlanReceiptDigest,
@@ -408,7 +512,7 @@ export async function composeMutationEvidenceV21(
   }
   const artifacts = [...documents].map(([path, value]) => ({
     path,
-    bytes: Buffer.from(canonicalJson(value)),
+    bytes: canonical.canonicalBytes(value),
   }));
   const byPath = new Map(artifacts.map((artifact) => [artifact.path, artifact.bytes]));
   await verifyMutationEvidenceV21(
@@ -435,7 +539,7 @@ export async function verifyMutationEvidenceV21(
   readArtifact: (path: string) => Uint8Array,
   options: MutationVerificationOptionsV21,
 ): Promise<JsonObject> {
-  const { kernel, provenance, safety, policyDigest } = await loadPinnedVerifier();
+  const { kernel, provenance, safety, policyDigest, canonical } = await loadPinnedVerifier();
   kernel.validateMutationContractV21(contract);
   requirePolicyDigest(contract, policyDigest);
   const descriptor = contract as {
@@ -449,7 +553,7 @@ export async function verifyMutationEvidenceV21(
     let value: unknown;
     try {
       value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
-      if (!bytes.equals(Buffer.from(canonicalJson(value)))) throw new Error();
+      if (!bytes.equals(canonical.canonicalBytes(value))) throw new Error();
     } catch {
       throw Object.assign(new Error('NON_CANONICAL_JSON'), { code: 'NON_CANONICAL_JSON' });
     }
@@ -461,7 +565,8 @@ export async function verifyMutationEvidenceV21(
       if (
         receipt === null ||
         typeof receipt !== 'object' ||
-        canonicalJson((receipt as JsonObject).verifierProvenance) !== canonicalJson(provenance)
+        canonical.canonicalize((receipt as JsonObject).verifierProvenance) !==
+          canonical.canonicalize(provenance)
       )
         refuse();
     } catch {
