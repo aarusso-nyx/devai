@@ -1028,7 +1028,7 @@
               "const": "each-package-has-exactly-one-evidence-manifest-and-provider-result"
             },
             "offline_verify": {
-              "const": "each-package-evidence-manifest-artifact-digest-and-external-trust-identity-must-match-the-exported-state"
+              "const": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-exact-exported-state-release-unit-artifact-sink-commit-and-external-trust-identity-continuity;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch"
             },
             "trust": {
               "const": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
@@ -3449,7 +3449,7 @@
           },
           "prepare": "each-package-has-exactly-one-manifest-tarball-and-sbom",
           "export": "each-package-has-exactly-one-evidence-manifest-and-provider-result",
-          "offline_verify": "each-package-evidence-manifest-artifact-digest-and-external-trust-identity-must-match-the-exported-state",
+          "offline_verify": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-exact-exported-state-release-unit-artifact-sink-commit-and-external-trust-identity-continuity;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch",
           "trust": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
         },
         "state_semantic_kernel": {
