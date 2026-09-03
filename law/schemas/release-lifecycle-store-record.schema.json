@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-store-record.schema.json",
   "title": "Release lifecycle append-only store record",
-  "description": "One durable append-only release execution event. Every event is canonical RFC 8785 JCS, content-addressed, and chained to its exact predecessor. The state head advances only from a completion record after an exclusive record create and atomic head compare-and-swap. An unknown provider result is terminal for its attempt and forbids automatic redispatch.",
+  "description": "One durable append-only release execution event. predecessor_record is the exact append-log tail; observed_head_before is the exact full v2 canonical completed-state head observed by the attempt and copied by its terminal record. Completion alone may advance that head through compare-and-swap. Failure advances only the log tail. An unknown provider result is terminal and non-retriable.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -15,6 +15,7 @@
     "repository",
     "candidate",
     "predecessor_record",
+    "observed_head_before",
     "attempt_id",
     "action_id",
     "request_digest_sha256",
@@ -54,7 +55,12 @@
     "repository": { "$ref": "#/$defs/repository" },
     "candidate": { "$ref": "#/$defs/candidate" },
     "predecessor_record": {
+      "description": "Exact append-log predecessor. Null only for the opening attempt; a successor after failure names the failure record rather than the unchanged completed-state head.",
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/record_ref" }]
+    },
+    "observed_head_before": {
+      "description": "Exact full v2 canonical completed-state HEAD observed before the attempt, or null when no action has completed. Every terminal record copies its attempt value byte-for-byte.",
+      "oneOf": [{ "type": "null" }, { "$ref": "release-lifecycle-store-head.schema.json" }]
     },
     "attempt_id": { "type": "string", "pattern": "^RLA-[0-9a-f]{16}$" },
     "action_id": {
@@ -88,6 +94,26 @@
     "record_digest_sha256": { "$ref": "#/$defs/sha256" }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": { "sequence": { "const": 0 } },
+        "required": ["sequence"]
+      },
+      "then": {
+        "properties": {
+          "record_kind": { "const": "attempt" },
+          "predecessor_record": { "type": "null" },
+          "observed_head_before": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "sequence": { "type": "integer", "minimum": 1 } },
+        "required": ["sequence"]
+      },
+      "then": { "properties": { "predecessor_record": { "type": "object" } } }
+    },
     {
       "if": {
         "properties": { "record_kind": { "const": "attempt" } },

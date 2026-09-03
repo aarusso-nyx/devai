@@ -528,10 +528,10 @@
             "append_order": {
               "const": [
                 "lstat-parents-and-targets-and-reject-nonsafe-paths",
-                "recompute-request-and-predecessor-identities",
+                "recompute-request-append-log-tail-and-observed-completed-head-identities",
                 "atomic-create-append-only-record-with-o_excl",
                 "fsync-record-and-parent-directory",
-                "for-completion-only-recheck-head-and-atomically-replace-head",
+                "for-completion-only-recheck-head-equals-attempt-observed_head_before-and-atomically-replace-head",
                 "fsync-head-and-parent-directory"
               ]
             },
@@ -539,31 +539,80 @@
               "const": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting"
             },
             "head_compare_and_swap": {
-              "const": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it"
+              "const": "completion-alone-may-advance-HEAD-and-only-when-the-current-full-v2-canonical-head-is-byte-equal-to-the-attempt-observed_head_before;-failure-and-unknown-never-write-HEAD"
             },
             "semantic_kernel": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["kernel_id", "rules", "errors"],
+              "required": ["kernel_id", "rules", "errors", "negative_fixtures"],
               "properties": {
-                "kernel_id": { "const": "devai.kernel.release-lifecycle-store.v2" },
+                "kernel_id": { "const": "devai.kernel.release-lifecycle-store.v3" },
                 "rules": {
                   "const": [
-                    "the-opening-attempt-has-null-predecessor-and-null-head-before-and-the-opening-completion-names-that-attempt",
-                    "each-successor-attempt-names-its-predecessor-as-the-exact-current-head-completion-and-observes-that-head-before-cas",
-                    "each-terminal-record-names-its-predecessor-as-the-exact-prior-attempt-and-each-attempt-id-has-at-most-one-terminal-record",
-                    "a-completion-and-an-unknown-provider-result-for-the-same-attempt-are-mutually-exclusive-and-an-unknown-provider-result-never-advances-the-head",
+                    "the-opening-attempt-has-null-predecessor_record-and-null-observed_head_before",
+                    "each-successor-attempt-after-a-completion-or-failure-names-predecessor_record-as-the-exact-append-log-tail-and-observed_head_before-as-the-exact-current-full-v2-canonical-completed-state-head-or-null-when-no-action-has-ever-completed",
+                    "each-terminal-record-names-predecessor_record-as-its-exact-attempt-and-copies-that-attempt-observed_head_before-byte-for-byte-and-each-attempt-id-has-at-most-one-terminal-record",
+                    "completion-alone-advances-HEAD-by-compare-and-swap-from-observed_head_before;-failure-leaves-HEAD-unchanged-but-advances-the-append-log-tail;-unknown-is-terminal-leaves-HEAD-unchanged-and-is-non-retriable",
+                    "a-failed-remote-attempt-may-be-followed-only-by-a-new-attempt-bound-to-a-fresh-exact-owner-authorization-and-the-failed-attempt-is-never-redispatched",
+                    "resume-validates-the-single-append-chain-and-full-v2-canonical-head-then-derives-the-exact-next-action-or-blocked-reason-from-both-the-log-tail-and-head-without-writing-or-repairing",
                     "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
                   ]
                 },
                 "errors": {
                   "const": [
                     "release-store-opening-attempt-invalid",
-                    "release-store-attempt-predecessor-invalid",
+                    "release-store-append-tail-mismatch",
+                    "release-store-observed-head-mismatch",
                     "release-store-terminal-attempt-link-invalid",
+                    "release-store-terminal-observed-head-mismatch",
                     "release-store-terminal-attempt-conflict",
                     "release-store-completion-unknown-conflict",
+                    "release-store-failure-advanced-head",
+                    "release-store-unknown-successor-conflict",
+                    "release-store-attempt-redispatch",
+                    "release-store-retry-authorization-reuse",
+                    "release-store-resume-history-divergence",
                     "release-store-head-completion-mismatch"
+                  ]
+                },
+                "negative_fixtures": {
+                  "const": [
+                    {
+                      "fixture": "successor-after-failure-predecessor-points-to-completed-head-instead-of-log-tail",
+                      "expected_error": "release-store-append-tail-mismatch"
+                    },
+                    {
+                      "fixture": "successor-after-failure-observed_head_before-points-to-failure-instead-of-completed-head",
+                      "expected_error": "release-store-observed-head-mismatch"
+                    },
+                    {
+                      "fixture": "terminal-observed_head_before-differs-from-its-attempt",
+                      "expected_error": "release-store-terminal-observed-head-mismatch"
+                    },
+                    {
+                      "fixture": "failure-record-advances-completed-state-head",
+                      "expected_error": "release-store-failure-advanced-head"
+                    },
+                    {
+                      "fixture": "unknown-provider-result-is-followed-by-another-attempt",
+                      "expected_error": "release-store-unknown-successor-conflict"
+                    },
+                    {
+                      "fixture": "failed-remote-attempt-is-redispatched",
+                      "expected_error": "release-store-attempt-redispatch"
+                    },
+                    {
+                      "fixture": "failed-remote-successor-reuses-consumed-authorization",
+                      "expected_error": "release-store-retry-authorization-reuse"
+                    },
+                    {
+                      "fixture": "resume-derives-next-action-from-head-without-validating-log-tail",
+                      "expected_error": "release-store-resume-history-divergence"
+                    },
+                    {
+                      "fixture": "resume-derives-blocked-reason-from-log-tail-without-validating-head",
+                      "expected_error": "release-store-resume-history-divergence"
+                    }
                   ]
                 }
               }
@@ -578,6 +627,7 @@
             "always_pure",
             "next_actions",
             "blocked_outcomes",
+            "history_resolution",
             "ambiguous_outcome"
           ],
           "properties": {
@@ -618,11 +668,26 @@
                 "broken-chain",
                 "stale-head",
                 "orphan-record",
+                "unterminated-attempt",
                 "unknown-provider-result",
                 "authorization-consumed",
+                "fresh-exact-authorization-required",
                 "candidate-identity-mismatch",
                 "receipt-identity-mismatch"
               ]
+            },
+            "history_resolution": {
+              "const": {
+                "inputs": [
+                  "validated-append-log-tail",
+                  "validated-full-v2-canonical-completed-state-head"
+                ],
+                "completion": "derive-next-action-from-the-completed-state-head",
+                "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-remote-action-is-blocked-until-a-fresh-exact-owner-authorization-is-supplied",
+                "unknown": "next-action-null-and-blocked-reason-unknown-provider-result-with-no-retry-or-redispatch",
+                "unterminated_attempt": "next-action-null-and-blocked-reason-unterminated-attempt-with-no-automatic-terminal-inference",
+                "divergence": "next-action-null-and-the-exact-store-validation-error-as-blocked-reason"
+              }
             },
             "ambiguous_outcome": {
               "const": "next_action-null-and-no-automatic-redispatch-or-state-advance"
@@ -671,7 +736,7 @@
               "const": "append-and-fsync-unknown-provider-result-and-block-without-redispatch"
             },
             "retry": {
-              "const": "a-consumed-attempt-never-retries;-a-new-attempt-requires-a-fresh-exact-owner-authorization"
+              "const": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
             }
           }
         },
@@ -2407,7 +2472,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.1.0",
+      "policy_version": "2.2.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -2855,30 +2920,77 @@
           },
           "append_order": [
             "lstat-parents-and-targets-and-reject-nonsafe-paths",
-            "recompute-request-and-predecessor-identities",
+            "recompute-request-append-log-tail-and-observed-completed-head-identities",
             "atomic-create-append-only-record-with-o_excl",
             "fsync-record-and-parent-directory",
-            "for-completion-only-recheck-head-and-atomically-replace-head",
+            "for-completion-only-recheck-head-equals-attempt-observed_head_before-and-atomically-replace-head",
             "fsync-head-and-parent-directory"
           ],
           "orphan_handling": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting",
-          "head_compare_and_swap": "the-head-must-equal-the-exact-prior-completion-sequence-state-id-and-state-digest-before-a-new-completion-can-advance-it",
+          "head_compare_and_swap": "completion-alone-may-advance-HEAD-and-only-when-the-current-full-v2-canonical-head-is-byte-equal-to-the-attempt-observed_head_before;-failure-and-unknown-never-write-HEAD",
           "semantic_kernel": {
-            "kernel_id": "devai.kernel.release-lifecycle-store.v2",
+            "kernel_id": "devai.kernel.release-lifecycle-store.v3",
             "rules": [
-              "the-opening-attempt-has-null-predecessor-and-null-head-before-and-the-opening-completion-names-that-attempt",
-              "each-successor-attempt-names-its-predecessor-as-the-exact-current-head-completion-and-observes-that-head-before-cas",
-              "each-terminal-record-names-its-predecessor-as-the-exact-prior-attempt-and-each-attempt-id-has-at-most-one-terminal-record",
-              "a-completion-and-an-unknown-provider-result-for-the-same-attempt-are-mutually-exclusive-and-an-unknown-provider-result-never-advances-the-head",
+              "the-opening-attempt-has-null-predecessor_record-and-null-observed_head_before",
+              "each-successor-attempt-after-a-completion-or-failure-names-predecessor_record-as-the-exact-append-log-tail-and-observed_head_before-as-the-exact-current-full-v2-canonical-completed-state-head-or-null-when-no-action-has-ever-completed",
+              "each-terminal-record-names-predecessor_record-as-its-exact-attempt-and-copies-that-attempt-observed_head_before-byte-for-byte-and-each-attempt-id-has-at-most-one-terminal-record",
+              "completion-alone-advances-HEAD-by-compare-and-swap-from-observed_head_before;-failure-leaves-HEAD-unchanged-but-advances-the-append-log-tail;-unknown-is-terminal-leaves-HEAD-unchanged-and-is-non-retriable",
+              "a-failed-remote-attempt-may-be-followed-only-by-a-new-attempt-bound-to-a-fresh-exact-owner-authorization-and-the-failed-attempt-is-never-redispatched",
+              "resume-validates-the-single-append-chain-and-full-v2-canonical-head-then-derives-the-exact-next-action-or-blocked-reason-from-both-the-log-tail-and-head-without-writing-or-repairing",
               "the-head-names-exactly-one-completion-record-with-the-same-candidate-repository-generation-state-id-and-state-digest"
             ],
             "errors": [
               "release-store-opening-attempt-invalid",
-              "release-store-attempt-predecessor-invalid",
+              "release-store-append-tail-mismatch",
+              "release-store-observed-head-mismatch",
               "release-store-terminal-attempt-link-invalid",
+              "release-store-terminal-observed-head-mismatch",
               "release-store-terminal-attempt-conflict",
               "release-store-completion-unknown-conflict",
+              "release-store-failure-advanced-head",
+              "release-store-unknown-successor-conflict",
+              "release-store-attempt-redispatch",
+              "release-store-retry-authorization-reuse",
+              "release-store-resume-history-divergence",
               "release-store-head-completion-mismatch"
+            ],
+            "negative_fixtures": [
+              {
+                "fixture": "successor-after-failure-predecessor-points-to-completed-head-instead-of-log-tail",
+                "expected_error": "release-store-append-tail-mismatch"
+              },
+              {
+                "fixture": "successor-after-failure-observed_head_before-points-to-failure-instead-of-completed-head",
+                "expected_error": "release-store-observed-head-mismatch"
+              },
+              {
+                "fixture": "terminal-observed_head_before-differs-from-its-attempt",
+                "expected_error": "release-store-terminal-observed-head-mismatch"
+              },
+              {
+                "fixture": "failure-record-advances-completed-state-head",
+                "expected_error": "release-store-failure-advanced-head"
+              },
+              {
+                "fixture": "unknown-provider-result-is-followed-by-another-attempt",
+                "expected_error": "release-store-unknown-successor-conflict"
+              },
+              {
+                "fixture": "failed-remote-attempt-is-redispatched",
+                "expected_error": "release-store-attempt-redispatch"
+              },
+              {
+                "fixture": "failed-remote-successor-reuses-consumed-authorization",
+                "expected_error": "release-store-retry-authorization-reuse"
+              },
+              {
+                "fixture": "resume-derives-next-action-from-head-without-validating-log-tail",
+                "expected_error": "release-store-resume-history-divergence"
+              },
+              {
+                "fixture": "resume-derives-blocked-reason-from-log-tail-without-validating-head",
+                "expected_error": "release-store-resume-history-divergence"
+              }
             ]
           }
         },
@@ -2909,11 +3021,24 @@
             "broken-chain",
             "stale-head",
             "orphan-record",
+            "unterminated-attempt",
             "unknown-provider-result",
             "authorization-consumed",
+            "fresh-exact-authorization-required",
             "candidate-identity-mismatch",
             "receipt-identity-mismatch"
           ],
+          "history_resolution": {
+            "inputs": [
+              "validated-append-log-tail",
+              "validated-full-v2-canonical-completed-state-head"
+            ],
+            "completion": "derive-next-action-from-the-completed-state-head",
+            "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-remote-action-is-blocked-until-a-fresh-exact-owner-authorization-is-supplied",
+            "unknown": "next-action-null-and-blocked-reason-unknown-provider-result-with-no-retry-or-redispatch",
+            "unterminated_attempt": "next-action-null-and-blocked-reason-unterminated-attempt-with-no-automatic-terminal-inference",
+            "divergence": "next-action-null-and-the-exact-store-validation-error-as-blocked-reason"
+          },
           "ambiguous_outcome": "next_action-null-and-no-automatic-redispatch-or-state-advance"
         },
         "remote_effect": {
@@ -2930,7 +3055,7 @@
             "append-completion-or-failure-or-unknown-provider-result"
           ],
           "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
-          "retry": "a-consumed-attempt-never-retries;-a-new-attempt-requires-a-fresh-exact-owner-authorization"
+          "retry": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
         },
         "release_unit_bijection": {
           "state_schema": "law/schemas/release-lifecycle-state.schema.json",
