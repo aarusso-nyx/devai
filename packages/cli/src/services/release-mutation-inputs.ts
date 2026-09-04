@@ -156,6 +156,17 @@ export interface ReleaseMutationInputControlsV21 {
 
 const derived = new WeakSet<object>();
 const derivedPackages = new WeakMap<object, string>();
+export interface ReleaseMutationInputExecutionContext {
+  readonly container_identity: Readonly<Record<string, unknown>>;
+  readonly environment: Readonly<Record<string, string>>;
+  readonly repository: ReleaseCandidateSnapshot['repository'];
+  readonly candidate_files: readonly {
+    readonly path: string;
+    readonly mode: string;
+    readonly object_id: string;
+  }[];
+}
+const derivedExecution = new WeakMap<object, ReleaseMutationInputExecutionContext>();
 function fail(code = INVALID): never {
   throw Object.assign(new Error(code), { code });
 }
@@ -342,6 +353,15 @@ export function assertReleaseMutationInputPackageIdentity(
     derivedPackages.get(plan) !== canonicalSha256(immutable(identity))
   )
     fail();
+}
+
+/** Private derivation custody; serializing a plan never supplies this execution context. */
+export function captureReleaseMutationInputExecutionContext(
+  plan: ReleaseMutationInputPlanV21,
+): ReleaseMutationInputExecutionContext {
+  const context = derivedExecution.get(plan);
+  if (!isDerivedReleaseMutationInputPlanV21(plan) || context === undefined) return fail();
+  return immutable(context);
 }
 
 /** Compare only with independently derived inputs. Caller projections are never an input source. */
@@ -1114,6 +1134,17 @@ export function buildReleaseMutationInputPlanV21(input: {
     });
     derived.add(result);
     derivedPackages.set(result, canonicalSha256(implementation));
+    derivedExecution.set(
+      result,
+      immutable({
+        container_identity: containerIdentity,
+        environment: effectiveEnvironment,
+        repository: candidate.repository,
+        candidate_files: [...members]
+          .map(([path, member]) => ({ path, ...member }))
+          .sort((a, b) => compare(a.path, b.path)),
+      }),
+    );
     return result;
   } catch (error) {
     if (error instanceof Error && /^MUTATION_[A-Z0-9_]+$/u.test(error.message)) throw error;

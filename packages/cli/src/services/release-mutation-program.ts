@@ -5,6 +5,8 @@ import { assertBoundReleaseHostPackageSnapshot } from './release-host-package-bi
 import type { ReleasePackageSnapshot } from './release-package-snapshot.js';
 import {
   assertReleaseMutationInputPackageIdentity,
+  captureReleaseMutationInputExecutionContext,
+  type ReleaseMutationInputExecutionContext,
   type ReleaseMutationInputPlanV21,
 } from './release-mutation-inputs.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
@@ -14,6 +16,13 @@ const PREFIX = 'dist/runtime/host/';
 const SOURCES = ['mutation-production.mjs', 'mutation-vitest-plugin.mjs'] as const;
 const MAXIMUM_DRIVER_BYTES = 128 * 1024;
 const programs = new WeakMap<object, CapturedProtectedMutationProgram>();
+const executionContexts = new WeakMap<object, ReleaseMutationInputExecutionContext>();
+const packageInputs = new WeakMap<object, ProtectedMutationProgramPackage>();
+
+export interface ProtectedMutationProgramPackage {
+  readonly package: ReleaseMutationInputPlanV21['packages'][number];
+  readonly limits: ReleaseMutationArtifactLimitsV21;
+}
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 function refuse(): never {
   throw new Error(INVALID);
@@ -61,6 +70,7 @@ export function createProtectedMutationProgram(input: {
 }): ProtectedMutationProgram {
   assertBoundReleaseHostPackageSnapshot(input.package_snapshot);
   assertReleaseMutationInputPackageIdentity(input.input_plan, input.package_snapshot.identity);
+  const executionContext = captureReleaseMutationInputExecutionContext(input.input_plan);
   const plan = input.input_plan;
   const pkg = plan.packages.find((entry) => entry.expected.packageName === input.package_name);
   const limits = JSON.parse(canonicalJson(input.limits)) as ReleaseMutationArtifactLimitsV21;
@@ -193,7 +203,69 @@ export function createProtectedMutationProgram(input: {
     maximum_observation_bytes: maximumObservation,
     maximum_raw_report_bytes: limits.maximum_raw_report_bytes,
   });
+  executionContexts.set(program, executionContext);
+  packageInputs.set(program, {
+    package: pkg,
+    limits: JSON.parse(canonicalJson(limits)) as ReleaseMutationArtifactLimitsV21,
+  });
   return program;
+}
+
+/** Exact factory-bound package inputs, never a caller-selected normalization projection. */
+export function captureProtectedMutationProgramPackage(
+  program: ProtectedMutationProgram,
+): ProtectedMutationProgramPackage {
+  const captured = packageInputs.get(program);
+  if (captured === undefined || !programs.has(program)) return refuse();
+  return JSON.parse(canonicalJson(captured)) as ProtectedMutationProgramPackage;
+}
+
+/**
+ * Validate the actual container invocation before its first effect, not merely
+ * the program's earlier input derivation. Every candidate member must be the
+ * exact Git blob/mode from that plan; additional files cannot influence config
+ * or test execution. Generated prerequisites need their own verified closure,
+ * so an arbitrary caller-supplied prior-output map is never accepted here.
+ */
+export function assertProtectedMutationProgramExecution(
+  program: ProtectedMutationProgram,
+  input: {
+    readonly container_identity: Readonly<Record<string, unknown>>;
+    readonly environment: Readonly<Record<string, string>>;
+    readonly source: readonly ContainerArchiveEntry[];
+    readonly prior_outputs: ReadonlyMap<string, ContainerArchiveEntry>;
+  },
+): void {
+  const expected = executionContexts.get(program);
+  if (
+    !programs.has(program) ||
+    expected === undefined ||
+    canonicalJson(input.container_identity) !== canonicalJson(expected.container_identity) ||
+    canonicalJson(input.environment) !== canonicalJson(expected.environment) ||
+    input.prior_outputs.size !== 0 ||
+    input.source.length !== expected.candidate_files.length
+  )
+    refuse();
+  const members = new Map(expected.candidate_files.map((entry) => [entry.path, entry]));
+  const seen = new Set<string>();
+  const algorithm = expected.repository.commit.length === 40 ? 'sha1' : 'sha256';
+  for (const entry of input.source) {
+    const member = members.get(entry.path);
+    if (
+      member === undefined ||
+      seen.has(entry.path) ||
+      entry.mode !== member.mode ||
+      !['100644', '100755'].includes(member.mode)
+    )
+      refuse();
+    const bytes = Buffer.from(entry.bytes);
+    const objectId = createHash(algorithm)
+      .update(Buffer.from(`blob ${bytes.length}\0`, 'utf8'))
+      .update(bytes)
+      .digest('hex');
+    if (objectId !== member.object_id) refuse();
+    seen.add(entry.path);
+  }
 }
 
 /** Same-instance capability only; serialized lookalikes and caller-owned buffers are never used. */

@@ -19,9 +19,45 @@ import {
 } from './release-dependency-transport.js';
 import {
   captureProtectedMutationProgram,
+  assertProtectedMutationProgramExecution,
   type ProtectedMutationProgram,
 } from './release-mutation-program.js';
 import type { PlannedTask, TaskExecutionResult } from './check-runner/types.js';
+
+export interface CapturedProtectedMutationExecution {
+  readonly program_identity_sha256: string;
+  readonly result: TaskExecutionResult;
+  readonly mutation_observation?: Buffer;
+  readonly mutation_report?: Buffer;
+}
+const mutationExecutions = new WeakMap<
+  object,
+  {
+    readonly program: ProtectedMutationProgram;
+    readonly captured: CapturedProtectedMutationExecution;
+  }
+>();
+
+/** Same invocation only. Returned caller buffers/status are never evidence custody. */
+export function captureProtectedMutationExecution(
+  result: unknown,
+  program: ProtectedMutationProgram,
+): CapturedProtectedMutationExecution {
+  const entry =
+    typeof result === 'object' && result !== null ? mutationExecutions.get(result) : undefined;
+  if (entry === undefined || entry.program !== program)
+    throw new Error('release-certification-mutation-program-invalid');
+  return {
+    ...entry.captured,
+    result: { ...entry.captured.result },
+    ...(entry.captured.mutation_observation === undefined
+      ? {}
+      : { mutation_observation: Buffer.from(entry.captured.mutation_observation) }),
+    ...(entry.captured.mutation_report === undefined
+      ? {}
+      : { mutation_report: Buffer.from(entry.captured.mutation_report) }),
+  };
+}
 
 export interface ProtectedContainerControls {
   /** Trusted host configuration only; no lifecycle request or candidate file selects these. */
@@ -69,6 +105,14 @@ function object(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
     throw new Error('release-certification-container-invalid');
   return value as Record<string, unknown>;
+}
+
+function freezeIdentity<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    Object.values(value).forEach(freezeIdentity);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 // This trusted PID 1 never receives sink credentials, host paths, or provider objects.
@@ -297,7 +341,7 @@ export class ProtectedCertificationContainer {
       this.#dependencies,
       controls.maximum_archive_bytes,
     );
-    this.identity = Object.freeze({
+    this.identity = freezeIdentity({
       protocol: 'devai.protected-container-certification.v1',
       image: controls.image,
       ...(controls.local_image === undefined
@@ -475,6 +519,39 @@ export class ProtectedCertificationContainer {
     readonly mutation_report?: Buffer;
   } {
     const c = this.#controls;
+    if (input.mutation_program !== undefined) {
+      // The bytes validated below are the bytes transported later. A host
+      // callback or shared caller buffer cannot swap candidate inputs between
+      // context validation and the Docker copy/start operations.
+      const copy = (entry: ContainerArchiveEntry): ContainerArchiveEntry => ({
+        path: entry.path,
+        mode: entry.mode,
+        bytes: Buffer.from(entry.bytes),
+      });
+      input = {
+        ...input,
+        task: JSON.parse(canonicalJson(input.task)) as PlannedTask,
+        environment: JSON.parse(canonicalJson(input.environment)) as Readonly<
+          Record<string, string>
+        >,
+        source: input.source.map(copy),
+        prior_outputs: new Map(
+          [...input.prior_outputs].map(([path, entry]) => [path, copy(entry)]),
+        ),
+        declared_outputs: [...input.declared_outputs],
+        ...(input.diagnostic_output_paths === undefined
+          ? {}
+          : { diagnostic_output_paths: [...input.diagnostic_output_paths] }),
+        ...(input.declared_namespaces === undefined
+          ? {}
+          : {
+              declared_namespaces: input.declared_namespaces.map((entry) => ({
+                prefix: entry.prefix,
+                required_paths: [...entry.required_paths],
+              })),
+            }),
+      };
+    }
     const mutation =
       input.mutation_program === undefined
         ? undefined
@@ -483,6 +560,38 @@ export class ProtectedCertificationContainer {
       mutation === undefined
         ? undefined
         : mutationProgramManifest(mutation.files, c.maximum_archive_bytes);
+    if (input.mutation_program !== undefined)
+      assertProtectedMutationProgramExecution(input.mutation_program, {
+        container_identity: this.identity,
+        environment: protectedContainerTaskEnvironment(input.environment),
+        source: input.source,
+        prior_outputs: input.prior_outputs,
+      });
+    const retain = <
+      T extends {
+        readonly result: TaskExecutionResult;
+        readonly mutation_observation?: Buffer;
+        readonly mutation_report?: Buffer;
+      },
+    >(
+      value: T,
+    ): T => {
+      if (input.mutation_program !== undefined && mutation !== undefined)
+        mutationExecutions.set(value, {
+          program: input.mutation_program,
+          captured: {
+            program_identity_sha256: mutation.identity_sha256,
+            result: { ...value.result },
+            ...(value.mutation_observation === undefined
+              ? {}
+              : { mutation_observation: Buffer.from(value.mutation_observation) }),
+            ...(value.mutation_report === undefined
+              ? {}
+              : { mutation_report: Buffer.from(value.mutation_report) }),
+          },
+        });
+      return value;
+    };
     const id = `devai-certify-${randomUUID()}`;
     const volume = `${id}-workspace`;
     const dependencyVolumes: string[] = [];
@@ -803,7 +912,7 @@ export class ProtectedCertificationContainer {
         result.status !== 0 || result.signal !== null || result.errorCode !== undefined;
       if (failed && requestedDiagnostics === undefined) {
         completed = true;
-        return {
+        return retain({
           result,
           outputs: [],
           ...(mutationResult === undefined
@@ -812,7 +921,7 @@ export class ProtectedCertificationContainer {
                 mutation_observation: Buffer.from(mutationResult.observation),
                 mutation_report: Buffer.from(mutationResult.report),
               }),
-        };
+        });
       }
       const captured = decodeContainerDependencyArchive(
         this.#checked(['cp', `${id}:/workspace/candidate/.`, '-']),
@@ -869,7 +978,7 @@ export class ProtectedCertificationContainer {
         throw new Error('release-certification-output-closure-invalid');
       completed = true;
       if (requestedDiagnostics === undefined)
-        return {
+        return retain({
           result,
           outputs,
           ...(mutationResult === undefined
@@ -878,12 +987,12 @@ export class ProtectedCertificationContainer {
                 mutation_observation: Buffer.from(mutationResult.observation),
                 mutation_report: Buffer.from(mutationResult.report),
               }),
-        };
+        });
       const outputsByPath = new Map(outputs.map((entry) => [entry.path, entry]));
       // Failed task bytes remain diagnostic-only. Capture still proves the complete
       // source/dependency/predecessor population, but missing new outputs are allowed.
       // No receipt, success status, export permission or reusable artifact is issued.
-      return {
+      return retain({
         result,
         outputs: failed ? [] : outputs,
         diagnostic_outputs: Object.freeze(
@@ -900,7 +1009,7 @@ export class ProtectedCertificationContainer {
               mutation_observation: Buffer.from(mutationResult.observation),
               mutation_report: Buffer.from(mutationResult.report),
             }),
-      };
+      });
     } finally {
       // Unproved namespace shutdown preserves resources for diagnosis, never accepts bytes.
       if (created && !stopped) {
