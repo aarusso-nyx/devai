@@ -1166,7 +1166,24 @@ function offlineReleaseUnits(exported: Readonly<Record<string, unknown>>): reado
       provider_result: pkg['provider_result'],
       trust: pkg['trust'],
     })),
+    ...('mutation_evidence' in unit ? { mutation_evidence: unit['mutation_evidence'] } : {}),
   }));
+}
+
+function exportedWithMutationEvidence(
+  exported: Parameters<typeof finalizeReleaseStateV2>[0] & Readonly<Record<string, unknown>>,
+  mutationEvidence: unknown,
+) {
+  const { state_id: _stateId, record_digest_sha256: _recordDigest, ...draft } = exported;
+  const releaseUnits = draft['release_units'];
+  if (!Array.isArray(releaseUnits)) throw new Error('exported fixture lacks release units');
+  return finalizeReleaseStateV2({
+    ...draft,
+    release_units: releaseUnits.map((unit) => ({
+      ...objectValue(unit),
+      mutation_evidence: mutationEvidence,
+    })),
+  } as Parameters<typeof finalizeReleaseStateV2>[0]);
 }
 
 function objectValue(value: unknown): Readonly<Record<string, unknown>> {
@@ -2669,6 +2686,71 @@ describe('release lifecycle execution kernel', () => {
         policyClosures,
       }),
     ).toMatchObject({ ok: false, code: 'release-offline-receipt-binding-invalid' });
+  });
+
+  it('binds an optional v2.1 unit mutation closure into offline receipts without claiming portable mutation semantics', async () => {
+    const store = new ReleaseLifecycleFileStore(root(), request('release export'));
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const omittedStateReceipt = boundOfflineReceipt(exported);
+    expect(
+      (omittedStateReceipt['release_units'] as readonly Readonly<Record<string, unknown>>[])[0],
+    ).not.toHaveProperty('mutation_evidence');
+    const mutation = await requiredMutationCertificationFixture();
+    const closureBound = exportedWithMutationEvidence(exported, mutation.evidence.closure);
+    const matchingReceipt = boundOfflineReceipt(closureBound);
+    const matchingUnits = matchingReceipt['release_units'] as readonly Readonly<
+      Record<string, unknown>
+    >[];
+    expect(matchingUnits[0]?.['mutation_evidence']).toEqual(mutation.evidence.closure);
+
+    const offlineRequest = request('release offline-verify');
+    const run = (receipt: Readonly<Record<string, unknown>>) =>
+      executeOfflineVerification({
+        request: offlineRequest,
+        exported_state: closureBound,
+        artifactReader: artifactReaderFor('release export'),
+        provider: () => receipt,
+        policyClosures,
+      });
+    await expect(run(matchingReceipt)).resolves.toMatchObject({ ok: true });
+
+    const omitted = rehashReceipt(matchingReceipt, {
+      release_units: matchingUnits.map(({ mutation_evidence: _closure, ...unit }) => unit),
+    });
+    await expect(run(omitted)).resolves.toMatchObject({
+      ok: false,
+      code: 'release-offline-receipt-binding-invalid',
+    });
+
+    const substitutedClosure = structuredClone(mutation.evidence.closure);
+    const firstMember = required(substitutedClosure.members[0], 'missing mutation closure member');
+    firstMember.sha256 = '0'.repeat(64);
+    const substituted = rehashReceipt(matchingReceipt, {
+      release_units: matchingUnits.map((unit) => ({
+        ...unit,
+        mutation_evidence: substitutedClosure,
+      })),
+    });
+    await expect(run(substituted)).resolves.toMatchObject({
+      ok: false,
+      code: 'release-offline-receipt-binding-invalid',
+    });
+
+    const explicitNull = exportedWithMutationEvidence(exported, null);
+    const nullReceipt = boundOfflineReceipt(explicitNull);
+    expect(
+      (nullReceipt['release_units'] as readonly Readonly<Record<string, unknown>>[])[0],
+    ).toHaveProperty('mutation_evidence', null);
+    await expect(
+      executeOfflineVerification({
+        request: offlineRequest,
+        exported_state: explicitNull,
+        artifactReader: artifactReaderFor('release export'),
+        provider: () => nullReceipt,
+        policyClosures,
+      }),
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it('separates append-log tail from completed-state head and permits a fresh retry', async () => {
