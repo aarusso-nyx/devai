@@ -1214,6 +1214,12 @@ void adapters;
     typeConsumer,
   ]);
 
+  run(process.execPath, [
+    join(packageRoot, 'tests/fixtures/release-host-bootstrap-installed-probe.mjs'),
+    installedPackage,
+    resolve(packageRoot, tarball),
+  ]);
+
   const mutationGate = JSON.parse(
     runInstalledModuleCheck(
       'mutation-gate',
