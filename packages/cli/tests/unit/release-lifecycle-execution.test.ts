@@ -10,6 +10,12 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  createAuthorityDecisionIssuer,
+  runWithAuthorityHostEffects,
+  type AuthorityHostEffectScope,
+  type ProtectedReleaseExportCapacityBinding,
+} from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
@@ -769,8 +775,65 @@ async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void
     const result =
       action === 'release prepare'
         ? await withReleasePrepareAuthorityFixture(value, execute)
-        : await withAuthorityHostTestScope(execute);
+        : action === 'release export'
+          ? await withReleaseExportAuthorityFixture(value, execute)
+          : await withAuthorityHostTestScope(execute);
     if (!result.ok) throw new Error(`advance failed: ${result.code}`);
+  }
+}
+
+async function withReleaseExportAuthorityFixture<T>(
+  request: ReleaseLifecycleRequest,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const plan = request.receipt_locators?.find((entry) => entry.kind === 'release-plan-receipt');
+  if (plan === undefined) throw new Error('fixture export request lacks a plan receipt');
+  const binding: ProtectedReleaseExportCapacityBinding = {
+    action_id: 'release export',
+    repository: request.repository_locator,
+    candidate: {
+      commit: request.candidate_locator.commit,
+      tree: request.candidate_locator.tree,
+    },
+    plan_receipt_digest_sha256: plan.receipt_digest_sha256,
+  };
+  let ordinal = 0;
+  let appliedBatches = 0;
+  let appliedTargets = 0;
+  const issuer = createAuthorityDecisionIssuer({
+    issuer_id: 'release-export-test-authority',
+    issuer_version: '1.0.0',
+    invocation_id: 'release-export-test-invocation',
+    canonicalSha256,
+    randomId: () => `release-export-test-authority-${String(++ordinal)}`,
+    now: () => '2026-09-03T00:00:00.000Z',
+    receipt_ttl_ms: 30_000,
+  });
+  const scope: AuthorityHostEffectScope = {
+    action_id: 'release export',
+    invocation_id: 'release-export-test-invocation',
+    effect: 'local-write',
+    receipt_store: issuer,
+    apply_effect: (_request, apply) => {
+      if (appliedBatches >= 128 || appliedTargets >= 8192)
+        throw new Error('release-export-capacity-unavailable');
+      appliedBatches += 1;
+      appliedTargets += 1;
+      return apply();
+    },
+    read_export_capacity: (selected) => {
+      if (canonicalSha256(selected) !== canonicalSha256(binding))
+        throw new Error('release-export-capacity-unavailable');
+      return {
+        remaining_batches: 128 - appliedBatches,
+        remaining_targets: 8192 - appliedTargets,
+      };
+    },
+  };
+  try {
+    return await runWithAuthorityHostEffects(scope, callback);
+  } finally {
+    issuer.dispose();
   }
 }
 
