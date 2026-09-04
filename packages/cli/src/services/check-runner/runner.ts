@@ -427,6 +427,11 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     descriptor.tasks.map((task) => task.nodeId),
   );
   const stage = input.releaseStage ?? 'preflight';
+  // Exit codes and output digests alone cannot satisfy required mutation. Keep
+  // read-only planning and the unconditional preflight floor usable while the
+  // protected semantic evidence producer/verifier bridge is being implemented.
+  if (stage === 'certify' && input.operation === 'run' && decision.mutation !== 'none')
+    throw new Error('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
   return {
     options: {
       ...input,

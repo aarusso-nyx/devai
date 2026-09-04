@@ -552,6 +552,12 @@ export function createContainerReleaseCertificationAdapters(
     preflight_provider,
     certification_provider(request) {
       const descriptor = bindRequest(request);
+      // A task's PASS and hashed output paths are not semantic mutation evidence.
+      // Until the protected v2.1 producer/verifier bridge is installed here, refuse
+      // required mutation before any task/container/sink effect, never certify the
+      // ordinary Vitest nodes currently used by the declarative roster.
+      if (selected.some((entry) => object(entry.receipt.determination).mutation !== 'none'))
+        throw new Error('release-certification-mutation-evidence-unavailable');
       const options = selected.map((_entry, index) =>
         optionsFor(request, descriptor, index, 'certify'),
       );
