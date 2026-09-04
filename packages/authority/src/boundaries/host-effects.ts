@@ -1064,6 +1064,9 @@ export function createProtectedReleaseSinkFilesystem(rootPath: string, owner: ob
   };
   return Object.freeze({
     root,
+    // Read-only assertion for synchronous transaction state changes. It neither
+    // creates a capability nor extends the existing sink operation's lifetime.
+    assertWriteAuthority: (): void => effect(() => undefined),
     lstatSync: (path: string) => lstatSync(pathFor(path)),
     readdirSync: (path: string, options?: { withFileTypes: true }) =>
       options === undefined ? readdirSync(pathFor(path)) : readdirSync(pathFor(path), options),

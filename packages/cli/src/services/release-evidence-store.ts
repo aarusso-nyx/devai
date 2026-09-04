@@ -14,6 +14,17 @@ import {
   type CertificationOutputClosureBinding,
 } from './release-prepare-kernel.js';
 import type { CertificationOutputBlobHandle } from './release-lifecycle-execution.js';
+import {
+  captureUnitMutationEvidenceBinding,
+  finalizeUnitMutationEvidenceClosure,
+  verifyUnitMutationEvidenceClosure,
+  verifyUnitMutationEvidenceDocuments,
+  type ReleaseUnitMutationEvidenceClosure,
+  type UnitMutationEvidenceBinding,
+  type UnitMutationEvidenceObject,
+  type UnitMutationEvidenceSink,
+  type UnitMutationEvidenceTransaction,
+} from './release-unit-mutation-evidence.js';
 
 const DIGEST = /^[0-9a-f]{64}$/u;
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
@@ -88,16 +99,27 @@ export interface ReleaseCertificationEvidenceStoreOptions {
   readonly max_blob_bytes: number;
 }
 
-export type ReleaseCertificationEvidenceStore = TrustedCertificationEvidenceSink & {
-  readonly authority_owner: object;
-};
+export type ReleaseCertificationEvidenceStore = TrustedCertificationEvidenceSink &
+  UnitMutationEvidenceSink & {
+    readonly authority_owner: object;
+  };
 
 function createStore(
   input: ReleaseCertificationEvidenceStoreOptions,
 ): ReleaseCertificationEvidenceStore {
+  const maximumUnitBytes = input.max_blob_bytes;
   const owner = createProtectedReleaseSinkOwner('certification', input.evidence_sink_id);
-  const { root, sinkId, checkRoot, inspectAncestors, read, ensureDirectory, install, objectPath } =
-    createDurableReleaseContentStore({ ...input, sink_id: input.evidence_sink_id }, fail, owner);
+  const {
+    root,
+    sinkId,
+    checkRoot,
+    inspectAncestors,
+    read,
+    ensureDirectory,
+    install,
+    objectPath,
+    assertWriteAuthority,
+  } = createDurableReleaseContentStore({ ...input, sink_id: input.evidence_sink_id }, fail, owner);
   const readBlob = (handle: CertificationOutputBlobHandle) => {
     if (
       !same(handle, {
@@ -113,6 +135,69 @@ function createStore(
     const value = read(objectPath(handle.sha256));
     if (value.length !== handle.size_bytes || digest(value) !== handle.sha256) fail();
     return value;
+  };
+  const unitObject = (identity: UnitMutationEvidenceObject) =>
+    readBlob({
+      evidence_sink_id: identity.evidence_sink_id,
+      opaque_handle: identity.opaque_handle,
+      sha256: identity.sha256,
+      size_bytes: identity.size_bytes,
+    });
+  // Unit evidence shares this protected owner and content-addressed object population.
+  // Its receipts are separate from package-entry closures and can never enter a tarball.
+  const unitCommits = (): readonly {
+    binding: UnitMutationEvidenceBinding;
+    closure: ReleaseUnitMutationEvidenceClosure;
+  }[] => {
+    checkRoot();
+    const directory = join(root, 'unit-mutation');
+    inspectAncestors(directory);
+    const values: {
+      binding: UnitMutationEvidenceBinding;
+      closure: ReleaseUnitMutationEvidenceClosure;
+    }[] = [];
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (!TRANSACTION.test(entry.name) || !entry.isDirectory() || entry.isSymbolicLink()) fail();
+      let committed: Buffer;
+      try {
+        committed = read(join(directory, entry.name, 'commit.json'));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw error;
+      }
+      const closure = JSON.parse(
+        new TextDecoder('utf-8', { fatal: true }).decode(committed),
+      ) as ReleaseUnitMutationEvidenceClosure;
+      if (!committed.equals(bytes(closure))) fail();
+      const beginBytes = read(join(directory, entry.name, 'begin.json'));
+      const begin = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(beginBytes)) as {
+        evidence_sink_id: string;
+        transaction_handle: string;
+        binding: UnitMutationEvidenceBinding;
+      };
+      const binding = captureUnitMutationEvidenceBinding(begin.binding);
+      if (
+        !beginBytes.equals(
+          bytes({ evidence_sink_id: sinkId, transaction_handle: entry.name, binding }),
+        )
+      )
+        fail();
+      const index = read(join(root, 'unit-mutation-index', `${digest(bytes(binding))}.json`));
+      if (
+        !index.equals(bytes({ evidence_sink_id: sinkId, transaction_handle: entry.name, binding }))
+      )
+        fail();
+      try {
+        lstatSync(join(directory, entry.name, 'abort.json'));
+        fail();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      verifyUnitMutationEvidenceClosure(closure, binding);
+      if (closure.output_contract.evidence_sink_id !== sinkId) fail();
+      values.push({ binding, closure });
+    }
+    return values;
   };
   const commits = (): readonly CertificationOutputClosure[] => {
     checkRoot();
@@ -218,6 +303,143 @@ function createStore(
     authority_owner: owner,
     kind: 'certification-evidence-sink-v3' as const,
     protocol: 'two-phase-content-addressed' as const,
+    beginUnitMutationEvidence(value) {
+      checkRoot();
+      const binding = captureUnitMutationEvidenceBinding(value);
+      const bindingIndex = join(root, 'unit-mutation-index', `${digest(bytes(binding))}.json`);
+      try {
+        read(bindingIndex);
+        fail();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      for (const name of ['staging', 'objects', 'unit-mutation', 'unit-mutation-index'])
+        ensureDirectory(join(root, name));
+      const transaction = randomUUID();
+      const directory = join(root, 'unit-mutation', transaction);
+      ensureDirectory(directory);
+      install(
+        join(directory, 'begin.json'),
+        bytes({ evidence_sink_id: sinkId, transaction_handle: transaction, binding }),
+      );
+      const handles = new Map<string, Omit<UnitMutationEvidenceObject, 'path'>>();
+      let terminal = false;
+      let verificationEpoch = 0;
+      let verified: ReleaseUnitMutationEvidenceClosure | undefined;
+      return Object.freeze<UnitMutationEvidenceTransaction>({
+        evidence_sink_id: sinkId,
+        transaction_handle: transaction,
+        put(value) {
+          if (
+            terminal ||
+            !Buffer.isBuffer(value.bytes) ||
+            value.bytes.length !== value.size_bytes ||
+            digest(value.bytes) !== value.sha256
+          )
+            fail();
+          const captured = Buffer.from(value.bytes);
+          install(objectPath(value.sha256), captured);
+          const handle = {
+            evidence_sink_id: sinkId,
+            opaque_handle: `sha256:${value.sha256}`,
+            sha256: value.sha256,
+            size_bytes: captured.length,
+          };
+          handles.set(handle.opaque_handle, handle);
+          return snapshot(handle);
+        },
+        async verify(projection) {
+          if (terminal) fail();
+          verified = undefined;
+          const epoch = ++verificationEpoch;
+          const closure = finalizeUnitMutationEvidenceClosure(binding, projection);
+          for (const identity of [closure.output_contract, ...closure.members]) {
+            if (
+              !same(handles.get(identity.opaque_handle), {
+                evidence_sink_id: identity.evidence_sink_id,
+                opaque_handle: identity.opaque_handle,
+                sha256: identity.sha256,
+                size_bytes: identity.size_bytes,
+              })
+            )
+              fail();
+          }
+          await verifyUnitMutationEvidenceDocuments({
+            closure,
+            expected: binding,
+            maximum_bytes: maximumUnitBytes,
+            read: unitObject,
+          });
+          if (terminal || epoch !== verificationEpoch) fail();
+          verified = closure;
+        },
+        commit(projection) {
+          assertWriteAuthority();
+          if (terminal) fail();
+          terminal = true;
+          const closure = finalizeUnitMutationEvidenceClosure(binding, projection);
+          if (verified === undefined || !same(closure, verified)) fail();
+          // No await inside the authorized write operation. Rehash every object
+          // against the privately verified snapshot before creating any receipt.
+          for (const identity of [closure.output_contract, ...closure.members])
+            unitObject(identity);
+          // One atomic election per binding, including across processes. A lost
+          // response leaves its index intact for reconciliation, never a retry.
+          install(
+            bindingIndex,
+            bytes({ evidence_sink_id: sinkId, transaction_handle: transaction, binding }),
+          );
+          install(join(directory, 'commit.json'), bytes(closure));
+          return snapshot(closure);
+        },
+        abort() {
+          assertWriteAuthority();
+          if (terminal) fail();
+          terminal = true;
+          install(
+            join(directory, 'abort.json'),
+            bytes({ evidence_sink_id: sinkId, transaction_handle: transaction, aborted: true }),
+          );
+        },
+      });
+    },
+    readUnitMutationEvidenceClosure(value) {
+      const binding = captureUnitMutationEvidenceBinding(value);
+      const matches = unitCommits()
+        .filter((entry) => same(entry.binding, binding))
+        .map((entry) => entry.closure);
+      const first = matches[0];
+      if (!first || matches.length !== 1) fail();
+      return snapshot(first);
+    },
+    readUnitMutationEvidenceReceipt(value) {
+      if (value.evidence_sink_id !== sinkId || !DIGEST.test(value.receipt_digest_sha256)) fail();
+      const matches = unitCommits()
+        .map((entry) => entry.closure.receipt)
+        .filter((receipt) => receipt.receipt_digest_sha256 === value.receipt_digest_sha256);
+      const first = matches[0];
+      if (!first || matches.length !== 1) fail();
+      return snapshot(first);
+    },
+    readUnitMutationEvidenceBlob(value) {
+      const closure = this.readUnitMutationEvidenceClosure(value.binding);
+      if (
+        ![closure.output_contract, ...closure.members].some((identity) =>
+          same(
+            {
+              path: identity.path,
+              sha256: identity.sha256,
+              size_bytes: identity.size_bytes,
+              evidence_sink_id: identity.evidence_sink_id,
+              opaque_handle: identity.opaque_handle,
+            },
+            value.identity,
+          ),
+        )
+      )
+        fail();
+      return unitObject(value.identity);
+    },
     begin(
       bindings: readonly CertificationOutputClosureBinding[],
     ): CertificationEvidenceTransaction {
@@ -400,6 +622,29 @@ export function createReleaseCertificationEvidenceStore(
     authority_owner: store.authority_owner,
     kind: store.kind,
     protocol: store.protocol,
+    beginUnitMutationEvidence(binding) {
+      const transaction = storageBoundary(() => store.beginUnitMutationEvidence(binding));
+      return Object.freeze<UnitMutationEvidenceTransaction>({
+        evidence_sink_id: transaction.evidence_sink_id,
+        transaction_handle: transaction.transaction_handle,
+        put: (value) => storageBoundary(() => transaction.put(value)),
+        async verify(value) {
+          try {
+            return await transaction.verify(value);
+          } catch {
+            return fail();
+          }
+        },
+        commit: (value) => storageBoundary(() => transaction.commit(value)),
+        abort: () => storageBoundary(() => transaction.abort()),
+      });
+    },
+    readUnitMutationEvidenceClosure: (value) =>
+      storageBoundary(() => store.readUnitMutationEvidenceClosure(value)),
+    readUnitMutationEvidenceReceipt: (value) =>
+      storageBoundary(() => store.readUnitMutationEvidenceReceipt(value)),
+    readUnitMutationEvidenceBlob: (value) =>
+      storageBoundary(() => store.readUnitMutationEvidenceBlob(value)),
     begin(bindings) {
       const transaction = storageBoundary(() => store.begin(bindings));
       if (transaction instanceof Promise) fail();

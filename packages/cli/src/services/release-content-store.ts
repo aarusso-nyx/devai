@@ -66,8 +66,16 @@ export function createDurableReleaseContentStore(
     rootStat.uid !== process.getuid()
   )
     fail();
-  const { closeSync, fsyncSync, linkSync, mkdirSync, openSync, writeSync, readdirSync } =
-    createProtectedReleaseSinkFilesystem(root, owner);
+  const {
+    closeSync,
+    fsyncSync,
+    linkSync,
+    mkdirSync,
+    openSync,
+    writeSync,
+    readdirSync,
+    assertWriteAuthority,
+  } = createProtectedReleaseSinkFilesystem(root, owner);
   const checkRoot = () => {
     for (const identity of initial) {
       const stat = lstatSync(identity.path);
@@ -204,5 +212,6 @@ export function createDurableReleaseContentStore(
     install,
     objectPath,
     list,
+    assertWriteAuthority,
   };
 }
