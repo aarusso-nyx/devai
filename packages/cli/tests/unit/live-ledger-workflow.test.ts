@@ -24,6 +24,7 @@ import {
   VERIFIER_SOURCE_COMMIT,
 } from '../../src/services/ci-scaffold/index.js';
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
+import { createHistoricalVerifierGitFixture } from '../fixtures/historical-verifier-1.4.4/index.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CHECKER = join(ROOT, 'scripts/check-workflows.mjs');
@@ -122,19 +123,23 @@ function executablePackageMaterializationFixture(
   // This fixture models the published 1.4.4 package, whose frozen control has
   // 21 runtime files. It must not inherit the current package's v2.1 vendor.
   const historicalArchive = join(root, 'published-1.4.4-verifier.tar');
-  writeFileSync(
-    historicalArchive,
-    execFileSync(
-      'git',
-      [
+  const historical = createHistoricalVerifierGitFixture();
+  try {
+    writeFileSync(
+      historicalArchive,
+      historical.git([
         'archive',
+        // The isolated bare fixture has no attributes; avoid indexing unrelated
+        // historical trees. The helper still pins every original archive byte.
+        '--worktree-attributes',
         '--format=tar',
         VERIFIER_POLICY.package.release_source.commit,
         'packages/cli/vendor/evidence-verification',
-      ],
-      { cwd: ROOT },
-    ),
-  );
+      ]),
+    );
+  } finally {
+    historical.cleanup();
+  }
   execFileSync(
     'tar',
     ['-xf', historicalArchive, '--strip-components=4', '--directory', verifierRoot],

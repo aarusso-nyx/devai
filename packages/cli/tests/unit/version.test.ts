@@ -1,26 +1,31 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { createHistoricalVerifierGitFixture } from '../fixtures/historical-verifier-1.4.4/index.js';
 import { renderHelp } from '../../src/command-router.js';
 import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const SELECTED_RELEASE_VERSION = '1.4.5';
+const CANDIDATE_RELEASE_VERSION = '1.5.0';
+const PUBLISHED_RELEASE_VERSION = '1.4.5';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.4.4';
+const historicalFixtures: Array<ReturnType<typeof createHistoricalVerifierGitFixture>> = [];
+afterEach(() => {
+  for (const fixture of historicalFixtures.splice(0)) fixture.cleanup();
+});
 
 describe('resolveCliVersion', () => {
   it('returns a semver-shaped string', () => {
     expect(resolveCliVersion()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it('returns the selected release version', () => {
-    expect(resolveCliVersion()).toBe(SELECTED_RELEASE_VERSION);
+  it('returns the selected candidate release version', () => {
+    expect(resolveCliVersion()).toBe(CANDIDATE_RELEASE_VERSION);
   });
 
-  it('keeps the root and public package manifests synchronized to the selected release', () => {
+  it('keeps the root and public package manifests synchronized to the selected candidate release', () => {
     const root = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
       version: string;
     };
@@ -29,18 +34,18 @@ describe('resolveCliVersion', () => {
     };
 
     expect({ root: root.version, public: published.version }).toEqual({
-      root: SELECTED_RELEASE_VERSION,
-      public: SELECTED_RELEASE_VERSION,
+      root: CANDIDATE_RELEASE_VERSION,
+      public: CANDIDATE_RELEASE_VERSION,
     });
   });
 
-  it('exposes the selected release through generated CLI help', () => {
+  it('exposes the selected candidate release through generated CLI help', () => {
     expect(renderHelp(canonicalRegistry(), resolveCliVersion())).toContain(
-      `devai/${SELECTED_RELEASE_VERSION}`,
+      `devai/${CANDIDATE_RELEASE_VERSION}`,
     );
   });
 
-  it('keeps current consumer documentation on the selected exact release without mutable installs', () => {
+  it('keeps current consumer documentation on the published exact release without mutable installs', () => {
     const documents = [
       'README.md',
       'docs/adopters/install.md',
@@ -49,13 +54,13 @@ describe('resolveCliVersion', () => {
     ].map((path) => ({ path, content: readFileSync(join(ROOT, path), 'utf8') }));
 
     for (const { path, content } of documents) {
-      expect.soft(content, path).toContain(SELECTED_RELEASE_VERSION);
+      expect.soft(content, path).toContain(PUBLISHED_RELEASE_VERSION);
     }
     const installCommands = documents
       .flatMap(({ content }) => content.split('\n'))
       .filter((line) => line.includes('pnpm add') && line.includes('@aarusso-nyx/devai@'));
     expect(installCommands.length).toBeGreaterThan(0);
-    expect(installCommands.every((line) => line.includes(`@${SELECTED_RELEASE_VERSION}`))).toBe(
+    expect(installCommands.every((line) => line.includes(`@${PUBLISHED_RELEASE_VERSION}`))).toBe(
       true,
     );
     expect(installCommands.join('\n')).not.toMatch(/@(?:latest|next)|@[~^*]|@[<>]=?/u);
@@ -91,7 +96,7 @@ describe('resolveCliVersion', () => {
       source_commit: '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de',
     });
     const currentReleaseNotes = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8')
-      .split(`## ${SELECTED_RELEASE_VERSION}`)[1]
+      .split(`## ${PUBLISHED_RELEASE_VERSION}`)[1]
       ?.split('\n## ')[0];
     expect(currentReleaseNotes).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
     expect(
@@ -114,8 +119,9 @@ describe('resolveCliVersion', () => {
       };
     };
     const releaseCommit = policy.package.release_source.commit;
-    const git = (args: string[]): Buffer =>
-      execFileSync('git', args, { cwd: ROOT, encoding: 'buffer' });
+    const historical = createHistoricalVerifierGitFixture();
+    historicalFixtures.push(historical);
+    const git = historical.git;
     const text = (args: string[]): string => git(args).toString('utf8').trim();
 
     expect(text(['cat-file', '-t', `v${policy.package.version}`])).toBe('tag');
