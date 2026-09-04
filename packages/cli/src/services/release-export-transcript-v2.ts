@@ -136,8 +136,21 @@ function limitsValid(limits: ReleaseExportTranscriptLimits): void {
       fail();
 }
 
+export function captureReleaseExportTranscriptLimits(
+  value: ReleaseExportTranscriptLimits,
+): ReleaseExportTranscriptLimits {
+  return guarded(() => {
+    limitsValid(value);
+    return {
+      maximum_transcript_bytes: value.maximum_transcript_bytes,
+      maximum_provider_result_bytes: value.maximum_provider_result_bytes,
+      maximum_packages: value.maximum_packages,
+    };
+  });
+}
+
 /** Capture descriptors, never property reads or toJSON; callers cannot change a validated value. */
-function snapshot(value: unknown, maximum: number): unknown {
+export function captureReleaseExportJson(value: unknown, maximum: number): unknown {
   let remaining = maximum;
   const ancestors = new Set<object>();
   const visit = (input: unknown): unknown => {
@@ -185,7 +198,7 @@ function validate(
   limits: ReleaseExportTranscriptLimits,
 ): ReleaseExportTranscriptV2 {
   limitsValid(limits);
-  const current = closed(snapshot(value, limits.maximum_transcript_bytes), [
+  const current = closed(captureReleaseExportJson(value, limits.maximum_transcript_bytes), [
     'version',
     'binding',
     'parent',

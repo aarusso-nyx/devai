@@ -28,7 +28,14 @@ import {
   resolutionForReleasePlanInputResolver,
 } from './release-policy-resolution.js';
 import { verifyReleasePolicyClosure } from './release-policy-closure.js';
-import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
+import {
+  reverifySinkArtifacts,
+  verifyCertificationManifest,
+  verifyPortableReleaseMutationEvidence,
+  type ReleaseMutationPlanReaders,
+} from './release-prepare-kernel.js';
+import { captureReleaseExportTranscriptLimits } from './release-export-transcript-v2.js';
+import type { ReleaseExportTranscriptLimits } from './release-export-transcript.js';
 import { isProtectedReleaseCertificationProvider } from './release-lifecycle-certification.js';
 import { isProtectedReleasePreflightProvider } from './release-certification-provider.js';
 import type {
@@ -2408,6 +2415,7 @@ export async function executeReleaseLifecycleAction(input: {
   readonly resolvePlanInput?: ReleasePlanInputResolver;
   readonly offlineReceiptVerifier?: TrustedOfflineReceiptVerifier;
   readonly artifactReader?: TrustedArtifactReader;
+  readonly exportLimits?: ReleaseExportTranscriptLimits;
   readonly recorded_at: string;
 }): Promise<ExecuteReleaseResult> {
   let request: ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction };
@@ -2559,7 +2567,7 @@ export async function executeReleaseLifecycleAction(input: {
               request.action_id === 'release evidence-publish' ||
               request.action_id === 'release publish')
           ) {
-            await reverifySinkArtifacts(stateHead, input.artifactReader);
+            await reverifySinkArtifacts(stateHead, input.artifactReader, input.exportLimits);
           }
           if (request.action_id === 'release evidence-publish') {
             const offline = receipts.find(
@@ -3029,10 +3037,17 @@ export async function executeOfflineVerification(input: {
   readonly provider?: OfflineVerificationProvider;
   readonly artifactReader?: TrustedArtifactReader;
   readonly policyClosures?: readonly Parameters<typeof verifyReleasePolicyClosure>[0][];
+  readonly exportLimits?: ReleaseExportTranscriptLimits;
 }): Promise<OfflineVerificationResult> {
   let request: ReleaseLifecycleRequest;
   let state: ReleaseLifecycleStateV2;
+  let mutationPlan: ReleaseMutationPlanReaders;
+  let exportLimits: ReleaseExportTranscriptLimits | undefined;
   try {
+    exportLimits =
+      input.exportLimits === undefined
+        ? undefined
+        : captureReleaseExportTranscriptLimits(input.exportLimits);
     request = validateReleaseLifecycleRequest(input.request, 'release offline-verify');
     state = verifyReleaseStateIdentity(input.exported_state);
     if (state.state !== 'exported') throw new Error('release-offline-state-mismatch');
@@ -3049,8 +3064,10 @@ export async function executeOfflineVerification(input: {
       closures.length !== request.candidate_locator.release_units.length
     )
       throw new Error('rpl-policy-resolution-mismatch');
-    const checkedPlans: VerifiedReceipt[] = closures.map((closure) => {
-      const resolution = verifyReleasePolicyClosure(closure);
+    const resolutions = closures.map((closure) => verifyReleasePolicyClosure(closure));
+    const checkedPlans: VerifiedReceipt[] = closures.map((closure, index) => {
+      const resolution = resolutions[index];
+      if (resolution === undefined) throw new Error('rpl-policy-resolution-mismatch');
       if (!same(resolution.repository, request.repository_locator))
         throw new Error('rpl-policy-resolution-mismatch');
       return verifyReceiptDocument(
@@ -3058,6 +3075,18 @@ export async function executeOfflineVerification(input: {
         createResolvedReleasePlanInputResolver(resolution),
       );
     });
+    mutationPlan = {
+      resolve_plan_input: createResolvedReleasePlanInputResolver(resolutions),
+      resolve_receipt: (locator) => {
+        const value = checkedPlans.find(
+          (entry) =>
+            entry.value['receipt_id'] === locator.receipt_id &&
+            entry.value['receipt_digest_sha256'] === locator.receipt_digest_sha256,
+        )?.value;
+        if (value === undefined) throw new Error('release-receipt-identity-mismatch');
+        return JSON.parse(canonicalJson(value)) as unknown;
+      },
+    };
     const supplied = checkedPlans
       .map(({ value }) => ({
         candidate: value['candidate'],
@@ -3100,7 +3129,7 @@ export async function executeOfflineVerification(input: {
       artifacts: state['artifacts'] as ReleaseStateMaterial['artifacts'],
       artifact_sink: state.artifact_sink,
     });
-    await reverifySinkArtifacts(state, input.artifactReader);
+    await reverifySinkArtifacts(state, input.artifactReader, exportLimits);
   } catch (error) {
     return {
       ok: false,
@@ -3148,6 +3177,22 @@ export async function executeOfflineVerification(input: {
     !trustMatches
   ) {
     return { ok: false, phase: 'validation', code: 'release-offline-receipt-binding-invalid' };
+  }
+  try {
+    await verifyPortableReleaseMutationEvidence(
+      request,
+      state,
+      input.artifactReader,
+      mutationPlan,
+      exportLimits,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      phase: 'validation',
+      code:
+        error instanceof Error ? error.message : 'release-certification-generated-output-untrusted',
+    };
   }
   return { ok: true, receipt };
 }
