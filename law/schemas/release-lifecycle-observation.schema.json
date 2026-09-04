@@ -3,7 +3,7 @@
   "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-observation.schema.json",
   "title": "Release lifecycle observation",
   "description": "The deterministic document emitted to stdout by release resume. It reports the exact recorded persisted head for one candidate, and the derived states it could verify from supplied or located receipts. It writes nothing: no state record, no evidence, no receipt file. It advances, repairs, and revives nothing. published is reported only when a signed publication receipt verifies against the exact recorded publication_dispatched state, candidate, artifact, and trust identity; an unverifiable receipt derives nothing, and the observation never appends published.",
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,7 +25,8 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0.0"
+      "enum": ["1.0.0", "1.1.0"],
+      "description": "Current emitters use 1.1.0. Historical 1.0.0 observations remain readable under their original closed shape; legacy-plan-non-authoritative is accepted only in 1.1.0."
     },
     "observation_kind": {
       "const": "release-lifecycle-observation"
@@ -296,9 +297,10 @@
         "authorization-consumed",
         "fresh-exact-authorization-required",
         "candidate-identity-mismatch",
-        "receipt-identity-mismatch"
+        "receipt-identity-mismatch",
+        "legacy-plan-non-authoritative"
       ],
-      "description": "Closed stable reason for a blocked observation. It is required only for next_outcome blocked; unknown provider results remain ambiguous, non-retriable, and do not use this retry shape."
+      "description": "Closed stable reason for a blocked observation. It is required only for next_outcome blocked; unknown provider results remain ambiguous, non-retriable, and do not use this retry shape. The 1.1.0-only legacy-plan-non-authoritative reason explicitly labels historical plan evidence without deriving any state, current readiness, next action or publication."
     },
     "blocked_requirements": {
       "type": "array",
@@ -393,6 +395,29 @@
   },
   "allOf": [
     {
+      "if": {
+        "properties": { "blocked_reason": { "const": "legacy-plan-non-authoritative" } },
+        "required": ["blocked_reason"]
+      },
+      "then": {
+        "properties": {
+          "schemaVersion": { "const": "1.1.0" },
+          "next_outcome": { "const": "blocked" },
+          "next_action": { "type": "null" },
+          "blocked_requirements": { "const": [] },
+          "derived_states": { "const": [] },
+          "published": {
+            "properties": {
+              "observed": { "const": false },
+              "receipt": { "type": "null" },
+              "verified_against": { "type": "null" }
+            }
+          },
+          "reconciliation_requirements": false
+        }
+      }
+    },
+    {
       "if": { "required": ["reconciliation_requirements"] },
       "then": {
         "properties": {
@@ -444,7 +469,8 @@
                   "unknown-provider-result",
                   "authorization-consumed",
                   "candidate-identity-mismatch",
-                  "receipt-identity-mismatch"
+                  "receipt-identity-mismatch",
+                  "legacy-plan-non-authoritative"
                 ]
               },
               "blocked_requirements": { "const": [] },

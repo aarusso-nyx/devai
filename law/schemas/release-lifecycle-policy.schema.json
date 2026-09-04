@@ -644,15 +644,20 @@
           "additionalProperties": false,
           "required": [
             "schema",
+            "emitted_observation_schema_version",
+            "readable_observation_schema_versions",
             "always_pure",
             "next_actions",
             "blocked_outcomes",
+            "historical_plan_observation",
             "blocked_retry_observation",
             "history_resolution",
             "ambiguous_outcome"
           ],
           "properties": {
             "schema": { "const": "law/schemas/release-lifecycle-observation.schema.json" },
+            "emitted_observation_schema_version": { "const": "1.1.0" },
+            "readable_observation_schema_versions": { "const": ["1.0.0", "1.1.0"] },
             "always_pure": { "const": true },
             "next_actions": {
               "const": [
@@ -694,8 +699,22 @@
                 "authorization-consumed",
                 "fresh-exact-authorization-required",
                 "candidate-identity-mismatch",
-                "receipt-identity-mismatch"
+                "receipt-identity-mismatch",
+                "legacy-plan-non-authoritative"
               ]
+            },
+            "historical_plan_observation": {
+              "const": {
+                "outcome": "blocked",
+                "reason": "legacy-plan-non-authoritative",
+                "requirements": [],
+                "next_action": null,
+                "derived_states": [],
+                "published_observed": false,
+                "receipt_scope": "plan-v1-valid-under-original-schema-canonical-id-digest-and-exact-observed-identity;recorded-history-must-independently-validate;no-historical-pass-or-input-reconstruction-claim",
+                "invalid_evidence": "retain-existing-receipt-or-chain-refusal;invalid-or-mismatched-evidence-is-never-labelled-valid-historical",
+                "authority": "read-only-historical-label-never-relabels-rehashes-upgrades-wraps-or-authorizes-current-evidence-readiness-transition-retry-or-publication"
+              }
             },
             "blocked_retry_observation": {
               "const": {
@@ -2915,7 +2934,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.8.0",
+      "policy_version": "2.9.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -3519,6 +3538,8 @@
         },
         "resume": {
           "schema": "law/schemas/release-lifecycle-observation.schema.json",
+          "emitted_observation_schema_version": "1.1.0",
+          "readable_observation_schema_versions": ["1.0.0", "1.1.0"],
           "always_pure": true,
           "next_actions": [
             { "from": "none", "next_action": "release plan", "outcome": "ready" },
@@ -3549,8 +3570,20 @@
             "authorization-consumed",
             "fresh-exact-authorization-required",
             "candidate-identity-mismatch",
-            "receipt-identity-mismatch"
+            "receipt-identity-mismatch",
+            "legacy-plan-non-authoritative"
           ],
+          "historical_plan_observation": {
+            "outcome": "blocked",
+            "reason": "legacy-plan-non-authoritative",
+            "requirements": [],
+            "next_action": null,
+            "derived_states": [],
+            "published_observed": false,
+            "receipt_scope": "plan-v1-valid-under-original-schema-canonical-id-digest-and-exact-observed-identity;recorded-history-must-independently-validate;no-historical-pass-or-input-reconstruction-claim",
+            "invalid_evidence": "retain-existing-receipt-or-chain-refusal;invalid-or-mismatched-evidence-is-never-labelled-valid-historical",
+            "authority": "read-only-historical-label-never-relabels-rehashes-upgrades-wraps-or-authorizes-current-evidence-readiness-transition-retry-or-publication"
+          },
           "blocked_retry_observation": {
             "outcome": "blocked",
             "reason": "fresh-exact-authorization-required",
