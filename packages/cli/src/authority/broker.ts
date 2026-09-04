@@ -1377,9 +1377,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
       const requestPath = flagValue(input.argv, '--request');
       if (requestPath === undefined) throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
-      const declaredRequest = JSON.parse(
-        readFileSync(resolve(repositoryRoot, requestPath), 'utf8'),
-      ) as JsonRecord;
+      const declaredRequest = JSON.parse(readFileSync(resolve(requestPath), 'utf8')) as JsonRecord;
       if (
         declaredRequest.action_id !== input.entry.name ||
         canonicalSha256(declaredRequest.repository_locator) !==

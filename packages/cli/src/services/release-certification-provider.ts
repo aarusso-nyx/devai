@@ -678,8 +678,9 @@ export function createContainerReleaseCertificationAdapters(
               if (first === undefined)
                 throw new Error('release-certification-plan-binding-invalid');
               const sinkHost = createProtectedReleaseHostAdapter(first.binding);
-              const transaction = await sinkHost.invokeSink(() =>
-                call.evidence_sink.begin(prepared.map((pkg) => pkg.binding)),
+              const transaction = await sinkHost.invokeSink(
+                () => call.evidence_sink.begin(prepared.map((pkg) => pkg.binding)),
+                call.evidence_sink.authority_owner,
               );
               let committing = false;
               let closures: readonly CertificationOutputClosure[];
@@ -689,12 +690,14 @@ export function createContainerReleaseCertificationAdapters(
                 for (const pkg of prepared) {
                   const outputs = [];
                   for (const output of pkg.generated) {
-                    const handle = await sinkHost.invokeSink(() =>
-                      transaction.put({
-                        bytes: Buffer.from(output.bytes),
-                        sha256: digest(output.bytes),
-                        size_bytes: output.bytes.length,
-                      }),
+                    const handle = await sinkHost.invokeSink(
+                      () =>
+                        transaction.put({
+                          bytes: Buffer.from(output.bytes),
+                          sha256: digest(output.bytes),
+                          size_bytes: output.bytes.length,
+                        }),
+                      call.evidence_sink.authority_owner,
                     );
                     if (
                       handle.sha256 !== digest(output.bytes) ||
@@ -711,7 +714,10 @@ export function createContainerReleaseCertificationAdapters(
                   drafts.push({ ...pkg.binding, outputs });
                 }
                 committing = true;
-                closures = await sinkHost.invokeSink(() => transaction.commit(drafts));
+                closures = await sinkHost.invokeSink(
+                  () => transaction.commit(drafts),
+                  call.evidence_sink.authority_owner,
+                );
                 if (
                   canonicalJson(
                     closures.map((closure) => ({
@@ -724,7 +730,11 @@ export function createContainerReleaseCertificationAdapters(
                 )
                   throw new Error('release-certification-output-closure-invalid');
               } catch (error) {
-                if (!committing) await sinkHost.invokeSink(() => transaction.abort());
+                if (!committing)
+                  await sinkHost.invokeSink(
+                    () => transaction.abort(),
+                    call.evidence_sink.authority_owner,
+                  );
                 throw error;
               }
               const result = material(

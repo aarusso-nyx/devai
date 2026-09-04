@@ -23,6 +23,7 @@ export interface DurableReleaseContentStoreOptions {
 export function createDurableReleaseContentStore(
   input: DurableReleaseContentStoreOptions,
   fail: () => never,
+  owner: object,
 ) {
   if (
     typeof constants.O_NOFOLLOW !== 'number' ||
@@ -65,8 +66,8 @@ export function createDurableReleaseContentStore(
     rootStat.uid !== process.getuid()
   )
     fail();
-  const { closeSync, fsyncSync, linkSync, mkdirSync, openSync, writeSync } =
-    createProtectedReleaseSinkFilesystem(root);
+  const { closeSync, fsyncSync, linkSync, mkdirSync, openSync, writeSync, readdirSync } =
+    createProtectedReleaseSinkFilesystem(root, owner);
   const checkRoot = () => {
     for (const identity of initial) {
       const stat = lstatSync(identity.path);
@@ -180,6 +181,18 @@ export function createDurableReleaseContentStore(
     if (!DIGEST.test(sha256)) fail();
     return join(root, 'objects', sha256);
   };
+  const list = (path: string) => {
+    assertPath(path);
+    const before = inspectAncestors(path);
+    const entries = readdirSync(path, { withFileTypes: true });
+    const after = inspectAncestors(path);
+    if (JSON.stringify(before) !== JSON.stringify(after)) fail();
+    checkRoot();
+    return entries.map((entry) => {
+      if (typeof entry === 'string') fail();
+      return entry;
+    });
+  };
   return {
     root,
     sinkId,
@@ -190,5 +203,6 @@ export function createDurableReleaseContentStore(
     ensureDirectory,
     install,
     objectPath,
+    list,
   };
 }

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { canonicalJson } from '@devai-nyx/utils';
+import { createProtectedReleaseSinkOwner } from '@devai-nyx/authority';
 import { createDurableReleaseContentStore } from './release-content-store.js';
 import type {
   CertificationEvidenceTransaction,
@@ -90,8 +91,9 @@ export interface ReleaseCertificationEvidenceStoreOptions {
 function createStore(
   input: ReleaseCertificationEvidenceStoreOptions,
 ): TrustedCertificationEvidenceSink {
+  const owner = createProtectedReleaseSinkOwner('certification', input.evidence_sink_id);
   const { root, sinkId, checkRoot, inspectAncestors, read, ensureDirectory, install, objectPath } =
-    createDurableReleaseContentStore({ ...input, sink_id: input.evidence_sink_id }, fail);
+    createDurableReleaseContentStore({ ...input, sink_id: input.evidence_sink_id }, fail, owner);
   const readBlob = (handle: CertificationOutputBlobHandle) => {
     if (
       !same(handle, {
@@ -209,6 +211,7 @@ function createStore(
     return closures;
   };
   return Object.freeze<TrustedCertificationEvidenceSink>({
+    authority_owner: owner,
     kind: 'certification-evidence-sink-v3' as const,
     protocol: 'two-phase-content-addressed' as const,
     begin(
@@ -390,6 +393,7 @@ export function createReleaseCertificationEvidenceStore(
 ): TrustedCertificationEvidenceSink {
   const store = storageBoundary(() => createStore(input));
   return Object.freeze<TrustedCertificationEvidenceSink>({
+    authority_owner: store.authority_owner,
     kind: store.kind,
     protocol: store.protocol,
     begin(bindings) {

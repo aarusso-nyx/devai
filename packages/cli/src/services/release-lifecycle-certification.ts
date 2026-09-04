@@ -43,6 +43,7 @@ export interface TrustedCertificationEvidenceSink extends Pick<
   ImmutableReleaseContentSource,
   'readCertificationEvidenceReceipt' | 'readCertificationOutputClosure' | 'readGeneratedBlob'
 > {
+  readonly authority_owner?: object;
   readonly kind: 'certification-evidence-sink-v3';
   readonly protocol: 'two-phase-content-addressed';
   readonly begin: (

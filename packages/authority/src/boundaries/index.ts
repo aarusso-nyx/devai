@@ -50,6 +50,13 @@ const READ_PROCESS_OWNERS = new Set([
   'packages/cli/src/version.ts',
   'packages/loop/src/governance-ledger/index.ts',
 ]);
+const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
+  readGitObjectSync: new Set<string>(),
+  readExactGitTreeSync: new Set([
+    'packages/cli/src/services/check-runner/authority-process.ts',
+    'packages/cli/src/services/release-certification-provider.ts',
+  ]),
+};
 const GOVERNANCE_PROJECTION_EXCEPTION = 'writeGovernanceProjectionSync';
 const GOVERNANCE_PROJECTION_OWNER = 'packages/cli/src/commands/docs/governance-render.ts';
 const HOST_EFFECTS_MODULE = '@devai-nyx/authority';
@@ -112,6 +119,10 @@ export function protectedReleaseBoundaryAdapterId(
   if (
     !isRecord(binding) ||
     !isRecord(binding.repository) ||
+    (artifact &&
+      (Object.keys(binding).sort().join(',') !==
+        'action_id,pack_spec_digest_sha256,plan_receipt_digest_sha256,repository,sink_id' ||
+        Object.keys(binding.repository).sort().join(',') !== 'commit,id,tree')) ||
     !(artifact
       ? binding.action_id === 'release prepare'
       : ['release preflight', 'release certify'].includes(binding.action_id)) ||
@@ -874,6 +885,19 @@ function unauthorizedMutatorCalls(
       const importedSymbol = ts.isIdentifier(expression)
         ? (importedNames.get(expression.text) ?? expression.text)
         : symbol;
+      const gitReadOwners =
+        importedSymbol === undefined ? undefined : GIT_READ_OWNERS[importedSymbol];
+      if (
+        importedSymbol !== undefined &&
+        gitReadOwners !== undefined &&
+        (!gitReadOwners.has(fileName) ||
+          (ts.isIdentifier(expression) && imported.get(expression.text) !== HOST_EFFECTS_MODULE))
+      ) {
+        calls.push({
+          line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+          symbol: importedSymbol,
+        });
+      }
       if (
         importedSymbol === HOST_SCOPE_CONTROLLER &&
         (!HOST_SCOPE_OWNERS.has(fileName) ||

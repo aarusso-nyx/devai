@@ -65,9 +65,49 @@ const scopes = new AsyncLocalStorage<AuthorityHostEffectScope>();
 const protectedSinkScopes = new AsyncLocalStorage<
   Readonly<{
     scope: AuthorityHostEffectScope;
-    apply: <T>(callback: () => T) => T;
+    owner: object | undefined;
+    active: () => boolean;
   }>
 >();
+
+const sinkOwners = new WeakMap<
+  object,
+  { kind: 'artifact' | 'certification'; sink_id: string; root?: string }
+>();
+export function createProtectedReleaseSinkOwner(
+  kind: 'artifact' | 'certification',
+  sinkId: string,
+): object {
+  if (
+    !['artifact', 'certification'].includes(kind) ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(sinkId)
+  )
+    throw new Error('AUTHORITY_PROTECTED_SINK_OWNER_INVALID');
+  const owner = Object.freeze({});
+  sinkOwners.set(owner, { kind, sink_id: sinkId });
+  return owner;
+}
+
+function runSinkUnit<T>(
+  scope: AuthorityHostEffectScope,
+  owner: object | undefined,
+  kind: 'artifact' | 'certification',
+  callback: () => T,
+  sinkId?: string,
+): T {
+  const identity = owner === undefined ? undefined : sinkOwners.get(owner);
+  if (
+    owner !== undefined &&
+    (identity?.kind !== kind || (sinkId !== undefined && identity.sink_id !== sinkId))
+  )
+    throw new Error('AUTHORITY_PROTECTED_SINK_OWNER_INVALID');
+  let active = true;
+  try {
+    return protectedSinkScopes.run({ scope, owner, active: () => active }, callback);
+  } finally {
+    active = false;
+  }
+}
 
 export interface ProtectedReleaseHostBinding {
   readonly action_id: 'release certify' | 'release preflight';
@@ -117,6 +157,12 @@ export function protectedArtifactSinkHostEffect(request: AuthorityHostEffectRequ
 
 /** Separate prepare-only capability. No execution or certification authority is exposed. */
 export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSinkBinding) {
+  if (
+    Object.keys(binding).sort().join(',') !==
+      'action_id,pack_spec_digest_sha256,plan_receipt_digest_sha256,repository,sink_id' ||
+    Object.keys(binding.repository).sort().join(',') !== 'commit,id,tree'
+  )
+    throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
   const selected = Object.freeze({
     ...binding,
     repository: Object.freeze({ ...binding.repository }),
@@ -163,9 +209,9 @@ export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSin
     }
   };
   return Object.freeze({
-    invokeSink: <T>(callback: () => T): T => {
+    invokeSink: <T>(callback: () => T, owner?: object): T => {
       const scope = requireScope('mutation');
-      return invoke(() => protectedSinkScopes.run({ scope, apply: invoke }, callback));
+      return invoke(() => runSinkUnit(scope, owner, 'artifact', callback, selected.sink_id));
     },
   });
 }
@@ -183,6 +229,12 @@ export function protectedReleaseHostEffect(request: AuthorityHostEffectRequest) 
 
 /** Only the trusted installed host composition creates this adapter. It is never passed to a task. */
 export function createProtectedReleaseHostAdapter(binding: ProtectedReleaseHostBinding) {
+  if (
+    Object.keys(binding).sort().join(',') !==
+      'action_id,helper_identity_sha256,plan_receipt_digest_sha256,repository,task_policy_digest_sha256' ||
+    Object.keys(binding.repository).sort().join(',') !== 'commit,id,tree'
+  )
+    throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
   const selected = Object.freeze({
     ...binding,
     repository: Object.freeze({ ...binding.repository }),
@@ -237,14 +289,9 @@ export function createProtectedReleaseHostAdapter(binding: ProtectedReleaseHostB
       invoke('provider', () =>
         Reflect.apply(nodeSpawnSync, undefined, args),
       )) as typeof nodeSpawnSync,
-    invokeSink: <T>(callback: () => T): T => {
+    invokeSink: <T>(callback: () => T, owner?: object): T => {
       const scope = requireScope('mutation');
-      return invoke('sink', () =>
-        protectedSinkScopes.run(
-          { scope, apply: (operation) => invoke('sink', operation) },
-          callback,
-        ),
-      );
+      return invoke('sink', () => runSinkUnit(scope, owner, 'certification', callback));
     },
   });
 }
@@ -277,8 +324,13 @@ function guarded<T extends object>(
 }
 
 /** Root-confined primitives for the installed trusted CAS, never handed to candidate processes. */
-export function createProtectedReleaseSinkFilesystem(rootPath: string) {
+export function createProtectedReleaseSinkFilesystem(rootPath: string, owner: object) {
+  const ownership = sinkOwners.get(owner);
+  if (ownership === undefined) throw new Error('AUTHORITY_PROTECTED_SINK_OWNER_INVALID');
   const root = realpathSync(rootPath);
+  if (ownership.root !== undefined && ownership.root !== root)
+    throw new Error('AUTHORITY_PROTECTED_SINK_OWNER_INVALID');
+  ownership.root = root;
   const initial = lstatSync(root);
   if (
     !isAbsolute(rootPath) ||
@@ -325,9 +377,14 @@ export function createProtectedReleaseSinkFilesystem(rootPath: string) {
   };
   const effect = <T>(operation: () => T): T => {
     const sink = protectedSinkScopes.getStore();
-    if (sink === undefined || sink.scope !== scopes.getStore())
+    if (
+      sink === undefined ||
+      sink.scope !== scopes.getStore() ||
+      !sink.active() ||
+      sink.owner !== owner
+    )
       throw new Error('AUTHORITY_PROTECTED_SINK_OPERATION_FORBIDDEN');
-    return sink.apply(operation);
+    return operation();
   };
   return Object.freeze({
     root,

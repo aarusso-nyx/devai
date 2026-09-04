@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { canonicalJson } from '@devai-nyx/utils';
-import { createProtectedArtifactSinkAdapter } from '@devai-nyx/authority';
+import {
+  createProtectedArtifactSinkAdapter,
+  createProtectedReleaseSinkOwner,
+} from '@devai-nyx/authority';
 import {
   createDurableReleaseContentStore,
   type DurableReleaseContentStoreOptions,
@@ -40,7 +42,8 @@ function same(left: unknown, right: unknown): boolean {
 function guard<T>(operation: () => T): T {
   try {
     return operation();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && /^AUTHORITY_[A-Z0-9_]+$/u.test(error.message)) throw error;
     return fail();
   }
 }
@@ -64,14 +67,18 @@ export function createReleaseArtifactStore(
   options: ReleaseArtifactStoreOptions,
 ): TrustedArtifactSink & TrustedArtifactReader {
   return guard(() => {
-    const store = createDurableReleaseContentStore(options, fail);
+    const owner = createProtectedReleaseSinkOwner('artifact', options.sink_id);
+    const store = createDurableReleaseContentStore(options, fail, owner);
     const binding = clone(options.binding);
     if (
       binding.sink_id !== store.sinkId ||
       binding.pack_spec_digest_sha256 !== RELEASE_PACK_SPEC_DIGEST
     )
       fail();
-    const authority = createProtectedArtifactSinkAdapter(binding);
+    const adapter = createProtectedArtifactSinkAdapter(binding);
+    const authority = {
+      invokeSink: <T>(callback: () => T): T => adapter.invokeSink(callback, owner),
+    };
     const expectedBegin: Begin = {
       repository: binding.repository,
       candidate: { commit: binding.repository.commit, tree: binding.repository.tree },
@@ -185,23 +192,26 @@ export function createReleaseArtifactStore(
       )
         fail();
       const handles = new Set<string>();
+      const logicalNames = new Set<string>([receipt.logical_name]);
       const receiptFiles = new Set<string>([`${split(receipt.opaque_handle).object}.json`]);
       for (const artifact of manifest.artifacts) {
         const observed = receiptFor(artifact.opaque_handle);
         if (
           observed.kind === 'committed-manifest' ||
           observed.transaction_handle !== parts.transaction ||
+          logicalNames.has(observed.logical_name) ||
           handles.has(observed.opaque_handle) ||
           !same(artifact, identity(observed))
         )
           fail();
         handles.add(observed.opaque_handle);
+        logicalNames.add(observed.logical_name);
         receiptFiles.add(`${split(observed.opaque_handle).object}.json`);
         readObject(observed);
       }
       const receiptsDirectory = join(directory, 'receipts');
       store.inspectAncestors(receiptsDirectory);
-      const storedReceipts = readdirSync(receiptsDirectory, { withFileTypes: true });
+      const storedReceipts = store.list(receiptsDirectory);
       if (
         storedReceipts.length !== receiptFiles.size ||
         storedReceipts.some(
@@ -210,6 +220,14 @@ export function createReleaseArtifactStore(
       )
         fail();
       if (handles.size === 0 || (!handles.has(handle) && handle !== receipt.opaque_handle)) fail();
+      const ordered = [...manifest.artifacts].sort((a, b) =>
+        Buffer.compare(
+          Buffer.from(`${a.kind}\0${a.sink_id}\0${a.opaque_handle}\0${a.sha256}\0${a.size_bytes}`),
+          Buffer.from(`${b.kind}\0${b.sink_id}\0${b.opaque_handle}\0${b.sha256}\0${b.size_bytes}`),
+        ),
+      );
+      if (!same(ordered, manifest.artifacts)) fail();
+      store.checkRoot();
       return readObject(receiptFor(handle));
     };
     const readArtifact = (input: ReadInput): Buffer =>
