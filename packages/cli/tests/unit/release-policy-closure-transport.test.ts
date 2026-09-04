@@ -58,6 +58,12 @@ function expectRefusal(operation: () => unknown): void {
   expect(operation).toThrow(/^rpl-policy-resolution-mismatch$/u);
 }
 
+function flipFirstByte(bytes: Uint8Array, message: string): void {
+  const first = bytes[0];
+  if (first === undefined) throw new Error(message);
+  bytes[0] = first ^ 0xff;
+}
+
 describe('release policy closure transport', () => {
   it('round-trips the producer closure and reconstructs the original semantic proof', () => {
     const { fixture, closure } = fixtureClosure();
@@ -93,20 +99,20 @@ describe('release policy closure transport', () => {
   it('copies input and decoded raw bytes across the transport boundary', () => {
     const { fixture, closure } = fixtureClosure();
     const encoded = encodeReleasePolicyClosure(closure, LIMITS);
-    closure.evidence.archive[0] ^= 0xff;
+    flipFirstByte(closure.evidence.archive, 'archive fixture missing');
     const firstInput = closure.evidence.candidate_objects.values().next().value;
     if (firstInput === undefined) throw new Error('candidate fixture missing');
-    firstInput.bytes[0] ^= 0xff;
+    flipFirstByte(firstInput.bytes, 'candidate object bytes missing');
     const producer = closure.evidence.producer;
     if (producer === undefined) throw new Error('producer fixture missing');
-    producer.build_provenance[0] ^= 0xff;
+    flipFirstByte(producer.build_provenance, 'producer provenance missing');
     const firstProducerFile = producer.files.values().next().value;
     if (firstProducerFile === undefined) throw new Error('producer file fixture missing');
-    firstProducerFile[0] ^= 0xff;
+    flipFirstByte(firstProducerFile, 'producer file bytes missing');
 
     const decoded = decodeReleasePolicyClosure(encoded, LIMITS);
     expect(verify(fixture, decoded).repository).toEqual(fixture.candidate.repository);
-    decoded.evidence.archive[0] ^= 0xff;
+    flipFirstByte(decoded.evidence.archive, 'decoded archive missing');
     const again = decodeReleasePolicyClosure(encoded, LIMITS);
     expect(verify(fixture, again).repository).toEqual(fixture.candidate.repository);
   });
@@ -114,7 +120,7 @@ describe('release policy closure transport', () => {
   it('does not mistake codec integrity for semantic closure authority', () => {
     const { fixture, closure } = fixtureClosure();
     const decoded = decodeReleasePolicyClosure(encodeReleasePolicyClosure(closure, LIMITS), LIMITS);
-    decoded.evidence.archive[0] ^= 0xff;
+    flipFirstByte(decoded.evidence.archive, 'decoded archive missing');
     const altered = decodeReleasePolicyClosure(encodeReleasePolicyClosure(decoded, LIMITS), LIMITS);
 
     expect(() => verify(fixture, altered)).toThrow(/^rpl-package-identity-mismatch$/u);
