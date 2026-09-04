@@ -1,7 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { boundaryApi, expectBoundaryFailure } from './authority-boundary-testkit.js';
 
 const INVENTORY = { entries: [], totals: { exemptions: 0 } };
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 async function inventoryFor(virtual_sources: Readonly<Record<string, string>>) {
   const api = await boundaryApi();
@@ -9,6 +11,22 @@ async function inventoryFor(virtual_sources: Readonly<Record<string, string>>) {
 }
 
 describe('immutable Git read helper ownership', () => {
+  it('finds no unapproved Git helper caller in the canonical source population', async () => {
+    const api = await boundaryApi();
+    const result = api.validateDirectMutatorInventory({ inventory: INVENTORY, repo_root: ROOT });
+
+    const unauthorized =
+      result.ok === false
+        ? ((result as { readonly unauthorized?: readonly { readonly symbol: string }[] })
+            .unauthorized ?? [])
+        : [];
+    expect(
+      unauthorized.filter(
+        ({ symbol }) => symbol === 'readExactGitTreeSync' || symbol === 'readGitObjectSync',
+      ),
+    ).toEqual([]);
+  });
+
   it('allows readExactGitTreeSync only in its two named production owners', async () => {
     const result = await inventoryFor({
       'packages/cli/src/services/check-runner/authority-process.ts': [
