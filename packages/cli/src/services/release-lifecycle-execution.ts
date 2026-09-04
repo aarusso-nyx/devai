@@ -19,6 +19,8 @@ import {
 } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { types } from 'node:util';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { verifyResolvedReleasePlanReceipt } from './release-lifecycle.js';
 import {
@@ -365,7 +367,81 @@ export interface ReleaseProviderResult {
 
 export type ReleaseProvider = (
   request: ReleaseLifecycleRequest,
+  context?: ReleaseProviderInvocationContext,
 ) => ReleaseProviderResult | Promise<ReleaseProviderResult>;
+
+/**
+ * Core-derived data for one live provider invocation, not a request field or an
+ * execution/signing grant. The durable attempt and verified parent already exist.
+ */
+export interface ReleaseProviderInvocationContext {
+  readonly action_id: PersistedReleaseAction;
+  readonly request_digest_sha256: string;
+  readonly attempt_id: string;
+  readonly attempt_record: StoreRecordReference;
+  readonly prior_state: ReleaseLifecycleStateV2 | null;
+}
+
+const providerInvocationScope = new AsyncLocalStorage<ReleaseProviderInvocationContext>();
+const liveProviderInvocations = new WeakMap<object, ReleaseLifecycleRequest>();
+
+/** Requires the actual request argument and context issued to this provider call. */
+export function assertReleaseProviderInvocationContext(
+  request: ReleaseLifecycleRequest,
+  value: unknown,
+): ReleaseProviderInvocationContext {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    providerInvocationScope.getStore() !== value ||
+    liveProviderInvocations.get(value) !== request
+  ) {
+    throw new Error('release-provider-invocation-unbound');
+  }
+  return value as ReleaseProviderInvocationContext;
+}
+
+function immutableProviderData<T>(value: T): T {
+  const snapshot = JSON.parse(canonicalJson(value)) as T;
+  const freeze = (entry: unknown): void => {
+    if (entry !== null && typeof entry === 'object') {
+      for (const child of Object.values(entry)) freeze(child);
+      Object.freeze(entry);
+    }
+  };
+  freeze(snapshot);
+  return snapshot;
+}
+
+function captureExportProviderResult(value: unknown): ReleaseProviderResult {
+  const invalid = () => new Error('release-adapter-output-invalid');
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    types.isProxy(value) ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value))
+  )
+    throw invalid();
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const allowed = new Set([
+    'outcome',
+    'dispatch_status',
+    'provider_handle',
+    'material',
+    'code',
+    'transaction',
+  ]);
+  if (
+    Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string' || !allowed.has(key)) ||
+    Object.values(descriptors).some((entry) => !entry.enumerable || !('value' in entry)) ||
+    !['success', 'failure', 'unknown'].includes(descriptors['outcome']?.value as string)
+  )
+    throw invalid();
+  // Capture disposition before any state validation or cleanup decision.
+  return Object.freeze(
+    Object.fromEntries(Object.entries(descriptors).map(([key, entry]) => [key, entry.value])),
+  ) as unknown as ReleaseProviderResult;
+}
 
 export interface TrustedArtifactReader {
   readonly readArtifact: (input: {
@@ -2253,9 +2329,8 @@ export async function executeReleaseLifecycleAction(input: {
   let authority: TrustedReleaseAuthority;
   let receipts: readonly VerifiedReceipt[];
   try {
-    request = validateReleaseLifecycleRequest(
-      input.request,
-      input.action,
+    request = immutableProviderData(
+      validateReleaseLifecycleRequest(input.request, input.action),
     ) as ReleaseLifecycleRequest & {
       readonly action_id: PersistedReleaseAction;
     };
@@ -2277,6 +2352,7 @@ export async function executeReleaseLifecycleAction(input: {
     };
   }
   const remote = EFFECT_BY_ACTION[request.action_id] === 'remote-write';
+  const potentiallyIrreversible = remote || request.action_id === 'release export';
   if (
     request.action_id === 'release certify' &&
     !isProtectedReleaseCertificationProvider(input.provider)
@@ -2326,6 +2402,7 @@ export async function executeReleaseLifecycleAction(input: {
         let storeRecords: StoreRecord[];
         let states: ReleaseLifecycleStateV2[];
         let head: StoreHead | null;
+        let verifiedPriorState: ReleaseLifecycleStateV2 | null;
         try {
           storeRecords = input.store.readStoreRecords();
           states = input.store.readStateRecords();
@@ -2349,6 +2426,7 @@ export async function executeReleaseLifecycleAction(input: {
             };
           }
           const stateHead = stateReduction.head;
+          verifiedPriorState = stateHead;
           if (stateHead !== null) assertStateMatchesRequest(request, stateHead);
           const initialState = states[0];
           const currentPlans = verifiedPlanBindings(receipts);
@@ -2562,28 +2640,48 @@ export async function executeReleaseLifecycleAction(input: {
 
         let result: ReleaseProviderResult;
         try {
-          result = await provider(request);
+          const context = immutableProviderData<ReleaseProviderInvocationContext>({
+            action_id: request.action_id,
+            request_digest_sha256: requestDigest,
+            attempt_id: attemptId,
+            attempt_record: storeRecordReference(attempt),
+            prior_state: verifiedPriorState,
+          });
+          liveProviderInvocations.set(context, request);
+          try {
+            const supplied = await providerInvocationScope.run(context, () =>
+              provider(request, context),
+            );
+            result =
+              request.action_id === 'release export'
+                ? captureExportProviderResult(supplied)
+                : supplied;
+          } finally {
+            liveProviderInvocations.delete(context);
+          }
         } catch {
-          result = remote
+          // Export may have crossed its one-use signer boundary before throwing.
+          // Only a managed provider can positively report failure before signing.
+          result = potentiallyIrreversible
             ? { outcome: 'unknown', code: 'release-provider-result-unknown' }
             : { outcome: 'failure', code: 'release-provider-failed' };
         }
         if (result.outcome !== 'success') {
-          if (!remote && result.outcome !== 'unknown' && result.transaction !== undefined) {
+          const unsafeFailure =
+            potentiallyIrreversible &&
+            result.outcome === 'failure' &&
+            (result.provider_handle !== undefined ||
+              result.dispatch_status !== 'failed-before-dispatch');
+          const terminalResult = unsafeFailure
+            ? ({ ...result, outcome: 'unknown', code: 'release-provider-result-unknown' } as const)
+            : result;
+          if (!remote && terminalResult.outcome !== 'unknown' && result.transaction !== undefined) {
             try {
               await result.transaction.rollback();
             } finally {
               await result.transaction.dispose();
             }
           }
-          const unsafeRemoteFailure =
-            remote &&
-            result.outcome === 'failure' &&
-            (result.provider_handle !== undefined ||
-              result.dispatch_status !== 'failed-before-dispatch');
-          const terminalResult = unsafeRemoteFailure
-            ? ({ ...result, outcome: 'unknown', code: 'release-provider-result-unknown' } as const)
-            : result;
           const kind = terminalResult.outcome === 'unknown' ? 'unknown-provider-result' : 'failure';
           const terminal = buildStoreRecord(
             request,
@@ -2642,7 +2740,7 @@ export async function executeReleaseLifecycleAction(input: {
           };
         }
         if (result.material === undefined) {
-          if (!remote && result.transaction !== undefined) {
+          if (!potentiallyIrreversible && result.transaction !== undefined) {
             try {
               await result.transaction.rollback();
             } finally {
@@ -2654,17 +2752,19 @@ export async function executeReleaseLifecycleAction(input: {
             attempt,
             head,
             attemptId,
-            remote ? 'unknown-provider-result' : 'failure',
+            potentiallyIrreversible ? 'unknown-provider-result' : 'failure',
             authorizationEventId,
-            remote
+            potentiallyIrreversible
               ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
               : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
           );
           input.store.appendStoreRecord(terminal);
           return {
             ok: false,
-            phase: remote ? 'ambiguous' : 'validation',
-            code: remote ? 'release-provider-result-unknown' : 'release-adapter-output-invalid',
+            phase: potentiallyIrreversible ? 'ambiguous' : 'validation',
+            code: potentiallyIrreversible
+              ? 'release-provider-result-unknown'
+              : 'release-adapter-output-invalid',
             record: terminal,
           };
         }
@@ -2692,27 +2792,29 @@ export async function executeReleaseLifecycleAction(input: {
             state,
           );
         } catch (error) {
-          try {
-            await result.transaction?.rollback();
-          } finally {
-            await result.transaction?.dispose();
+          if (!potentiallyIrreversible) {
+            try {
+              await result.transaction?.rollback();
+            } finally {
+              await result.transaction?.dispose();
+            }
           }
           const terminal = buildStoreRecord(
             request,
             attempt,
             head,
             attemptId,
-            remote ? 'unknown-provider-result' : 'failure',
+            potentiallyIrreversible ? 'unknown-provider-result' : 'failure',
             authorizationEventId,
-            remote
+            potentiallyIrreversible
               ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
               : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
           );
           input.store.appendStoreRecord(terminal);
           return {
             ok: false,
-            phase: remote ? 'ambiguous' : 'validation',
-            code: remote
+            phase: potentiallyIrreversible ? 'ambiguous' : 'validation',
+            code: potentiallyIrreversible
               ? 'release-provider-result-unknown'
               : error instanceof Error
                 ? error.message

@@ -98,6 +98,7 @@ export type {
   ReleaseLifecycleRequest,
   ReleaseLifecycleStateV2,
   ReleaseProvider,
+  ReleaseProviderInvocationContext,
   ReleaseProviderResult,
   ReleaseStateMaterial,
   ReleaseUnitEvidence,
@@ -105,6 +106,7 @@ export type {
   TrustedOfflineReceiptVerifier,
   TrustIdentity,
 } from './services/release-lifecycle-execution.js';
+export { assertReleaseProviderInvocationContext } from './services/release-lifecycle-execution.js';
 
 /** Configure only from a trusted host, between invocations. No request selects code. */
 export function installReleaseLifecycleCommandAdapters(
