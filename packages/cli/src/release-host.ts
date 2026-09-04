@@ -138,6 +138,10 @@ export {
   type ProtectedReleaseExportBinding,
 } from './services/release-export-artifact-store.js';
 export {
+  createReleaseExportProvider,
+  type ReleaseExportProviderOptions,
+} from './services/release-export-provider.js';
+export {
   encodeReleaseExportTranscript,
   verifyReleaseExportTranscript,
   encodeReleaseExportProviderResult,

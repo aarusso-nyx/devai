@@ -41,6 +41,7 @@ import {
   type ImmutableReleaseContentSource,
   type TrustedArtifactSink,
 } from '../../services/release-prepare-kernel.js';
+import type { ReleaseExportTranscriptLimits } from '../../services/release-export-transcript.js';
 
 interface PlanOptions {
   readonly repoRoot?: string;
@@ -112,6 +113,10 @@ export interface ReleaseLifecycleCommandAdapters {
   readonly artifact_reader?: (
     request: ReleaseLifecycleRequest,
   ) => TrustedArtifactReader | undefined;
+  /** Protected host transport bounds, never inferred from candidate or bundle bytes. */
+  readonly export_limits?: (
+    request: ReleaseLifecycleRequest,
+  ) => ReleaseExportTranscriptLimits | undefined;
 }
 
 let commandAdapters: ReleaseLifecycleCommandAdapters | undefined;
@@ -472,6 +477,9 @@ function lifecycleAction(
               ...(authorization === undefined ? {} : { authorization }),
               ...(offlineReceiptVerifier === undefined ? {} : { offlineReceiptVerifier }),
               ...(artifactReader === undefined ? {} : { artifactReader }),
+              ...(requiresArtifactReader
+                ? { exportLimits: adapters?.export_limits?.(request) }
+                : {}),
               ...(name === 'release publish'
                 ? { publication_controls: adapters?.publication_controls(request) }
                 : {}),
@@ -583,6 +591,7 @@ export const releaseOfflineVerify = defineCommand({
             provider,
             artifactReader,
             policyClosures: commandAdapters?.offline_policy_closures?.(request),
+            exportLimits: commandAdapters?.export_limits?.(request),
           });
           if (!result.ok) {
             fail('release offline-verify', result.code, result.phase, EXIT_REVIEW);

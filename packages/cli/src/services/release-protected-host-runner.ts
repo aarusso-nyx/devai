@@ -27,10 +27,16 @@ import {
 } from './release-candidate-snapshot.js';
 import type { ReleasePackageSnapshot } from './release-package-snapshot.js';
 import {
+  createResolvedReleasePlanInputResolver,
   resolveReleasePolicySnapshot,
   type ReleasePolicyExpectedIdentity,
 } from './release-policy-resolution.js';
 import { createReleasePolicyClosure, type ReleasePolicyClosure } from './release-policy-closure.js';
+import { encodeReleasePolicyClosure } from './release-policy-closure-transport.js';
+import {
+  createReleaseExportProvider,
+  type ReleaseExportProviderOptions,
+} from './release-export-provider.js';
 import { buildResolvedReleasePlanReceipt } from './release-lifecycle.js';
 import { canonicalContainerPath } from './container-archive.js';
 import {
@@ -108,9 +114,21 @@ export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHost
   readonly certification_store: ReleaseCertificationEvidenceStoreOptions;
   readonly artifact_store: Omit<ReleaseArtifactStoreOptions, 'binding'>;
   readonly publication_signature_verifier: PublicationSignatureVerifier;
-  /** Deliberately unfinished delivery slots, not permission or an ambient fallback. */
-  readonly later_stages: { readonly export: 'unavailable'; readonly offline_verify: 'unavailable' };
+  /** Protected host choices only; absent stages have no ambient fallback. */
+  readonly later_stages: {
+    readonly export: 'unavailable' | ProtectedReleaseHostExportControls;
+    readonly offline_verify: 'unavailable';
+  };
 }
+
+export type ProtectedReleaseHostExportControls = Pick<
+  ReleaseExportProviderOptions,
+  'provider' | 'destination' | 'trust' | 'signer'
+> &
+  Pick<
+    ReleaseExportProviderOptions['store'],
+    'closure_limits' | 'transport_limits' | 'transcript_limits'
+  >;
 
 interface InvocationAuthority {
   /** No role is inferred by this runner; the normal CLI checks this explicit declaration. */
@@ -121,7 +139,8 @@ interface InvocationAuthority {
 export type ProtectedReleaseHostInvocation =
   | { readonly action: 'release plan'; readonly intent: ProtectedReleaseInputFile }
   | (InvocationAuthority & {
-      readonly action: 'release preflight' | 'release certify' | 'release prepare';
+      readonly action:
+        'release preflight' | 'release certify' | 'release prepare' | 'release export';
       readonly request: ProtectedReleaseInputFile;
     })
   | {
@@ -258,8 +277,9 @@ function captureReleaseHostLane(
     repository,
   });
   const unit = copy(input.unit);
+  const expected = copy(input.expected);
   const resolution = resolveReleasePolicySnapshot({
-    expected: input.expected,
+    expected,
     installed_package: input.installed_package,
     candidate,
     ...(input.producer === undefined ? {} : { producer: input.producer }),
@@ -389,6 +409,7 @@ function captureReleaseHostLane(
     root,
     stateRoot,
     candidate,
+    expected,
     repository,
     repositoryContext,
     unit,
@@ -411,8 +432,8 @@ function captureReleaseHostLane(
  *
  * Existing CLI actions run sequentially against digest-pinned inputs and exact
  * prebound lane identities. No retry, next-action dispatch, adapter disposal,
- * cwd change or authority inference occurs. Export, offline verification and
- * remote publication remain unavailable. Input revalidation detects races but
+ * cwd change or authority inference occurs. Export requires explicit protected controls;
+ * offline verification and remote publication remain unavailable. Input revalidation detects races but
  * is not native openat containment or protection against ABA.
  */
 export function createProtectedReleaseHostRunner(
@@ -445,11 +466,28 @@ export function createProtectedReleaseHostRunner(
   assertBoundReleaseHostPackageSnapshot(input.installed_package);
   closed(input.later_stages, ['export', 'offline_verify']);
   if (
-    input.later_stages.export !== 'unavailable' ||
     input.later_stages.offline_verify !== 'unavailable' ||
     typeof input.publication_signature_verifier !== 'function'
   )
     fail();
+  const exportControls = input.later_stages.export;
+  if (exportControls !== 'unavailable') {
+    closed(exportControls, [
+      'provider',
+      'destination',
+      'trust',
+      'signer',
+      'closure_limits',
+      'transport_limits',
+      'transcript_limits',
+    ]);
+    closed(exportControls.signer, ['sign', 'verify']);
+    if (
+      typeof exportControls.signer.sign !== 'function' ||
+      typeof exportControls.signer.verify !== 'function'
+    )
+      fail();
+  }
   const cwd = process.cwd();
   const production = captureReleaseHostLane(input);
   const { root, repository, resolution, receipt, git, material } = production;
@@ -551,6 +589,48 @@ export function createProtectedReleaseHostRunner(
     readCertificationOutputClosure: (value) => evidence.readCertificationOutputClosure(value),
     readGeneratedBlob: (value) => evidence.readGeneratedBlob(value),
   };
+  const exportDelivery =
+    exportControls === 'unavailable'
+      ? undefined
+      : createReleaseExportProvider({
+          provider: exportControls.provider,
+          destination: exportControls.destination,
+          trust: exportControls.trust,
+          signer: exportControls.signer,
+          mutation_source: content,
+          plan: {
+            resolve_plan_input: createResolvedReleasePlanInputResolver(resolution),
+            resolve_receipt: (locator) => {
+              if (
+                locator.kind !== 'release-plan-receipt' ||
+                locator.receipt_id !== receipt.receipt_id ||
+                locator.receipt_digest_sha256 !== receipt.receipt_digest_sha256
+              )
+                fail(INPUT_INVALID);
+              return copy(receipt);
+            },
+          },
+          store: {
+            ...artifactOptions,
+            implementation: input.installed_package,
+            parent_reader: artifacts,
+            closure_limits: exportControls.closure_limits,
+            transport_limits: exportControls.transport_limits,
+            transcript_limits: exportControls.transcript_limits,
+            closures: production.candidateLocator.release_units.flatMap((unit) =>
+              unit.package_roster.map((pkg) => ({
+                package_id: pkg.package_id,
+                expected: production.expected,
+                bytes: encodeReleasePolicyClosure(
+                  createReleasePolicyClosure({ plan: receipt, resolution }),
+                  exportControls.transport_limits,
+                ),
+              })),
+            ),
+          },
+        });
+  const exportLimits =
+    exportControls === 'unavailable' ? undefined : copy(exportControls.transcript_limits);
   let pinnedRequest: ReleaseLifecycleRequest | undefined;
   let activeLane = production;
   let fixtureSucceeded = false;
@@ -647,13 +727,20 @@ export function createProtectedReleaseHostRunner(
     },
     artifact_reader(request) {
       requireProduction(request);
-      return artifacts;
+      return exportDelivery?.reader ?? artifacts;
+    },
+    export_limits(request) {
+      requireProduction(request);
+      return exportLimits === undefined ? undefined : copy(exportLimits);
     },
     publication_signature_verifier(request) {
       requireProduction(request);
       return verifySignature;
     },
-    provider: () => undefined,
+    provider(action, request) {
+      requireProduction(request);
+      return action === 'release export' ? exportDelivery?.provider : undefined;
+    },
     offline_verification_provider: () => undefined,
     authorization: () => undefined,
     offline_receipt_verifier: () => undefined,
@@ -689,6 +776,7 @@ export function createProtectedReleaseHostRunner(
             'release preflight',
             'release certify',
             'release prepare',
+            ...(exportDelivery === undefined ? [] : ['release export']),
             'release resume',
           ].includes(action)
         )
