@@ -36,7 +36,11 @@ import {
   validateReleaseLifecycleRequest,
 } from '../../src/services/release-lifecycle-execution.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release-lifecycle-local-adapters.js';
-import { createContainerReleaseCertificationAdapters } from '../../src/services/release-certification-provider.js';
+import {
+  createContainerReleaseCertificationAdapters,
+  isVerifiedProtectedPreflightObservation,
+  takeProtectedPreflightObservation,
+} from '../../src/services/release-certification-provider.js';
 import { createResolvedReleasePlanInputResolver } from '../../src/services/release-policy-resolution.js';
 import { createFilesystemLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 import type {
@@ -59,6 +63,17 @@ vi.mock('../../src/services/release-certification-container.js', () => ({
     }
     verifyRuntime(): void {
       containerRuns();
+    }
+    execute(input: { readonly declared_outputs: readonly string[] }) {
+      containerRuns();
+      return {
+        result: { status: 0, signal: null, stdout: '', stderr: '' },
+        outputs: input.declared_outputs.map((path) => ({
+          path,
+          mode: '100644',
+          bytes: Buffer.from('protected preflight observation\n', 'utf8'),
+        })),
+      };
     }
   },
 }));
@@ -435,11 +450,14 @@ describe('release lifecycle command adapter composition', () => {
           argv: ['node', '-e', 'process.exit(0)'],
           cwd: '.',
           executable: { path: '/usr/local/bin/node', sha256: 'f'.repeat(64) },
-          outputContract: { kind: 'tracked-files', paths: [] },
+          outputContract: {
+            kind: 'test',
+            paths: ['reports/preflight-observation.json'],
+          },
         },
       ],
     };
-    runChecks.mockReturnValue({
+    const protectedReport = {
       schemaVersion: '1.0.0',
       operation: 'run',
       plan: protectedPlan,
@@ -459,6 +477,19 @@ describe('release lifecycle command adapter composition', () => {
         value: {},
       },
       exitCode: 0,
+    };
+    runChecks.mockImplementation((options) => {
+      const task = protectedPlan.tasks[0];
+      if (options.executeTask !== undefined) {
+        if (task === undefined) throw new Error('missing protected preflight execution fixture');
+        expect(options.executeTask(task.argv, root, 1_000, {})).toMatchObject({
+          status: 0,
+          signal: null,
+          stdout: '',
+          stderr: '',
+        });
+      }
+      return protectedReport;
     });
     const protectedAdapters = createContainerReleaseCertificationAdapters({
       repository_root: root,
@@ -571,6 +602,77 @@ describe('release lifecycle command adapter composition', () => {
     expect(errorOutput.mock.calls, JSON.stringify(errorOutput.mock.calls)).toEqual([]);
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"preflight_passed"'));
 
+    expect(isVerifiedProtectedPreflightObservation(protectedAdapters.preflight_provider)).toBe(
+      false,
+    );
+    expect(() =>
+      takeProtectedPreflightObservation(protectedAdapters.preflight_provider, {
+        ...request,
+        candidate_locator: { ...request.candidate_locator, tree: '0'.repeat(40) },
+      }),
+    ).toThrow('release-certification-preflight-observation-unavailable');
+    expect(() =>
+      takeProtectedPreflightObservation(protectedAdapters.preflight_provider, request),
+    ).toThrow('release-certification-preflight-observation-unavailable');
+
+    const observedSuccess = await withProtectedPreflightScope(
+      {
+        repository: request.repository_locator,
+        task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+        plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+        state_root: join(root, 'observation-state'),
+      },
+      () => protectedAdapters.preflight_provider(request),
+    );
+    expect(observedSuccess).toMatchObject({ outcome: 'success' });
+    const observation = takeProtectedPreflightObservation(
+      protectedAdapters.preflight_provider,
+      request,
+    );
+    expect(isVerifiedProtectedPreflightObservation(observation)).toBe(true);
+    expect(isVerifiedProtectedPreflightObservation({ read: observation.read })).toBe(false);
+    const firstRead = observation.read();
+    expect(firstRead).toMatchObject({
+      request,
+      execution_identity: {
+        container: { protocol: 'test-protected-container-boundary' },
+        environment: {},
+        toolchain: { node: 'v24.0.0' },
+      },
+      runs: [
+        {
+          binding: {
+            action_id: 'release preflight',
+            repository: request.repository_locator,
+            task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+            plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+          },
+          preflight_receipt: {},
+          output_census: [
+            {
+              path: 'reports/preflight-observation.json',
+              mode: '100644',
+              sha256: createHash('sha256')
+                .update('protected preflight observation\n', 'utf8')
+                .digest('hex'),
+              size_bytes: Buffer.byteLength('protected preflight observation\n', 'utf8'),
+              task_node: 'format',
+            },
+          ],
+        },
+      ],
+    });
+    const run = firstRead.runs[0];
+    const outputCensus = run?.output_census[0];
+    if (outputCensus === undefined) throw new Error('missing observation output fixture');
+    expect(Reflect.set(outputCensus, 'path', 'mutated.json')).toBe(true);
+    expect(observation.read().runs[0]?.output_census[0]?.path).toBe(
+      'reports/preflight-observation.json',
+    );
+    expect(() =>
+      takeProtectedPreflightObservation(protectedAdapters.preflight_provider, request),
+    ).toThrow('release-certification-preflight-observation-unavailable');
+
     const failedPreflightRoot = join(root, 'failed-preflight-state');
     runChecks.mockImplementationOnce(() => {
       throw new Error(`native runner fixture path ${root}`);
@@ -602,6 +704,9 @@ describe('release lifecycle command adapter composition', () => {
       expect.stringContaining('release-certification-task-failed'),
     );
     expect(errorOutput.mock.calls.flat().join('')).not.toContain(root);
+    expect(() =>
+      takeProtectedPreflightObservation(protectedAdapters.preflight_provider, request),
+    ).toThrow('release-certification-preflight-observation-unavailable');
     output.mockClear();
     errorOutput.mockClear();
 
