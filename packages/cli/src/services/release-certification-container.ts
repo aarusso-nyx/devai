@@ -70,6 +70,23 @@ function object(value: unknown): Record<string, unknown> {
 // Exiting PID 1 tears down the complete PID namespace, including detached descendants.
 const TASK_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){process.stderr.write('protected-container-toolchain-mismatch');process.exit(125)}const r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:'inherit',timeout:p.timeout_ms,shell:false});if(r.error||r.signal||r.status===null){process.stderr.write('protected-container-task-abnormal');process.exit(124)}process.exit(r.status);`;
 
+/** Exact non-inherited task environment shared by execution and private identity binding. */
+export function protectedContainerTaskEnvironment(
+  environment: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  return {
+    ...environment,
+    PATH: '/usr/local/bin:/usr/bin:/bin',
+    HOME: '/tmp',
+    TMPDIR: '/tmp',
+    CI: '1',
+    NO_COLOR: '1',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_OPTIONAL_LOCKS: '0',
+  };
+}
+
 export class ProtectedCertificationContainer {
   readonly #controls: ProtectedContainerControls;
   readonly #dependencies: readonly ProtectedContainerDependency[];
@@ -444,17 +461,7 @@ export class ProtectedCertificationContainer {
         argv: input.task.argv.slice(1),
         cwd: `/workspace/candidate${input.task.cwd === '.' ? '' : `/${input.task.cwd}`}`,
         timeout_ms: input.timeout_ms,
-        environment: {
-          ...input.environment,
-          PATH: '/usr/local/bin:/usr/bin:/bin',
-          HOME: '/tmp',
-          TMPDIR: '/tmp',
-          CI: '1',
-          NO_COLOR: '1',
-          GIT_CONFIG_NOSYSTEM: '1',
-          GIT_CONFIG_GLOBAL: '/dev/null',
-          GIT_OPTIONAL_LOCKS: '0',
-        },
+        environment: protectedContainerTaskEnvironment(input.environment),
       };
       this.#checked([
         'create',

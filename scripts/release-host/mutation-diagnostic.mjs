@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -34,6 +35,8 @@ const SIGNALS = [
 ];
 const MAX_OBSERVATION_BYTES = 8192;
 const MAX_REPORT_BYTES = 1024 * 1024;
+const FIXTURE_ROOT = '/workspace/candidate/packages/fixture/';
+const TARGETS = ['src/subject.ts', 'src/zero.ts'];
 const canonical = (value) =>
   JSON.stringify(value, (_key, item) =>
     item !== null && typeof item === 'object' && !Array.isArray(item)
@@ -50,6 +53,54 @@ const closed = (value, keys) =>
   typeof value === 'object' &&
   !Array.isArray(value) &&
   canonical(Object.keys(value).sort()) === canonical([...keys].sort());
+
+/** Fixed-fixture discovery only: no raw report establishes this independent census. */
+export function summarizeFixtureDiscovery(selected, result) {
+  assert(Array.isArray(selected) && selected.length === TARGETS.length);
+  assert.deepEqual(
+    selected.map(({ name }) => name),
+    TARGETS.map((path) => FIXTURE_ROOT + path),
+  );
+  assert(selected.every(({ content, mutate }) => typeof content === 'string' && mutate === true));
+  assert(Array.isArray(result.files) && result.files.length === TARGETS.length);
+  const instrumented = result.files
+    .map(({ name }) => {
+      assert(typeof name === 'string' && name.startsWith(FIXTURE_ROOT));
+      return name.slice(FIXTURE_ROOT.length);
+    })
+    .sort();
+  assert.deepEqual(instrumented, TARGETS);
+  assert(
+    Array.isArray(result.mutants) && result.mutants.length > 0 && result.mutants.length <= 1000,
+  );
+  const ids = new Set();
+  const byFile = new Map(TARGETS.map((path) => [path, []]));
+  for (const mutant of result.mutants) {
+    assert(typeof mutant.fileName === 'string' && mutant.fileName.startsWith(FIXTURE_ROOT));
+    const path = mutant.fileName.slice(FIXTURE_ROOT.length);
+    assert(byFile.has(path) && typeof mutant.id === 'string' && !ids.has(mutant.id));
+    ids.add(mutant.id);
+    byFile.get(path).push(mutant.id);
+  }
+  assert.equal(byFile.get('src/zero.ts').length, 0);
+  return {
+    algorithm: 'devai.fixed-fixture-instrumenter.v1',
+    instrumenter_version: '9.6.1',
+    options: { plugins: null, excludedMutations: [], ignorers: [] },
+    selected: selected.map(({ name, content }) => ({
+      path: name.slice(FIXTURE_ROOT.length),
+      source_sha256: createHash('sha256').update(content, 'utf8').digest('hex'),
+    })),
+    instrumented,
+    emitted: [...byFile]
+      .filter(([, ids]) => ids.length !== 0)
+      .map(([path, ids]) => ({
+        path,
+        mutant_ids: ids.sort(),
+        mutant_count: ids.length,
+      })),
+  };
+}
 
 /** Pure diagnostic data, never an execution capability or certification receipt. */
 export function summarizeDiagnostic({ status, signal, workerOutput, stdout, abnormal = false }) {
@@ -152,6 +203,36 @@ async function worker() {
     () => writeFileSync('/workspace/candidate/node_modules/.diagnostic-write', 'forbidden'),
     { code: 'EROFS' },
   );
+  // The public pinned instrumenter exposes zero-mutant inputs that the raw
+  // reporter intentionally omits. Resolve it through core's exact frozen graph.
+  const coreRequire = createRequire(require.resolve('@stryker-mutator/core/package.json'));
+  assert.equal(
+    JSON.parse(readFileSync(coreRequire.resolve('@stryker-mutator/instrumenter/package.json')))
+      .version,
+    '9.6.1',
+  );
+  const { Instrumenter } = await import(
+    pathToFileURL(coreRequire.resolve('@stryker-mutator/instrumenter')).href
+  );
+  const selected = TARGETS.map((path) => ({
+    name: FIXTURE_ROOT + path,
+    content: readFileSync(path, 'utf8'),
+    mutate: true,
+  }));
+  const instrumenter = new Instrumenter({
+    debug() {},
+    info() {},
+    warn() {},
+    error() {},
+    trace() {},
+    fatal() {},
+    isDebugEnabled: () => false,
+    isTraceEnabled: () => false,
+  });
+  const discovery = summarizeFixtureDiscovery(
+    selected,
+    await instrumenter.instrument(selected, { plugins: null, excludedMutations: [], ignorers: [] }),
+  );
   const { Stryker } = await import(pathToFileURL(require.resolve('@stryker-mutator/core')).href);
   const results = await new Stryker({ configFile: 'stryker.config.json' }).runMutationTest();
   let raw;
@@ -209,6 +290,17 @@ async function worker() {
   assert.equal(raw?.framework.version, '9.6.1');
   assert(Object.keys(raw.files).includes('src/subject.ts'));
   assert(Object.values(raw.files).flatMap((file) => file.mutants).length > 0);
+  assert.deepEqual(
+    Object.keys(raw.files).sort(),
+    discovery.emitted.map(({ path }) => path),
+  );
+  for (const emitted of discovery.emitted) {
+    assert.equal(raw.files[emitted.path].mutants.length, emitted.mutant_count);
+    assert.deepEqual(
+      raw.files[emitted.path].mutants.map(({ id }) => id).sort(),
+      emitted.mutant_ids,
+    );
+  }
   writeFileSync(
     'reports/mutation/compatibility.json',
     JSON.stringify({
@@ -224,6 +316,7 @@ async function worker() {
       realMutationObserved: true,
       certification: false,
       reusable: false,
+      discovery,
     }),
   );
 }

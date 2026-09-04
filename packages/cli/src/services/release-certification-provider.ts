@@ -19,6 +19,19 @@ import {
 } from './release-certification-container.js';
 import { createProtectedCandidateGitMetadata } from './release-certification-git.js';
 import { resolveProtectedGeneratedNamespaces } from './release-production-outputs.js';
+import {
+  attachProtectedToolchainFixtureCustody,
+  assertProtectedToolchainFixtureCompatibility,
+  bindProtectedToolchainFixtureContext,
+  createProtectedToolchainFixtureContext,
+  issueProtectedToolchainFixtureCompatibility,
+  observeProtectedToolchainFixtureInputs,
+  recordProtectedToolchainFixtureBinding,
+  type ProtectedToolchainFixtureContext,
+  type ProtectedToolchainFixtureCompatibility,
+} from './release-toolchain-fixture-compatibility.js';
+import type { ReleaseCandidateSnapshot } from './release-candidate-snapshot.js';
+import type { ReleasePackageSnapshot } from './release-package-snapshot.js';
 import { buildReleasePlanReceipt, verifyResolvedReleasePlanReceipt } from './release-lifecycle.js';
 import {
   isVerifiedReleasePolicyResolution,
@@ -77,6 +90,14 @@ export interface ContainerReleaseCertificationOptions {
     readonly task_node: string;
     readonly paths: readonly string[];
   }[];
+  /** Private source-owned fixture context; a candidate cannot construct this brand. */
+  readonly fixture_context?: ProtectedToolchainFixtureContext;
+  /** Fixed diagnostic construction on the existing host broker; never a CLI/request input. */
+  readonly toolchain_fixture?: {
+    readonly candidate: ReleaseCandidateSnapshot;
+    readonly installed_package: ReleasePackageSnapshot;
+    readonly production_resolution: VerifiedReleasePolicyResolution;
+  };
   readonly content_source: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'>;
   readonly evidence_sink: TrustedCertificationEvidenceSink;
 }
@@ -90,6 +111,21 @@ export interface ContainerReleaseCertificationAdapters {
 
 type Json = Readonly<Record<string, unknown>>;
 const protectedPreflightProviders = new WeakSet<ReleaseProvider>();
+const fixtureProviderCompatibility = new WeakMap<
+  ReleaseProvider,
+  ProtectedToolchainFixtureCompatibility
+>();
+
+/** Internal producer seam only. A lookalike provider or serialized result carries no credit. */
+export function assertProtectedFixtureProviderCompatibility(
+  provider: ReleaseProvider,
+  input: Parameters<typeof assertProtectedToolchainFixtureCompatibility>[1],
+): void {
+  const compatibility = fixtureProviderCompatibility.get(provider);
+  if (!protectedPreflightProviders.has(provider) || compatibility === undefined)
+    throw new Error('release-toolchain-fixture-compatibility-invalid');
+  assertProtectedToolchainFixtureCompatibility(compatibility, input);
+}
 
 /** Package-private execution observation, never a mutation grant or transferable receipt. */
 export interface ProtectedPreflightObservation {
@@ -116,6 +152,7 @@ export interface ProtectedFixtureDiagnosticCustody {
     readonly request: ReleaseLifecycleRequest;
     readonly execution_identity: Json;
     readonly runtime_identity: Json;
+    readonly fixture_input_identity?: Json;
     readonly outcome: 'success' | 'failure';
     readonly runs: readonly {
       readonly binding: Json;
@@ -348,12 +385,43 @@ export function createContainerReleaseCertificationAdapters(
       throw new Error('release-certification-plan-binding-invalid');
     return { plan, receipt, intent: object(plan.intent), preflight: plan.preflight_receipt };
   });
+  if (input.fixture_context !== undefined && input.toolchain_fixture !== undefined)
+    throw new Error('release-toolchain-fixture-compatibility-invalid');
+  const fixtureResolution = selected[0]?.plan.resolution;
+  let fixtureContext = input.fixture_context;
+  if (input.toolchain_fixture !== undefined) {
+    if (selected.length !== 1 || fixtureResolution === undefined)
+      throw new Error('release-toolchain-fixture-compatibility-invalid');
+    fixtureContext = createProtectedToolchainFixtureContext({
+      ...input.toolchain_fixture,
+      fixture_resolution: fixtureResolution,
+      controls,
+      dependencies: input.dependencies ?? [],
+      environment,
+      toolchain,
+    });
+  }
+  const fixtureIdentity =
+    fixtureContext === undefined
+      ? undefined
+      : bindProtectedToolchainFixtureContext(fixtureContext, {
+          container: container.identity,
+          environment,
+          toolchain,
+          resolutions: selected.map(({ plan }) => plan.resolution),
+          receipts: selected.map(({ receipt }) => ({
+            receipt_id: receipt.receipt_id,
+            receipt_digest_sha256: receipt.receipt_digest_sha256,
+          })),
+          diagnostic_outputs: diagnosticOutputs,
+        });
   const bindingIdentity = {
     container: container.identity,
     candidate_git_metadata: 'verified-candidate-shallow-v1',
     toolchain,
     environment,
     ...(diagnosticOutputs.length === 0 ? {} : { diagnostic_outputs: diagnosticOutputs }),
+    ...(fixtureIdentity === undefined ? {} : { fixture_input_identity: fixtureIdentity }),
     plans: selected.map(({ plan, receipt }) => ({
       receipt_id: receipt.receipt_id,
       receipt_digest_sha256: receipt.receipt_digest_sha256,
@@ -547,6 +615,8 @@ export function createContainerReleaseCertificationAdapters(
         task_policy_digest_sha256: planned.taskPolicyDigest,
       }),
     };
+    if (fixtureContext !== undefined && diagnosticRuns !== undefined)
+      recordProtectedToolchainFixtureBinding(fixtureContext, binding);
     let taskIndex = 0;
     const report = container.runBound(binding, () => {
       container.verifyRuntime();
@@ -554,6 +624,11 @@ export function createContainerReleaseCertificationAdapters(
         ...options,
         operation: 'run',
         executeTask: (argv, cwd, timeout, taskEnvironment) => {
+          if (
+            fixtureContext !== undefined &&
+            canonicalJson(taskEnvironment) !== canonicalJson(environment)
+          )
+            throw new Error('release-toolchain-fixture-compatibility-invalid');
           const task = planned.tasks[taskIndex++];
           if (
             task === undefined ||
@@ -710,6 +785,7 @@ export function createContainerReleaseCertificationAdapters(
   const preflight_provider: ReleaseProvider = async (request) => {
     if (active) return { outcome: 'failure', code: 'release-certification-provider-in-use' };
     active = true;
+    fixtureProviderCompatibility.delete(preflight_provider);
     preflightObservations.delete(preflight_provider);
     fixtureDiagnosticCustodies.delete(preflight_provider);
     const diagnosticRuns: CapturedDiagnosticRun[] = [];
@@ -723,6 +799,7 @@ export function createContainerReleaseCertificationAdapters(
         request,
         execution_identity: bindingIdentity,
         runtime_identity: runtimeIdentity,
+        ...(fixtureIdentity === undefined ? {} : { fixture_input_identity: fixtureIdentity }),
         outcome,
         runs: diagnosticRuns.map((run) => ({
           binding: run.binding,
@@ -765,6 +842,8 @@ export function createContainerReleaseCertificationAdapters(
         },
       });
       verifiedFixtureDiagnosticCustodies.add(custody);
+      if (fixtureContext !== undefined && outcome === 'success')
+        attachProtectedToolchainFixtureCustody(fixtureContext, custody);
       fixtureDiagnosticCustodies.set(preflight_provider, {
         request_digest: canonicalSha256(request),
         custody,
@@ -792,6 +871,13 @@ export function createContainerReleaseCertificationAdapters(
             throw new Error('release-certification-diagnostic-controls-invalid');
         }
       }
+      if (fixtureContext !== undefined)
+        observeProtectedToolchainFixtureInputs(fixtureContext, {
+          request,
+          source: source.source,
+          descriptor,
+          tasks: options.flatMap((option) => runCheckTasks(option).plan.tasks),
+        });
       const runs = options.map((option) =>
         execute(request, option, source.source, source.gitMetadata, diagnosticRuns),
       );
@@ -836,10 +922,24 @@ export function createContainerReleaseCertificationAdapters(
         observation,
       });
       retainDiagnostics('success');
+      if (input.toolchain_fixture !== undefined)
+        fixtureProviderCompatibility.set(
+          preflight_provider,
+          issueProtectedToolchainFixtureCompatibility(
+            takeProtectedFixtureDiagnosticCustody(preflight_provider, request),
+          ),
+        );
       return { outcome: 'success', material: stateMaterial };
     } catch (error) {
+      fixtureProviderCompatibility.delete(preflight_provider);
       preflightObservations.delete(preflight_provider);
-      retainDiagnostics('failure');
+      try {
+        retainDiagnostics('failure');
+      } catch {
+        // Invalid/consumed fixture context must not replace the original terminal
+        // failure with a rejected promise or expose a partially attached custody.
+        fixtureDiagnosticCustodies.delete(preflight_provider);
+      }
       return {
         outcome: 'failure',
         // Native/tool diagnostics are not ledger codes and can expose host paths.
