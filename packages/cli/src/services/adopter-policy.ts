@@ -1,5 +1,4 @@
 import { getValidator } from '@devai-nyx/schemas';
-import { canonicalJson } from '@devai-nyx/utils';
 import { resolveCanonicalPolicyContent, validateCanonicalPolicyContent } from '@devai-nyx/skills';
 
 export type JsonObject = Record<string, unknown>;
@@ -7,12 +6,7 @@ export type JsonObject = Record<string, unknown>;
 export interface AdopterPolicyMaterializationSources {
   readonly getValidator: typeof getValidator;
   readonly readPolicy: (
-    file:
-      | 'domains.json'
-      | 'thresholds.json'
-      | 'scorecard-na.json'
-      | 'glob-guards.json'
-      | 'release-verification.json',
+    file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
   ) => string;
 }
 
@@ -106,35 +100,15 @@ export function resolveAdopterPolicyMaterialization(
     throw new Error(`ADOPTER_POLICY_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
   }
 
-  // A binding that does not override a policy must not rewrite its bytes. Re-serializing
-  // an unchanged document would fork the adopter copy from the installed canonical source
-  // and break byte-identity with the operational-law materialization of the same file.
-  const unchanged = (
-    file:
-      | 'domains.json'
-      | 'thresholds.json'
-      | 'scorecard-na.json'
-      | 'glob-guards.json'
-      | 'release-verification.json',
-    value: unknown,
-  ): string => {
-    const canonical = (readPolicy as (name: string) => string)(file);
-    return canonicalJson(JSON.parse(canonical)) === canonicalJson(value)
-      ? canonical
-      : jsonBytes(value);
-  };
   const resolved = new Map<(typeof ADOPTER_POLICY_TARGETS)[number], string>([
     ['.devai/config/project.json', jsonBytes(project)],
-    ['.devai/config/domains.json', unchanged('domains.json', domains)],
-    ['.devai/config/thresholds.json', unchanged('thresholds.json', thresholds)],
-    ['.devai/config/scorecard-na.json', unchanged('scorecard-na.json', scorecardNa)],
-    ['.devai/config/glob-guards.json', unchanged('glob-guards.json', globGuards)],
+    ['.devai/config/domains.json', jsonBytes(domains)],
+    ['.devai/config/thresholds.json', jsonBytes(thresholds)],
+    ['.devai/config/scorecard-na.json', jsonBytes(scorecardNa)],
+    ['.devai/config/glob-guards.json', jsonBytes(globGuards)],
   ]);
   if (releaseVerification !== undefined) {
-    resolved.set(
-      '.devai/config/release-verification.json',
-      unchanged('release-verification.json', releaseVerification),
-    );
+    resolved.set('.devai/config/release-verification.json', jsonBytes(releaseVerification));
   }
   return resolved;
 }
