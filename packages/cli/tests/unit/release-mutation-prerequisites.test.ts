@@ -70,13 +70,19 @@ afterEach(() => {
 function certificationFixture() {
   const value = providerFixture();
   const { toolchain_fixture: _fixture, ...options } = value.options;
+  const [plan] = value.options.plans;
+  const receipt = plan?.receipt;
+  if (receipt === null || typeof receipt !== 'object' || Array.isArray(receipt))
+    throw new Error('fixture receipt missing');
+  const receiptDigest = (receipt as Readonly<Record<string, unknown>>)['receipt_digest_sha256'];
+  if (typeof receiptDigest !== 'string') throw new Error('fixture receipt digest missing');
   const request = { ...value.request, action_id: 'release certify' as const };
   const adapters = createContainerReleaseCertificationAdapters(options);
   const assembly = adapters.certification_provider(request);
   const expected: ProtectedMutationPrerequisiteBinding = {
     repository: request.repository_locator,
     release_unit: '@devai-toolchain/diagnostic',
-    release_plan_receipt_digest: value.options.plans[0]?.receipt.receipt_digest_sha256 ?? '',
+    release_plan_receipt_digest: receiptDigest,
     release_profile_digest: canonicalSha256(
       value.options.plans[0]?.release_verification_profile ?? {},
     ),

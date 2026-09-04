@@ -127,10 +127,16 @@ async function withScope<T>(callback: () => Promise<T>): Promise<T> {
   }
 }
 
-function options(
+type RunnerExecutor = (
+  ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
+) =>
+  | ReturnType<NonNullable<CheckRunnerOptions['executeTask']>>
+  | Promise<ReturnType<NonNullable<CheckRunnerOptions['executeTask']>>>;
+
+function options<T extends RunnerExecutor>(
   root: string,
-  executeTask: NonNullable<CheckRunnerOptions['executeTask']>,
-): CheckRunnerOptions {
+  executeTask: T,
+): Omit<CheckRunnerOptions, 'executeTask'> & { readonly executeTask: T } {
   return {
     repoRoot: root,
     target: 'local',

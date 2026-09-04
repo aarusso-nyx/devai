@@ -682,7 +682,10 @@ describe('release export transcript v2 mutation carrier', () => {
     ).toHaveLength(2);
     refusal(() =>
       encodeReleaseExportTranscriptV2(
-        { ...value, version: RELEASE_EXPORT_TRANSCRIPT_FORMAT } as ReleaseExportTranscriptV2,
+        {
+          ...value,
+          version: RELEASE_EXPORT_TRANSCRIPT_FORMAT,
+        } as unknown as ReleaseExportTranscriptV2,
         LIMITS,
       ),
     );

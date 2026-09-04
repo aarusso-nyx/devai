@@ -329,8 +329,16 @@ async function offlineFixture() {
       return Buffer.from(bytes);
     },
   };
+  // Deliberately partial transport-only state: this direct pure-kernel test does not exercise
+  // lifecycle parsing, signing, or store transitions. It supplies every field consumed below.
   const state = {
     schemaVersion: '2.1.0',
+    state: 'exported',
+    repository: fixture.selected.repository_locator,
+    candidate: {
+      commit: fixture.selected.candidate_locator.commit,
+      tree: fixture.selected.candidate_locator.tree,
+    },
     release_units: [
       {
         ...releaseUnit,
@@ -346,7 +354,7 @@ async function offlineFixture() {
       committed_manifest_size_bytes: committed.size_bytes,
       commit_protocol: 'devai.artifact-sink.two-phase.v1',
     },
-  } as ReleaseLifecycleStateV2;
+  } as unknown as ReleaseLifecycleStateV2;
   return { fixture, reader, state, limits, artifacts };
 }
 
@@ -407,7 +415,7 @@ describe('release export mutation evidence capture', () => {
   it('refuses forged tokens and every expected candidate, plan, material, and input drift', async () => {
     const fixture = await requiredFixture();
     const token = await createReleaseExportMutationEvidence(fixture.input);
-    const foreign = { kind: 'protected-release-export-mutation-evidence' };
+    const foreign = { kind: 'protected-release-export-mutation-evidence' } as const;
     refusal(() => readReleaseExportMutationEvidence(foreign, fixture.expected));
     const [input] = fixture.expected.inputs;
     if (input === undefined) throw new Error('fixture input missing');
@@ -574,7 +582,13 @@ describe('release export mutation evidence capture', () => {
 
     const offlineCorrupt = await offlineFixture();
     const provider = offlineCorrupt.state.release_units[0]?.packages[0]?.provider_result;
-    if (provider === undefined || provider === null) throw new Error('fixture provider missing');
+    if (
+      provider === undefined ||
+      provider === null ||
+      !('opaque_handle' in provider) ||
+      typeof provider.opaque_handle !== 'string'
+    )
+      throw new Error('fixture provider missing');
     const bytes = offlineCorrupt.artifacts.get(provider.opaque_handle);
     if (bytes === undefined) throw new Error('fixture provider bytes missing');
     const corrupt = Buffer.from(bytes);
