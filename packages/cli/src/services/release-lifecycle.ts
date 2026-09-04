@@ -8,6 +8,10 @@ import {
   type ReleasePlanReceipt,
 } from '@devai-nyx/loop';
 import { resolveReleaseVerification } from './release-profile.js';
+import {
+  isVerifiedReleasePolicyResolution,
+  type VerifiedReleasePolicyResolution,
+} from './release-policy-resolution.js';
 
 export interface ReleaseIntentDocument {
   readonly schemaVersion: '1.0.0';
@@ -38,6 +42,8 @@ interface ReleaseLifecyclePolicyDocument {
       readonly source: string;
       readonly schema: string;
       readonly canonical_bytes: string;
+      readonly origin?: string;
+      readonly path?: string;
     }[];
   };
   readonly states: readonly {
@@ -86,26 +92,85 @@ const PLAN_KERNEL = {
   ],
 } as const;
 
+const PLAN_KERNEL_V3 = {
+  ...PLAN_KERNEL,
+  kernel_id: 'devai.kernel.release-plan-receipt.v3',
+  determination_contract: 'dist/law/policy/release-lifecycle.json#/plan_determination',
+  algorithm: [
+    'verify-policy-resolution-against-external-expected-package-candidate-and-complete-binding-evidence-before-resolving-inputs',
+    ...PLAN_KERNEL.algorithm.map((step, index) =>
+      index === 1
+        ? 'require-the-exact-four-ordered-input-kinds-origins-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination'
+        : step,
+    ),
+  ],
+  errors: [
+    ...PLAN_KERNEL.errors,
+    'rpl-policy-source-unresolved',
+    'rpl-package-identity-mismatch',
+    'rpl-adopter-binding-mismatch',
+    'rpl-policy-resolution-mismatch',
+    'rpl-legacy-plan-non-authoritative',
+  ],
+} as const;
+
 function inputPath(kind: string, intentPath: string, source: string): string {
   return kind === 'release-intent' ? intentPath : source;
 }
 
 export function buildReleasePlanReceipt(input: {
   readonly repository_id: string;
-  readonly intent_path: string;
+  readonly intent_path?: string;
   readonly intent: unknown;
   readonly release_verification_profile: unknown;
   readonly release_lifecycle_policy: unknown;
   readonly action_registry: unknown;
+  readonly resolution?: VerifiedReleasePolicyResolution;
 }): ReleasePlanReceipt {
-  const intent = parsers.releaseIntent.parse<ReleaseIntentDocument>(input.intent);
-  const profile = parsers.releaseVerificationProfile.parse<ReleaseVerificationProfileDocument>(
-    input.release_verification_profile,
-  );
-  const lifecycle = parsers.releaseLifecyclePolicy.parse<ReleaseLifecyclePolicyDocument>(
-    input.release_lifecycle_policy,
-  );
-  parsers.actionRegistry.parse(input.action_registry);
+  const resolution = input.resolution;
+  if (resolution !== undefined && !isVerifiedReleasePolicyResolution(resolution))
+    throw new Error('rpl-policy-resolution-mismatch');
+  if (resolution === undefined && input.intent_path === undefined)
+    throw new Error('rpl-input-unresolved');
+  const intent =
+    resolution === undefined
+      ? parsers.releaseIntent.parse<ReleaseIntentDocument>(input.intent)
+      : resolution.tools.parse<ReleaseIntentDocument>('release-intent.schema.json', input.intent);
+  const profile =
+    resolution === undefined
+      ? parsers.releaseVerificationProfile.parse<ReleaseVerificationProfileDocument>(
+          input.release_verification_profile,
+        )
+      : resolution.tools.parse<ReleaseVerificationProfileDocument>(
+          'release-verification-profile.schema.json',
+          input.release_verification_profile,
+        );
+  const lifecycle =
+    resolution === undefined
+      ? parsers.releaseLifecyclePolicy.parse<ReleaseLifecyclePolicyDocument>(
+          input.release_lifecycle_policy,
+        )
+      : resolution.tools.parse<ReleaseLifecyclePolicyDocument>(
+          'release-lifecycle-policy.schema.json',
+          input.release_lifecycle_policy,
+        );
+  if (resolution === undefined) parsers.actionRegistry.parse(input.action_registry);
+  else {
+    resolution.tools.parse('action-registry.schema.json', input.action_registry);
+    if (
+      resolution.repository.id !== input.repository_id ||
+      resolution.repository.commit !== intent.candidate.commit ||
+      resolution.repository.tree !== intent.candidate.tree ||
+      resolution.release_unit !== intent.release_unit ||
+      canonicalSha256(resolution.readInput('release-verification-profile')) !==
+        canonicalSha256(input.release_verification_profile) ||
+      canonicalSha256(resolution.readInput('release-lifecycle-policy')) !==
+        canonicalSha256(input.release_lifecycle_policy) ||
+      canonicalSha256(resolution.readInput('action-registry-policy')) !==
+        canonicalSha256(input.action_registry)
+    )
+      throw new Error('rpl-policy-resolution-mismatch');
+  }
 
   const documents = new Map<string, unknown>([
     ['release-intent', intent],
@@ -123,7 +188,12 @@ export function buildReleasePlanReceipt(input: {
       kind: required.kind,
       source: required.source,
       schema: required.schema,
-      path: inputPath(required.kind, input.intent_path, required.source),
+      ...(resolution === undefined
+        ? { path: inputPath(required.kind, input.intent_path ?? '', required.source) }
+        : {
+            origin: required.origin,
+            ...(required.kind === 'release-intent' ? {} : { path: required.path }),
+          }),
       canonical_bytes: required.canonical_bytes,
       ...(required.kind === 'release-intent' ? { inline_document: intent } : {}),
       sha256: canonicalSha256(document),
@@ -167,8 +237,8 @@ export function buildReleasePlanReceipt(input: {
         }))
     : [];
   const blockingReason = decision.blockingReasons[0];
-  return finalizeReleasePlanReceipt({
-    schemaVersion: '1.0.0',
+  const draft = {
+    schemaVersion: resolution === undefined ? '1.0.0' : '2.0.0',
     receipt_kind: 'release-plan-receipt',
     canonicalization: PLAN_CANONICALIZATION,
     state_observed: passed ? 'planned' : null,
@@ -193,7 +263,8 @@ export function buildReleasePlanReceipt(input: {
       },
       blocking_reasons: decision.blockingReasons,
     },
-    verification_kernel: PLAN_KERNEL,
+    verification_kernel: resolution === undefined ? PLAN_KERNEL : PLAN_KERNEL_V3,
+    ...(resolution === undefined ? {} : { policy_resolution: resolution.resolution }),
     emitted_by: {
       action_id: 'release plan',
       effect: 'read',
@@ -213,7 +284,51 @@ export function buildReleasePlanReceipt(input: {
       derived_from_bound_inputs_only: true,
       contains_wall_clock_time: false,
     },
-  } as never);
+  };
+  if (resolution === undefined) return finalizeReleasePlanReceipt(draft as never);
+  const digest = canonicalSha256(draft);
+  return resolution.tools.parse<ReleasePlanReceipt>('release-plan-receipt-v2.schema.json', {
+    ...draft,
+    receipt_id: `RPL-${digest.slice(0, 16)}`,
+    receipt_digest_sha256: digest,
+  });
+}
+
+export function buildResolvedReleasePlanReceipt(input: {
+  readonly intent: unknown;
+  readonly resolution: VerifiedReleasePolicyResolution;
+}): ReleasePlanReceipt {
+  if (!isVerifiedReleasePolicyResolution(input.resolution))
+    throw new Error('rpl-policy-resolution-mismatch');
+  return buildReleasePlanReceipt({
+    repository_id: input.resolution.repository.id,
+    intent: input.intent,
+    resolution: input.resolution,
+    release_verification_profile: input.resolution.readInput('release-verification-profile'),
+    release_lifecycle_policy: input.resolution.readInput('release-lifecycle-policy'),
+    action_registry: input.resolution.readInput('action-registry-policy'),
+  });
+}
+
+export function verifyResolvedReleasePlanReceipt(input: {
+  readonly receipt: unknown;
+  readonly resolution: VerifiedReleasePolicyResolution;
+}): boolean {
+  try {
+    if (!isVerifiedReleasePolicyResolution(input.resolution)) return false;
+    const receipt = input.resolution.tools.parse<ReleasePlanReceipt>(
+      'release-plan-receipt-v2.schema.json',
+      input.receipt,
+    );
+    const inputs = receipt['inputs'] as readonly { readonly inline_document?: unknown }[];
+    const expected = buildResolvedReleasePlanReceipt({
+      intent: inputs[0]?.inline_document,
+      resolution: input.resolution,
+    });
+    return canonicalSha256(expected) === canonicalSha256(receipt);
+  } catch {
+    return false;
+  }
 }
 
 export function verifyReleasePlanReceipt(input: {

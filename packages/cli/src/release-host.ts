@@ -6,6 +6,27 @@ import {
 
 export { invokeDevaiCli, startDevaiCli, type CliInvocationResult } from './cli-runtime.js';
 export {
+  verifyReleasePackageSnapshot,
+  type ReleasePackageSnapshot,
+  type ReleasePackageIdentity,
+} from './services/release-package-snapshot.js';
+export {
+  verifyReleaseCandidateSnapshot,
+  type ReleaseCandidateSnapshot,
+  type ReleaseGitObject,
+} from './services/release-candidate-snapshot.js';
+export {
+  resolveReleasePolicySnapshot,
+  type ReleasePolicyExpectedIdentity,
+  type VerifiedReleasePolicyResolution,
+} from './services/release-policy-resolution.js';
+export {
+  createReleasePolicyClosure,
+  verifyReleasePolicyClosure,
+  type ReleasePolicyClosure,
+  type ReleasePolicyClosureLimits,
+} from './services/release-policy-closure.js';
+export {
   createContainerReleaseCertificationAdapters,
   type ContainerReleaseCertificationAdapters,
   type ContainerReleaseCertificationOptions,

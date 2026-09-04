@@ -4,6 +4,8 @@ export interface ReleaseCandidateSnapshot {
   readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
   readonly paths: readonly string[];
   readonly read: (path: string) => Buffer;
+  /** Complete tree census and exactly the requested regular-file blobs, all copied. */
+  readonly readProof: (paths: readonly string[]) => ReadonlyMap<string, ReleaseGitObject>;
 }
 
 export interface ReleaseGitObject {
@@ -135,6 +137,22 @@ export function verifyReleaseCandidateSnapshot(input: {
         if (entry === undefined || (entry.mode !== '100644' && entry.mode !== '100755'))
           return fail();
         return Buffer.from(readObject(entry.id, 'blob'));
+      },
+      readProof: (paths: readonly string[]): ReadonlyMap<string, ReleaseGitObject> => {
+        const selected = new Map<string, ReleaseGitObject>();
+        const add = (id: string, type: ReleaseGitObject['type']): void => {
+          selected.set(id, Object.freeze({ type, bytes: Buffer.from(readObject(id, type)) }));
+        };
+        add(repository.commit, 'commit');
+        for (const tree of pending) add(tree.id, 'tree');
+        if (new Set(paths).size !== paths.length) return fail();
+        for (const path of paths) {
+          const entry = files.get(path);
+          if (entry === undefined || (entry.mode !== '100644' && entry.mode !== '100755'))
+            return fail();
+          add(entry.id, 'blob');
+        }
+        return selected;
       },
     });
     verifiedSnapshots.add(snapshot);
