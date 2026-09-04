@@ -21,7 +21,7 @@ affected_rules:
   - law/schemas/release-verification-profile.schema.json
 inspector_acceptance:
   - IA-001 -- A package execution receipt can be committed only by the existing certification-evidence sink after the canonical source verifier has checked one protected, complete, passing pair against its exact candidate, plan, profile, policy, template, task, environment, toolchain and whole-roster input identity. Failed, incomplete, unknown and diagnostic material never become a readable receipt or reusable origin.
-  - IA-002 -- A resumed package is reusable only when the exact committed record, its canonical receipt and both canonical pair documents rehash and agree field-for-field with the current v2.2 output contract, final unit receipt referent and external offline expectations. Every missing, extra, noncanonical, stale, foreign, mismatched or caller-supplied substitute refuses.
+  - IA-002 -- A reused v2.2 package accepts only one exact closed origin: a same-candidate MPE1 record or an existing fully resolved semantic receipt for cross-candidate reuse. It must rehash and agree field-for-field with the current v2.2 output contract, final unit receipt referent and external offline expectations. Every missing, extra, noncanonical, stale, foreign, mismatched or caller-supplied substitute refuses.
   - IA-003 -- A final mutation-required release retains exactly the ADR-MUT-0008 `2N + 2` members. The embedded reusable execution receipt is byte-bound inside the v2.2 summary, never a member, tarball entry, ArtifactSink kind, state row, separate signer operation or independent campaign pass.
   - IA-004 -- Lost-commit reconciliation reads the exact committed record once: an exact record becomes reused, an absent record requires a newly protected execution under the ordinary attempt ledger, and ambiguity stops as unknown. Unindexed bytes are never recovered or promoted, although a new independently verified transaction may use ordinary content-addressed deduplication.
   - IA-005 -- The v2.1 reader rejects every v2.2 contract, composition, summary and semantic receipt while preserving exact historical v2.1 reads. The v2.2 reader consumes byte-identical v2.1 report, package-result and input-projection pairs without translating or rewriting them.
@@ -204,17 +204,20 @@ recover, enumerate, promote or recommit an old unindexed object.
 
 ### Same-campaign reuse and reconciliation
 
-A v2.2 composition marks a package `reused` only with this embedded origin:
-
-```text
-{ kind: "mutation-package-execution-origin-v1", receipt: <complete MPE1> }
-```
-
-Digest-only, handle-only, partial or callback-resolved forms refuse.
-`executed` retains null origin. The old complete semantic-receipt origin remains
-available only by its existing route. MPE1 permits same repository, candidate,
-release unit, plan, profile, policy, template and task reuse; it deliberately
-does not widen cross-candidate reuse.
+An executed v2.2 package retains null origin. A reused package carries exactly
+one closed origin alternative: (1)
+`{ kind: "mutation-package-execution-origin-v1", receipt: <complete MPE1> }`
+for same-campaign reuse, or (2) the existing complete semantic-receipt origin
+`{ candidate, semanticReceiptDigest, evidenceSetDigest }` resolved only through
+the existing protected origin resolver for cross-candidate reuse. The MPE1
+route permits only the exact same repository, candidate, release unit, plan,
+profile, policy, template and task; digest-only, handle-only, partial or
+callback-resolved MPE forms refuse. The semantic-receipt route retains every
+existing protected resolver, complete producing composition, semantic
+verification, provenance, policy, input and pass check; no digest-shaped
+substitute is authority. A v2.2 complete producing composition and semantic
+receipt is consumed only under those exact v2.2 checks. v2.1 readers and
+emitters remain unchanged and refuse v2.2 documents.
 
 For issuance and exact-record reading, the DEVAI protected host first verifies
 the current plan with `verifyResolvedReleasePlanReceipt` and a genuine
@@ -236,15 +239,16 @@ identical bytes through normal content addressing after independent validation.
 
 ### Final closure and portable verification
 
-MPE1 is embedded in the v2.2 summary's reused origin. It is not an additional
-unit-closure member. The final mutation-required unit continues to contain
-exactly `2N + 2` members: one report/result pair per required package, one
-summary and one semantic receipt. The existing external unit receipt binds the
-summary bytes, and the existing signed export transcript binds the closure.
+When used, MPE1 is embedded in the v2.2 summary's reused origin. It is not an
+additional unit-closure member. The final mutation-required unit continues to
+contain exactly `2N + 2` members: one report/result pair per required package,
+one summary and one semantic receipt. The existing external unit receipt binds
+the summary bytes, and the existing signed export transcript binds the closure.
 
 Pure canonical and offline verification never asks for a host WeakMap brand,
-checkout, sink reader, candidate callback or live policy resolver. It verifies
-MPE1 only against already verified portable values:
+checkout, sink reader, candidate callback or live policy resolver. When the
+origin is MPE1, it verifies the embedded receipt only against already verified
+portable values:
 
 - `repositoryId` equals the external expected repository and final unit-receipt
   referent repository;
@@ -257,10 +261,13 @@ MPE1 only against already verified portable values:
 - MPE1 provenance equals the final semantic receipt provenance and the
   current pinned canonical provenance.
 
-Consequently an offline consumer rehashes and semantically verifies only the
-signed portable closure. It treats a missing, substituted, noncanonical or
-inconsistent MPE1 as refusal; it never treats the receipt by itself as signed
-release evidence, a campaign pass, a publication proof or an offline fallback.
+The complete semantic-receipt origin is resolved only during protected
+certification. Offline verification rehashes and semantically verifies the
+signed current semantic receipt and portable closure; it never invokes that
+resolver. It treats a missing, substituted, noncanonical or inconsistent MPE1
+when present, or an inconsistent complete semantic origin, as refusal; neither
+origin is by itself signed release evidence, a campaign pass, a publication
+proof or an offline fallback.
 
 ### Profile scope
 
@@ -348,7 +355,10 @@ control-character path, receipt path/member mismatch, wrong execution-binding
 field, task digest absent from the final referent, changed plan/profile/policy
 resolution, wrong candidate or release unit, stale/foreign record, commit lost
 response, unindexed blob recovery attempt, and cross-candidate MPE1 replay.
-Each refuses without a final unit receipt. Demonstrate a newly protected
+Each refuses without a final unit receipt. Demonstrate exact cross-candidate
+complete-semantic-origin reuse passes only through the existing protected
+resolver, while offline verification uses the signed current semantic receipt
+and portable closure without that resolver. Demonstrate a newly protected
 execution may deduplicate byte-identical physical objects only after new source
 validation and transaction verification. Demonstrate restart after one
 committed package creates a mixed v2.2 composition without re-running that
