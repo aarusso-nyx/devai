@@ -164,7 +164,12 @@
         "required": ["authorization_event_id", "provider_handle", "unknown"],
         "properties": {
           "action_id": {
-            "enum": ["release prepare", "release evidence-publish", "release publish"]
+            "enum": [
+              "release prepare",
+              "release export",
+              "release evidence-publish",
+              "release publish"
+            ]
           },
           "completion": { "type": "null" },
           "failure": { "type": "null" },
