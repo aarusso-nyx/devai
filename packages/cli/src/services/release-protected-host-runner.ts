@@ -35,9 +35,15 @@ import { buildResolvedReleasePlanReceipt } from './release-lifecycle.js';
 import { canonicalContainerPath } from './container-archive.js';
 import {
   createContainerReleaseCertificationAdapters,
+  createContainerReleasePreflightProvider,
   type ContainerReleaseCertificationOptions,
   type ProtectedReleasePlanMaterial,
 } from './release-certification-provider.js';
+import {
+  buildReleaseMutationInputPlanV21,
+  type ReleaseMutationInputControlsV21,
+  type ReleaseMutationInputPlanV21,
+} from './release-mutation-inputs.js';
 import {
   createReleaseCertificationEvidenceStore,
   type ReleaseCertificationEvidenceStoreOptions,
@@ -62,12 +68,9 @@ export interface ProtectedReleaseInputFile {
   readonly sha256: string;
 }
 
-export interface ProtectedReleaseHostRunnerControls {
-  /** Use the exact object returned by bootstrapReleaseHost, never a source-mode snapshot. */
-  readonly installed_package: ReleasePackageSnapshot;
+export interface ProtectedReleaseHostLaneControls {
   readonly candidate: ReleaseCandidateSnapshot;
   readonly expected: ReleasePolicyExpectedIdentity;
-  readonly producer?: Parameters<typeof resolveReleasePolicySnapshot>[0]['producer'];
   readonly repository_root: string;
   readonly repository_identity: {
     readonly authority_repository_id: string;
@@ -89,6 +92,18 @@ export interface ProtectedReleaseHostRunnerControls {
   readonly execution: Pick<
     ContainerReleaseCertificationOptions,
     'controls' | 'dependencies' | 'environment' | 'toolchain' | 'timeout_ms'
+  >;
+}
+
+export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHostLaneControls {
+  /** Use the exact object returned by bootstrapReleaseHost, never a source-mode snapshot. */
+  readonly installed_package: ReleasePackageSnapshot;
+  readonly producer?: Parameters<typeof resolveReleasePolicySnapshot>[0]['producer'];
+  /** A fixed diagnostic preflight lane, prebound in this same process. No store or signer. */
+  readonly toolchain_fixture?: ProtectedReleaseHostLaneControls;
+  readonly mutation_inputs?: Pick<
+    ReleaseMutationInputControlsV21,
+    'execution_coverage' | 'maximum_source_bytes' | 'maximum_source_entries'
   >;
   readonly certification_store: ReleaseCertificationEvidenceStoreOptions;
   readonly artifact_store: Omit<ReleaseArtifactStoreOptions, 'binding'>;
@@ -120,6 +135,9 @@ export interface ProtectedReleaseHostRunner {
   /** Copies, not live provider state. These methods do not persist receipts or advance the lifecycle. */
   readonly readPlan: () => Readonly<Record<string, unknown>>;
   readonly readPolicyClosure: () => ReleasePolicyClosure;
+  readonly readFixturePlan: () => Readonly<Record<string, unknown>>;
+  /** Serial diagnostic projection only, not a derived-plan brand or execution grant. */
+  readonly readMutationInputPlan: () => Omit<ReleaseMutationInputPlanV21, 'readProof'>;
   readonly invoke: (input: ProtectedReleaseHostInvocation) => Promise<CliInvocationResult>;
 }
 
@@ -190,54 +208,15 @@ function regularInput(input: ProtectedReleaseInputFile, maximum: number): unknow
   }
 }
 
-/**
- * Package-owned external-host composition, called on the runtime returned by the
- * approved bootstrap/provisioner. Controls and producer approval belong to the
- * operator, never a candidate, environment loader, request or task subprocess.
- * Construct once before invoking the CLI. This installs real container and durable
- * store adapters; it creates no directories and writes no intent/request files.
- *
- * One release unit is supported here because the current prepare capacity binding
- * requires one plan receipt. Its complete package roster and the profile's full
- * mutation/task populations are preserved; the multi-unit kernels are unchanged.
- * Export, offline verification and remote publication are not implemented here.
- *
- * Invoke sequentially with operator-prepared digest-pinned files. No auto retry,
- * next-action dispatch, adapter disposal, cwd change or authority inference occurs.
- * The operator owns input paths for the invocation lifetime: descriptor revalidation
- * detects races but is not native openat containment or protection against ABA.
- */
-export function createProtectedReleaseHostRunner(
-  input: ProtectedReleaseHostRunnerControls,
-): ProtectedReleaseHostRunner {
-  assertCliInvocationIdle();
-  if (installed) fail('release-host-runner-already-installed');
-  closed(
-    input,
-    [
-      'installed_package',
-      'candidate',
-      'expected',
-      'repository_root',
-      'state_root',
-      'maximum_input_bytes',
-      'unit',
-      'execution',
-      'certification_store',
-      'artifact_store',
-      'publication_signature_verifier',
-      'repository_identity',
-      'later_stages',
-    ],
-    ['producer'],
-  );
-  assertBoundReleaseHostPackageSnapshot(input.installed_package);
+/** Capture one immutable lane without installing adapters or constructing stores. */
+function captureReleaseHostLane(
+  input: ProtectedReleaseHostLaneControls & {
+    readonly installed_package: ReleasePackageSnapshot;
+    readonly producer?: ProtectedReleaseHostRunnerControls['producer'];
+  },
+) {
   if (!isVerifiedReleaseCandidateSnapshot(input.candidate)) fail();
-  closed(input.later_stages, ['export', 'offline_verify']);
   if (
-    input.later_stages.export !== 'unavailable' ||
-    input.later_stages.offline_verify !== 'unavailable' ||
-    typeof input.publication_signature_verifier !== 'function' ||
     !Number.isSafeInteger(input.maximum_input_bytes) ||
     input.maximum_input_bytes < 1 ||
     input.maximum_input_bytes > 0x7fffffff
@@ -249,9 +228,22 @@ export function createProtectedReleaseHostRunner(
   const stateRoot = path(input.state_root);
   const stateNamespace = resolve(root, '.devai/state/release-lifecycle');
   if (stateRoot !== stateNamespace && !stateRoot.startsWith(`${stateNamespace}${sep}`)) fail();
-  const cwd = process.cwd();
-  const maximum = input.maximum_input_bytes;
-  const verifySignature = input.publication_signature_verifier;
+  const execution: ProtectedReleaseHostLaneControls['execution'] = {
+    ...copy({
+      controls: input.execution.controls,
+      environment: input.execution.environment,
+      toolchain: input.execution.toolchain,
+      timeout_ms: input.execution.timeout_ms,
+    }),
+    ...(input.execution.dependencies === undefined
+      ? {}
+      : {
+          dependencies: input.execution.dependencies.map(({ archive, ...dependency }) => ({
+            ...copy(dependency),
+            archive: Buffer.from(archive),
+          })),
+        }),
+  };
   const candidate = input.candidate;
   const repository = copy(candidate.repository);
   closed(input.repository_identity, [
@@ -382,11 +374,151 @@ export function createProtectedReleaseHostRunner(
       return bytes;
     },
   };
+  const material: ProtectedReleasePlanMaterial = {
+    receipt,
+    resolution,
+    intent_path: 'invocation',
+    intent: unit.intent,
+    release_verification_profile: resolution.readInput('release-verification-profile'),
+    release_lifecycle_policy: resolution.readInput('release-lifecycle-policy'),
+    action_registry: resolution.readInput('action-registry-policy'),
+    packages: packages.map((pkg) => pkg.mapping),
+    ...(unit.preflight_receipt === undefined ? {} : { preflight_receipt: unit.preflight_receipt }),
+  };
+  return {
+    root,
+    stateRoot,
+    candidate,
+    repository,
+    repositoryContext,
+    unit,
+    resolution,
+    receipt,
+    candidateLocator,
+    git,
+    material,
+    execution,
+    maximum: input.maximum_input_bytes,
+  };
+}
+
+/**
+ * Package-owned host composition, called once on the approved bootstrap runtime.
+ * Controls and producer approval belong to the operator, never candidate code.
+ * A campaign binds one production release unit and optionally its fixed diagnostic
+ * preflight lane up front. Only production receives durable-store adapters; no
+ * provider, compatibility brand or derived mutation plan escapes this runner.
+ *
+ * Existing CLI actions run sequentially against digest-pinned inputs and exact
+ * prebound lane identities. No retry, next-action dispatch, adapter disposal,
+ * cwd change or authority inference occurs. Export, offline verification and
+ * remote publication remain unavailable. Input revalidation detects races but
+ * is not native openat containment or protection against ABA.
+ */
+export function createProtectedReleaseHostRunner(
+  input: ProtectedReleaseHostRunnerControls,
+): ProtectedReleaseHostRunner {
+  assertCliInvocationIdle();
+  if (installed) fail('release-host-runner-already-installed');
+  const laneFields = [
+    'candidate',
+    'expected',
+    'repository_root',
+    'state_root',
+    'maximum_input_bytes',
+    'unit',
+    'execution',
+    'repository_identity',
+  ];
+  closed(
+    input,
+    [
+      ...laneFields,
+      'installed_package',
+      'certification_store',
+      'artifact_store',
+      'publication_signature_verifier',
+      'later_stages',
+    ],
+    ['producer', 'toolchain_fixture', 'mutation_inputs'],
+  );
+  assertBoundReleaseHostPackageSnapshot(input.installed_package);
+  closed(input.later_stages, ['export', 'offline_verify']);
+  if (
+    input.later_stages.export !== 'unavailable' ||
+    input.later_stages.offline_verify !== 'unavailable' ||
+    typeof input.publication_signature_verifier !== 'function'
+  )
+    fail();
+  const cwd = process.cwd();
+  const production = captureReleaseHostLane(input);
+  const { root, repository, resolution, receipt, git, material } = production;
+  let fixture: ReturnType<typeof captureReleaseHostLane> | undefined;
+  if (Object.hasOwn(input, 'toolchain_fixture')) {
+    closed(input.toolchain_fixture, laneFields);
+    if (input.toolchain_fixture === undefined) return fail();
+    fixture = captureReleaseHostLane({
+      ...input.toolchain_fixture,
+      installed_package: input.installed_package,
+    });
+    if (
+      fixture.repository.id === repository.id ||
+      fixture.root === root ||
+      fixture.root.startsWith(`${root}${sep}`) ||
+      root.startsWith(`${fixture.root}${sep}`) ||
+      !same(fixture.execution.controls, production.execution.controls) ||
+      !same(fixture.execution.environment, production.execution.environment) ||
+      !same(fixture.execution.toolchain, production.execution.toolchain) ||
+      Object.hasOwn(fixture.unit, 'preflight_receipt') ||
+      Object.hasOwn(input.toolchain_fixture.unit, 'preflight_receipt')
+    )
+      fail();
+  }
+  const mutationInputs =
+    input.mutation_inputs === undefined ? undefined : copy(input.mutation_inputs);
+  if (Object.hasOwn(input, 'mutation_inputs')) {
+    closed(mutationInputs, [
+      'execution_coverage',
+      'maximum_source_bytes',
+      'maximum_source_entries',
+    ]);
+    if (fixture === undefined) fail();
+  }
+  const fixtureProvider =
+    fixture === undefined
+      ? undefined
+      : createContainerReleasePreflightProvider({
+          ...fixture.execution,
+          repository_root: fixture.root,
+          repository_id: fixture.repository.id,
+          plans: [fixture.material],
+          content_source: fixture.git,
+          diagnostic_outputs: [
+            {
+              task_node: 'diagnostic:mutation-toolchain',
+              paths: [
+                'packages/fixture/reports/mutation/compatibility.json',
+                'packages/fixture/reports/mutation/raw.json',
+              ],
+            },
+          ],
+          toolchain_fixture: {
+            candidate: fixture.candidate,
+            installed_package: input.installed_package,
+            production_resolution: resolution,
+          },
+        });
+  const verifySignature = input.publication_signature_verifier;
   const certificationOptions = copy(input.certification_store);
   const artifactOptions = copy(input.artifact_store);
+  // repository_roots is the store's exclusion census, not a write allowlist.
+  // Both candidates must be excluded so a production store cannot sit inside the fixture.
   if (
     !certificationOptions.repository_roots.includes(root) ||
     !artifactOptions.repository_roots.includes(root) ||
+    (fixture !== undefined &&
+      (!certificationOptions.repository_roots.includes(fixture.root) ||
+        !artifactOptions.repository_roots.includes(fixture.root))) ||
     resolve(certificationOptions.root) === resolve(artifactOptions.root)
   )
     fail();
@@ -401,19 +533,8 @@ export function createProtectedReleaseHostRunner(
       sink_id: artifactOptions.sink_id,
     },
   });
-  const material: ProtectedReleasePlanMaterial = {
-    receipt,
-    resolution,
-    intent_path: 'invocation',
-    intent: unit.intent,
-    release_verification_profile: resolution.readInput('release-verification-profile'),
-    release_lifecycle_policy: resolution.readInput('release-lifecycle-policy'),
-    action_registry: resolution.readInput('action-registry-policy'),
-    packages: packages.map((pkg) => pkg.mapping),
-    ...(unit.preflight_receipt === undefined ? {} : { preflight_receipt: unit.preflight_receipt }),
-  };
   const certification = createContainerReleaseCertificationAdapters({
-    ...input.execution,
+    ...production.execution,
     repository_root: root,
     repository_id: repository.id,
     plans: [material],
@@ -427,11 +548,14 @@ export function createProtectedReleaseHostRunner(
     readGeneratedBlob: (value) => evidence.readGeneratedBlob(value),
   };
   let pinnedRequest: ReleaseLifecycleRequest | undefined;
+  let activeLane = production;
+  let fixtureSucceeded = false;
   const assertRequest = (request: ReleaseLifecycleRequest) => {
     if (pinnedRequest !== undefined && !same(request, pinnedRequest)) fail(INPUT_INVALID);
     if (
-      !same(request.repository_locator, repository) ||
-      !same(request.candidate_locator, candidateLocator)
+      !same(request.repository_locator, activeLane.repository) ||
+      !same(request.candidate_locator, activeLane.candidateLocator) ||
+      (activeLane === fixture && request.action_id !== 'release preflight')
     )
       fail(INPUT_INVALID);
     // Resume forbids receipt locators in its request; its separately pinned
@@ -441,57 +565,88 @@ export function createProtectedReleaseHostRunner(
       request.receipt_locators?.filter((value) => value.kind === 'release-plan-receipt') ?? [];
     if (
       plans.length !== 1 ||
-      plans[0]?.receipt_id !== receipt.receipt_id ||
-      plans[0].receipt_digest_sha256 !== receipt.receipt_digest_sha256
+      plans[0]?.receipt_id !== activeLane.receipt.receipt_id ||
+      plans[0].receipt_digest_sha256 !== activeLane.receipt.receipt_digest_sha256
     )
       fail(INPUT_INVALID);
   };
   let active = false;
   const requireActive = () => {
-    if (!active || process.cwd() !== cwd || realpathSync(root) !== root)
+    if (
+      !active ||
+      process.cwd() !== cwd ||
+      realpathSync(root) !== root ||
+      (fixture !== undefined && realpathSync(fixture.root) !== fixture.root)
+    )
       fail('release-host-invocation-unbound');
   };
+  const requireProduction = (request: ReleaseLifecycleRequest) => {
+    requireActive();
+    if (activeLane !== production) fail('release-host-stage-unavailable');
+    assertRequest(request);
+  };
+  const mutationPlan = () => {
+    if (mutationInputs === undefined)
+      return fail('release-host-mutation-input-controls-unavailable');
+    return buildReleaseMutationInputPlanV21({
+      candidate: production.candidate,
+      resolution,
+      plan_receipt: receipt,
+      controls: {
+        ...mutationInputs,
+        container: production.execution.controls,
+        dependencies: production.execution.dependencies ?? [],
+        environment: production.execution.environment,
+        toolchain: production.execution.toolchain,
+        ...(fixtureSucceeded && fixtureProvider !== undefined
+          ? { fixture_provider: fixtureProvider }
+          : {}),
+      },
+    });
+  };
+  // Reject stale coverage receipts or invalid production inputs before a diagnostic can run.
+  if (mutationInputs !== undefined) mutationPlan();
   // Deliberately retain no disposer. One host process owns one immutable binding.
   installed = true;
   installReleaseLifecycleCommandAdapters({
     policy_resolution(value) {
       requireActive();
       if (
-        value.repository_id !== repository.id ||
-        !same(value.candidate, { commit: repository.commit, tree: repository.tree }) ||
-        value.release_unit !== resolution.release_unit
+        value.repository_id !== activeLane.repository.id ||
+        !same(value.candidate, {
+          commit: activeLane.repository.commit,
+          tree: activeLane.repository.tree,
+        }) ||
+        value.release_unit !== activeLane.resolution.release_unit
       )
         fail(INPUT_INVALID);
-      return resolution;
+      return activeLane.resolution;
     },
     preflight_provider(request) {
       requireActive();
       assertRequest(request);
-      return certification.preflight_provider;
+      return activeLane === fixture
+        ? (fixtureProvider ?? fail())
+        : certification.preflight_provider;
     },
     certification_provider(request) {
-      requireActive();
-      assertRequest(request);
+      requireProduction(request);
       return certification.certification_provider(request);
     },
     prepare_content_source(request) {
-      requireActive();
-      assertRequest(request);
+      requireProduction(request);
       return content;
     },
     artifact_sink(request) {
-      requireActive();
-      assertRequest(request);
+      requireProduction(request);
       return artifacts;
     },
     artifact_reader(request) {
-      requireActive();
-      assertRequest(request);
+      requireProduction(request);
       return artifacts;
     },
     publication_signature_verifier(request) {
-      requireActive();
-      assertRequest(request);
+      requireProduction(request);
       return verifySignature;
     },
     provider: () => undefined,
@@ -503,10 +658,23 @@ export function createProtectedReleaseHostRunner(
   return Object.freeze({
     readPlan: () => copy(receipt),
     readPolicyClosure: () => createReleasePolicyClosure({ plan: receipt, resolution }),
+    readFixturePlan: () =>
+      fixture === undefined ? fail('release-host-fixture-unavailable') : copy(fixture.receipt),
+    readMutationInputPlan: () => {
+      assertCliInvocationIdle();
+      if (active) fail('release-host-invocation-in-progress');
+      const { readProof, ...document } = mutationPlan();
+      void readProof;
+      return copy(document);
+    },
     async invoke(value: ProtectedReleaseHostInvocation) {
       assertCliInvocationIdle();
       if (active) fail('release-host-invocation-in-progress');
-      if (process.cwd() !== cwd || realpathSync(root) !== root)
+      if (
+        process.cwd() !== cwd ||
+        realpathSync(root) !== root ||
+        (fixture !== undefined && realpathSync(fixture.root) !== fixture.root)
+      )
         fail('release-host-working-directory-changed');
       active = true;
       try {
@@ -540,41 +708,69 @@ export function createProtectedReleaseHostRunner(
             typeof invocation.write !== 'boolean')
         )
           fail();
+        let request: ReleaseLifecycleRequest | undefined;
+        if (invocation.action !== 'release plan') {
+          request = validateReleaseLifecycleRequest(
+            regularInput(invocation.request, Math.max(production.maximum, fixture?.maximum ?? 0)),
+            invocation.action,
+          );
+          activeLane = same(request.repository_locator, production.repository)
+            ? production
+            : fixture !== undefined && same(request.repository_locator, fixture.repository)
+              ? fixture
+              : fail(INPUT_INVALID);
+          // Reapply the selected lane's input bound; the approved digest must still match.
+          regularInput(invocation.request, activeLane.maximum);
+          if (activeLane === fixture) fixtureSucceeded = false;
+          assertRequest(request);
+          pinnedRequest = copy(request);
+        }
         const args = [
           ...action.split(' '),
           '--repo-root',
-          root,
+          activeLane.root,
           ...('as_role' in invocation
             ? ['--as-role', invocation.as_role, ...(invocation.write ? ['--write'] : [])]
             : []),
         ];
         if (invocation.action === 'release plan') {
-          if (!same(regularInput(invocation.intent, maximum), unit.intent)) fail(INPUT_INVALID);
+          if (!same(regularInput(invocation.intent, production.maximum), production.unit.intent))
+            fail(INPUT_INVALID);
           args.push('--intent', invocation.intent.path, '--repository', repository.id);
         } else {
-          const request = validateReleaseLifecycleRequest(
-            regularInput(invocation.request, maximum),
-            invocation.action,
-          );
-          assertRequest(request);
-          pinnedRequest = copy(request);
-          args.push('--request', invocation.request.path, '--state-root', stateRoot);
+          args.push('--request', invocation.request.path, '--state-root', activeLane.stateRoot);
           if (invocation.action === 'release resume') {
-            const receipts = regularInput(invocation.receipts, maximum);
+            const receipts = regularInput(invocation.receipts, production.maximum);
             if (!Array.isArray(receipts) || !receipts.some((value) => same(value, receipt)))
               fail(INPUT_INVALID);
             args.push('--receipts', invocation.receipts.path);
             if (invocation.publication_receipt !== undefined) {
-              regularInput(invocation.publication_receipt, maximum);
+              regularInput(invocation.publication_receipt, production.maximum);
               args.push('--publication-receipt', invocation.publication_receipt.path);
             }
           }
         }
-        return await (action === 'release plan' || action === 'release resume'
+        const result = await (action === 'release plan' || action === 'release resume'
           ? invokeDevaiCli(args)
-          : withProtectedReleaseRepositoryContext(repositoryContext, () => invokeDevaiCli(args)));
+          : withProtectedReleaseRepositoryContext(activeLane.repositoryContext, () =>
+              invokeDevaiCli(args),
+            ));
+        if (activeLane === fixture && result.exit_code === 0) {
+          fixtureSucceeded = true;
+          // A CLI exit code is not compatibility evidence: the planner checks the private brand.
+          if (mutationInputs !== undefined) {
+            try {
+              mutationPlan();
+            } catch (error) {
+              fixtureSucceeded = false;
+              throw error;
+            }
+          }
+        }
+        return result;
       } finally {
         pinnedRequest = undefined;
+        activeLane = production;
         active = false;
       }
     },
