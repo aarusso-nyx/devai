@@ -1257,7 +1257,21 @@ describe('content-addressed check runner', () => {
       releaseProfile: releaseProfile(),
     });
     expect(preflight.plan.releaseIntentDigest).toBe(sha256Hex(releaseIntent));
-    expect(preflight.plan.taskPolicy.inputProjection).toMatchObject({
+    expect(preflight.plan.taskPolicy.schemaVersion).toBe('1.1.0');
+    expect(preflight.plan.taskPolicy).not.toHaveProperty('inputProjection');
+    const releasePlan = run(state.root, {
+      target: 'release',
+      operation: 'plan',
+      baseCommit: state.base,
+      releaseCandidate: releaseIntent.candidate,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+    });
+    expect(Object.keys(releasePlan.plan.taskPolicy).sort()).toEqual(
+      ['inputProjection', 'repositoryId', 'requiredNodes', 'schemaVersion'].sort(),
+    );
+    expect(releasePlan.plan.taskPolicy.schemaVersion).toBe('1.2.0');
+    expect(releasePlan.plan.taskPolicy.inputProjection).toEqual({
       schemaVersion: '1.0.0',
       source: 'exact-candidate-tree',
       excludedPrefixes: ['.devai/state/', 'record/', 'scratch/'],
@@ -1577,6 +1591,8 @@ describe('content-addressed check runner', () => {
     expect(Object.keys(first.plan.taskPolicy).sort()).toEqual(
       ['repositoryId', 'requiredNodes', 'schemaVersion'].sort(),
     );
+    expect(first.plan.taskPolicy.schemaVersion).toBe('1.1.0');
+    expect(first.plan.taskPolicy).not.toHaveProperty('inputProjection');
     expect(second.plan.tasks.at(-1)?.taskKey).not.toBe(first.plan.tasks.at(-1)?.taskKey);
     expect(second.plan.taskPolicyDigest).not.toBe(first.plan.taskPolicyDigest);
   });
