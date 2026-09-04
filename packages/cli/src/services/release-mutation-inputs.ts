@@ -18,9 +18,12 @@ import { parseTaskDescriptor, selectorMatches } from './check-runner/policy.js';
 import type { TaskDescriptorNode } from './check-runner/types.js';
 import {
   ProtectedCertificationContainer,
+  protectedContainerTaskEnvironment,
   type ProtectedContainerControls,
   type ProtectedContainerDependency,
 } from './release-certification-container.js';
+import { assertProtectedFixtureProviderCompatibility } from './release-certification-provider.js';
+import type { ReleaseProvider } from './release-lifecycle-execution.js';
 import type { ReleaseMutationPackageInputsV21 } from './release-mutation-artifacts.js';
 
 type Json = Readonly<Record<string, unknown>>;
@@ -132,6 +135,8 @@ export type ReleaseMutationExecutionCoverageV21 =
 
 export interface ReleaseMutationInputControlsV21 {
   readonly execution_coverage: ReleaseMutationExecutionCoverageV21;
+  /** Process-local verified fixture provider, never serialized authority or execution credit. */
+  readonly fixture_provider?: ReleaseProvider;
   readonly container: ProtectedContainerControls;
   readonly dependencies: readonly ProtectedContainerDependency[];
   /** Explicit public values from the protected host, never ambient process.env. */
@@ -385,6 +390,7 @@ export function buildReleaseMutationInputPlanV21(input: {
     )
       fail('MUTATION_ROSTER_MISMATCH');
     const controls = input.controls;
+    const hasFixtureProvider = Object.hasOwn(controls, 'fixture_provider');
     closed(controls, [
       'execution_coverage',
       'container',
@@ -393,7 +399,9 @@ export function buildReleaseMutationInputPlanV21(input: {
       'toolchain',
       'maximum_source_bytes',
       'maximum_source_entries',
+      ...(hasFixtureProvider ? ['fixture_provider'] : []),
     ]);
+    if (hasFixtureProvider && typeof controls.fixture_provider !== 'function') fail();
     const requestedCoverage = immutable(controls.execution_coverage);
     const coverageIdentity = {
       repository: candidate.repository,
@@ -471,6 +479,18 @@ export function buildReleaseMutationInputPlanV21(input: {
     const containerIdentity = immutable(
       new ProtectedCertificationContainer(containerControls, dependencies).identity,
     );
+    let fixtureValidated = false;
+    if (hasFixtureProvider) {
+      const provider = controls.fixture_provider;
+      if (typeof provider !== 'function') return fail();
+      assertProtectedFixtureProviderCompatibility(provider, {
+        resolution,
+        container_identity: containerIdentity,
+        toolchain,
+        environment,
+      });
+      fixtureValidated = true;
+    }
     const members = treeMembers(candidate, maximumEntries);
     const captured = new Map<string, Buffer>();
     const population = new Map<string, ReleaseMutationSourceMemberV21>();
@@ -775,17 +795,7 @@ export function buildReleaseMutationInputPlanV21(input: {
       visit(initial);
       return [...result.values()];
     };
-    const effectiveEnvironment = {
-      ...environment,
-      PATH: '/usr/local/bin:/usr/bin:/bin',
-      HOME: '/tmp',
-      TMPDIR: '/tmp',
-      CI: '1',
-      NO_COLOR: '1',
-      GIT_CONFIG_NOSYSTEM: '1',
-      GIT_CONFIG_GLOBAL: '/dev/null',
-      GIT_OPTIONAL_LOCKS: '0',
-    };
+    const effectiveEnvironment = protectedContainerTaskEnvironment(environment);
     const packages = roster.map((entry): ReleaseMutationInputPackageV21 => {
       const packageName = text(entry['package']),
         manifestPath = path(entry['manifest_path']);
@@ -970,6 +980,9 @@ export function buildReleaseMutationInputPlanV21(input: {
         'mutation-report-set-v2.schema.json#/$defs/input_projection',
         projection,
       );
+      // Input identity binds the static fixture requirement, not this process's observation.
+      // Discharge its operational blocker only after that unchanged projection is captured.
+      if (fixtureValidated) unresolved.delete('toolchain-fixture-validation-required');
       return immutable({
         id: text(entry['id']),
         input_digest: inputDigest(projection),
