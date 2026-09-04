@@ -822,14 +822,32 @@ describe('targeted dependency security floor', () => {
   it('resolves reviewed compatible transitive versions', () => {
     const lock = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8');
     const resolvedPackages = lock.slice(lock.indexOf('\npackages:\n'));
-    expect(resolvedPackages).not.toMatch(/^ {2}fast-uri@3\.1\.[0-4]:/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}fast-uri@3\.1\.[0-5]:/mu);
     expect(resolvedPackages).not.toMatch(/^ {2}brace-expansion@2\.1\.[0-3]:/mu);
-    expect(resolvedPackages).toMatch(/^ {2}fast-uri@3\.1\.5:/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}qs@6\.(?:[0-9]|1[0-5])\.\d+:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}fast-uri@3\.1\.6:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@1\.1\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@2\.1\.4:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@5\.0\.9:/mu);
     expect(resolvedPackages).toMatch(/^ {2}js-yaml@4\.3\.1:/mu);
     expect(resolvedPackages).toMatch(/^ {2}nanoid@3\.3\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}postcss@8\.5\.23:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}qs@6\.16\.0:/mu);
+  });
+
+  it('keeps the fixed Stryker diagnostic toolchain as root development-only inputs', () => {
+    const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      readonly dependencies?: Readonly<Record<string, string>>;
+      readonly devDependencies?: Readonly<Record<string, string>>;
+    };
+    const stryker = {
+      '@stryker-mutator/core': '9.6.1',
+      '@stryker-mutator/typescript-checker': '9.6.1',
+      '@stryker-mutator/vitest-runner': '9.6.1',
+    };
+    expect(manifest.devDependencies).toMatchObject(stryker);
+    for (const name of Object.keys(stryker)) {
+      expect(manifest.dependencies?.[name]).toBeUndefined();
+    }
   });
 });
