@@ -70,10 +70,11 @@ function tar(files: readonly ReleasePackageFile[]): Buffer {
   }
   return gzipSync(Buffer.concat([...records, Buffer.alloc(1024)]));
 }
-function packageSnapshot(): ReleasePackageSnapshot {
+function packageSnapshot(extraFiles: readonly ReleasePackageFile[] = []): ReleasePackageSnapshot {
   const schemaRoot = join(ROOT, 'law/schemas');
   const policyRoot = join(ROOT, 'law/policy');
   const files: ReleasePackageFile[] = [
+    ...extraFiles,
     {
       path: 'package.json',
       mode: 0o644,
@@ -461,8 +462,19 @@ export function createFilesystemLifecyclePolicyFixture(input: {
 
 export function createLifecyclePolicyFixture(
   mutationRoster: readonly unknown[] = [],
+  profileOverrides: Readonly<Record<string, unknown>> = {},
 ): LifecyclePolicyFixture {
-  const checked = packageSnapshot();
+  const checked = packageSnapshot(
+    profileOverrides['mutation_execution'] === undefined
+      ? []
+      : [
+          {
+            path: 'dist/law/policy/mutation-evidence-v2.json',
+            mode: 0o644,
+            bytes: readFileSync(join(ROOT, 'law/policy/mutation-evidence-v2.json')),
+          },
+        ],
+  );
   const pin = checked.read('dist/law/constitution.md');
   const version = parseConstitutionVersion(pin.toString());
   if (version === null) throw new Error('fixture constitution');
@@ -480,6 +492,7 @@ export function createLifecyclePolicyFixture(
       capability_tasks: { lint: ['lint'] },
       risk_capabilities: {},
       mutation_roster: mutationRoster,
+      ...profileOverrides,
     },
   };
   const materialized = resolveAdopterPolicyMaterialization({
