@@ -101,10 +101,20 @@ function ensureSchemaReferences(name: SchemaName): void {
     ajv.addSchema(loadSchema('triage.schema.json'), 'triage.schema.json');
   }
   if (
-    name === 'release-plan-receipt.schema.json' &&
+    (name === 'release-plan-receipt.schema.json' ||
+      name === 'release-plan-receipt-v2.schema.json') &&
     ajv.getSchema('release-intent.schema.json') === undefined
   ) {
     ajv.addSchema(loadSchema('release-intent.schema.json'), 'release-intent.schema.json');
+  }
+  if (
+    name === 'release-plan-receipt-v2.schema.json' &&
+    ajv.getSchema('release-policy-resolution.schema.json') === undefined
+  ) {
+    ajv.addSchema(
+      loadSchema('release-policy-resolution.schema.json'),
+      'release-policy-resolution.schema.json',
+    );
   }
   if (
     name === 'release-lifecycle-store-record.schema.json' &&

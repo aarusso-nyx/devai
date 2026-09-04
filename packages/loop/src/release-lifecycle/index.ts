@@ -87,7 +87,7 @@ export interface PublicationExpectation {
 }
 
 export interface ReleasePlanReceipt extends Readonly<Record<string, unknown>> {
-  readonly schemaVersion: '1.0.0';
+  readonly schemaVersion: '1.0.0' | '2.0.0';
   readonly receipt_kind: 'release-plan-receipt';
   readonly receipt_id: string;
   readonly state_observed: 'planned' | null;
@@ -275,7 +275,9 @@ export function finalizeReleasePlanReceipt(
   draft: Omit<ReleasePlanReceipt, 'receipt_id' | 'receipt_digest_sha256'>,
 ): ReleasePlanReceipt {
   const digest = canonicalSha256(draft);
-  return parsers.releasePlanReceipt.parse<ReleasePlanReceipt>({
+  const parser =
+    draft.schemaVersion === '2.0.0' ? parsers.releasePlanReceiptV2 : parsers.releasePlanReceipt;
+  return parser.parse<ReleasePlanReceipt>({
     ...draft,
     receipt_id: `RPL-${digest.slice(0, 16)}`,
     receipt_digest_sha256: digest,
@@ -296,7 +298,12 @@ export function finalizeReleaseOfflineVerificationReceipt(
 export function verifyReleasePlanReceiptIdentity(
   receiptInput: unknown,
 ): receiptInput is ReleasePlanReceipt {
-  const parsed = parsers.releasePlanReceipt.safeParse<ReleasePlanReceipt>(receiptInput);
+  const version =
+    receiptInput !== null && typeof receiptInput === 'object' && 'schemaVersion' in receiptInput
+      ? receiptInput.schemaVersion
+      : undefined;
+  const parser = version === '2.0.0' ? parsers.releasePlanReceiptV2 : parsers.releasePlanReceipt;
+  const parsed = parser.safeParse<ReleasePlanReceipt>(receiptInput);
   if (!parsed.ok) return false;
   const digest = computeReleaseReadReceiptDigest(parsed.value);
   return (

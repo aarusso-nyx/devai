@@ -320,6 +320,8 @@ try {
     join(runtimeIndex, 'release-host.js'),
     join(runtimeRoot, 'types/cli/release-host.d.ts'),
     join(runtimeIndex, 'schemas/action-result.schema.json'),
+    join(runtimeIndex, 'schemas/release-plan-receipt-v2.schema.json'),
+    join(runtimeIndex, 'schemas/release-policy-resolution.schema.json'),
     join(runtimeIndex, 'schemas/mutation-evidence-policy-v2.schema.json'),
     join(runtimeIndex, 'sensor-registry.json'),
     join(runtimeIndex, 'round-execution.json'),
