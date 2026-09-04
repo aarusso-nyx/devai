@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1.0.0",
+  "policy_id": "diagnostic.mutation-toolchain",
+  "policy_version": "1.0.0",
+  "release_verification": {
+    "schemaVersion": "1.0.0",
+    "policy_id": "devai.release-verification",
+    "policy_version": "1.0.0",
+    "release_unit": "@devai-toolchain/diagnostic",
+    "version_source": "package.json",
+    "default_support": "current",
+    "required_check": "devai-release-gate",
+    "capability_tasks": {
+      "formatting-hygiene": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "lint": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "type-integrity": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "schema-consistency": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "secret-scan": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "path-portability": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "package-integrity": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "exact-candidate": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "affected-checks": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "dependent-checks": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "build-integrity": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "unit": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "integration": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "e2e": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "consumer": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "api-compatibility": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "migration": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "rollback": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "adopter-materialization": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "security": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "database": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "tenancy": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "provenance": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "reproducibility": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "operational-matrix": [
+        "diagnostic:mutation-toolchain"
+      ]
+    },
+    "risk_capabilities": {},
+    "mutation_roster": []
+  }
+}

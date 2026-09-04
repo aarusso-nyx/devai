@@ -1,0 +1,43 @@
+{
+  "mutate": [
+    "src/subject.ts",
+    "src/zero.ts"
+  ],
+  "plugins": [
+    "@stryker-mutator/vitest-runner",
+    "@stryker-mutator/typescript-checker"
+  ],
+  "testRunner": "vitest",
+  "checkers": [
+    "typescript"
+  ],
+  "coverageAnalysis": "perTest",
+  "concurrency": 1,
+  "thresholds": {
+    "break": 60,
+    "high": 60,
+    "low": 60
+  },
+  "reporters": [
+    "json"
+  ],
+  "jsonReporter": {
+    "fileName": "reports/mutation/raw.json"
+  },
+  "vitest": {
+    "configFile": "vitest.config.cjs",
+    "related": false
+  },
+  "tsconfigFile": "tsconfig.json",
+  "tempDirName": "/tmp/devai-mutation-compatibility",
+  "cleanTempDir": "always",
+  "symlinkNodeModules": true,
+  "fileLogLevel": "off",
+  "logLevel": "info",
+  "timeoutMS": 10000,
+  "timeoutFactor": 2,
+  "ignorePatterns": [
+    "reports/**"
+  ],
+  "incremental": false
+}
