@@ -20,16 +20,24 @@ const runner = vi.fn((options: CheckRunnerOptions) => fixtureRuntime.runCheckTas
 vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/services/check-runner/runner.js')>()),
   runCheckTasks: (options: CheckRunnerOptions) => runner(options),
+  runCheckTasksAsync: async (options: CheckRunnerOptions) => runner(options),
 }));
 
 let runBound: ReturnType<typeof vi.spyOn> | undefined;
 let verifyRuntime: ReturnType<typeof vi.spyOn> | undefined;
 let execute: ReturnType<typeof vi.spyOn> | undefined;
+const runBoundReturns: unknown[] = [];
 
 beforeEach(() => {
   runBound = vi
     .spyOn(ProtectedCertificationContainer.prototype, 'runBound')
-    .mockImplementation(<T>(_binding: unknown, operation: () => T): T => operation());
+    .mockImplementation(<T>(_binding: unknown, operation: () => T): T => {
+      const result = operation();
+      runBoundReturns.push(result);
+      if (result !== null && typeof result === 'object' && 'then' in result)
+        throw new Error('runBound callback escaped asynchronously');
+      return result;
+    });
   verifyRuntime = vi
     .spyOn(ProtectedCertificationContainer.prototype, 'verifyRuntime')
     .mockImplementation(() => undefined);
@@ -54,6 +62,7 @@ afterEach(() => {
   runBound = undefined;
   verifyRuntime = undefined;
   execute = undefined;
+  runBoundReturns.splice(0);
   cleanupFixtures();
   runner.mockClear();
 });
@@ -99,9 +108,15 @@ async function completeDag() {
 describe('protected mutation prerequisites', () => {
   it('issues a private token only after the bound non-mutation adapter reports a passing DAG, then returns defensive bytes', async () => {
     const value = await completeDag();
-    expect(runBound).toHaveBeenCalledTimes(1);
+    expect(runBound).toHaveBeenCalledTimes(2);
     expect(verifyRuntime).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledTimes(1);
+    expect(runBoundReturns).toHaveLength(2);
+    expect(
+      runBoundReturns.every(
+        (value) => value === null || typeof value !== 'object' || !('then' in value),
+      ),
+    ).toBe(true);
 
     const [token] = takeProtectedMutationPrerequisites(
       value.adapters.certification_provider,
@@ -181,6 +196,10 @@ describe('protected mutation prerequisites', () => {
         evidence_sink: value.assembly.evidence_sink,
       }),
     ).rejects.toThrow('release-certification-task-failed');
+    expect(runBound).toHaveBeenCalledTimes(2);
+    expect(verifyRuntime).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(runBoundReturns).toHaveLength(2);
     expect(() =>
       takeProtectedMutationPrerequisites(value.adapters.certification_provider, value.request),
     ).toThrow('release-certification-prerequisite-proof-invalid');
