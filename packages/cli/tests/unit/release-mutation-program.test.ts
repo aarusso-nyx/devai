@@ -6,13 +6,19 @@ import { pathToFileURL } from 'node:url';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { build, fixture, installedPackage } from '../helpers/release-mutation-inputs-fixture.js';
+import type { ContainerArchiveEntry } from '../../src/services/container-archive.js';
 import type { ReleaseMutationInputPlanV21 } from '../../src/services/release-mutation-inputs.js';
 import type { ReleasePackageSnapshot } from '../../src/services/release-package-snapshot.js';
 import {
   captureProtectedMutationProgram,
   createProtectedMutationProgram,
+  assertProtectedMutationProgramExecution,
   type ProtectedMutationProgram,
 } from '../../src/services/release-mutation-program.js';
+import {
+  ProtectedCertificationContainer,
+  protectedContainerTaskEnvironment,
+} from '../../src/services/release-certification-container.js';
 
 const authority = vi.hoisted(() => ({ bound: vi.fn() }));
 vi.mock('../../src/services/release-host-package-binding.js', async (original) => ({
@@ -23,7 +29,12 @@ const actualInputs = await vi.importActual<
   typeof import('../../src/services/release-mutation-inputs.js')
 >('../../src/services/release-mutation-inputs.js');
 const realIdentityAssertion = actualInputs.assertReleaseMutationInputPackageIdentity;
+const realExecutionContextCapture = actualInputs.captureReleaseMutationInputExecutionContext;
 const identityAssertion = vi.spyOn(actualInputs, 'assertReleaseMutationInputPackageIdentity');
+const executionContextCapture = vi.spyOn(
+  actualInputs,
+  'captureReleaseMutationInputExecutionContext',
+);
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const require = createRequire(import.meta.url);
 const corePackage = require.resolve('@stryker-mutator/core/package.json');
@@ -36,6 +47,28 @@ const { FileMatcher } = (await import(
 const ASSETS = ['mutation-production.mjs', 'mutation-vitest-plugin.mjs'] as const;
 const INVALID = 'release-mutation-program-invalid';
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const isolatedSource = Buffer.from('export const isolated = true;\n', 'utf8');
+const isolatedExecutionContext = {
+  container_identity: { fixture: 'isolated-container' },
+  environment: { CI: 'fixture' },
+  repository: { id: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+  candidate_files: [
+    {
+      path: 'src/isolated.ts',
+      mode: '100644',
+      object_id: createHash('sha1')
+        .update(Buffer.from(`blob ${isolatedSource.length}\0`, 'utf8'))
+        .update(isolatedSource)
+        .digest('hex'),
+    },
+  ],
+} as const;
+const isolatedPriorOutputs: ReadonlyMap<string, ContainerArchiveEntry> = new Map([
+  [
+    'generated/output.json',
+    { path: 'generated/output.json', mode: '100644', bytes: Buffer.from('{}') },
+  ],
+]);
 const limits = {
   maximum_document_bytes: 1_000_000,
   maximum_files: 100,
@@ -71,6 +104,8 @@ beforeEach(() => {
   authority.bound.mockReset();
   identityAssertion.mockReset();
   identityAssertion.mockImplementation(realIdentityAssertion);
+  executionContextCapture.mockReset();
+  executionContextCapture.mockImplementation(realExecutionContextCapture);
 });
 
 /** Only factory-byte tests isolate prior authority; this is NOT an executable/custody fixture. */
@@ -81,6 +116,7 @@ function factoryUnit() {
     throw new Error('fixture package missing');
   Object.assign(pkg, { reuse: { eligible: true, unresolved: [] } });
   identityAssertion.mockImplementation(() => undefined);
+  executionContextCapture.mockImplementation(() => isolatedExecutionContext);
   return { pkg, input: { ...current.input, input_plan: plan, limits: { ...limits } } };
 }
 
@@ -97,6 +133,94 @@ function json(
 }
 
 describe('protected mutation program factory with explicit upstream-authority isolation (ADR-MUT-0008)', () => {
+  it('captures a genuine immutable execution context only from the exact derived plan', () => {
+    const context = realExecutionContextCapture(current.value.plan);
+    expect(context).toEqual({
+      container_identity: new ProtectedCertificationContainer(
+        current.value.controls.container,
+        current.value.controls.dependencies,
+      ).identity,
+      environment: protectedContainerTaskEnvironment(current.value.controls.environment),
+      repository: current.value.snapshot.repository,
+      candidate_files: expect.arrayContaining([
+        expect.objectContaining({ path: 'packages/utils/src/main.ts', mode: '100644' }),
+      ]),
+    });
+    expect(Object.isFrozen(context)).toBe(true);
+    expect(() =>
+      realExecutionContextCapture(
+        JSON.parse(JSON.stringify(current.value.plan)) as ReleaseMutationInputPlanV21,
+      ),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+  });
+
+  it('uses the isolated execution-context seam only for factory-byte tests, never as authority', () => {
+    const { input } = factoryUnit();
+    const program = createProtectedMutationProgram(input);
+    expect(() =>
+      assertProtectedMutationProgramExecution(program, {
+        container_identity: isolatedExecutionContext.container_identity,
+        environment: isolatedExecutionContext.environment,
+        source: [{ path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource }],
+        prior_outputs: new Map(),
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertProtectedMutationProgramExecution(program, {
+        container_identity: { fixture: 'substituted-container' },
+        environment: isolatedExecutionContext.environment,
+        source: [{ path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource }],
+        prior_outputs: new Map(),
+      }),
+    ).toThrow(INVALID);
+  });
+
+  it.each([
+    ['a substituted environment', { environment: { CI: 'substituted' } }],
+    [
+      'a changed candidate blob',
+      {
+        source: [
+          { path: 'src/isolated.ts', mode: '100644', bytes: Buffer.from('changed\n', 'utf8') },
+        ],
+      },
+    ],
+    [
+      'a changed candidate mode',
+      {
+        source: [{ path: 'src/isolated.ts', mode: '100755', bytes: isolatedSource }],
+      },
+    ],
+    [
+      'an extra candidate file',
+      {
+        source: [
+          { path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource },
+          { path: 'src/extra.ts', mode: '100644', bytes: Buffer.from('extra\n', 'utf8') },
+        ],
+      },
+    ],
+    ['a missing candidate file', { source: [] }],
+    [
+      'caller-provided prerequisite outputs',
+      {
+        prior_outputs: isolatedPriorOutputs,
+      },
+    ],
+  ] as const)('refuses %s at the isolated execution boundary', (_label, change) => {
+    const { input } = factoryUnit();
+    const program = createProtectedMutationProgram(input);
+    expect(() =>
+      assertProtectedMutationProgramExecution(program, {
+        container_identity: isolatedExecutionContext.container_identity,
+        environment: isolatedExecutionContext.environment,
+        source: [{ path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource }],
+        prior_outputs: new Map(),
+        ...change,
+      }),
+    ).toThrow(INVALID);
+  });
+
   it.each([
     ['subject[1].ts', 'subject1.ts'],
     ['subject?.ts', 'subjectX.ts'],
@@ -304,6 +428,7 @@ describe('protected mutation program factory with explicit upstream-authority is
     for (const pkg of plan.packages)
       Object.assign(pkg, { reuse: { eligible: true, unresolved: [] } });
     identityAssertion.mockImplementation(() => undefined);
+    executionContextCapture.mockImplementation(() => isolatedExecutionContext);
     expect(() => createProtectedMutationProgram({ ...historical.input, input_plan: plan })).toThrow(
       INVALID,
     );

@@ -1,9 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  ProtectedCertificationContainer,
-  type ProtectedContainerControls,
-  type ProtectedContainerDependency,
-} from '../../src/services/release-certification-container.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProtectedCertificationContainer } from '../../src/services/release-certification-container.js';
 import { isVerifiedReleaseCandidateSnapshot } from '../../src/services/release-candidate-snapshot.js';
 import {
   createProtectedToolchainFixtureContext,
@@ -45,6 +41,11 @@ import {
   cleanupFixtures,
 } from '../helpers/release-toolchain-provider-fixture.js';
 const runner = vi.fn((options: CheckRunnerOptions) => fixtureRuntime.runCheckTasks?.(options));
+const containerCalls: {
+  runBound: ReturnType<typeof vi.spyOn> | undefined;
+  verifyRuntime: ReturnType<typeof vi.spyOn> | undefined;
+  execute: ReturnType<typeof vi.spyOn> | undefined;
+} = { runBound: undefined, verifyRuntime: undefined, execute: undefined };
 const certificationStore = vi.hoisted(() =>
   vi.fn(() => {
     throw new Error('unexpected certification store construction');
@@ -65,50 +66,40 @@ vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => (
   ...(await importOriginal<typeof import('../../src/services/check-runner/runner.js')>()),
   runCheckTasks: (options: CheckRunnerOptions) => runner(options),
 }));
-vi.mock('../../src/services/release-certification-container.js', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('../../src/services/release-certification-container.js')>();
-  return {
-    ...original,
-    ProtectedCertificationContainer: class {
-      readonly identity: Record<string, unknown>;
-      constructor(
-        controls: ProtectedContainerControls,
-        dependencies: readonly ProtectedContainerDependency[],
-      ) {
-        this.identity = new original.ProtectedCertificationContainer(
-          controls,
-          dependencies,
-        ).identity;
-      }
-      runBound<T>(_binding: unknown, operation: () => T): T {
-        return operation();
-      }
-      verifyRuntime(): void {}
-      execute(input: {
-        readonly declared_outputs: readonly string[];
-        readonly diagnostic_output_paths?: readonly string[];
-      }) {
-        const select = (paths: readonly string[]) =>
-          paths.flatMap((path) => {
-            const bytes = containerState.outputs.get(path);
-            return bytes === undefined
-              ? []
-              : [{ path, mode: '100644' as const, bytes: Buffer.from(bytes) }];
-          });
-        return {
-          result: { status: containerState.status, signal: null, stdout: '', stderr: '' },
-          outputs: containerState.status === 0 ? select(input.declared_outputs) : [],
-          ...(input.diagnostic_output_paths === undefined
-            ? {}
-            : { diagnostic_outputs: select(input.diagnostic_output_paths) }),
-        };
-      }
-    },
-  };
+beforeEach(() => {
+  containerCalls.runBound = vi
+    .spyOn(ProtectedCertificationContainer.prototype, 'runBound')
+    .mockImplementation(<T>(_binding: unknown, operation: () => T): T => operation());
+  containerCalls.verifyRuntime = vi
+    .spyOn(ProtectedCertificationContainer.prototype, 'verifyRuntime')
+    .mockImplementation(() => undefined);
+  containerCalls.execute = vi
+    .spyOn(ProtectedCertificationContainer.prototype, 'execute')
+    .mockImplementation((input) => {
+      const select = (paths: readonly string[]) =>
+        paths.flatMap((path) => {
+          const bytes = containerState.outputs.get(path);
+          return bytes === undefined
+            ? []
+            : [{ path, mode: '100644' as const, bytes: Buffer.from(bytes) }];
+        });
+      return {
+        result: { status: containerState.status, signal: null, stdout: '', stderr: '' },
+        outputs: containerState.status === 0 ? select(input.declared_outputs) : [],
+        ...(input.diagnostic_output_paths === undefined
+          ? {}
+          : { diagnostic_outputs: select(input.diagnostic_output_paths) }),
+      };
+    });
 });
 
 afterEach(() => {
+  containerCalls.runBound?.mockRestore();
+  containerCalls.verifyRuntime?.mockRestore();
+  containerCalls.execute?.mockRestore();
+  containerCalls.runBound = undefined;
+  containerCalls.verifyRuntime = undefined;
+  containerCalls.execute = undefined;
   cleanupFixtures();
   runner.mockClear();
   certificationStore.mockClear();
@@ -130,6 +121,9 @@ describe('release toolchain fixture compatibility', () => {
     expect(Object.keys(provider)).toEqual([]);
     expect(provider).not.toHaveProperty('certification_provider');
     expect(await provider(value.request)).toMatchObject({ outcome: 'success' });
+    expect(containerCalls.runBound).toHaveBeenCalled();
+    expect(containerCalls.verifyRuntime).toHaveBeenCalled();
+    expect(containerCalls.execute).toHaveBeenCalled();
     expect(() =>
       assertProtectedFixtureProviderCompatibility(provider, value.expected),
     ).not.toThrow();
