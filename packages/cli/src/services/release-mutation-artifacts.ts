@@ -304,8 +304,33 @@ export function normalizeReleaseMutationPackageV21(input: {
           typeof mutant.id !== 'string' ||
           !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(mutant.id) ||
           mutants.has(mutant.id) ||
+          typeof mutant.mutatorName !== 'string' ||
+          mutant.mutatorName.length === 0 ||
+          mutant.mutatorName.length > 160 ||
+          mutant.mutatorName.includes('/') ||
+          mutant.mutatorName.includes('\\') ||
+          [...mutant.mutatorName].some(
+            (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+          ) ||
           typeof mutant.replacementDigest !== 'string' ||
           !DIGEST.test(mutant.replacementDigest)
+        )
+          fail();
+        closed(mutant.location, ['start', 'end']);
+        for (const position of [mutant.location.start, mutant.location.end]) {
+          closed(position, ['line', 'column']);
+          if (
+            !Number.isSafeInteger(position.line) ||
+            !Number.isSafeInteger(position.column) ||
+            position.line < 1 ||
+            position.column < 1
+          )
+            fail();
+        }
+        if (
+          mutant.location.end.line < mutant.location.start.line ||
+          (mutant.location.end.line === mutant.location.start.line &&
+            mutant.location.end.column < mutant.location.start.column)
         )
           fail();
         discoveredCount += 1;
