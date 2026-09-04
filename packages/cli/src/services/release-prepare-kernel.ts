@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@devai-nyx/utils';
+import { readProtectedReleasePrepareCapacity } from '@devai-nyx/authority';
 import type {
   ArtifactSinkCommitIdentity,
   CertificationOutputBlobHandle,
@@ -971,6 +972,26 @@ export function createReleasePrepareProvider(input: {
       if (new Set(logicalNames).size !== logicalNames.length) {
         throw new Error('release-prepare-package-entry-coverage-invalid');
       }
+      const plan = request.receipt_locators?.find(
+        (receipt) => receipt.kind === 'release-plan-receipt',
+      );
+      if (plan === undefined) throw new Error('release-prepare-capacity-unavailable');
+      const capacity = readProtectedReleasePrepareCapacity({
+        action_id: 'release prepare',
+        repository: request.repository_locator,
+        candidate: {
+          commit: request.candidate_locator.commit,
+          tree: request.candidate_locator.tree,
+        },
+        plan_receipt_digest_sha256: plan.receipt_digest_sha256,
+      });
+      const required = 3 * packed.length + 33;
+      if (
+        !Number.isSafeInteger(required) ||
+        capacity.remaining_batches < required ||
+        capacity.remaining_targets < required
+      )
+        throw new Error('release-prepare-capacity-insufficient');
       const opened = await input.artifact_sink.begin({
         repository: request.repository_locator,
         candidate: {

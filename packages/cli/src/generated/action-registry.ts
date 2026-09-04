@@ -1313,7 +1313,7 @@ export const ACTION_REGISTRY = [
       mode: 'action-envelope',
       envelope_schema: 'law/schemas/action-result.schema.json',
       success_channel: 'stdout',
-      payload_schema: 'law/schemas/release-plan-receipt.schema.json',
+      payload_schema: 'law/schemas/release-plan-receipt-v2.schema.json',
     },
     error_contract: {
       schemaVersion: '1.0.0',
@@ -1463,7 +1463,7 @@ export const ACTION_REGISTRY = [
         planner_id: 'release-prepare-bounded-plan',
         target_kinds: ['fs', 'artifact-sink'],
         bounds: {
-          max_batches: 128,
+          max_batches: 256,
           max_targets_per_batch: 64,
           max_total_targets: 8192,
         },

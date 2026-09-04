@@ -14,11 +14,17 @@ import {
   renameSync,
   unlinkSync,
   writeSync,
+  withProtectedReleasePrepareCapacity,
 } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { verifyReleasePlanReceipt } from './release-lifecycle.js';
+import { verifyResolvedReleasePlanReceipt } from './release-lifecycle.js';
+import {
+  createResolvedReleasePlanInputResolver,
+  resolutionForReleasePlanInputResolver,
+} from './release-policy-resolution.js';
+import { verifyReleasePolicyClosure } from './release-policy-closure.js';
 import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
 import { isProtectedReleaseCertificationProvider } from './release-lifecycle-certification.js';
 import { isProtectedReleasePreflightProvider } from './release-certification-provider.js';
@@ -608,37 +614,9 @@ function verifyPlanReceiptSemantics(
   receipt: Readonly<Record<string, unknown>>,
   resolveInput: ReleasePlanInputResolver | undefined,
 ): void {
-  if (resolveInput === undefined) throw new Error('rpl-semantic-verification-not-performed');
-  const inputs = receipt['inputs'];
-  if (!Array.isArray(inputs)) throw new Error('rpl-input-set-mismatch');
-  const byKind = new Map(
-    inputs.map((input) => {
-      const value = object(input);
-      return [String(value['kind']), value] as const;
-    }),
-  );
-  const intent = byKind.get('release-intent');
-  const profile = byKind.get('release-verification-profile');
-  const lifecycle = byKind.get('release-lifecycle-policy');
-  const actions = byKind.get('action-registry-policy');
-  const repository = object(receipt['repository']);
-  if (
-    intent === undefined ||
-    profile === undefined ||
-    lifecycle === undefined ||
-    actions === undefined ||
-    typeof repository['id'] !== 'string' ||
-    typeof intent['path'] !== 'string' ||
-    !verifyReleasePlanReceipt({
-      receipt,
-      repository_id: repository['id'],
-      intent_path: intent['path'],
-      intent: resolveInput(intent),
-      release_verification_profile: resolveInput(profile),
-      release_lifecycle_policy: resolveInput(lifecycle),
-      action_registry: resolveInput(actions),
-    })
-  ) {
+  if (receipt['schemaVersion'] !== '2.0.0') throw new Error('rpl-legacy-plan-non-authoritative');
+  const resolution = resolutionForReleasePlanInputResolver(resolveInput);
+  if (resolution === undefined || !verifyResolvedReleasePlanReceipt({ receipt, resolution })) {
     throw new Error('rpl-semantic-verification-not-performed');
   }
 }
@@ -652,9 +630,18 @@ function verifyReceiptDocument(
   if (kind !== 'release-plan-receipt' && kind !== 'release-offline-verification-receipt') {
     throw new Error('release-receipt-identity-mismatch');
   }
+  if (kind === 'release-plan-receipt' && value['schemaVersion'] === '1.0.0')
+    throw new Error('rpl-legacy-plan-non-authoritative');
+  if (kind === 'release-plan-receipt' && value['schemaVersion'] !== '2.0.0')
+    throw new Error('release-receipt-identity-mismatch');
+  const resolution = resolutionForReleasePlanInputResolver(resolvePlanInput);
+  if (kind === 'release-plan-receipt') {
+    if (resolution === undefined) throw new Error('rpl-semantic-verification-not-performed');
+    resolution.tools.parse('release-plan-receipt-v2.schema.json', value);
+  }
   const parsed =
     kind === 'release-plan-receipt'
-      ? parsers.releasePlanReceipt.safeParse<Readonly<Record<string, unknown>>>(value)
+      ? { ok: true as const, value }
       : parsers.releaseOfflineVerificationReceipt.safeParse<Readonly<Record<string, unknown>>>(
           value,
         );
@@ -1451,6 +1438,14 @@ function headForCompletion(state: ReleaseLifecycleStateV2, completion: StoreReco
 export class ReleaseLifecycleFileStore {
   readonly campaignDirectory: string;
   private executionLocked = false;
+  private directoryIdentities:
+    | readonly {
+        readonly path: string;
+        readonly dev: number;
+        readonly ino: number;
+        readonly private: boolean;
+      }[]
+    | undefined;
 
   constructor(root: string, request: ReleaseLifecycleRequest) {
     const absoluteRoot = resolve(root);
@@ -1462,10 +1457,38 @@ export class ReleaseLifecycleFileStore {
   }
 
   initialize(): void {
+    if (this.directoryIdentities !== undefined) {
+      for (const identity of this.directoryIdentities) {
+        safeExistingDirectory(identity.path, identity.private);
+        const stat = lstatSync(identity.path);
+        if (stat.dev !== identity.dev || stat.ino !== identity.ino)
+          throw new Error('release-state-store-unsafe');
+      }
+      return;
+    }
     ensurePrivateDirectory(this.campaignDirectory);
     for (const directory of ['records', 'attempts', 'completions', 'failures', 'unknown']) {
       ensurePrivateDirectory(join(this.campaignDirectory, directory));
     }
+    const privatePaths = [
+      this.campaignDirectory,
+      ...['records', 'attempts', 'completions', 'failures', 'unknown'].map((name) =>
+        join(this.campaignDirectory, name),
+      ),
+    ];
+    const paths = [...privatePaths];
+    let ancestor = dirname(this.campaignDirectory);
+    for (;;) {
+      paths.push(ancestor);
+      const parent = dirname(ancestor);
+      if (parent === ancestor) break;
+      ancestor = parent;
+    }
+    this.directoryIdentities = paths.map((path) => {
+      safeExistingDirectory(path, privatePaths.includes(path));
+      const stat = lstatSync(path);
+      return { path, dev: stat.dev, ino: stat.ino, private: privatePaths.includes(path) };
+    });
   }
 
   async withExecutionLock<T>(operation: () => T | Promise<T>): Promise<T> {
@@ -1492,6 +1515,7 @@ export class ReleaseLifecycleFileStore {
       return await operation();
     } finally {
       this.executionLocked = false;
+      this.initialize();
       unlinkSync(path);
       fsyncDirectory(this.campaignDirectory);
     }
@@ -2259,468 +2283,489 @@ export async function executeReleaseLifecycleAction(input: {
     }
   }
   try {
-    return await input.store.withExecutionLock(async () => {
-      let storeRecords: StoreRecord[];
-      let states: ReleaseLifecycleStateV2[];
-      let head: StoreHead | null;
-      try {
-        storeRecords = input.store.readStoreRecords();
-        states = input.store.readStateRecords();
-        head = input.store.readHead();
-        const reduced = reduceStoreRecords(storeRecords);
-        if (!reduced.ok || reduced.ambiguous) {
-          return {
-            ok: false,
-            phase: 'reconciliation',
-            code: reduced.ambiguous
-              ? 'release-provider-result-unknown'
-              : (reduced.errors[0] ?? 'release-state-store-unsafe'),
-          };
-        }
-        const stateReduction = reduceReleaseStates(states);
-        if (!stateReduction.ok) {
-          return {
-            ok: false,
-            phase: 'reconciliation',
-            code: stateReduction.errors[0] ?? 'release-state-store-unsafe',
-          };
-        }
-        const stateHead = stateReduction.head;
-        if (stateHead !== null) assertStateMatchesRequest(request, stateHead);
-        const completions = storeRecords.filter((record) => record.record_kind === 'completion');
-        if (
-          completions.length !== states.length ||
-          completions.some((record, index) => {
-            const state = states[index];
-            return (
-              state === undefined ||
-              record.completion?.state_id !== state.state_id ||
-              record.completion.state_digest_sha256 !== state.record_digest_sha256
-            );
-          })
-        ) {
-          return { ok: false, phase: 'reconciliation', code: 'release-state-store-orphan-record' };
-        }
-        const expectedHead =
-          stateHead === null
-            ? null
-            : headForCompletion(stateHead, completions[completions.length - 1] as StoreRecord);
-        if (!same(head, expectedHead))
-          return { ok: false, phase: 'reconciliation', code: 'release-state-head-mismatch' };
-        if (!same(reduced.completed_head, head)) {
-          return { ok: false, phase: 'reconciliation', code: 'release-state-head-mismatch' };
-        }
-        const expectedPrior = PRIOR_BY_STATE[STATE_BY_ACTION[request.action_id]];
-        if (expectedPrior !== (stateHead?.state ?? null)) {
-          return { ok: false, phase: 'validation', code: 'release-state-transition-invalid' };
-        }
-        assertReceiptContinuity(request, receipts, stateHead);
-        if (
-          stateHead !== null &&
-          (request.action_id === 'release export' ||
-            request.action_id === 'release evidence-publish' ||
-            request.action_id === 'release publish')
-        ) {
-          await reverifySinkArtifacts(stateHead, input.artifactReader);
-        }
-        if (request.action_id === 'release evidence-publish') {
-          const offline = receipts.find(
-            (receipt) => receipt.kind === 'release-offline-verification-receipt',
-          );
-          if (stateHead === null || offline === undefined) {
-            throw new Error('release-offline-receipt-binding-invalid');
-          }
-          const verifiedDocument = await input.offlineReceiptVerifier?.verify({
-            repository: request.repository_locator,
-            candidate_locator: request.candidate_locator,
-            exported_state: stateHead,
-            receipt: offline.value,
-          });
-          if (
-            verifiedDocument === undefined ||
-            !same(verifyReceiptDocument(verifiedDocument).value, offline.value)
-          ) {
-            throw new Error('rov-semantic-verification-not-performed');
-          }
-        }
-      } catch (error) {
-        return {
-          ok: false,
-          phase: 'reconciliation',
-          code: error instanceof Error ? error.message : 'release-state-store-unsafe',
-        };
-      }
-
-      const priorRecord = storeRecords.at(-1) ?? null;
-      const nextSequence = priorRecord === null ? 0 : priorRecord.sequence + 1;
-      const requestDigest = computeReleaseRequestDigest(request);
-      const attemptId = deriveAttemptId({
-        request_digest_sha256: requestDigest,
-        action_id: request.action_id,
-        sequence: nextSequence,
-        predecessor_record: priorRecord === null ? null : storeRecordReference(priorRecord),
-      });
-      let authorizationEventId: string | null = null;
-      let binding: AuthorizationAttemptBinding | undefined;
-      let grantProof:
-        | {
-            readonly grant: Readonly<Record<string, unknown>>;
-            readonly grant_event_id: string;
-            readonly ledger_head: AuthorizationLedgerHead;
-            readonly ledger: Readonly<Record<string, unknown>>;
-            readonly events: readonly Readonly<Record<string, unknown>>[];
-          }
-        | undefined;
-      if (remote) {
-        binding = {
-          attempt_id: attemptId,
-          action_id: request.action_id,
-          request_digest_sha256: requestDigest,
-          repository: request.repository_locator,
-          candidate: primaryCandidate(request),
-          destination: authorizationDestination(request),
-        };
+    const execute = () =>
+      input.store.withExecutionLock<ExecuteReleaseResult>(async () => {
+        let storeRecords: StoreRecord[];
+        let states: ReleaseLifecycleStateV2[];
+        let head: StoreHead | null;
         try {
-          const resolution = await input.authorization?.resolve(binding);
-          if (resolution === undefined)
-            throw new Error('release-authorization-provider-unavailable');
-          grantProof = verifyGrantResolution(resolution, binding, authority, input.recorded_at);
-          authorizationEventId = grantProof.grant_event_id;
+          storeRecords = input.store.readStoreRecords();
+          states = input.store.readStateRecords();
+          head = input.store.readHead();
+          const reduced = reduceStoreRecords(storeRecords);
+          if (!reduced.ok || reduced.ambiguous) {
+            return {
+              ok: false,
+              phase: 'reconciliation',
+              code: reduced.ambiguous
+                ? 'release-provider-result-unknown'
+                : (reduced.errors[0] ?? 'release-state-store-unsafe'),
+            };
+          }
+          const stateReduction = reduceReleaseStates(states);
+          if (!stateReduction.ok) {
+            return {
+              ok: false,
+              phase: 'reconciliation',
+              code: stateReduction.errors[0] ?? 'release-state-store-unsafe',
+            };
+          }
+          const stateHead = stateReduction.head;
+          if (stateHead !== null) assertStateMatchesRequest(request, stateHead);
+          const completions = storeRecords.filter((record) => record.record_kind === 'completion');
           if (
-            priorRecord?.record_kind === 'failure' &&
-            priorRecord.authorization_event_id === authorizationEventId
+            completions.length !== states.length ||
+            completions.some((record, index) => {
+              const state = states[index];
+              return (
+                state === undefined ||
+                record.completion?.state_id !== state.state_id ||
+                record.completion.state_digest_sha256 !== state.record_digest_sha256
+              );
+            })
           ) {
-            throw new Error('fresh-exact-authorization-required');
+            return {
+              ok: false,
+              phase: 'reconciliation',
+              code: 'release-state-store-orphan-record',
+            };
+          }
+          const expectedHead =
+            stateHead === null
+              ? null
+              : headForCompletion(stateHead, completions[completions.length - 1] as StoreRecord);
+          if (!same(head, expectedHead))
+            return { ok: false, phase: 'reconciliation', code: 'release-state-head-mismatch' };
+          if (!same(reduced.completed_head, head)) {
+            return { ok: false, phase: 'reconciliation', code: 'release-state-head-mismatch' };
+          }
+          const expectedPrior = PRIOR_BY_STATE[STATE_BY_ACTION[request.action_id]];
+          if (expectedPrior !== (stateHead?.state ?? null)) {
+            return { ok: false, phase: 'validation', code: 'release-state-transition-invalid' };
+          }
+          assertReceiptContinuity(request, receipts, stateHead);
+          if (
+            stateHead !== null &&
+            (request.action_id === 'release export' ||
+              request.action_id === 'release evidence-publish' ||
+              request.action_id === 'release publish')
+          ) {
+            await reverifySinkArtifacts(stateHead, input.artifactReader);
+          }
+          if (request.action_id === 'release evidence-publish') {
+            const offline = receipts.find(
+              (receipt) => receipt.kind === 'release-offline-verification-receipt',
+            );
+            if (stateHead === null || offline === undefined) {
+              throw new Error('release-offline-receipt-binding-invalid');
+            }
+            const verifiedDocument = await input.offlineReceiptVerifier?.verify({
+              repository: request.repository_locator,
+              candidate_locator: request.candidate_locator,
+              exported_state: stateHead,
+              receipt: offline.value,
+            });
+            if (
+              verifiedDocument === undefined ||
+              !same(verifyReceiptDocument(verifiedDocument).value, offline.value)
+            ) {
+              throw new Error('rov-semantic-verification-not-performed');
+            }
           }
         } catch (error) {
           return {
             ok: false,
-            phase: 'authorization',
-            code:
-              error instanceof Error
-                ? error.message
-                : 'release-authorization-attempt-binding-invalid',
+            phase: 'reconciliation',
+            code: error instanceof Error ? error.message : 'release-state-store-unsafe',
           };
         }
-      }
-      if (input.provider === undefined) {
-        return { ok: false, phase: 'provider', code: 'release-provider-unavailable' };
-      }
-      const provider = input.provider;
-      const attempt = buildStoreRecord(
-        request,
-        priorRecord,
-        head,
-        attemptId,
-        'attempt',
-        authorizationEventId,
-      );
-      try {
-        input.store.appendStoreRecord(attempt);
-      } catch (error) {
-        return {
-          ok: false,
-          phase: 'append',
-          code: error instanceof Error ? error.message : 'release-state-store-unsafe',
-        };
-      }
 
-      if (remote && binding !== undefined && authorizationEventId !== null) {
+        const priorRecord = storeRecords.at(-1) ?? null;
+        const nextSequence = priorRecord === null ? 0 : priorRecord.sequence + 1;
+        const requestDigest = computeReleaseRequestDigest(request);
+        const attemptId = deriveAttemptId({
+          request_digest_sha256: requestDigest,
+          action_id: request.action_id,
+          sequence: nextSequence,
+          predecessor_record: priorRecord === null ? null : storeRecordReference(priorRecord),
+        });
+        let authorizationEventId: string | null = null;
+        let binding: AuthorizationAttemptBinding | undefined;
+        let grantProof:
+          | {
+              readonly grant: Readonly<Record<string, unknown>>;
+              readonly grant_event_id: string;
+              readonly ledger_head: AuthorizationLedgerHead;
+              readonly ledger: Readonly<Record<string, unknown>>;
+              readonly events: readonly Readonly<Record<string, unknown>>[];
+            }
+          | undefined;
+        if (remote) {
+          binding = {
+            attempt_id: attemptId,
+            action_id: request.action_id,
+            request_digest_sha256: requestDigest,
+            repository: request.repository_locator,
+            candidate: primaryCandidate(request),
+            destination: authorizationDestination(request),
+          };
+          try {
+            const resolution = await input.authorization?.resolve(binding);
+            if (resolution === undefined)
+              throw new Error('release-authorization-provider-unavailable');
+            grantProof = verifyGrantResolution(resolution, binding, authority, input.recorded_at);
+            authorizationEventId = grantProof.grant_event_id;
+            if (
+              priorRecord?.record_kind === 'failure' &&
+              priorRecord.authorization_event_id === authorizationEventId
+            ) {
+              throw new Error('fresh-exact-authorization-required');
+            }
+          } catch (error) {
+            return {
+              ok: false,
+              phase: 'authorization',
+              code:
+                error instanceof Error
+                  ? error.message
+                  : 'release-authorization-attempt-binding-invalid',
+            };
+          }
+        }
+        if (input.provider === undefined) {
+          return { ok: false, phase: 'provider', code: 'release-provider-unavailable' };
+        }
+        const provider = input.provider;
+        const attempt = buildStoreRecord(
+          request,
+          priorRecord,
+          head,
+          attemptId,
+          'attempt',
+          authorizationEventId,
+        );
         try {
-          const refreshed = await input.authorization?.resolve(binding);
-          if (refreshed === undefined || grantProof === undefined)
-            throw new Error('release-authorization-consumption-not-durable');
-          const refreshedProof = verifyGrantResolution(
-            refreshed,
-            binding,
+          input.store.appendStoreRecord(attempt);
+        } catch (error) {
+          return {
+            ok: false,
+            phase: 'append',
+            code: error instanceof Error ? error.message : 'release-state-store-unsafe',
+          };
+        }
+
+        if (remote && binding !== undefined && authorizationEventId !== null) {
+          try {
+            const refreshed = await input.authorization?.resolve(binding);
+            if (refreshed === undefined || grantProof === undefined)
+              throw new Error('release-authorization-consumption-not-durable');
+            const refreshedProof = verifyGrantResolution(
+              refreshed,
+              binding,
+              authority,
+              input.recorded_at,
+            );
+            if (
+              refreshedProof.grant_event_id !== grantProof.grant_event_id ||
+              !same(refreshedProof.ledger_head, grantProof.ledger_head) ||
+              !same(refreshedProof.grant, grantProof.grant)
+            ) {
+              throw new Error('release-authorization-attempt-binding-invalid');
+            }
+            const consumption = await input.authorization?.consume({
+              ...binding,
+              grant_event_id: authorizationEventId,
+            });
+            if (consumption === undefined)
+              throw new Error('release-authorization-consumption-not-durable');
+            verifyConsumptionProof(
+              consumption,
+              binding,
+              grantProof.grant,
+              authorizationEventId,
+              grantProof.ledger_head,
+              grantProof.ledger,
+              grantProof.events,
+            );
+          } catch (error) {
+            const failure = buildStoreRecord(
+              request,
+              attempt,
+              head,
+              attemptId,
+              'failure',
+              authorizationEventId,
+              {
+                outcome: 'failure',
+                dispatch_status: 'failed-before-dispatch',
+                code: 'release-authorization-consumption-failed',
+              },
+            );
+            input.store.appendStoreRecord(failure);
+            return {
+              ok: false,
+              phase: 'authorization',
+              code:
+                error instanceof Error
+                  ? error.message
+                  : 'release-authorization-consumption-not-durable',
+              record: failure,
+            };
+          }
+        }
+
+        let result: ReleaseProviderResult;
+        try {
+          result = await provider(request);
+        } catch {
+          result = remote
+            ? { outcome: 'unknown', code: 'release-provider-result-unknown' }
+            : { outcome: 'failure', code: 'release-provider-failed' };
+        }
+        if (result.outcome !== 'success') {
+          if (!remote && result.outcome !== 'unknown' && result.transaction !== undefined) {
+            try {
+              await result.transaction.rollback();
+            } finally {
+              await result.transaction.dispose();
+            }
+          }
+          const unsafeRemoteFailure =
+            remote &&
+            result.outcome === 'failure' &&
+            (result.provider_handle !== undefined ||
+              result.dispatch_status !== 'failed-before-dispatch');
+          const terminalResult = unsafeRemoteFailure
+            ? ({ ...result, outcome: 'unknown', code: 'release-provider-result-unknown' } as const)
+            : result;
+          const kind = terminalResult.outcome === 'unknown' ? 'unknown-provider-result' : 'failure';
+          const terminal = buildStoreRecord(
+            request,
+            attempt,
+            head,
+            attemptId,
+            kind,
+            authorizationEventId,
+            terminalResult,
+          );
+          input.store.appendStoreRecord(terminal);
+          return {
+            ok: false,
+            phase: terminalResult.outcome === 'unknown' ? 'ambiguous' : 'provider',
+            code:
+              terminalResult.outcome === 'unknown'
+                ? 'release-provider-result-unknown'
+                : (terminalResult.code ?? 'release-provider-failed'),
+            record: terminal,
+          };
+        }
+        if (remote && result.provider_handle === undefined) {
+          const unknown = buildStoreRecord(
+            request,
+            attempt,
+            head,
+            attemptId,
+            'unknown-provider-result',
+            authorizationEventId,
+            { outcome: 'unknown', code: 'release-provider-result-unknown' },
+          );
+          input.store.appendStoreRecord(unknown);
+          return {
+            ok: false,
+            phase: 'ambiguous',
+            code: 'release-provider-handle-observation-invalid',
+            record: unknown,
+          };
+        }
+        if (remote && result.transaction !== undefined) {
+          const unknown = buildStoreRecord(
+            request,
+            attempt,
+            head,
+            attemptId,
+            'unknown-provider-result',
+            authorizationEventId,
+            { outcome: 'unknown', code: 'release-provider-result-unknown' },
+          );
+          input.store.appendStoreRecord(unknown);
+          return {
+            ok: false,
+            phase: 'ambiguous',
+            code: 'release-adapter-output-invalid',
+            record: unknown,
+          };
+        }
+        if (result.material === undefined) {
+          if (!remote && result.transaction !== undefined) {
+            try {
+              await result.transaction.rollback();
+            } finally {
+              await result.transaction.dispose();
+            }
+          }
+          const terminal = buildStoreRecord(
+            request,
+            attempt,
+            head,
+            attemptId,
+            remote ? 'unknown-provider-result' : 'failure',
+            authorizationEventId,
+            remote
+              ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
+              : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
+          );
+          input.store.appendStoreRecord(terminal);
+          return {
+            ok: false,
+            phase: remote ? 'ambiguous' : 'validation',
+            code: remote ? 'release-provider-result-unknown' : 'release-adapter-output-invalid',
+            record: terminal,
+          };
+        }
+
+        let state: ReleaseLifecycleStateV2;
+        let completion: StoreRecord;
+        try {
+          state = buildState(
+            request,
+            result.material,
+            states.at(-1) ?? null,
+            authorizationEventId,
             authority,
+            input.publication_controls,
             input.recorded_at,
           );
-          if (
-            refreshedProof.grant_event_id !== grantProof.grant_event_id ||
-            !same(refreshedProof.ledger_head, grantProof.ledger_head) ||
-            !same(refreshedProof.grant, grantProof.grant)
-          ) {
-            throw new Error('release-authorization-attempt-binding-invalid');
-          }
-          const consumption = await input.authorization?.consume({
-            ...binding,
-            grant_event_id: authorizationEventId,
-          });
-          if (consumption === undefined)
-            throw new Error('release-authorization-consumption-not-durable');
-          verifyConsumptionProof(
-            consumption,
-            binding,
-            grantProof.grant,
+          completion = buildStoreRecord(
+            request,
+            attempt,
+            head,
+            attemptId,
+            'completion',
             authorizationEventId,
-            grantProof.ledger_head,
-            grantProof.ledger,
-            grantProof.events,
+            result,
+            state,
           );
         } catch (error) {
-          const failure = buildStoreRecord(
+          try {
+            await result.transaction?.rollback();
+          } finally {
+            await result.transaction?.dispose();
+          }
+          const terminal = buildStoreRecord(
             request,
             attempt,
             head,
             attemptId,
-            'failure',
+            remote ? 'unknown-provider-result' : 'failure',
             authorizationEventId,
-            {
-              outcome: 'failure',
-              dispatch_status: 'failed-before-dispatch',
-              code: 'release-authorization-consumption-failed',
-            },
+            remote
+              ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
+              : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
           );
-          input.store.appendStoreRecord(failure);
+          input.store.appendStoreRecord(terminal);
           return {
             ok: false,
-            phase: 'authorization',
-            code:
-              error instanceof Error
-                ? error.message
-                : 'release-authorization-consumption-not-durable',
-            record: failure,
-          };
-        }
-      }
-
-      let result: ReleaseProviderResult;
-      try {
-        result = await provider(request);
-      } catch {
-        result = remote
-          ? { outcome: 'unknown', code: 'release-provider-result-unknown' }
-          : { outcome: 'failure', code: 'release-provider-failed' };
-      }
-      if (result.outcome !== 'success') {
-        if (!remote && result.outcome !== 'unknown' && result.transaction !== undefined) {
-          try {
-            await result.transaction.rollback();
-          } finally {
-            await result.transaction.dispose();
-          }
-        }
-        const unsafeRemoteFailure =
-          remote &&
-          result.outcome === 'failure' &&
-          (result.provider_handle !== undefined ||
-            result.dispatch_status !== 'failed-before-dispatch');
-        const terminalResult = unsafeRemoteFailure
-          ? ({ ...result, outcome: 'unknown', code: 'release-provider-result-unknown' } as const)
-          : result;
-        const kind = terminalResult.outcome === 'unknown' ? 'unknown-provider-result' : 'failure';
-        const terminal = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          kind,
-          authorizationEventId,
-          terminalResult,
-        );
-        input.store.appendStoreRecord(terminal);
-        return {
-          ok: false,
-          phase: terminalResult.outcome === 'unknown' ? 'ambiguous' : 'provider',
-          code:
-            terminalResult.outcome === 'unknown'
+            phase: remote ? 'ambiguous' : 'validation',
+            code: remote
               ? 'release-provider-result-unknown'
-              : (terminalResult.code ?? 'release-provider-failed'),
-          record: terminal,
-        };
-      }
-      if (remote && result.provider_handle === undefined) {
-        const unknown = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          'unknown-provider-result',
-          authorizationEventId,
-          { outcome: 'unknown', code: 'release-provider-result-unknown' },
-        );
-        input.store.appendStoreRecord(unknown);
-        return {
-          ok: false,
-          phase: 'ambiguous',
-          code: 'release-provider-handle-observation-invalid',
-          record: unknown,
-        };
-      }
-      if (remote && result.transaction !== undefined) {
-        const unknown = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          'unknown-provider-result',
-          authorizationEventId,
-          { outcome: 'unknown', code: 'release-provider-result-unknown' },
-        );
-        input.store.appendStoreRecord(unknown);
-        return {
-          ok: false,
-          phase: 'ambiguous',
-          code: 'release-adapter-output-invalid',
-          record: unknown,
-        };
-      }
-      if (result.material === undefined) {
-        if (!remote && result.transaction !== undefined) {
-          try {
-            await result.transaction.rollback();
-          } finally {
-            await result.transaction.dispose();
-          }
+              : error instanceof Error
+                ? error.message
+                : 'release-adapter-output-invalid',
+            record: terminal,
+          };
         }
-        const terminal = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          remote ? 'unknown-provider-result' : 'failure',
-          authorizationEventId,
-          remote
-            ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
-            : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
-        );
-        input.store.appendStoreRecord(terminal);
-        return {
-          ok: false,
-          phase: remote ? 'ambiguous' : 'validation',
-          code: remote ? 'release-provider-result-unknown' : 'release-adapter-output-invalid',
-          record: terminal,
-        };
-      }
-
-      let state: ReleaseLifecycleStateV2;
-      let completion: StoreRecord;
-      try {
-        state = buildState(
-          request,
-          result.material,
-          states.at(-1) ?? null,
-          authorizationEventId,
-          authority,
-          input.publication_controls,
-          input.recorded_at,
-        );
-        completion = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          'completion',
-          authorizationEventId,
-          result,
-          state,
-        );
-      } catch (error) {
         try {
-          await result.transaction?.rollback();
-        } finally {
-          await result.transaction?.dispose();
-        }
-        const terminal = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          remote ? 'unknown-provider-result' : 'failure',
-          authorizationEventId,
-          remote
-            ? { ...result, outcome: 'unknown', code: 'release-provider-result-unknown' }
-            : { ...result, outcome: 'failure', code: 'release-adapter-output-invalid' },
-        );
-        input.store.appendStoreRecord(terminal);
-        return {
-          ok: false,
-          phase: remote ? 'ambiguous' : 'validation',
-          code: remote
-            ? 'release-provider-result-unknown'
-            : error instanceof Error
-              ? error.message
-              : 'release-adapter-output-invalid',
-          record: terminal,
-        };
-      }
-      try {
-        await result.transaction?.commit();
-      } catch {
-        if (request.action_id !== 'release prepare') {
-          try {
-            await result.transaction?.rollback();
-          } finally {
-            await result.transaction?.dispose();
+          await result.transaction?.commit();
+        } catch {
+          if (request.action_id !== 'release prepare') {
+            try {
+              await result.transaction?.rollback();
+            } finally {
+              await result.transaction?.dispose();
+            }
+            const failure = buildStoreRecord(
+              request,
+              attempt,
+              head,
+              attemptId,
+              'failure',
+              authorizationEventId,
+              {
+                outcome: 'failure',
+                dispatch_status: 'failed-before-dispatch',
+                code: 'release-provider-commit-failed',
+              },
+            );
+            input.store.appendStoreRecord(failure);
+            return {
+              ok: false,
+              phase: 'provider',
+              code: 'release-provider-commit-failed',
+              record: failure,
+            };
           }
+          // A dispatched commit is not proven absent merely because its response was lost.
+          // Preserve its transaction and all opaque handles for external reconciliation.
           const failure = buildStoreRecord(
             request,
             attempt,
             head,
             attemptId,
-            'failure',
+            'unknown-provider-result',
             authorizationEventId,
             {
-              outcome: 'failure',
-              dispatch_status: 'failed-before-dispatch',
-              code: 'release-provider-commit-failed',
+              ...result,
+              outcome: 'unknown',
+              dispatch_status: 'unknown',
+              code: 'release-provider-result-unknown',
             },
           );
           input.store.appendStoreRecord(failure);
           return {
             ok: false,
-            phase: 'provider',
-            code: 'release-provider-commit-failed',
+            phase: 'ambiguous',
+            code: 'release-artifact-sink-commit-unknown',
             record: failure,
           };
         }
-        // A dispatched commit is not proven absent merely because its response was lost.
-        // Preserve its transaction and all opaque handles for external reconciliation.
-        const failure = buildStoreRecord(
-          request,
-          attempt,
-          head,
-          attemptId,
-          'unknown-provider-result',
-          authorizationEventId,
-          {
-            ...result,
-            outcome: 'unknown',
-            dispatch_status: 'unknown',
-            code: 'release-provider-result-unknown',
-          },
-        );
-        input.store.appendStoreRecord(failure);
-        return {
-          ok: false,
-          phase: 'ambiguous',
-          code: 'release-artifact-sink-commit-unknown',
-          record: failure,
-        };
-      }
-      try {
-        input.store.appendStoreRecord(completion);
-        input.store.appendStateAndAdvanceHead(state, completion, head);
-      } catch (error) {
-        // The sink has committed. An append failure cannot authorize rollback or abort.
-        if (request.action_id !== 'release prepare') {
-          try {
-            await result.transaction?.rollback();
-          } finally {
-            await result.transaction?.dispose();
+        try {
+          input.store.appendStoreRecord(completion);
+          input.store.appendStateAndAdvanceHead(state, completion, head);
+        } catch (error) {
+          // The sink has committed. An append failure cannot authorize rollback or abort.
+          if (request.action_id !== 'release prepare') {
+            try {
+              await result.transaction?.rollback();
+            } finally {
+              await result.transaction?.dispose();
+            }
           }
+          return {
+            ok: false,
+            phase: 'append',
+            code: error instanceof Error ? error.message : 'release-state-store-unsafe',
+            record: completion,
+          };
         }
-        return {
-          ok: false,
-          phase: 'append',
-          code: error instanceof Error ? error.message : 'release-state-store-unsafe',
-          record: completion,
-        };
-      }
-      await result.transaction?.dispose();
-      return { ok: true, state, completion };
-    });
+        await result.transaction?.dispose();
+        return { ok: true, state, completion };
+      });
+    if (request.action_id !== 'release prepare') return await execute();
+    const plan = receipts.find((receipt) => receipt.kind === 'release-plan-receipt');
+    if (plan === undefined || typeof plan.value['receipt_digest_sha256'] !== 'string')
+      throw new Error('release-prepare-capacity-unavailable');
+    return await withProtectedReleasePrepareCapacity(
+      {
+        action_id: 'release prepare',
+        repository: request.repository_locator,
+        candidate: {
+          commit: request.candidate_locator.commit,
+          tree: request.candidate_locator.tree,
+        },
+        plan_receipt_digest_sha256: plan.value['receipt_digest_sha256'],
+      },
+      execute,
+    );
   } catch (error) {
     return {
       ok: false,
@@ -2740,6 +2785,7 @@ export async function executeOfflineVerification(input: {
   readonly exported_state: unknown;
   readonly provider?: OfflineVerificationProvider;
   readonly artifactReader?: TrustedArtifactReader;
+  readonly policyClosures?: readonly Parameters<typeof verifyReleasePolicyClosure>[0][];
 }): Promise<OfflineVerificationResult> {
   let request: ReleaseLifecycleRequest;
   let state: ReleaseLifecycleStateV2;
@@ -2754,6 +2800,50 @@ export async function executeOfflineVerification(input: {
     ) {
       throw new Error('release-request-identity-mismatch');
     }
+    const closures = input.policyClosures;
+    if (
+      closures === undefined ||
+      closures.length !== request.candidate_locator.release_units.length
+    )
+      throw new Error('rpl-policy-resolution-mismatch');
+    const checkedPlans: VerifiedReceipt[] = closures.map((closure) => {
+      const resolution = verifyReleasePolicyClosure(closure);
+      if (!same(resolution.repository, request.repository_locator))
+        throw new Error('rpl-policy-resolution-mismatch');
+      return verifyReceiptDocument(
+        closure.closure.plan,
+        createResolvedReleasePlanInputResolver(resolution),
+      );
+    });
+    const supplied = checkedPlans
+      .map(({ value }) => ({
+        candidate: value['candidate'],
+        receipt_id: value['receipt_id'],
+        receipt_digest_sha256: value['receipt_digest_sha256'],
+      }))
+      .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b), 'en'));
+    const expected = request.candidate_locator.release_units
+      .map((unit) => {
+        const plan = checkedPlans.find(
+          ({ value }) => object(value['candidate'])['release_unit'] === unit.release_unit,
+        );
+        const locator = request.receipt_locators?.find(
+          (item) => item.receipt_id === plan?.value['receipt_id'],
+        );
+        if (locator === undefined) throw new Error('rpl-policy-resolution-mismatch');
+        return {
+          candidate: {
+            release_unit: unit.release_unit,
+            version: unit.version,
+            commit: request.candidate_locator.commit,
+            tree: request.candidate_locator.tree,
+          },
+          receipt_id: locator.receipt_id,
+          receipt_digest_sha256: locator.receipt_digest_sha256,
+        };
+      })
+      .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b), 'en'));
+    if (!same(supplied, expected)) throw new Error('rpl-policy-resolution-mismatch');
     assertMaterialBijection(request, 'release export', {
       release_units: state.release_units,
       inputs: [],
@@ -3191,7 +3281,7 @@ export async function resumeReleaseLifecycleExecution(input: {
     }
   }
   if (
-    observedPlanCandidates.length > 0 &&
+    (observedPlanCandidates.length > 0 || head !== null || storeReduction.records.length > 0) &&
     !same(
       observedPlanCandidates.sort((left, right) =>
         canonicalJson(left).localeCompare(canonicalJson(right), 'en'),
