@@ -133,6 +133,7 @@ export {
   type ReleaseExportArtifactCommitManifest,
   type TrustedExportArtifactSink,
   type TrustedExportArtifactSinkTransaction,
+  type ProtectedReleaseExportBinding,
 } from './services/release-export-artifact-store.js';
 export {
   encodeReleaseExportTranscript,
@@ -144,4 +145,3 @@ export {
   type ReleaseExportProviderResultInput,
   type ReleaseExportProviderResult,
 } from './services/release-export-transcript.js';
-export type { ProtectedReleaseExportBinding } from '@devai-nyx/authority';

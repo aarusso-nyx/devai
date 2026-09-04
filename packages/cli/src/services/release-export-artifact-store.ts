@@ -5,7 +5,6 @@ import {
   createProtectedExportSinkAdapter,
   readProtectedReleaseExportCapacity,
   createProtectedReleaseSinkOwner,
-  type ProtectedReleaseExportBinding,
 } from '@devai-nyx/authority';
 import { createReleaseArtifactStore } from './release-artifact-store.js';
 import {
@@ -27,7 +26,7 @@ import {
   type ArtifactSinkCommitReceipt,
 } from './release-prepare-kernel.js';
 import { assertBoundReleaseHostPackageSnapshot } from './release-host-package-binding.js';
-import type { ReleasePackageSnapshot } from './release-package-snapshot.js';
+import type { ReleasePackageIdentity, ReleasePackageSnapshot } from './release-package-snapshot.js';
 import {
   verifyReleasePolicyClosure,
   type ReleasePolicyClosureLimits,
@@ -42,6 +41,7 @@ import {
   verifyReleaseExportProviderResult,
   type ReleaseExportProviderResult,
   type ReleaseExportTranscript,
+  type ReleaseExportTranscriptBinding,
   type ReleaseExportTranscriptLimits,
 } from './release-export-transcript.js';
 
@@ -54,6 +54,18 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12
 const HANDLE = new RegExp(`^(${UUID}):(${UUID}):([0-9a-f]{64})$`, 'u');
 type ExportKind = 'evidence-manifest' | 'provider-result';
 type ReadInput = Parameters<TrustedArtifactReader['readArtifact']>[0];
+
+/** Portable host data contract. The private authority adapter independently validates it. */
+export interface ProtectedReleaseExportBinding extends ReleaseExportTranscriptBinding {
+  readonly export_spec_digest_sha256: string;
+  readonly closure_inputs: readonly {
+    readonly package_id: string;
+    readonly sha256: string;
+    readonly size_bytes: number;
+    readonly expected_installed_package: ReleasePackageIdentity;
+    readonly policy_resolution_digest_sha256: string;
+  }[];
+}
 
 export interface ReleaseExportArtifactObjectReceipt {
   readonly sink_id: string;
