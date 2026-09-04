@@ -116,6 +116,69 @@ const fixtureProviderCompatibility = new WeakMap<
   ProtectedToolchainFixtureCompatibility
 >();
 
+/** Process-local proof of this provider's completed DAG, never serialized evidence. */
+export interface ProtectedMutationPrerequisiteClosure {
+  readonly kind: 'protected-mutation-prerequisite-closure-v1';
+}
+
+export interface ProtectedMutationPrerequisiteBinding {
+  readonly repository: ReleaseCandidateSnapshot['repository'];
+  readonly release_unit: string;
+  readonly release_plan_receipt_digest: string;
+  readonly release_profile_digest: string;
+  readonly container_identity: Json;
+  readonly environment: Readonly<Record<string, string>>;
+  readonly toolchain: Readonly<Record<string, string>>;
+}
+
+export interface CapturedMutationPrerequisiteClosure {
+  readonly binding: ProtectedMutationPrerequisiteBinding;
+  readonly task_policy_digest: string;
+  readonly tasks: readonly { readonly node_id: string; readonly output_contract: Json }[];
+  readonly outputs: readonly (ContainerArchiveEntry & {
+    readonly producer_task_node: string;
+    readonly size: number;
+    readonly sha256: string;
+  })[];
+}
+
+const mutationPrerequisites = new WeakMap<object, CapturedMutationPrerequisiteClosure>();
+const pendingMutationPrerequisites = new WeakMap<
+  ContainerReleaseCertificationAdapters['certification_provider'],
+  {
+    readonly request_digest: string;
+    readonly closures: readonly ProtectedMutationPrerequisiteClosure[];
+  }
+>();
+
+/** Internal one-shot handoff only; absent from the public host barrel and lifecycle material. */
+export function takeProtectedMutationPrerequisites(
+  provider: ContainerReleaseCertificationAdapters['certification_provider'],
+  expectedRequest: ReleaseLifecycleRequest,
+): readonly ProtectedMutationPrerequisiteClosure[] {
+  const pending = pendingMutationPrerequisites.get(provider);
+  pendingMutationPrerequisites.delete(provider);
+  if (pending === undefined || pending.request_digest !== canonicalSha256(expectedRequest))
+    throw new Error('release-certification-prerequisite-proof-invalid');
+  return [...pending.closures];
+}
+
+/** Only a token issued below after actual DAG verification can discharge a prerequisite. */
+export function captureProtectedMutationPrerequisites(
+  value: ProtectedMutationPrerequisiteClosure,
+  expected: ProtectedMutationPrerequisiteBinding,
+): CapturedMutationPrerequisiteClosure {
+  const captured = mutationPrerequisites.get(value);
+  if (captured === undefined || canonicalJson(captured.binding) !== canonicalJson(expected))
+    throw new Error('release-certification-prerequisite-proof-invalid');
+  return {
+    binding: snapshot(captured.binding),
+    task_policy_digest: captured.task_policy_digest,
+    tasks: snapshot(captured.tasks),
+    outputs: captured.outputs.map((entry) => ({ ...entry, bytes: Buffer.from(entry.bytes) })),
+  };
+}
+
 /** Internal producer seam only. A lookalike provider or serialized result carries no credit. */
 export function assertProtectedFixtureProviderCompatibility(
   provider: ReleaseProvider,
@@ -737,10 +800,54 @@ function createContainerReleaseAdapters(
       canonicalJson(report.plan.taskPolicy) !== canonicalJson(planned.taskPolicy)
     )
       throw new Error('release-certification-task-failed');
+    let mutationPrerequisiteClosure: ProtectedMutationPrerequisiteClosure | undefined;
+    if (request.action_id === 'release certify' && fixtureContext === undefined) {
+      const resolution = boundPlan.plan.resolution;
+      if (!isVerifiedReleasePolicyResolution(resolution))
+        throw new Error('release-certification-prerequisite-proof-invalid');
+      mutationPrerequisiteClosure = Object.freeze({
+        kind: 'protected-mutation-prerequisite-closure-v1' as const,
+      });
+      mutationPrerequisites.set(mutationPrerequisiteClosure, {
+        binding: snapshot({
+          repository: request.repository_locator,
+          release_unit: resolution.release_unit,
+          release_plan_receipt_digest: boundPlan.receipt.receipt_digest_sha256,
+          release_profile_digest: canonicalSha256(
+            resolution.readInput('release-verification-profile'),
+          ),
+          container_identity: container.identity,
+          environment,
+          toolchain,
+        }),
+        task_policy_digest: planned.taskPolicyDigest,
+        tasks: planned.tasks.map((task) => ({
+          node_id: task.nodeId,
+          output_contract: snapshot(task.outputContract),
+        })),
+        outputs: [...outputs.values()]
+          .sort((a, b) => compare(a.path, b.path))
+          .map((entry) => {
+            const producer = producers.get(entry.path);
+            if (producer === undefined)
+              throw new Error('release-certification-prerequisite-proof-invalid');
+            const bytes = Buffer.from(entry.bytes);
+            return {
+              path: entry.path,
+              mode: entry.mode,
+              bytes,
+              producer_task_node: producer,
+              size: bytes.length,
+              sha256: digest(bytes),
+            };
+          }),
+      });
+    }
     return {
       report,
       outputs,
       producers,
+      mutation_prerequisites: mutationPrerequisiteClosure,
       namespaces: namespaces.filter((entry) =>
         planned.tasks.some((task) => task.nodeId === entry.task_node),
       ),
@@ -973,9 +1080,10 @@ function createContainerReleaseAdapters(
   };
 
   protectedPreflightProviders.add(preflight_provider);
-  return {
+  const adapters: ContainerReleaseCertificationAdapters = {
     preflight_provider,
     certification_provider(request) {
+      pendingMutationPrerequisites.delete(adapters.certification_provider);
       if (input.evidence_sink === undefined)
         throw new Error('release-certification-evidence-sink-unavailable');
       const descriptor = bindRequest(request);
@@ -1022,6 +1130,15 @@ function createContainerReleaseAdapters(
                 )
               )
                 throw new Error('release-task-policy-identity-mismatch');
+              if (runs.every((run) => run.mutation_prerequisites !== undefined))
+                pendingMutationPrerequisites.set(adapters.certification_provider, {
+                  request_digest: canonicalSha256(request),
+                  closures: runs.map((run) => {
+                    if (run.mutation_prerequisites === undefined)
+                      throw new Error('release-certification-prerequisite-proof-invalid');
+                    return run.mutation_prerequisites;
+                  }),
+                });
               const prepared = runs.flatMap((run, unitIndex) => {
                 const unit = request.candidate_locator.release_units[unitIndex];
                 const entry = selected[unitIndex];
@@ -1252,4 +1369,5 @@ function createContainerReleaseAdapters(
       };
     },
   };
+  return adapters;
 }

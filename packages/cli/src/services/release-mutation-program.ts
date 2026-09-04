@@ -70,7 +70,7 @@ export function createProtectedMutationProgram(input: {
 }): ProtectedMutationProgram {
   assertBoundReleaseHostPackageSnapshot(input.package_snapshot);
   assertReleaseMutationInputPackageIdentity(input.input_plan, input.package_snapshot.identity);
-  const executionContext = captureReleaseMutationInputExecutionContext(input.input_plan);
+  const derivedContext = captureReleaseMutationInputExecutionContext(input.input_plan);
   const plan = input.input_plan;
   const pkg = plan.packages.find((entry) => entry.expected.packageName === input.package_name);
   const limits = JSON.parse(canonicalJson(input.limits)) as ReleaseMutationArtifactLimitsV21;
@@ -91,6 +91,15 @@ export function createProtectedMutationProgram(input: {
     pkg.selected_tests.length > limits.maximum_files
   )
     refuse();
+  const prerequisiteOutputs = (derivedContext.prerequisite_outputs ?? []).filter((entry) =>
+    pkg.prerequisite_nodes.includes(entry.producer_task_node),
+  );
+  const executionContext = {
+    ...derivedContext,
+    ...(derivedContext.prerequisite_outputs === undefined
+      ? {}
+      : { prerequisite_outputs: prerequisiteOutputs }),
+  };
   const config = pkg.execution_configuration;
   const files: ContainerArchiveEntry[] = SOURCES.map((name) => {
     const path = `${PREFIX}${name}`;
@@ -123,6 +132,7 @@ export function createProtectedMutationProgram(input: {
         config.vitest_config,
         config.typescript_config,
         ...config.typescript_closure,
+        ...prerequisiteOutputs,
       ].map((entry) => [entry.path, { path: entry.path, size: entry.size, sha256: entry.sha256 }]),
     ).values(),
   ];
@@ -242,10 +252,21 @@ export function assertProtectedMutationProgramExecution(
     expected === undefined ||
     canonicalJson(input.container_identity) !== canonicalJson(expected.container_identity) ||
     canonicalJson(input.environment) !== canonicalJson(expected.environment) ||
-    input.prior_outputs.size !== 0 ||
+    input.prior_outputs.size !== (expected.prerequisite_outputs?.length ?? 0) ||
     input.source.length !== expected.candidate_files.length
   )
     refuse();
+  for (const member of expected.prerequisite_outputs ?? []) {
+    const entry = input.prior_outputs.get(member.path);
+    if (
+      entry === undefined ||
+      entry.path !== member.path ||
+      entry.mode !== member.mode ||
+      entry.bytes.length !== member.size ||
+      hash(entry.bytes) !== member.sha256
+    )
+      refuse();
+  }
   const members = new Map(expected.candidate_files.map((entry) => [entry.path, entry]));
   const seen = new Set<string>();
   const algorithm = expected.repository.commit.length === 40 ? 'sha1' : 'sha256';

@@ -22,7 +22,11 @@ import {
   type ProtectedContainerControls,
   type ProtectedContainerDependency,
 } from './release-certification-container.js';
-import { assertProtectedFixtureProviderCompatibility } from './release-certification-provider.js';
+import {
+  assertProtectedFixtureProviderCompatibility,
+  captureProtectedMutationPrerequisites,
+  type ProtectedMutationPrerequisiteClosure,
+} from './release-certification-provider.js';
 import type { ReleaseProvider } from './release-lifecycle-execution.js';
 import type { ReleaseMutationPackageInputsV21 } from './release-mutation-artifacts.js';
 
@@ -64,6 +68,14 @@ export interface ReleaseMutationSourceMemberV21 {
   readonly object_id: string;
   readonly size: number;
   readonly sha256: string;
+}
+
+export interface ReleaseMutationPrerequisiteMember {
+  readonly path: string;
+  readonly mode: '100644' | '100755';
+  readonly size: number;
+  readonly sha256: string;
+  readonly producer_task_node: string;
 }
 
 export interface ReleaseMutationInputPackageV21 {
@@ -145,6 +157,8 @@ export interface ReleaseMutationInputControlsV21 {
   readonly execution_coverage: ReleaseMutationExecutionCoverageV21;
   /** Process-local verified fixture provider, never serialized authority or execution credit. */
   readonly fixture_provider?: ReleaseProvider;
+  /** Actual verified predecessor outputs from the same protected provider, never a caller map. */
+  readonly prerequisite_closure?: ProtectedMutationPrerequisiteClosure;
   readonly container: ProtectedContainerControls;
   readonly dependencies: readonly ProtectedContainerDependency[];
   /** Explicit public values from the protected host, never ambient process.env. */
@@ -165,6 +179,7 @@ export interface ReleaseMutationInputExecutionContext {
     readonly mode: string;
     readonly object_id: string;
   }[];
+  readonly prerequisite_outputs?: readonly ReleaseMutationPrerequisiteMember[];
 }
 const derivedExecution = new WeakMap<object, ReleaseMutationInputExecutionContext>();
 function fail(code = INVALID): never {
@@ -438,6 +453,7 @@ export function buildReleaseMutationInputPlanV21(input: {
       fail('MUTATION_ROSTER_MISMATCH');
     const controls = input.controls;
     const hasFixtureProvider = Object.hasOwn(controls, 'fixture_provider');
+    const hasPrerequisiteClosure = Object.hasOwn(controls, 'prerequisite_closure');
     closed(controls, [
       'execution_coverage',
       'container',
@@ -447,6 +463,7 @@ export function buildReleaseMutationInputPlanV21(input: {
       'maximum_source_bytes',
       'maximum_source_entries',
       ...(hasFixtureProvider ? ['fixture_provider'] : []),
+      ...(hasPrerequisiteClosure ? ['prerequisite_closure'] : []),
     ]);
     if (hasFixtureProvider && typeof controls.fixture_provider !== 'function') fail();
     const requestedCoverage = immutable(controls.execution_coverage);
@@ -544,6 +561,43 @@ export function buildReleaseMutationInputPlanV21(input: {
       fixtureValidated = true;
     }
     const members = treeMembers(candidate, maximumEntries);
+    const prerequisiteProof = hasPrerequisiteClosure
+      ? captureProtectedMutationPrerequisites(controls.prerequisite_closure ?? fail(), {
+          repository: candidate.repository,
+          release_unit: resolution.release_unit,
+          release_plan_receipt_digest: text(receipt['receipt_digest_sha256']),
+          release_profile_digest: canonicalSha256(profile),
+          container_identity: containerIdentity,
+          environment,
+          toolchain,
+        })
+      : undefined;
+    if (prerequisiteProof !== undefined && !currentTemplate) fail();
+    let prerequisiteBytes = 0;
+    const prerequisitePaths = new Set<string>();
+    const prerequisiteOutputs: ReleaseMutationPrerequisiteMember[] =
+      prerequisiteProof?.outputs.map((entry) => {
+        prerequisiteBytes += entry.bytes.length;
+        if (
+          members.has(entry.path) ||
+          prerequisitePaths.has(entry.path) ||
+          (entry.mode !== '100644' && entry.mode !== '100755') ||
+          entry.size !== entry.bytes.length ||
+          entry.sha256 !== hash(entry.bytes) ||
+          prerequisiteBytes > maximumBytes ||
+          !prerequisiteProof.tasks.some((task) => task.node_id === entry.producer_task_node)
+        )
+          return fail();
+        prerequisitePaths.add(entry.path);
+        return {
+          path: path(entry.path),
+          mode: entry.mode,
+          size: entry.size,
+          sha256: entry.sha256,
+          producer_task_node: entry.producer_task_node,
+        };
+      }) ?? [];
+    if (candidate.paths.length + prerequisiteOutputs.length > maximumEntries) fail();
     const captured = new Map<string, Buffer>();
     const population = new Map<string, ReleaseMutationSourceMemberV21>();
     let bytesRead = 0;
@@ -906,6 +960,29 @@ export function buildReleaseMutationInputPlanV21(input: {
         dependencyNames.flatMap((name) => select(byPackage.get(name)?.entry['source_selectors'])),
       );
       const nodes = taskClosure(task);
+      const prerequisiteNodes = nodes.filter((node) => node.nodeId !== task.nodeId);
+      const generatedPrerequisites = prerequisiteOutputs.filter((output) =>
+        prerequisiteNodes.some((node) => node.nodeId === output.producer_task_node),
+      );
+      let prerequisitesVerified = false;
+      if (prerequisiteProof !== undefined) {
+        for (const node of prerequisiteNodes) {
+          const executed = prerequisiteProof.tasks.find((entry) => entry.node_id === node.nodeId);
+          if (executed === undefined || !same(executed.output_contract, node.outputContract))
+            fail();
+          if (node.outputContract['kind'] !== 'tracked-files') {
+            for (const declared of strings(node.outputContract['paths'] ?? [])) {
+              if (
+                !generatedPrerequisites.some(
+                  (output) => output.path === declared && output.producer_task_node === node.nodeId,
+                )
+              )
+                fail();
+            }
+          }
+        }
+        prerequisitesVerified = true;
+      }
       const prerequisiteInputs = uniqueFiles(
         nodes.flatMap((node) => {
           if (
@@ -985,7 +1062,17 @@ export function buildReleaseMutationInputPlanV21(input: {
             target_projection_digest: targetProjectionDigest,
           },
         ],
-        runner: [...orchestration, { template, tasks: nodes, implementation }],
+        runner: [
+          ...orchestration,
+          {
+            template,
+            tasks: nodes,
+            implementation,
+            ...(generatedPrerequisites.length === 0
+              ? {}
+              : { prerequisite_outputs: generatedPrerequisites }),
+          },
+        ],
         roster: wholeRoster,
         thresholds: [thresholds],
         sanitizer,
@@ -1073,6 +1160,7 @@ export function buildReleaseMutationInputPlanV21(input: {
       // Input identity binds the static fixture requirement, not this process's observation.
       // Discharge its operational blocker only after that unchanged projection is captured.
       if (fixtureValidated) unresolved.delete('toolchain-fixture-validation-required');
+      if (prerequisitesVerified) unresolved.delete('prerequisite-output-proof-required');
       return immutable({
         id: text(entry['id']),
         input_digest: inputDigest(projection),
@@ -1143,6 +1231,7 @@ export function buildReleaseMutationInputPlanV21(input: {
         candidate_files: [...members]
           .map(([path, member]) => ({ path, ...member }))
           .sort((a, b) => compare(a.path, b.path)),
+        ...(prerequisiteProof === undefined ? {} : { prerequisite_outputs: prerequisiteOutputs }),
       }),
     );
     return result;
