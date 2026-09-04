@@ -155,6 +155,7 @@ export interface ReleaseMutationInputControlsV21 {
 }
 
 const derived = new WeakSet<object>();
+const derivedPackages = new WeakMap<object, string>();
 function fail(code = INVALID): never {
   throw Object.assign(new Error(code), { code });
 }
@@ -329,6 +330,18 @@ export function isDerivedReleaseMutationInputPlanV21(
   value: unknown,
 ): value is ReleaseMutationInputPlanV21 {
   return value !== null && typeof value === 'object' && derived.has(value);
+}
+
+/** A production driver must come from the same installed package that derived its inputs. */
+export function assertReleaseMutationInputPackageIdentity(
+  plan: ReleaseMutationInputPlanV21,
+  identity: unknown,
+): void {
+  if (
+    !isDerivedReleaseMutationInputPlanV21(plan) ||
+    derivedPackages.get(plan) !== canonicalSha256(immutable(identity))
+  )
+    fail();
 }
 
 /** Compare only with independently derived inputs. Caller projections are never an input source. */
@@ -1100,6 +1113,7 @@ export function buildReleaseMutationInputPlanV21(input: {
         ),
     });
     derived.add(result);
+    derivedPackages.set(result, canonicalSha256(implementation));
     return result;
   } catch (error) {
     if (error instanceof Error && /^MUTATION_[A-Z0-9_]+$/u.test(error.message)) throw error;

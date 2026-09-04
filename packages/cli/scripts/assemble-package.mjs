@@ -364,6 +364,11 @@ const __dirname = __devaiDirname(__filename);`,
     join(packageRoot, 'scripts/release-host/provision-package.mjs'),
     join(runtimeRoot, 'host/provision-package.mjs'),
   );
+  for (const name of ['mutation-production.mjs', 'mutation-vitest-plugin.mjs']) {
+    const target = join(runtimeRoot, 'host', name);
+    copyFileSync(join(repositoryRoot, 'scripts/release-host', name), target);
+    chmodSync(target, 0o644);
+  }
   const fixtureRoot = join(runtimeRoot, 'fixtures/mutation-toolchain');
   mkdirSync(fixtureRoot, { recursive: true });
   const fixtureManifest = join(fixtureRoot, 'manifest.json');
