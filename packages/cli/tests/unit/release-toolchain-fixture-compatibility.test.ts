@@ -543,13 +543,12 @@ describe('release toolchain fixture compatibility', () => {
       });
     // The production lane shares this object and declares every key its own DAG
     // binds; an extra key is bound evidence, not an unchecked input.
-    expect(() => build({ ...pinned, eslint: '9.39.5' })).not.toThrow();
+    const complete: Readonly<Record<string, string>> = { ...pinned, eslint: '9.39.5' };
+    expect(() => build(complete)).not.toThrow();
     // Every pinned key stays mandatory.
     for (const key of Object.keys(pinned)) {
-      const { [key]: _dropped, ...without } = { ...pinned, eslint: '9.39.5' };
-      expect(() => build(without as Readonly<Record<string, string>>)).toThrow(
-        'release-toolchain-fixture-compatibility-invalid',
-      );
+      const { [key]: _dropped, ...without } = complete;
+      expect(() => build(without)).toThrow('release-toolchain-fixture-compatibility-invalid');
     }
     // The version-pinned keys stay exact. `git` is bound by the recorded identity
     // rather than pinned to a literal here, which this contract has never done.

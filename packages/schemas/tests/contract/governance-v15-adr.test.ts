@@ -200,7 +200,7 @@ describe('ADR-v2 census and legacy catalog', () => {
         continue;
       }
 
-      expect(classify(name, source, catalog, policy.body.required_sections)).toBe('v2');
+      expect(classify(name, source, catalog, policy.body.required_sections), name).toBe('v2');
       const metadata = frontmatter(source);
       expect(metadata, `${name} must be v2 or catalogued`).toBeDefined();
       expect(getValidator('adr-v2.schema.json')(metadata)).toBe(true);
@@ -627,6 +627,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-MUT-0005',
       'ADR-MUT-0006',
       'ADR-MUT-0007',
+      'ADR-MUT-0008',
+      'ADR-MUT-0009',
+      'ADR-MUT-0010',
       'ADR-REL-0001',
       'ADR-REL-0002',
       'ADR-REL-0003',
@@ -651,14 +654,15 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0022',
       'ADR-REL-0023',
       'ADR-REL-0024',
+      'ADR-REL-0025',
     ]);
-    expect(records).toHaveLength(49);
+    expect(records).toHaveLength(53);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(50);
-    expect(result.subject_authorities).toHaveLength(99);
+    expect(result.files_scanned).toBe(54);
+    expect(result.subject_authorities).toHaveLength(110);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -673,6 +677,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-MUT-0004',
       'ADR-MUT-0006',
       'ADR-MUT-0007',
+      'ADR-MUT-0008',
+      'ADR-MUT-0009',
+      'ADR-MUT-0010',
       'ADR-REL-0002',
       'ADR-REL-0004',
       'ADR-REL-0005',

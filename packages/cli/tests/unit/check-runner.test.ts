@@ -1181,7 +1181,9 @@ describe('content-addressed check runner', () => {
       capturedTaskOutputPaths: () => [],
     });
     const expected = readProtectedCompletedTaskResults(report);
-    const returned = readProtectedCompletedTaskResults(report) as Array<{
+    // Deliberately widened: the test mutates the returned array itself to prove the
+    // reader hands back a defensive snapshot rather than the retained population.
+    const returned = readProtectedCompletedTaskResults(report) as unknown as Array<{
       outputDigests: Record<string, string>;
     }>;
 

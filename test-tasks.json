@@ -550,7 +550,11 @@
       "inputSelectors": [{ "kind": "glob", "pattern": "**" }],
       "toolchainKeys": ["node", "pnpm"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1"
+      }
     },
     {
       "nodeId": "release:static-integrity",

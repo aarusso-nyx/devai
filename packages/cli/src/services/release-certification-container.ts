@@ -117,11 +117,11 @@ function freezeIdentity<T>(value: T): T {
 
 // This trusted PID 1 never receives sink credentials, host paths, or provider objects.
 // Exiting PID 1 tears down the complete PID namespace, including detached descendants.
-const TASK_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){process.stderr.write('protected-container-toolchain-mismatch');process.exit(125)}const r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:'inherit',timeout:p.timeout_ms,shell:false});if(r.error||r.signal||r.status===null){process.stderr.write('protected-container-task-abnormal');process.exit(124)}process.exit(r.status);`;
+const TASK_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){process.stderr.write('protected-container-toolchain-mismatch');process.exit(125)}const seedIndex=x=>{try{fs.copyFileSync('/workspace/candidate/.git/index',x)}catch{}};seedIndex(p.environment.GIT_INDEX_FILE);const r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:'inherit',timeout:p.timeout_ms,shell:false});if(r.error||r.signal||r.status===null){process.stderr.write('protected-container-task-abnormal');process.exit(124)}process.exit(r.status);`;
 
 // The host owns this PID 1 and the mounted driver. Worker stdout/stderr never become a
 // task result: fd 3/4 are the sole bounded observation/report channels.
-const MUTATION_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');const emit=(r,errorAbsent)=>process.stdout.write(JSON.stringify({kind:'devai.protected-mutation-program-result.v1',observation_base64:Buffer.from(r?.output?.[3]??'').toString('base64'),process:{error_absent:errorAbsent,signal:r?.signal??null,status:r?.status??null},report_base64:Buffer.from(r?.output?.[4]??'').toString('base64'),schemaVersion:'1.0.0'}));if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){emit(undefined,false);process.exit(125)}let r;try{r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:['ignore','pipe','pipe','pipe','pipe'],timeout:p.timeout_ms,maxBuffer:p.maximum_buffer_bytes,shell:false})}catch{emit(undefined,false);process.exit(124)}emit(r,!r.error);if(r.error||r.signal||r.status===null)process.exit(124);process.exit(r.status);`;
+const MUTATION_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');const emit=(r,errorAbsent)=>process.stdout.write(JSON.stringify({kind:'devai.protected-mutation-program-result.v1',observation_base64:Buffer.from(r?.output?.[3]??'').toString('base64'),process:{error_absent:errorAbsent,signal:r?.signal??null,status:r?.status??null},report_base64:Buffer.from(r?.output?.[4]??'').toString('base64'),schemaVersion:'1.0.0'}));if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){emit(undefined,false);process.exit(125)}const seedIndex=x=>{try{fs.copyFileSync('/workspace/candidate/.git/index',x)}catch{}};seedIndex(p.environment.GIT_INDEX_FILE);let r;try{r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:['ignore','pipe','pipe','pipe','pipe'],timeout:p.timeout_ms,maxBuffer:p.maximum_buffer_bytes,shell:false})}catch{emit(undefined,false);process.exit(124)}emit(r,!r.error);if(r.error||r.signal||r.status===null)process.exit(124);process.exit(r.status);`;
 
 const MUTATION_PROGRAM_ARGV = ['node', '/devai-host/run.mjs'] as const;
 const MUTATION_ENVELOPE_KIND = 'devai.protected-mutation-program-result.v1';
@@ -235,6 +235,8 @@ function mutationEnvelope(
   };
 }
 
+const PROTECTED_GIT_INDEX = '/tmp/devai-protected-git-index';
+
 /** Exact non-inherited task environment shared by execution and private identity binding. */
 export function protectedContainerTaskEnvironment(
   environment: Readonly<Record<string, string>>,
@@ -249,6 +251,10 @@ export function protectedContainerTaskEnvironment(
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_OPTIONAL_LOCKS: '0',
+    // git refreshes the index on read (git diff ignores GIT_OPTIONAL_LOCKS), and the
+    // transported index carries no stat data, so every read would rewrite it and
+    // report the candidate source as changed. Give git a scratch copy instead.
+    GIT_INDEX_FILE: PROTECTED_GIT_INDEX,
   };
 }
 
