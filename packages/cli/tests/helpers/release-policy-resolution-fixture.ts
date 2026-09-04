@@ -221,6 +221,145 @@ export interface LifecyclePolicyFixture {
   readonly expected: Parameters<typeof resolveReleasePolicySnapshot>[0]['expected'];
 }
 
+export interface LifecyclePolicyResolutionSetFixture {
+  readonly package_snapshot: ReleasePackageSnapshot;
+  readonly candidate: ReleaseCandidateSnapshot;
+  readonly resolutions: readonly VerifiedReleasePolicyResolution[];
+  readonly receipts: readonly ReturnType<typeof buildResolvedReleasePlanReceipt>[];
+  readonly intents: readonly Readonly<Record<string, unknown>>[];
+  readonly foreign_resolution: VerifiedReleasePolicyResolution;
+}
+
+/**
+ * Two independently verified release units deliberately share one candidate,
+ * installed package, and materialized policy binding.  This is the only
+ * supported multi-unit shape for a single candidate replay.
+ */
+export function createLifecyclePolicyResolutionSetFixture(): LifecyclePolicyResolutionSetFixture {
+  const checked = packageSnapshot();
+  const pin = checked.read('dist/law/constitution.md');
+  const version = parseConstitutionVersion(pin.toString());
+  if (version === null) throw new Error('fixture constitution');
+  const document = {
+    schemaVersion: '1.0.0',
+    policy_id: 'fixture.multi-unit-policy',
+    policy_version: '1.0.0',
+    release_verification: {
+      schemaVersion: '1.0.0',
+      policy_id: 'fixture.multi-unit-profile',
+      policy_version: '1.0.0',
+      release_unit: '@fixture/unit-one',
+      version_source: 'package.json',
+      default_support: 'current',
+      capability_tasks: { lint: ['lint'] },
+      risk_capabilities: {},
+      mutation_roster: [],
+    },
+  };
+  const materialized = resolveAdopterPolicyMaterialization({
+    policy: document,
+    currentProject: {
+      schemaVersion: '1.0.0',
+      project_type: 'framework',
+      constitution: { version, sha256: sha256(pin) },
+    },
+    frameworkVersion: VERSION,
+  });
+  const policyBytes = Buffer.from(jsonBytes(document));
+  const binding = {
+    schemaVersion: '1.0.0',
+    policy_id: document.policy_id,
+    policy_version: document.policy_version,
+    source_path: SOURCE,
+    source_digest_sha256: sha256(policyBytes),
+    materialized: Object.fromEntries(
+      [...materialized].map(([path, bytes]) => [path, sha256(Buffer.from(bytes))]),
+    ),
+  };
+  const dependency = { [PACKAGE]: VERSION };
+  const candidateFiles = new Map<string, Uint8Array>([
+    [SOURCE, policyBytes],
+    [BINDING, Buffer.from(jsonBytes(binding))],
+    ...[...materialized].map(([path, bytes]) => [path, Buffer.from(bytes)] as const),
+    [PIN, pin],
+    [
+      'package.json',
+      Buffer.from(
+        JSON.stringify({
+          name: 'fixture-multi-unit-adopter',
+          version: '1.0.0',
+          packageManager: 'npm@10.8.2',
+          dependencies: dependency,
+        }),
+      ),
+    ],
+    [
+      'package-lock.json',
+      Buffer.from(
+        JSON.stringify({
+          name: 'fixture-multi-unit-adopter',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          packages: {
+            '': { dependencies: dependency },
+            [`node_modules/${PACKAGE}`]: {
+              version: VERSION,
+              integrity: `sha512-${createHash('sha512').update(checked.readArchive()).digest('base64')}`,
+            },
+          },
+        }),
+      ),
+    ],
+  ]);
+  const candidateResult = git(candidateFiles, 'fixture/multi-unit');
+  const makeResolution = (release_unit: string, candidate = candidateResult.snapshot) =>
+    resolveReleasePolicySnapshot({
+      expected: {
+        repository: candidate.repository,
+        installed_package: checked.identity,
+        installation_origin: 'candidate-adopter-dependency',
+        release_unit,
+      },
+      installed_package: checked,
+      candidate,
+    });
+  const units = ['@fixture/unit-one', '@fixture/unit-two'] as const;
+  const resolutions = units.map((release_unit) => makeResolution(release_unit));
+  const intents = units.map((release_unit) => ({
+    schemaVersion: '1.0.0',
+    release_unit,
+    current_version: VERSION,
+    target_version: '1.4.6',
+    support: 'current',
+    change_kind: 'behavioral',
+    changed_paths: ['packages/cli/src/services/release-policy-resolution.ts'],
+    changed_packages: [PACKAGE],
+    candidate: {
+      commit: candidateResult.snapshot.repository.commit,
+      tree: candidateResult.snapshot.repository.tree,
+    },
+    base: { commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+  }));
+  const foreignCandidate = git(candidateFiles, 'fixture/foreign-multi-unit').snapshot;
+  return {
+    package_snapshot: checked,
+    candidate: candidateResult.snapshot,
+    resolutions,
+    receipts: intents.map((intent, index) =>
+      buildResolvedReleasePlanReceipt({
+        intent,
+        resolution:
+          resolutions[index] ??
+          (() => {
+            throw new Error('fixture resolution');
+          })(),
+      }),
+    ),
+    intents,
+    foreign_resolution: makeResolution('@fixture/foreign-unit', foreignCandidate),
+  };
+}
+
 /**
  * Materialize the same candidate-bound policy evidence used by the in-memory
  * fixture into an already initialized repository, then resolve it from the

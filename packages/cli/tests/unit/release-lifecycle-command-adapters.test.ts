@@ -345,18 +345,11 @@ describe('release lifecycle command adapter composition', () => {
       ],
     } as const;
     const policyResolution = vi.fn(
-      (input: {
+      (_input: {
         readonly repository_id: string;
         readonly candidate: { readonly commit: string; readonly tree: string };
         readonly release_unit: string;
-      }) => {
-        expect(input).toEqual({
-          repository_id: 'aarusso-nyx/devai',
-          candidate: { commit, tree },
-          release_unit: '@aarusso-nyx/devai',
-        });
-        return fixture.resolution;
-      },
+      }) => fixture.resolution,
     );
     const requestPath = join(root, 'request.json');
     writeFileSync(requestPath, `${canonicalJson(request)}\n`);
@@ -561,6 +554,11 @@ describe('release lifecycle command adapter composition', () => {
         }),
     );
     expect(preflightHook).toHaveBeenCalledWith(request);
+    expect(policyResolution).toHaveBeenCalledWith({
+      repository_id: 'aarusso-nyx/devai',
+      candidate: { commit, tree },
+      release_unit: '@aarusso-nyx/devai',
+    });
     expect(errorOutput.mock.calls).toEqual([]);
     expect(errorOutput.mock.calls, JSON.stringify(errorOutput.mock.calls)).toEqual([]);
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"preflight_passed"'));
@@ -626,6 +624,61 @@ describe('release lifecycle command adapter composition', () => {
     );
     expect(errorOutput.mock.calls).toEqual([]);
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"next_action":"release certify"'));
+
+    const stockStore = new ReleaseLifecycleFileStore(join(root, 'stock-state'), request);
+    const stateChainPath = join(root, 'resume-states.json');
+    const storeRecordsPath = join(root, 'resume-store-records.json');
+    const storeHeadPath = join(root, 'resume-store-head.json');
+    writeFileSync(stateChainPath, `${canonicalJson(stockStore.readStateRecords())}\n`);
+    writeFileSync(storeRecordsPath, `${canonicalJson(stockStore.readStoreRecords())}\n`);
+    writeFileSync(storeHeadPath, `${canonicalJson(stockStore.readHead())}\n`);
+    for (const [name, foreignRequest, refusal] of [
+      [
+        'foreign-repository',
+        {
+          schemaVersion: '1.0.0',
+          request_kind: 'release-lifecycle-request',
+          action_id: 'release resume',
+          repository_locator: { id: 'fixture/foreign', commit, tree },
+          candidate_locator: request.candidate_locator,
+        },
+        'rpl-policy-resolution-mismatch',
+      ],
+      [
+        'foreign-candidate',
+        {
+          schemaVersion: '1.0.0',
+          request_kind: 'release-lifecycle-request',
+          action_id: 'release resume',
+          repository_locator: request.repository_locator,
+          candidate_locator: {
+            ...request.candidate_locator,
+            commit: 'c'.repeat(40),
+            tree: 'd'.repeat(40),
+          },
+        },
+        'release-request-identity-mismatch',
+      ],
+    ] as const) {
+      const foreignRequestPath = join(root, `${name}-resume-request.json`);
+      writeFileSync(foreignRequestPath, `${canonicalJson(foreignRequest)}\n`);
+      output.mockClear();
+      errorOutput.mockClear();
+      await withAuthorityHostTestScope(() =>
+        captureAction(releaseResume)({
+          request: foreignRequestPath,
+          repoRoot: root,
+          stateChain: stateChainPath,
+          storeRecords: storeRecordsPath,
+          storeHead: storeHeadPath,
+          receipts: resumeReceiptsPath,
+        }),
+      );
+      expect(output).not.toHaveBeenCalled();
+      expect(errorOutput).toHaveBeenCalledWith(
+        expect.stringContaining(`RELEASE_RESUME_FAILED: ${refusal}`),
+      );
+    }
     uninstallPreflight();
 
     const certifyRequestPath = join(root, 'certify-request.json');
