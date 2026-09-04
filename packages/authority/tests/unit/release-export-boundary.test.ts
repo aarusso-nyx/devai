@@ -13,12 +13,23 @@ import {
   type ProtectedReleaseExportBinding,
 } from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import {
+  captureProtectedReleaseExportBinding,
+  type ExportMutationUnitProjection,
+  type ProtectedReleaseExportBindingV3,
+} from '../../src/boundaries/release-export-binding.js';
 import { createReleaseRepositoryTestFixture } from './release-repository-test-fixture.js';
 
 const REPOSITORY_FIXTURE = createReleaseRepositoryTestFixture();
 const COMMIT = REPOSITORY_FIXTURE.repository.commit;
 const TREE = REPOSITORY_FIXTURE.repository.tree;
 const DIGEST = (character: string) => character.repeat(64);
+const EXPORT_SPEC_V3_DIGEST = 'aac1c75a539516a38b567aea9be4490eb3f82fe0ab7b75e46e55e46d3166e37f';
+
+function present<T>(value: T | null | undefined, message: string): T {
+  if (value === null || value === undefined) throw new Error(message);
+  return value;
+}
 
 function binding(): ProtectedReleaseExportBinding {
   return {
@@ -57,6 +68,97 @@ function binding(): ProtectedReleaseExportBinding {
         },
         policy_resolution_digest_sha256: DIGEST('3'),
       },
+    ],
+  };
+}
+
+function mutationObject(path: string, character: string) {
+  const sha256 = DIGEST(character);
+  return {
+    path,
+    sha256,
+    size_bytes: 1,
+    evidence_sink_id: 'fixture-sink',
+    opaque_handle: `sha256:${sha256}`,
+  };
+}
+
+function mutationUnit(
+  releaseUnit: string,
+  carrierPackageId: string,
+  memberCharacter: string,
+): ProtectedReleaseExportBindingV3['mutation_units'][number] {
+  const members = [
+    {
+      ...mutationObject(`mutation/${releaseUnit}/01-report.json`, memberCharacter),
+      document_kind: 'mutation-normalized-stryker-report-v2' as const,
+      package_name: carrierPackageId,
+    },
+    {
+      ...mutationObject(`mutation/${releaseUnit}/02-result.json`, 'a'),
+      document_kind: 'mutation-package-result-v2' as const,
+      package_name: carrierPackageId,
+    },
+    {
+      ...mutationObject(`mutation/${releaseUnit}/03-summary.json`, 'b'),
+      document_kind: 'mutation-composed-report-set-v2' as const,
+      package_name: null,
+    },
+    {
+      ...mutationObject(`mutation/${releaseUnit}/04-receipt.json`, 'c'),
+      document_kind: 'mutation-semantic-verification-receipt-v2' as const,
+      package_name: null,
+    },
+  ];
+  return {
+    release_unit: releaseUnit,
+    mutation_evidence: {
+      carrier_package_id: carrierPackageId,
+      binding: {
+        repository_id: REPOSITORY_FIXTURE.repository.id,
+        candidate_commit: COMMIT,
+        candidate_tree: TREE,
+        release_unit: releaseUnit,
+        release_plan_receipt_digest_sha256: DIGEST('c'),
+        release_profile_digest_sha256: DIGEST('d'),
+        mutation_policy_digest_sha256: DIGEST('e'),
+        task_policy_digests_sha256: [DIGEST('1'), DIGEST('2')],
+      },
+      closure: { sha256: DIGEST('3'), size_bytes: 1 },
+      receipt: {
+        sha256: DIGEST('4'),
+        size_bytes: 1,
+        receipt_digest_sha256: DIGEST('5'),
+      },
+      output_contract: mutationObject(`mutation/${releaseUnit}/00-output-contract.json`, '6'),
+      members,
+      member_projection_digest_sha256: canonicalSha256(members),
+    },
+  };
+}
+
+function bindingV3(): ProtectedReleaseExportBindingV3 {
+  const legacy = binding();
+  const closure = present(legacy.closure_inputs[0], 'missing legacy closure input');
+  return {
+    ...legacy,
+    export_spec_digest_sha256: EXPORT_SPEC_V3_DIGEST,
+    closure_inputs: [
+      {
+        ...closure,
+        package_id: '@fixture/carrier',
+        release_unit: 'fixture/required',
+      },
+      {
+        ...closure,
+        package_id: '@fixture/none',
+        sha256: DIGEST('7'),
+        release_unit: 'fixture/none',
+      },
+    ],
+    mutation_units: [
+      { release_unit: 'fixture/none', mutation_evidence: null },
+      mutationUnit('fixture/required', '@fixture/carrier', '8'),
     ],
   };
 }
@@ -326,5 +428,153 @@ describe('protected release export boundary', () => {
     } finally {
       successful.issuer.dispose();
     }
+  });
+
+  it('keeps the v2 binding population exact while requiring the complete v3 unit projection', () => {
+    const legacy = binding();
+    expect(captureProtectedReleaseExportBinding(legacy)).toEqual(legacy);
+    expect(() =>
+      captureProtectedReleaseExportBinding({
+        ...legacy,
+        mutation_units: [],
+      }),
+    ).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+    expect(() =>
+      captureProtectedReleaseExportBinding({
+        ...legacy,
+        export_spec_digest_sha256: EXPORT_SPEC_V3_DIGEST,
+      }),
+    ).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+
+    const current = bindingV3();
+    const captured = captureProtectedReleaseExportBinding(current);
+    expect(captured).toEqual(current);
+    expect(captured.export_spec_digest_sha256).toBe(EXPORT_SPEC_V3_DIGEST);
+    expect('mutation_units' in captured).toBe(true);
+    expect(Object.isFrozen(captured)).toBe(true);
+    expect(Object.isFrozen(captured.closure_inputs)).toBe(true);
+    expect(
+      Object.isFrozen(present(captured.closure_inputs[0], 'missing captured closure input')),
+    ).toBe(true);
+    if (!('mutation_units' in captured)) throw new Error('missing captured v3 projection');
+    expect(Object.isFrozen(captured.mutation_units)).toBe(true);
+    const capturedRequired = present(captured.mutation_units[1], 'missing captured required unit');
+    expect(Object.isFrozen(capturedRequired.mutation_evidence?.members)).toBe(true);
+
+    expect(
+      Reflect.set(
+        present(current.closure_inputs[0], 'missing mutable closure input'),
+        'release_unit',
+        'fixture/substituted',
+      ),
+    ).toBe(true);
+    const required = present(
+      current.mutation_units[1],
+      'missing mutable required unit',
+    ).mutation_evidence;
+    if (required === null) throw new Error('missing required mutation fixture');
+    expect(Reflect.set(required.binding, 'release_profile_digest_sha256', DIGEST('0'))).toBe(true);
+    expect(
+      Reflect.set(present(required.members[0], 'missing mutable member'), 'sha256', DIGEST('0')),
+    ).toBe(true);
+    expect(captured).not.toEqual(current);
+  });
+
+  it('refuses v3 mapping, election, projection, and hostile-input drift before host effects exist', () => {
+    const malformed = (mutate: (value: ProtectedReleaseExportBindingV3) => void) => {
+      const value = structuredClone(bindingV3()) as ProtectedReleaseExportBindingV3;
+      mutate(value);
+      expect(() => captureProtectedReleaseExportBinding(value)).toThrow(
+        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+      );
+    };
+    malformed((value) => {
+      expect(
+        Reflect.deleteProperty(
+          present(value.closure_inputs[0], 'missing closure input'),
+          'release_unit',
+        ),
+      ).toBe(true);
+    });
+    malformed((value) => {
+      (value.mutation_units as ExportMutationUnitProjection[]).reverse();
+    });
+    malformed((value) => {
+      const evidence = present(value.mutation_units[1], 'missing required unit').mutation_evidence;
+      if (evidence === null) throw new Error('missing required mutation fixture');
+      expect(Reflect.set(evidence, 'carrier_package_id', '@fixture/none')).toBe(true);
+    });
+    malformed((value) => {
+      const evidence = present(value.mutation_units[1], 'missing required unit').mutation_evidence;
+      if (evidence === null) throw new Error('missing required mutation fixture');
+      expect(Reflect.set(evidence.binding, 'candidate_tree', '0'.repeat(40))).toBe(true);
+    });
+    malformed((value) => {
+      expect(Reflect.set(value, 'plan_receipt_digest_sha256', DIGEST('0'))).toBe(true);
+    });
+    malformed((value) => {
+      expect(
+        Reflect.set(
+          present(value.closure_inputs[0], 'missing closure input'),
+          'release_unit',
+          'fixture/foreign',
+        ),
+      ).toBe(true);
+    });
+    malformed((value) => {
+      const evidence = present(value.mutation_units[1], 'missing required unit').mutation_evidence;
+      if (evidence === null) throw new Error('missing required mutation fixture');
+      const members = evidence.members as unknown as Array<(typeof evidence.members)[number]>;
+      members.push(structuredClone(present(evidence.members[0], 'missing mutation member')));
+      expect(
+        Reflect.set(evidence, 'member_projection_digest_sha256', canonicalSha256(evidence.members)),
+      ).toBe(true);
+    });
+    malformed((value) => {
+      const evidence = present(value.mutation_units[1], 'missing required unit').mutation_evidence;
+      if (evidence === null) throw new Error('missing required mutation fixture');
+      expect(Reflect.set(evidence, 'member_projection_digest_sha256', DIGEST('0'))).toBe(true);
+    });
+    const extra = bindingV3() as ProtectedReleaseExportBindingV3 & Record<string, unknown>;
+    extra['unexpected'] = true;
+    expect(() => captureProtectedReleaseExportBinding(extra)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+
+    const sparse = bindingV3();
+    delete (sparse.mutation_units as ExportMutationUnitProjection[])[0];
+    expect(() => captureProtectedReleaseExportBinding(sparse)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+
+    const sparseMembers = bindingV3();
+    const sparseEvidence = present(
+      present(sparseMembers.mutation_units[1], 'missing required unit').mutation_evidence,
+      'missing required mutation fixture',
+    );
+    delete (sparseEvidence.members as unknown as Array<(typeof sparseEvidence.members)[number]>)[0];
+    expect(() => captureProtectedReleaseExportBinding(sparseMembers)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+
+    let reads = 0;
+    const accessor = bindingV3();
+    Object.defineProperty(accessor, 'mutation_units', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return [];
+      },
+    });
+    expect(() => captureProtectedReleaseExportBinding(accessor)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+    expect(reads).toBe(0);
+
+    const decorated = bindingV3();
+    Object.setPrototypeOf(decorated.mutation_units, { map: () => [] });
+    expect(() => captureProtectedReleaseExportBinding(decorated)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
   });
 });
