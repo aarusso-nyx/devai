@@ -489,7 +489,7 @@ describe('content-addressed check runner', () => {
       expect(actual.tasks.find((task) => task.nodeId === nodeId)?.dependencies).toContain('build');
     }
     expect(actual.tasks.find((task) => task.nodeId === 'test:schemas')).toMatchObject({
-      argv: ['pnpm', 'run', 'test:schemas'],
+      argv: ['pnpm', 'run', 'test:schemas', '--configLoader', 'runner', '--no-cache'],
     });
     expect(actual.tasks.find((task) => task.nodeId === 'test:local-full')?.dependencies).toContain(
       'test:schemas',
