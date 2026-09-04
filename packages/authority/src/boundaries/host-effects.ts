@@ -33,6 +33,11 @@ import {
   type SpawnSyncOptions,
 } from 'node:child_process';
 import { issuerState } from '../runtime/contracts.js';
+import {
+  captureProtectedReleaseExportBinding,
+  type ProtectedReleaseExportBinding,
+} from './release-export-binding.js';
+export type { ProtectedReleaseExportBinding } from './release-export-binding.js';
 
 /**
  * The sole raw host-effect seam for DEVAI's supported CLI runtime.
@@ -249,14 +254,14 @@ const protectedSinkScopes = new AsyncLocalStorage<
 
 const sinkOwners = new WeakMap<
   object,
-  { kind: 'artifact' | 'certification'; sink_id: string; root?: string }
+  { kind: 'artifact' | 'certification' | 'export'; sink_id: string; root?: string }
 >();
 export function createProtectedReleaseSinkOwner(
-  kind: 'artifact' | 'certification',
+  kind: 'artifact' | 'certification' | 'export',
   sinkId: string,
 ): object {
   if (
-    !['artifact', 'certification'].includes(kind) ||
+    !['artifact', 'certification', 'export'].includes(kind) ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(sinkId)
   )
     throw new Error('AUTHORITY_PROTECTED_SINK_OWNER_INVALID');
@@ -268,7 +273,7 @@ export function createProtectedReleaseSinkOwner(
 function runSinkUnit<T>(
   scope: AuthorityHostEffectScope,
   owner: object | undefined,
-  kind: 'artifact' | 'certification',
+  kind: 'artifact' | 'certification' | 'export',
   callback: () => T,
   sinkId?: string,
 ): T {
@@ -389,6 +394,93 @@ export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSin
     invokeSink: <T>(callback: () => T, owner?: object): T => {
       const scope = requireScope('mutation');
       return invoke(() => runSinkUnit(scope, owner, 'artifact', callback, selected.sink_id));
+    },
+  });
+}
+
+const exportOperations = new WeakMap<
+  object,
+  Readonly<{
+    binding: ProtectedReleaseExportBinding;
+    scope: AuthorityHostEffectScope;
+    kind: 'export-sink' | 'export-signer';
+    operation_id: string;
+  }>
+>();
+
+/** The dedicated export capability cannot be mistaken for prepare or certification authority. */
+export function protectedExportHostEffect(request: AuthorityHostEffectRequest) {
+  if (request.kind !== 'protected-release' || request.symbol !== 'protectedExportOperation')
+    return undefined;
+  const token = request.arguments[0];
+  if (token === null || typeof token !== 'object') return undefined;
+  const operation = exportOperations.get(token);
+  return operation?.scope === scopes.getStore() ? operation : undefined;
+}
+
+function exportAdapter(
+  binding: ProtectedReleaseExportBinding,
+  kind: 'export-sink' | 'export-signer',
+) {
+  const selected = captureProtectedReleaseExportBinding(binding);
+  return <T>(callback: () => T): T => {
+    const scope = requireScope('mutation');
+    if (scope.action_id !== 'release export' || scope.effect !== 'local-write')
+      throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+    const token = Object.freeze({});
+    protectedOperationSequence += 1;
+    const operation = Object.freeze({
+      binding: selected,
+      scope,
+      kind,
+      operation_id: `${scope.invocation_id}-${String(protectedOperationSequence)}`,
+    });
+    exportOperations.set(token, operation);
+    try {
+      return scope.apply_effect(
+        { kind: 'protected-release', symbol: 'protectedExportOperation', arguments: [token] },
+        () => {
+          if (exportOperations.get(token) !== operation || scopes.getStore() !== scope)
+            throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+          exportOperations.delete(token);
+          return callback();
+        },
+      ) as T;
+    } finally {
+      exportOperations.delete(token);
+    }
+  };
+}
+
+/** Sink-only capability; never grants a signing operation or reopens the prepared transaction. */
+export function createProtectedExportSinkAdapter(binding: ProtectedReleaseExportBinding) {
+  const selected = captureProtectedReleaseExportBinding(binding);
+  const invoke = exportAdapter(selected, 'export-sink');
+  return Object.freeze({
+    invokeSink: <T>(callback: () => T, owner: object): T => {
+      const scope = requireScope('mutation');
+      return invoke(() => runSinkUnit(scope, owner, 'export', callback, selected.sink_id));
+    },
+  });
+}
+
+const exportSignerAccounts = new WeakSet<object>();
+
+/** Separate one-use aggregate signer capability. A throwing/ambiguous invocation is also spent. */
+export function createProtectedExportSignerAdapter(binding: ProtectedReleaseExportBinding) {
+  const invoke = exportAdapter(binding, 'export-signer');
+  let spent = false;
+  return Object.freeze({
+    invokeSigner: <T>(callback: () => T): T => {
+      if (spent) throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      return invoke(() => {
+        const scope = requireScope('mutation');
+        if (spent || exportSignerAccounts.has(scope.receipt_store))
+          throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+        spent = true;
+        exportSignerAccounts.add(scope.receipt_store);
+        return callback();
+      });
     },
   });
 }
