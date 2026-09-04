@@ -97,7 +97,12 @@ function record(value: unknown, names: readonly string[]): Record<string, unknow
 }
 
 function array(value: unknown, maximum: number): readonly unknown[] {
-  if (!Array.isArray(value) || value.length > maximum) return fail();
+  if (
+    !Array.isArray(value) ||
+    Object.getPrototypeOf(value) !== Array.prototype ||
+    value.length > maximum
+  )
+    return fail();
   if (Reflect.ownKeys(value).length !== value.length + 1) return fail();
   for (let index = 0; index < value.length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));

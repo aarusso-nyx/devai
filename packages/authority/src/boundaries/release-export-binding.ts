@@ -155,6 +155,7 @@ export function captureProtectedReleaseExportBinding(
     const closures = binding['closure_inputs'];
     if (
       !Array.isArray(closures) ||
+      Object.getPrototypeOf(closures) !== Array.prototype ||
       closures.length === 0 ||
       closures.length > 8192 ||
       Reflect.ownKeys(closures).length !== closures.length + 1
