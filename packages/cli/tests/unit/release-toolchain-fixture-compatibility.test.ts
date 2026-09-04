@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { canonicalJson, canonicalSha256, parseConstitutionVersion } from '@devai-nyx/utils';
 import { stringify } from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveAdopterPolicyMaterialization } from '../../src/services/adopter-policy.js';
+import { createReleasePolicyPackageTools } from '../../src/services/release-policy-package.js';
 import { encodeContainerDependencyArchive } from '../../src/services/container-archive.js';
 import type { ContainerArchiveEntry } from '../../src/services/container-archive.js';
 import type { PlannedTask, TaskDescriptor } from '../../src/services/check-runner/types.js';
@@ -47,6 +47,11 @@ import {
   type ContainerReleaseCertificationOptions,
 } from '../../src/services/release-certification-provider.js';
 import type { CheckRunnerOptions } from '../../src/services/check-runner/types.js';
+import { buildReleaseMutationInputPlanV21 } from '../../src/services/release-mutation-inputs.js';
+import {
+  fixture as mutationFixture,
+  build as buildMutationFixture,
+} from '../helpers/release-mutation-inputs-fixture.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const FIXTURE_ROOT = resolve(import.meta.dirname, '../fixtures/mutation-toolchain');
@@ -99,59 +104,48 @@ vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => (
   ...(await importOriginal<typeof import('../../src/services/check-runner/runner.js')>()),
   runCheckTasks: runner,
 }));
-vi.mock('../../src/services/release-certification-container.js', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../src/services/release-certification-container.js')
-  >()),
-  ProtectedCertificationContainer: class {
-    readonly identity: Record<string, unknown>;
-    constructor(
-      controls: ProtectedContainerControls,
-      dependencies: readonly ProtectedContainerDependency[],
-    ) {
-      this.identity = {
-        protocol: 'devai.protected-container-certification.v1',
-        image: controls.image,
-        engine_version: controls.engine_version,
-        node_version: controls.node_version,
-        docker_binary_sha256: controls.docker_binary_sha256,
-        executables: controls.executables,
-        network: 'none',
-        rootfs: 'readonly',
-        capabilities: ['ALL'],
-        privilege_escalation: false,
-        pids_limit: controls.pids_limit,
-        memory_bytes: controls.memory_bytes,
-        cpus: controls.cpus,
-        dependencies: dependencies.map((entry) => entry.sha256),
-        dependency_transport_sha256: '0'.repeat(64),
-      };
-    }
-    runBound<T>(_binding: unknown, operation: () => T): T {
-      return operation();
-    }
-    verifyRuntime(): void {}
-    execute(input: {
-      readonly declared_outputs: readonly string[];
-      readonly diagnostic_output_paths?: readonly string[];
-    }) {
-      const select = (paths: readonly string[]) =>
-        paths.flatMap((path) => {
-          const bytes = containerState.outputs.get(path);
-          return bytes === undefined
-            ? []
-            : [{ path, mode: '100644' as const, bytes: Buffer.from(bytes) }];
-        });
-      return {
-        result: { status: containerState.status, signal: null, stdout: '', stderr: '' },
-        outputs: containerState.status === 0 ? select(input.declared_outputs) : [],
-        ...(input.diagnostic_output_paths === undefined
-          ? {}
-          : { diagnostic_outputs: select(input.diagnostic_output_paths) }),
-      };
-    }
-  },
-}));
+vi.mock('../../src/services/release-certification-container.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../src/services/release-certification-container.js')>();
+  return {
+    ...original,
+    ProtectedCertificationContainer: class {
+      readonly identity: Record<string, unknown>;
+      constructor(
+        controls: ProtectedContainerControls,
+        dependencies: readonly ProtectedContainerDependency[],
+      ) {
+        this.identity = new original.ProtectedCertificationContainer(
+          controls,
+          dependencies,
+        ).identity;
+      }
+      runBound<T>(_binding: unknown, operation: () => T): T {
+        return operation();
+      }
+      verifyRuntime(): void {}
+      execute(input: {
+        readonly declared_outputs: readonly string[];
+        readonly diagnostic_output_paths?: readonly string[];
+      }) {
+        const select = (paths: readonly string[]) =>
+          paths.flatMap((path) => {
+            const bytes = containerState.outputs.get(path);
+            return bytes === undefined
+              ? []
+              : [{ path, mode: '100644' as const, bytes: Buffer.from(bytes) }];
+          });
+        return {
+          result: { status: containerState.status, signal: null, stdout: '', stderr: '' },
+          outputs: containerState.status === 0 ? select(input.declared_outputs) : [],
+          ...(input.diagnostic_output_paths === undefined
+            ? {}
+            : { diagnostic_outputs: select(input.diagnostic_output_paths) }),
+        };
+      }
+    },
+  };
+});
 
 function sha256(value: Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
@@ -337,7 +331,7 @@ function resolutionFor(
   const version = parseConstitutionVersion(pin.toString('utf8'));
   if (version === null) throw new Error('fixture constitution version');
   const policy = JSON.parse(policyBytes.toString('utf8')) as Record<string, unknown>;
-  const materialized = resolveAdopterPolicyMaterialization({
+  const materialized = createReleasePolicyPackageTools(installed).materialize({
     policy,
     currentProject: {
       schemaVersion: '1.0.0',
@@ -409,9 +403,14 @@ function resolutionFor(
 }
 
 function fixture(
-  options: { readonly modePath?: string; readonly extraPath?: boolean } = {},
+  options: {
+    readonly modePath?: string;
+    readonly extraPath?: boolean;
+    readonly installed?: Fixture['installed'];
+    readonly productionResolution?: VerifiedReleasePolicyResolution;
+  } = {},
 ): Fixture {
-  const installed = createLifecyclePolicyFixture().package_snapshot;
+  const installed = options.installed ?? createLifecyclePolicyFixture().package_snapshot;
   const { definition, files: fixed } = fixedDefinition();
   loader.value = definition;
   const pin = installed.read('dist/law/constitution.md');
@@ -421,7 +420,7 @@ function fixture(
     string,
     unknown
   >;
-  const materialized = resolveAdopterPolicyMaterialization({
+  const materialized = createReleasePolicyPackageTools(installed).materialize({
     policy,
     currentProject: {
       schemaVersion: '1.0.0',
@@ -489,13 +488,15 @@ function fixture(
     installed_package: installed,
     candidate: snapshot,
   });
-  const productionResolution = resolutionFor(
-    installed,
-    'law/policy/devai-adoption.json',
-    readFileSync(join(ROOT, 'law/policy/devai-adoption.json')),
-    PACKAGE,
-    'aarusso-nyx/devai',
-  );
+  const productionResolution =
+    options.productionResolution ??
+    resolutionFor(
+      installed,
+      'law/policy/devai-adoption.json',
+      readFileSync(join(ROOT, 'law/policy/devai-adoption.json')),
+      PACKAGE,
+      'aarusso-nyx/devai',
+    );
   const source = snapshot.paths.map((path) => ({
     path,
     mode: '100644' as const,
@@ -609,8 +610,14 @@ afterEach(() => {
   containerState.status = 0;
 });
 
-function providerFixture() {
-  const value = fixture();
+function providerFixture(production?: {
+  readonly installed: Fixture['installed'];
+  readonly resolution: VerifiedReleasePolicyResolution;
+}) {
+  const value = fixture({
+    installed: production?.installed,
+    productionResolution: production?.resolution,
+  });
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-toolchain-provider-')));
   temporaryRoots.push(root);
   const git = (args: readonly string[], input?: Uint8Array): Buffer => {
@@ -808,6 +815,120 @@ function providerFixture() {
 }
 
 describe('release toolchain fixture compatibility', () => {
+  it('removes only the fixture blocker from all ten plans using the genuine provider and preserves every other identity and grant', async () => {
+    const base = mutationFixture();
+    const production = buildMutationFixture(base);
+    const value = providerFixture({ installed: base.installed, resolution: production.resolution });
+    const adapters = createContainerReleaseCertificationAdapters(value.options);
+    const controls = {
+      ...production.controls,
+      container: value.options.controls,
+      environment: value.options.environment,
+      toolchain: value.options.toolchain,
+    };
+    const input = {
+      candidate: production.snapshot,
+      resolution: production.resolution,
+      plan_receipt: production.receipt,
+      controls,
+    };
+    const before = buildReleaseMutationInputPlanV21(input);
+    expect(before.packages).toHaveLength(10);
+    expect(
+      before.packages.every((entry) =>
+        entry.reuse.unresolved.includes('toolchain-fixture-validation-required'),
+      ),
+    ).toBe(true);
+    expect(() =>
+      buildReleaseMutationInputPlanV21({
+        ...input,
+        controls: { ...controls, fixture_provider: adapters.preflight_provider },
+      }),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'success' });
+    const after = buildReleaseMutationInputPlanV21({
+      ...input,
+      controls: { ...controls, fixture_provider: adapters.preflight_provider },
+    });
+    expect({ ...after, readProof: after.readProof() }).toEqual({
+      ...before,
+      readProof: before.readProof(),
+      packages: before.packages.map((entry) => ({
+        ...entry,
+        reuse: {
+          eligible: false,
+          unresolved: entry.reuse.unresolved.filter(
+            (reason) => reason !== 'toolchain-fixture-validation-required',
+          ),
+        },
+      })),
+    });
+    expect(after.grants).toEqual({ execution: false, certification: false, reuse: false });
+    expect(after.packages.every((entry) => entry.reuse.unresolved.length > 0)).toBe(true);
+    const wrongProvider = createContainerReleaseCertificationAdapters(
+      value.options,
+    ).preflight_provider;
+    for (const substituted of [
+      { ...controls, fixture_provider: {} },
+      { ...controls, fixture_provider: async () => ({ outcome: 'success' }) },
+      { ...controls, fixture_provider: wrongProvider },
+      { ...controls, fixture_provider: adapters.preflight_provider, environment: { CI: '1' } },
+      {
+        ...controls,
+        fixture_provider: adapters.preflight_provider,
+        toolchain: { ...controls.toolchain, git: 'different' },
+      },
+      {
+        ...controls,
+        fixture_provider: adapters.preflight_provider,
+        container: { ...controls.container, cpus: 0.5 },
+      },
+    ]) {
+      expect(() =>
+        buildReleaseMutationInputPlanV21({ ...input, controls: substituted as typeof controls }),
+      ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    }
+    const otherResolution = resolveReleasePolicySnapshot({
+      expected: {
+        repository: production.snapshot.repository,
+        installed_package: base.installed.identity,
+        installation_origin: 'candidate-adopter-dependency',
+        release_unit: PACKAGE,
+      },
+      installed_package: base.installed,
+      candidate: production.snapshot,
+    });
+    expect(otherResolution.resolution).toEqual(production.resolution.resolution);
+    expect(() =>
+      buildReleaseMutationInputPlanV21({
+        ...input,
+        resolution: otherResolution,
+        controls: { ...controls, fixture_provider: adapters.preflight_provider },
+      }),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'failure' });
+    expect(() =>
+      buildReleaseMutationInputPlanV21({
+        ...input,
+        controls: { ...controls, fixture_provider: adapters.preflight_provider },
+      }),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    const withoutProvider = buildReleaseMutationInputPlanV21(input);
+    expect({ ...withoutProvider, readProof: withoutProvider.readProof() }).toEqual({
+      ...before,
+      readProof: before.readProof(),
+    });
+    const failed = createContainerReleaseCertificationAdapters(value.options);
+    containerState.status = 1;
+    expect(await failed.preflight_provider(value.request)).toMatchObject({ outcome: 'failure' });
+    expect(() =>
+      buildReleaseMutationInputPlanV21({
+        ...input,
+        controls: { ...controls, fixture_provider: failed.preflight_provider },
+      }),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+  });
+
   it('autoissues compatibility only inside the actual protected provider and consumes raw custody', async () => {
     const value = providerFixture();
     const adapters = createContainerReleaseCertificationAdapters(value.options);
