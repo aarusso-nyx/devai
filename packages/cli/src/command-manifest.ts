@@ -19,6 +19,7 @@ export type ActionCapability =
   | 'db:unclassified'
   | 'host-cache:write'
   | 'artifact-sink:write'
+  | 'protected-export-signer-v1:sign'
   | 'protected-certification-provider-v3:execute'
   | 'certification-evidence-sink:write'
   | `proc:${string}`
@@ -63,6 +64,7 @@ export type AuthorityTargetKind =
   | 'db'
   | 'remote'
   | 'artifact-sink'
+  | 'protected-export-signer'
   | 'protected-certification-provider'
   | 'certification-evidence-sink';
 
@@ -150,6 +152,7 @@ export function deriveActionEffectFromCapabilities(
         'db:unclassified',
         'host-cache:write',
         'artifact-sink:write',
+        'protected-export-signer-v1:sign',
       ].includes(capability),
     )
   ) {

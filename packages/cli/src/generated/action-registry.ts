@@ -1196,7 +1196,7 @@ export const ACTION_REGISTRY = [
     effect: 'local-write',
     authority: 'release_controller',
     description:
-      'Export the prepared candidate and its evidence bundle to local artifacts under Architect authority; it performs no remote effect.',
+      'Export the prepared candidate through a dedicated append-only protected artifact-sink extension and one protected aggregate signer under Architect authority; it performs no remote effect.',
     output_contract: {
       schemaVersion: '1.0.0',
       mode: 'action-envelope',
@@ -1216,7 +1216,14 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'release export',
       effect: 'local-write',
-      capabilities: ['fs:f5-state', 'fs:proofs', 'fs:workspace', 'proc:git'],
+      capabilities: [
+        'fs:f5-state',
+        'fs:proofs',
+        'fs:workspace',
+        'proc:git',
+        'artifact-sink:write',
+        'protected-export-signer-v1:sign',
+      ],
       subject: {
         kind: 'human',
         allowed_roles: ['architect'],
@@ -1229,7 +1236,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'release-export-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'artifact-sink', 'protected-export-signer'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -1239,7 +1246,11 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: [
+          'fs-authority-boundary',
+          'trusted-export-artifact-sink-v1',
+          'protected-export-signer-v1',
+        ],
         final_reverification: true,
       },
       readiness: {

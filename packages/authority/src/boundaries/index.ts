@@ -10,6 +10,8 @@ import {
   type AnyRecord,
 } from '../runtime/contracts.js';
 import { selectorMatches } from '../runtime/policy-resolver.js';
+import { captureProtectedReleaseRepositoryIdentity } from './release-repository-identity.js';
+import { captureProtectedReleaseExportBinding } from './release-export-binding.js';
 
 const MUTATORS = new Set([
   'appendFile',
@@ -114,15 +116,55 @@ export function protectedReleaseBoundaryAdapterId(
     target.operation_id === 'write';
   const artifact =
     target.system_id === 'trusted-artifact-sink-v3' && target.operation_id === 'write';
-  if (!provider && !sink && !artifact) return undefined;
+  const exportSink =
+    target.system_id === 'trusted-export-artifact-sink-v1' && target.operation_id === 'write';
+  const exportSigner =
+    target.system_id === 'protected-export-signer-v1' && target.operation_id === 'sign';
+  if (!provider && !sink && !artifact && !exportSink && !exportSigner) return undefined;
   const binding = target.protected_release_binding;
+  if (!isRecord(binding)) return undefined;
+  try {
+    const prototype = Object.getPrototypeOf(binding) as unknown;
+    if (
+      (prototype !== Object.prototype && prototype !== null) ||
+      Reflect.ownKeys(binding).some((key) => {
+        const descriptor = Object.getOwnPropertyDescriptor(binding, key);
+        return typeof key !== 'string' || !descriptor?.enumerable || !('value' in descriptor);
+      })
+    )
+      return undefined;
+    captureProtectedReleaseRepositoryIdentity({
+      authority_repository_id: binding.authority_repository_id,
+      expected_release_repository_id: binding.expected_release_repository_id,
+      origin_url: binding.origin_url,
+      repository: binding.repository,
+    });
+    if (exportSink || exportSigner) {
+      const descriptor = Object.fromEntries(
+        Object.entries(binding).filter(
+          ([key]) =>
+            !['authority_repository_id', 'expected_release_repository_id', 'origin_url'].includes(
+              key,
+            ),
+        ),
+      );
+      captureProtectedReleaseExportBinding(descriptor);
+      if (
+        typeof target.protected_operation_id !== 'string' ||
+        target.protected_operation_id.length === 0
+      )
+        return undefined;
+      return exportSink ? 'trusted-export-artifact-sink-v1' : 'protected-export-signer-v1';
+    }
+  } catch {
+    return undefined;
+  }
   if (
-    !isRecord(binding) ||
     !isRecord(binding.repository) ||
-    (artifact &&
-      (Object.keys(binding).sort().join(',') !==
-        'action_id,pack_spec_digest_sha256,plan_receipt_digest_sha256,repository,sink_id' ||
-        Object.keys(binding.repository).sort().join(',') !== 'commit,id,tree')) ||
+    Object.keys(binding).sort().join(',') !==
+      (artifact
+        ? 'action_id,authority_repository_id,expected_release_repository_id,origin_url,pack_spec_digest_sha256,plan_receipt_digest_sha256,repository,sink_id'
+        : 'action_id,authority_repository_id,expected_release_repository_id,helper_identity_sha256,origin_url,plan_receipt_digest_sha256,repository,task_policy_digest_sha256') ||
     !(artifact
       ? binding.action_id === 'release prepare'
       : ['release preflight', 'release certify'].includes(binding.action_id)) ||
@@ -268,6 +310,8 @@ export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
         'devai-protected-certification-provider-v3',
         'trusted-certification-evidence-sink-v1',
         'trusted-artifact-sink-v3',
+        'trusted-export-artifact-sink-v1',
+        'protected-export-signer-v1',
       ].includes(input.system_id) &&
       protectedReleaseBoundaryAdapterId(input) === undefined
     ) {

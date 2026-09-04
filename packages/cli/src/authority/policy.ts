@@ -234,6 +234,44 @@ export function buildTrustedAuthoritySources(
   const human = (role: string) => [{ kind: 'human', roles: [role] }];
   const joint = [{ kind: 'human', roles: ['owner', 'architect'] }];
   const coreRules = defined([
+    ...[
+      {
+        kind: 'export-sink',
+        capability: 'artifact-sink:write',
+        system: 'trusted-export-artifact-sink-v1',
+        operation: 'write',
+      },
+      {
+        kind: 'export-signer',
+        capability: 'protected-export-signer-v1:sign',
+        system: 'protected-export-signer-v1',
+        operation: 'sign',
+      },
+    ].map((adapter) =>
+      rule({
+        id: `core-protected-release-${adapter.kind}`,
+        origin: 'immutable-core',
+        precedence: 750,
+        actionIds: actionIds(
+          entries,
+          (entry) =>
+            entry.name === 'release export' &&
+            entry.authority_contract.capabilities.some(
+              (capability) => capability === adapter.capability,
+            ),
+        ),
+        selector: {
+          kind: 'remote',
+          system_id: adapter.system,
+          endpoint_ids: ['host'],
+          operation_ids: [adapter.operation],
+          publication: false,
+        },
+        subjects: human('architect'),
+        rationale:
+          'Dedicated export-only capability; the live broker binds repository, candidate, plan, parent, destination, trust and one bounded export account. No prepare or generic remote authority transfers.',
+      }),
+    ),
     rule({
       id: 'core-protected-release-artifact-sink',
       origin: 'immutable-core',

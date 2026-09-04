@@ -144,7 +144,14 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'release export',
     public_action_id: 'release export',
     effect: 'local-write',
-    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:workspace', 'proc:git'],
+    capabilities: [
+      'fs:f5-state',
+      'fs:proofs',
+      'fs:workspace',
+      'proc:git',
+      'artifact-sink:write',
+      'protected-export-signer-v1:sign',
+    ],
   },
   {
     action_id: 'release offline-verify',

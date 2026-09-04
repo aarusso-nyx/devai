@@ -21,6 +21,7 @@ import {
   type AtomicAuthorityHostEffect,
   protectedReleaseHostEffect,
   protectedArtifactSinkHostEffect,
+  protectedExportHostEffect,
   protectedReleaseBoundaryAdapterId,
   assertProtectedReleasePrepareCapacityEffect,
   assertProtectedReleaseExportCapacityEffect,
@@ -835,6 +836,21 @@ function targetOperation(target: JsonRecord): string {
 }
 
 function boundedSelectors(kind: string, repositoryId: string, actionName: string): JsonRecord[] {
+  if (
+    actionName === 'release export' &&
+    (kind === 'artifact-sink' || kind === 'protected-export-signer')
+  ) {
+    const signer = kind === 'protected-export-signer';
+    return [
+      {
+        kind: 'remote',
+        system_id: signer ? 'protected-export-signer-v1' : 'trusted-export-artifact-sink-v1',
+        endpoint_ids: ['host'],
+        operation_ids: [signer ? 'sign' : 'write'],
+        publication: false,
+      },
+    ];
+  }
   if (actionName === 'release prepare' && kind === 'artifact-sink') {
     return [
       {
@@ -1127,6 +1143,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         );
   const boundedPlanDigest = boundedPlan === undefined ? undefined : canonicalSha256(boundedPlan);
   let releaseRequestDigest: string | undefined;
+  let exportBindingDigest: string | undefined;
   const readReleaseCapacity = (
     binding: ProtectedReleasePrepareCapacityBinding | ProtectedReleaseExportCapacityBinding,
   ): ProtectedReleasePrepareCapacity => {
@@ -1445,31 +1462,45 @@ export function createAuthorityHostBroker(input: BrokerInput): {
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     assertProtectedReleasePrepareCapacityEffect(issuer);
+    assertProtectedReleaseExportCapacityEffect(issuer);
     if (request.kind === 'protected-release') {
       const operation =
-        protectedReleaseHostEffect(request) ?? protectedArtifactSinkHostEffect(request);
+        protectedReleaseHostEffect(request) ??
+        protectedArtifactSinkHostEffect(request) ??
+        protectedExportHostEffect(request);
       const artifact = operation?.kind === 'artifact-sink';
       const provider = operation?.kind === 'provider';
-      const requiredCapability = artifact
-        ? 'artifact-sink:write'
-        : provider
-          ? 'protected-certification-provider-v3:execute'
-          : 'certification-evidence-sink:write';
-      const requiredKind = artifact
-        ? 'artifact-sink'
-        : provider
-          ? 'protected-certification-provider'
-          : 'certification-evidence-sink';
-      const requiredAdapter = artifact
-        ? 'trusted-artifact-sink-v3'
-        : provider
-          ? 'protected-certification-provider-v3'
-          : 'trusted-certification-evidence-sink-v1';
+      const exportSink = operation?.kind === 'export-sink';
+      const exportSigner = operation?.kind === 'export-signer';
+      const isExport = exportSink || exportSigner;
+      const requiredCapability = exportSigner
+        ? 'protected-export-signer-v1:sign'
+        : artifact || exportSink
+          ? 'artifact-sink:write'
+          : provider
+            ? 'protected-certification-provider-v3:execute'
+            : 'certification-evidence-sink:write';
+      const requiredKind = exportSigner
+        ? 'protected-export-signer'
+        : artifact || exportSink
+          ? 'artifact-sink'
+          : provider
+            ? 'protected-certification-provider'
+            : 'certification-evidence-sink';
+      const requiredAdapter = exportSigner
+        ? 'protected-export-signer-v1'
+        : exportSink
+          ? 'trusted-export-artifact-sink-v1'
+          : artifact
+            ? 'trusted-artifact-sink-v3'
+            : provider
+              ? 'protected-certification-provider-v3'
+              : 'trusted-certification-evidence-sink-v1';
       if (
         operation === undefined ||
         input.entry.effects === 'read' ||
         operation.binding.action_id !== input.entry.name ||
-        input.role !== (artifact ? 'architect' : 'inspector') ||
+        input.role !== (artifact || isExport ? 'architect' : 'inspector') ||
         !input.argv.includes('--write') ||
         !input.entry.authority_contract.capabilities.some(
           (capability) => capability === requiredCapability,
@@ -1502,16 +1533,37 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         )
       )
         throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      if (isExport) {
+        // The request selects a destination, never a sink/parent or key. Pin the
+        // entire externally supplied export control tuple for this live account.
+        const binding = operation.binding;
+        const destination = declaredRequest.destination;
+        if (
+          !('destination' in binding) ||
+          !isRecord(destination) ||
+          destination.kind !== binding.destination.kind ||
+          destination.exact_identifier !== binding.destination.exact_identifier ||
+          (Object.hasOwn(destination, 'trust') &&
+            canonicalSha256(destination.trust) !== canonicalSha256(binding.trust)) ||
+          (exportBindingDigest !== undefined && exportBindingDigest !== canonicalSha256(binding))
+        )
+          throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+        exportBindingDigest = canonicalSha256(binding);
+      }
       const target: JsonRecord = {
         kind: 'remote',
         id: `protected-release:${operation.operation_id}`,
-        system_id: artifact
-          ? 'trusted-artifact-sink-v3'
-          : provider
-            ? 'devai-protected-certification-provider-v3'
-            : 'trusted-certification-evidence-sink-v1',
+        system_id: exportSigner
+          ? 'protected-export-signer-v1'
+          : exportSink
+            ? 'trusted-export-artifact-sink-v1'
+            : artifact
+              ? 'trusted-artifact-sink-v3'
+              : provider
+                ? 'devai-protected-certification-provider-v3'
+                : 'trusted-certification-evidence-sink-v1',
         endpoint_id: 'host',
-        operation_id: provider ? 'execute' : 'write',
+        operation_id: exportSigner ? 'sign' : provider ? 'execute' : 'write',
         publication: false,
         protected_release_binding: operation.binding,
         protected_operation_id: operation.operation_id,
