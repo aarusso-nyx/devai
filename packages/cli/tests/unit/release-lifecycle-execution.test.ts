@@ -25,6 +25,7 @@ import { createReleaseCertificationProvider } from '../../src/services/release-l
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
   ReleaseLifecycleFileStore,
+  assertReleaseProviderInvocationContext,
   computeReleaseRequestDigest,
   executeReleaseLifecycleAction,
   executeOfflineVerification,
@@ -980,6 +981,24 @@ async function seedCertified(store: ReleaseLifecycleFileStore) {
   return result;
 }
 
+async function advanceToPrepared(store: ReleaseLifecycleFileStore): Promise<void> {
+  await seedCertified(store);
+  const value = request('release prepare');
+  const result = await withReleasePrepareAuthorityFixture(value, () =>
+    executeReleaseLifecycleAction({
+      request: value,
+      action: 'release prepare',
+      authority: authorityFor('release prepare'),
+      store,
+      resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
+      provider: providerFor('release prepare'),
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    }),
+  );
+  if (!result.ok) throw new Error(`prepared fixture failed: ${result.code}`);
+}
+
 async function advanceToEvidencePublished(store: ReleaseLifecycleFileStore): Promise<void> {
   await advanceToExported(store);
   const exported = required(store.readStateRecords().at(-1), 'missing exported state');
@@ -1083,6 +1102,208 @@ describe('release lifecycle execution kernel', () => {
       }),
     ).toThrow('release-certification-evidence-sink-unavailable');
     expect(protectedProvider.certify).not.toHaveBeenCalled();
+  });
+
+  it('binds a provider only to its durable attempt and immutable verified parent', async () => {
+    const value = request('release prepare');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    await seedCertified(store);
+    const parent = required(store.readStateRecords().at(-1), 'missing certified parent');
+    let escaped: unknown;
+    const provider = vi.fn((providerRequest, context) => {
+      const bound = assertReleaseProviderInvocationContext(providerRequest, context);
+      const attempt = required(store.readStoreRecords().at(-1), 'missing durable provider attempt');
+
+      expect(providerRequest).not.toBe(value);
+      expect(bound.request_digest_sha256).toBe(computeReleaseRequestDigest(value));
+      expect(bound.action_id).toBe('release prepare');
+      expect(bound.attempt_id).toBe(attempt.attempt_id);
+      expect(bound.attempt_record).toEqual({
+        sequence: attempt.sequence,
+        record_id: attempt.record_id,
+        record_digest_sha256: attempt.record_digest_sha256,
+      });
+      expect(bound.prior_state).toEqual(parent);
+      expect(bound.prior_state).not.toBe(parent);
+      expect(Object.isFrozen(bound)).toBe(true);
+      expect(Object.isFrozen(bound.attempt_record)).toBe(true);
+      expect(Object.isFrozen(bound.prior_state)).toBe(true);
+      expect(Object.isFrozen(bound.prior_state?.repository)).toBe(true);
+      expect(Reflect.set(bound.attempt_record, 'sequence', 999)).toBe(false);
+      if (bound.prior_state === null) throw new Error('fixture provider parent missing');
+      expect(Reflect.set(bound.prior_state.repository, 'id', 'mutated/repository')).toBe(false);
+      expect(parent.repository.id).toBe('aarusso-nyx/devai');
+      expect(() => assertReleaseProviderInvocationContext(value, bound)).toThrow(
+        'release-provider-invocation-unbound',
+      );
+      expect(() => assertReleaseProviderInvocationContext(providerRequest, { ...bound })).toThrow(
+        'release-provider-invocation-unbound',
+      );
+      escaped = bound;
+      return { outcome: 'success' as const, material: materialFor('release prepare') };
+    });
+
+    const result = await withReleasePrepareAuthorityFixture(value, () =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    expect(provider).toHaveBeenCalledOnce();
+    expect(() => assertReleaseProviderInvocationContext(value, escaped)).toThrow(
+      'release-provider-invocation-unbound',
+    );
+  });
+
+  it('never mints provider context if durable attempt append fails', async () => {
+    const value = request('release prepare');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    await seedCertified(store);
+    const provider = vi.fn(() => ({
+      outcome: 'success' as const,
+      material: materialFor('release prepare'),
+    }));
+    vi.spyOn(store, 'appendStoreRecord').mockImplementationOnce(() => {
+      throw new Error('fixture-attempt-append-failed');
+    });
+
+    const result = await withReleasePrepareAuthorityFixture(value, () =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'append',
+      code: 'fixture-attempt-append-failed',
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('treats an export provider exception or post-sign material defect as unknown without cleanup or redispatch', async () => {
+    for (const kind of ['throw', 'missing-material', 'invalid-material'] as const) {
+      const value = request('release export');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      await advanceToPrepared(store);
+      const rollback = vi.fn();
+      const dispose = vi.fn();
+      const provider = vi.fn(() => {
+        if (kind === 'throw') throw new Error('fixture signer result lost');
+        if (kind === 'missing-material')
+          return {
+            outcome: 'success' as const,
+            transaction: { commit: vi.fn(), rollback, dispose },
+          };
+        return {
+          outcome: 'success' as const,
+          material: { ...materialFor('release export'), release_units: [] },
+          transaction: { commit: vi.fn(), rollback, dispose },
+        };
+      });
+
+      const first = await withReleaseExportAuthorityFixture(value, () =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release export',
+          authority: authorityFor('release export'),
+          store,
+          resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
+          provider,
+          artifactReader: artifactReaderFor('release prepare'),
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+
+      expect(first).toMatchObject({
+        ok: false,
+        phase: 'ambiguous',
+        code: 'release-provider-result-unknown',
+      });
+      expect(rollback).not.toHaveBeenCalled();
+      expect(dispose).not.toHaveBeenCalled();
+      expect(store.readStateRecords().at(-1)?.state).toBe('prepared');
+      expect(
+        store
+          .readStoreRecords()
+          .slice(-2)
+          .map((record) => record.record_kind),
+      ).toEqual(['attempt', 'unknown-provider-result']);
+
+      const retry = await withReleaseExportAuthorityFixture(value, () =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release export',
+          authority: authorityFor('release export'),
+          store,
+          resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
+          provider,
+          artifactReader: artifactReaderFor('release prepare'),
+          recorded_at: '2026-09-03T00:00:01.000Z',
+        }),
+      );
+      expect(retry).toMatchObject({
+        ok: false,
+        phase: 'reconciliation',
+        code: 'release-provider-result-unknown',
+      });
+      expect(provider).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('keeps an explicitly managed pre-sign export failure retryable', async () => {
+    const value = request('release export');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    await advanceToPrepared(store);
+    const rollback = vi.fn();
+    const dispose = vi.fn();
+    const provider = vi.fn(() => ({
+      outcome: 'failure' as const,
+      dispatch_status: 'failed-before-dispatch' as const,
+      code: 'release-export-before-sign-failed',
+      transaction: { commit: vi.fn(), rollback, dispose },
+    }));
+
+    const result = await withReleaseExportAuthorityFixture(value, () =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release export',
+        authority: authorityFor('release export'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider,
+        artifactReader: artifactReaderFor('release prepare'),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'provider',
+      code: 'release-export-before-sign-failed',
+    });
+    expect(rollback).toHaveBeenCalledOnce();
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(store.readStateRecords().at(-1)?.state).toBe('prepared');
+    expect(store.readStoreRecords().at(-1)?.record_kind).toBe('failure');
   });
 
   it('preserves an ambiguous prepare sink commit without cleanup or redispatch until external reconciliation', async () => {
