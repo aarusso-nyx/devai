@@ -10,15 +10,22 @@ const probe = readFileSync(
 describe('installed release-host bootstrap probe', () => {
   it('keeps the real-package bootstrap population and isolated irreversible modes', () => {
     for (const marker of [
-      'positive,',
+      "'pnpm-negative'",
+      "'positive-candidate'",
       "'captured-immutability'",
       "'cache-import'",
       "'cache-require'",
       "'cache-altered-import'",
       "'cache-altered-require'",
       "'asset-inequality'",
+      "'provisioning-refusals'",
       "'failed-startup'",
       'bootstrapReleaseHost',
+      'provisionReleaseHostPackage',
+      'archiveManifest',
+      'collectCandidate',
+      'remote.origin.promisor',
+      'gitControl',
       'createRequire',
       '__devaiBootstrapCachedSentinel',
       'execFileSync(',
@@ -27,6 +34,6 @@ describe('installed release-host bootstrap probe', () => {
       expect(probe, `installed bootstrap probe missing ${marker}`).toContain(marker);
     }
     expect(probe).toContain("message: 'rpl-package-identity-mismatch'");
-    expect(probe).toContain("host.runtime.invokeDevaiCli(['--version'])");
+    expect(probe).toContain("provisioned.host.runtime.invokeDevaiCli(['--version'])");
   });
 });
