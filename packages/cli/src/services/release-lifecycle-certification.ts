@@ -246,8 +246,11 @@ export function createReleaseCertificationProvider(
     } catch (error) {
       return {
         outcome: 'failure',
+        // Native/tool diagnostics are not ledger codes. Keeping the original message
+        // here makes the attempt record fail its own schema, which replaces a
+        // diagnosable refusal with an opaque store failure.
         code:
-          error instanceof Error
+          error instanceof Error && /^release-[a-z0-9-]+$/u.test(error.message)
             ? error.message
             : 'release-certification-generated-output-untrusted',
       };

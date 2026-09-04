@@ -524,8 +524,15 @@ export async function runCheckTasksAsync(
     readonly executeTask?: AsyncTaskExecutor;
   },
 ): Promise<CheckRunnerReport> {
-  const { executeTask, resolveExecutable, readTaskOutput, capturedTaskOutputPaths, now, ...data } =
-    inputOptions;
+  const {
+    executeTask,
+    resolveExecutable,
+    readTaskOutput,
+    capturedTaskOutputPaths,
+    resolveProtectedMutationProducer,
+    now,
+    ...data
+  } = inputOptions;
   // Host functions are captured once; caller-owned documents cannot drift while
   // a task is awaited. None of these callbacks is resolved from candidate data.
   const captured: CheckRunnerOptions = {
@@ -533,6 +540,9 @@ export async function runCheckTasksAsync(
     ...(resolveExecutable === undefined ? {} : { resolveExecutable }),
     ...(readTaskOutput === undefined ? {} : { readTaskOutput }),
     ...(capturedTaskOutputPaths === undefined ? {} : { capturedTaskOutputPaths }),
+    ...(resolveProtectedMutationProducer === undefined
+      ? {}
+      : { resolveProtectedMutationProducer }),
     ...(now === undefined ? {} : { now }),
   };
   const steps = runCheckTaskSteps(
