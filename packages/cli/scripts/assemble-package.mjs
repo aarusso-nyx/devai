@@ -112,7 +112,7 @@ function validateVerifierAssets() {
   const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
   if (
     provenance.schemaVersion !== '1.0.0' ||
-    provenance.sourceCommit !== '098d090013dda34e38d1045ba06274d99bd5aec1' ||
+    provenance.sourceCommit !== '9f849f117fe1e460b5e3c647515f5ccbe783cbfb' ||
     !Array.isArray(provenance.files)
   ) {
     throw new Error('PACKAGE_VERIFIER_PROVENANCE_INVALID');
@@ -125,8 +125,10 @@ function validateVerifierAssets() {
   const sourceOnlyTests = actualPopulation.filter((path) => path.startsWith('test/'));
   const expectedSourceOnlyTests = [
     'artifact-safety.test.js',
+    'detached-trust.test.js',
     'export.test.js',
     'mutation-v21-contract.test.js',
+    'mutation-v22-contract.test.js',
     'mutation.test.js',
     'policy-builder.test.js',
     'publish.test.js',
@@ -134,7 +136,7 @@ function validateVerifierAssets() {
   ].map((name) => `test/${name}`);
   const runtimePopulation = actualPopulation.filter((path) => !path.startsWith('test/'));
   if (
-    declared.length !== 24 ||
+    declared.length !== 26 ||
     new Set(declared).size !== declared.length ||
     JSON.stringify(sourceOnlyTests) !== JSON.stringify(expectedSourceOnlyTests) ||
     declared.some((path) => path.startsWith('test/')) ||

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "sourceCommit": "098d090013dda34e38d1045ba06274d99bd5aec1",
+  "sourceCommit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
   "files": [
     {
       "path": "schemas/candidate-receipt-1.1.schema.json",
@@ -36,7 +36,7 @@
     },
     {
       "path": "schemas/trust-store.schema.json",
-      "sha256": "750fc53d327bae95524a0fed4410f1fa336b2470a93a4e05ba0b11260a8f8ff1"
+      "sha256": "60ceae5de1eabfe3ca9dc295850020d10b55e754d93e388c11483596ac2fcbeb"
     },
     {
       "path": "src/artifact-safety.js",
@@ -68,15 +68,19 @@
     },
     {
       "path": "src/export.js",
-      "sha256": "7940b7aa4ee67bb6551caced976db8df96d9476e05ef459b6c6d33272769e91f"
+      "sha256": "0eaf18d3f00507e12de2b60d029c68f3874bd6803f457836521fcc3aefdf14bb"
     },
     {
       "path": "src/mutation-v21.js",
-      "sha256": "a810681a1a8749ea6508f26398171e5cdf358c900b13d4d45b3762b333817d8f"
+      "sha256": "180d9a694da56a75f7808f9c07c01c2fe6568b16e8c664fabe4fbaa16bf8376e"
+    },
+    {
+      "path": "src/mutation-v22.js",
+      "sha256": "79b46e57c082c508ddac3105007a96073b91f137c5e1c35a77de732a5e4e0240"
     },
     {
       "path": "src/mutation.js",
-      "sha256": "4353937961d2937690170def6821b032617b304560d2bb3166f049d297e166a1"
+      "sha256": "6ee9885a9af91959f07e668ba5dfdfe23146c8e0fd1c5171403954b9d4e48802"
     },
     {
       "path": "src/policy-builder.js",
@@ -88,15 +92,19 @@
     },
     {
       "path": "src/publish.js",
-      "sha256": "b9932049790f32c5a8c046e8248027e3710c755be2a68556d1d1db5c56d6c212"
+      "sha256": "dbb6b54fcad42bff17a9e722b37b51eefbf87f3b8fddcd7dd45fe023cc54ed2e"
     },
     {
       "path": "src/safe-path.js",
       "sha256": "d2216abcf818622c7d93c2558714bd502eab0de34993d775a80ddde04781e4eb"
     },
     {
+      "path": "src/trust.js",
+      "sha256": "9c57937899c903bba34acd376525071c4276c6e501d7d3e42f8ebd61cf64bdda"
+    },
+    {
       "path": "src/verify.js",
-      "sha256": "27d47461d114681993f119c4e1a6bcc5937e0948f67529b07d85a405cc8ff2e9"
+      "sha256": "e9b9904f9d3114b4ec9c06100b2d6f344b3f9ca6eac1b4135cf4fe90861eecf2"
     }
   ]
 }

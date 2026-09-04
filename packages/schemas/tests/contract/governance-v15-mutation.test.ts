@@ -6,8 +6,8 @@ type Json = Record<string, unknown>;
 
 const APPROVED_SOURCE = {
   repository: 'devai-nyx/devai-verifier',
-  commit: '098d090013dda34e38d1045ba06274d99bd5aec1',
-  tree: '8eb8491dc43ca893399b2fc87dcfc25815c4a209',
+  commit: '9f849f117fe1e460b5e3c647515f5ccbe783cbfb',
+  tree: 'ad825591bd32fb39d1a045c492660acf90f78c38',
 } as const;
 
 const PROVENANCE_PROOF = {
@@ -15,12 +15,12 @@ const PROVENANCE_PROOF = {
   vendor: {
     root: 'packages/cli/vendor/evidence-verification',
     manifestPath: 'packages/cli/vendor/evidence-verification/provenance.json',
-    manifestDigest: '5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b',
+    manifestDigest: 'f61cccd8a0c0c5e7020cc6055f254c1a5ab56388fc9fc220ea76b1f9dc9a196c',
     sourceCommit: APPROVED_SOURCE.commit,
     sourceTree: APPROVED_SOURCE.tree,
-    byteSetDigest: 'dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e',
+    byteSetDigest: '9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4',
   },
-  sourceByteSetDigest: 'dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e',
+  sourceByteSetDigest: '9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4',
   byteEqual: true,
 } as const;
 
@@ -255,8 +255,10 @@ describe('source-pinned mutation v2.1 verifier activation', () => {
     expect(activationModel.semanticReceiptProvenance).toEqual(SEMANTIC_RECEIPT_PROVENANCE);
     expect(activationModel.sourceOnlyTestPaths).toEqual([
       'test/artifact-safety.test.js',
+      'test/detached-trust.test.js',
       'test/export.test.js',
       'test/mutation-v21-contract.test.js',
+      'test/mutation-v22-contract.test.js',
       'test/mutation.test.js',
       'test/policy-builder.test.js',
       'test/publish.test.js',

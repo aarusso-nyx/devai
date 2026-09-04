@@ -64,8 +64,8 @@
     "approvedSource": {
       "const": {
         "repository": "devai-nyx/devai-verifier",
-        "commit": "098d090013dda34e38d1045ba06274d99bd5aec1",
-        "tree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209"
+        "commit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
+        "tree": "ad825591bd32fb39d1a045c492660acf90f78c38"
       }
     },
     "activation": {
@@ -73,18 +73,18 @@
         "provenanceProof": {
           "source": {
             "repository": "devai-nyx/devai-verifier",
-            "commit": "098d090013dda34e38d1045ba06274d99bd5aec1",
-            "tree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209"
+            "commit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
+            "tree": "ad825591bd32fb39d1a045c492660acf90f78c38"
           },
           "vendor": {
             "root": "packages/cli/vendor/evidence-verification",
             "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
-            "manifestDigest": "5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b",
-            "sourceCommit": "098d090013dda34e38d1045ba06274d99bd5aec1",
-            "sourceTree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209",
-            "byteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e"
+            "manifestDigest": "f61cccd8a0c0c5e7020cc6055f254c1a5ab56388fc9fc220ea76b1f9dc9a196c",
+            "sourceCommit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
+            "sourceTree": "ad825591bd32fb39d1a045c492660acf90f78c38",
+            "byteSetDigest": "9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4"
           },
-          "sourceByteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e",
+          "sourceByteSetDigest": "9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4",
           "byteEqual": true
         },
         "emissionPermitted": true,
@@ -110,34 +110,36 @@
         "byteSetDigestRule": "sha256-of-rfc8785-jcs-utf8-provenance-files-array-in-manifest-order-with-exact-path-and-sha256-members",
         "runtimeEqualityRequired": "before-emission-or-verification-validate-the-constant-policy-and-recompute-manifest-digest-sourceCommit-exact-runtime-file-population-each-file-sha256-and-byteSetDigest-against-provenanceProof-and-approvedSource;missing-mismatched-symlinked-or-extra-runtime-files-refuse;policy-booleans-and-byteEqual-alone-grant-nothing",
         "installedVendorRoot": "dist/runtime/evidence-verification",
-        "runtimeFileCount": 24,
-        "sourceOnlyTests": "seven-byte-equal-upstream-test-files-remain-source-regressions-and-are-excluded-from-the-runtime-manifest-and-installed-package",
+        "runtimeFileCount": 26,
+        "sourceOnlyTests": "nine-byte-equal-upstream-test-files-remain-source-regressions-and-are-excluded-from-the-runtime-manifest-and-installed-package",
         "sourceBaselineGrantsActivationAuthority": false,
         "semanticReceiptProvenance": {
           "source": {
             "repository": "devai-verifier",
-            "commit": "098d090013dda34e38d1045ba06274d99bd5aec1",
-            "tree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209",
-            "byteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e"
+            "commit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
+            "tree": "ad825591bd32fb39d1a045c492660acf90f78c38",
+            "byteSetDigest": "9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4"
           },
           "vendor": {
             "root": "packages/cli/vendor/evidence-verification",
             "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
-            "manifestDigest": "5319ef6154ca90b0851cc2b7fbce4e16919c9f4b5326a67a452e1c52ffb7027b",
-            "sourceCommit": "098d090013dda34e38d1045ba06274d99bd5aec1",
-            "sourceTree": "8eb8491dc43ca893399b2fc87dcfc25815c4a209",
-            "byteSetDigest": "dcb9af5f43f396e4a2a1a09fcdb181ade346575cd111dd532b78269e3fdfc34e"
+            "manifestDigest": "f61cccd8a0c0c5e7020cc6055f254c1a5ab56388fc9fc220ea76b1f9dc9a196c",
+            "sourceCommit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
+            "sourceTree": "ad825591bd32fb39d1a045c492660acf90f78c38",
+            "byteSetDigest": "9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4"
           },
           "byteEquality": true
         },
         "semanticReceiptProvenanceRequirement": "require-exact-object-equality-with-semanticReceiptProvenance-for-the-current-receipt-and-every-reused-producing-receipt;generic-self-consistency-or-an-unapproved-producing-verifier-refuses",
         "portableVendorPathRule": "emitted-semantic-receipt-vendor-root-and-manifestPath-always-equal-activation-provenanceProof-vendor-source-relative-values;installedVendorRoot-is-only-a-physical-execution-locator-and-never-emitted-provenance",
-        "runtimePopulation": "exactly-provenance.json-plus-the-24-manifest-declared-runtime-files;source-layout-additionally-permits-only-sourceOnlyTestPaths;installed-layout-permits-no-tests-or-additional-files",
+        "runtimePopulation": "exactly-provenance.json-plus-the-26-manifest-declared-runtime-files;source-layout-additionally-permits-only-sourceOnlyTestPaths;installed-layout-permits-no-tests-or-additional-files",
         "noFollowScope": "vendor-root-and-every-ancestor-of-vendor-root-manifest-and-each-runtime-or-source-test-file-including-every-final-component;symlinks-nonregular-files-or-path-identity-changes-refuse",
         "sourceOnlyTestPaths": [
           "test/artifact-safety.test.js",
+          "test/detached-trust.test.js",
           "test/export.test.js",
           "test/mutation-v21-contract.test.js",
+          "test/mutation-v22-contract.test.js",
           "test/mutation.test.js",
           "test/policy-builder.test.js",
           "test/publish.test.js",

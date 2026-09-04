@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
 const SELECTED_RELEASE_VERSION = '1.4.5';
-const VENDORED_VERIFIER_SOURCE_COMMIT = '098d090013dda34e38d1045ba06274d99bd5aec1';
+const VENDORED_VERIFIER_SOURCE_COMMIT = '9f849f117fe1e460b5e3c647515f5ccbe783cbfb';
 const VENDORED_VERIFIER_PROVENANCE = readFileSync(
   join(root, 'packages/cli/vendor/evidence-verification/provenance.json'),
 );
