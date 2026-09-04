@@ -715,7 +715,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       return { ...planned, ...options.cacheState(planned) };
     });
   const taskPolicy: TaskPolicy = {
-    schemaVersion: '1.1.0',
+    // v1.1 stays byte-compatible for non-release checks. The canonical verifier
+    // accepts inputProjection only in the explicitly forward v1.2 release form.
+    schemaVersion: target === 'release' ? '1.2.0' : '1.1.0',
     repositoryId: descriptor.repositoryId,
     requiredNodes: tasks.map(({ nodeId, taskKey, dependencies, outputContract }) => ({
       nodeId,

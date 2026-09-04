@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import {
   captureExportMutationUnitProjections,
-  type ExportMutationUnitProjection,
 } from '@devai-nyx/authority';
+import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
 import { canonicalJson } from '@devai-nyx/utils';
 import {
   RELEASE_EXPORT_TRANSCRIPT_FORMAT,
@@ -34,7 +34,7 @@ export interface ReleaseExportTranscriptV2 extends Omit<
   readonly closures: readonly (ReleaseExportTranscript['closures'][number] & {
     readonly release_unit: string;
   })[];
-  readonly mutation_units: readonly ExportMutationUnitProjection[];
+  readonly mutation_units: readonly ReleaseExportMutationUnitProjection[];
 }
 
 export interface ReleaseExportByteDocument {
@@ -266,7 +266,7 @@ export function verifyReleaseExportTranscriptV2(
 /** Bounded closed-document decoding. It never dereferences a path, handle or origin store. */
 function portable(
   value: unknown,
-  projection: NonNullable<ExportMutationUnitProjection['mutation_evidence']>,
+  projection: NonNullable<ReleaseExportMutationUnitProjection['mutation_evidence']>,
   maximum: number,
 ): ReleaseUnitMutationPortable {
   const envelope = closed(value, ['version', 'closure', 'receipt', 'output_contract', 'members']);

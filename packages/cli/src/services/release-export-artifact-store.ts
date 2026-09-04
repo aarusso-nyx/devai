@@ -5,7 +5,6 @@ import {
   createProtectedExportSinkAdapter,
   readProtectedReleaseExportCapacity,
   createProtectedReleaseSinkOwner,
-  type ExportMutationUnitProjection,
 } from '@devai-nyx/authority';
 import { createReleaseArtifactStore } from './release-artifact-store.js';
 import {
@@ -59,6 +58,7 @@ import {
   reverifyReleaseExportMutationEvidence,
   type ReleaseExportMutationEvidence,
 } from './release-export-mutation-evidence.js';
+import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
 
 export { RELEASE_EXPORT_SPEC_ID, RELEASE_EXPORT_SPEC_DIGEST } from './release-export-transcript.js';
 const INVALID = 'release-export-artifact-sink-protocol-invalid';
@@ -79,6 +79,12 @@ export interface LegacyProtectedReleaseExportBinding extends ReleaseExportTransc
     readonly policy_resolution_digest_sha256: string;
   }[];
 }
+/**
+ * Portable copy of the sealed mutation projection contract.  The authority package
+ * independently validates this value at the runtime boundary; keeping the public
+ * declaration structural prevents the private workspace package from leaking into
+ * the installed CLI's declaration closure.
+ */
 export interface ProtectedReleaseExportBindingV3 extends Omit<
   LegacyProtectedReleaseExportBinding,
   'closure_inputs'
@@ -86,7 +92,7 @@ export interface ProtectedReleaseExportBindingV3 extends Omit<
   readonly closure_inputs: readonly (LegacyProtectedReleaseExportBinding['closure_inputs'][number] & {
     readonly release_unit: string;
   })[];
-  readonly mutation_units: readonly ExportMutationUnitProjection[];
+  readonly mutation_units: readonly ReleaseExportMutationUnitProjection[];
 }
 export type ProtectedReleaseExportBinding =
   LegacyProtectedReleaseExportBinding | ProtectedReleaseExportBindingV3;

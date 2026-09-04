@@ -42,7 +42,8 @@ export interface TaskPolicyNode {
 }
 
 export interface TaskPolicy {
-  readonly schemaVersion: '1.1.0';
+  /** 1.2.0 is required precisely when the release input projection is carried. */
+  readonly schemaVersion: '1.1.0' | '1.2.0';
   readonly repositoryId: string;
   readonly requiredNodes: readonly TaskPolicyNode[];
   readonly inputProjection?: Readonly<{

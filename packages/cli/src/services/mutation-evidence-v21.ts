@@ -194,8 +194,10 @@ function readProtectedFile(path: string): {
 
 const SOURCE_TESTS = [
   'artifact-safety.test.js',
+  'detached-trust.test.js',
   'export.test.js',
   'mutation-v21-contract.test.js',
+  'mutation-v22-contract.test.js',
   'mutation.test.js',
   'policy-builder.test.js',
   'publish.test.js',

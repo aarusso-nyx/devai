@@ -20,7 +20,7 @@ import {
   captureReleaseExportTranscriptLimits,
   type ReleaseExportProviderResultV2,
 } from './release-export-transcript-v2.js';
-import type { ExportMutationUnitProjection } from '@devai-nyx/authority';
+import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
 import type { ReleaseExportArtifactCommitManifest } from './release-export-artifact-store.js';
 import { resolveReleaseMutationRequirements } from './release-lifecycle-execution.js';
 import { resolutionForReleasePlanInputResolver } from './release-policy-resolution.js';
@@ -1605,7 +1605,7 @@ async function reverifyExportContinuity(
   let transcript: Buffer;
   if (current) {
     if (!('mutation_units' in binding)) return fail();
-    const units: ExportMutationUnitProjection[] = state.release_units
+    const units: ReleaseExportMutationUnitProjection[] = state.release_units
       .map((unit) => {
         const closure = unit.mutation_evidence;
         if (closure == null) return { release_unit: unit.release_unit, mutation_evidence: null };

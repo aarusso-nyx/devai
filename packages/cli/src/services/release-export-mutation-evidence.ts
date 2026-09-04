@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import {
   captureExportMutationUnitProjections,
-  type ExportMutationUnitProjection,
 } from '@devai-nyx/authority';
+import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
 import {
   validateReleaseLifecycleRequest,
   resolveReleaseMutationRequirements,
@@ -41,7 +41,7 @@ export interface ReleaseExportMutationEvidenceExpected extends Material {
   readonly plan_receipt_digest_sha256: string;
 }
 export interface ReleaseExportMutationEvidenceSnapshot {
-  readonly mutation_units: readonly ExportMutationUnitProjection[];
+  readonly mutation_units: readonly ReleaseExportMutationUnitProjection[];
   readonly portable_units: readonly {
     readonly release_unit: string;
     readonly mutation_evidence: ReleaseUnitMutationPortable | null;
@@ -183,7 +183,7 @@ export async function createReleaseExportMutationEvidence(
       },
     };
     await verifyCertificationMutationEvidence(request, material, cached, plan);
-    const mutationUnits: ExportMutationUnitProjection[] = [];
+    const mutationUnits: ReleaseExportMutationUnitProjection[] = [];
     const portableUnits: ReleaseExportMutationEvidenceSnapshot['portable_units'][number][] = [];
     for (const [index, requirement] of requirements.entries()) {
       const unit = material.release_units[index] ?? fail();
