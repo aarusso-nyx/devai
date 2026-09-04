@@ -24,6 +24,8 @@ import {
   protectedReleaseBoundaryAdapterId,
   assertProtectedReleasePrepareCapacityEffect,
   assertProtectedReleaseExportCapacityEffect,
+  readProtectedReleaseRepositoryIdentity,
+  assertProtectedReleaseRepositoryRoot,
   type ProtectedReleasePrepareCapacityBinding,
   type ProtectedReleasePrepareCapacity,
   type ProtectedReleaseExportCapacityBinding,
@@ -1147,6 +1149,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       recovery: 'preserve-and-report',
     };
     try {
+      assertProtectedReleaseRepositoryRoot(repositoryRoot);
+      const identity = readProtectedReleaseRepositoryIdentity();
       if (
         disposed ||
         input.entry.name !== action ||
@@ -1154,7 +1158,10 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         input.role !== 'architect' ||
         !input.argv.includes('--write') ||
         binding.action_id !== input.entry.name ||
-        binding.repository.id !== sources.repository_id ||
+        identity.authority_repository_id !== sources.repository_id ||
+        binding.repository.id !== identity.expected_release_repository_id ||
+        binding.repository.commit !== identity.repository.commit ||
+        binding.repository.tree !== identity.repository.tree ||
         boundedPlan === undefined ||
         boundedPlanHandle === undefined ||
         canonicalSha256(boundedPlan) !== boundedPlanDigest ||
@@ -1476,11 +1483,16 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       const requestPath = flagValue(input.argv, '--request');
       if (requestPath === undefined) throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
       const declaredRequest = JSON.parse(readFileSync(resolve(requestPath), 'utf8')) as JsonRecord;
+      assertProtectedReleaseRepositoryRoot(repositoryRoot);
       if (
         declaredRequest.action_id !== input.entry.name ||
         canonicalSha256(declaredRequest.repository_locator) !==
           canonicalSha256(operation.binding.repository) ||
-        operation.binding.repository.id !== sources.repository_id ||
+        operation.binding.authority_repository_id !== sources.repository_id ||
+        operation.binding.repository.id !== operation.binding.expected_release_repository_id ||
+        !isRecord(declaredRequest.candidate_locator) ||
+        declaredRequest.candidate_locator.commit !== operation.binding.repository.commit ||
+        declaredRequest.candidate_locator.tree !== operation.binding.repository.tree ||
         !Array.isArray(declaredRequest.receipt_locators) ||
         !declaredRequest.receipt_locators.some(
           (locator: unknown) =>

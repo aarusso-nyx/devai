@@ -34,6 +34,15 @@ import {
 } from 'node:child_process';
 import { issuerState } from '../runtime/contracts.js';
 import {
+  captureProtectedReleaseRepositoryIdentity,
+  type ProtectedReleaseRepositoryIdentity,
+} from './release-repository-identity.js';
+export {
+  captureProtectedReleaseRepositoryIdentity,
+  parseProtectedReleaseOrigin,
+  type ProtectedReleaseRepositoryIdentity,
+} from './release-repository-identity.js';
+import {
   captureProtectedReleaseExportBinding,
   type ProtectedReleaseExportBinding,
 } from './release-export-binding.js';
@@ -75,6 +84,250 @@ export interface AtomicAuthorityHostEffect {
 }
 
 const scopes = new AsyncLocalStorage<AuthorityHostEffectScope>();
+
+/** External operator controls, never obtained from a candidate or CLI request. */
+export interface ProtectedReleaseRepositoryControls {
+  readonly repository_root: string;
+  readonly authority_repository_id: string;
+  readonly read_expected_release_repository_id: () => string;
+  readonly repository: ProtectedReleaseRepositoryIdentity['repository'];
+}
+
+export interface ProtectedReleaseRepositoryContext {
+  readonly identity: ProtectedReleaseRepositoryIdentity;
+}
+
+type RepositoryPin = Readonly<{ path: string; dev: bigint; ino: bigint }>;
+interface RepositoryContextState {
+  readonly configuredRoot: string;
+  readonly root: string;
+  readonly expected: () => string;
+  readonly identity: ProtectedReleaseRepositoryIdentity;
+  readonly pins: readonly RepositoryPin[];
+}
+interface LiveRepositoryContext {
+  readonly state: RepositoryContextState;
+  active: boolean;
+}
+const repositoryContexts = new WeakMap<ProtectedReleaseRepositoryContext, RepositoryContextState>();
+const liveRepositoryContexts = new AsyncLocalStorage<LiveRepositoryContext>();
+
+function repositoryIdentityFailure(): never {
+  throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+}
+
+function repositoryGit(root: string, args: readonly string[]): string {
+  if (process.platform !== 'darwin' && process.platform !== 'linux')
+    return repositoryIdentityFailure();
+  const environment = Object.freeze({
+    PATH: '/usr/bin:/bin',
+    LC_ALL: 'C',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+  });
+  if (
+    Object.keys(environment)
+      .filter((key) => key.startsWith('GIT_'))
+      .sort()
+      .join(',') !== 'GIT_CONFIG_GLOBAL,GIT_CONFIG_NOSYSTEM,GIT_CONFIG_SYSTEM' ||
+    environment.GIT_CONFIG_NOSYSTEM !== '1' ||
+    environment.GIT_CONFIG_SYSTEM !== '/dev/null' ||
+    environment.GIT_CONFIG_GLOBAL !== '/dev/null'
+  )
+    return repositoryIdentityFailure();
+  const result = nodeSpawnSync(
+    '/usr/bin/git',
+    [
+      '--no-optional-locks',
+      '--no-replace-objects',
+      '--no-lazy-fetch',
+      '-c',
+      'core.fsmonitor=false',
+      ...args,
+    ],
+    {
+      cwd: root,
+      env: environment,
+      encoding: 'buffer',
+      maxBuffer: 1024 * 1024,
+      timeout: 10000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    },
+  );
+  if (result.status !== 0 || result.signal !== null || result.error !== undefined)
+    return repositoryIdentityFailure();
+  return new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
+}
+
+function repositoryPin(path: string): RepositoryPin {
+  const info = lstatSync(path, { bigint: true });
+  if (info.isSymbolicLink() || (!info.isDirectory() && !info.isFile()))
+    return repositoryIdentityFailure();
+  return Object.freeze({ path, dev: info.dev, ino: info.ino });
+}
+
+function repositoryProbe(configuredRoot: string) {
+  if (!isAbsolute(configuredRoot) || /[\p{Cc}\p{Cs}]/u.test(configuredRoot))
+    return repositoryIdentityFailure();
+  const root = realpathSync(configuredRoot);
+  if (!lstatSync(root).isDirectory()) return repositoryIdentityFailure();
+  const before = [repositoryPin(root), repositoryPin(resolve(root, '.git'))];
+  // Override worktree-config resolution only while examining the common local
+  // config; any declaration of the extension is rejected before rev-parse.
+  const config = repositoryGit(root, [
+    '-c',
+    'extensions.worktreeConfig=false',
+    'config',
+    '--local',
+    '--no-includes',
+    '--null',
+    '--list',
+  ]);
+  const origin: string[] = [];
+  if (config !== '' && !config.endsWith('\0')) return repositoryIdentityFailure();
+  for (const entry of config === '' ? [] : config.slice(0, -1).split('\0')) {
+    const delimiter = entry.indexOf('\n');
+    const key = delimiter === -1 ? entry : entry.slice(0, delimiter);
+    const firstDot = key.indexOf('.');
+    const lastDot = key.lastIndexOf('.');
+    const section = key.slice(0, firstDot).toLowerCase();
+    const variable = key.slice(lastDot + 1).toLowerCase();
+    // Git section/variable names are case-insensitive; subsection names are not.
+    // remote.Origin must never stand in for the named remote.origin.
+    const subsection = firstDot === lastDot ? undefined : key.slice(firstDot + 1, lastDot);
+    const value = delimiter === -1 ? undefined : entry.slice(delimiter + 1);
+    if (
+      ((section === 'include' || section === 'includeif') && variable === 'path') ||
+      (section === 'extensions' && variable === 'worktreeconfig') ||
+      (section === 'url' && (variable === 'insteadof' || variable === 'pushinsteadof')) ||
+      (section === 'remote' && subsection === 'origin' && variable === 'pushurl')
+    )
+      return repositoryIdentityFailure();
+    if (section === 'remote' && subsection === 'origin' && variable === 'url') {
+      if (value === undefined) return repositoryIdentityFailure();
+      origin.push(value);
+    }
+  }
+  if (origin.length !== 1) return repositoryIdentityFailure();
+  const line = (args: readonly string[]): string => {
+    const value = repositoryGit(root, args);
+    if (!value.endsWith('\n') || /[\p{Cc}\p{Cs}]/u.test(value.slice(0, -1)))
+      return repositoryIdentityFailure();
+    return value.slice(0, -1);
+  };
+  if (line(['rev-parse', '--show-toplevel']) !== root) return repositoryIdentityFailure();
+  const gitDirectory = line(['rev-parse', '--absolute-git-dir']);
+  const commonDirectory = line(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (
+    realpathSync(gitDirectory) !== gitDirectory ||
+    realpathSync(commonDirectory) !== commonDirectory
+  )
+    return repositoryIdentityFailure();
+  const pins = [
+    ...before,
+    repositoryPin(gitDirectory),
+    repositoryPin(commonDirectory),
+    repositoryPin(resolve(commonDirectory, 'config')),
+  ];
+  const commit = line(['rev-parse', '--verify', 'HEAD']);
+  const tree = line(['rev-parse', '--verify', 'HEAD^{tree}']);
+  for (const pin of pins) {
+    const current = repositoryPin(pin.path);
+    if (current.dev !== pin.dev || current.ino !== pin.ino) return repositoryIdentityFailure();
+  }
+  return { root, origin: origin[0], commit, tree, pins: Object.freeze(pins) };
+}
+
+/** Read-only capture; possession of this context grants no role, action or effect. */
+export function createProtectedReleaseRepositoryContext(
+  controls: ProtectedReleaseRepositoryControls,
+): ProtectedReleaseRepositoryContext {
+  try {
+    const expected = controls.read_expected_release_repository_id;
+    if (typeof expected !== 'function') return repositoryIdentityFailure();
+    const expectedId = expected();
+    const configuredRoot = controls.repository_root;
+    const probe = repositoryProbe(configuredRoot);
+    const identity = captureProtectedReleaseRepositoryIdentity({
+      authority_repository_id: controls.authority_repository_id,
+      expected_release_repository_id: expectedId,
+      origin_url: probe.origin,
+      repository: controls.repository,
+    });
+    if (identity.repository.commit !== probe.commit || identity.repository.tree !== probe.tree)
+      return repositoryIdentityFailure();
+    const context = Object.freeze({ identity });
+    repositoryContexts.set(context, {
+      configuredRoot,
+      root: probe.root,
+      identity,
+      expected,
+      pins: probe.pins,
+    });
+    return context;
+  } catch {
+    return repositoryIdentityFailure();
+  }
+}
+
+/** Every caller performs a fresh host/config/HEAD check, not a cached identity lookup. */
+export function readProtectedReleaseRepositoryIdentity(): ProtectedReleaseRepositoryIdentity {
+  try {
+    const live = liveRepositoryContexts.getStore();
+    if (!live?.active) return repositoryIdentityFailure();
+    const state = live.state;
+    if (state.expected() !== state.identity.expected_release_repository_id)
+      return repositoryIdentityFailure();
+    const probe = repositoryProbe(state.configuredRoot);
+    if (
+      probe.root !== state.root ||
+      probe.origin !== state.identity.origin_url ||
+      probe.commit !== state.identity.repository.commit ||
+      probe.tree !== state.identity.repository.tree ||
+      probe.pins.length !== state.pins.length ||
+      probe.pins.some((pin, index) => {
+        const initial = state.pins[index];
+        return initial?.path !== pin.path || initial.dev !== pin.dev || initial.ino !== pin.ino;
+      })
+    )
+      return repositoryIdentityFailure();
+    return state.identity;
+  } catch {
+    return repositoryIdentityFailure();
+  }
+}
+
+/** The broker's authority sources must belong to the very same host-owned checkout. */
+export function assertProtectedReleaseRepositoryRoot(root: string): void {
+  try {
+    const live = liveRepositoryContexts.getStore();
+    if (!live?.active || !isAbsolute(root) || realpathSync(root) !== live.state.root)
+      return repositoryIdentityFailure();
+  } catch {
+    return repositoryIdentityFailure();
+  }
+}
+
+/** Host invocation lifetime only. Nested selection and escaped descendants refuse. */
+export async function withProtectedReleaseRepositoryContext<T>(
+  context: ProtectedReleaseRepositoryContext,
+  callback: () => T | Promise<T>,
+): Promise<T> {
+  const state = repositoryContexts.get(context);
+  if (state === undefined || liveRepositoryContexts.getStore() !== undefined)
+    return repositoryIdentityFailure();
+  const live: LiveRepositoryContext = { state, active: true };
+  return liveRepositoryContexts.run(live, async () => {
+    try {
+      readProtectedReleaseRepositoryIdentity();
+      return await callback();
+    } finally {
+      live.active = false;
+    }
+  });
+}
 
 export interface ProtectedReleasePrepareCapacityBinding {
   readonly action_id: 'release prepare';
@@ -432,10 +685,23 @@ export interface ProtectedReleaseHostBinding {
   readonly helper_identity_sha256: string;
 }
 
+function currentRepositoryBinding<
+  T extends { readonly repository: ProtectedReleaseRepositoryIdentity['repository'] },
+>(binding: T): T & ProtectedReleaseRepositoryIdentity {
+  const identity = readProtectedReleaseRepositoryIdentity();
+  if (
+    binding.repository.id !== identity.repository.id ||
+    binding.repository.commit !== identity.repository.commit ||
+    binding.repository.tree !== identity.repository.tree
+  )
+    return repositoryIdentityFailure();
+  return Object.freeze({ ...binding, ...identity });
+}
+
 const protectedOperations = new WeakMap<
   object,
   Readonly<{
-    binding: ProtectedReleaseHostBinding;
+    binding: ProtectedReleaseHostBinding & ProtectedReleaseRepositoryIdentity;
     scope: AuthorityHostEffectScope;
     kind: 'provider' | 'sink';
     operation_id: string;
@@ -454,7 +720,7 @@ export interface ProtectedArtifactSinkBinding {
 const artifactOperations = new WeakMap<
   object,
   Readonly<{
-    binding: ProtectedArtifactSinkBinding;
+    binding: ProtectedArtifactSinkBinding & ProtectedReleaseRepositoryIdentity;
     scope: AuthorityHostEffectScope;
     kind: 'artifact-sink';
     operation_id: string;
@@ -503,7 +769,7 @@ export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSin
     const token = Object.freeze({});
     protectedOperationSequence += 1;
     const operation = Object.freeze({
-      binding: selected,
+      binding: currentRepositoryBinding(selected),
       scope,
       kind: 'artifact-sink' as const,
       operation_id: `${scope.invocation_id}-${String(protectedOperationSequence)}`,
@@ -534,7 +800,7 @@ export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSin
 const exportOperations = new WeakMap<
   object,
   Readonly<{
-    binding: ProtectedReleaseExportBinding;
+    binding: ProtectedReleaseExportBinding & ProtectedReleaseRepositoryIdentity;
     scope: AuthorityHostEffectScope;
     kind: 'export-sink' | 'export-signer';
     operation_id: string;
@@ -569,7 +835,7 @@ function exportAdapter(
     const token = Object.freeze({});
     protectedOperationSequence += 1;
     const operation = Object.freeze({
-      binding: selected,
+      binding: currentRepositoryBinding(selected),
       scope,
       kind,
       operation_id: `${scope.invocation_id}-${String(protectedOperationSequence)}`,
@@ -672,7 +938,7 @@ export function createProtectedReleaseHostAdapter(binding: ProtectedReleaseHostB
     const token = Object.freeze({});
     protectedOperationSequence += 1;
     const operation = Object.freeze({
-      binding: selected,
+      binding: currentRepositoryBinding(selected),
       scope,
       kind,
       operation_id: `${scope.invocation_id}-${String(protectedOperationSequence)}`,

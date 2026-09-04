@@ -11,6 +11,10 @@ import {
 import { isAbsolute, resolve, sep } from 'node:path';
 import { canonicalJson } from '@devai-nyx/utils';
 import {
+  createProtectedReleaseRepositoryContext,
+  withProtectedReleaseRepositoryContext,
+} from '@devai-nyx/authority';
+import {
   assertCliInvocationIdle,
   invokeDevaiCli,
   type CliInvocationResult,
@@ -65,6 +69,10 @@ export interface ProtectedReleaseHostRunnerControls {
   readonly expected: ReleasePolicyExpectedIdentity;
   readonly producer?: Parameters<typeof resolveReleasePolicySnapshot>[0]['producer'];
   readonly repository_root: string;
+  readonly repository_identity: {
+    readonly authority_repository_id: string;
+    readonly read_expected_release_repository_id: () => string;
+  };
   /** Must be the registered .devai/state/release-lifecycle namespace or a descendant. */
   readonly state_root: string;
   readonly maximum_input_bytes: number;
@@ -218,6 +226,7 @@ export function createProtectedReleaseHostRunner(
       'certification_store',
       'artifact_store',
       'publication_signature_verifier',
+      'repository_identity',
       'later_stages',
     ],
     ['producer'],
@@ -245,6 +254,17 @@ export function createProtectedReleaseHostRunner(
   const verifySignature = input.publication_signature_verifier;
   const candidate = input.candidate;
   const repository = copy(candidate.repository);
+  closed(input.repository_identity, [
+    'authority_repository_id',
+    'read_expected_release_repository_id',
+  ]);
+  const repositoryContext = createProtectedReleaseRepositoryContext({
+    repository_root: root,
+    authority_repository_id: input.repository_identity.authority_repository_id,
+    read_expected_release_repository_id:
+      input.repository_identity.read_expected_release_repository_id,
+    repository,
+  });
   const unit = copy(input.unit);
   const resolution = resolveReleasePolicySnapshot({
     expected: input.expected,
@@ -550,7 +570,9 @@ export function createProtectedReleaseHostRunner(
             }
           }
         }
-        return await invokeDevaiCli(args);
+        return await (action === 'release plan' || action === 'release resume'
+          ? invokeDevaiCli(args)
+          : withProtectedReleaseRepositoryContext(repositoryContext, () => invokeDevaiCli(args)));
       } finally {
         pinnedRequest = undefined;
         active = false;
