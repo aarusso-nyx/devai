@@ -59,6 +59,7 @@ async function invoke(
   value: ReturnType<typeof fixture>,
   bindingRepository = value.repository,
   before?: () => void,
+  brokerRoot = value.root,
 ) {
   const entries = canonicalRegistry();
   const entry = entries.find((candidate) => candidate.name === 'release certify');
@@ -79,7 +80,7 @@ async function invoke(
     ],
     role: 'inspector',
     declaration: { as_role: 'inspector' },
-    repository_root: value.root,
+    repository_root: brokerRoot,
     package_version: resolveCliVersion(),
     bootstrap_policy: true,
   });
@@ -102,23 +103,29 @@ async function invoke(
 
 describe('authority repository identity boundary', () => {
   it.each([
-    ['DEVAI', 'aarusso-nyx/devai', 'aarusso-nyx-devai'],
-    ['STYNX', 'stynx-nyx/stynx', 'stynx-nyx-stynx'],
-  ])('%s keeps canonical release id separate from its authority slug', async (_name, id, slug) => {
-    const value = fixture(id, slug);
-    try {
-      expect(repositoryIdFor(value.root)).toBe(slug);
-      await expect(invoke(value)).resolves.toBe(true);
-      await expect(invoke(value, { ...value.repository, id: slug })).rejects.toThrow(
-        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
-      );
-      await expect(
-        invoke(value, { ...value.repository, id: 'foreign/repository' }),
-      ).rejects.toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
-    } finally {
-      value.dispose();
-    }
-  });
+    ['DEVAI', 'aarusso-nyx/devai', 'devai', 'aarusso-nyx-devai'],
+    ['STYNX', 'stynx-nyx/stynx', 'stynx', 'stynx-nyx-stynx'],
+  ])(
+    '%s keeps canonical release id separate from its authority slug',
+    async (_name, id, slug, normalized) => {
+      const value = fixture(id, slug);
+      try {
+        expect(repositoryIdFor(value.root)).toBe(slug);
+        await expect(invoke(value)).resolves.toBe(true);
+        await expect(invoke(value, { ...value.repository, id: slug })).rejects.toThrow(
+          'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+        );
+        await expect(invoke(value, { ...value.repository, id: normalized })).rejects.toThrow(
+          'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+        );
+        await expect(
+          invoke(value, { ...value.repository, id: 'foreign/repository' }),
+        ).rejects.toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      } finally {
+        value.dispose();
+      }
+    },
+  );
 
   it('refuses candidate and raw-origin drift before the protected callback', async () => {
     const value = fixture('aarusso-nyx/devai', 'aarusso-nyx-devai');
@@ -140,6 +147,19 @@ describe('authority repository identity boundary', () => {
       ).rejects.toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
     } finally {
       value.dispose();
+    }
+  });
+
+  it('refuses a second real checkout even when it has the same configured identities', async () => {
+    const first = fixture('aarusso-nyx/devai', 'devai');
+    const second = fixture('aarusso-nyx/devai', 'devai');
+    try {
+      await expect(invoke(first, first.repository, undefined, second.root)).rejects.toThrow(
+        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+      );
+    } finally {
+      first.dispose();
+      second.dispose();
     }
   });
 });
