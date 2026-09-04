@@ -15,6 +15,7 @@ import {
   unlinkSync,
   writeSync,
   withProtectedReleasePrepareCapacity,
+  withProtectedReleaseExportCapacity,
 } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
@@ -2722,7 +2723,7 @@ export async function executeReleaseLifecycleAction(input: {
         try {
           await result.transaction?.commit();
         } catch {
-          if (request.action_id !== 'release prepare') {
+          if (request.action_id !== 'release prepare' && request.action_id !== 'release export') {
             try {
               await result.transaction?.rollback();
             } finally {
@@ -2778,7 +2779,7 @@ export async function executeReleaseLifecycleAction(input: {
           input.store.appendStateAndAdvanceHead(state, completion, head);
         } catch (error) {
           // The sink has committed. An append failure cannot authorize rollback or abort.
-          if (request.action_id !== 'release prepare') {
+          if (request.action_id !== 'release prepare' && request.action_id !== 'release export') {
             try {
               await result.transaction?.rollback();
             } finally {
@@ -2795,22 +2796,32 @@ export async function executeReleaseLifecycleAction(input: {
         await result.transaction?.dispose();
         return { ok: true, state, completion };
       });
-    if (request.action_id !== 'release prepare') return await execute();
+    if (request.action_id !== 'release prepare' && request.action_id !== 'release export')
+      return await execute();
     const plan = receipts.find((receipt) => receipt.kind === 'release-plan-receipt');
     if (plan === undefined || typeof plan.value['receipt_digest_sha256'] !== 'string')
-      throw new Error('release-prepare-capacity-unavailable');
-    return await withProtectedReleasePrepareCapacity(
-      {
-        action_id: 'release prepare',
-        repository: request.repository_locator,
-        candidate: {
-          commit: request.candidate_locator.commit,
-          tree: request.candidate_locator.tree,
-        },
-        plan_receipt_digest_sha256: plan.value['receipt_digest_sha256'],
+      throw new Error(
+        request.action_id === 'release export'
+          ? 'release-export-capacity-unavailable'
+          : 'release-prepare-capacity-unavailable',
+      );
+    const capacityBinding = {
+      repository: request.repository_locator,
+      candidate: {
+        commit: request.candidate_locator.commit,
+        tree: request.candidate_locator.tree,
       },
-      execute,
-    );
+      plan_receipt_digest_sha256: plan.value['receipt_digest_sha256'],
+    };
+    return request.action_id === 'release export'
+      ? await withProtectedReleaseExportCapacity(
+          { ...capacityBinding, action_id: 'release export' },
+          execute,
+        )
+      : await withProtectedReleasePrepareCapacity(
+          { ...capacityBinding, action_id: 'release prepare' },
+          execute,
+        );
   } catch (error) {
     return {
       ok: false,

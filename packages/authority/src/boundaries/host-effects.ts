@@ -57,6 +57,10 @@ export interface AuthorityHostEffectScope {
   readonly read_prepare_capacity?: (
     binding: ProtectedReleasePrepareCapacityBinding,
   ) => ProtectedReleasePrepareCapacity;
+  /** Separate export account; no prepare allowance is transferable to this action. */
+  readonly read_export_capacity?: (
+    binding: ProtectedReleaseExportCapacityBinding,
+  ) => ProtectedReleaseExportCapacity;
 }
 
 export interface AuthorityHostEffectRequest {
@@ -244,6 +248,135 @@ export function readProtectedReleasePrepareCapacity(
   return readPrepareCapacity(sequence);
 }
 
+export interface ProtectedReleaseExportCapacityBinding {
+  readonly action_id: 'release export';
+  readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly plan_receipt_digest_sha256: string;
+}
+
+export interface ProtectedReleaseExportCapacity {
+  readonly remaining_batches: number;
+  readonly remaining_targets: number;
+}
+
+interface ExportCapacitySequence {
+  readonly scope: AuthorityHostEffectScope;
+  readonly binding: ProtectedReleaseExportCapacityBinding;
+  readonly reader: NonNullable<AuthorityHostEffectScope['read_export_capacity']>;
+  active: boolean;
+}
+
+const exportCapacityContexts = new AsyncLocalStorage<ExportCapacitySequence>();
+const exportCapacityAccounts = new WeakMap<object, ExportCapacitySequence>();
+
+function exportCapacityBinding(value: unknown): ProtectedReleaseExportCapacityBinding {
+  try {
+    const binding = capacityRecord(value, [
+      'action_id',
+      'repository',
+      'candidate',
+      'plan_receipt_digest_sha256',
+    ]);
+    if (binding['action_id'] !== 'release export') throw new Error();
+    // Reuse only the closed locator validation, never the prepare action/account.
+    const checked = prepareCapacityBinding({ ...binding, action_id: 'release prepare' });
+    if (
+      checked.repository.commit !== checked.candidate.commit ||
+      checked.repository.tree !== checked.candidate.tree
+    )
+      throw new Error();
+    return Object.freeze({ ...checked, action_id: 'release export' });
+  } catch {
+    throw new Error('release-export-capacity-unavailable');
+  }
+}
+
+function readExportCapacity(sequence: ExportCapacitySequence): ProtectedReleaseExportCapacity {
+  try {
+    const value = capacityRecord(sequence.reader(sequence.binding), [
+      'remaining_batches',
+      'remaining_targets',
+    ]);
+    const batches = value['remaining_batches'];
+    const targets = value['remaining_targets'];
+    if (
+      typeof batches !== 'number' ||
+      !Number.isSafeInteger(batches) ||
+      batches < 0 ||
+      batches > 128 ||
+      typeof targets !== 'number' ||
+      !Number.isSafeInteger(targets) ||
+      targets < 0 ||
+      targets > 8192
+    )
+      throw new Error();
+    return Object.freeze({ remaining_batches: batches, remaining_targets: targets });
+  } catch {
+    throw new Error('release-export-capacity-unavailable');
+  }
+}
+
+export function assertProtectedReleaseExportCapacityEffect(receiptStore: object): void {
+  const sequence = exportCapacityAccounts.get(receiptStore);
+  if (
+    sequence !== undefined &&
+    (!sequence.active ||
+      exportCapacityContexts.getStore() !== sequence ||
+      scopes.getStore() !== sequence.scope ||
+      issuerState(receiptStore)?.closed !== false)
+  )
+    throw new Error('release-export-capacity-unavailable');
+}
+
+/** One immutable export sequence includes terminal bookkeeping and execution-lock cleanup. */
+export async function withProtectedReleaseExportCapacity<T>(
+  binding: ProtectedReleaseExportCapacityBinding,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const scope = scopes.getStore();
+  const selected = exportCapacityBinding(binding);
+  if (
+    scope?.action_id !== 'release export' ||
+    scope.effect !== 'local-write' ||
+    typeof callback !== 'function' ||
+    typeof scope.read_export_capacity !== 'function' ||
+    issuerState(scope.receipt_store)?.closed !== false ||
+    issuerState(scope.receipt_store)?.invocation_id !== scope.invocation_id ||
+    exportCapacityAccounts.has(scope.receipt_store)
+  )
+    throw new Error('release-export-capacity-unavailable');
+  const sequence: ExportCapacitySequence = {
+    scope,
+    binding: selected,
+    reader: scope.read_export_capacity,
+    active: true,
+  };
+  readExportCapacity(sequence);
+  exportCapacityAccounts.set(scope.receipt_store, sequence);
+  try {
+    return await exportCapacityContexts.run(sequence, callback);
+  } finally {
+    sequence.active = false;
+  }
+}
+
+/** Fresh live-account read only; absent readers and prior-invocation credit always refuse. */
+export function readProtectedReleaseExportCapacity(
+  binding: ProtectedReleaseExportCapacityBinding,
+): ProtectedReleaseExportCapacity {
+  const selected = exportCapacityBinding(binding);
+  const sequence = exportCapacityContexts.getStore();
+  if (
+    sequence === undefined ||
+    exportCapacityAccounts.get(sequence.scope.receipt_store) !== sequence ||
+    JSON.stringify(selected) !== JSON.stringify(sequence.binding)
+  )
+    throw new Error('release-export-capacity-unavailable');
+  assertProtectedReleaseExportCapacityEffect(sequence.scope.receipt_store);
+  return readExportCapacity(sequence);
+}
+
 const protectedSinkScopes = new AsyncLocalStorage<
   Readonly<{
     scope: AuthorityHostEffectScope;
@@ -427,6 +560,12 @@ function exportAdapter(
     const scope = requireScope('mutation');
     if (scope.action_id !== 'release export' || scope.effect !== 'local-write')
       throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+    readProtectedReleaseExportCapacity({
+      action_id: selected.action_id,
+      repository: selected.repository,
+      candidate: selected.candidate,
+      plan_receipt_digest_sha256: selected.plan_receipt_digest_sha256,
+    });
     const token = Object.freeze({});
     protectedOperationSequence += 1;
     const operation = Object.freeze({
@@ -571,6 +710,7 @@ function requireScope(mode: 'mutation' | 'process'): AuthorityHostEffectScope {
     throw new Error('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
   }
   assertProtectedReleasePrepareCapacityEffect(scope.receipt_store);
+  assertProtectedReleaseExportCapacityEffect(scope.receipt_store);
   if (mode === 'mutation' && scope.effect === 'read') {
     throw new Error('AUTHORITY_READ_ACTION_MUTATION_FORBIDDEN');
   }
