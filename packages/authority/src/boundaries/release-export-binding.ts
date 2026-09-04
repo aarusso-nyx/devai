@@ -1,5 +1,15 @@
+import { types } from 'node:util';
+import {
+  captureExportMutationUnitProjections,
+  type ExportMutationUnitProjection,
+} from './release-export-mutation.js';
+export {
+  captureExportMutationUnitProjections,
+  type ExportMutationUnitProjection,
+} from './release-export-mutation.js';
+
 /** Private host binding; no member supplies an executable callback, key bytes or storage path. */
-export interface ProtectedReleaseExportBinding {
+export interface LegacyProtectedReleaseExportBinding {
   readonly action_id: 'release export';
   readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
   readonly candidate: { readonly commit: string; readonly tree: string };
@@ -36,7 +46,21 @@ export interface ProtectedReleaseExportBinding {
   }[];
 }
 
+export interface ProtectedReleaseExportBindingV3 extends Omit<
+  LegacyProtectedReleaseExportBinding,
+  'closure_inputs'
+> {
+  readonly closure_inputs: readonly (LegacyProtectedReleaseExportBinding['closure_inputs'][number] & {
+    readonly release_unit: string;
+  })[];
+  readonly mutation_units: readonly ExportMutationUnitProjection[];
+}
+
+export type ProtectedReleaseExportBinding =
+  LegacyProtectedReleaseExportBinding | ProtectedReleaseExportBindingV3;
+
 const EXPORT_SPEC_DIGEST = '77ab8fd69d2b3d4edeaebd12b516eb5c15fe910f93ff4516deadd466f0853f98';
+const EXPORT_SPEC_V3_DIGEST = 'aac1c75a539516a38b567aea9be4490eb3f82fe0ab7b75e46e55e46d3166e37f';
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OPAQUE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u;
 const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/u;
@@ -48,6 +72,7 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
   if (
     value === null ||
     typeof value !== 'object' ||
+    types.isProxy(value) ||
     ![Object.prototype, null].includes(Object.getPrototypeOf(value) as object | null) ||
     Reflect.ownKeys(value).length !== keys.length
   )
@@ -81,6 +106,11 @@ export function captureProtectedReleaseExportBinding(
   value: unknown,
 ): ProtectedReleaseExportBinding {
   try {
+    if (value === null || typeof value !== 'object' || types.isProxy(value)) return fail();
+    const spec = Object.getOwnPropertyDescriptor(value, 'export_spec_digest_sha256');
+    if (!spec?.enumerable || !('value' in spec)) return fail();
+    const current = spec.value === EXPORT_SPEC_V3_DIGEST;
+    if (!current && spec.value !== EXPORT_SPEC_DIGEST) return fail();
     const binding = record(value, [
       'action_id',
       'repository',
@@ -93,12 +123,9 @@ export function captureProtectedReleaseExportBinding(
       'attempt_id',
       'export_spec_digest_sha256',
       'closure_inputs',
+      ...(current ? ['mutation_units'] : []),
     ]);
-    if (
-      binding['action_id'] !== 'release export' ||
-      binding['export_spec_digest_sha256'] !== EXPORT_SPEC_DIGEST
-    )
-      return fail();
+    if (binding['action_id'] !== 'release export') return fail();
     const repository = record(binding['repository'], ['id', 'commit', 'tree']);
     text(repository['id'], REPOSITORY, 200);
     const commit = text(repository['commit'], /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
@@ -155,6 +182,7 @@ export function captureProtectedReleaseExportBinding(
     const closures = binding['closure_inputs'];
     if (
       !Array.isArray(closures) ||
+      types.isProxy(closures) ||
       Object.getPrototypeOf(closures) !== Array.prototype ||
       closures.length === 0 ||
       closures.length > 8192 ||
@@ -171,7 +199,9 @@ export function captureProtectedReleaseExportBinding(
         'size_bytes',
         'expected_installed_package',
         'policy_resolution_digest_sha256',
+        ...(current ? ['release_unit'] : []),
       ]);
+      if (current) text(closure['release_unit'], /^[^\p{Cc}\p{Cs}]+$/u, 200);
       const packageId = text(
         closure['package_id'],
         /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u,
@@ -196,6 +226,20 @@ export function captureProtectedReleaseExportBinding(
       text(installed['version'], /^[^\p{Cc}\p{Cs}]+$/u, 200);
       text(installed['archive_sha256'], SHA256);
       text(installed['content_manifest_sha256'], SHA256);
+    }
+    if (current) {
+      captureExportMutationUnitProjections(
+        binding['mutation_units'],
+        closures.map((entry) => ({
+          package_id: entry.package_id as string,
+          release_unit: entry.release_unit as string,
+        })),
+        {
+          repository: repository as unknown as ProtectedReleaseExportBinding['repository'],
+          plan_receipt_digest_sha256: binding['plan_receipt_digest_sha256'] as string,
+        },
+        8192,
+      );
     }
     return freeze(JSON.parse(JSON.stringify(binding)) as ProtectedReleaseExportBinding);
   } catch {

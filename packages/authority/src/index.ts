@@ -1,6 +1,10 @@
 export * from './adapters.js';
 export * from './boundaries/host-effects.js';
 export * from './boundaries/index.js';
+export {
+  captureExportMutationUnitProjections,
+  type ExportMutationUnitProjection,
+} from './boundaries/release-export-mutation.js';
 export * from './capabilities/database.js';
 export * from './capabilities/path-domains.js';
 export * from './decision.js';
