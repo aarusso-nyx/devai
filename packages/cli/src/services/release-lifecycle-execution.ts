@@ -2196,6 +2196,7 @@ function offlineReleaseUnitsProjection(state: ReleaseLifecycleStateV2): readonly
   return state.release_units.map((unit) => ({
     release_unit: unit.release_unit,
     version: unit.version,
+    ...(unit.mutation_evidence === undefined ? {} : { mutation_evidence: unit.mutation_evidence }),
     packages: unit.packages.map((pkg) => ({
       package_id: pkg.package_id,
       package_manifest: pkg.package_manifest,
