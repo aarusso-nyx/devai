@@ -12,6 +12,18 @@ import {
   type ReleaseExportTranscriptLimits,
 } from '../../src/services/release-export-transcript.js';
 import type { OpaqueArtifactIdentity } from '../../src/services/release-lifecycle-execution.js';
+import {
+  RELEASE_EXPORT_PROVIDER_RESULT_V2_FORMAT,
+  RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
+  encodeReleaseExportProviderResultV2,
+  encodeReleaseExportTranscriptV2,
+  verifyReleaseExportProviderResultSetV2,
+  verifyReleaseExportProviderResultV2,
+  verifyReleaseExportTranscriptV2,
+  type ReleaseExportTranscriptV2,
+  type ReleaseUnitMutationPortable,
+} from '../../src/services/release-export-transcript-v2.js';
+import { fixture as unitMutationFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
 
 const DIGEST = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const LIMITS: ReleaseExportTranscriptLimits = {
@@ -484,5 +496,358 @@ describe('release export transcript transport', () => {
     refusal(() => verifyReleaseExportProviderResult(Buffer.from([0xc3]), input, LIMITS));
     refusal(() => verifyReleaseExportProviderResult(encoded, input, LIMITS));
     refusal(() => verifyReleaseExportTranscript(bytes, value, LIMITS));
+  });
+});
+
+describe('release export transcript v2 mutation carrier', () => {
+  async function forwardFixture() {
+    const base = transcript();
+    const unit = await unitMutationFixture({
+      packages: [{ packageName: '@fixture/internal', workspace: 'packages/internal' }],
+      binding: {
+        repository_id: base.binding.repository.id,
+        candidate_commit: base.binding.candidate.commit,
+        candidate_tree: base.binding.candidate.tree,
+        release_unit: '@fixture/unit',
+        release_plan_receipt_digest_sha256: base.binding.plan_receipt_digest_sha256,
+      },
+    });
+    const closure = Buffer.from(canonicalJson(unit.closure));
+    const receipt = Buffer.from(canonicalJson(unit.closure.receipt));
+    const document = (path: string, value: Buffer) => ({
+      path,
+      sha256: DIGEST(value),
+      size_bytes: value.length,
+      bytes_base64: value.toString('base64'),
+    });
+    const portable: ReleaseUnitMutationPortable = {
+      version: 'devai.release-unit-mutation-portable-json.v1',
+      closure: {
+        sha256: DIGEST(closure),
+        size_bytes: closure.length,
+        bytes_base64: closure.toString('base64'),
+      },
+      receipt: {
+        sha256: DIGEST(receipt),
+        size_bytes: receipt.length,
+        bytes_base64: receipt.toString('base64'),
+      },
+      output_contract: document(
+        unit.closure.output_contract.path,
+        unit.read(unit.closure.output_contract),
+      ),
+      members: unit.closure.members.map((member) => document(member.path, unit.read(member))),
+    };
+    const mutationEvidence = {
+      carrier_package_id: '@fixture/a',
+      binding: unit.binding,
+      closure: { sha256: DIGEST(closure), size_bytes: closure.length },
+      receipt: {
+        sha256: DIGEST(receipt),
+        size_bytes: receipt.length,
+        receipt_digest_sha256: unit.closure.receipt.receipt_digest_sha256,
+      },
+      output_contract: unit.closure.output_contract,
+      members: unit.closure.members,
+      member_projection_digest_sha256:
+        unit.closure.receipt.referent.member_projection_digest_sha256,
+    };
+    const value: ReleaseExportTranscriptV2 = {
+      ...base,
+      version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
+      closures: base.closures.map((row) => ({ ...row, release_unit: '@fixture/unit' })),
+      mutation_units: [{ release_unit: '@fixture/unit', mutation_evidence: mutationEvidence }],
+    };
+    const encoded = encodeReleaseExportTranscriptV2(value, LIMITS);
+    return { encoded, portable, value };
+  }
+
+  it('emits and verifies the exact v2 projection and elected portable carrier', async () => {
+    const value = await forwardFixture();
+    expect(verifyReleaseExportTranscriptV2(value.encoded, value.value, LIMITS)).toEqual(
+      value.value,
+    );
+    const provider = encodeReleaseExportProviderResultV2(
+      {
+        package_id: '@fixture/a',
+        transcript: value.encoded,
+        signature: 'AQ==',
+        mutation_evidence: value.portable,
+      },
+      LIMITS,
+    );
+    expect(
+      verifyReleaseExportProviderResultV2(
+        provider,
+        { package_id: '@fixture/a', transcript: value.encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    ).toMatchObject({
+      version: RELEASE_EXPORT_PROVIDER_RESULT_V2_FORMAT,
+      mutation_evidence: value.portable,
+    });
+    const noncarrier = encodeReleaseExportProviderResultV2(
+      {
+        package_id: '@fixture/b',
+        transcript: value.encoded,
+        signature: 'AQ==',
+        mutation_evidence: null,
+      },
+      LIMITS,
+    );
+    expect(
+      verifyReleaseExportProviderResultSetV2(
+        [provider, noncarrier],
+        { transcript: value.encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('refuses carrier election, incomplete sets, and malformed embedded canonical bytes', async () => {
+    const value = await forwardFixture();
+    refusal(() =>
+      encodeReleaseExportProviderResultV2(
+        {
+          package_id: '@fixture/b',
+          transcript: value.encoded,
+          signature: 'AQ==',
+          mutation_evidence: value.portable,
+        },
+        LIMITS,
+      ),
+    );
+    const carrier = encodeReleaseExportProviderResultV2(
+      {
+        package_id: '@fixture/a',
+        transcript: value.encoded,
+        signature: 'AQ==',
+        mutation_evidence: value.portable,
+      },
+      LIMITS,
+    );
+    refusal(() =>
+      verifyReleaseExportProviderResultSetV2(
+        [carrier],
+        { transcript: value.encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    );
+    const altered = structuredClone(value.portable) as ReleaseUnitMutationPortable;
+    const closure = altered.closure as { bytes_base64: string };
+    closure.bytes_base64 = `${closure.bytes_base64}\n`;
+    refusal(() =>
+      encodeReleaseExportProviderResultV2(
+        {
+          package_id: '@fixture/a',
+          transcript: value.encoded,
+          signature: 'AQ==',
+          mutation_evidence: altered,
+        },
+        LIMITS,
+      ),
+    );
+    refusal(() =>
+      verifyReleaseExportTranscriptV2(Buffer.from(`${value.encoded}\n`), value.value, LIMITS),
+    );
+  });
+
+  it('requires an explicit null carrier population for mutation-none units', () => {
+    const base = transcript();
+    const value: ReleaseExportTranscriptV2 = {
+      ...base,
+      version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
+      closures: base.closures.map((row) => ({ ...row, release_unit: '@fixture/unit' })),
+      mutation_units: [{ release_unit: '@fixture/unit', mutation_evidence: null }],
+    };
+    const encoded = encodeReleaseExportTranscriptV2(value, LIMITS);
+    const results = base.closures.map((row) =>
+      encodeReleaseExportProviderResultV2(
+        {
+          package_id: row.package_id,
+          transcript: encoded,
+          signature: 'AQ==',
+          mutation_evidence: null,
+        },
+        LIMITS,
+      ),
+    );
+
+    expect(
+      verifyReleaseExportProviderResultSetV2(
+        results,
+        { transcript: encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    ).toHaveLength(2);
+    refusal(() =>
+      encodeReleaseExportTranscriptV2(
+        { ...value, version: RELEASE_EXPORT_TRANSCRIPT_FORMAT } as ReleaseExportTranscriptV2,
+        LIMITS,
+      ),
+    );
+    refusal(() => verifyReleaseExportTranscript(encoded, transcript(), LIMITS));
+  });
+
+  it('refuses extra or missing carrier members and altered closure, receipt, and projection identities', async () => {
+    const value = await forwardFixture();
+    const [portableMember] = value.portable.members;
+    if (portableMember === undefined) throw new Error('fixture member missing');
+    for (const mutationEvidence of [
+      { ...value.portable, members: value.portable.members.slice(1) },
+      {
+        ...value.portable,
+        members: [...value.portable.members, portableMember],
+      },
+      {
+        ...value.portable,
+        closure: { ...value.portable.closure, sha256: DIGEST('substituted-closure') },
+      },
+      {
+        ...value.portable,
+        receipt: { ...value.portable.receipt, sha256: DIGEST('substituted-receipt') },
+      },
+    ]) {
+      refusal(() =>
+        encodeReleaseExportProviderResultV2(
+          {
+            package_id: '@fixture/a',
+            transcript: value.encoded,
+            signature: 'AQ==',
+            mutation_evidence: mutationEvidence,
+          },
+          LIMITS,
+        ),
+      );
+    }
+
+    const [unit] = value.value.mutation_units;
+    const evidence = unit?.mutation_evidence;
+    if (evidence === undefined || evidence === null) throw new Error('fixture evidence missing');
+    const [first] = evidence.members;
+    if (first === undefined) throw new Error('fixture projection member missing');
+    const sha256 = DIGEST('substituted-projection-member');
+    const members = [
+      { ...first, sha256, opaque_handle: `sha256:${sha256}` },
+      ...evidence.members.slice(1),
+    ];
+    const projected: ReleaseExportTranscriptV2 = {
+      ...value.value,
+      mutation_units: [
+        {
+          release_unit: '@fixture/unit',
+          mutation_evidence: {
+            ...evidence,
+            members,
+            member_projection_digest_sha256: DIGEST(canonicalJson(members)),
+          },
+        },
+      ],
+    };
+    const transcriptWithSubstitutedProjection = encodeReleaseExportTranscriptV2(projected, LIMITS);
+    refusal(() =>
+      encodeReleaseExportProviderResultV2(
+        {
+          package_id: '@fixture/a',
+          transcript: transcriptWithSubstitutedProjection,
+          signature: 'AQ==',
+          mutation_evidence: value.portable,
+        },
+        LIMITS,
+      ),
+    );
+  });
+
+  it('refuses duplicate package carriers, noncanonical resources, malformed UTF-8, and bounded oversized results', async () => {
+    const value = await forwardFixture();
+    const carrier = encodeReleaseExportProviderResultV2(
+      {
+        package_id: '@fixture/a',
+        transcript: value.encoded,
+        signature: 'AQ==',
+        mutation_evidence: value.portable,
+      },
+      LIMITS,
+    );
+    const noncarrier = encodeReleaseExportProviderResultV2(
+      {
+        package_id: '@fixture/b',
+        transcript: value.encoded,
+        signature: 'AQ==',
+        mutation_evidence: null,
+      },
+      LIMITS,
+    );
+    refusal(() =>
+      verifyReleaseExportProviderResultSetV2(
+        [carrier, carrier],
+        { transcript: value.encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    );
+    const altered = JSON.parse(noncarrier.toString('utf8')) as Record<string, unknown>;
+    altered['transcript'] = `${altered['transcript'] as string}\n`;
+    refusal(() =>
+      verifyReleaseExportProviderResultV2(
+        Buffer.from(canonicalJson(altered)),
+        { package_id: '@fixture/b', transcript: value.encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    );
+    refusal(() =>
+      verifyReleaseExportProviderResultV2(
+        Buffer.from([0xc3]),
+        { package_id: '@fixture/a', transcript: value.encoded, signature: 'AQ==' },
+        LIMITS,
+      ),
+    );
+    refusal(() =>
+      encodeReleaseExportProviderResultV2(
+        {
+          package_id: '@fixture/a',
+          transcript: value.encoded,
+          signature: 'AQ==',
+          mutation_evidence: value.portable,
+        },
+        { ...LIMITS, maximum_provider_result_bytes: 1 },
+      ),
+    );
+  });
+
+  it('refuses proxied forward binding, parent, and mutation-unit inputs before any proxy trap runs', async () => {
+    const { value } = await forwardFixture();
+    const [unit] = value.mutation_units;
+    if (unit === undefined) throw new Error('fixture unit missing');
+    const cases: readonly {
+      readonly target: object;
+      readonly apply: (proxy: object) => ReleaseExportTranscriptV2;
+    }[] = [
+      {
+        target: value.binding,
+        apply: (proxy) => ({ ...value, binding: proxy as ReleaseExportTranscriptV2['binding'] }),
+      },
+      {
+        target: value.parent,
+        apply: (proxy) => ({ ...value, parent: proxy as ReleaseExportTranscriptV2['parent'] }),
+      },
+      {
+        target: unit,
+        apply: (proxy) => ({
+          ...value,
+          mutation_units: [proxy as ReleaseExportTranscriptV2['mutation_units'][number]],
+        }),
+      },
+    ];
+    for (const { target, apply } of cases) {
+      let reads = 0;
+      const proxy = new Proxy(target, {
+        get(object, key, receiver) {
+          reads += 1;
+          return Reflect.get(object, key, receiver);
+        },
+      });
+      refusal(() => encodeReleaseExportTranscriptV2(apply(proxy), LIMITS));
+      expect(reads).toBe(0);
+    }
   });
 });
