@@ -598,6 +598,147 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/package_evidence" }
+        },
+        "mutation_evidence": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/$defs/release_unit_mutation_evidence_closure"
+            }
+          ]
+        }
+      }
+    },
+    "release_unit_mutation_evidence_closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "release_unit",
+        "member_order",
+        "output_contract",
+        "summary_path",
+        "semantic_receipt_path",
+        "members",
+        "receipt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "kind": { "const": "release-unit-mutation-evidence-closure-v1" },
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "member_order": { "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse" },
+        "output_contract": { "$ref": "#/$defs/release_unit_mutation_output_contract" },
+        "summary_path": { "$ref": "#/$defs/relative_path" },
+        "semantic_receipt_path": { "$ref": "#/$defs/relative_path" },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/release_unit_mutation_evidence_member" }
+        },
+        "receipt": { "$ref": "#/$defs/release_unit_mutation_evidence_receipt" }
+      }
+    },
+    "release_unit_mutation_output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "evidence_sink_id", "opaque_handle"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" }
+      }
+    },
+    "release_unit_mutation_evidence_member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document_kind",
+        "package_name",
+        "path",
+        "sha256",
+        "size_bytes",
+        "evidence_sink_id",
+        "opaque_handle"
+      ],
+      "properties": {
+        "document_kind": {
+          "enum": [
+            "mutation-normalized-stryker-report-v2",
+            "mutation-package-result-v2",
+            "mutation-composed-report-set-v2",
+            "mutation-semantic-verification-receipt-v2"
+          ]
+        },
+        "package_name": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 200 }]
+        },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "document_kind": {
+                "enum": ["mutation-normalized-stryker-report-v2", "mutation-package-result-v2"]
+              }
+            },
+            "required": ["document_kind"]
+          },
+          "then": {
+            "properties": { "package_name": { "type": "string", "minLength": 1, "maxLength": 200 } }
+          },
+          "else": { "properties": { "package_name": { "type": "null" } } }
+        }
+      ]
+    },
+    "release_unit_mutation_evidence_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt_digest_sha256", "canonicalization", "referent"],
+      "properties": {
+        "kind": { "const": "release-unit-mutation-evidence-receipt-v1" },
+        "receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "canonicalization": { "const": "utf-8-rfc8785-jcs-sha256" },
+        "referent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_id",
+            "candidate_commit",
+            "candidate_tree",
+            "release_unit",
+            "release_plan_receipt_digest_sha256",
+            "release_profile_digest_sha256",
+            "mutation_policy_digest_sha256",
+            "task_policy_digests_sha256",
+            "output_contract_digest_sha256",
+            "member_projection_digest_sha256"
+          ],
+          "properties": {
+            "repository_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "candidate_commit": { "$ref": "#/$defs/git_object" },
+            "candidate_tree": { "$ref": "#/$defs/git_object" },
+            "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "release_plan_receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "release_profile_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "mutation_policy_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "task_policy_digests_sha256": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/sha256" }
+            },
+            "output_contract_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "member_projection_digest_sha256": { "$ref": "#/$defs/sha256" }
+          }
         }
       }
     },
@@ -705,6 +846,14 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/package_handle_evidence" }
+        },
+        "mutation_evidence": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/$defs/release_unit_mutation_evidence_closure"
+            }
+          ]
         }
       }
     },

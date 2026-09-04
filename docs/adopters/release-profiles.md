@@ -44,6 +44,24 @@ roster for LTS. When targeted assurance cannot prove a narrower population it
 fails safe to the complete declared roster; an unresolved affected population
 blocks.
 
+The current protected Stryker template additionally records one exact Vitest
+configuration path and one TypeScript configuration root for every roster row.
+Both are part of the row's bound configuration population; the protected host
+also binds the no-follow TypeScript `extends` and project-reference closure.
+The complete declared test population and its security-relevant source/test
+population remain intact even when an effective runner configuration excludes
+files or Stryker emits no mutant for a selected file.
+
+Mutation-v2.1 release evidence is retained as one protected, unit-scoped
+closure in the existing certification-evidence sink. It contains a report and
+result for each required package, plus exactly one summary and semantic receipt.
+It is not a publishable package row and is never added to a package tarball or
+the prepare/export ArtifactSink vocabulary. Certification, prepare, export and
+the prepare/export ArtifactSink vocabulary. Certification and prepare re-read
+and re-hash the sink closure. Export carries an exact copy in its existing
+provider result; offline verification re-hashes that portable copy without
+requiring the original host evidence store.
+
 Package policy can opt into materialization with `release_verification`. Use the
 existing `init bind` preview and reviewed write flow. Existing adopters without
 that field receive no release profile and retain their prior `affected`, `local`,

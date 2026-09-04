@@ -17,7 +17,7 @@
     "mutation_roster"
   ],
   "properties": {
-    "schemaVersion": { "enum": ["1.0.0", "1.1.0"] },
+    "schemaVersion": { "enum": ["1.0.0", "1.1.0", "1.2.0"] },
     "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
     "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -91,6 +91,14 @@
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
           },
           "config_paths": { "$ref": "#/$defs/pathList" },
+          "vitest_config_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "typescript_config_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
           "sanitizer_paths": { "$ref": "#/$defs/pathList" },
           "orchestration_paths": { "$ref": "#/$defs/pathList" },
           "lockfile_path": {
@@ -118,7 +126,7 @@
   "allOf": [
     {
       "if": {
-        "properties": { "schemaVersion": { "const": "1.1.0" } },
+        "properties": { "schemaVersion": { "enum": ["1.1.0", "1.2.0"] } },
         "required": ["schemaVersion"]
       },
       "then": { "required": ["mutation_execution"] }
@@ -126,26 +134,32 @@
     {
       "if": {
         "properties": {
+          "schemaVersion": { "const": "1.2.0" },
           "mutation_execution": {
-            "properties": { "template_id": { "const": "devai.protected-mutation-stryker.v1" } },
-            "required": ["template_id"]
+            "properties": {
+              "template_id": { "const": "devai.protected-mutation-stryker.v1" },
+              "schemaVersion": { "const": "1.2.0" }
+            },
+            "required": ["template_id", "schemaVersion"]
           }
         },
-        "required": ["mutation_execution"]
+        "required": ["schemaVersion", "mutation_execution"]
       },
       "then": {
         "properties": {
-          "release_unit": { "const": "@aarusso-nyx/devai" },
           "mutation_roster": {
-            "minItems": 10,
-            "maxItems": 10,
             "items": {
-              "properties": {
-                "thresholds": {
-                  "const": { "score_min": 60, "survived_max": 50 }
+              "required": ["vitest_config_path", "typescript_config_path"],
+              "allOf": [
+                {
+                  "properties": {
+                    "config_paths": {
+                      "allOf": [{ "contains": { "const": "tests/config/local.config.ts" } }]
+                    }
+                  },
+                  "required": ["config_paths"]
                 }
-              },
-              "required": ["thresholds"]
+              ]
             }
           }
         }
@@ -168,7 +182,7 @@
         "toolchain_fixture_validation"
       ],
       "properties": {
-        "schemaVersion": { "const": "1.1.0" },
+        "schemaVersion": { "enum": ["1.1.0", "1.2.0"] },
         "template_id": { "const": "devai.protected-mutation-stryker.v1" },
         "runner": {
           "type": "object",
@@ -205,6 +219,36 @@
             "lockfile": { "const": "roster.lockfile_path" },
             "configuration": { "const": "host-derived-ephemeral-from-roster-only" },
             "invocation": { "const": "fixed-host-template-not-profile-or-candidate-script" }
+          }
+        },
+        "runner_mapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task_node",
+            "vitest_config",
+            "typescript_config",
+            "typescript_config_closure",
+            "test_population",
+            "security_population",
+            "effective_options"
+          ],
+          "properties": {
+            "task_node": { "const": "roster.task_node" },
+            "vitest_config": { "const": "roster.vitest_config_path" },
+            "typescript_config": { "const": "roster.typescript_config_path" },
+            "typescript_config_closure": {
+              "const": "protected-no-follow-extends-and-project-references-closure-from-roster.typescript_config_path;missing-or-out-of-bound-reference-refuses"
+            },
+            "test_population": {
+              "const": "complete-roster.test_selectors-without-runner-config-exclusions"
+            },
+            "security_population": {
+              "const": "complete-roster.source_selectors-and-test_selectors-without-runner-config-exclusions"
+            },
+            "effective_options": {
+              "const": "protected-resolved-effective-options-from-the-exact-vitest-and-typescript-config-bytes"
+            }
           }
         },
         "mutation_targets": {
@@ -272,6 +316,31 @@
             }
           }
         },
+        "retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["carrier", "scope", "members", "binding", "continuity", "tarball"],
+          "properties": {
+            "carrier": {
+              "const": "certification-evidence-sink-v3-unit-mutation-closure-v1"
+            },
+            "scope": {
+              "const": "exactly-one-closure-per-release-unit-not-per-mutation-roster-package"
+            },
+            "members": {
+              "const": "two-canonical-members-per-required-mutation-package-plus-exactly-one-summary-and-one-semantic-receipt;not-required-packages-have-no-report-or-result-member"
+            },
+            "binding": {
+              "const": "externally-finalized-unit-receipt-binds-repository-candidate-release-unit-plan-profile-mutation-policy-task-policy-digests-the-exact-canonical-output-contract-and-the-complete-sorted-member-handle-digest-size-projection"
+            },
+            "continuity": {
+              "const": "certify-and-prepare-reread-rehash-and-semantic-verify-the-sink-closure;export-rehydrates-the-exact-closure-into-the-existing-provider-result-and-the-signed-export-transcript-binds-its-receipt-and-member-projection-digests;offline-rehashes-and-semantic-verifies-only-that-portable-provider-result-copy"
+            },
+            "tarball": {
+              "const": "never-a-certified-package-entry-and-never-included-in-a-package-tarball"
+            }
+          }
+        },
         "threshold_projection": {
           "type": "object",
           "additionalProperties": false,
@@ -322,7 +391,16 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "schemaVersion": { "const": "1.2.0" } },
+            "required": ["schemaVersion"]
+          },
+          "then": { "required": ["runner_mapping", "retention"] }
+        }
+      ]
     },
     "pathList": {
       "type": "array",
