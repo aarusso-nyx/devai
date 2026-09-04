@@ -55,6 +55,18 @@ export interface ReleaseMutationArtifactLimitsV21 {
   readonly maximum_mutants: number;
 }
 
+/** Instrumenter-derived identity only; execution statuses must come from the runner. */
+export interface ReleaseMutationDiscoveredMutantV21 {
+  readonly id: string;
+  readonly mutatorName: string;
+  readonly replacementDigest: string;
+  /** Report coordinates: the pinned Stryker reporter adds one to internal line and column. */
+  readonly location: {
+    readonly start: { readonly line: number; readonly column: number };
+    readonly end: { readonly line: number; readonly column: number };
+  };
+}
+
 function fail(code = INVALID): never {
   throw Object.assign(new Error(code), { code });
 }
@@ -234,9 +246,15 @@ export function normalizeReleaseMutationPackageV21(input: {
    * Exact independently established emitted-target census from immutable source bytes.
    * This is NOT the complete selected source population bound in inputProjection: Stryker
    * legitimately omits selected files with zero mutants. The protected producer must prove
-   * their distinction; a report-supplied file list cannot establish either census.
+   * their distinction; report-supplied files or mutants cannot establish either census.
+   * Mutant identities must be derived before execution from the effective instrumenter
+   * configuration and immutable source, never copied from the report being checked.
    */
-  readonly source_files: readonly { readonly path: string; readonly sha256: string }[];
+  readonly source_files: readonly {
+    readonly path: string;
+    readonly sha256: string;
+    readonly mutants: readonly ReleaseMutationDiscoveredMutantV21[];
+  }[];
   /** Full allowed test population, not a runner-supplied selection. */
   readonly test_files: readonly string[];
   readonly limits: ReleaseMutationArtifactLimitsV21;
@@ -267,14 +285,36 @@ export function normalizeReleaseMutationPackageV21(input: {
     const expected = packageInputs(input.expected);
     const process = copy(input.process);
     closed(process, ['errorAbsent', 'signal', 'status']);
-    const sources = new Map<string, string>();
+    const sources = new Map<
+      string,
+      { sha256: string; mutants: ReadonlyMap<string, ReleaseMutationDiscoveredMutantV21> }
+    >();
+    let discoveredCount = 0;
     for (const entry of array(input.source_files, limits.maximum_files)) {
-      closed(entry, ['path', 'sha256']);
+      closed(entry, ['path', 'sha256', 'mutants']);
       const member = object(entry),
         name = path(member['path']),
         digest = text(member['sha256']);
       if (!DIGEST.test(digest) || sources.has(name)) fail();
-      sources.set(name, digest);
+      const mutants = new Map<string, ReleaseMutationDiscoveredMutantV21>();
+      for (const value of array(member['mutants'], limits.maximum_mutants)) {
+        closed(value, ['id', 'mutatorName', 'replacementDigest', 'location']);
+        const mutant = copy(value) as ReleaseMutationDiscoveredMutantV21;
+        if (
+          typeof mutant.id !== 'string' ||
+          !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(mutant.id) ||
+          mutants.has(mutant.id) ||
+          typeof mutant.replacementDigest !== 'string' ||
+          !DIGEST.test(mutant.replacementDigest)
+        )
+          fail();
+        discoveredCount += 1;
+        if (discoveredCount > limits.maximum_mutants) fail();
+        mutants.set(mutant.id, mutant);
+      }
+      // Zero-emission selected files belong to the input projection, not this census.
+      if (mutants.size === 0) fail();
+      sources.set(name, { sha256: digest, mutants });
     }
     const tests = array(input.test_files, limits.maximum_files).map(path);
     if (new Set(tests).size !== tests.length) fail();
@@ -309,7 +349,9 @@ export function normalizeReleaseMutationPackageV21(input: {
       Object.entries(rawFiles).map(([name, rawFile]) => {
         path(name);
         const file = object(rawFile);
-        if (sha256(Buffer.from(text(file['source']), 'utf8')) !== sources.get(name))
+        const discovered = sources.get(name);
+        if (discovered === undefined) return fail('MUTATION_ROSTER_MISMATCH');
+        if (sha256(Buffer.from(text(file['source']), 'utf8')) !== discovered.sha256)
           fail('MUTATION_INPUT_DIGEST_MISMATCH');
         if (file['language'] !== 'typescript' && file['language'] !== 'javascript') fail();
         const ids = new Set<string>();
@@ -328,15 +370,19 @@ export function normalizeReleaseMutationPackageV21(input: {
             mutantCount += 1;
             if (mutantCount > limits.maximum_mutants) fail();
             statusTotals[status] += 1;
-            return {
+            const identity = {
               id,
               mutatorName: text(mutant['mutatorName']),
               replacementDigest: sha256(Buffer.from(text(mutant['replacement']), 'utf8')),
               location: copy(mutant['location']),
-              status,
             };
+            const expectedIdentity = discovered.mutants.get(id);
+            if (expectedIdentity === undefined) fail('MUTATION_ROSTER_MISMATCH');
+            if (!equal(identity, expectedIdentity)) fail('MUTATION_INPUT_DIGEST_MISMATCH');
+            return { ...identity, status };
           })
           .sort((a, b) => Buffer.compare(Buffer.from(a.id), Buffer.from(b.id)));
+        if (ids.size !== discovered.mutants.size) fail('MUTATION_ROSTER_MISMATCH');
         return [name, { language: file['language'], mutants }];
       }),
     );
