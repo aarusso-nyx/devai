@@ -1,10 +1,12 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   chmodSync,
+  cpSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -24,6 +26,15 @@ import { canonicalSha256 } from '@devai-nyx/utils';
 import { createReleaseRepositoryTestFixture } from '../../../authority/tests/unit/release-repository-test-fixture.js';
 import { createReleaseCertificationEvidenceStore } from '../../src/services/release-evidence-store.js';
 import type { CertificationOutputClosureBinding } from '../../src/services/release-prepare-kernel.js';
+import {
+  verifyUnitMutationEvidenceDocuments,
+  type UnitMutationEvidenceObject,
+  type UnitMutationEvidenceTransaction,
+} from '../../src/services/release-unit-mutation-evidence.js';
+import {
+  bytes as canonicalBytes,
+  fixture as unitFixture,
+} from '../helpers/release-unit-mutation-evidence-fixture.js';
 
 const roots: string[] = [];
 const REPOSITORY_FIXTURE = createReleaseRepositoryTestFixture();
@@ -135,6 +146,52 @@ function output(handle: {
   readonly size_bytes: number;
 }) {
   return { path: 'generated/report.json', mode: '100644' as const, output_blob_handle: handle };
+}
+
+async function unitEvidence(
+  fixture: ReturnType<typeof storeFixture>,
+  options: { reused?: boolean; notRequired?: boolean } = {},
+) {
+  return await unitFixture({
+    ...options,
+    sinkId: fixture.input.evidence_sink_id,
+    binding: {
+      repository_id: REPOSITORY_FIXTURE.repository.id,
+      candidate_commit: COMMIT,
+      candidate_tree: TREE,
+      release_plan_receipt_digest_sha256: 'd'.repeat(64),
+      task_policy_digests_sha256: [TASK_POLICY],
+    },
+  });
+}
+
+function unitObjectIdentity({
+  path,
+  sha256,
+  size_bytes,
+  evidence_sink_id,
+  opaque_handle,
+}: UnitMutationEvidenceObject) {
+  return { path, sha256, size_bytes, evidence_sink_id, opaque_handle };
+}
+
+async function putUnitDocuments(
+  fixture: ReturnType<typeof storeFixture>,
+  evidence: Awaited<ReturnType<typeof unitEvidence>>,
+  transaction: UnitMutationEvidenceTransaction,
+) {
+  await invokeSink(fixture.store.authority_owner, () => {
+    for (const identity of [evidence.projection.output_contract, ...evidence.projection.members]) {
+      const bytes = evidence.objects.get(identity.sha256);
+      if (bytes === undefined) throw new Error('fixture unit document missing');
+      const handle = transaction.put({
+        bytes,
+        sha256: identity.sha256,
+        size_bytes: identity.size_bytes,
+      });
+      expect({ path: identity.path, ...handle }).toEqual(unitObjectIdentity(identity));
+    }
+  });
 }
 
 afterEach(() => {
@@ -458,6 +515,373 @@ describe('durable external certification evidence store', () => {
         evidence_sink_id: 'fixture-evidence-sink',
         repository_roots: [candidate],
         max_blob_bytes: 1024,
+      }),
+    );
+  });
+});
+
+describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', () => {
+  it('commits one ten-package closure and rereads exact contract, receipt and members after store recreation', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture, { reused: true, notRequired: true });
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+    await transaction.verify(evidence.projection);
+    const closure = await invokeSink(fixture.store.authority_owner, () => {
+      const result = transaction.commit(evidence.projection);
+      expect(result).not.toBeInstanceOf(Promise);
+      return result;
+    });
+    expect(closure).toEqual(evidence.closure);
+    expect(closure.members).toHaveLength(22);
+    expect(closure).not.toHaveProperty('packages');
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+    expect(reopened.readUnitMutationEvidenceClosure(evidence.binding)).toEqual(closure);
+    expect(
+      reopened.readUnitMutationEvidenceReceipt({
+        evidence_sink_id: fixture.input.evidence_sink_id,
+        receipt_digest_sha256: closure.receipt.receipt_digest_sha256,
+      }),
+    ).toEqual(closure.receipt);
+    for (const identity of [closure.output_contract, ...closure.members]) {
+      expect(
+        reopened.readUnitMutationEvidenceBlob({
+          binding: evidence.binding,
+          identity: unitObjectIdentity(identity),
+        }),
+      ).toEqual(evidence.objects.get(identity.sha256));
+    }
+    await expect(
+      verifyUnitMutationEvidenceDocuments({
+        closure,
+        expected: evidence.binding,
+        maximum_bytes: fixture.input.max_blob_bytes,
+        read: (identity) =>
+          reopened.readUnitMutationEvidenceBlob({ binding: evidence.binding, identity }),
+      }),
+    ).resolves.toBeUndefined();
+    const summaryMember = closure.members.find((member) => member.path === closure.summary_path);
+    if (summaryMember === undefined) throw new Error('fixture summary missing');
+    const summary = JSON.parse(
+      reopened
+        .readUnitMutationEvidenceBlob({
+          binding: evidence.binding,
+          identity: unitObjectIdentity(summaryMember),
+        })
+        .toString('utf8'),
+    ) as Record<string, unknown>;
+    expect(summary).toMatchObject({
+      aggregate: {
+        packageCount: 11,
+        executedPackageCount: 9,
+        reusedPackageCount: 1,
+        notRequiredPackageCount: 1,
+      },
+    });
+    const escaped = reopened.readUnitMutationEvidenceClosure(evidence.binding);
+    Object.assign(escaped.receipt, { receipt_digest_sha256: '0'.repeat(64) });
+    expect(reopened.readUnitMutationEvidenceClosure(evidence.binding)).toEqual(closure);
+    const packageTransaction = await invokeSink(reopened.authority_owner, () =>
+      reopened.begin([binding('@fixture/publishable')]),
+    );
+    const packages = await invokeSink(reopened.authority_owner, () =>
+      packageTransaction.commit([{ ...binding('@fixture/publishable'), outputs: [] }]),
+    );
+    expect(packages).toEqual([{ ...binding('@fixture/publishable'), outputs: [] }]);
+    expect(reopened.readCertificationOutputClosure(binding('@fixture/publishable'))).toEqual(
+      packages[0],
+    );
+  });
+
+  it('requires the same protected sink owner for begin, put, commit and abort', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    await refusal(() => fixture.store.beginUnitMutationEvidence(evidence.binding));
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    const identity = evidence.projection.output_contract;
+    const bytes = evidence.objects.get(identity.sha256);
+    if (bytes === undefined) throw new Error('fixture contract missing');
+    await refusal(() =>
+      transaction.put({ bytes, sha256: identity.sha256, size_bytes: identity.size_bytes }),
+    );
+    await refusal(() => transaction.commit(evidence.projection));
+    await refusal(() => transaction.abort());
+    const other = storeFixture();
+    await refusal(() =>
+      invokeSink(other.store.authority_owner, () =>
+        transaction.put({
+          bytes,
+          sha256: identity.sha256,
+          size_bytes: identity.size_bytes,
+        }),
+      ),
+    );
+    await invokeSink(fixture.store.authority_owner, () => transaction.abort());
+    await refusal(() => fixture.store.readUnitMutationEvidenceClosure(evidence.binding));
+  });
+
+  it('keeps uncommitted and aborted objects unreadable without a finalized unit receipt', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+    for (const store of [fixture.store, createReleaseCertificationEvidenceStore(fixture.input)]) {
+      await refusal(() => store.readUnitMutationEvidenceClosure(evidence.binding));
+      await refusal(() =>
+        store.readUnitMutationEvidenceReceipt({
+          evidence_sink_id: fixture.input.evidence_sink_id,
+          receipt_digest_sha256: evidence.closure.receipt.receipt_digest_sha256,
+        }),
+      );
+      await refusal(() =>
+        store.readUnitMutationEvidenceBlob({
+          binding: evidence.binding,
+          identity: evidence.projection.output_contract,
+        }),
+      );
+    }
+    await invokeSink(fixture.store.authority_owner, () => transaction.abort());
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () => transaction.commit(evidence.projection)),
+    );
+    await refusal(() => fixture.store.readUnitMutationEvidenceClosure(evidence.binding));
+  });
+
+  it.each(['missing', 'corrupt'] as const)(
+    'refuses %s retained bytes after store recreation',
+    async (fault) => {
+      const fixture = storeFixture();
+      const evidence = await unitEvidence(fixture);
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.beginUnitMutationEvidence(evidence.binding),
+      );
+      await putUnitDocuments(fixture, evidence, transaction);
+      await transaction.verify(evidence.projection);
+      const closure = await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit(evidence.projection),
+      );
+      const objectPath = join(fixture.evidenceRoot, 'objects', closure.output_contract.sha256);
+      if (fault === 'missing') rmSync(objectPath);
+      else writeFileSync(objectPath, 'corrupt');
+      const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+      await refusal(() =>
+        reopened.readUnitMutationEvidenceBlob({
+          binding: evidence.binding,
+          identity: closure.output_contract,
+        }),
+      );
+      await refusal(() =>
+        verifyUnitMutationEvidenceDocuments({
+          closure,
+          expected: evidence.binding,
+          maximum_bytes: fixture.input.max_blob_bytes,
+          read: (identity) =>
+            reopened.readUnitMutationEvidenceBlob({ binding: evidence.binding, identity }),
+        }),
+      );
+    },
+  );
+
+  it('refuses foreign candidate, mapping, sink, and retained-object references', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+    await transaction.verify(evidence.projection);
+    const closure = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit(evidence.projection),
+    );
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+    for (const changed of [
+      { candidate_commit: '0'.repeat(40) },
+      { candidate_tree: '0'.repeat(40) },
+      { release_unit: '@fixture/other' },
+      { release_profile_digest_sha256: '0'.repeat(64) },
+      { task_policy_digests_sha256: ['0'.repeat(64)] },
+    ]) {
+      const foreign = { ...evidence.binding, ...changed };
+      await refusal(() => reopened.readUnitMutationEvidenceClosure(foreign));
+      await refusal(() =>
+        reopened.readUnitMutationEvidenceBlob({
+          binding: foreign,
+          identity: closure.output_contract,
+        }),
+      );
+    }
+    await refusal(() =>
+      reopened.readUnitMutationEvidenceReceipt({
+        evidence_sink_id: 'foreign-sink',
+        receipt_digest_sha256: closure.receipt.receipt_digest_sha256,
+      }),
+    );
+    for (const changed of [
+      { path: 'mutation/foreign.json' },
+      { sha256: '0'.repeat(64) },
+      { size_bytes: closure.output_contract.size_bytes + 1 },
+      { evidence_sink_id: 'foreign-sink' },
+      { opaque_handle: `sha256:${'0'.repeat(64)}` },
+    ]) {
+      await refusal(() =>
+        reopened.readUnitMutationEvidenceBlob({
+          binding: evidence.binding,
+          identity: { ...closure.output_contract, ...changed },
+        }),
+      );
+    }
+  });
+
+  it('retains failed semantic bytes but consumes the transaction without issuing a receipt or allowing retry', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+    const invalid = structuredClone(evidence.projection);
+    const reports = invalid.members.filter(
+      (member) => member.document_kind === 'mutation-normalized-stryker-report-v2',
+    );
+    const first = reports[0],
+      second = reports[1];
+    if (first === undefined || second === undefined) throw new Error('fixture reports missing');
+    const firstName = first.package_name;
+    Object.assign(first, { package_name: second.package_name });
+    Object.assign(second, { package_name: firstName });
+    await refusal(() => transaction.verify(invalid));
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () => transaction.commit(invalid)),
+    );
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () => transaction.commit(evidence.projection)),
+    );
+    await refusal(() => invokeSink(fixture.store.authority_owner, () => transaction.abort()));
+    await refusal(() => fixture.store.readUnitMutationEvidenceClosure(evidence.binding));
+    expect(
+      readFileSync(
+        join(fixture.evidenceRoot, 'objects', evidence.projection.output_contract.sha256),
+      ),
+    ).toEqual(evidence.objects.get(evidence.projection.output_contract.sha256));
+    expect(
+      readdirSync(join(fixture.evidenceRoot, 'unit-mutation', transaction.transaction_handle)),
+    ).not.toContain('commit.json');
+  });
+
+  it('allows exactly one commit for two begun transactions with the same binding', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const first = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    const second = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, first);
+    await putUnitDocuments(fixture, evidence, second);
+    await first.verify(evidence.projection);
+    await second.verify(evidence.projection);
+    const closure = await invokeSink(fixture.store.authority_owner, () =>
+      first.commit(evidence.projection),
+    );
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () => second.commit(evidence.projection)),
+    );
+    expect(
+      createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
+        evidence.binding,
+      ),
+    ).toEqual(closure);
+  });
+
+  it.each(['unverified', 'changed-projection', 'changed-bytes'] as const)(
+    'refuses a synchronous commit with %s evidence',
+    async (fault) => {
+      const fixture = storeFixture();
+      const evidence = await unitEvidence(fixture);
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.beginUnitMutationEvidence(evidence.binding),
+      );
+      await putUnitDocuments(fixture, evidence, transaction);
+      if (fault !== 'unverified') await transaction.verify(evidence.projection);
+      const projection = structuredClone(evidence.projection);
+      if (fault === 'changed-projection') {
+        Object.assign(projection.output_contract, { path: 'mutation/renamed-contract.json' });
+      } else if (fault === 'changed-bytes') {
+        const path = join(fixture.evidenceRoot, 'objects', projection.output_contract.sha256);
+        const changed = readFileSync(path);
+        changed[0] = 0;
+        writeFileSync(path, changed);
+      }
+      await refusal(() =>
+        invokeSink(fixture.store.authority_owner, () => transaction.commit(projection)),
+      );
+      await refusal(() => fixture.store.readUnitMutationEvidenceClosure(evidence.binding));
+      expect(
+        readdirSync(join(fixture.evidenceRoot, 'unit-mutation', transaction.transaction_handle)),
+      ).not.toContain('commit.json');
+    },
+  );
+
+  it.each(['completed', 'in-flight'] as const)(
+    'invalidates %s semantic verification when a newer verification fails',
+    async (state) => {
+      const fixture = storeFixture();
+      const evidence = await unitEvidence(fixture);
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.beginUnitMutationEvidence(evidence.binding),
+      );
+      await putUnitDocuments(fixture, evidence, transaction);
+      const prior = transaction.verify(evidence.projection);
+      if (state === 'completed') await prior;
+      const invalid = { ...evidence.projection, members: [] };
+      const newer = transaction.verify(invalid);
+      const outcomes = await Promise.allSettled([prior, newer]);
+      expect(outcomes[1]?.status).toBe('rejected');
+      await refusal(() =>
+        invokeSink(fixture.store.authority_owner, () => transaction.commit(evidence.projection)),
+      );
+      await refusal(() => fixture.store.readUnitMutationEvidenceClosure(evidence.binding));
+    },
+  );
+
+  it('refuses a copied second durable transaction even if its closure and binding are identical', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+    await transaction.verify(evidence.projection);
+    const closure = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit(evidence.projection),
+    );
+    const duplicate = randomUUID();
+    cpSync(
+      join(fixture.evidenceRoot, 'unit-mutation', transaction.transaction_handle),
+      join(fixture.evidenceRoot, 'unit-mutation', duplicate),
+      { recursive: true },
+    );
+    writeFileSync(
+      join(fixture.evidenceRoot, 'unit-mutation', duplicate, 'begin.json'),
+      canonicalBytes({
+        evidence_sink_id: fixture.input.evidence_sink_id,
+        transaction_handle: duplicate,
+        binding: evidence.binding,
+      }),
+    );
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+    await refusal(() => reopened.readUnitMutationEvidenceClosure(evidence.binding));
+    await refusal(() =>
+      reopened.readUnitMutationEvidenceReceipt({
+        evidence_sink_id: fixture.input.evidence_sink_id,
+        receipt_digest_sha256: closure.receipt.receipt_digest_sha256,
       }),
     );
   });
