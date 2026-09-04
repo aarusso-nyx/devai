@@ -24,6 +24,7 @@ export interface ReleasePackageSnapshot {
     readonly sha256: string;
   }[];
   readonly read: (path: string) => Buffer;
+  readonly readArchive: () => Buffer;
 }
 
 const INVALID = 'rpl-package-identity-mismatch';
@@ -218,6 +219,7 @@ export function verifyReleasePackageSnapshot(input: {
     const snapshot = Object.freeze({
       identity: Object.freeze(expected),
       manifest: Object.freeze(manifest),
+      readArchive: (): Buffer => Buffer.from(archive),
       read: (path: string): Buffer => {
         const file = population.get(path);
         return file === undefined ? fail() : Buffer.from(file.bytes);
