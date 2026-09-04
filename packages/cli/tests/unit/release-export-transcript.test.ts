@@ -138,6 +138,80 @@ describe('release export transcript transport', () => {
         ),
       }),
     ],
+    [
+      'an installed archive identity',
+      (value: ReleaseExportTranscript) => ({
+        ...value,
+        closures: value.closures.map((closure, index) =>
+          index === 0
+            ? {
+                ...closure,
+                expected_installed_package: {
+                  ...closure.expected_installed_package,
+                  archive_sha256: DIGEST('other archive'),
+                },
+              }
+            : closure,
+        ),
+      }),
+    ],
+    [
+      'an installed content-manifest identity',
+      (value: ReleaseExportTranscript) => ({
+        ...value,
+        closures: value.closures.map((closure, index) =>
+          index === 0
+            ? {
+                ...closure,
+                expected_installed_package: {
+                  ...closure.expected_installed_package,
+                  content_manifest_sha256: DIGEST('other content manifest'),
+                },
+              }
+            : closure,
+        ),
+      }),
+    ],
+    [
+      'the prepared parent commit identity',
+      (value: ReleaseExportTranscript) => ({
+        ...value,
+        binding: {
+          ...value.binding,
+          parent_artifact_sink: {
+            ...value.binding.parent_artifact_sink,
+            committed_manifest_sha256: DIGEST('other commit'),
+          },
+        },
+      }),
+    ],
+    [
+      'a prepared parent artifact identity',
+      (value: ReleaseExportTranscript) => ({
+        ...value,
+        parent: value.parent.map((parent, index) =>
+          index === 0 ? { ...parent, sha256: DIGEST('other parent') } : parent,
+        ),
+      }),
+    ],
+    [
+      'the lifecycle attempt identity',
+      (value: ReleaseExportTranscript) => ({
+        ...value,
+        binding: { ...value.binding, attempt_id: 'RLA-fedcba9876543210' },
+      }),
+    ],
+    [
+      'the repository and candidate identity',
+      (value: ReleaseExportTranscript) => ({
+        ...value,
+        binding: {
+          ...value.binding,
+          repository: { ...value.binding.repository, commit: 'c'.repeat(40) },
+          candidate: { ...value.binding.candidate, commit: 'c'.repeat(40) },
+        },
+      }),
+    ],
   ])(
     'refuses bytes that differ from the independently expected transcript: %s',
     (_label, alter) => {
@@ -161,6 +235,131 @@ describe('release export transcript transport', () => {
         { ...value, trust: { ...value.trust, trust_root_id: 'other/trust' } },
         LIMITS,
       ),
+    );
+  });
+
+  it('rejects nested unknown keys, symbols, and accessors without invoking an accessor', () => {
+    const value = transcript();
+    refusal(() =>
+      encodeReleaseExportTranscript(
+        {
+          ...value,
+          closures: [
+            { ...value.closures[0], unexpected: true },
+            ...(value.closures.slice(1) as ReleaseExportTranscript['closures']),
+          ],
+        } as ReleaseExportTranscript,
+        LIMITS,
+      ),
+    );
+    refusal(() =>
+      encodeReleaseExportTranscript(
+        {
+          ...value,
+          parent: [
+            { ...value.parent[0], [Symbol('unexpected')]: true },
+            ...(value.parent.slice(1) as ReleaseExportTranscript['parent']),
+          ],
+        } as ReleaseExportTranscript,
+        LIMITS,
+      ),
+    );
+    let accesses = 0;
+    const binding = { ...value.binding } as Record<string, unknown>;
+    Object.defineProperty(binding, 'attempt_id', {
+      enumerable: true,
+      get: () => {
+        accesses += 1;
+        return 'RLA-0123456789abcdef';
+      },
+    });
+    refusal(() =>
+      encodeReleaseExportTranscript(
+        { ...value, binding } as unknown as ReleaseExportTranscript,
+        LIMITS,
+      ),
+    );
+    expect(accesses).toBe(0);
+  });
+
+  it('retains distinct handles for byte-identical artifacts and refuses shared handles', () => {
+    const value = transcript();
+    const equalBytes = {
+      ...value,
+      parent: value.parent.map((parent, index) =>
+        index === 1 ? { ...parent, sha256: value.parent[0]?.sha256 ?? '' } : parent,
+      ),
+    };
+    const equalBytesTranscript = encodeReleaseExportTranscript(equalBytes, LIMITS);
+    expect(
+      verifyReleaseExportTranscript(equalBytesTranscript, equalBytes, LIMITS).parent,
+    ).toHaveLength(6);
+    refusal(() =>
+      encodeReleaseExportTranscript(
+        {
+          ...value,
+          parent: value.parent.map((parent, index) =>
+            index === 1
+              ? { ...parent, opaque_handle: value.parent[0]?.opaque_handle ?? '' }
+              : parent,
+          ),
+        },
+        LIMITS,
+      ),
+    );
+  });
+
+  it('rejects incomplete or type-confused parent and closure populations', () => {
+    const value = transcript();
+    refusal(() =>
+      encodeReleaseExportTranscript({ ...value, parent: value.parent.slice(1) }, LIMITS),
+    );
+    refusal(() =>
+      encodeReleaseExportTranscript(
+        {
+          ...value,
+          parent: [
+            artifact('package-manifest', 'manifest-a', 'manifest-a'),
+            artifact('package-manifest', 'manifest-b', 'manifest-b'),
+            artifact('package-manifest', 'manifest-c', 'manifest-c'),
+            artifact('package-sbom', 'sbom-a', 'sbom-a'),
+            artifact('package-tarball', 'tarball-a', 'tarball-a'),
+            artifact('package-tarball', 'tarball-b', 'tarball-b'),
+          ],
+        },
+        LIMITS,
+      ),
+    );
+    refusal(() =>
+      encodeReleaseExportTranscript({ ...value, closures: value.closures.slice(1) }, LIMITS),
+    );
+    const secondClosure = value.closures[1];
+    if (secondClosure === undefined) throw new Error('fixture closure missing');
+    const extraClosure = {
+      ...secondClosure,
+      package_id: '@fixture/c',
+      evidence_manifest: artifact('evidence-manifest', 'closure-c', 'closure-c'),
+    };
+    const extraPopulation: ReleaseExportTranscript = {
+      ...value,
+      parent: [
+        ...value.parent,
+        artifact('package-manifest', 'manifest-c', 'manifest-c'),
+        artifact('package-sbom', 'sbom-c', 'sbom-c'),
+        artifact('package-tarball', 'tarball-c', 'tarball-c'),
+      ].sort((left, right) => {
+        const key = (entry: OpaqueArtifactIdentity) =>
+          `${entry.kind}\0${entry.sink_id}\0${entry.opaque_handle}\0${entry.sha256}\0${entry.size_bytes}`;
+        return Buffer.compare(Buffer.from(key(left)), Buffer.from(key(right)));
+      }),
+      closures: [...value.closures, extraClosure],
+    };
+    const extraBytes = encodeReleaseExportTranscript(extraPopulation, {
+      ...LIMITS,
+      maximum_packages: 3,
+    });
+    refusal(() =>
+      verifyReleaseExportTranscript(extraBytes, value, { ...LIMITS, maximum_packages: 3 }),
     );
   });
 
@@ -261,5 +460,9 @@ describe('release export transcript transport', () => {
     refusal(() =>
       verifyReleaseExportProviderResult(Buffer.from(canonicalJson(altered)), input, LIMITS),
     );
+    refusal(() => verifyReleaseExportTranscript(Buffer.from([0xc3]), value, LIMITS));
+    refusal(() => verifyReleaseExportProviderResult(Buffer.from([0xc3]), input, LIMITS));
+    refusal(() => verifyReleaseExportProviderResult(encoded, input, LIMITS));
+    refusal(() => verifyReleaseExportTranscript(bytes, value, LIMITS));
   });
 });
