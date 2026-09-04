@@ -251,7 +251,7 @@ describe('durable external release artifact store', () => {
   it('never exposes uncommitted or aborted objects to the committed reader', async () => {
     const value = fixture();
     const store = createReleaseArtifactStore(value.input);
-    await refusal(() => store.begin(beginInput()));
+    expect(() => store.begin(beginInput())).toThrow('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
     const transaction = await invokePrepare(value.binding, () => store.begin(beginInput()));
     const receipt = await invokePrepare(value.binding, () =>
       transaction.put(object('package-manifest', 'pending', Buffer.from('pending'))),
