@@ -2,7 +2,15 @@ import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createReleasePrepareProvider,
+  createAuthorityDecisionIssuer,
+  runWithAuthorityHostEffects,
+  withProtectedReleasePrepareCapacity,
+  type AuthorityHostEffectScope,
+  type ProtectedReleasePrepareCapacityBinding,
+} from '@devai-nyx/authority';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import {
+  createReleasePrepareProvider as createKernelReleasePrepareProvider,
   finalizeCertificationManifest,
   finalizeCertificationReceipt,
   RELEASE_PACK_SPEC_CANONICAL_BYTES,
@@ -11,6 +19,7 @@ import {
   reverifySinkArtifacts,
   type ArtifactSinkObject,
   type ArtifactSinkObjectReceipt,
+  type CertificationOutputClosureBinding,
   type ImmutableReleaseContentSource,
   type TrustedArtifactSink,
 } from '../../src/services/release-prepare-kernel.js';
@@ -22,6 +31,60 @@ import type {
 
 const TASK_POLICY = '3'.repeat(64);
 const CERTIFICATION_EVIDENCE = '4'.repeat(64);
+
+async function withKernelPrepareCapacity<T>(
+  request: ReleaseLifecycleRequest,
+  callback: () => Promise<T>,
+  available: Readonly<{ batches: number; targets: number }> = { batches: 256, targets: 8192 },
+): Promise<T> {
+  const plan = request.receipt_locators?.find((receipt) => receipt.kind === 'release-plan-receipt');
+  if (plan === undefined) throw new Error('test release plan receipt missing');
+  let ordinal = 0;
+  const issuer = createAuthorityDecisionIssuer({
+    issuer_id: 'release-prepare-kernel-capacity-test',
+    issuer_version: '1.0.0',
+    invocation_id: 'release-prepare-kernel-capacity-test',
+    canonicalSha256,
+    randomId: () => `release-prepare-kernel-capacity-${String(++ordinal)}`,
+    now: () => '2026-09-03T00:00:00.000Z',
+    receipt_ttl_ms: 30_000,
+  });
+  const binding: ProtectedReleasePrepareCapacityBinding = {
+    action_id: 'release prepare',
+    repository: request.repository_locator,
+    candidate: {
+      commit: request.candidate_locator.commit,
+      tree: request.candidate_locator.tree,
+    },
+    plan_receipt_digest_sha256: plan.receipt_digest_sha256,
+  };
+  const scope: AuthorityHostEffectScope = {
+    action_id: 'release prepare',
+    invocation_id: 'release-prepare-kernel-capacity-test',
+    effect: 'local-write',
+    receipt_store: issuer,
+    apply_effect: (_request, apply) => apply(),
+    read_prepare_capacity: (selected) => {
+      expect(selected).toEqual(binding);
+      return { remaining_batches: available.batches, remaining_targets: available.targets };
+    },
+  };
+  try {
+    return await runWithAuthorityHostEffects(scope, () =>
+      withProtectedReleasePrepareCapacity(binding, callback),
+    );
+  } finally {
+    issuer.dispose();
+  }
+}
+
+function createReleasePrepareProvider(
+  input: Parameters<typeof createKernelReleasePrepareProvider>[0],
+): ReturnType<typeof createKernelReleasePrepareProvider> {
+  const provider = createKernelReleasePrepareProvider(input);
+  return async (request) =>
+    await withKernelPrepareCapacity(request, () => Promise.resolve(provider(request)));
+}
 
 function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -277,13 +340,59 @@ function memorySink(
   return { sink: { begin } satisfies TrustedArtifactSink, begin, abort, bytes };
 }
 
+function fixtureWithGeneratedPath(path: string) {
+  const value = fixture();
+  const entry = value.certificationManifest.entries[0];
+  if (entry === undefined || entry.immutable_blob_locator.kind !== 'generated-output') {
+    throw new Error('generated entry missing');
+  }
+  const locator = entry.immutable_blob_locator;
+  (entry as { path: string }).path = path;
+  const { manifest_digest_sha256: _digest, ...draft } = value.certificationManifest;
+  (value.certificationManifest as { manifest_digest_sha256: string }).manifest_digest_sha256 =
+    finalizeCertificationManifest(draft).manifest_digest_sha256;
+  return {
+    value,
+    source: {
+      ...value.source,
+      readCertificationOutputClosure: (binding: CertificationOutputClosureBinding) => ({
+        ...binding,
+        outputs: [
+          {
+            path,
+            mode: entry.mode,
+            output_blob_handle: locator.output_blob_handle,
+            certification_evidence_receipt: locator.certification_evidence_receipt,
+          },
+        ],
+      }),
+    },
+  };
+}
+
+function preparedTarball(
+  result: Awaited<ReturnType<ReturnType<typeof createReleasePrepareProvider>>>,
+  target: ReturnType<typeof memorySink>,
+): Buffer {
+  if (result.outcome !== 'success' || result.material === undefined) {
+    throw new Error(`prepare failed: ${result.code ?? 'unknown'}`);
+  }
+  const tarball = result.material.release_units[0]?.packages[0]?.package_tarball;
+  if (tarball === null || tarball === undefined || !('opaque_handle' in tarball)) {
+    throw new Error('tarball missing');
+  }
+  return target.bytes.get(tarball.opaque_handle) ?? Buffer.alloc(0);
+}
+
 function tarEntries(tarball: Buffer) {
   const tar = gunzipSync(tarball);
   const values: { path: string; mode: number; bytes: Buffer }[] = [];
   for (let offset = 0; offset + 512 <= tar.byteLength;) {
     const header = tar.subarray(offset, offset + 512);
     if (header.every((byte) => byte === 0)) break;
-    const path = header.subarray(0, 100).toString('utf8').replace(/\0.*$/u, '');
+    const name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/u, '');
+    const prefix = header.subarray(345, 500).toString('utf8').replace(/\0.*$/u, '');
+    const path = prefix.length === 0 ? name : `${prefix}/${name}`;
     const mode = Number.parseInt(
       header.subarray(100, 108).toString('ascii').replace(/\0.*$/u, ''),
       8,
@@ -713,6 +822,99 @@ describe('pure release prepare kernel', () => {
     );
     await result.transaction?.rollback();
   });
+
+  it.each([
+    ['the exact 100-byte name', 'a'.repeat(92), `package/${'a'.repeat(92)}`, ''],
+    [
+      'a 101-byte path at its rightmost valid separator',
+      `a/${'b'.repeat(91)}`,
+      'b'.repeat(91),
+      'package/a',
+    ],
+    [
+      'the real 102-byte scaffold template',
+      'dist/resources/operations/scaffold/templates/api/controllers/__kebabEntity__.controller.ts.tpl',
+      '__kebabEntity__.controller.ts.tpl',
+      'package/dist/resources/operations/scaffold/templates/api/controllers',
+    ],
+    [
+      'a UTF-8 boundary without splitting a scalar',
+      `${'a'.repeat(147)}/${'é'.repeat(50)}`,
+      'é'.repeat(50),
+      `package/${'a'.repeat(147)}`,
+    ],
+  ] as const)(
+    'retains %s with exact USTAR bytes and reconstruction',
+    async (_name, path, name, prefix) => {
+      const { value, source } = fixtureWithGeneratedPath(path);
+      const archivePath = `package/${path}`;
+      const target = memorySink();
+      const result = await createReleasePrepareProvider({
+        certified_state: value.state,
+        content_source: source,
+        artifact_sink: target.sink,
+      })(value.request);
+      const tarball = preparedTarball(result, target);
+      const header = gunzipSync(tarball).subarray(0, 512);
+      const nameBytes = Buffer.from(name, 'utf8');
+      const prefixBytes = Buffer.from(prefix, 'utf8');
+      expect(header.subarray(0, nameBytes.byteLength)).toEqual(nameBytes);
+      expect(header.subarray(nameBytes.byteLength, 100)).toEqual(
+        Buffer.alloc(100 - nameBytes.byteLength),
+      );
+      expect(header.subarray(345, 345 + prefixBytes.byteLength)).toEqual(prefixBytes);
+      expect(header.subarray(345 + prefixBytes.byteLength, 500)).toEqual(
+        Buffer.alloc(155 - prefixBytes.byteLength),
+      );
+      expect(prefix.length === 0 ? name : `${prefix}/${name}`).toBe(archivePath);
+      expect(tarEntries(tarball).map((entry) => entry.path)).toContain(archivePath);
+      await result.transaction?.rollback();
+    },
+  );
+
+  it.each([
+    [
+      'a 156-byte prefix',
+      `${'a'.repeat(148)}/${'b'.repeat(100)}`,
+      'release-prepare-unsupported-package-semantics',
+    ],
+    [
+      'a 101-byte suffix',
+      `${'a'.repeat(147)}/${'b'.repeat(101)}`,
+      'release-prepare-unsupported-package-semantics',
+    ],
+    [
+      'an unsplittable 101-byte name',
+      'a'.repeat(101),
+      'release-prepare-unsupported-package-semantics',
+    ],
+    [
+      'an invalid Unicode scalar',
+      `dir/${String.fromCharCode(0xd800)}`,
+      'release-prepare-certification-manifest-invalid',
+    ],
+    [
+      'an unsafe dot-dot segment',
+      'dir/../file.js',
+      'release-prepare-certification-manifest-invalid',
+    ],
+  ] as const)(
+    'refuses %s after complete verification or manifest rejection, before sink.begin',
+    async (_name, path, code) => {
+      const { value, source } = fixtureWithGeneratedPath(path);
+      const target = memorySink();
+      const result = await createReleasePrepareProvider({
+        certified_state: value.state,
+        content_source: source,
+        artifact_sink: target.sink,
+      })(value.request);
+      expect(result).toMatchObject({
+        outcome: 'failure',
+        code,
+      });
+      expect(target.begin).not.toHaveBeenCalled();
+    },
+  );
 
   it('aborts a pre-commit failure and preserves an uncertain commit attempt for inspection', async () => {
     const value = fixture();
