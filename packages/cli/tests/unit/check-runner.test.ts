@@ -494,9 +494,19 @@ describe('content-addressed check runner', () => {
     expect(actual.tasks.find((task) => task.nodeId === 'test:local-full')?.dependencies).toContain(
       'test:schemas',
     );
-    expect(actual.tasks.find((task) => task.nodeId === 'build')?.outputContract).toMatchObject({
-      paths: ['scratch/coverage/rc-reachable-sources.json'],
-    });
+    expect(actual.tasks.find((task) => task.nodeId === 'build')?.outputContract?.paths).toEqual([
+      'scratch/coverage/rc-reachable-sources.json',
+      'packages/authority/tsconfig.tsbuildinfo',
+      'packages/cli/tsconfig.tsbuildinfo',
+      'packages/effects-check/tsconfig.tsbuildinfo',
+      'packages/evidence/tsconfig.tsbuildinfo',
+      'packages/loop/tsconfig.tsbuildinfo',
+      'packages/schemas/tsconfig.tsbuildinfo',
+      'packages/sensors/tsconfig.tsbuildinfo',
+      'packages/skills/tsconfig.tsbuildinfo',
+      'packages/spec/tsconfig.tsbuildinfo',
+      'packages/utils/tsconfig.tsbuildinfo',
+    ]);
     expect(actual.tasks.find((task) => task.nodeId === 'test:coverage:rc')?.dependencies).toEqual([
       'build',
     ]);
