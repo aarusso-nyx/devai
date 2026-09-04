@@ -340,6 +340,77 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": { "action_id": { "const": "release export" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "local-write" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release export" },
+                    "effect": { "const": "local-write" },
+                    "capabilities": {
+                      "const": [
+                        "fs:f5-state",
+                        "fs:proofs",
+                        "fs:workspace",
+                        "proc:git",
+                        "artifact-sink:write",
+                        "protected-export-signer-v1:sign"
+                      ]
+                    },
+                    "planner": {
+                      "const": {
+                        "kind": "bounded-batches",
+                        "planner_id": "release-export-bounded-plan",
+                        "target_kinds": ["fs", "artifact-sink", "protected-export-signer"],
+                        "bounds": {
+                          "max_batches": 128,
+                          "max_targets_per_batch": 64,
+                          "max_total_targets": 8192
+                        },
+                        "recovery": "preserve-and-report"
+                      }
+                    },
+                    "boundary": {
+                      "properties": {
+                        "kind": { "const": "mutation-adapters" },
+                        "adapter_ids": {
+                          "const": [
+                            "fs-authority-boundary",
+                            "trusted-export-artifact-sink-v1",
+                            "protected-export-signer-v1"
+                          ]
+                        },
+                        "final_reverification": { "const": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "authority_contract": {
+                  "properties": {
+                    "capabilities": {
+                      "contains": { "const": "protected-export-signer-v1:sign" }
+                    }
+                  },
+                  "required": ["capabilities"]
+                }
+              },
+              "required": ["authority_contract"]
+            },
+            "then": {
+              "properties": { "action_id": { "const": "release export" } }
+            }
           }
         ]
       }
@@ -511,7 +582,8 @@
                   "db:unclassified",
                   "host-cache:write",
                   "protected-certification-provider-v3:execute",
-                  "certification-evidence-sink:write"
+                  "certification-evidence-sink:write",
+                  "protected-export-signer-v1:sign"
                 ]
               },
               {
@@ -709,7 +781,8 @@
                       "remote",
                       "artifact-sink",
                       "protected-certification-provider",
-                      "certification-evidence-sink"
+                      "certification-evidence-sink",
+                      "protected-export-signer"
                     ]
                   }
                 },
@@ -742,7 +815,8 @@
                       "remote",
                       "artifact-sink",
                       "protected-certification-provider",
-                      "certification-evidence-sink"
+                      "certification-evidence-sink",
+                      "protected-export-signer"
                     ]
                   }
                 },
