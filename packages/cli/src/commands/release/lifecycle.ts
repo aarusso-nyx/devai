@@ -21,6 +21,7 @@ import {
   type OfflineVerificationProvider,
   type PersistedReleaseAction,
   type PublicationControls,
+  type PublicationSignatureVerifier,
   type ReleaseLifecycleRequest,
   type ReleasePlanInputResolver,
   type ReleaseProvider,
@@ -101,6 +102,9 @@ export interface ReleaseLifecycleCommandAdapters {
   readonly publication_controls: (
     request: ReleaseLifecycleRequest,
   ) => PublicationControls | undefined;
+  readonly publication_signature_verifier?: (
+    request: ReleaseLifecycleRequest,
+  ) => PublicationSignatureVerifier | undefined;
   readonly prepare_content_source?: (
     request: ReleaseLifecycleRequest,
   ) => ImmutableReleaseContentSource | undefined;
@@ -655,7 +659,7 @@ export const releaseResume = defineCommand({
           if (first === undefined && request === undefined) {
             throw new Error('an empty state chain requires an exact release resume request');
           }
-          const repository = first?.repository ?? request?.repository_locator;
+          const repository = request?.repository_locator ?? first?.repository;
           const firstUnit = request?.candidate_locator.release_units[0];
           const requestedCandidate =
             request === undefined || firstUnit === undefined
@@ -666,7 +670,7 @@ export const releaseResume = defineCommand({
                   commit: request.candidate_locator.commit,
                   tree: request.candidate_locator.tree,
                 };
-          const candidate = first?.candidate ?? requestedCandidate;
+          const candidate = requestedCandidate ?? first?.candidate;
           if (repository === undefined || candidate === undefined) {
             throw new Error('release resume identity is unavailable');
           }
@@ -679,13 +683,7 @@ export const releaseResume = defineCommand({
           if (!Array.isArray(storeRecords)) throw new Error('store records must be a JSON array');
           const receipts = options.receipts === undefined ? [] : readPinnedJson(options.receipts);
           if (!Array.isArray(receipts)) throw new Error('receipts must be a JSON array');
-          const locatedReceipts = new Map(
-            (request?.receipt_locators ?? []).map((locator) => [
-              locator.path,
-              readContainedJson(root, locator.path),
-            ]),
-          );
-          const currentPlan = [...receipts, ...locatedReceipts.values()].some(
+          const currentPlan = receipts.some(
             (receipt: unknown) =>
               receipt !== null &&
               typeof receipt === 'object' &&
@@ -699,7 +697,7 @@ export const releaseResume = defineCommand({
             currentPlan
               ? resolvePolicyFor({
                   repository_id: repository.id,
-                  candidate,
+                  candidate: { commit: candidate.commit, tree: candidate.tree },
                   release_unit: candidate.release_unit,
                 })
               : undefined,
@@ -716,14 +714,6 @@ export const releaseResume = defineCommand({
             candidate,
             ...(request === undefined ? {} : { candidate_locator: request.candidate_locator }),
             receipt_documents: receipts,
-            ...(request?.receipt_locators === undefined
-              ? {}
-              : {
-                  receipt_locators: request.receipt_locators,
-                  resolve_receipt: (
-                    locator: NonNullable<ReleaseLifecycleRequest['receipt_locators']>[number],
-                  ) => locatedReceipts.get(locator.path),
-                }),
             resolve_plan_input: resolvers.plan,
             ...(request === undefined
               ? {}
@@ -734,9 +724,13 @@ export const releaseResume = defineCommand({
               ? {}
               : {
                   publication_receipt: readPinnedJson(options.publicationReceipt),
-                  // Trust material is deliberately external. The stock CLI
-                  // cannot derive published without an injected verifier.
-                  verify_signature: () => false,
+                  // Only trusted host code supplies verification against external
+                  // trust. Receipt bytes and CLI locators never choose a verifier.
+                  verify_signature:
+                    (request === undefined
+                      ? undefined
+                      : commandAdapters?.publication_signature_verifier?.(request)) ??
+                    (() => false),
                 }),
           });
           process.stdout.write(

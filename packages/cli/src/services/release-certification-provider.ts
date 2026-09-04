@@ -534,7 +534,13 @@ export function createContainerReleaseCertificationAdapters(
     } catch (error) {
       return {
         outcome: 'failure',
-        code: error instanceof Error ? error.message : 'release-certification-task-failed',
+        // Native/tool diagnostics are not ledger codes and can expose host paths.
+        // Keep the original failure terminal instead of making its record fail
+        // schema validation and leaving only an ambiguous attempt behind.
+        code:
+          error instanceof Error && /^release-[a-z0-9-]+$/u.test(error.message)
+            ? error.message
+            : 'release-certification-task-failed',
       };
     } finally {
       active = false;
