@@ -46,12 +46,13 @@ describe('resolveCliVersion', () => {
   });
 
   it('keeps current consumer documentation on the published exact release without mutable installs', () => {
-    const documents = [
-      'README.md',
-      'docs/adopters/install.md',
-      'docs/index.md',
-      'docs/site/src/pages/index.tsx',
-    ].map((path) => ({ path, content: readFileSync(join(ROOT, path), 'utf8') }));
+    // The published site's landing page is bound to the staged package version by
+    // release-package-staging.test.ts, so it names the candidate rather than the
+    // published release. Only the documents carrying install commands belong here.
+    const documents = ['README.md', 'docs/adopters/install.md', 'docs/index.md'].map((path) => ({
+      path,
+      content: readFileSync(join(ROOT, path), 'utf8'),
+    }));
 
     for (const { path, content } of documents) {
       expect.soft(content, path).toContain(PUBLISHED_RELEASE_VERSION);

@@ -266,6 +266,7 @@
                       "const": [
                         "fs:f5-state",
                         "fs:proofs",
+                        "proc:git",
                         "protected-certification-provider-v3:execute",
                         "certification-evidence-sink:write"
                       ]
@@ -312,7 +313,7 @@
                     "action_id": { "const": "release prepare" },
                     "effect": { "const": "local-write" },
                     "capabilities": {
-                      "const": ["fs:f5-state", "fs:proofs", "artifact-sink:write"]
+                      "const": ["fs:f5-state", "fs:proofs", "proc:git", "artifact-sink:write"]
                     },
                     "planner": {
                       "const": {

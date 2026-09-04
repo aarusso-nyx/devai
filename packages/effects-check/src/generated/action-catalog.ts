@@ -118,6 +118,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: [
       'fs:f5-state',
       'fs:proofs',
+      'proc:git',
       'protected-certification-provider-v3:execute',
       'certification-evidence-sink:write',
     ],
@@ -180,7 +181,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'release prepare',
     public_action_id: 'release prepare',
     effect: 'local-write',
-    capabilities: ['fs:f5-state', 'fs:proofs', 'artifact-sink:write'],
+    capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git', 'artifact-sink:write'],
   },
   {
     action_id: 'release publish',

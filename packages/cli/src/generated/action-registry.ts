@@ -948,6 +948,7 @@ export const ACTION_REGISTRY = [
       capabilities: [
         'fs:f5-state',
         'fs:proofs',
+        'proc:git',
         'protected-certification-provider-v3:execute',
         'certification-evidence-sink:write',
       ],
@@ -1459,7 +1460,7 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'release prepare',
       effect: 'local-write',
-      capabilities: ['fs:f5-state', 'fs:proofs', 'artifact-sink:write'],
+      capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git', 'artifact-sink:write'],
       subject: {
         kind: 'human',
         allowed_roles: ['architect'],

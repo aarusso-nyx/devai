@@ -61,12 +61,16 @@ describe('release prepare v3 policy', () => {
     const kernel = policy.execution_contract.prepare_kernel;
     expect(validatePolicy(policy), JSON.stringify(validatePolicy.errors)).toBe(true);
     expect(policySchema.examples[0]?.execution_contract.prepare_kernel).toEqual(kernel);
-    expect(kernel.kernel_id).toBe('devai.kernel.release-prepare.v3');
+    expect(kernel.kernel_id).toBe('devai.kernel.release-prepare.v4');
     expect(kernel.stock_composition).toEqual({
       built_in_actions: ['release plan', 'release preflight', 'release resume'],
+      preflight:
+        'built-in-orchestration-requires-injected-execution-only-protected-preflight;missing-or-mismatched-helper-refuses-without-ambient-fallback',
       certify:
         'requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only',
       prepare: 'requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink',
+      export:
+        'requires-injected-dedicated-export-extension-sink-and-protected-aggregate-signer-and-has-no-stock-pathname-or-unprotected-provider-fallback',
     });
     expect(kernel.certification_manifest.entry_fields).toEqual([
       'path',
@@ -101,9 +105,9 @@ describe('release prepare v3 policy', () => {
     expect(kernel.content_source.generated_output).toContain(
       'opaque-content-addressed-evidence-sink-handle',
     );
-    expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v3');
+    expect(kernel.pack.pack_spec_id).toBe('devai.pure-npm-compatible-pack.v4');
     expect(kernel.pack.pack_spec_digest_sha256).toBe(
-      'd287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd',
+      '46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316',
     );
     expect(createHash('sha256').update(kernel.pack.pack_spec_canonical_bytes).digest('hex')).toBe(
       kernel.pack.pack_spec_digest_sha256,
@@ -116,7 +120,7 @@ describe('release prepare v3 policy', () => {
       'BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
-      'creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent',
+      'creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v4];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent',
     );
     expect(kernel.pack.pack_spec_canonical_bytes).toContain(
       'package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value))',
@@ -168,6 +172,8 @@ describe('release prepare v3 policy', () => {
       'release-artifact-sink-commit-unknown',
       'release-artifact-sink-abort-failed',
       'release-downstream-artifact-reverification-failed',
+      'release-prepare-capacity-unavailable',
+      'release-prepare-capacity-insufficient',
     ]);
     expect(policy.execution_contract.state_semantic_kernel.algorithm).toContain(
       'require-release-certify-to-emit-one-complete-candidate-tree-task-policy-bound-package-entry-manifest-per-package-before-a-v3-prepare',
@@ -194,11 +200,13 @@ describe('release prepare v3 policy', () => {
     expect(action?.authority_contract.capabilities).toEqual([
       'fs:f5-state',
       'fs:proofs',
+      'proc:git',
       'artifact-sink:write',
     ]);
     expect(certify?.authority_contract.capabilities).toEqual([
       'fs:f5-state',
       'fs:proofs',
+      'proc:git',
       'protected-certification-provider-v3:execute',
       'certification-evidence-sink:write',
     ]);

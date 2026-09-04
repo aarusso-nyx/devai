@@ -436,7 +436,9 @@
         "state_semantic_kernel"
       ],
       "properties": {
-        "kernel_id": { "const": "devai.kernel.release-execution-contract.v2" },
+        "kernel_id": {
+          "const": "devai.kernel.release-execution-contract.v2"
+        },
         "compatibility": {
           "type": "object",
           "additionalProperties": false,
@@ -456,7 +458,9 @@
             "v1_execution_seams": {
               "const": "legacy-v1-observation-only-and-ignored-by-v2-and-v3-active-kernels-for-generation-head-and-cas-semantics"
             },
-            "client_drafted_state": { "const": "never-trusted" }
+            "client_drafted_state": {
+              "const": "never-trusted"
+            }
           }
         },
         "request": {
@@ -464,7 +468,9 @@
           "additionalProperties": false,
           "required": ["schema", "canonicalization", "recursive_forbidden", "identity_bindings"],
           "properties": {
-            "schema": { "const": "law/schemas/release-lifecycle-request.schema.json" },
+            "schema": {
+              "const": "law/schemas/release-lifecycle-request.schema.json"
+            },
             "canonicalization": {
               "const": "core-hashes-the-closed-request-projection-as-utf-8-rfc8785-jcs"
             },
@@ -511,8 +517,12 @@
             "semantic_kernel"
           ],
           "properties": {
-            "schema": { "const": "law/schemas/release-lifecycle-store-record.schema.json" },
-            "head_schema": { "const": "law/schemas/release-lifecycle-store-head.schema.json" },
+            "schema": {
+              "const": "law/schemas/release-lifecycle-store-record.schema.json"
+            },
+            "head_schema": {
+              "const": "law/schemas/release-lifecycle-store-head.schema.json"
+            },
             "canonicalization": {
               "const": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters"
             },
@@ -521,7 +531,9 @@
               "additionalProperties": false,
               "required": ["head", "attempt", "completion", "failure", "unknown"],
               "properties": {
-                "head": { "const": "{campaign-path}/HEAD.json" },
+                "head": {
+                  "const": "{campaign-path}/HEAD.json"
+                },
                 "attempt": {
                   "const": "{campaign-path}/attempts/{sequence}-{record-digest-sha256}.json"
                 },
@@ -557,7 +569,9 @@
               "additionalProperties": false,
               "required": ["kernel_id", "rules", "errors", "negative_fixtures"],
               "properties": {
-                "kernel_id": { "const": "devai.kernel.release-lifecycle-store.v3" },
+                "kernel_id": {
+                  "const": "devai.kernel.release-lifecycle-store.v3"
+                },
                 "rules": {
                   "const": [
                     "the-opening-attempt-has-null-predecessor_record-and-null-observed_head_before",
@@ -656,22 +670,50 @@
             "ambiguous_outcome"
           ],
           "properties": {
-            "schema": { "const": "law/schemas/release-lifecycle-observation.schema.json" },
-            "emitted_observation_schema_version": { "const": "1.1.0" },
-            "readable_observation_schema_versions": { "const": ["1.0.0", "1.1.0"] },
-            "always_pure": { "const": true },
+            "schema": {
+              "const": "law/schemas/release-lifecycle-observation.schema.json"
+            },
+            "emitted_observation_schema_version": {
+              "const": "1.1.0"
+            },
+            "readable_observation_schema_versions": {
+              "const": ["1.0.0", "1.1.0"]
+            },
+            "always_pure": {
+              "const": true
+            },
             "next_actions": {
               "const": [
-                { "from": "none", "next_action": "release plan", "outcome": "ready" },
-                { "from": "planned", "next_action": "release preflight", "outcome": "ready" },
+                {
+                  "from": "none",
+                  "next_action": "release plan",
+                  "outcome": "ready"
+                },
+                {
+                  "from": "planned",
+                  "next_action": "release preflight",
+                  "outcome": "ready"
+                },
                 {
                   "from": "preflight_passed",
                   "next_action": "release certify",
                   "outcome": "ready"
                 },
-                { "from": "certified", "next_action": "release prepare", "outcome": "ready" },
-                { "from": "prepared", "next_action": "release export", "outcome": "ready" },
-                { "from": "exported", "next_action": "release offline-verify", "outcome": "ready" },
+                {
+                  "from": "certified",
+                  "next_action": "release prepare",
+                  "outcome": "ready"
+                },
+                {
+                  "from": "prepared",
+                  "next_action": "release export",
+                  "outcome": "ready"
+                },
+                {
+                  "from": "exported",
+                  "next_action": "release offline-verify",
+                  "outcome": "ready"
+                },
                 {
                   "from": "offline_verified",
                   "next_action": "release evidence-publish",
@@ -687,7 +729,11 @@
                   "next_action": "release resume",
                   "outcome": "awaiting-external-receipt"
                 },
-                { "from": "published", "next_action": null, "outcome": "complete" }
+                {
+                  "from": "published",
+                  "next_action": null,
+                  "outcome": "complete"
+                }
               ]
             },
             "blocked_outcomes": {
@@ -1158,7 +1204,9 @@
                 "refusal_effect": "before-sink.begin-or-artifact-exposure;no-success-state;existing-bounded-failure-bookkeeping-only;unknown-commit-preserves-handles-without-abort-or-retry"
               }
             },
-            "export_extension": { "$ref": "#/$defs/export_extension" }
+            "export_extension": {
+              "$ref": "#/$defs/export_extension"
+            }
           }
         },
         "release_unit_bijection": {
@@ -1175,8 +1223,12 @@
             "trust"
           ],
           "properties": {
-            "state_schema": { "const": "law/schemas/release-lifecycle-state.schema.json" },
-            "store_schema": { "const": "law/schemas/release-lifecycle-store-record.schema.json" },
+            "state_schema": {
+              "const": "law/schemas/release-lifecycle-state.schema.json"
+            },
+            "store_schema": {
+              "const": "law/schemas/release-lifecycle-store-record.schema.json"
+            },
             "unit_roster": {
               "const": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result"
             },
@@ -1236,9 +1288,15 @@
             "errors"
           ],
           "properties": {
-            "kernel_id": { "const": "devai.kernel.release-lifecycle-state.v2" },
-            "state_schema": { "const": "law/schemas/release-lifecycle-state.schema.json" },
-            "schema_validation_alone_establishes_state": { "const": false },
+            "kernel_id": {
+              "const": "devai.kernel.release-lifecycle-state.v2"
+            },
+            "state_schema": {
+              "const": "law/schemas/release-lifecycle-state.schema.json"
+            },
+            "schema_validation_alone_establishes_state": {
+              "const": false
+            },
             "algorithm": {
               "const": [
                 "accept-v1-only-for-wire-compatible-read-and-never-as-a-v2-write",
@@ -1473,16 +1531,12 @@
       }
     },
     "export_extension_v4": {
-      "const":
-      {
+      "const": {
         "artifact_spec": {
           "artifact_spec_id": "devai.release-export-closure.v4",
           "artifact_spec_canonical_bytes": "devai.release-export-closure.v4\nparent=exact-prepared-artifact-sink-commit;same-sink-id;retain-parent-opaque-handles;rehash-parent-members-before-begin;final-manifest-carries-exact-parent-commit-identity\nclosure=exact-sorted-duplicate-free-five-kind-projection-per-package;parent-kinds=package-manifest,package-tarball,package-sbom;new-kinds=evidence-manifest,provider-result\nevidence=evidence-manifest-is-exact-canonical-utf8-devai.release-policy-closure-json.v1;one-opaque-handle-per-package;contains-plan-approved-archive-candidate-git-objects-and-when-required-producer-toolchain-source-and-build-provenance;byte-identical-closures-may-be-content-deduplicated-only-by-the-trusted-same-sink-under-distinct-recorded-opaque-identities;offline-rehashes-each-identity-and-may-cache-by-equal-sha256-and-size-only-after-resolution;decode-and-verifyReleasePolicyClosure-under-signed-expected-installed-package-identity-and-checked-implementation;no-ambient-dereference\ncertification=one-complete-non-null-canonical-devai.release-certified-evidence-carrier-json.v1-per-release-unit-in-its-elected-provider-result;carrier-exactly-retains-original-candidate-receipt-task-policy-every-required-task-result-and-one-digest-only-namespace-census;all-carrier-member-identities-and-census-protected-derivation-binding-are-fully-enumerated-in-the-signed-transcript;mutation-none-remains-carrier-required;no-raw-stdout-stderr-or-generated-bytes\npolicy=release-inputProjection-requires-task-policy-schemaVersion-1.2.0-exactly;task-policy-1.0-and-1.1-remain-strict-unchanged-and-1.1-with-inputProjection-refuses\ncensus=canonical-digest-only-namespace-census-with-producer-task-protected-derivation-binding-and-sorted-path-mode-sha256-size-identities;verifier-requires-disjointness-prefix-and-node-containment-and-full-result-digest-equality;generated-bytes-and-raw-streams-are-never-carrier-members\ntranscript=one-exact-canonical-utf8-devai.release-export-transcript-json.v3-sorted-by-package;signing-preimage-fully-enumerates-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-package-release-unit-mapping-complete-unit-mutation-projections-and-every-certification-carrier-policy-receipt-result-census-and-derivation-binding-identity-plus-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-excluded\nbinding=action-id,repository-id-commit-tree,candidate-commit-tree,plan-receipt-digest,parent-sink-commit,sink-id,destination-kind-exact-identifier,trust-root-id-trust-store-digest-key-id-signature-algorithm,expected-installed-package-identity,policy-resolution-digest,evidence-manifest-closure-digest,attempt-identity,closure-release-unit-mapping,carrier-package-identity,unit-mutation-closure-digest-and-size,unit-receipt-full-byte-identity-and-receipt-digest,output-contract-identity,complete-unit-member-projection-and-digest,certification-carrier-package-identity,certification-candidate-receipt-byte-identity-and-digest,certification-task-policy-byte-identity-and-digest,certification-task-result-byte-identities-and-digests,certification-namespace-census-byte-identity-and-digest,certification-namespace-derivation-binding-digest,certification-census-digest-only-member-projection\nsigning=v4-requires-ed25519-64-byte-aggregate-detached-signature-and-non-ed25519-refuses-SIGNATURE_ALGORITHM_UNSUPPORTED-before-store.begin-or-signer-dispatch;one-host-protected-aggregate-detached-signature-over-the-transcript-only;provider-result-is-post-signature-canonical-utf8-devai.release-export-provider-result-json.v3-with-exact-unit-portable-mutation-copy-and-exact-unit-certified-evidence-carrier-and-must-bind-transcript-digest-signature-trust-and-its-evidence-manifest-digest;final-manifest-continuity-reverifies-provider-result-without-rehashing-it-into-the-preimage\ncommit=append-only-extension-transaction;one-complete-canonical-manifest;atomic-once;new-export-commit-is-state-artifact-sink-commit\nreader=resolve-only-exact-parent-or-extension-handles-through-trusted-host-reader;offline-uses-only-evidence-manifest-policy-closure-parent-artifacts-signed-transcript-external-expected-identity-provider-result-embedded-unit-mutation-bytes-and-bounded-certified-evidence-carrier-bytes;never-resolve-certification-or-mutation-sink-handles-checkout-cache-network-host-path-or-ambient-source-offline;reject-unknown-cross-sink-extra-duplicate-or-noncanonical-members\nrecovery=precommit-failure-abort-only;after-commit-timeout-lost-response-or-unverifiable-commit-preserve-handles-append-unknown-and-never-abort-rollback-retry-or-redispatch\nmutation=devai.release-unit-mutation-portable-json.v1;one-unit-keyed-exact-carrier-in-signed-utf8-minimum-request-package-provider-result;noncarriers-null;required-carrier-missing-or-duplicate-refuses;strict-canonical-padded-base64-of-jcs-utf8-closure-output-contract-external-unit-receipt-and-exact-2N+2-members;complete-unit-projection-in-transcript-and-protected-binding;full-profile-roster-thresholds-task-policy-and-version-matched-source-semantics;not-required-unit-has-null-and-no-carrier;exactly-one-carrier-per-required-unit-verified-across-complete-five-kind-artifact-set\noffline=all-nine-required-offline-checks-have-distinct-nonzero-evidence-projections-and-no-synthetic-rows;legacy-v2-or-v3-closure-lacks-complete-certified-carrier-and-fails-mandatory-result-dag-integrity-never-not-applicable\nacyclic=finalized-unit-evidence-before-transcript-before-one-signature-before-provider-results-before-final-export-commit;no-provider-result-signature-or-final-export-commit-identity-in-preimage\ncompatibility=historical-export-closure.v2-transcript.v1-provider-result.v1-and-export-closure.v3-transcript.v2-provider-result.v2-read-unchanged-under-exact-legacy-branch;legacy-never-satisfies-current-mutation-required-plan-or-mandatory-result-dag-integrity;current-emission-export-closure.v4-transcript.v3-provider-result.v3;mutation-contract-summary-receipt-2.1-or-2.2-explicit-version-match;2.2-only-after-approved-source-and-byte-equal-vendor-pin;immutable-package-pairs-remain-2.1\n",
           "artifact_spec_digest_sha256": "245fba3823b7f80a55b73e8721ac5871a40b90cce8789aa49b87228b8d03ac44",
-          "outputs": [
-            "evidence-manifest",
-            "provider-result"
-          ]
+          "outputs": ["evidence-manifest", "provider-result"]
         },
         "binding": [
           "action_id",
@@ -1597,8 +1651,12 @@
             "published"
           ]
         },
-        "next_action": { "type": ["string", "null"] },
-        "outcome": { "enum": ["ready", "awaiting-external-receipt", "complete"] }
+        "next_action": {
+          "type": ["string", "null"]
+        },
+        "outcome": {
+          "enum": ["ready", "awaiting-external-receipt", "complete"]
+        }
       }
     },
     "execution_seams": {
@@ -1618,8 +1676,12 @@
         "errors"
       ],
       "properties": {
-        "status": { "const": "deprecated-read-only-v1-non-authoritative" },
-        "kernel_id": { "const": "devai.kernel.release-execution-seams.v1" },
+        "status": {
+          "const": "deprecated-read-only-v1-non-authoritative"
+        },
+        "kernel_id": {
+          "const": "devai.kernel.release-execution-seams.v1"
+        },
         "applicability": {
           "const": {
             "read_scope": "wire-compatible-legacy-v1-observation-only",
@@ -1661,7 +1723,9 @@
               "minItems": 9,
               "maxItems": 9,
               "uniqueItems": true,
-              "items": { "$ref": "#/$defs/execution_action_projection" },
+              "items": {
+                "$ref": "#/$defs/execution_action_projection"
+              },
               "allOf": [
                 {
                   "contains": {
@@ -1774,7 +1838,9 @@
             }
           }
         },
-        "state_store": { "$ref": "#/$defs/execution_state_store" },
+        "state_store": {
+          "$ref": "#/$defs/execution_state_store"
+        },
         "filesystem_safety": {
           "type": "array",
           "const": [
@@ -1793,7 +1859,9 @@
           "additionalProperties": false,
           "required": ["adapters_return", "adapters_may_not_return", "core"],
           "properties": {
-            "adapters_return": { "const": ["bounded-raw-output", "opaque-provider-handle"] },
+            "adapters_return": {
+              "const": ["bounded-raw-output", "opaque-provider-handle"]
+            },
             "adapters_may_not_return": {
               "const": ["lifecycle-record", "state-id", "state-digest", "authority-decision"]
             },
@@ -1812,10 +1880,18 @@
             "replay"
           ],
           "properties": {
-            "append_before_adapter": { "const": true },
-            "success_advances_state": { "const": true },
-            "failure_record": { "const": "append-only-and-never-advances-state" },
-            "replay": { "const": "same-request-and-consumed-authorization-refuses" }
+            "append_before_adapter": {
+              "const": true
+            },
+            "success_advances_state": {
+              "const": true
+            },
+            "failure_record": {
+              "const": "append-only-and-never-advances-state"
+            },
+            "replay": {
+              "const": "same-request-and-consumed-authorization-refuses"
+            }
           }
         },
         "evidence_binding": {
@@ -1826,8 +1902,12 @@
             "check_runner": {
               "const": "core-rehashes-output-and-binds-manifest-and-receipt-digests-into-state-evidence"
             },
-            "prepare_artifacts": { "const": ["package-tarball", "manifest", "sbom"] },
-            "export": { "const": ["evidence-bundle", "provider-result"] },
+            "prepare_artifacts": {
+              "const": ["package-tarball", "manifest", "sbom"]
+            },
+            "export": {
+              "const": ["evidence-bundle", "provider-result"]
+            },
             "offline_verify": {
               "const": "requires-external-trust-inputs-and-emits-no-state-record"
             }
@@ -1866,7 +1946,9 @@
                 "fsync-success-record-and-head"
               ]
             },
-            "provider_unavailable": { "const": "fail-without-state-advance" },
+            "provider_unavailable": {
+              "const": "fail-without-state-advance"
+            },
             "provider_failure": {
               "const": "append-failure-without-state-advance-and-require-fresh-exact-authorization"
             },
@@ -1942,16 +2024,30 @@
         "crash_recovery"
       ],
       "properties": {
-        "root": { "const": ".devai/state/release/v1" },
-        "campaign_path": { "const": "{root}/{repository-id-sha256}/{candidate-commit}" },
-        "head_path": { "const": "{campaign-path}/HEAD.json" },
+        "root": {
+          "const": ".devai/state/release/v1"
+        },
+        "campaign_path": {
+          "const": "{root}/{repository-id-sha256}/{candidate-commit}"
+        },
+        "head_path": {
+          "const": "{campaign-path}/HEAD.json"
+        },
         "record_path": {
           "const": "{campaign-path}/records/{generation}-{record-digest-sha256}.json"
         },
-        "attempt_path": { "const": "{campaign-path}/attempts/{attempt-id}.json" },
-        "failure_path": { "const": "{campaign-path}/failures/{attempt-id}.json" },
-        "head_fields": { "const": ["generation", "record_digest_sha256"] },
-        "record_fields": { "const": ["generation", "head_before"] },
+        "attempt_path": {
+          "const": "{campaign-path}/attempts/{attempt-id}.json"
+        },
+        "failure_path": {
+          "const": "{campaign-path}/failures/{attempt-id}.json"
+        },
+        "head_fields": {
+          "const": ["generation", "record_digest_sha256"]
+        },
+        "record_fields": {
+          "const": ["generation", "head_before"]
+        },
         "record_layout": {
           "const": "each-record-carries-its-nonnegative-generation-and-the-exact-head-observed-before-cas;core-requires-generation-zero-and-null-head-before-for-the-opening-record-and-successor-generation-equals-head-before-generation-plus-one"
         },
@@ -1970,7 +2066,9 @@
       "type": "array",
       "minItems": 7,
       "maxItems": 7,
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "plan_determination": {
       "const": {
@@ -3131,16 +3229,28 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release plan" } },
+            "properties": {
+              "action_id": {
+                "const": "release plan"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
-            "properties": { "binds_identity": { "const": ["repository", "candidate", "input"] } }
+            "properties": {
+              "binds_identity": {
+                "const": ["repository", "candidate", "input"]
+              }
+            }
           }
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release preflight" } },
+            "properties": {
+              "action_id": {
+                "const": "release preflight"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3153,7 +3263,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release certify" } },
+            "properties": {
+              "action_id": {
+                "const": "release certify"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3166,7 +3280,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release prepare" } },
+            "properties": {
+              "action_id": {
+                "const": "release prepare"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3179,7 +3297,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release export" } },
+            "properties": {
+              "action_id": {
+                "const": "release export"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3192,7 +3314,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release offline-verify" } },
+            "properties": {
+              "action_id": {
+                "const": "release offline-verify"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3213,7 +3339,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release evidence-publish" } },
+            "properties": {
+              "action_id": {
+                "const": "release evidence-publish"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3234,7 +3364,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release publish" } },
+            "properties": {
+              "action_id": {
+                "const": "release publish"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3247,7 +3381,11 @@
         },
         {
           "if": {
-            "properties": { "action_id": { "const": "release resume" } },
+            "properties": {
+              "action_id": {
+                "const": "release resume"
+              }
+            },
             "required": ["action_id"]
           },
           "then": {
@@ -3595,7 +3733,10 @@
             "effective_authorities"
           ],
           "actions": [
-            { "action_id": "release plan", "fields": ["candidate_locator", "repository_locator"] },
+            {
+              "action_id": "release plan",
+              "fields": ["candidate_locator", "repository_locator"]
+            },
             {
               "action_id": "release preflight",
               "fields": ["candidate_locator", "repository_locator", "receipt_locators"]
@@ -3883,24 +4024,56 @@
           "readable_observation_schema_versions": ["1.0.0", "1.1.0"],
           "always_pure": true,
           "next_actions": [
-            { "from": "none", "next_action": "release plan", "outcome": "ready" },
-            { "from": "planned", "next_action": "release preflight", "outcome": "ready" },
-            { "from": "preflight_passed", "next_action": "release certify", "outcome": "ready" },
-            { "from": "certified", "next_action": "release prepare", "outcome": "ready" },
-            { "from": "prepared", "next_action": "release export", "outcome": "ready" },
-            { "from": "exported", "next_action": "release offline-verify", "outcome": "ready" },
+            {
+              "from": "none",
+              "next_action": "release plan",
+              "outcome": "ready"
+            },
+            {
+              "from": "planned",
+              "next_action": "release preflight",
+              "outcome": "ready"
+            },
+            {
+              "from": "preflight_passed",
+              "next_action": "release certify",
+              "outcome": "ready"
+            },
+            {
+              "from": "certified",
+              "next_action": "release prepare",
+              "outcome": "ready"
+            },
+            {
+              "from": "prepared",
+              "next_action": "release export",
+              "outcome": "ready"
+            },
+            {
+              "from": "exported",
+              "next_action": "release offline-verify",
+              "outcome": "ready"
+            },
             {
               "from": "offline_verified",
               "next_action": "release evidence-publish",
               "outcome": "ready"
             },
-            { "from": "evidence_published", "next_action": "release publish", "outcome": "ready" },
+            {
+              "from": "evidence_published",
+              "next_action": "release publish",
+              "outcome": "ready"
+            },
             {
               "from": "publication_dispatched",
               "next_action": "release resume",
               "outcome": "awaiting-external-receipt"
             },
-            { "from": "published", "next_action": null, "outcome": "complete" }
+            {
+              "from": "published",
+              "next_action": null,
+              "outcome": "complete"
+            }
           ],
           "blocked_outcomes": [
             "broken-chain",
@@ -4182,9 +4355,9 @@
           },
           "export_extension": {
             "artifact_spec": {
-              "artifact_spec_id": "devai.release-export-closure.v2",
-              "artifact_spec_canonical_bytes": "devai.release-export-closure.v2\nparent=exact-prepared-artifact-sink-commit;same-sink-id;retain-parent-opaque-handles;rehash-parent-members-before-begin;final-manifest-carries-exact-parent-commit-identity\nclosure=exact-sorted-duplicate-free-five-kind-projection-per-package;parent-kinds=package-manifest,package-tarball,package-sbom;new-kinds=evidence-manifest,provider-result\nevidence=evidence-manifest-is-exact-canonical-utf8-devai.release-policy-closure-json.v1;one-opaque-handle-per-package;contains-plan-approved-archive-candidate-git-objects-and-when-required-producer-toolchain-source-and-build-provenance;byte-identical-closures-may-be-content-deduplicated-only-by-the-trusted-same-sink-under-distinct-recorded-opaque-identities;offline-rehashes-each-identity-and-may-cache-by-equal-sha256-and-size-only-after-resolution;decode-and-verifyReleasePolicyClosure-under-signed-expected-installed-package-identity-and-checked-implementation;no-ambient-dereference\ntranscript=one-exact-canonical-utf8-devai.release-export-transcript-json.v1-sorted-by-package;signing-preimage-is-binding-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-excluded\nbinding=action-id,repository-id-commit-tree,candidate-commit-tree,plan-receipt-digest,parent-sink-commit,sink-id,destination-kind-exact-identifier,trust-root-id-trust-store-digest-key-id-signature-algorithm,expected-installed-package-identity,policy-resolution-digest,evidence-manifest-closure-digest,attempt-identity\nsigning=one-host-protected-aggregate-detached-signature-over-the-transcript-only;provider-result-is-post-signature-canonical-utf8-and-must-bind-transcript-digest-signature-trust-and-its-evidence-manifest-digest;final-manifest-continuity-reverifies-provider-result-without-rehashing-it-into-the-preimage\ncommit=append-only-extension-transaction;one-complete-canonical-manifest;atomic-once;new-export-commit-is-state-artifact-sink-commit\nreader=resolve-only-exact-parent-or-extension-handles-through-trusted-host-reader;offline-uses-only-evidence-manifest-closure-parent-handles-signed-transcript-and-external-expected-identity;reject-unknown-cross-sink-extra-duplicate-or-noncanonical-members\nrecovery=precommit-failure-abort-only;after-commit-timeout-lost-response-or-unverifiable-commit-preserve-handles-append-unknown-and-never-abort-rollback-retry-or-redispatch\n",
-              "artifact_spec_digest_sha256": "77ab8fd69d2b3d4edeaebd12b516eb5c15fe910f93ff4516deadd466f0853f98",
+              "artifact_spec_id": "devai.release-export-closure.v4",
+              "artifact_spec_canonical_bytes": "devai.release-export-closure.v4\nparent=exact-prepared-artifact-sink-commit;same-sink-id;retain-parent-opaque-handles;rehash-parent-members-before-begin;final-manifest-carries-exact-parent-commit-identity\nclosure=exact-sorted-duplicate-free-five-kind-projection-per-package;parent-kinds=package-manifest,package-tarball,package-sbom;new-kinds=evidence-manifest,provider-result\nevidence=evidence-manifest-is-exact-canonical-utf8-devai.release-policy-closure-json.v1;one-opaque-handle-per-package;contains-plan-approved-archive-candidate-git-objects-and-when-required-producer-toolchain-source-and-build-provenance;byte-identical-closures-may-be-content-deduplicated-only-by-the-trusted-same-sink-under-distinct-recorded-opaque-identities;offline-rehashes-each-identity-and-may-cache-by-equal-sha256-and-size-only-after-resolution;decode-and-verifyReleasePolicyClosure-under-signed-expected-installed-package-identity-and-checked-implementation;no-ambient-dereference\ncertification=one-complete-non-null-canonical-devai.release-certified-evidence-carrier-json.v1-per-release-unit-in-its-elected-provider-result;carrier-exactly-retains-original-candidate-receipt-task-policy-every-required-task-result-and-one-digest-only-namespace-census;all-carrier-member-identities-and-census-protected-derivation-binding-are-fully-enumerated-in-the-signed-transcript;mutation-none-remains-carrier-required;no-raw-stdout-stderr-or-generated-bytes\npolicy=release-inputProjection-requires-task-policy-schemaVersion-1.2.0-exactly;task-policy-1.0-and-1.1-remain-strict-unchanged-and-1.1-with-inputProjection-refuses\ncensus=canonical-digest-only-namespace-census-with-producer-task-protected-derivation-binding-and-sorted-path-mode-sha256-size-identities;verifier-requires-disjointness-prefix-and-node-containment-and-full-result-digest-equality;generated-bytes-and-raw-streams-are-never-carrier-members\ntranscript=one-exact-canonical-utf8-devai.release-export-transcript-json.v3-sorted-by-package;signing-preimage-fully-enumerates-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-package-release-unit-mapping-complete-unit-mutation-projections-and-every-certification-carrier-policy-receipt-result-census-and-derivation-binding-identity-plus-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-excluded\nbinding=action-id,repository-id-commit-tree,candidate-commit-tree,plan-receipt-digest,parent-sink-commit,sink-id,destination-kind-exact-identifier,trust-root-id-trust-store-digest-key-id-signature-algorithm,expected-installed-package-identity,policy-resolution-digest,evidence-manifest-closure-digest,attempt-identity,closure-release-unit-mapping,carrier-package-identity,unit-mutation-closure-digest-and-size,unit-receipt-full-byte-identity-and-receipt-digest,output-contract-identity,complete-unit-member-projection-and-digest,certification-carrier-package-identity,certification-candidate-receipt-byte-identity-and-digest,certification-task-policy-byte-identity-and-digest,certification-task-result-byte-identities-and-digests,certification-namespace-census-byte-identity-and-digest,certification-namespace-derivation-binding-digest,certification-census-digest-only-member-projection\nsigning=v4-requires-ed25519-64-byte-aggregate-detached-signature-and-non-ed25519-refuses-SIGNATURE_ALGORITHM_UNSUPPORTED-before-store.begin-or-signer-dispatch;one-host-protected-aggregate-detached-signature-over-the-transcript-only;provider-result-is-post-signature-canonical-utf8-devai.release-export-provider-result-json.v3-with-exact-unit-portable-mutation-copy-and-exact-unit-certified-evidence-carrier-and-must-bind-transcript-digest-signature-trust-and-its-evidence-manifest-digest;final-manifest-continuity-reverifies-provider-result-without-rehashing-it-into-the-preimage\ncommit=append-only-extension-transaction;one-complete-canonical-manifest;atomic-once;new-export-commit-is-state-artifact-sink-commit\nreader=resolve-only-exact-parent-or-extension-handles-through-trusted-host-reader;offline-uses-only-evidence-manifest-policy-closure-parent-artifacts-signed-transcript-external-expected-identity-provider-result-embedded-unit-mutation-bytes-and-bounded-certified-evidence-carrier-bytes;never-resolve-certification-or-mutation-sink-handles-checkout-cache-network-host-path-or-ambient-source-offline;reject-unknown-cross-sink-extra-duplicate-or-noncanonical-members\nrecovery=precommit-failure-abort-only;after-commit-timeout-lost-response-or-unverifiable-commit-preserve-handles-append-unknown-and-never-abort-rollback-retry-or-redispatch\nmutation=devai.release-unit-mutation-portable-json.v1;one-unit-keyed-exact-carrier-in-signed-utf8-minimum-request-package-provider-result;noncarriers-null;required-carrier-missing-or-duplicate-refuses;strict-canonical-padded-base64-of-jcs-utf8-closure-output-contract-external-unit-receipt-and-exact-2N+2-members;complete-unit-projection-in-transcript-and-protected-binding;full-profile-roster-thresholds-task-policy-and-version-matched-source-semantics;not-required-unit-has-null-and-no-carrier;exactly-one-carrier-per-required-unit-verified-across-complete-five-kind-artifact-set\noffline=all-nine-required-offline-checks-have-distinct-nonzero-evidence-projections-and-no-synthetic-rows;legacy-v2-or-v3-closure-lacks-complete-certified-carrier-and-fails-mandatory-result-dag-integrity-never-not-applicable\nacyclic=finalized-unit-evidence-before-transcript-before-one-signature-before-provider-results-before-final-export-commit;no-provider-result-signature-or-final-export-commit-identity-in-preimage\ncompatibility=historical-export-closure.v2-transcript.v1-provider-result.v1-and-export-closure.v3-transcript.v2-provider-result.v2-read-unchanged-under-exact-legacy-branch;legacy-never-satisfies-current-mutation-required-plan-or-mandatory-result-dag-integrity;current-emission-export-closure.v4-transcript.v3-provider-result.v3;mutation-contract-summary-receipt-2.1-or-2.2-explicit-version-match;2.2-only-after-approved-source-and-byte-equal-vendor-pin;immutable-package-pairs-remain-2.1\n",
+              "artifact_spec_digest_sha256": "245fba3823b7f80a55b73e8721ac5871a40b90cce8789aa49b87228b8d03ac44",
               "outputs": ["evidence-manifest", "provider-result"]
             },
             "binding": [
@@ -4202,17 +4375,30 @@
               "expected-installed-package-identity",
               "policy-resolution-digest",
               "evidence-manifest-closure-digest",
-              "attempt-identity"
+              "attempt-identity",
+              "closure-release-unit-mapping",
+              "carrier-package-identity",
+              "unit-mutation-closure-digest-and-size",
+              "unit-receipt-full-byte-identity-and-receipt-digest",
+              "output-contract-identity",
+              "complete-unit-member-projection-and-digest",
+              "certification-carrier-package-identity",
+              "certification-candidate-receipt-byte-identity-and-digest",
+              "certification-task-policy-byte-identity-and-digest",
+              "certification-task-result-byte-identities-and-digests",
+              "certification-namespace-census-byte-identity-and-digest",
+              "certification-namespace-derivation-binding-digest",
+              "certification-census-digest-only-member-projection"
             ],
             "parent": "before-begin-require-the-exact-prepared-predecessor-commit-manifest-and-its-complete-sorted-three-kind-per-package-closure-through-the-trusted-reader;preserve-every-parent-opaque-identity-byte-for-byte-and-never-repack-or-relabel-it",
-            "resolution": "before-begin-replay-the-exact-installed-policy-resolution-and-retain-one-exact-canonical-devai.release-policy-closure-json.v1-evidence-manifest-per-package;verify-each-under-the-signed-expected-installed-package-identity-and-checked-implementation;no-checkout-network-source-layout-or-ambient-installed-input-fallback",
-            "signing": "one-host-owned-externally-protected-aggregate-signature-only;the-signer-reverifies-one-acyclic-canonical-devai.release-export-transcript-json.v1-over-the-closed-binding-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-not-preimage-members;candidate-code-never-selects-a-key-or-signing-implementation",
-            "preflight": "validate-all-binding-parent-resolution-destination-trust-capacity-and-canonical-bytes-before-begin-or-signing;any-failure-has-no-sink-or-signing-effect",
+            "resolution": "before-begin-replay-the-exact-installed-policy-resolution-and-retain-one-exact-canonical-devai.release-policy-closure-json.v1-evidence-manifest-per-package;verify-each-under-the-signed-expected-installed-package-identity-and-checked-implementation;no-checkout-network-source-layout-or-ambient-installed-input-fallback;for-every-verified-request-release-unit-retain-one-complete-non-null-canonical-certified-evidence-carrier-containing-the-unchanged-candidate-receipt-task-policy-every-required-task-result-and-digest-only-namespace-census-through-the-existing-certification-evidence-sink-under-protected-measured-preallocated-bounds-and-rehash-every-byte-before-begin;including-mutation-none-units;retain-immutable-canonical-bytes-and-compare-rereads-before-signing-never-silently-replace",
+            "signing": "v4-requires-ed25519-64-byte-aggregate-detached-signature-and-refuses-SIGNATURE_ALGORITHM_UNSUPPORTED-before-store.begin-or-signer-dispatch-for-any-other-algorithm;one-host-owned-externally-protected-aggregate-signature-only;the-signer-reverifies-one-acyclic-canonical-devai.release-export-transcript-json.v3-over-the-closed-binding-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-package-release-unit-mapping-complete-unit-mutation-projections-and-fully-enumerated-certification-carrier-policy-receipt-result-census-and-derivation-binding-identities-plus-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-not-preimage-members;candidate-code-never-selects-a-key-or-signing-implementation",
+            "preflight": "validate-all-binding-parent-resolution-complete-non-null-certification-carrier-election-every-carrier-member-identity-digest-only-census-derivation-binding-destination-ed25519-trust-measured-preallocated-capacity-and-canonical-bytes-before-begin-or-signing;any-failure-has-no-sink-or-signing-effect",
             "protocol": [
               "begin-one-dedicated-export-extension-transaction-after-preflight",
               "put-exactly-one-canonical-devai.release-policy-closure-json.v1-evidence-manifest-per-package-and-reverify-every-new-handle-byte-digest-and-size",
-              "construct-and-sign-exactly-one-acyclic-canonical-export-transcript-before-its-dependent-provider-results-are-accepted",
-              "put-exactly-one-post-signature-provider-result-per-package-binding-the-signed-transcript-digest-signature-trust-and-evidence-manifest-digest-and-reverify-every-new-handle-byte-digest-and-size",
+              "construct-and-sign-exactly-one-acyclic-canonical-devai.release-export-transcript-json.v3-with-complete-request-package-to-release-unit-mapping-sorted-unit-mutation-projections-and-fully-enumerated-certification-carrier-policy-receipt-every-result-census-and-derivation-binding-identities-before-its-dependent-provider-results-are-accepted",
+              "put-exactly-one-post-signature-canonical-devai.release-export-provider-result-json.v3-per-package-binding-the-signed-transcript-digest-signature-trust-and-evidence-manifest-digest;for-each-release-unit-in-its-elected-provider-result-carry-one-complete-non-null-canonical-certified-evidence-carrier-containing-unchanged-candidate-receipt-task-policy-every-required-task-result-and-digest-only-namespace-census-even-when-mutation-is-none;missing-duplicate-extra-substituted-or-cross-unit-carriers-refuse-across-the-complete-five-kind-artifact-set;reverify-every-new-handle-byte-digest-and-size",
               "commit-one-complete-canonical-five-kind-manifest-atomically-once-and-use-that-new-commit-as-the-exported-state-sink-identity",
               "abort-only-on-proven-pre-commit-failure",
               "after-signing-or-commit-ambiguity-preserve-the-transaction-and-handles-append-unknown-and-never-abort-rollback-retry-or-redispatch"
