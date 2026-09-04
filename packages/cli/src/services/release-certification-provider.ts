@@ -85,6 +85,50 @@ export interface ContainerReleaseCertificationAdapters {
 
 type Json = Readonly<Record<string, unknown>>;
 const protectedPreflightProviders = new WeakSet<ReleaseProvider>();
+
+/** Package-private execution observation, never a mutation grant or transferable receipt. */
+export interface ProtectedPreflightObservation {
+  readonly read: () => {
+    readonly request: ReleaseLifecycleRequest;
+    readonly execution_identity: Json;
+    readonly runs: readonly {
+      readonly binding: Json;
+      readonly preflight_receipt: Json;
+      readonly output_census: readonly {
+        readonly path: string;
+        readonly mode: string;
+        readonly sha256: string;
+        readonly size_bytes: number;
+        readonly task_node: string;
+      }[];
+    }[];
+  };
+}
+
+const preflightObservations = new WeakMap<
+  ReleaseProvider,
+  { readonly request_digest: string; readonly observation: ProtectedPreflightObservation }
+>();
+const verifiedPreflightObservations = new WeakSet<object>();
+
+export function isVerifiedProtectedPreflightObservation(
+  value: unknown,
+): value is ProtectedPreflightObservation {
+  return value !== null && typeof value === 'object' && verifiedPreflightObservations.has(value);
+}
+
+/** Internal fixed-fixture composition only; deliberately absent from the public host barrel. */
+export function takeProtectedPreflightObservation(
+  provider: ReleaseProvider,
+  expectedRequest: ReleaseLifecycleRequest,
+): ProtectedPreflightObservation {
+  const pending = preflightObservations.get(provider);
+  preflightObservations.delete(provider);
+  if (pending === undefined || pending.request_digest !== canonicalSha256(expectedRequest))
+    throw new Error('release-certification-preflight-observation-unavailable');
+  return pending.observation;
+}
+
 export function isProtectedReleasePreflightProvider(
   provider: ReleaseProvider | undefined,
 ): boolean {
@@ -510,27 +554,61 @@ export function createContainerReleaseCertificationAdapters(
   const preflight_provider: ReleaseProvider = async (request) => {
     if (active) return { outcome: 'failure', code: 'release-certification-provider-in-use' };
     active = true;
+    preflightObservations.delete(preflight_provider);
     try {
       if (request.action_id !== 'release preflight')
         throw new Error('release-certification-plan-binding-invalid');
       const descriptor = bindRequest(request);
       const source = await sourcesFor(request);
-      const reports = selected.map(
-        (_entry, index) =>
-          execute(
-            request,
-            optionsFor(request, descriptor, index, 'preflight'),
-            source.source,
-            source.gitMetadata,
-          ).report,
+      const runs = selected.map((_entry, index) =>
+        execute(
+          request,
+          optionsFor(request, descriptor, index, 'preflight'),
+          source.source,
+          source.gitMetadata,
+        ),
       );
+      const reports = runs.map((run) => run.report);
       for (const [index, report] of reports.entries()) {
         if (report.preflightReceipt === undefined)
           throw new Error('release-certification-preflight-required');
         const entry = selected[index];
         if (entry !== undefined) entry.preflight = snapshot(report.preflightReceipt.value);
       }
-      return { outcome: 'success', material: material(request, reports, source.locators) };
+      const stateMaterial = material(request, reports, source.locators);
+      const captured: ReturnType<ProtectedPreflightObservation['read']> = snapshot({
+        request,
+        execution_identity: bindingIdentity,
+        runs: runs.map((run) => ({
+          binding: run.binding,
+          preflight_receipt: object(run.report.preflightReceipt?.value),
+          output_census: [...run.outputs.values()]
+            .sort((a, b) => compare(a.path, b.path))
+            .map((output) => {
+              const producer = run.producers.get(output.path);
+              if (producer === undefined)
+                throw new Error('release-certification-output-closure-invalid');
+              return {
+                path: output.path,
+                mode: output.mode,
+                sha256: digest(output.bytes),
+                size_bytes: output.bytes.length,
+                task_node: producer,
+              };
+            }),
+        })),
+      });
+      // Keep only identities after verified execution/quiescence. This does not retain
+      // raw reports, certify their semantics, or discharge any production mutation gate.
+      const observation: ProtectedPreflightObservation = Object.freeze({
+        read: () => snapshot(captured),
+      });
+      verifiedPreflightObservations.add(observation);
+      preflightObservations.set(preflight_provider, {
+        request_digest: canonicalSha256(request),
+        observation,
+      });
+      return { outcome: 'success', material: stateMaterial };
     } catch (error) {
       return {
         outcome: 'failure',
