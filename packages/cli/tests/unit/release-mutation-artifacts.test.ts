@@ -34,6 +34,7 @@ const SOURCE = "export const apiKey = 'fixture-credential-do-not-retain';\n";
 const TEST_SOURCE = "expect('fixture-test-credential-do-not-retain').toBeDefined();\n";
 const RAW_SECRET = 'fixture-config-credential-do-not-retain';
 const RAW_REASON = `${RAW_CWD}/status-reason-do-not-retain`;
+const REPLACEMENT = 'fixture-replacement-credential-do-not-retain';
 
 interface RawMutant {
   id: string;
@@ -112,7 +113,7 @@ function rawReport(statuses: readonly (typeof STATUS)[number][]): RawReport {
         mutants: statuses.map((status, index) => ({
           id: String(index),
           mutatorName: 'BooleanLiteral',
-          replacement: 'fixture-replacement-credential-do-not-retain',
+          replacement: REPLACEMENT,
           location: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } },
           status,
           statusReason: RAW_REASON,
@@ -124,16 +125,33 @@ function rawReport(statuses: readonly (typeof STATUS)[number][]): RawReport {
   };
 }
 
+/** Fixed instrumenter-side fixture data: never inferred from a raw result under test. */
+function emittedSources(ids: readonly string[] = ['0', '1', '2']) {
+  return [
+    {
+      path: 'src/value.ts',
+      sha256: sha256(SOURCE),
+      mutants: ids.map((id) => ({
+        id,
+        mutatorName: 'BooleanLiteral',
+        replacementDigest: sha256(REPLACEMENT),
+        location: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } },
+      })),
+    },
+  ];
+}
+
 function controls(
   report = rawReport(['Killed', 'Killed', 'Survived']),
   overrides: Record<string, unknown> = {},
+  emittedIds: readonly string[] = ['0', '1', '2'],
 ) {
   return {
     expected: EXPECTED,
     raw_report: Buffer.from(JSON.stringify(report)),
     execution_cwd: RAW_CWD,
     process: { errorAbsent: true, signal: null, status: 0 },
-    source_files: [{ path: 'src/value.ts', sha256: sha256(SOURCE) }],
+    source_files: emittedSources(emittedIds),
     test_files: ['tests/value.test.ts'],
     limits: {
       maximum_raw_report_bytes: 100_000,
@@ -152,8 +170,9 @@ function json(bytes: Uint8Array): Record<string, unknown> {
 function normalized(
   report = rawReport(['Killed', 'Killed', 'Survived']),
   overrides: Record<string, unknown> = {},
+  emittedIds: readonly string[] = ['0', '1', '2'],
 ) {
-  return normalizeReleaseMutationPackageV21(controls(report, overrides));
+  return normalizeReleaseMutationPackageV21(controls(report, overrides, emittedIds));
 }
 
 function finalizerInput(artifacts = normalized()) {
@@ -216,7 +235,7 @@ describe('release mutation artifact normalization v2.1', () => {
   });
 
   it('retains all eight status counts and treats incomplete statuses as nonpassing', () => {
-    const artifacts = normalized(rawReport(STATUS));
+    const artifacts = normalized(rawReport(STATUS), {}, ['0', '1', '2', '3', '4', '5', '6', '7']);
     const result = json(artifacts.result.bytes);
 
     expect(result.statusTotals).toEqual(Object.fromEntries(STATUS.map((status) => [status, 1])));
@@ -230,7 +249,7 @@ describe('release mutation artifact normalization v2.1', () => {
     { errorAbsent: true, signal: 'SIGTERM', status: null },
     { errorAbsent: true, signal: null, status: 1 },
   ])('makes a failed process nonpassing: %j', (process) => {
-    const result = json(normalized(rawReport(['Killed']), { process }).result.bytes);
+    const result = json(normalized(rawReport(['Killed']), { process }, ['0']).result.bytes);
     expect(result.process).toEqual(process);
     expect(result.complete).toBe(false);
     expect(result.passed).toBe(false);
@@ -249,7 +268,7 @@ describe('release mutation artifact normalization v2.1', () => {
   });
 
   it('does not promote an unscored CompileError-only population despite its 100 sentinel score', () => {
-    const result = json(normalized(rawReport(['CompileError'])).result.bytes);
+    const result = json(normalized(rawReport(['CompileError']), {}, ['0']).result.bytes);
 
     expect(result.targetCensus).toEqual({ targetFileCount: 1, totalMutants: 1 });
     expect(result.statusTotals).toEqual({
@@ -265,6 +284,138 @@ describe('release mutation artifact normalization v2.1', () => {
     expect(result.score).toBe(100);
     expect(result.complete).toBe(false);
     expect(result.passed).toBe(false);
+  });
+
+  it.each([
+    ['missing', 'MUTATION_ROSTER_MISMATCH'],
+    ['added', 'MUTATION_ROSTER_MISMATCH'],
+    ['id', 'MUTATION_ROSTER_MISMATCH'],
+    ['mutatorName', 'MUTATION_INPUT_DIGEST_MISMATCH'],
+    ['replacement', 'MUTATION_INPUT_DIGEST_MISMATCH'],
+    ['location', 'MUTATION_INPUT_DIGEST_MISMATCH'],
+  ] as const)(
+    'refuses raw mutant %s drift against the unchanged independent census',
+    (change, code) => {
+      const discovery = emittedSources();
+      const capturedDiscovery = canonicalSha256(discovery);
+      const report = rawReport(['Killed', 'Killed', 'Survived']);
+      const mutants = report.files['src/value.ts']?.mutants;
+      const first = mutants?.[0];
+      if (mutants === undefined || first === undefined) throw new Error('fixture mutants missing');
+      switch (change) {
+        case 'missing':
+          mutants.pop();
+          break;
+        case 'added':
+          mutants.push({ ...first, id: '3' });
+          break;
+        case 'id':
+          first.id = 'different-id';
+          break;
+        case 'mutatorName':
+          first.mutatorName = 'StringLiteral';
+          break;
+        case 'replacement':
+          first.replacement = 'altered replacement';
+          break;
+        case 'location':
+          first.location.end.column = 3;
+          break;
+      }
+      expect(() => normalized(report, { source_files: discovery })).toThrow(code);
+      expect(canonicalSha256(discovery)).toBe(capturedDiscovery);
+    },
+  );
+
+  it('refuses duplicate, missing, empty, or extended instrumenter-side mutant declarations', () => {
+    const duplicate = emittedSources(['0', '0', '2']);
+    const empty = emittedSources([]);
+    const missing = emittedSources().map(({ path, sha256 }) => ({ path, sha256 }));
+    const extended = emittedSources().map((entry) => ({
+      ...entry,
+      mutants: entry.mutants.map((mutant) => ({ ...mutant, status: 'Killed' })),
+    }));
+    for (const source_files of [duplicate, empty, missing, extended]) {
+      expect(() =>
+        normalized(rawReport(['Killed', 'Killed', 'Survived']), { source_files }),
+      ).toThrow('MUTATION_REPORT_INVALID');
+    }
+  });
+
+  it('rejects accessors in independent discovery without evaluating them', () => {
+    const discovery = emittedSources();
+    const first = discovery[0]?.mutants[0];
+    if (first === undefined) throw new Error('fixture discovery missing');
+    const read = vi.fn(() => '0');
+    Object.defineProperty(first, 'id', { enumerable: true, get: read });
+    expect(() =>
+      normalized(rawReport(['Killed', 'Killed', 'Survived']), { source_files: discovery }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('accepts reordered exact file and mutant censuses with identical canonical artifacts', () => {
+    const report = rawReport(['Killed', 'Killed', 'Survived']);
+    const otherReport = rawReport(['Killed']);
+    const otherFile = otherReport.files['src/value.ts'];
+    const otherMutant = otherFile?.mutants[0];
+    const otherDiscovery = emittedSources(['other-0'])[0];
+    if (otherFile === undefined || otherMutant === undefined || otherDiscovery === undefined)
+      throw new Error('fixture other file missing');
+    otherMutant.id = 'other-0';
+    report.files['src/other.ts'] = otherFile;
+    const discovery = [...emittedSources(), { ...otherDiscovery, path: 'src/other.ts' }];
+    const initial = normalized(report, { source_files: discovery });
+    report.files = Object.fromEntries(
+      Object.entries(report.files)
+        .reverse()
+        .map(([path, file]) => [path, { ...file, mutants: [...file.mutants].reverse() }]),
+    );
+    const reordered = [...discovery]
+      .reverse()
+      .map((entry) => ({ ...entry, mutants: [...entry.mutants].reverse() }));
+    expect(normalized(report, { source_files: reordered })).toEqual(initial);
+  });
+
+  it('keeps legitimately zero-emission selected source outside the emitted mutant census', () => {
+    const selected = [
+      { path: 'src/value.ts', sha256: sha256(SOURCE) },
+      {
+        path: 'src/zero.ts',
+        sha256: sha256('export interface Zero { readonly value: boolean }\n'),
+      },
+    ];
+    const bindings = EXPECTED.inputProjection['bindings'] as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const expected = {
+      ...EXPECTED,
+      inputProjection: {
+        ...EXPECTED.inputProjection,
+        bindings: {
+          ...bindings,
+          source: {
+            ...bindings['source'],
+            memberCount: selected.length,
+            populationDigest: canonicalSha256(selected),
+          },
+        },
+      },
+    };
+    const artifacts = normalized(rawReport(['Killed', 'Killed', 'Survived']), { expected });
+    expect(Object.keys(json(artifacts.report.bytes)['files'] as Record<string, unknown>)).toEqual([
+      'src/value.ts',
+    ]);
+    expect(json(artifacts.result.bytes)).toMatchObject({
+      targetCensus: { targetFileCount: 1, totalMutants: 3 },
+      complete: true,
+      passed: true,
+    });
+    expect(
+      (json(artifacts.result.bytes)['inputProjection'] as Record<string, unknown>)['bindings'],
+    ).toEqual(expected.inputProjection.bindings);
+    expect(emittedSources().some((entry) => entry.path === 'src/zero.ts')).toBe(false);
   });
 
   it('refuses malformed roots, source/roster drift, duplicate mutants, and size quotas', () => {
@@ -289,7 +440,7 @@ describe('release mutation artifact normalization v2.1', () => {
     );
     expect(() =>
       normalized(rawReport(['Killed']), {
-        source_files: [{ path: 'src/value.ts', sha256: '0'.repeat(64) }],
+        source_files: emittedSources(['0']).map((entry) => ({ ...entry, sha256: '0'.repeat(64) })),
       }),
     ).toThrow('MUTATION_INPUT_DIGEST_MISMATCH');
     expect(() => normalized(extra)).toThrow('MUTATION_ROSTER_MISMATCH');
