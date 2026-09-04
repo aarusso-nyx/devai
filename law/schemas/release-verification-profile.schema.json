@@ -17,7 +17,7 @@
     "mutation_roster"
   ],
   "properties": {
-    "schemaVersion": { "enum": ["1.0.0", "1.1.0", "1.2.0"] },
+    "schemaVersion": { "enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"] },
     "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
     "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -126,7 +126,7 @@
   "allOf": [
     {
       "if": {
-        "properties": { "schemaVersion": { "enum": ["1.1.0", "1.2.0"] } },
+        "properties": { "schemaVersion": { "enum": ["1.1.0", "1.2.0", "1.3.0"] } },
         "required": ["schemaVersion"]
       },
       "then": { "required": ["mutation_execution"] }
@@ -164,6 +164,44 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": { "const": "1.3.0" }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "mutation_execution": {
+            "properties": { "schemaVersion": { "const": "1.3.0" } },
+            "required": ["schemaVersion"]
+          },
+          "mutation_roster": {
+            "items": {
+              "required": ["vitest_config_path", "typescript_config_path"]
+            }
+          }
+        },
+        "required": ["mutation_execution"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "enum": ["1.0.0", "1.1.0", "1.2.0"] } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "mutation_execution": {
+            "not": {
+              "properties": { "schemaVersion": { "const": "1.3.0" } },
+              "required": ["schemaVersion"]
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -182,7 +220,7 @@
         "toolchain_fixture_validation"
       ],
       "properties": {
-        "schemaVersion": { "enum": ["1.1.0", "1.2.0"] },
+        "schemaVersion": { "enum": ["1.1.0", "1.2.0", "1.3.0"] },
         "template_id": { "const": "devai.protected-mutation-stryker.v1" },
         "runner": {
           "type": "object",
@@ -341,6 +379,28 @@
             }
           }
         },
+        "resume": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["record", "origin", "reconciliation", "verification", "activation"],
+          "properties": {
+            "record": {
+              "const": "existing-certification-evidence-sink-v3-private-package-execution-record"
+            },
+            "origin": {
+              "const": "embedded-mutation-package-execution-origin-v1-with-complete-mpe1-receipt-only"
+            },
+            "reconciliation": {
+              "const": "exact-reader-once-committed-reuse-absent-execute-under-durable-attempt-ledger-ambiguous-refuse"
+            },
+            "verification": {
+              "const": "source-first-v22-package-pair-and-mpe1-verifier-with-portable-closure-only-offline-comparison"
+            },
+            "activation": {
+              "const": "forward-source-provenance-pin-required-before-emission-or-verification"
+            }
+          }
+        },
         "threshold_projection": {
           "type": "object",
           "additionalProperties": false,
@@ -398,7 +458,24 @@
             "properties": { "schemaVersion": { "const": "1.2.0" } },
             "required": ["schemaVersion"]
           },
-          "then": { "required": ["runner_mapping", "retention"] }
+          "then": {
+            "required": ["runner_mapping", "retention"],
+            "not": { "required": ["resume"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "schemaVersion": { "const": "1.3.0" } },
+            "required": ["schemaVersion"]
+          },
+          "then": { "required": ["runner_mapping", "retention", "resume"] }
+        },
+        {
+          "if": {
+            "properties": { "schemaVersion": { "const": "1.1.0" } },
+            "required": ["schemaVersion"]
+          },
+          "then": { "not": { "required": ["resume"] } }
         }
       ]
     },

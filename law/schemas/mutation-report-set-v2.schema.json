@@ -2,14 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/mutation-report-set-v2.schema.json",
   "title": "Canonical mutation report set v2",
-  "description": "Sole forward mutation-v2 schema. The strict union covers the output contract, normalized Stryker report, immutable package result, candidate composition, and prior semantic-verification receipt. Schema validation never establishes a pass.",
-  "schema_version": "2.1.0",
+  "description": "Sole forward mutation-v2 schema. The strict union retains the isolated v2.1 output-contract, composition, and semantic-receipt branch and adds the forward v2.2 contract, composition, semantic receipt, and embedded package-execution-origin branch. Schema validation never establishes a pass or activates a forward branch.",
+  "schema_version": "2.2.0",
   "oneOf": [
     { "$ref": "#/$defs/output_contract" },
     { "$ref": "#/$defs/normalized_report" },
     { "$ref": "#/$defs/package_result" },
     { "$ref": "#/$defs/composition" },
-    { "$ref": "#/$defs/semantic_receipt" }
+    { "$ref": "#/$defs/semantic_receipt" },
+    { "$ref": "#/$defs/output_contract_v22" },
+    { "$ref": "#/$defs/composition_v22" },
+    { "$ref": "#/$defs/semantic_receipt_v22" }
   ],
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -973,6 +976,531 @@
       ],
       "properties": {
         "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-semantic-verification-receipt-v2" },
+        "receiptId": { "type": "string", "pattern": "^MSV2-[0-9a-f]{16}$" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "outputContractDigest": { "$ref": "#/$defs/sha256" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "verifierProvenance": { "$ref": "#/$defs/verifier_provenance" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/semantic_receipt_package" }
+        },
+        "packageResultSetDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "semanticVerificationPerformed": { "const": true },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "execution_binding_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templateId", "templateVersion", "taskNode", "taskPolicyDigest"],
+      "properties": {
+        "templateId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "templateVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "taskNode": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
+        "taskPolicyDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "required_package_contract_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "reportPath",
+        "resultPath",
+        "inputProjection",
+        "inputDigest",
+        "thresholds",
+        "executionBinding"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "inputProjection": { "$ref": "#/$defs/input_projection" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
+        "executionBinding": { "$ref": "#/$defs/execution_binding_v22" }
+      }
+    },
+    "output_contract_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "expectedPackageCount",
+        "summaryPath",
+        "semanticReceiptPath",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "packages",
+        "paths"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.2.0" },
+        "kind": { "const": "mutation-report-set-v2" },
+        "expectedPackageCount": { "type": "integer", "minimum": 1 },
+        "summaryPath": { "$ref": "#/$defs/portable_path" },
+        "semanticReceiptPath": { "$ref": "#/$defs/portable_path" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/required_package_contract_v22" },
+              { "$ref": "#/$defs/not_required_package_contract" }
+            ]
+          }
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/portable_path" }
+        }
+      }
+    },
+    "mpe_artifact_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "sizeBytes"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portable_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "sizeBytes": { "$ref": "#/$defs/count" }
+      }
+    },
+    "mutation_package_execution_receipt_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptId",
+        "repositoryId",
+        "candidate",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "template",
+        "task",
+        "package",
+        "report",
+        "result",
+        "verifierProvenance",
+        "receiptDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "kind": { "const": "mutation-package-execution-receipt-v1" },
+        "receiptId": { "type": "string", "pattern": "^MPE1-[0-9a-f]{16}$" },
+        "repositoryId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "template": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "version": { "type": "string", "minLength": 1, "maxLength": 100 }
+          }
+        },
+        "task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodeId", "policyDigest"],
+          "properties": {
+            "nodeId": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
+            "policyDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "package": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName", "workspace", "inputDigest"],
+          "properties": {
+            "packageName": { "$ref": "#/$defs/package_name" },
+            "workspace": { "$ref": "#/$defs/portable_path" },
+            "inputDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "report": { "$ref": "#/$defs/mpe_artifact_v1" },
+        "result": { "$ref": "#/$defs/mpe_artifact_v1" },
+        "verifierProvenance": { "$ref": "#/$defs/verifier_provenance" },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "mutation_package_execution_origin_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt"],
+      "properties": {
+        "kind": { "const": "mutation-package-execution-origin-v1" },
+        "receipt": { "$ref": "#/$defs/mutation_package_execution_receipt_v1" }
+      }
+    },
+    "reuse_origin_v22": {
+      "oneOf": [
+        { "$ref": "#/$defs/reuse_origin" },
+        { "$ref": "#/$defs/mutation_package_execution_origin_v1" }
+      ]
+    },
+    "evidence_ref_v22": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "kind",
+        "packageName",
+        "workspace",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputDigest",
+        "provenance",
+        "origin"
+      ],
+      "properties": {
+        "kind": { "const": "mutation-package-evidence-ref-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "provenance": { "enum": ["fresh", "reused"] },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin_v22" }] }
+      },
+      "oneOf": [
+        {
+          "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } },
+          "required": ["provenance", "origin"]
+        },
+        {
+          "properties": {
+            "provenance": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin_v22" }
+          },
+          "required": ["provenance", "origin"]
+        }
+      ]
+    },
+    "evidence_package_entry_v22": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "disposition",
+        "verdict",
+        "passed",
+        "complete",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputDigest",
+        "evidenceRef",
+        "evidenceRefDigest",
+        "thresholds",
+        "statusTotals",
+        "targetCensus",
+        "score",
+        "origin"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "disposition": { "enum": ["executed", "reused"] },
+        "verdict": { "enum": ["pass", "fail", "unknown"] },
+        "passed": { "type": "boolean" },
+        "complete": { "type": "boolean" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceRef": { "$ref": "#/$defs/evidence_ref_v22" },
+        "evidenceRefDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "targetCensus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFileCount", "totalMutants"],
+          "properties": {
+            "targetFileCount": { "$ref": "#/$defs/count" },
+            "totalMutants": { "$ref": "#/$defs/count" }
+          }
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin_v22" }] }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "disposition": { "const": "executed" },
+            "origin": { "type": "null" },
+            "evidenceRef": {
+              "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        },
+        {
+          "properties": {
+            "disposition": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin_v22" },
+            "evidenceRef": {
+              "properties": {
+                "provenance": { "const": "reused" },
+                "origin": { "$ref": "#/$defs/reuse_origin_v22" }
+              }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        }
+      ],
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/required_measurement_is_empty" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "passed": { "const": false },
+              "verdict": { "const": "unknown" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "complete": { "const": false } }, "required": ["complete"] },
+          "then": {
+            "properties": { "passed": { "const": false }, "verdict": { "const": "unknown" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": true } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "pass" } } }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": false } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "fail" } } }
+        }
+      ]
+    },
+    "composition_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "candidate",
+        "complete",
+        "verdict",
+        "passed",
+        "packages",
+        "aggregate"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.2.0" },
+        "kind": { "const": "mutation-composed-report-set-v2" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "complete": { "type": "boolean" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "passed": { "type": "boolean" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/evidence_package_entry_v22" },
+              { "$ref": "#/$defs/not_required_package_entry" }
+            ]
+          }
+        },
+        "aggregate": { "$ref": "#/$defs/aggregate" }
+      },
+      "allOf": [
+        {
+          "if": { "not": { "$ref": "#/$defs/contains_required_package" } },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "not-applicable" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "executedPackageCount": { "const": 0 },
+                      "reusedPackageCount": { "const": 0 },
+                      "score": { "type": "null" },
+                      "statusTotals": { "$ref": "#/$defs/zero_status_totals" },
+                      "verdict": { "const": "not-applicable" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "$ref": "#/$defs/aggregate_scored_is_zero" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "null" } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/aggregate_scored_is_zero" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "number", "minimum": 0, "maximum": 100 } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": { "$ref": "#/$defs/contains_incomplete_required_package" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "verdict": { "const": "unknown" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "unknown" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "not": { "$ref": "#/$defs/contains_not_passed_required_package" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "pass" },
+              "passed": { "const": true },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "verdict": { "const": "pass" }, "passed": { "const": true } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "$ref": "#/$defs/contains_not_passed_required_package" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "fail" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "verdict": { "const": "fail" }, "passed": { "const": false } } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "semantic_receipt_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptId",
+        "candidate",
+        "outputContractDigest",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "verifierProvenance",
+        "packages",
+        "packageResultSetDigest",
+        "evidenceSetDigest",
+        "verdict",
+        "semanticVerificationPerformed",
+        "receiptDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.2.0" },
         "kind": { "const": "mutation-semantic-verification-receipt-v2" },
         "receiptId": { "type": "string", "pattern": "^MSV2-[0-9a-f]{16}$" },
         "candidate": { "$ref": "#/$defs/candidate" },
