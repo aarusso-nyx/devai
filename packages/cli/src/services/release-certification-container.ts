@@ -444,10 +444,14 @@ export class ProtectedCertificationContainer {
       'none',
       '--restart',
       'no',
-      // Bounded scratch, and still noexec/nosuid/nodev. The release DAG packs the
-      // candidate package twice under /tmp, which does not fit in 64 MiB.
+      // Bounded scratch, still nosuid and nodev. The release DAG packs the candidate
+      // package twice under /tmp, which does not fit in 64 MiB, and its tasks build
+      // and run their own stub executables there. noexec constrains nothing a task
+      // cannot already do through the interpreters it is given; it only turns those
+      // checks into unrun ones. Isolation rests on the read-only rootfs, dropped
+      // capabilities, no-new-privileges, the unprivileged user and the absent network.
       '--tmpfs',
-      '/tmp:rw,noexec,nosuid,nodev,size=536870912',
+      '/tmp:rw,exec,nosuid,nodev,size=536870912',
       '--env',
       'HOME=/tmp',
       '--env',
