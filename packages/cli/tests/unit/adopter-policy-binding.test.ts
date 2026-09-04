@@ -104,8 +104,8 @@ function verify(
   return verifyAdopterPolicyBindingSnapshot({
     files: fixture.files,
     frameworkVersion: fixture.frameworkVersion,
-    validatePolicy: (document) => getValidator('adopter-policy.schema.json')(document),
-    validateProject: (document) => getValidator('project-config.schema.json')(document),
+    validatePolicy: (document) => getValidator('adopter-policy.schema.json')(document) === true,
+    validateProject: (document) => getValidator('project-config.schema.json')(document) === true,
     materialize,
     ...overrides,
   });
@@ -176,12 +176,14 @@ describe('adopter policy binding parser', () => {
 
   it('verifies exact raw materialization bytes using the installed validators and materializer', () => {
     const fixture = snapshot();
+    const source = fixture.files.get(SOURCE_PATH);
+    if (source === undefined) throw new Error('fixture source is missing');
 
     expect(verify(fixture)).toMatchObject({
       policy,
       project: { ...project, devai_version: FRAMEWORK_VERSION },
       release_verification: policy.release_verification,
-      adopter_policy: { path: SOURCE_PATH, sha256: sha256(fixture.files.get(SOURCE_PATH) ?? []) },
+      adopter_policy: { path: SOURCE_PATH, sha256: sha256(source) },
       binding_receipt: { path: BINDING_PATH },
     });
   });
