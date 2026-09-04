@@ -1,4 +1,5 @@
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import { resolveReleaseMutationRequirements } from './release-lifecycle-execution.js';
 import type {
   CertificationOutputBlobHandle,
   ReleaseLifecycleRequest,
@@ -10,6 +11,7 @@ import {
   type CertificationOutputClosure,
   type CertificationOutputClosureBinding,
   type ImmutableReleaseContentSource,
+  type ReleaseMutationPlanReaders,
 } from './release-prepare-kernel.js';
 
 export interface ImmutableCertificationTaskPolicy {
@@ -41,7 +43,13 @@ export interface CertificationEvidenceTransaction {
 
 export interface TrustedCertificationEvidenceSink extends Pick<
   ImmutableReleaseContentSource,
-  'readCertificationEvidenceReceipt' | 'readCertificationOutputClosure' | 'readGeneratedBlob'
+  | 'readCertificationEvidenceReceipt'
+  | 'readCertificationOutputClosure'
+  | 'readGeneratedBlob'
+  | 'unit_mutation_maximum_bytes'
+  | 'readUnitMutationEvidenceClosure'
+  | 'readUnitMutationEvidenceReceipt'
+  | 'readUnitMutationEvidenceBlob'
 > {
   readonly authority_owner?: object;
   readonly kind: 'certification-evidence-sink-v3';
@@ -71,12 +79,14 @@ export function isProtectedReleaseCertificationProvider(
 }
 
 /** Only a trusted host composition root can supply these capabilities. No CLI document selects code. */
-export function createReleaseCertificationProvider(input: {
-  readonly provider: ProtectedCertificationProvider;
-  readonly evidence_sink: TrustedCertificationEvidenceSink;
-  readonly content_source: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'>;
-  readonly task_policies: readonly ImmutableCertificationTaskPolicy[];
-}): ReleaseProvider {
+export function createReleaseCertificationProvider(
+  input: ReleaseMutationPlanReaders & {
+    readonly provider: ProtectedCertificationProvider;
+    readonly evidence_sink: TrustedCertificationEvidenceSink;
+    readonly content_source: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'>;
+    readonly task_policies: readonly ImmutableCertificationTaskPolicy[];
+  },
+): ReleaseProvider {
   if (
     input.provider?.kind !== 'protected-certification-provider-v3' ||
     typeof input.provider.certify !== 'function'
@@ -104,8 +114,22 @@ export function createReleaseCertificationProvider(input: {
   const policies = JSON.parse(
     canonicalJson(input.task_policies),
   ) as readonly ImmutableCertificationTaskPolicy[];
-  const provider: ReleaseProvider = async (request) => {
+  const readUnitClosure =
+    typeof sink.readUnitMutationEvidenceClosure === 'function'
+      ? sink.readUnitMutationEvidenceClosure.bind(sink)
+      : undefined;
+  const readUnitReceipt =
+    typeof sink.readUnitMutationEvidenceReceipt === 'function'
+      ? sink.readUnitMutationEvidenceReceipt.bind(sink)
+      : undefined;
+  const readUnitBlob =
+    typeof sink.readUnitMutationEvidenceBlob === 'function'
+      ? sink.readUnitMutationEvidenceBlob.bind(sink)
+      : undefined;
+  const maximumUnitBytes = sink.unit_mutation_maximum_bytes;
+  const provider: ReleaseProvider = async (requestInput) => {
     try {
+      const request = JSON.parse(canonicalJson(requestInput)) as ReleaseLifecycleRequest;
       if (
         request.action_id !== 'release certify' ||
         canonicalJson(policies.map((policy) => policy.release_unit)) !==
@@ -116,6 +140,18 @@ export function createReleaseCertificationProvider(input: {
       ) {
         throw new Error('release-task-policy-identity-mismatch');
       }
+      // Resolve before any producer work; a missing/stale plan is not permission to run.
+      const requirements = resolveReleaseMutationRequirements(request, input);
+      if (
+        requirements.some((unit) => unit.binding !== null) &&
+        (typeof readUnitClosure !== 'function' ||
+          typeof readUnitReceipt !== 'function' ||
+          typeof readUnitBlob !== 'function' ||
+          maximumUnitBytes === undefined ||
+          !Number.isSafeInteger(maximumUnitBytes) ||
+          maximumUnitBytes < 1)
+      )
+        throw new Error('release-certification-generated-output-untrusted');
       const result = await input.provider.certify({
         request: JSON.parse(canonicalJson(request)) as ReleaseLifecycleRequest,
         task_policies: JSON.parse(
@@ -127,7 +163,10 @@ export function createReleaseCertificationProvider(input: {
       if (result.material === undefined || result.transaction !== undefined) {
         throw new Error('release-certification-generated-output-untrusted');
       }
-      for (const [index, unit] of result.material.release_units.entries()) {
+      const material = JSON.parse(canonicalJson(result.material)) as NonNullable<
+        ReleaseProviderResult['material']
+      >;
+      for (const [index, unit] of material.release_units.entries()) {
         if (
           unit.packages.some(
             (pkg) =>
@@ -138,14 +177,39 @@ export function createReleaseCertificationProvider(input: {
           throw new Error('release-task-policy-identity-mismatch');
         }
       }
-      await verifyCertificationMaterial(request, result.material, {
-        readGitObject: (value) => input.content_source.readGitObject(value),
-        readGitBlob: (value) => input.content_source.readGitBlob(value),
-        readCertificationEvidenceReceipt: (value) => sink.readCertificationEvidenceReceipt(value),
-        readCertificationOutputClosure: (value) => sink.readCertificationOutputClosure(value),
-        readGeneratedBlob: (value) => sink.readGeneratedBlob(value),
-      });
-      return result;
+      await verifyCertificationMaterial(
+        request,
+        material,
+        {
+          readGitObject: (value) => input.content_source.readGitObject(value),
+          readGitBlob: (value) => input.content_source.readGitBlob(value),
+          readCertificationEvidenceReceipt: (value) => sink.readCertificationEvidenceReceipt(value),
+          readCertificationOutputClosure: (value) => sink.readCertificationOutputClosure(value),
+          readGeneratedBlob: (value) => sink.readGeneratedBlob(value),
+          ...(maximumUnitBytes === undefined
+            ? {}
+            : {
+                unit_mutation_maximum_bytes: maximumUnitBytes,
+              }),
+          ...(readUnitClosure === undefined
+            ? {}
+            : {
+                readUnitMutationEvidenceClosure: readUnitClosure,
+              }),
+          ...(readUnitReceipt === undefined
+            ? {}
+            : {
+                readUnitMutationEvidenceReceipt: readUnitReceipt,
+              }),
+          ...(readUnitBlob === undefined
+            ? {}
+            : {
+                readUnitMutationEvidenceBlob: readUnitBlob,
+              }),
+        },
+        input,
+      );
+      return { ...result, material };
     } catch (error) {
       return {
         outcome: 'failure',

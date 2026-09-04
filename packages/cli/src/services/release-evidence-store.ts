@@ -300,6 +300,7 @@ function createStore(
     return closures;
   };
   return Object.freeze<ReleaseCertificationEvidenceStore>({
+    unit_mutation_maximum_bytes: maximumUnitBytes,
     authority_owner: owner,
     kind: 'certification-evidence-sink-v3' as const,
     protocol: 'two-phase-content-addressed' as const,
@@ -619,6 +620,7 @@ export function createReleaseCertificationEvidenceStore(
 ): ReleaseCertificationEvidenceStore {
   const store = storageBoundary(() => createStore(input));
   return Object.freeze<ReleaseCertificationEvidenceStore>({
+    unit_mutation_maximum_bytes: store.unit_mutation_maximum_bytes,
     authority_owner: store.authority_owner,
     kind: store.kind,
     protocol: store.protocol,

@@ -81,6 +81,8 @@ export interface UnitMutationEvidenceTransaction {
 }
 
 export interface UnitMutationEvidenceSink {
+  /** Protected host read budget, captured from the evidence store controls. */
+  readonly unit_mutation_maximum_bytes: number;
   readonly beginUnitMutationEvidence: (
     binding: UnitMutationEvidenceBinding,
   ) => UnitMutationEvidenceTransaction;

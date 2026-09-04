@@ -31,7 +31,10 @@ import { verifyReleasePolicyClosure } from './release-policy-closure.js';
 import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
 import { isProtectedReleaseCertificationProvider } from './release-lifecycle-certification.js';
 import { isProtectedReleasePreflightProvider } from './release-certification-provider.js';
-import type { UnitMutationEvidenceBinding } from './release-unit-mutation-evidence.js';
+import type {
+  UnitMutationEvidenceBinding,
+  ReleaseUnitMutationEvidenceClosure,
+} from './release-unit-mutation-evidence.js';
 
 export const RELEASE_ACTIONS = [
   'release plan',
@@ -224,6 +227,7 @@ export interface ReleaseUnitEvidence {
   readonly release_unit: string;
   readonly version: string;
   readonly packages: readonly PackageEvidence[];
+  readonly mutation_evidence?: ReleaseUnitMutationEvidenceClosure | null;
 }
 
 export interface ReleaseStateMaterial {
@@ -2225,6 +2229,11 @@ function assertPriorMaterialContinuity(
   for (const [unitIndex, priorUnit] of prior.release_units.entries()) {
     const nextUnit = material.release_units[unitIndex];
     if (nextUnit === undefined) throw new Error('release-evidence-binding-invalid');
+    if (
+      (action === 'release prepare' || action === 'release export') &&
+      !same(priorUnit.mutation_evidence ?? null, nextUnit.mutation_evidence ?? null)
+    )
+      throw new Error('release-evidence-binding-invalid');
     for (const [packageIndex, priorPackage] of priorUnit.packages.entries()) {
       const nextPackage = nextUnit.packages[packageIndex];
       if (nextPackage === undefined) throw new Error('release-evidence-binding-invalid');

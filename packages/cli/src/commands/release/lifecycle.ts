@@ -392,7 +392,11 @@ function lifecycleAction(
               const certification = adapters?.certification_provider?.(request);
               if (certification === undefined)
                 throw new Error('release-certification-provider-unavailable');
-              provider = createReleaseCertificationProvider(certification);
+              provider = createReleaseCertificationProvider({
+                ...certification,
+                resolve_receipt: resolvers.receipt,
+                resolve_plan_input: resolvers.plan,
+              });
             } else if (name === 'release prepare') {
               const contentSource = adapters?.prepare_content_source?.(request);
               const artifactSink = adapters?.artifact_sink?.(request);
@@ -405,6 +409,8 @@ function lifecycleAction(
                   certified_state: certifiedState,
                   content_source: contentSource,
                   artifact_sink: artifactSink,
+                  resolve_receipt: resolvers.receipt,
+                  resolve_plan_input: resolvers.plan,
                 });
               }
             } else {

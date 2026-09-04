@@ -543,6 +543,10 @@ export function createProtectedReleaseHostRunner(
   });
   const content: ImmutableReleaseContentSource = {
     ...git,
+    unit_mutation_maximum_bytes: evidence.unit_mutation_maximum_bytes,
+    readUnitMutationEvidenceClosure: (value) => evidence.readUnitMutationEvidenceClosure(value),
+    readUnitMutationEvidenceReceipt: (value) => evidence.readUnitMutationEvidenceReceipt(value),
+    readUnitMutationEvidenceBlob: (value) => evidence.readUnitMutationEvidenceBlob(value),
     readCertificationEvidenceReceipt: (value) => evidence.readCertificationEvidenceReceipt(value),
     readCertificationOutputClosure: (value) => evidence.readCertificationOutputClosure(value),
     readGeneratedBlob: (value) => evidence.readGeneratedBlob(value),
