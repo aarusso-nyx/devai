@@ -44,10 +44,15 @@ function archive(files: readonly ReleasePackageFile[]): Buffer {
   const chunks: Buffer[] = [];
   for (const file of files) {
     const name = `package/${file.path}`;
-    if (Buffer.byteLength(name, 'utf8') > 100) throw new Error('fixture archive path too long');
+    const split = Buffer.byteLength(name, 'utf8') > 100 ? name.lastIndexOf('/') : -1;
+    const headerName = split < 0 ? name : name.slice(split + 1);
+    const prefix = split < 0 ? '' : name.slice(0, split);
+    if (Buffer.byteLength(headerName, 'utf8') > 100 || Buffer.byteLength(prefix, 'utf8') > 155)
+      throw new Error('fixture archive path too long');
     const bytes = Buffer.from(file.bytes);
     const header = Buffer.alloc(512);
-    header.write(name, 0, 'utf8');
+    header.write(headerName, 0, 'utf8');
+    header.write(prefix, 345, 'utf8');
     octal(header, 100, 8, file.mode);
     octal(header, 108, 8, 0);
     octal(header, 116, 8, 0);
@@ -75,10 +80,13 @@ function frozen(path: string): Buffer {
   });
 }
 
-function installedPackage(): ReleasePackageSnapshot {
+export function installedPackage(
+  extraFiles: readonly ReleasePackageFile[] = [],
+): ReleasePackageSnapshot {
   const schemaRoot = join(ROOT, 'law/schemas');
   const policyRoot = join(ROOT, 'law/policy');
   const files: ReleasePackageFile[] = [
+    ...extraFiles,
     {
       path: 'package.json',
       mode: 0o644,
@@ -231,8 +239,7 @@ interface Fixture {
   readonly files: Map<string, Uint8Array>;
 }
 
-export function fixture(): Fixture {
-  const installed = installedPackage();
+export function fixture(installed = installedPackage()): Fixture {
   const policy = JSON.parse(frozen(POLICY_PATH).toString('utf8')) as Record<string, unknown>;
   const tools = createReleasePolicyPackageTools(installed);
   const pin = installed.read('dist/law/constitution.md');
