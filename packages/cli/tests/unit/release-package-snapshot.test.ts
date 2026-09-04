@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import {
   isVerifiedReleasePackageSnapshot,
+  verifyReleaseHostArchive,
   verifyReleasePackageSnapshot,
   type ReleasePackageFile,
   type ReleasePackageIdentity,
@@ -140,11 +141,103 @@ function verify(
   });
 }
 
+function verifyHostArchive(
+  value: ReturnType<typeof fixture>,
+  // Runtime closed-key tests intentionally construct controls outside the public type.
+  overrides: object = {},
+) {
+  return verifyReleaseHostArchive({
+    expected: value.expected,
+    archive: value.archive,
+    maximum_archive_bytes: value.archive.byteLength,
+    maximum_unpacked_bytes: 64 * 1024,
+    maximum_entries: value.files.length + value.directories.length,
+    maximum_depth: 1,
+    ...overrides,
+  } as Parameters<typeof verifyReleaseHostArchive>[0]);
+}
+
 function expectRefusal(run: () => unknown): void {
   expect(run).toThrow(/^rpl-package-identity-mismatch$/u);
 }
 
 describe('release package archive snapshot', () => {
+  it('projects an exact bounded USTAR archive without minting an installed snapshot brand', () => {
+    const value = fixture();
+    const sourceArchive = Buffer.from(value.archive);
+    const projection = verifyHostArchive(value, { archive: sourceArchive });
+
+    expect(projection.identity).toEqual(value.expected);
+    expect(projection.manifest).toEqual(value.manifest);
+    expect(projection.directories).toEqual(value.directories);
+    expect(projection.read('package.json')).toEqual(value.files[0]?.bytes);
+    expect(isVerifiedReleasePackageSnapshot(projection)).toBe(false);
+    expect(isVerifiedReleasePackageSnapshot({ ...projection })).toBe(false);
+
+    sourceArchive.fill(0);
+    const read = projection.read('package.json');
+    const compressed = projection.readArchive();
+    const tar = projection.readTar();
+    read.fill(0);
+    compressed.fill(0);
+    tar.fill(0);
+    expect(projection.read('package.json')).toEqual(value.files[0]?.bytes);
+    expect(projection.readArchive()).toEqual(value.archive);
+    expect(projection.readTar().byteLength).toBeGreaterThan(1024);
+  });
+
+  it.each([
+    ['one below the complete file plus implicit-directory census', { maximum_entries: 4 }],
+    ['below the deepest package-relative directory', { maximum_depth: 0 }],
+    ['a malformed gzip archive', { archive: Buffer.from('not a gzip archive') }],
+    ['an unexpected own key', { unexpected: true }],
+    ['an own symbol key', { [Symbol('unexpected')]: true }],
+  ])('archive projection refuses %s', (_label, alteration) => {
+    const value = fixture();
+    expectRefusal(() => verifyHostArchive(value, alteration));
+  });
+
+  it.each([
+    [
+      'a duplicate archive path',
+      () =>
+        fixture([
+          {
+            path: 'package/package.json',
+            mode: 0o644,
+            bytes: Buffer.from('{"name":"@aarusso-nyx/devai","version":"1.4.5"}'),
+          },
+          { path: 'package/package.json', mode: 0o644, bytes: Buffer.from('duplicate') },
+        ]),
+    ],
+    [
+      'an escaping archive path',
+      () =>
+        fixture([
+          {
+            path: 'package/package.json',
+            mode: 0o644,
+            bytes: Buffer.from('{"name":"@aarusso-nyx/devai","version":"1.4.5"}'),
+          },
+          { path: 'package/../escape.js', mode: 0o644, bytes: Buffer.from('escape') },
+        ]),
+    ],
+    [
+      'a link archive entry',
+      () =>
+        fixture([
+          {
+            path: 'package/package.json',
+            mode: 0o644,
+            bytes: Buffer.from('{"name":"@aarusso-nyx/devai","version":"1.4.5"}'),
+          },
+          { path: 'package/link.js', mode: 0o644, type: 0x32, linkname: 'package.json' },
+        ]),
+    ],
+  ])('archive projection rejects %s before provisioning', (_label, build) => {
+    expectRefusal(() => verifyHostArchive(build()));
+  });
+
   it('verifies a complete USTAR .tgz population and full raw-byte manifest', () => {
     const value = fixture();
     const snapshot = verify(value);
