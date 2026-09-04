@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { constants, fstatSync, lstatSync, readFileSync } from 'node:fs';
+import { constants, fstatSync, lstatSync, readFileSync, type Dirent } from 'node:fs';
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { createProtectedReleaseSinkFilesystem } from '@devai-nyx/authority';
 
@@ -181,7 +181,7 @@ export function createDurableReleaseContentStore(
     if (!DIGEST.test(sha256)) fail();
     return join(root, 'objects', sha256);
   };
-  const list = (path: string) => {
+  const list = (path: string): Dirent<string>[] => {
     assertPath(path);
     const before = inspectAncestors(path);
     const entries = readdirSync(path, { withFileTypes: true });

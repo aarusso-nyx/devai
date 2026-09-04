@@ -88,9 +88,13 @@ export interface ReleaseCertificationEvidenceStoreOptions {
   readonly max_blob_bytes: number;
 }
 
+export type ReleaseCertificationEvidenceStore = TrustedCertificationEvidenceSink & {
+  readonly authority_owner: object;
+};
+
 function createStore(
   input: ReleaseCertificationEvidenceStoreOptions,
-): TrustedCertificationEvidenceSink {
+): ReleaseCertificationEvidenceStore {
   const owner = createProtectedReleaseSinkOwner('certification', input.evidence_sink_id);
   const { root, sinkId, checkRoot, inspectAncestors, read, ensureDirectory, install, objectPath } =
     createDurableReleaseContentStore({ ...input, sink_id: input.evidence_sink_id }, fail, owner);
@@ -210,7 +214,7 @@ function createStore(
     }
     return closures;
   };
-  return Object.freeze<TrustedCertificationEvidenceSink>({
+  return Object.freeze<ReleaseCertificationEvidenceStore>({
     authority_owner: owner,
     kind: 'certification-evidence-sink-v3' as const,
     protocol: 'two-phase-content-addressed' as const,
@@ -390,9 +394,9 @@ function storageBoundary<T>(operation: () => T): T {
 
 export function createReleaseCertificationEvidenceStore(
   input: ReleaseCertificationEvidenceStoreOptions,
-): TrustedCertificationEvidenceSink {
+): ReleaseCertificationEvidenceStore {
   const store = storageBoundary(() => createStore(input));
-  return Object.freeze<TrustedCertificationEvidenceSink>({
+  return Object.freeze<ReleaseCertificationEvidenceStore>({
     authority_owner: store.authority_owner,
     kind: store.kind,
     protocol: store.protocol,

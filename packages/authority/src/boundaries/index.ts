@@ -886,12 +886,18 @@ function unauthorizedMutatorCalls(
         ? (importedNames.get(expression.text) ?? expression.text)
         : symbol;
       const gitReadOwners =
-        importedSymbol === undefined ? undefined : GIT_READ_OWNERS[importedSymbol];
+        importedSymbol !== undefined && Object.hasOwn(GIT_READ_OWNERS, importedSymbol)
+          ? GIT_READ_OWNERS[importedSymbol]
+          : undefined;
+      const gitReadModule = ts.isIdentifier(expression)
+        ? imported.get(expression.text)
+        : ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)
+          ? imported.get(expression.expression.text)
+          : undefined;
       if (
         importedSymbol !== undefined &&
         gitReadOwners !== undefined &&
-        (!gitReadOwners.has(fileName) ||
-          (ts.isIdentifier(expression) && imported.get(expression.text) !== HOST_EFFECTS_MODULE))
+        (!gitReadOwners.has(fileName) || gitReadModule !== HOST_EFFECTS_MODULE)
       ) {
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
