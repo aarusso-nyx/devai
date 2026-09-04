@@ -58,6 +58,18 @@ const PROFILE = '.devai/config/release-verification.json';
 const PROJECT = '.devai/config/project.json';
 const PIN = '.devai/pin/constitution.md';
 const BINDING = '.devai/config/adopter-policy-binding.json';
+const REFUSALS = new Set([
+  INVALID,
+  'rpl-package-identity-mismatch',
+  'rpl-adopter-binding-mismatch',
+  'rpl-input-unresolved',
+  'rpl-policy-source-unresolved',
+]);
+
+/** Preserve the same closed refusal classes at every replay boundary, never native diagnostics. */
+export function releasePolicyFailureCode(error: unknown): string {
+  return error instanceof Error && REFUSALS.has(error.message) ? error.message : INVALID;
+}
 
 function fail(code = INVALID): never {
   throw new Error(code);
@@ -340,17 +352,6 @@ export function resolveReleasePolicySnapshot(input: {
     }));
     return result;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      [
-        INVALID,
-        'rpl-package-identity-mismatch',
-        'rpl-adopter-binding-mismatch',
-        'rpl-input-unresolved',
-        'rpl-policy-source-unresolved',
-      ].includes(error.message)
-    )
-      throw error;
-    return fail();
+    return fail(releasePolicyFailureCode(error));
   }
 }

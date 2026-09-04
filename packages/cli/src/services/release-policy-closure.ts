@@ -7,6 +7,7 @@ import {
 } from './release-package-snapshot.js';
 import {
   readReleasePolicyResolutionEvidence,
+  releasePolicyFailureCode,
   resolveReleasePolicySnapshot,
   type ReleasePolicyExpectedIdentity,
   type ReleasePolicyResolutionEvidence,
@@ -69,7 +70,7 @@ export function verifyReleasePolicyClosure(input: {
       canonicalJson(input.implementation.identity) !==
         canonicalJson(input.expected.installed_package)
     )
-      return fail();
+      throw new Error('rpl-package-identity-mismatch');
     const closure = input.closure;
     if (
       Object.keys(closure).sort().join(',') !== 'evidence,format,plan' ||
@@ -140,7 +141,7 @@ export function verifyReleasePolicyClosure(input: {
     });
     if (!verifyResolvedReleasePlanReceipt({ receipt: closure.plan, resolution })) return fail();
     return resolution;
-  } catch {
-    return fail();
+  } catch (error) {
+    throw new Error(releasePolicyFailureCode(error));
   }
 }

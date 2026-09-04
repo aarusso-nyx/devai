@@ -664,6 +664,21 @@ function verifyReceiptDocument(
   return { kind, value: receipt };
 }
 
+/** Integrity-only historical inspection. Never called by a current execution gate. */
+function readHistoricalPlanReceipt(value: unknown): VerifiedReceipt {
+  const parsed = parsers.releasePlanReceipt.safeParse<Readonly<Record<string, unknown>>>(value);
+  if (!parsed.ok) throw new Error('release-receipt-identity-mismatch');
+  const receipt = parsed.value;
+  const digest = canonicalSha256(without(receipt, ['receipt_id', 'receipt_digest_sha256']));
+  if (
+    receipt['schemaVersion'] !== '1.0.0' ||
+    receipt['receipt_digest_sha256'] !== digest ||
+    receipt['receipt_id'] !== `RPL-${digest.slice(0, 16)}`
+  )
+    throw new Error('release-receipt-identity-mismatch');
+  return { kind: 'release-plan-receipt', value: receipt };
+}
+
 function verifyBoundReceipts(
   request: ReleaseLifecycleRequest,
   resolver?: ReceiptResolver,
@@ -1964,6 +1979,28 @@ function sortedArtifacts(values: readonly unknown[]): readonly unknown[] {
   );
 }
 
+function recordedPlanBindings(state: ReleaseLifecycleStateV2): readonly unknown[] {
+  const receipts = state['bound_receipts'];
+  return sortedArtifacts(
+    Array.isArray(receipts)
+      ? receipts.filter((entry: unknown) => object(entry)['kind'] === 'release-plan-receipt')
+      : [],
+  );
+}
+
+function verifiedPlanBindings(receipts: readonly VerifiedReceipt[]): readonly unknown[] {
+  return sortedArtifacts(
+    receipts
+      .filter((receipt) => receipt.kind === 'release-plan-receipt')
+      .map(({ value }) => ({
+        kind: 'release-plan-receipt',
+        receipt_id: value['receipt_id'],
+        receipt_digest_sha256: value['receipt_digest_sha256'],
+        verdict: value['verdict'],
+      })),
+  );
+}
+
 function offlineArtifactProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
   if (state.schemaVersion === '2.1.0') {
     return state['artifacts'] as readonly unknown[];
@@ -2312,6 +2349,14 @@ export async function executeReleaseLifecycleAction(input: {
           }
           const stateHead = stateReduction.head;
           if (stateHead !== null) assertStateMatchesRequest(request, stateHead);
+          const initialState = states[0];
+          const currentPlans = verifiedPlanBindings(receipts);
+          if (
+            initialState !== undefined &&
+            currentPlans.length > 0 &&
+            !same(currentPlans, recordedPlanBindings(initialState))
+          )
+            throw new Error('release-receipt-identity-mismatch');
           const completions = storeRecords.filter((record) => record.record_kind === 'completion');
           if (
             completions.length !== states.length ||
@@ -2844,6 +2889,8 @@ export async function executeOfflineVerification(input: {
       })
       .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b), 'en'));
     if (!same(supplied, expected)) throw new Error('rpl-policy-resolution-mismatch');
+    if (!same(recordedPlanBindings(state), verifiedPlanBindings(checkedPlans)))
+      throw new Error('release-receipt-identity-mismatch');
     assertMaterialBijection(request, 'release export', {
       release_units: state.release_units,
       inputs: [],
@@ -2916,6 +2963,7 @@ export interface StateReduction {
 export function reduceReleaseStates(values: readonly unknown[]): StateReduction {
   const errors = new Set<string>();
   let prior: ReleaseLifecycleStateV2 | null = null;
+  let initialPlans: readonly unknown[] | undefined;
   for (const [index, value] of values.entries()) {
     let state: ReleaseLifecycleStateV2;
     try {
@@ -2924,6 +2972,10 @@ export function reduceReleaseStates(values: readonly unknown[]): StateReduction 
       errors.add(error instanceof Error ? error.message : 'release-state-schema-invalid');
       continue;
     }
+    const plans = recordedPlanBindings(state);
+    if (initialPlans === undefined) initialPlans = plans;
+    else if (plans.length > 0 && !same(plans, initialPlans))
+      errors.add('release-receipt-identity-mismatch');
     if (prior !== null) {
       if (!same(state.repository, prior.repository) || !same(state.candidate, prior.candidate)) {
         errors.add('release-state-identity-mismatch');
@@ -3124,18 +3176,25 @@ export async function resumeReleaseLifecycleExecution(input: {
     }
   }
   const verifiedReceipts: VerifiedReceipt[] = [];
+  const historicalReceipts = new Set<VerifiedReceipt>();
+  const inspectReceipt = (document: unknown): VerifiedReceipt => {
+    const value = object(document);
+    if (value['receipt_kind'] === 'release-plan-receipt' && value['schemaVersion'] === '1.0.0') {
+      const receipt = readHistoricalPlanReceipt(value);
+      historicalReceipts.add(receipt);
+      return receipt;
+    }
+    return verifyReceiptDocument(value, input.resolve_plan_input);
+  };
   let receiptInvalid = false;
   try {
     for (const document of input.receipt_documents ?? []) {
-      verifiedReceipts.push(verifyReceiptDocument(document, input.resolve_plan_input));
+      verifiedReceipts.push(inspectReceipt(document));
     }
     for (const locator of input.receipt_locators ?? []) {
       if (input.resolve_receipt === undefined)
         throw new Error('release-receipt-provider-unavailable');
-      const receipt = verifyReceiptDocument(
-        input.resolve_receipt(locator),
-        input.resolve_plan_input,
-      );
+      const receipt = inspectReceipt(input.resolve_receipt(locator));
       if (
         receipt.kind !== locator.kind ||
         receipt.value['receipt_id'] !== locator.receipt_id ||
@@ -3148,6 +3207,7 @@ export async function resumeReleaseLifecycleExecution(input: {
   } catch {
     receiptInvalid = true;
   }
+  const hasHistoricalPlans = historicalReceipts.size > 0;
   const blocked =
     !stateReduction.ok ||
     !storeReduction.ok ||
@@ -3192,6 +3252,14 @@ export async function resumeReleaseLifecycleExecution(input: {
     const candidateMatches = expectedPlanCandidates.some((candidate) =>
       same(receipt['candidate'], candidate),
     );
+    if (hasHistoricalPlans) {
+      if (!repositoryMatches || !candidateMatches) receiptInvalid = true;
+      if (verified.kind === 'release-plan-receipt')
+        observedPlanCandidates.push(receipt['candidate']);
+      // Recognize intact historical data, without verifying a provider, deriving
+      // a current state, or promoting a mixed v1/v2 receipt set into authority.
+      continue;
+    }
     if (verified.kind === 'release-plan-receipt' && repositoryMatches && candidateMatches) {
       observedPlanCandidates.push(receipt['candidate']);
       derived.push({
@@ -3283,17 +3351,36 @@ export async function resumeReleaseLifecycleExecution(input: {
   if (
     (observedPlanCandidates.length > 0 || head !== null || storeReduction.records.length > 0) &&
     !same(
-      observedPlanCandidates.sort((left, right) =>
-        canonicalJson(left).localeCompare(canonicalJson(right), 'en'),
-      ),
+      (hasHistoricalPlans
+        ? [
+            ...new Map(
+              observedPlanCandidates.map((candidate) => [canonicalJson(candidate), candidate]),
+            ).values(),
+          ]
+        : observedPlanCandidates
+      ).sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right), 'en')),
       expectedPlanCandidates,
     )
   ) {
     receiptInvalid = true;
   }
+  if (stateReduction.ok && head !== null && input.states[0] !== undefined) {
+    const suppliedPlans = verifiedPlanBindings(verifiedReceipts);
+    const requiredPlans = recordedPlanBindings(verifyReleaseStateIdentity(input.states[0]));
+    if (
+      hasHistoricalPlans
+        ? requiredPlans.length === 0 ||
+          requiredPlans.some(
+            (required) => !suppliedPlans.some((supplied) => same(required, supplied)),
+          )
+        : !same(suppliedPlans, requiredPlans)
+    )
+      receiptInvalid = true;
+  }
   if (
     !blocked &&
     !receiptInvalid &&
+    !hasHistoricalPlans &&
     head !== null &&
     input.publication_receipt !== undefined &&
     input.verify_signature !== undefined
@@ -3313,7 +3400,7 @@ export async function resumeReleaseLifecycleExecution(input: {
       verified: true,
     });
   }
-  if (blocked || receiptInvalid) derived.length = 0;
+  if (blocked || receiptInvalid || hasHistoricalPlans) derived.length = 0;
   const hasPlan = derived.some((entry) => entry['state'] === 'planned');
   const hasOffline = derived.some((entry) => entry['state'] === 'offline_verified');
   let nextAction: ReleaseAction | null;
@@ -3328,6 +3415,7 @@ export async function resumeReleaseLifecycleExecution(input: {
     | 'fresh-exact-authorization-required'
     | 'candidate-identity-mismatch'
     | 'receipt-identity-mismatch'
+    | 'legacy-plan-non-authoritative'
     | null = null;
   let blockedRequirements: readonly 'fresh_exact_owner_authorization_required'[] = [];
   if (blocked || receiptInvalid) {
@@ -3344,6 +3432,10 @@ export async function resumeReleaseLifecycleExecution(input: {
             : !storeReduction.ok || !stateReduction.ok
               ? 'broken-chain'
               : 'receipt-identity-mismatch';
+  } else if (hasHistoricalPlans) {
+    nextAction = null;
+    nextOutcome = 'blocked';
+    blockedReason = 'legacy-plan-non-authoritative';
   } else if (ambiguous) {
     nextAction = null;
     nextOutcome = 'ambiguous';
@@ -3378,7 +3470,7 @@ export async function resumeReleaseLifecycleExecution(input: {
     nextOutcome = 'awaiting-external-receipt';
   }
   const draft = {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
     observation_kind: 'release-lifecycle-observation',
     repository: input.repository,
     candidate: input.candidate,
