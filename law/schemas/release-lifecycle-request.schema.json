@@ -132,7 +132,7 @@
   ],
   "$defs": {
     "sha256": { "$ref": "common-defs.schema.json#/$defs/sha256" },
-    "git_object": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "git_object": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
     "repository_locator": {
       "type": "object",
       "additionalProperties": false,
