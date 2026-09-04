@@ -28,6 +28,11 @@ export {
   type ReleasePolicyClosureLimits,
 } from './services/release-policy-closure.js';
 export {
+  encodeReleasePolicyClosure,
+  decodeReleasePolicyClosure,
+  type ReleasePolicyClosureTransportLimits,
+} from './services/release-policy-closure-transport.js';
+export {
   createContainerReleaseCertificationAdapters,
   type ContainerReleaseCertificationAdapters,
   type ContainerReleaseCertificationOptions,
@@ -82,6 +87,7 @@ export type {
   PackageEvidence,
   PersistedReleaseAction,
   PublicationControls,
+  PublicationSignatureVerifier,
   ReleaseLifecycleRequest,
   ReleaseLifecycleStateV2,
   ReleaseProvider,
