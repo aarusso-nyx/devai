@@ -34,6 +34,7 @@ import {
   type CheckRunnerOptions,
   type TaskExecutionResult,
 } from '../../src/services/check-runner/index.js';
+import { readProtectedCompletedTaskResults } from '../../src/services/check-runner/runner.js';
 import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
 import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
@@ -1097,6 +1098,99 @@ describe('content-addressed check runner', () => {
       ['createdAt', 'profile', 'repository', 'schemaVersion', 'taskPolicyDigest', 'tasks'].sort(),
     );
     expect(receiptBytes).not.toContain('signature');
+  });
+
+  it('retains the complete protected candidate result population in planned order', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const report = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [],
+    });
+
+    expect(report.receipt).toBeDefined();
+    expect(report.execution?.every((task) => task.disposition === 'executed')).toBe(true);
+    const results = readProtectedCompletedTaskResults(report);
+    expect(results.map((result) => result.nodeId)).toEqual(
+      report.plan.tasks.map((task) => task.nodeId),
+    );
+    expect(results.map((result) => result.taskKey)).toEqual(
+      report.plan.tasks.map((task) => task.taskKey),
+    );
+    expect(results.map((result) => result.status)).toEqual(report.plan.tasks.map(() => 'PASS'));
+    expect(results.every((result) => result.schemaVersion === '1.0.0')).toBe(true);
+  });
+
+  it('retains reused protected task results as the complete planned population', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const protectedOptions = {
+      target: 'affected' as const,
+      baseCommit: state.base,
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path: string) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [] as const,
+    };
+    const first = run(state.root, protectedOptions);
+    const second = run(state.root, protectedOptions);
+
+    expect(second.receipt).toBeDefined();
+    expect(second.execution?.every((task) => task.disposition === 'reused')).toBe(true);
+    expect(readProtectedCompletedTaskResults(second)).toEqual(
+      readProtectedCompletedTaskResults(first),
+    );
+    expect(readProtectedCompletedTaskResults(second).map((result) => result.nodeId)).toEqual(
+      second.plan.tasks.map((task) => task.nodeId),
+    );
+  });
+
+  it('refuses ordinary and non-receipt reports at the protected result boundary', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const ordinary = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+    });
+    const nonReceipt = run(state.root, {
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [],
+    });
+
+    expect(ordinary.receipt).toBeDefined();
+    expect(nonReceipt.receipt).toBeUndefined();
+    expect(() => readProtectedCompletedTaskResults(ordinary)).toThrow(
+      'release-certification-task-results-unavailable',
+    );
+    expect(() => readProtectedCompletedTaskResults(nonReceipt)).toThrow(
+      'release-certification-task-results-unavailable',
+    );
+  });
+
+  it('returns defensive snapshots without exposing retained protected results', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const report = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [],
+    });
+    const expected = readProtectedCompletedTaskResults(report);
+    const returned = readProtectedCompletedTaskResults(report) as Array<{
+      outputDigests: Record<string, string>;
+    }>;
+
+    returned.pop();
+    const firstReturned = returned.at(0);
+    if (firstReturned === undefined)
+      throw new Error('protected result population unexpectedly empty');
+    expect(Reflect.set(firstReturned.outputDigests, 'forged', 'f'.repeat(64))).toBe(false);
+    expect(readProtectedCompletedTaskResults(report)).toEqual(expected);
   });
 
   it('keeps ordinary RC task keys identical to independent portable-policy reconstruction', () => {

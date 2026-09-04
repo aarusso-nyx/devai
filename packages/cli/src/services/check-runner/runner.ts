@@ -38,6 +38,31 @@ import type {
 } from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 15 * 60_000;
+const protectedCompletedTaskResults = new WeakMap<
+  CheckRunnerReport,
+  readonly TaskResult[]
+>();
+
+function snapshotTaskResult(value: TaskResult): TaskResult {
+  return Object.freeze({
+    ...value,
+    dependencyResultDigests: Object.freeze({ ...value.dependencyResultDigests }),
+    outputDigests: Object.freeze({ ...value.outputDigests }),
+  });
+}
+
+/**
+ * A protected certification host may retain the canonical task-result population
+ * while it is still live. This never consults a cache path and is unavailable for
+ * reports that did not produce an attestable candidate receipt.
+ */
+export function readProtectedCompletedTaskResults(
+  report: CheckRunnerReport,
+): readonly TaskResult[] {
+  const results = protectedCompletedTaskResults.get(report);
+  if (results === undefined) throw new Error('release-certification-task-results-unavailable');
+  return results.map(snapshotTaskResult);
+}
 
 function descriptorFor(options: CheckRunnerOptions) {
   return options.descriptorDocument === undefined
@@ -659,6 +684,7 @@ function* runCheckTaskSteps(
       : currentRepositoryState(options.repoRoot);
   const initialState = repositoryState();
   const resultDigests = new Map<string, string>();
+  const taskResults = new Map<string, TaskResult>();
   const execution: ExecutedTask[] = [];
 
   for (const task of plan.tasks) {
@@ -684,7 +710,10 @@ function* runCheckTaskSteps(
     }
     const cached = cache.inspect(task, dependencyResultDigests);
     if (cached.cacheState === 'reusable' && cached.cachedResultDigest !== undefined) {
+      if (cached.result === undefined)
+        throw new Error('CHECK_RUNNER_INTERNAL: reusable task result missing');
       resultDigests.set(task.nodeId, cached.cachedResultDigest);
+      taskResults.set(task.nodeId, snapshotTaskResult(cached.result));
       execution.push({
         nodeId: task.nodeId,
         taskKey: task.taskKey,
@@ -799,6 +828,7 @@ function* runCheckTaskSteps(
     const resultDigest = cache.writeResult(taskResult);
     cache.writeAttempt(task.nodeId, task.taskKey, 'PASS', finishedAt, resultDigest);
     resultDigests.set(task.nodeId, resultDigest);
+    taskResults.set(task.nodeId, snapshotTaskResult(taskResult));
     execution.push({
       nodeId: task.nodeId,
       taskKey: task.taskKey,
@@ -899,7 +929,7 @@ function* runCheckTaskSteps(
     const written = cache.writeReceipt(candidateReceipt);
     receipt = { ...written, value: candidateReceipt };
   }
-  return {
+  const report: CheckRunnerReport = {
     schemaVersion: '1.0.0',
     operation: options.operation,
     plan,
@@ -945,4 +975,22 @@ function* runCheckTaskSteps(
     ...(receiptRefusal !== undefined && { receiptRefusal }),
     exitCode: allPass ? 0 : 1,
   };
+  if (
+    protectedOutputCapture &&
+    receipt !== undefined &&
+    taskResults.size === plan.tasks.length &&
+    plan.tasks.every((task) => taskResults.get(task.nodeId)?.taskKey === task.taskKey)
+  ) {
+    protectedCompletedTaskResults.set(
+      report,
+      Object.freeze(
+        plan.tasks.map((task) => {
+          const result = taskResults.get(task.nodeId);
+          if (result === undefined) throw new Error('CHECK_RUNNER_INTERNAL: retained task result missing');
+          return snapshotTaskResult(result);
+        }),
+      ),
+    );
+  }
+  return report;
 }
