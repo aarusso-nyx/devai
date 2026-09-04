@@ -248,6 +248,25 @@ describe('release mutation artifact normalization v2.1', () => {
     expect(result.passed).toBe(false);
   });
 
+  it('does not promote an unscored CompileError-only population despite its 100 sentinel score', () => {
+    const result = json(normalized(rawReport(['CompileError'])).result.bytes);
+
+    expect(result.targetCensus).toEqual({ targetFileCount: 1, totalMutants: 1 });
+    expect(result.statusTotals).toEqual({
+      CompileError: 1,
+      Ignored: 0,
+      Killed: 0,
+      NoCoverage: 0,
+      Pending: 0,
+      RuntimeError: 0,
+      Survived: 0,
+      Timeout: 0,
+    });
+    expect(result.score).toBe(100);
+    expect(result.complete).toBe(false);
+    expect(result.passed).toBe(false);
+  });
+
   it('refuses malformed roots, source/roster drift, duplicate mutants, and size quotas', () => {
     const malformedVersion = rawReport(['Killed']);
     malformedVersion.schemaVersion = '1.0.0';
