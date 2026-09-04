@@ -17,7 +17,7 @@
     "mutation_roster"
   ],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
+    "schemaVersion": { "enum": ["1.0.0", "1.1.0"] },
     "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
     "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -110,9 +110,138 @@
           }
         }
       }
+    },
+    "mutation_execution": {
+      "$ref": "#/$defs/devaiProtectedMutationExecution"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.1.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": { "required": ["mutation_execution"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "mutation_execution": {
+            "properties": { "template_id": { "const": "devai.protected-mutation-stryker.v1" } },
+            "required": ["template_id"]
+          }
+        },
+        "required": ["mutation_execution"]
+      },
+      "then": {
+        "properties": {
+          "release_unit": { "const": "@aarusso-nyx/devai" },
+          "mutation_roster": {
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "properties": {
+                "thresholds": {
+                  "const": { "score_min": 60, "survived_max": 50 }
+                }
+              },
+              "required": ["thresholds"]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "devaiProtectedMutationExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "template_id",
+        "runner",
+        "selection",
+        "roster_order",
+        "output",
+        "threshold_projection",
+        "toolchain_fixture_validation"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "template_id": { "const": "devai.protected-mutation-stryker.v1" },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "package_manager", "packages", "vitest_peer_range"],
+          "properties": {
+            "kind": { "const": "stryker-vitest-typescript" },
+            "package_manager": { "const": "pnpm" },
+            "packages": {
+              "const": [
+                { "name": "@stryker-mutator/core", "version": "9.6.1" },
+                { "name": "@stryker-mutator/typescript-checker", "version": "9.6.1" },
+                { "name": "@stryker-mutator/vitest-runner", "version": "9.6.1" }
+              ]
+            },
+            "vitest_peer_range": { "const": ">=2" }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "package_root",
+            "source",
+            "tests",
+            "lockfile",
+            "configuration",
+            "invocation"
+          ],
+          "properties": {
+            "package_root": { "const": "parent-of-roster.manifest_path" },
+            "source": { "const": "roster.source_selectors" },
+            "tests": { "const": "roster.test_selectors" },
+            "lockfile": { "const": "roster.lockfile_path" },
+            "configuration": { "const": "host-derived-ephemeral-from-roster-only" },
+            "invocation": { "const": "fixed-host-template-not-profile-or-candidate-script" }
+          }
+        },
+        "roster_order": { "const": "id-lexicographic" },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["raw", "normalized_report", "package_result", "finalization"],
+          "properties": {
+            "raw": { "const": "protected-container-only" },
+            "normalized_report": { "const": "mutation-normalized-stryker-report-v2" },
+            "package_result": { "const": "mutation-package-result-v2" },
+            "finalization": {
+              "const": "verify-mutation-evidence-v21-before-certification-evidence-retention"
+            }
+          }
+        },
+        "threshold_projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "target"],
+          "properties": {
+            "source": { "const": "roster.thresholds.score_min-and-survived_max" },
+            "target": {
+              "const": {
+                "break": "score_min",
+                "high": "score_min",
+                "low": "score_min",
+                "scoreMin": "score_min",
+                "survivedMax": "survived_max"
+              }
+            }
+          }
+        },
+        "toolchain_fixture_validation": {
+          "const": "pending-engineer-pinned-toolchain-fixture-validation-before-protected-invocation"
+        }
+      }
+    },
     "pathList": {
       "type": "array",
       "minItems": 1,

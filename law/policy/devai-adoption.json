@@ -1,11 +1,11 @@
 {
   "schemaVersion": "1.0.0",
   "policy_id": "devai.devai-adoption",
-  "policy_version": "1.0.0",
+  "policy_version": "1.1.0",
   "release_verification": {
-    "schemaVersion": "1.0.0",
+    "schemaVersion": "1.1.0",
     "policy_id": "devai.release-verification",
-    "policy_version": "1.0.0",
+    "policy_version": "1.1.0",
     "release_unit": "@aarusso-nyx/devai",
     "version_source": "packages/cli/package.json",
     "default_support": "current",
@@ -38,6 +38,46 @@
       "operational-matrix": ["test:local-full"]
     },
     "risk_capabilities": {},
+    "mutation_execution": {
+      "schemaVersion": "1.0.0",
+      "template_id": "devai.protected-mutation-stryker.v1",
+      "runner": {
+        "kind": "stryker-vitest-typescript",
+        "package_manager": "pnpm",
+        "packages": [
+          { "name": "@stryker-mutator/core", "version": "9.6.1" },
+          { "name": "@stryker-mutator/typescript-checker", "version": "9.6.1" },
+          { "name": "@stryker-mutator/vitest-runner", "version": "9.6.1" }
+        ],
+        "vitest_peer_range": ">=2"
+      },
+      "selection": {
+        "package_root": "parent-of-roster.manifest_path",
+        "source": "roster.source_selectors",
+        "tests": "roster.test_selectors",
+        "lockfile": "roster.lockfile_path",
+        "configuration": "host-derived-ephemeral-from-roster-only",
+        "invocation": "fixed-host-template-not-profile-or-candidate-script"
+      },
+      "roster_order": "id-lexicographic",
+      "output": {
+        "raw": "protected-container-only",
+        "normalized_report": "mutation-normalized-stryker-report-v2",
+        "package_result": "mutation-package-result-v2",
+        "finalization": "verify-mutation-evidence-v21-before-certification-evidence-retention"
+      },
+      "threshold_projection": {
+        "source": "roster.thresholds.score_min-and-survived_max",
+        "target": {
+          "break": "score_min",
+          "high": "score_min",
+          "low": "score_min",
+          "scoreMin": "score_min",
+          "survivedMax": "survived_max"
+        }
+      },
+      "toolchain_fixture_validation": "pending-engineer-pinned-toolchain-fixture-validation-before-protected-invocation"
+    },
     "mutation_roster": [
       {
         "id": "authority",
