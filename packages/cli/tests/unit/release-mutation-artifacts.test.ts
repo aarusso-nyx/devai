@@ -354,6 +354,104 @@ describe('release mutation artifact normalization v2.1', () => {
     expect(read).not.toHaveBeenCalled();
   });
 
+  it.each(
+    (['start', 'end'] as const).flatMap((endpoint) =>
+      (['line', 'column'] as const).flatMap((coordinate) =>
+        [0, -1, Number.MAX_SAFE_INTEGER + 1].map((value) => ({ endpoint, coordinate, value })),
+      ),
+    ),
+  )(
+    'refuses matching raw/discovery $endpoint.$coordinate=$value before raw validation',
+    ({ endpoint, coordinate, value }) => {
+      const report = rawReport(['Killed', 'Killed', 'Survived']);
+      const discovery = emittedSources();
+      const raw = report.files['src/value.ts']?.mutants[0];
+      const emitted = discovery[0]?.mutants[0];
+      if (raw === undefined || emitted === undefined) throw new Error('fixture mutant missing');
+      raw.location[endpoint][coordinate] = value;
+      emitted.location[endpoint][coordinate] = value;
+      expect(raw.location).toEqual(emitted.location);
+      expect(() => normalized(report, { source_files: discovery })).toThrow(
+        'MUTATION_REPORT_INVALID',
+      );
+      report.schemaVersion = 'unsupported';
+      expect(() => normalized(report, { source_files: discovery })).toThrow(
+        'MUTATION_REPORT_INVALID',
+      );
+    },
+  );
+
+  it.each([
+    'reversed-line',
+    'reversed-column',
+    'extra-location',
+    'extra-start',
+    'extra-end',
+  ] as const)('refuses matching raw/discovery %s before raw validation', (change) => {
+    const report = rawReport(['Killed', 'Killed', 'Survived']);
+    const discovery = emittedSources();
+    const raw = report.files['src/value.ts']?.mutants[0];
+    const emitted = discovery[0]?.mutants[0];
+    if (raw === undefined || emitted === undefined) throw new Error('fixture mutant missing');
+    for (const mutant of [raw, emitted]) {
+      switch (change) {
+        case 'reversed-line':
+          mutant.location.start.line = 2;
+          break;
+        case 'reversed-column':
+          mutant.location.start.column = 3;
+          break;
+        case 'extra-location':
+          Object.assign(mutant.location, { offset: 0 });
+          break;
+        case 'extra-start':
+          Object.assign(mutant.location.start, { offset: 0 });
+          break;
+        case 'extra-end':
+          Object.assign(mutant.location.end, { offset: 0 });
+          break;
+      }
+    }
+    expect(raw.location).toEqual(emitted.location);
+    expect(() => normalized(report, { source_files: discovery })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+    report.schemaVersion = 'unsupported';
+    expect(() => normalized(report, { source_files: discovery })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+  });
+
+  it.each([
+    0,
+    null,
+    ['BooleanLiteral'],
+    '',
+    'x'.repeat(161),
+    'Bad/Name',
+    'Bad\\Name',
+    'Bad\u0000Name',
+  ])(
+    'refuses matching raw/discovery invalid mutator name %j before raw validation',
+    (mutatorName) => {
+      const report = rawReport(['Killed', 'Killed', 'Survived']);
+      const discovery = emittedSources();
+      const raw = report.files['src/value.ts']?.mutants[0];
+      const emitted = discovery[0]?.mutants[0];
+      if (raw === undefined || emitted === undefined) throw new Error('fixture mutant missing');
+      Object.assign(raw, { mutatorName });
+      Object.assign(emitted, { mutatorName });
+      expect(raw.mutatorName).toEqual(emitted.mutatorName);
+      expect(() => normalized(report, { source_files: discovery })).toThrow(
+        'MUTATION_REPORT_INVALID',
+      );
+      report.schemaVersion = 'unsupported';
+      expect(() => normalized(report, { source_files: discovery })).toThrow(
+        'MUTATION_REPORT_INVALID',
+      );
+    },
+  );
+
   it('accepts reordered exact file and mutant censuses with identical canonical artifacts', () => {
     const report = rawReport(['Killed', 'Killed', 'Survived']);
     const otherReport = rawReport(['Killed']);
