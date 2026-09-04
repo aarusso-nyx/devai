@@ -19,7 +19,11 @@ import {
 } from './release-certification-container.js';
 import { createProtectedCandidateGitMetadata } from './release-certification-git.js';
 import { resolveProtectedGeneratedNamespaces } from './release-production-outputs.js';
-import { buildReleasePlanReceipt, verifyReleasePlanReceipt } from './release-lifecycle.js';
+import { buildReleasePlanReceipt, verifyResolvedReleasePlanReceipt } from './release-lifecycle.js';
+import {
+  isVerifiedReleasePolicyResolution,
+  type VerifiedReleasePolicyResolution,
+} from './release-policy-resolution.js';
 import type {
   CertificationPackageEntry,
   GitReleaseBlobLocator,
@@ -41,6 +45,8 @@ import {
 
 export interface ProtectedReleasePlanMaterial {
   readonly receipt: unknown;
+  /** Current execution requires the host's genuine, package/candidate-bound policy resolution. */
+  readonly resolution?: VerifiedReleasePolicyResolution;
   readonly intent_path: string;
   readonly intent: unknown;
   readonly release_verification_profile: unknown;
@@ -131,7 +137,12 @@ export function createContainerReleaseCertificationAdapters(
   input: ContainerReleaseCertificationOptions,
 ): ContainerReleaseCertificationAdapters {
   const root = realpathSync(input.repository_root);
-  const plans = snapshot(input.plans);
+  // Keep the opaque resolution from this runtime. JSON copying would erase its
+  // provenance brand; all ordinary caller-owned plan data is still snapshotted.
+  const plans = input.plans.map(({ resolution, ...plan }) => ({
+    ...snapshot(plan),
+    resolution,
+  }));
   const environment = snapshot(input.environment);
   const toolchain = snapshot(input.toolchain);
   const controls = snapshot(input.controls);
@@ -155,6 +166,8 @@ export function createContainerReleaseCertificationAdapters(
     throw new Error('release-certification-container-controls-invalid');
   }
   const selected = plans.map((plan) => {
+    if (!isVerifiedReleasePolicyResolution(plan.resolution))
+      throw new Error('rpl-policy-resolution-mismatch');
     const verification = {
       repository_id: input.repository_id,
       intent_path: plan.intent_path,
@@ -162,11 +175,13 @@ export function createContainerReleaseCertificationAdapters(
       release_verification_profile: plan.release_verification_profile,
       release_lifecycle_policy: plan.release_lifecycle_policy,
       action_registry: plan.action_registry,
+      resolution: plan.resolution,
     };
-    if (!verifyReleasePlanReceipt({ ...verification, receipt: plan.receipt }))
+    if (!verifyResolvedReleasePlanReceipt({ resolution: plan.resolution, receipt: plan.receipt }))
       throw new Error('release-certification-plan-binding-invalid');
     const receipt = buildReleasePlanReceipt(verification);
-    if (receipt.verdict !== 'pass') throw new Error('release-certification-plan-binding-invalid');
+    if (receipt.verdict !== 'pass' || canonicalJson(receipt) !== canonicalJson(plan.receipt))
+      throw new Error('release-certification-plan-binding-invalid');
     return { plan, receipt, intent: object(plan.intent), preflight: plan.preflight_receipt };
   });
   const bindingIdentity = {

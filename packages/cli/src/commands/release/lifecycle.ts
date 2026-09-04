@@ -27,7 +27,12 @@ import {
   type TrustedArtifactReader,
   type TrustedOfflineReceiptVerifier,
 } from '../../services/release-lifecycle-execution.js';
-import { buildReleasePlanReceipt } from '../../services/release-lifecycle.js';
+import { buildResolvedReleasePlanReceipt } from '../../services/release-lifecycle.js';
+import {
+  createResolvedReleasePlanInputResolver,
+  isVerifiedReleasePolicyResolution,
+  type VerifiedReleasePolicyResolution,
+} from '../../services/release-policy-resolution.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../services/release-lifecycle-local-adapters.js';
 import { createReleaseCertificationProvider } from '../../services/release-lifecycle-certification.js';
 import {
@@ -70,6 +75,11 @@ interface OfflineVerifyOptions {
 }
 
 export interface ReleaseLifecycleCommandAdapters {
+  readonly policy_resolution?: (input: {
+    readonly repository_id: string;
+    readonly candidate: { readonly commit: string; readonly tree: string };
+    readonly release_unit: string;
+  }) => VerifiedReleasePolicyResolution | undefined;
   readonly preflight_provider?: (request: ReleaseLifecycleRequest) => ReleaseProvider | undefined;
   readonly certification_provider?: (
     request: ReleaseLifecycleRequest,
@@ -81,6 +91,9 @@ export interface ReleaseLifecycleCommandAdapters {
   readonly offline_verification_provider: (
     request: ReleaseLifecycleRequest,
   ) => OfflineVerificationProvider | undefined;
+  readonly offline_policy_closures?: (
+    request: ReleaseLifecycleRequest,
+  ) => Parameters<typeof executeOfflineVerification>[0]['policyClosures'];
   readonly authorization: (request: ReleaseLifecycleRequest) => AuthorizationBridge | undefined;
   readonly offline_receipt_verifier: (
     request: ReleaseLifecycleRequest,
@@ -189,7 +202,10 @@ function readContainedJson(root: string, path: string): unknown {
   return JSON.parse(readContainedBytes(root, path).toString('utf8')) as unknown;
 }
 
-function localResolvers(root: string): {
+function localResolvers(
+  root: string,
+  resolution?: VerifiedReleasePolicyResolution,
+): {
   readonly receipt: (
     locator: NonNullable<ReleaseLifecycleRequest['receipt_locators']>[number],
   ) => unknown;
@@ -197,16 +213,72 @@ function localResolvers(root: string): {
 } {
   return {
     receipt: (locator) => readContainedJson(root, locator.path),
-    plan: (input) => {
-      if (typeof input['path'] !== 'string') throw new Error('rpl-input-unresolved');
-      return readContainedJson(root, input['path']);
-    },
+    plan:
+      resolution === undefined
+        ? () => {
+            throw new Error('rpl-policy-source-unresolved');
+          }
+        : createResolvedReleasePlanInputResolver(resolution),
   };
+}
+
+function resolvePolicyFor(input: {
+  readonly repository_id: string;
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly release_unit: string;
+}): VerifiedReleasePolicyResolution {
+  const resolution = commandAdapters?.policy_resolution?.(input);
+  if (!isVerifiedReleasePolicyResolution(resolution))
+    throw new Error('rpl-policy-source-unresolved');
+  if (
+    resolution.repository.id !== input.repository_id ||
+    resolution.repository.commit !== input.candidate.commit ||
+    resolution.repository.tree !== input.candidate.tree ||
+    resolution.release_unit !== input.release_unit
+  )
+    throw new Error('rpl-policy-resolution-mismatch');
+  return resolution;
+}
+
+function requestPolicy(request: ReleaseLifecycleRequest): VerifiedReleasePolicyResolution {
+  const unit = request.candidate_locator.release_units[0];
+  if (unit === undefined) throw new Error('rpl-policy-resolution-mismatch');
+  return resolvePolicyFor({
+    repository_id: request.repository_locator.id,
+    candidate: {
+      commit: request.candidate_locator.commit,
+      tree: request.candidate_locator.tree,
+    },
+    release_unit: unit.release_unit,
+  });
 }
 
 function fail(action: string, code: string, detail: string, exit = EXIT_FAIL): void {
   process.stderr.write(`devai ${action}: ${code}: ${detail}\n`);
   process.exitCode = exit;
+}
+
+/** Never echo native read/JSON errors: their messages may include host paths or input bytes. */
+function inputFailureCode(error: unknown, fallback: string): string {
+  const codes = new Set([
+    'rpl-policy-source-unresolved',
+    'rpl-package-identity-mismatch',
+    'rpl-adopter-binding-mismatch',
+    'rpl-policy-resolution-mismatch',
+    'rpl-legacy-plan-non-authoritative',
+    'rpl-input-unresolved',
+    'release-receipt-path-unsafe',
+    'release-request-projection-invalid',
+    'release-request-action-mismatch',
+    'release-request-identity-mismatch',
+    'release-request-receipt-order-invalid',
+    'release-receipt-identity-mismatch',
+    'release-release-unit-bijection-invalid',
+    'release-offline-state-missing',
+    'release-offline-state-mismatch',
+    'release-state-store-unsafe',
+  ]);
+  return error instanceof Error && codes.has(error.message) ? error.message : fallback;
 }
 
 export const releasePlan = defineCommand({
@@ -230,19 +302,28 @@ export const releasePlan = defineCommand({
           );
           return;
         }
-        const root = options.repoRoot ?? process.cwd();
         try {
-          const receipt = buildReleasePlanReceipt({
+          const intent = readPinnedJson(resolve(options.intent));
+          if (
+            intent === null ||
+            typeof intent !== 'object' ||
+            !('candidate' in intent) ||
+            intent.candidate === null ||
+            typeof intent.candidate !== 'object' ||
+            !('commit' in intent.candidate) ||
+            typeof intent.candidate.commit !== 'string' ||
+            !('tree' in intent.candidate) ||
+            typeof intent.candidate.tree !== 'string' ||
+            !('release_unit' in intent) ||
+            typeof intent.release_unit !== 'string'
+          )
+            throw new Error('rpl-input-unresolved');
+          const resolution = resolvePolicyFor({
             repository_id: options.repository,
-            intent_path: relative(root, resolve(options.intent)).replaceAll('\\', '/'),
-            intent: readContainedJson(root, options.intent),
-            release_verification_profile: readContainedJson(
-              root,
-              'law/policy/release-verification.json',
-            ),
-            release_lifecycle_policy: readContainedJson(root, 'law/policy/release-lifecycle.json'),
-            action_registry: readContainedJson(root, 'law/policy/action-registry.json'),
+            candidate: { commit: intent.candidate.commit, tree: intent.candidate.tree },
+            release_unit: intent.release_unit,
           });
+          const receipt = buildResolvedReleasePlanReceipt({ intent, resolution });
           process.stdout.write(
             options.human === true
               ? `release plan: ${receipt.receipt_id} -> ${receipt.verdict}\n`
@@ -253,7 +334,7 @@ export const releasePlan = defineCommand({
           fail(
             'release plan',
             'RELEASE_PLAN_FAILED',
-            error instanceof Error ? error.message : String(error),
+            inputFailureCode(error, 'rpl-policy-resolution-mismatch'),
             EXIT_REVIEW,
           );
         }
@@ -293,7 +374,7 @@ function lifecycleAction(
               name,
             ) as ReleaseLifecycleRequest & { readonly action_id: PersistedReleaseAction };
             const root = resolve(options.repoRoot ?? process.cwd());
-            const resolvers = localResolvers(root);
+            const resolvers = localResolvers(root, requestPolicy(request));
             const adapters = commandAdapters;
             const remote = name === 'release evidence-publish' || name === 'release publish';
             const store = new ReleaseLifecycleFileStore(
@@ -398,7 +479,7 @@ function lifecycleAction(
             fail(
               name,
               'RELEASE_ACTION_REQUEST_INVALID',
-              error instanceof Error ? error.message : String(error),
+              inputFailureCode(error, 'release-request-projection-invalid'),
               EXIT_REVIEW,
             );
           }
@@ -489,6 +570,7 @@ export const releaseOfflineVerify = defineCommand({
             exported_state: state,
             provider,
             artifactReader,
+            policyClosures: commandAdapters?.offline_policy_closures?.(request),
           });
           if (!result.ok) {
             fail('release offline-verify', result.code, result.phase, EXIT_REVIEW);
@@ -504,7 +586,7 @@ export const releaseOfflineVerify = defineCommand({
           fail(
             'release offline-verify',
             'RELEASE_OFFLINE_VERIFY_INPUT_INVALID',
-            error instanceof Error ? error.message : String(error),
+            inputFailureCode(error, 'release-request-projection-invalid'),
             EXIT_REVIEW,
           );
         }
@@ -550,7 +632,6 @@ export const releaseResume = defineCommand({
               ? undefined
               : validateReleaseLifecycleRequest(readPinnedJson(options.request), 'release resume');
           const root = resolve(options.repoRoot ?? process.cwd());
-          const resolvers = localResolvers(root);
           const useBuiltInStore =
             request !== undefined &&
             options.stateChain === undefined &&
@@ -598,6 +679,31 @@ export const releaseResume = defineCommand({
           if (!Array.isArray(storeRecords)) throw new Error('store records must be a JSON array');
           const receipts = options.receipts === undefined ? [] : readPinnedJson(options.receipts);
           if (!Array.isArray(receipts)) throw new Error('receipts must be a JSON array');
+          const locatedReceipts = new Map(
+            (request?.receipt_locators ?? []).map((locator) => [
+              locator.path,
+              readContainedJson(root, locator.path),
+            ]),
+          );
+          const currentPlan = [...receipts, ...locatedReceipts.values()].some(
+            (receipt: unknown) =>
+              receipt !== null &&
+              typeof receipt === 'object' &&
+              'receipt_kind' in receipt &&
+              receipt.receipt_kind === 'release-plan-receipt' &&
+              'schemaVersion' in receipt &&
+              receipt.schemaVersion === '2.0.0',
+          );
+          const resolvers = localResolvers(
+            root,
+            currentPlan
+              ? resolvePolicyFor({
+                  repository_id: repository.id,
+                  candidate,
+                  release_unit: candidate.release_unit,
+                })
+              : undefined,
+          );
           const observation = await resumeReleaseLifecycleExecution({
             states,
             store_records: storeRecords,
@@ -610,6 +716,14 @@ export const releaseResume = defineCommand({
             candidate,
             ...(request === undefined ? {} : { candidate_locator: request.candidate_locator }),
             receipt_documents: receipts,
+            ...(request?.receipt_locators === undefined
+              ? {}
+              : {
+                  receipt_locators: request.receipt_locators,
+                  resolve_receipt: (
+                    locator: NonNullable<ReleaseLifecycleRequest['receipt_locators']>[number],
+                  ) => locatedReceipts.get(locator.path),
+                }),
             resolve_plan_input: resolvers.plan,
             ...(request === undefined
               ? {}
@@ -635,7 +749,7 @@ export const releaseResume = defineCommand({
           fail(
             'release resume',
             'RELEASE_RESUME_FAILED',
-            error instanceof Error ? error.message : String(error),
+            inputFailureCode(error, 'release-request-projection-invalid'),
             EXIT_REVIEW,
           );
         }
