@@ -173,6 +173,34 @@ try {
     /release-host-controls-invalid/,
   );
   assert.equal(observations.stores.length, 0);
+  for (const storeName of ['certification_store', 'artifact_store']) {
+    assert.throws(
+      () =>
+        createProtectedReleaseHostRunner({
+          ...controls,
+          [storeName]: { ...controls[storeName], repository_roots: [productionRoot] },
+        }),
+      /release-host-controls-invalid/,
+    );
+  }
+  assert.equal(observations.stores.length, 0);
+  assert.equal(observations.calls.length, 0);
+  assert.equal(observations.container_executions, 0);
+  const fixtureStatus = git(fixtureRoot, ['status', '--porcelain', '--untracked-files=all']);
+  for (const storeName of ['certification_store', 'artifact_store']) {
+    // Existing directory only: the exclusion census must reject containment before any write.
+    assert.throws(
+      () =>
+        createProtectedReleaseHostRunner({
+          ...controls,
+          [storeName]: { ...controls[storeName], root: join(fixtureRoot, 'packages') },
+        }),
+      /release-(?:certification-generated-output-untrusted|artifact-sink-protocol-invalid)/,
+    );
+  }
+  assert.equal(git(fixtureRoot, ['status', '--porcelain', '--untracked-files=all']), fixtureStatus);
+  assert.equal(observations.calls.length, 0);
+  assert.equal(observations.container_executions, 0);
   const stale = {
     ...controls,
     mutation_inputs: {
