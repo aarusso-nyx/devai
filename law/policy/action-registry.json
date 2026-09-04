@@ -1316,7 +1316,7 @@
         "mode": "action-envelope",
         "envelope_schema": "law/schemas/action-result.schema.json",
         "success_channel": "stdout",
-        "payload_schema": "law/schemas/release-plan-receipt.schema.json"
+        "payload_schema": "law/schemas/release-plan-receipt-v2.schema.json"
       },
       "error_contract": {
         "schemaVersion": "1.0.0",

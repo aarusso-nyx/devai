@@ -4,45 +4,52 @@
   "id": "release-lifecycle",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.6.0",
+  "policy_version": "2.7.0",
   "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
   "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
   "receipt_schemas": {
-    "plan_receipt_schema": "law/schemas/release-plan-receipt.schema.json",
+    "plan_receipt_schema": "law/schemas/release-plan-receipt-v2.schema.json",
     "offline_verification_receipt_schema": "law/schemas/release-offline-verification-receipt.schema.json",
     "publication_receipt_schema": "law/schemas/release-publication-receipt.schema.json",
     "lifecycle_observation_schema": "law/schemas/release-lifecycle-observation.schema.json"
   },
   "plan_determination": {
-    "kernel_id": "devai.kernel.release-plan-determination.v2",
+    "kernel_id": "devai.kernel.release-plan-determination.v3",
     "required_inputs": [
       {
         "order": 1,
         "kind": "release-intent",
         "source": "invocation-provided-release-intent-document",
         "schema": "law/schemas/release-intent.schema.json",
-        "canonical_bytes": "utf-8-rfc8785-jcs"
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "invocation"
       },
       {
         "order": 2,
         "kind": "release-verification-profile",
-        "source": "law/policy/release-verification.json",
+        "source": ".devai/config/release-verification.json",
         "schema": "law/schemas/release-verification-profile.schema.json",
-        "canonical_bytes": "utf-8-rfc8785-jcs"
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "generated-adopter",
+        "path": ".devai/config/release-verification.json"
       },
       {
         "order": 3,
         "kind": "release-lifecycle-policy",
-        "source": "law/policy/release-lifecycle.json",
+        "source": "dist/law/policy/release-lifecycle.json",
         "schema": "law/schemas/release-lifecycle-policy.schema.json",
-        "canonical_bytes": "utf-8-rfc8785-jcs"
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "installed-package",
+        "path": "dist/law/policy/release-lifecycle.json"
       },
       {
         "order": 4,
         "kind": "action-registry-policy",
-        "source": "law/policy/action-registry.json",
+        "source": "dist/law/policy/action-registry.json",
         "schema": "law/schemas/action-registry.schema.json",
-        "canonical_bytes": "utf-8-rfc8785-jcs"
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "installed-package",
+        "path": "dist/law/policy/action-registry.json"
       }
     ],
     "semver": {
@@ -204,9 +211,18 @@
       "operational-matrix"
     ],
     "risk_capability_rules": [
-      { "when_any_risk": true, "add": ["security", "integration"] },
-      { "risks": ["tenancy", "rls"], "add": ["tenancy"] },
-      { "risks": ["database", "migration"], "add": ["database"] },
+      {
+        "when_any_risk": true,
+        "add": ["security", "integration"]
+      },
+      {
+        "risks": ["tenancy", "rls"],
+        "add": ["tenancy"]
+      },
+      {
+        "risks": ["database", "migration"],
+        "add": ["database"]
+      },
       {
         "risks": ["public-api", "export-map", "package-boundary"],
         "add": ["api-compatibility", "consumer"]
@@ -228,7 +244,55 @@
       "otherwise-behavioral-selects-affected",
       "otherwise-selects-none",
       "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"
-    ]
+    ],
+    "policy_resolution": {
+      "resolver_id": "devai.release-policy-resolution.v1",
+      "receipt_schema": "law/schemas/release-policy-resolution.schema.json",
+      "plan_receipt_version": "2.0.0",
+      "verification_kernel": "devai.kernel.release-plan-receipt.v3",
+      "installed_package": "externally-approved-archive-and-exact-installed-content-manifest-not-version-alone",
+      "content_manifest": "sha256-rfc8785-jcs-of-lexically-path-sorted-complete-archive-regular-file-array-path-mode-size-sha256-with-package-prefix-removed-no-exclusions",
+      "source_rules": [
+        "intent-inline-invocation-document",
+        "profile-only-explicit-adopter-policy-materialization-at-.devai/config/release-verification.json",
+        "lifecycle-and-action-registry-only-dist/law/policy-in-the-verified-installed-package",
+        "schemas-and-materializer-only-the-same-verified-installed-package",
+        "portable-origin-relative-paths-never-physical-install-locators",
+        "no-repository-law-policy-or-source-layout-or-default-profile-fallback"
+      ],
+      "binding_checks": [
+        "external-expected-package-name-version-archive-sha256-and-content-manifest-sha256-match-before-input-use",
+        "exact-installed-regular-file-population-and-bytes-match-approved-archive-no-links-or-extra-members",
+        "all-adopter-binding-files-belong-to-the-exact-candidate-tree-and-match-raw-digests",
+        "active-origin-declaration-lock-resolution-project-version-and-installed-package-agree",
+        "project-constitution-version-digest-and-pinned-bytes-match-installed-constitution",
+        "closed-adopter-binding-v1-source-policy-id-version-raw-digest-and-complete-materialized-set-match",
+        "recompute-pure-materialization-with-same-installed-package-and-project-input-and-compare-every-target-byte",
+        "release-verification-is-explicit-in-adopter-source-and-exactly-the-generated-profile",
+        "all-four-semantic-documents-validate-with-installed-schemas-and-match-jcs-input-digests",
+        "reverify-same-source-and-binding-identity-before-each-dependent-operation"
+      ],
+      "replay": "same-resolution-contract-for-plan-preflight-certify-prepare-export-offline-verify-publication-and-resume",
+      "offline": "complete-immutable-input-and-binding-byte-closure-plus-approved-package-archive-with-external-expected-package-and-candidate-identity-no-network-or-ambient-fallback",
+      "legacy": "plan-v1-observation-only-under-original-contract-never-relabel-rehash-upgrade-or-authorize-current-lifecycle",
+      "refusal_codes": [
+        "rpl-policy-source-unresolved",
+        "rpl-package-identity-mismatch",
+        "rpl-adopter-binding-mismatch",
+        "rpl-policy-resolution-mismatch",
+        "rpl-legacy-plan-non-authoritative"
+      ],
+      "refusal_effect": "no-current-pass-no-task-or-provider-invocation-no-sink-effect-no-success-state-append-no-publication",
+      "trust_claim": "trusted-local-not-independent-attestation",
+      "installation_origins": {
+        "selection": "externally-expected-origin-never-candidate-selected",
+        "candidate_adopter_dependency": "candidate-declaration-and-complete-lockfile-set-resolve-the-exact-approved-installed-archive-producer-toolchain-forbidden",
+        "external_producer_toolchain": "only-aarusso-nyx/devai-releasing-@aarusso-nyx/devai-independent-candidate-inputs-plus-separate-immutable-toolchain-declaration-and-lockfiles-resolving-the-exact-approved-installed-archive",
+        "producer_provenance": "externally-expected-complete-producer-toolchain-object-with-exact-producer-repository-commit-tree-source-package-manifest-and-approved-build-provenance-binding-source-toolchain-and-installed-artifact-no-self-assertion",
+        "offline": "include-and-reverify-complete-toolchain-and-producer-build-source-evidence-under-the-same-external-expectation",
+        "producer_build_provenance_schema": "law/schemas/release-policy-resolution.schema.json#/$defs/producer_build_provenance"
+      }
+    }
   },
   "execution_seams": {
     "status": "deprecated-read-only-v1-non-authoritative",
