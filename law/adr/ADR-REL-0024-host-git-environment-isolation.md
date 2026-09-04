@@ -88,7 +88,7 @@ every refused local key family, absent/changing/extra allowlist members, and
 the preservation of pure-reader and offline behavior. A passing parser alone
 does not establish an authorized protected Git invocation.
 
-## Alternatives considered
+## Alternatives Considered
 
 **Leave the `GIT_*` population empty.** Rejected because Git's supported
 system/global isolation uses `GIT_CONFIG_*` controls.
@@ -99,9 +99,15 @@ candidate process state could select configuration or repository discovery.
 **Treat `--no-includes` as a global Git isolation setting.** Rejected because
 it scopes the config query, not `rev-parse` or every other Git child.
 
-## Affected rules
+## Affected Rules
 
 - The lifecycle policy and its exact schema mirror replace only the impossible
   empty-`GIT_*` phrase with the three-value host allowlist and local-config
   preflight.
 - ADR-REL-0023 remains accepted historical authority without modification.
+
+## Inspector Adversarial Acceptance
+
+IA-001 through IA-004 in this record are mandatory. The Inspector verifies the
+exact child environment allowlist, every local-config refusal family, and that
+pure readers and offline verification retain their root-free behavior.
