@@ -58,6 +58,38 @@ const { containerRuns, containerStatus, runChecks, declaredRole } = vi.hoisted((
   runChecks: vi.fn(),
   declaredRole: { value: 'inspector' as 'architect' | 'inspector' },
 }));
+const lifecycleCommandCapture = vi.hoisted(() => ({
+  action: undefined as undefined | ((input: unknown) => Promise<unknown>),
+  offline: undefined as undefined | ((input: unknown) => Promise<unknown>),
+  state: undefined as undefined | ((input: unknown) => unknown),
+}));
+
+vi.mock('../../src/services/release-lifecycle-execution.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/services/release-lifecycle-execution.js')>();
+  return {
+    ...actual,
+    executeReleaseLifecycleAction: async (
+      input: Parameters<typeof actual.executeReleaseLifecycleAction>[0],
+    ) => {
+      const capture = lifecycleCommandCapture.action;
+      return capture === undefined ? actual.executeReleaseLifecycleAction(input) : capture(input);
+    },
+    executeOfflineVerification: async (
+      input: Parameters<typeof actual.executeOfflineVerification>[0],
+    ) => {
+      const capture = lifecycleCommandCapture.offline;
+      return capture === undefined ? actual.executeOfflineVerification(input) : capture(input);
+    },
+    verifyReleaseStateIdentity: (input: unknown, requireCurrentWrite?: boolean) => {
+      const capture = lifecycleCommandCapture.state;
+      return capture === undefined
+        ? actual.verifyReleaseStateIdentity(input, requireCurrentWrite)
+        : capture(input);
+    },
+  };
+});
+
 vi.mock('../../src/services/release-certification-container.js', () => ({
   ProtectedCertificationContainer: class {
     readonly identity = { protocol: 'test-protected-container-boundary' };
@@ -117,6 +149,7 @@ const {
   installReleaseLifecycleCommandAdapters,
   releaseCertify,
   releaseExport,
+  releaseOfflineVerify,
   releasePreflight,
   releasePrepare,
   releaseResume,
@@ -128,6 +161,9 @@ afterEach(() => {
   containerRuns.mockClear();
   containerStatus.value = 0;
   declaredRole.value = 'inspector';
+  lifecycleCommandCapture.action = undefined;
+  lifecycleCommandCapture.offline = undefined;
+  lifecycleCommandCapture.state = undefined;
   vi.restoreAllMocks();
 });
 
@@ -1319,6 +1355,213 @@ describe('release lifecycle command adapter composition', () => {
       expect.stringContaining('RELEASE_ACTION_PROVIDER_UNAVAILABLE'),
     );
     uninstallExport();
+
+    // Command-boundary transport only: the execution kernels remain covered by
+    // their own structural v3 suites. These captures prove the CLI cannot
+    // select a limit object and forwards the host-selected object unchanged.
+    const trustedExportLimits = Object.freeze({
+      maximum_transcript_bytes: 16 * 1024,
+      maximum_provider_result_bytes: 16 * 1024,
+      maximum_packages: 10,
+    });
+    const trustedArtifactReader = vi.fn(() => ({
+      readArtifact: () => Buffer.alloc(0),
+    }));
+    const trustedLimitSelector = vi.fn(() => trustedExportLimits);
+    const actionInputs: unknown[] = [];
+    lifecycleCommandCapture.action = async (input) => {
+      actionInputs.push(input);
+      return {
+        ok: false,
+        code: 'release-command-adapter-capture',
+        phase: 'provider',
+      };
+    };
+    const uninstallBoundedExport = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
+      provider: () => exportProvider,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+      artifact_reader: trustedArtifactReader,
+      export_limits: trustedLimitSelector,
+    });
+    cleanups.push(uninstallBoundedExport);
+    const exportRequest = validateReleaseLifecycleRequest(
+      json(exportRequestPath),
+      'release export',
+    );
+    output.mockClear();
+    errorOutput.mockClear();
+    await withAuthorityHostTestScope(() =>
+      captureAction(releaseExport)({
+        request: exportRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
+    );
+    expect(trustedLimitSelector).toHaveBeenCalledExactlyOnceWith(exportRequest);
+    expect(trustedArtifactReader).toHaveBeenCalledExactlyOnceWith(exportRequest);
+    expect(actionInputs).toHaveLength(1);
+    expect(actionInputs[0]).toHaveProperty('exportLimits', trustedExportLimits);
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('release-command-adapter-capture'),
+    );
+    uninstallBoundedExport();
+
+    const absentLimitInputs: unknown[] = [];
+    lifecycleCommandCapture.action = async (input) => {
+      absentLimitInputs.push(input);
+      return {
+        ok: false,
+        code: 'release-command-adapter-capture',
+        phase: 'provider',
+      };
+    };
+    const uninstallUnboundedExport = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
+      provider: () => exportProvider,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+      artifact_reader: trustedArtifactReader,
+    });
+    cleanups.push(uninstallUnboundedExport);
+    output.mockClear();
+    errorOutput.mockClear();
+    await withAuthorityHostTestScope(() =>
+      captureAction(releaseExport)({
+        request: exportRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
+    );
+    expect(absentLimitInputs).toHaveLength(1);
+    expect(absentLimitInputs[0]).toHaveProperty('exportLimits', undefined);
+    uninstallUnboundedExport();
+
+    const cliLimitOverridePath = join(root, 'cli-limit-override.json');
+    const untrustedExportRequest = json(exportRequestPath);
+    if (
+      untrustedExportRequest === null ||
+      typeof untrustedExportRequest !== 'object' ||
+      Array.isArray(untrustedExportRequest)
+    )
+      throw new Error('missing export request fixture');
+    writeFileSync(
+      cliLimitOverridePath,
+      `${canonicalJson({
+        ...untrustedExportRequest,
+        export_limits: {
+          maximum_transcript_bytes: 1,
+          maximum_provider_result_bytes: 1,
+          maximum_packages: 1,
+        },
+      })}\n`,
+    );
+    const deniedLimitSelector = vi.fn(() => trustedExportLimits);
+    const deniedReader = vi.fn(() => ({ readArtifact: () => Buffer.alloc(0) }));
+    const uninstallCliOverride = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
+      provider: () => exportProvider,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+      artifact_reader: deniedReader,
+      export_limits: deniedLimitSelector,
+    });
+    cleanups.push(uninstallCliOverride);
+    actionInputs.length = 0;
+    output.mockClear();
+    errorOutput.mockClear();
+    await withAuthorityHostTestScope(() =>
+      captureAction(releaseExport)({
+        request: cliLimitOverridePath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+      }),
+    );
+    expect(deniedLimitSelector).not.toHaveBeenCalled();
+    expect(deniedReader).not.toHaveBeenCalled();
+    expect(actionInputs).toEqual([]);
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('release-request-projection-invalid'),
+    );
+    uninstallCliOverride();
+
+    const offlineRequestPath = join(root, 'offline-request.json');
+    const offlineRequest = {
+      ...request,
+      action_id: 'release offline-verify',
+      provider: { kind: 'offline-verifier', provider_id: 'canonical-verifier' },
+      destination: {
+        kind: 'external-trust-input',
+        exact_identifier: 'external/devai-1.5.0',
+        trust: {
+          trust_root_id: 'fixture-trust-root',
+          trust_store_digest_sha256: 'a'.repeat(64),
+          key_id: 'fixture-key',
+          signature_algorithm: 'ed25519',
+        },
+      },
+    };
+    writeFileSync(offlineRequestPath, `${canonicalJson(offlineRequest)}\n`);
+    const offlineStatePath = join(root, 'exported-state.json');
+    const capturedExportedState = { state: 'exported', fixture: 'command-adapter-only' };
+    writeFileSync(offlineStatePath, `${canonicalJson(capturedExportedState)}\n`);
+    const offlineInputs: unknown[] = [];
+    lifecycleCommandCapture.state = (state) => {
+      expect(state).toEqual(capturedExportedState);
+      return capturedExportedState;
+    };
+    lifecycleCommandCapture.offline = async (input) => {
+      offlineInputs.push(input);
+      return {
+        ok: false,
+        code: 'release-command-adapter-capture',
+        phase: 'provider',
+      };
+    };
+    const offlineLimitSelector = vi.fn(() => trustedExportLimits);
+    const offlineProvider = vi.fn(() => () => undefined);
+    const offlineReader = vi.fn(() => ({ readArtifact: () => Buffer.alloc(0) }));
+    const uninstallOffline = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
+      provider: () => undefined,
+      offline_verification_provider: offlineProvider,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+      artifact_reader: offlineReader,
+      export_limits: offlineLimitSelector,
+    });
+    cleanups.push(uninstallOffline);
+    output.mockClear();
+    errorOutput.mockClear();
+    await captureAction(releaseOfflineVerify)({
+      request: offlineRequestPath,
+      exportedState: offlineStatePath,
+      repoRoot: root,
+    });
+    const persistedOfflineRequest = validateReleaseLifecycleRequest(
+      offlineRequest,
+      'release offline-verify',
+    );
+    expect(offlineProvider).toHaveBeenCalledExactlyOnceWith(persistedOfflineRequest);
+    expect(offlineReader).toHaveBeenCalledExactlyOnceWith(persistedOfflineRequest);
+    expect(offlineLimitSelector).toHaveBeenCalledExactlyOnceWith(persistedOfflineRequest);
+    expect(offlineInputs).toHaveLength(1);
+    expect(offlineInputs[0]).toHaveProperty('exportLimits', trustedExportLimits);
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('release-command-adapter-capture'),
+    );
+    uninstallOffline();
+    lifecycleCommandCapture.action = undefined;
+    lifecycleCommandCapture.offline = undefined;
+    lifecycleCommandCapture.state = undefined;
     declaredRole.value = 'inspector';
 
     output.mockClear();

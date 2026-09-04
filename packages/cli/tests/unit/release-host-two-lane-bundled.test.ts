@@ -98,7 +98,7 @@ export async function invokeDevaiCli(args) {
               if (id === join(source, 'commands/release/lifecycle.ts'))
                 return `export { install as installReleaseLifecycleCommandAdapters } from 'test-host-runtime-state';`;
               if (id === join(source, 'services/check-runner/runner.ts'))
-                return `import { fixtureRuntime } from ${JSON.stringify(providerHelper)}; export function runCheckTasks(options) { return fixtureRuntime.runCheckTasks(options); }`;
+                return `import { fixtureRuntime } from ${JSON.stringify(providerHelper)}; export function runCheckTasks(options) { return fixtureRuntime.runCheckTasks(options); } export async function runCheckTasksAsync(options) { return fixtureRuntime.runCheckTasks(options); }`;
               return null;
             },
             transform(code: string, id: string) {
