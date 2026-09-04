@@ -11,6 +11,11 @@ import type { ReleaseCandidateSnapshot } from './services/release-candidate-snap
 import type { ReleasePackageSnapshot } from './services/release-package-snapshot.js';
 
 export type { ReleaseHostCandidateControls, ReleaseHostPackageControls };
+export {
+  verifyReleaseHostArchive,
+  type ReleaseHostArchiveControls,
+  type ReleaseHostArchiveProjection,
+} from './services/release-package-snapshot.js';
 
 export interface BootstrappedReleaseHost {
   /** The one shared CLI runtime, loaded from this installation's approved bytes. */

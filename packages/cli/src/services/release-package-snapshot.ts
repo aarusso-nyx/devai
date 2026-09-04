@@ -27,6 +27,28 @@ export interface ReleasePackageSnapshot {
   readonly readArchive: () => Buffer;
 }
 
+export interface ReleaseHostArchiveControls {
+  readonly expected: ReleasePackageIdentity;
+  readonly archive: Uint8Array;
+  readonly maximum_archive_bytes: number;
+  readonly maximum_unpacked_bytes: number;
+  /** Complete file/ancestor-directory population, excluding the package root. */
+  readonly maximum_entries: number;
+  /** Directory depth below the package root, matching host capture semantics. */
+  readonly maximum_depth: number;
+}
+
+/** Checked archive data only: this is NOT a verified installation or loaded runtime. */
+export interface ReleaseHostArchiveProjection {
+  readonly identity: ReleasePackageIdentity;
+  readonly manifest: ReleasePackageSnapshot['manifest'];
+  readonly directories: readonly string[];
+  readonly read: (path: string) => Buffer;
+  readonly readArchive: () => Buffer;
+  /** Exact bounded uncompressed USTAR bytes accepted by the parser; never re-encoded. */
+  readonly readTar: () => Buffer;
+}
+
 const INVALID = 'rpl-package-identity-mismatch';
 const DIGEST = /^[a-f0-9]{64}$/u;
 const verifiedSnapshots = new WeakSet<object>();
@@ -73,12 +95,18 @@ function octal(block: Buffer, offset: number, length: number): number {
 }
 
 /** Read a package archive into memory only; never extract or execute its contents. */
-function archiveFiles(archive: Buffer, maximumBytes: number): readonly ReleasePackageFile[] {
+function archiveFiles(
+  archive: Buffer,
+  maximumBytes: number,
+  limits?: Pick<ReleaseHostArchiveControls, 'maximum_entries' | 'maximum_depth'>,
+) {
   const bytes = gunzipSync(archive, { maxOutputLength: maximumBytes });
   if (bytes.length % 512 !== 0 || bytes.length < 1024) return fail();
   const files: ReleasePackageFile[] = [];
   const seen = new Set<string>();
   const directories = new Set<string>();
+  const ancestors = new Set<string>(['package']);
+  const populationPaths = new Set<string>();
   let offset = 0;
   let terminated = false;
   while (offset + 512 <= bytes.length) {
@@ -104,14 +132,35 @@ function archiveFiles(archive: Buffer, maximumBytes: number): readonly ReleasePa
     if (bytes.subarray(end, next).some((byte) => byte !== 0)) return fail();
     if (type === 0x35 && path.endsWith('/')) path = path.slice(0, -1);
     if (!portablePath(path) || seen.has(path)) return fail();
+    const isDirectory = type === 0x35;
+    if (
+      isDirectory
+        ? path !== 'package' && !path.startsWith('package/')
+        : !path.startsWith('package/')
+    )
+      return fail();
+    const parts = path.split('/');
+    const depth = parts.length - (isDirectory ? 1 : 2);
+    if (limits !== undefined && depth > limits.maximum_depth) return fail();
+    // Bound before growing any population or copying a file body. Implicit
+    // ancestors count too: an archive need not contain directory headers.
+    for (let index = 2; index <= parts.length; index += 1) {
+      const member = parts.slice(1, index).join('/');
+      if (!populationPaths.has(member)) {
+        if (limits !== undefined && populationPaths.size >= limits.maximum_entries) return fail();
+        populationPaths.add(member);
+      }
+    }
     seen.add(path);
-    if (type === 0x35) {
+    if (isDirectory) {
       if (size !== 0 || (path !== 'package' && !path.startsWith('package/'))) return fail();
       directories.add(path);
     } else {
       if ((type !== 0 && type !== 0x30) || !path.startsWith('package/')) return fail();
       const mode = octal(block, 100, 8);
       if (mode > 0o7777) return fail();
+      for (let index = 1; index < parts.length; index += 1)
+        ancestors.add(parts.slice(0, index).join('/'));
       files.push({
         path: path.slice('package/'.length),
         mode,
@@ -121,15 +170,124 @@ function archiveFiles(archive: Buffer, maximumBytes: number): readonly ReleasePa
     offset = next;
   }
   if (!terminated || files.length === 0) return fail();
-  const ancestors = new Set<string>(['package']);
-  for (const file of files) {
-    const parts = `package/${file.path}`.split('/');
-    for (let index = 1; index < parts.length; index += 1)
-      ancestors.add(parts.slice(0, index).join('/'));
-  }
   if ([...directories].some((path) => !ancestors.has(path))) return fail();
   if (files.some((file) => ancestors.has(`package/${file.path}`))) return fail();
-  return files;
+  return {
+    files,
+    tar: bytes,
+    directories: [...ancestors]
+      .filter((path) => path !== 'package')
+      .map((path) => path.slice('package/'.length))
+      .sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right))),
+  };
+}
+
+type ArchiveInput = Pick<
+  ReleaseHostArchiveControls,
+  'expected' | 'archive' | 'maximum_archive_bytes' | 'maximum_unpacked_bytes'
+>;
+
+/** One parser/identity computation for archive provisioning and installation verification. */
+function checkedArchive(
+  input: ArchiveInput,
+  limits?: Pick<ReleaseHostArchiveControls, 'maximum_entries' | 'maximum_depth'>,
+) {
+  const expected = { ...input.expected };
+  if (
+    Object.keys(expected).sort().join(',') !==
+      'archive_sha256,content_manifest_sha256,name,version' ||
+    expected.name !== '@aarusso-nyx/devai' ||
+    typeof expected.version !== 'string' ||
+    expected.version.length === 0 ||
+    !DIGEST.test(expected.archive_sha256) ||
+    !DIGEST.test(expected.content_manifest_sha256) ||
+    !Number.isSafeInteger(input.maximum_archive_bytes) ||
+    input.maximum_archive_bytes < 1 ||
+    !Number.isSafeInteger(input.maximum_unpacked_bytes) ||
+    input.maximum_unpacked_bytes < 1024 ||
+    input.archive.byteLength > input.maximum_archive_bytes
+  )
+    return fail();
+  const archive = Buffer.from(input.archive);
+  if (sha256(archive) !== expected.archive_sha256) return fail();
+  const { files, tar, directories } = archiveFiles(archive, input.maximum_unpacked_bytes, limits);
+  const population = new Map(files.map((file) => [file.path, file]));
+  const manifest = files
+    .map((file) =>
+      Object.freeze({
+        path: file.path,
+        mode: file.mode,
+        size: file.bytes.byteLength,
+        sha256: sha256(Buffer.from(file.bytes)),
+      }),
+    )
+    .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)));
+  if (canonicalSha256(manifest) !== expected.content_manifest_sha256) return fail();
+  const packageBytes = population.get('package.json');
+  if (packageBytes === undefined) return fail();
+  const metadata: unknown = JSON.parse(Buffer.from(packageBytes.bytes).toString('utf8'));
+  if (
+    metadata === null ||
+    typeof metadata !== 'object' ||
+    !('name' in metadata) ||
+    metadata.name !== expected.name ||
+    !('version' in metadata) ||
+    metadata.version !== expected.version
+  )
+    return fail();
+  return {
+    identity: Object.freeze(expected),
+    manifest: Object.freeze(manifest),
+    directories: Object.freeze(directories),
+    population,
+    archive,
+    tar,
+  };
+}
+
+/**
+ * Pure external-host prerequisite. No filesystem/process effects, runtime loading,
+ * or installation brand. A provisioner may consume the captured TAR bytes; it must
+ * still call bootstrapReleaseHost on the complete resulting root before use.
+ */
+export function verifyReleaseHostArchive(
+  input: ReleaseHostArchiveControls,
+): ReleaseHostArchiveProjection {
+  try {
+    const keys = Reflect.ownKeys(input);
+    if (
+      keys.some((key) => typeof key !== 'string') ||
+      keys.sort().join(',') !==
+        'archive,expected,maximum_archive_bytes,maximum_depth,maximum_entries,maximum_unpacked_bytes' ||
+      !(input.archive instanceof Uint8Array)
+    )
+      return fail();
+    const controls = { ...input, expected: { ...input.expected } };
+    for (const value of [
+      controls.maximum_archive_bytes,
+      controls.maximum_unpacked_bytes,
+      controls.maximum_entries,
+      controls.maximum_depth,
+    ])
+      if (!Number.isSafeInteger(value) || value < 1 || value > 0x7fffffff) return fail();
+    const { identity, manifest, directories, population, archive, tar } = checkedArchive(
+      controls,
+      controls,
+    );
+    return Object.freeze({
+      identity,
+      manifest,
+      directories,
+      read: (path: string): Buffer => {
+        const file = population.get(path);
+        return file === undefined ? fail() : Buffer.from(file.bytes);
+      },
+      readArchive: (): Buffer => Buffer.from(archive),
+      readTar: (): Buffer => Buffer.from(tar),
+    });
+  } catch {
+    return fail();
+  }
 }
 
 /**
@@ -147,37 +305,7 @@ export function verifyReleasePackageSnapshot(input: {
   readonly maximum_unpacked_bytes: number;
 }): ReleasePackageSnapshot {
   try {
-    const expected = { ...input.expected };
-    if (
-      Object.keys(expected).sort().join(',') !==
-        'archive_sha256,content_manifest_sha256,name,version' ||
-      expected.name !== '@aarusso-nyx/devai' ||
-      typeof expected.version !== 'string' ||
-      expected.version.length === 0 ||
-      !DIGEST.test(expected.archive_sha256) ||
-      !DIGEST.test(expected.content_manifest_sha256) ||
-      !Number.isSafeInteger(input.maximum_archive_bytes) ||
-      input.maximum_archive_bytes < 1 ||
-      !Number.isSafeInteger(input.maximum_unpacked_bytes) ||
-      input.maximum_unpacked_bytes < 1024 ||
-      input.archive.byteLength > input.maximum_archive_bytes
-    )
-      return fail();
-    const archive = Buffer.from(input.archive);
-    if (sha256(archive) !== expected.archive_sha256) return fail();
-    const files = archiveFiles(archive, input.maximum_unpacked_bytes);
-    const population = new Map(files.map((file) => [file.path, file]));
-    const manifest = files
-      .map((file) =>
-        Object.freeze({
-          path: file.path,
-          mode: file.mode,
-          size: file.bytes.byteLength,
-          sha256: sha256(Buffer.from(file.bytes)),
-        }),
-      )
-      .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)));
-    if (canonicalSha256(manifest) !== expected.content_manifest_sha256) return fail();
+    const { identity, manifest, population, archive } = checkedArchive(input);
     const observed = new Set<string>();
     for (const entry of input.installed_files) {
       const source = population.get(entry.path);
@@ -204,21 +332,9 @@ export function verifyReleasePackageSnapshot(input: {
       input.installed_directories.some((path) => !directories.has(path))
     )
       return fail();
-    const packageBytes = population.get('package.json');
-    if (packageBytes === undefined) return fail();
-    const metadata: unknown = JSON.parse(Buffer.from(packageBytes.bytes).toString('utf8'));
-    if (
-      metadata === null ||
-      typeof metadata !== 'object' ||
-      !('name' in metadata) ||
-      metadata.name !== expected.name ||
-      !('version' in metadata) ||
-      metadata.version !== expected.version
-    )
-      return fail();
     const snapshot = Object.freeze({
-      identity: Object.freeze(expected),
-      manifest: Object.freeze(manifest),
+      identity,
+      manifest,
       readArchive: (): Buffer => Buffer.from(archive),
       read: (path: string): Buffer => {
         const file = population.get(path);
