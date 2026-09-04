@@ -5,6 +5,13 @@ import {
 } from './commands/release/lifecycle.js';
 
 export { invokeDevaiCli, startDevaiCli, type CliInvocationResult } from './cli-runtime.js';
+export {
+  createProtectedReleaseHostRunner,
+  type ProtectedReleaseHostRunnerControls,
+  type ProtectedReleaseHostRunner,
+  type ProtectedReleaseHostInvocation,
+  type ProtectedReleaseInputFile,
+} from './services/release-protected-host-runner.js';
 export { bindReleaseHostPackageSnapshot } from './services/release-host-package-binding.js';
 export {
   verifyReleasePackageSnapshot,

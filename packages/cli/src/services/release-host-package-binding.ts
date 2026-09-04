@@ -12,6 +12,13 @@ import {
 } from './release-package-snapshot.js';
 
 let bound = false;
+let boundSnapshot: ReleasePackageSnapshot | undefined;
+
+/** Package-private composition gate; a separately verified equal snapshot is insufficient. */
+export function assertBoundReleaseHostPackageSnapshot(snapshot: ReleasePackageSnapshot): void {
+  if (boundSnapshot === undefined || snapshot !== boundSnapshot)
+    throw new Error('rpl-package-identity-mismatch');
+}
 
 function bindCompilerLibraries(snapshot: ReleasePackageSnapshot): void {
   const prefix = 'dist/runtime/index/';
@@ -94,6 +101,9 @@ export function bindReleaseHostPackageSnapshot(snapshot: ReleasePackageSnapshot)
     });
     bindCompilerLibraries(snapshot);
     bindMutationEvidenceV21PackageSnapshot(snapshot);
+    // Publish the identity only after every binding succeeds. A partial failure
+    // leaves the one-shot binder consumed but cannot expose a usable host runner.
+    boundSnapshot = snapshot;
   } catch {
     throw new Error('rpl-package-identity-mismatch');
   }
