@@ -284,7 +284,9 @@ export class ProtectedCertificationContainer {
     ) {
       throw new Error('release-certification-container-identity-mismatch');
     }
-    const bootstrap = `const fs=require('node:fs'),c=require('node:crypto');console.log(JSON.stringify({version:process.version,sha256:c.createHash('sha256').update(fs.readFileSync(process.execPath)).digest('hex')}))`;
+    // Indirect tools (for example Stryker's process-tree utility) must be checked
+    // before tasks start, not only when they happen to be the selected executable.
+    const bootstrap = `const fs=require('node:fs'),c=require('node:crypto');const hash=p=>c.createHash('sha256').update(fs.readFileSync(p)).digest('hex');const executables=Object.fromEntries(Object.entries(JSON.parse(process.argv[1])).map(([name,{path}])=>[name,{path,sha256:hash(path)}]));console.log(JSON.stringify({version:process.version,sha256:hash(process.execPath),executables}))`;
     const observed = object(
       JSON.parse(
         this.#checked([
@@ -295,12 +297,14 @@ export class ProtectedCertificationContainer {
           '/usr/local/bin/node',
           '-e',
           bootstrap,
+          canonicalJson(this.#controls.executables),
         ]).toString('utf8'),
       ),
     );
     if (
       observed.version !== this.#controls.node_version ||
-      observed.sha256 !== this.#controls.executables.node?.sha256
+      observed.sha256 !== this.#controls.executables.node?.sha256 ||
+      canonicalJson(object(observed.executables)) !== canonicalJson(this.#controls.executables)
     )
       throw new Error('release-certification-container-identity-mismatch');
   }
