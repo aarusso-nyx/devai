@@ -58,7 +58,11 @@ function assertSensorPaths(value, owner, key = '') {
 
 const rootPackage = json('package.json');
 const cliPackage = json('packages/cli/package.json');
-if (cliPackage.name !== PACKAGE_NAME || !/^1\.4\.\d+(?:-rc\.\d+)?$/u.test(cliPackage.version)) {
+if (
+  cliPackage.name !== PACKAGE_NAME ||
+  cliPackage.version !== rootPackage.version ||
+  !/^1\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-rc\.(?:0|[1-9][0-9]*))?$/u.test(cliPackage.version)
+) {
   fail('PUBLISHABLE_PACKAGE_IDENTITY_INVALID', `${cliPackage.name}@${cliPackage.version}`);
 }
 if (cliPackage.repository?.url !== `git+https://github.com/${REPOSITORY}.git`) {
