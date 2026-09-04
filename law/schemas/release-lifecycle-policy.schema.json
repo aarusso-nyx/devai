@@ -825,19 +825,18 @@
             "artifact_sink",
             "prepared_state",
             "downstream_reverification",
-            "errors"
+            "errors",
+            "capacity"
           ],
           "properties": {
-            "kernel_id": { "const": "devai.kernel.release-prepare.v3" },
+            "kernel_id": {
+              "const": "devai.kernel.release-prepare.v4"
+            },
             "compatibility": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["v2_local_path_and_npm_adapter", "v3_prepare"],
-              "properties": {
-                "v2_local_path_and_npm_adapter": {
-                  "const": "deprecated-read-only-v2-compatibility-only;it-must-never-be-selected-for-a-v3-prepare"
-                },
-                "v3_prepare": { "const": "pure-in-memory-and-sink-mediated-only" }
+              "const": {
+                "v1_v2_local_path_and_npm_adapter": "deprecated-read-only-compatibility-only;never-select-for-current-prepare",
+                "v3_pack": "historical-read-only-under-original-specification;never-relabel-repack-rehash-or-wrap-as-v4-authority",
+                "v4_prepare": "pure-in-memory-and-sink-mediated-only;exact-current-pack-specification-and-live-capacity-required"
               }
             },
             "stock_composition": {
@@ -876,7 +875,9 @@
                 "missing_or_extra_entry"
               ],
               "properties": {
-                "produced_by": { "const": "release certify" },
+                "produced_by": {
+                  "const": "release certify"
+                },
                 "producer": {
                   "const": "injected-protected-certification-provider-v3-executes-the-selected-immutable-task-policy-outside-candidate-authority-and-returns-the-complete-package-output-closure"
                 },
@@ -902,14 +903,18 @@
                 "entry_fields": {
                   "const": ["path", "mode", "size_bytes", "sha256", "immutable_blob_locator"]
                 },
-                "entry_origins": { "const": ["git-object", "generated-output"] },
+                "entry_origins": {
+                  "const": ["git-object", "generated-output"]
+                },
                 "entry_order": {
                   "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse"
                 },
                 "manifest_digest": {
                   "const": "sha256-of-domain-DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1-nul-followed-by-utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted"
                 },
-                "missing_or_extra_entry": { "const": "fail-closed" }
+                "missing_or_extra_entry": {
+                  "const": "fail-closed"
+                }
               }
             },
             "content_source": {
@@ -926,7 +931,9 @@
                 "locator_rule": {
                   "const": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-ambient-worktree-reads-self-issued-generated-receipts-and-foreign-git-objects-are-forbidden"
                 },
-                "mismatch": { "const": "fail-closed" }
+                "mismatch": {
+                  "const": "fail-closed"
+                }
               }
             },
             "pack": {
@@ -943,22 +950,30 @@
                 "unsupported_semantics"
               ],
               "properties": {
-                "implementation": { "const": "pure-in-memory-npm-compatible-tar-gzip" },
-                "pack_spec_id": { "const": "devai.pure-npm-compatible-pack.v3" },
+                "implementation": {
+                  "const": "pure-in-memory-npm-compatible-tar-gzip"
+                },
+                "pack_spec_id": {
+                  "const": "devai.pure-npm-compatible-pack.v4"
+                },
                 "pack_spec_canonical_bytes": {
-                  "const": "devai.pure-npm-compatible-pack.v3\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;utf-8;no-backslash;maximum-100-bytes;no-pax\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=archive-path;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=empty\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n"
+                  "const": "devai.pure-npm-compatible-pack.v4\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;valid-unicode-scalar-values;utf-8;relative;no-backslash-no-nul-no-empty-dot-or-dotdot-segments;no-pax\nustar-path=if-archive-path-utf8-bytes<=100:name=archive-path,prefix=empty;otherwise-split-at-rightmost-slash-with-nonempty-prefix-utf8-bytes<=155-and-nonempty-name-utf8-bytes<=100;separator-not-stored;refuse-if-no-valid-split;no-truncation-no-unicode-normalization;name-offset=0,width=100;prefix-offset=345,width=155;unused-bytes=zero;full-width-fields=no-extra-nul\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=ustar-name;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=ustar-prefix\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v4];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n"
                 },
                 "pack_spec_digest_sha256": {
-                  "const": "d287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd"
+                  "const": "46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316"
                 },
-                "outputs": { "const": ["package-tarball", "package-sbom", "package-manifest"] },
+                "outputs": {
+                  "const": ["package-tarball", "package-sbom", "package-manifest"]
+                },
                 "determinism": {
                   "const": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec"
                 },
                 "forbidden_execution": {
                   "const": ["npm-subprocess", "tool-subprocess", "shell", "ambient-path-resolution"]
                 },
-                "unsupported_semantics": { "const": "fail-closed-before-any-sink-effect" }
+                "unsupported_semantics": {
+                  "const": "fail-closed-before-any-sink-effect"
+                }
               }
             },
             "artifact_sink": {
@@ -973,7 +988,9 @@
                 "partial_or_unverifiable_commit"
               ],
               "properties": {
-                "required": { "const": true },
+                "required": {
+                  "const": true
+                },
                 "trust_boundary": {
                   "const": "injected-trusted-artifact-sink-outside-the-candidate-repository"
                 },
@@ -995,14 +1012,16 @@
                     "append-unknown-terminal-evidence-and-preserve-handles-without-abort-or-rollback-on-timeout-lost-response-or-unverifiable-commit"
                   ]
                 },
-                "missing_sink": { "const": "fail-before-package-generation-or-exposure" },
+                "missing_sink": {
+                  "const": "fail-before-package-generation-or-exposure"
+                },
                 "partial_or_unverifiable_commit": {
                   "const": "append-unknown-ambiguous-terminal-evidence-preserve-the-sink-transaction-and-handles-without-abort-rollback-retry-or-redispatch-until-external-reconciliation"
                 }
               }
             },
             "prepared_state": {
-              "const": "v3-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only"
+              "const": "v4-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only"
             },
             "downstream_reverification": {
               "const": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-the-exact-committed-manifest-handle-then-recompute-byte-digest-size-and-manifest-membership-before-use"
@@ -1029,8 +1048,59 @@
                 "release-artifact-sink-commit-failed",
                 "release-artifact-sink-commit-unknown",
                 "release-artifact-sink-abort-failed",
-                "release-downstream-artifact-reverification-failed"
+                "release-downstream-artifact-reverification-failed",
+                "release-prepare-capacity-unavailable",
+                "release-prepare-capacity-insufficient"
               ]
+            },
+            "capacity": {
+              "const": {
+                "contract_id": "devai.release-prepare-capacity.v1",
+                "action_id": "release prepare",
+                "bounds": {
+                  "max_batches": 256,
+                  "max_targets_per_batch": 64,
+                  "max_total_targets": 8192
+                },
+                "reader": "host-owned-read-only-non-transferable-live-invocation-and-exact-bounded-plan-account;no-request-field-candidate-callback-or-numeric-self-assertion",
+                "check_point": "after-complete-certified-package-and-packed-artifact-count-verification-immediately-before-sink.begin",
+                "package_count": "complete-request-bound-certified-package-roster;safe-integer;no-subset",
+                "package_artifacts_per_package": 3,
+                "commit_manifest_objects": 1,
+                "sink_batches": {
+                  "begin": 1,
+                  "package_puts_per_package": 3,
+                  "commit_manifest_put": 1,
+                  "commit": 1,
+                  "pre_commit_abort_allowance": 1
+                },
+                "state_batches": {
+                  "exclusive_write": 7,
+                  "completion": 7,
+                  "state_record": 7,
+                  "temporary_head": 7,
+                  "head_rename": 1,
+                  "head_directory_sync": 3,
+                  "execution_lock_cleanup": 4,
+                  "success_reserve": 29,
+                  "failure_or_unknown_terminal_plus_cleanup": 11
+                },
+                "required_remaining_batches": "3 * package_count + 33",
+                "required_remaining_targets": "3 * package_count + 33",
+                "acceptance_cohort": {
+                  "package_count": 38,
+                  "required_remaining_batches": 147,
+                  "required_remaining_targets": 147
+                },
+                "initialization": "already-charged-before-check;pin-campaign-and-records-attempts-completions-failures-unknown-directory-identities-under-execution-lock;append-validates-and-refuses-drift-never-recreates",
+                "sequencing": "exclusive-through-completion-or-protected-reservation-in-same-account;no-concurrent-or-unaccounted-effect-may-spend-required-capacity",
+                "accounting": "one-batch-and-target-per-logical-sink-operation;ordinary-state-filesystem-effects-separate;read-only-reverification-has-no-mutation-effect;no-counter-reset-cross-invocation-credit-or-missing-reader-fallback",
+                "refusal_codes": [
+                  "release-prepare-capacity-unavailable",
+                  "release-prepare-capacity-insufficient"
+                ],
+                "refusal_effect": "before-sink.begin-or-artifact-exposure;no-success-state;existing-bounded-failure-bookkeeping-only;unknown-commit-preserves-handles-without-abort-or-retry"
+              }
             }
           }
         },
@@ -2845,7 +2915,7 @@
       "id": "release-lifecycle",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.7.0",
+      "policy_version": "2.8.0",
       "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
       "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
       "receipt_schemas": {
@@ -3558,10 +3628,11 @@
           "missing_or_mismatched_provider": "refuse-before-task-execution-or-success-state-append;no-ambient-or-unprotected-fallback"
         },
         "prepare_kernel": {
-          "kernel_id": "devai.kernel.release-prepare.v3",
+          "kernel_id": "devai.kernel.release-prepare.v4",
           "compatibility": {
-            "v2_local_path_and_npm_adapter": "deprecated-read-only-v2-compatibility-only;it-must-never-be-selected-for-a-v3-prepare",
-            "v3_prepare": "pure-in-memory-and-sink-mediated-only"
+            "v1_v2_local_path_and_npm_adapter": "deprecated-read-only-compatibility-only;never-select-for-current-prepare",
+            "v3_pack": "historical-read-only-under-original-specification;never-relabel-repack-rehash-or-wrap-as-v4-authority",
+            "v4_prepare": "pure-in-memory-and-sink-mediated-only;exact-current-pack-specification-and-live-capacity-required"
           },
           "stock_composition": {
             "built_in_actions": ["release plan", "release preflight", "release resume"],
@@ -3597,9 +3668,9 @@
           },
           "pack": {
             "implementation": "pure-in-memory-npm-compatible-tar-gzip",
-            "pack_spec_id": "devai.pure-npm-compatible-pack.v3",
-            "pack_spec_canonical_bytes": "devai.pure-npm-compatible-pack.v3\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;utf-8;no-backslash;maximum-100-bytes;no-pax\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=archive-path;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=empty\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n",
-            "pack_spec_digest_sha256": "d287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd",
+            "pack_spec_id": "devai.pure-npm-compatible-pack.v4",
+            "pack_spec_canonical_bytes": "devai.pure-npm-compatible-pack.v4\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;valid-unicode-scalar-values;utf-8;relative;no-backslash-no-nul-no-empty-dot-or-dotdot-segments;no-pax\nustar-path=if-archive-path-utf8-bytes<=100:name=archive-path,prefix=empty;otherwise-split-at-rightmost-slash-with-nonempty-prefix-utf8-bytes<=155-and-nonempty-name-utf8-bytes<=100;separator-not-stored;refuse-if-no-valid-split;no-truncation-no-unicode-normalization;name-offset=0,width=100;prefix-offset=345,width=155;unused-bytes=zero;full-width-fields=no-extra-nul\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=ustar-name;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=ustar-prefix\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v4];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n",
+            "pack_spec_digest_sha256": "46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316",
             "outputs": ["package-tarball", "package-sbom", "package-manifest"],
             "determinism": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec",
             "forbidden_execution": [
@@ -3630,7 +3701,7 @@
             "missing_sink": "fail-before-package-generation-or-exposure",
             "partial_or_unverifiable_commit": "append-unknown-ambiguous-terminal-evidence-preserve-the-sink-transaction-and-handles-without-abort-rollback-retry-or-redispatch-until-external-reconciliation"
           },
-          "prepared_state": "v3-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only",
+          "prepared_state": "v4-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only",
           "downstream_reverification": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-the-exact-committed-manifest-handle-then-recompute-byte-digest-size-and-manifest-membership-before-use",
           "errors": [
             "release-prepare-certification-manifest-invalid",
@@ -3653,8 +3724,57 @@
             "release-artifact-sink-commit-failed",
             "release-artifact-sink-commit-unknown",
             "release-artifact-sink-abort-failed",
-            "release-downstream-artifact-reverification-failed"
-          ]
+            "release-downstream-artifact-reverification-failed",
+            "release-prepare-capacity-unavailable",
+            "release-prepare-capacity-insufficient"
+          ],
+          "capacity": {
+            "contract_id": "devai.release-prepare-capacity.v1",
+            "action_id": "release prepare",
+            "bounds": {
+              "max_batches": 256,
+              "max_targets_per_batch": 64,
+              "max_total_targets": 8192
+            },
+            "reader": "host-owned-read-only-non-transferable-live-invocation-and-exact-bounded-plan-account;no-request-field-candidate-callback-or-numeric-self-assertion",
+            "check_point": "after-complete-certified-package-and-packed-artifact-count-verification-immediately-before-sink.begin",
+            "package_count": "complete-request-bound-certified-package-roster;safe-integer;no-subset",
+            "package_artifacts_per_package": 3,
+            "commit_manifest_objects": 1,
+            "sink_batches": {
+              "begin": 1,
+              "package_puts_per_package": 3,
+              "commit_manifest_put": 1,
+              "commit": 1,
+              "pre_commit_abort_allowance": 1
+            },
+            "state_batches": {
+              "exclusive_write": 7,
+              "completion": 7,
+              "state_record": 7,
+              "temporary_head": 7,
+              "head_rename": 1,
+              "head_directory_sync": 3,
+              "execution_lock_cleanup": 4,
+              "success_reserve": 29,
+              "failure_or_unknown_terminal_plus_cleanup": 11
+            },
+            "required_remaining_batches": "3 * package_count + 33",
+            "required_remaining_targets": "3 * package_count + 33",
+            "acceptance_cohort": {
+              "package_count": 38,
+              "required_remaining_batches": 147,
+              "required_remaining_targets": 147
+            },
+            "initialization": "already-charged-before-check;pin-campaign-and-records-attempts-completions-failures-unknown-directory-identities-under-execution-lock;append-validates-and-refuses-drift-never-recreates",
+            "sequencing": "exclusive-through-completion-or-protected-reservation-in-same-account;no-concurrent-or-unaccounted-effect-may-spend-required-capacity",
+            "accounting": "one-batch-and-target-per-logical-sink-operation;ordinary-state-filesystem-effects-separate;read-only-reverification-has-no-mutation-effect;no-counter-reset-cross-invocation-credit-or-missing-reader-fallback",
+            "refusal_codes": [
+              "release-prepare-capacity-unavailable",
+              "release-prepare-capacity-insufficient"
+            ],
+            "refusal_effect": "before-sink.begin-or-artifact-exposure;no-success-state;existing-bounded-failure-bookkeeping-only;unknown-commit-preserves-handles-without-abort-or-retry"
+          }
         },
         "release_unit_bijection": {
           "state_schema": "law/schemas/release-lifecycle-state.schema.json",
@@ -4158,7 +4278,101 @@
           "rlo-semantic-verification-not-performed"
         ]
       },
-      "fail_closed": ["missing-prior-state"]
+      "fail_closed": [
+        "missing-prior-state",
+        "prior-state-digest-mismatch",
+        "repository-identity-mismatch",
+        "candidate-identity-mismatch",
+        "input-digest-mismatch",
+        "evidence-digest-mismatch",
+        "artifact-digest-mismatch",
+        "absent-effect-authorization",
+        "consumed-effect-authorization",
+        "revoked-effect-authorization",
+        "expired-effect-authorization",
+        "authorization-identity-mismatch",
+        "initiator-role-mismatch",
+        "absent-publish-consent",
+        "observational-action-attempted-transition",
+        "offline-verify-treated-as-grant",
+        "resume-treated-as-transition",
+        "absent-plan-receipt",
+        "invalid-plan-receipt",
+        "plan-receipt-digest-mismatch",
+        "plan-receipt-identity-mismatch",
+        "absent-offline-verification-receipt",
+        "invalid-offline-verification-receipt",
+        "failing-offline-verification-receipt",
+        "offline-verification-receipt-digest-mismatch",
+        "offline-verification-receipt-identity-mismatch",
+        "offline-verification-verifier-identity-mismatch",
+        "absent-publication-receipt",
+        "invalid-publication-receipt",
+        "unsigned-publication-receipt",
+        "untrusted-publication-receipt-signer",
+        "publication-receipt-signature-invalid",
+        "publication-receipt-digest-mismatch",
+        "publication-receipt-identity-mismatch",
+        "publication-receipt-state-identity-mismatch",
+        "publication-receipt-artifact-mismatch",
+        "publication-receipt-workflow-identity-mismatch",
+        "publication-receipt-emitted-by-devai-action",
+        "published-state-record-appended",
+        "publish-produced-published-state",
+        "derived-state-persisted",
+        "read-action-persisted-state",
+        "read-action-nondeterministic-output",
+        "receipt-treated-as-authorization",
+        "observation-treated-as-transition",
+        "unknown-receipt-kind",
+        "unknown-action-id",
+        "unknown-state",
+        "rlo-head-not-publication-dispatched",
+        "rlo-head-verified-against-mismatch",
+        "rlo-receipt-dispatched-state-mismatch",
+        "rlo-derived-state-receipt-mismatch",
+        "rlo-receipt-digest-mismatch",
+        "rlo-candidate-identity-mismatch",
+        "rlo-artifact-identity-mismatch",
+        "rlo-destination-identity-mismatch",
+        "rlo-workflow-identity-mismatch",
+        "rlo-trust-store-digest-mismatch",
+        "rlo-trust-identity-mismatch",
+        "rlo-signature-invalid",
+        "rlo-semantic-verification-not-performed",
+        "rpd-action-state-effect-role-mismatch",
+        "rpd-owner-grant-id-mismatch",
+        "rpd-owner-grant-unresolved",
+        "rpd-owner-grant-not-live",
+        "rpd-owner-grant-identity-mismatch",
+        "rpd-destination-mismatch",
+        "rpd-workflow-expectation-invalid",
+        "rpd-trust-expectation-invalid",
+        "rpd-semantic-verification-not-performed",
+        "release-store-append-tail-mismatch",
+        "release-store-observed-head-mismatch",
+        "release-store-unknown-successor-conflict",
+        "release-store-attempt-redispatch",
+        "release-store-retry-authorization-reuse",
+        "release-store-resume-history-divergence",
+        "release-store-legacy-seam-authority-conflict",
+        "release-store-head-state-generation-mismatch",
+        "release-prepare-certification-manifest-invalid",
+        "release-prepare-package-entry-coverage-invalid",
+        "release-prepare-immutable-blob-locator-invalid",
+        "release-prepare-content-digest-mismatch",
+        "release-prepare-pack-spec-digest-mismatch",
+        "release-prepare-unsupported-package-semantics",
+        "release-prepare-subprocess-forbidden",
+        "release-artifact-sink-unavailable",
+        "release-artifact-sink-protocol-invalid",
+        "release-artifact-sink-verification-failed",
+        "release-artifact-sink-commit-failed",
+        "release-artifact-sink-abort-failed",
+        "release-downstream-artifact-reverification-failed",
+        "release-prepare-capacity-unavailable",
+        "release-prepare-capacity-insufficient"
+      ]
     }
   ]
 }

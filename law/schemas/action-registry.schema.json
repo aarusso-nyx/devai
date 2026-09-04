@@ -315,8 +315,16 @@
                       "const": ["fs:f5-state", "fs:proofs", "artifact-sink:write"]
                     },
                     "planner": {
-                      "properties": {
-                        "target_kinds": { "const": ["fs", "artifact-sink"] }
+                      "const": {
+                        "kind": "bounded-batches",
+                        "planner_id": "release-prepare-bounded-plan",
+                        "target_kinds": ["fs", "artifact-sink"],
+                        "bounds": {
+                          "max_batches": 256,
+                          "max_targets_per_batch": 64,
+                          "max_total_targets": 8192
+                        },
+                        "recovery": "preserve-and-report"
                       }
                     },
                     "boundary": {
