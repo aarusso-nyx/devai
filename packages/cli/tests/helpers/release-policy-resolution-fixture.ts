@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -11,6 +11,7 @@ import {
 } from '../../src/services/adopter-policy.js';
 import {
   createResolvedReleasePlanInputResolver,
+  readReleasePolicyResolutionEvidence,
   resolveReleasePolicySnapshot,
   type VerifiedReleasePolicyResolution,
 } from '../../src/services/release-policy-resolution.js';
@@ -213,12 +214,111 @@ export interface LifecyclePolicyFixture {
   readonly candidate: ReleaseCandidateSnapshot;
   readonly objects: ReadonlyMap<string, ReleaseGitObject>;
   readonly resolution: VerifiedReleasePolicyResolution;
-  readonly receipt: Readonly<Record<string, unknown>>;
+  readonly receipt: ReturnType<typeof buildResolvedReleasePlanReceipt>;
   readonly resolve_plan_input: (input: Readonly<Record<string, unknown>>) => unknown;
   readonly intent: Readonly<Record<string, unknown>>;
   readonly package_json: Buffer;
   readonly expected: Parameters<typeof resolveReleasePolicySnapshot>[0]['expected'];
 }
+
+/**
+ * Materialize the same candidate-bound policy evidence used by the in-memory
+ * fixture into an already initialized repository, then resolve it from the
+ * repository's real Git objects.  Callers commit only after this returns from
+ * its materialization phase, so the candidate commit includes every binding.
+ */
+export function createFilesystemLifecyclePolicyFixture(input: {
+  readonly root: string;
+  readonly base: { readonly commit: string; readonly tree: string };
+  readonly git: (args: readonly string[]) => string;
+  readonly readGitObject: (type: ReleaseGitObject['type'], object_id: string) => Buffer;
+  readonly package_manifest: Uint8Array;
+}): Omit<LifecyclePolicyFixture, 'candidate' | 'resolution' | 'receipt' | 'resolve_plan_input'> & {
+  readonly candidate: ReleaseCandidateSnapshot;
+  readonly resolution: VerifiedReleasePolicyResolution;
+  readonly receipt: ReturnType<typeof buildResolvedReleasePlanReceipt>;
+  readonly resolve_plan_input: (input: Readonly<Record<string, unknown>>) => unknown;
+} {
+  const fixture = createLifecyclePolicyFixture();
+  for (const path of fixture.candidate.paths) {
+    const target = join(input.root, path);
+    mkdirSync(join(target, '..'), { recursive: true });
+    writeFileSync(target, fixture.candidate.read(path));
+  }
+  mkdirSync(join(input.root, 'packages/cli'), { recursive: true });
+  writeFileSync(join(input.root, 'packages/cli/package.json'), input.package_manifest);
+  input.git(['add', '.']);
+  input.git(['commit', '-qm', 'candidate-policy-bound']);
+
+  const commit = input.git(['rev-parse', 'HEAD']);
+  const tree = input.git(['rev-parse', 'HEAD^{tree}']);
+  const objectIds = new Set<string>([
+    commit,
+    ...input
+      .git(['rev-list', '--objects', commit])
+      .split('\n')
+      .map((line) => line.split(' ', 1)[0])
+      .filter((value): value is string => value !== undefined && /^[0-9a-f]{40}$/.test(value)),
+  ]);
+  const objects = new Map<string, ReleaseGitObject>();
+  for (const object_id of objectIds) {
+    const type = input.git(['cat-file', '-t', object_id]) as ReleaseGitObject['type'];
+    if (!['blob', 'tree', 'commit'].includes(type)) throw new Error('fixture Git object type');
+    objects.set(object_id, { type, bytes: input.readGitObject(type, object_id) });
+  }
+  const candidate = verifyReleaseCandidateSnapshot({
+    repository: { id: 'aarusso-nyx/devai', commit, tree },
+    objects,
+    maximum_bytes: 4 * 1024 * 1024,
+    maximum_entries: 2000,
+  });
+  const evidence = readReleasePolicyResolutionEvidence(fixture.resolution);
+  const producer = evidence.producer;
+  if (producer === undefined) throw new Error('fixture producer evidence');
+  const provenance = JSON.parse(Buffer.from(producer.build_provenance).toString('utf8')) as {
+    readonly producer_source: {
+      readonly repository_id: string;
+      readonly commit: string;
+      readonly tree: string;
+    };
+  };
+  const source = verifyReleaseCandidateSnapshot({
+    repository: {
+      id: provenance.producer_source.repository_id,
+      commit: provenance.producer_source.commit,
+      tree: provenance.producer_source.tree,
+    },
+    objects: producer.source_objects,
+    maximum_bytes: 4 * 1024 * 1024,
+    maximum_entries: 2000,
+  });
+  const expected = { ...fixture.expected, repository: candidate.repository };
+  const resolution = resolveReleasePolicySnapshot({
+    expected,
+    installed_package: fixture.package_snapshot,
+    candidate,
+    producer: {
+      files: producer.files,
+      source,
+      build_provenance: producer.build_provenance,
+    },
+  });
+  const intent = {
+    ...fixture.intent,
+    candidate: { commit, tree },
+    base: input.base,
+  };
+  return {
+    ...fixture,
+    candidate,
+    resolution,
+    receipt: buildResolvedReleasePlanReceipt({ intent, resolution }),
+    resolve_plan_input: createResolvedReleasePlanInputResolver(resolution),
+    intent,
+    expected,
+  };
+}
+
 export function createLifecyclePolicyFixture(): LifecyclePolicyFixture {
   const checked = packageSnapshot();
   const pin = checked.read('dist/law/constitution.md');

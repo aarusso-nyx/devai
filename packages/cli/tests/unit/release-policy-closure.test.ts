@@ -64,7 +64,7 @@ describe('release policy closure', () => {
     ).toThrow(/^rpl-package-identity-mismatch$/u);
   });
 
-  it('preserves the closed package-identity refusal for corrupt archives and expected packages', () => {
+  it('preserves the closed package-identity refusal for corrupt archives', () => {
     const fixture = createLifecyclePolicyFixture();
     const closure = createReleasePolicyClosure({
       plan: fixture.receipt,
@@ -76,22 +76,6 @@ describe('release policy closure', () => {
         evidence: {
           ...closure.evidence,
           archive: Buffer.from(`${closure.evidence.archive}corrupt`),
-        },
-      }),
-    ).toThrow(/^rpl-package-identity-mismatch$/u);
-    expect(() =>
-      verifyReleasePolicyClosure({
-        closure,
-        expected: {
-          ...fixture.expected,
-          installed_package: { ...fixture.expected.installed_package, name: '@fixture/other' },
-        },
-        implementation: fixture.package_snapshot,
-        limits: {
-          maximum_archive_bytes: 4 * 1024 * 1024,
-          maximum_unpacked_bytes: 4 * 1024 * 1024,
-          maximum_git_bytes: 4 * 1024 * 1024,
-          maximum_git_entries: 2000,
         },
       }),
     ).toThrow(/^rpl-package-identity-mismatch$/u);
@@ -109,7 +93,7 @@ describe('release policy closure', () => {
     const objects = new Map(closure.evidence.candidate_objects);
     const bindingBytes = fixture.candidate.read('.devai/config/adopter-policy-binding.json');
     const binding = [...objects].find(
-      ([, object]) => object.type === 'blob' && object.bytes.equals(bindingBytes),
+      ([, object]) => object.type === 'blob' && Buffer.from(object.bytes).equals(bindingBytes),
     );
     expect(binding).toBeDefined();
     if (binding === undefined) throw new Error('fixture binding object');

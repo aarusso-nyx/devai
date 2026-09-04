@@ -6,24 +6,36 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CAC } from 'cac';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuthorityDecisionIssuer,
+  protectedReleaseHostEffect,
   runWithAuthorityHostEffects,
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
-import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
+import { declaredInvocationAuthority } from '../../src/authority/index.js';
 import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
+import { verifyResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import {
+  executeReleaseLifecycleAction,
+  ReleaseLifecycleFileStore,
+  validateReleaseLifecycleRequest,
+} from '../../src/services/release-lifecycle-execution.js';
 import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release-lifecycle-local-adapters.js';
+import { createContainerReleaseCertificationAdapters } from '../../src/services/release-certification-provider.js';
+import { createResolvedReleasePlanInputResolver } from '../../src/services/release-policy-resolution.js';
+import { createFilesystemLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 import type {
   ArtifactSinkObject,
   ArtifactSinkObjectReceipt,
@@ -34,8 +46,17 @@ const { runChecks, declaredRole } = vi.hoisted(() => ({
   runChecks: vi.fn(),
   declaredRole: { value: 'inspector' as 'architect' | 'inspector' },
 }));
-vi.mock('../../src/services/check-runner/index.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/services/check-runner/index.js')>()),
+vi.mock('../../src/services/release-certification-container.js', () => ({
+  ProtectedCertificationContainer: class {
+    readonly identity = { protocol: 'test-protected-container-boundary' };
+    runBound<T>(_binding: unknown, operation: () => T): T {
+      return operation();
+    }
+    verifyRuntime(): void {}
+  },
+}));
+vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/check-runner/runner.js')>()),
   runCheckTasks: runChecks,
 }));
 
@@ -95,23 +116,85 @@ function git(root: string, args: readonly string[]): string {
   return String(result.stdout).trim();
 }
 
-async function withLocalMutationScope<T>(callback: () => Promise<T>): Promise<T> {
+async function withProtectedPreflightScope<T>(
+  binding: {
+    readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
+    readonly task_policy_digest_sha256: string;
+    readonly plan_receipt_digest_sha256: string;
+    readonly state_root: string;
+  },
+  callback: () => T | Promise<T>,
+): Promise<T> {
   let ordinal = 0;
   const issuer = createAuthorityDecisionIssuer({
-    issuer_id: 'release-local-adapter-test',
+    issuer_id: 'release-preflight-adapter-test',
     issuer_version: '1.0.0',
-    invocation_id: 'release-local-adapter-test',
+    invocation_id: 'release-preflight-adapter-test',
     canonicalSha256,
-    randomId: () => `release-local-adapter-test-${String(++ordinal)}`,
+    randomId: () => `release-preflight-adapter-${String(++ordinal)}`,
     now: () => '2026-09-03T00:00:00.000Z',
     receipt_ttl_ms: 30_000,
   });
+  const stateRoot = resolve(binding.state_root);
+  const descriptors = new Set<number>();
+  const statePath = (value: unknown): boolean => {
+    if (typeof value !== 'string' || !isAbsolute(value)) return false;
+    const path = relative(stateRoot, resolve(value));
+    return path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+  };
   const scope: AuthorityHostEffectScope = {
-    action_id: 'release prepare',
-    invocation_id: 'release-local-adapter-test',
-    effect: 'local-write',
+    action_id: 'release preflight',
+    invocation_id: 'release-preflight-adapter-test',
+    effect: 'harness-write',
     receipt_store: issuer,
-    apply_effect: (_request, apply) => apply(),
+    apply_effect: (request, apply) => {
+      const operation = protectedReleaseHostEffect(request);
+      if (operation !== undefined) {
+        if (
+          operation.kind !== 'provider' ||
+          operation.binding.action_id !== 'release preflight' ||
+          canonicalJson(operation.binding.repository) !== canonicalJson(binding.repository) ||
+          operation.binding.task_policy_digest_sha256 !== binding.task_policy_digest_sha256 ||
+          operation.binding.plan_receipt_digest_sha256 !== binding.plan_receipt_digest_sha256
+        ) {
+          throw new Error('TEST_PROTECTED_PREFLIGHT_OPERATION_REQUIRED');
+        }
+        return apply();
+      }
+      if (
+        request.kind !== 'filesystem' ||
+        ![
+          'mkdirSync',
+          'openSync',
+          'readFileSync',
+          'writeSync',
+          'fsyncSync',
+          'closeSync',
+          'lstatSync',
+          'readdirSync',
+          'renameSync',
+          'unlinkSync',
+        ].includes(request.symbol)
+      )
+        throw new Error('TEST_PROTECTED_PREFLIGHT_OPERATION_REQUIRED');
+      const target = request.arguments[0];
+      if (request.symbol === 'renameSync') {
+        if (!statePath(target) || !statePath(request.arguments[1]))
+          throw new Error('TEST_PROTECTED_PREFLIGHT_OPERATION_REQUIRED:path:renameSync');
+        return apply();
+      }
+      if (typeof target === 'number') {
+        if (!descriptors.has(target))
+          throw new Error('TEST_PROTECTED_PREFLIGHT_OPERATION_REQUIRED');
+        const result = apply();
+        if (request.symbol === 'closeSync') descriptors.delete(target);
+        return result;
+      }
+      if (!statePath(target)) throw new Error('TEST_PROTECTED_PREFLIGHT_OPERATION_REQUIRED');
+      const result = apply();
+      if (request.symbol === 'openSync' && typeof result === 'number') descriptors.add(result);
+      return result;
+    },
   };
   try {
     return await runWithAuthorityHostEffects(scope, callback);
@@ -121,8 +204,8 @@ async function withLocalMutationScope<T>(callback: () => Promise<T>): Promise<T>
 }
 
 describe('release lifecycle command adapter composition', () => {
-  it('executes the public preflight through the installed local provider', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'devai-release-command-'));
+  it('wires only the protected preflight factory before continuing the public lifecycle', async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-release-command-')));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
     mkdirSync(join(root, 'law/policy'), { recursive: true });
     mkdirSync(join(root, 'receipts'), { recursive: true });
@@ -133,9 +216,9 @@ describe('release lifecycle command adapter composition', () => {
     ]) {
       cpSync(join(process.cwd(), 'law/policy', name), join(root, 'law/policy', name));
     }
-    const manifestBytes = `${canonicalJson({
+    let manifestBytes = `${canonicalJson({
       name: '@aarusso-nyx/devai',
-      version: '1.5.0',
+      version: '1.4.5',
       files: ['bin'],
       bin: { 'mode-fixture': 'bin/mode-fixture.mjs' },
     })}\n`;
@@ -180,32 +263,55 @@ describe('release lifecycle command adapter composition', () => {
     git(root, ['config', 'user.name', 'Release Test']);
     git(root, ['config', 'user.email', 'release@example.invalid']);
     git(root, ['add', '.']);
-    git(root, ['commit', '-qm', 'candidate']);
-    const commit = git(root, ['rev-parse', 'HEAD']);
-    const tree = git(root, ['rev-parse', 'HEAD^{tree}']);
-    mkdirSync(join(root, '.devai/state'), { recursive: true });
-    const intent = {
-      schemaVersion: '1.0.0',
-      release_unit: '@aarusso-nyx/devai',
-      current_version: '1.4.5',
-      target_version: '1.5.0',
-      support: 'current',
-      change_kind: 'behavioral',
-      changed_paths: ['packages/cli/src/services/release-lifecycle-execution.ts'],
-      changed_packages: ['@aarusso-nyx/devai'],
-      candidate: { commit, tree },
-      base: { commit: '7'.repeat(40), tree: '8'.repeat(40) },
-    };
-    writeFileSync(join(root, 'release-intent.json'), `${canonicalJson(intent)}\n`);
-    const receipt = buildReleasePlanReceipt({
-      repository_id: 'aarusso-nyx/devai',
-      intent_path: 'release-intent.json',
-      intent,
-      release_verification_profile: json(join(root, 'law/policy/release-verification.json')),
-      release_lifecycle_policy: json(join(root, 'law/policy/release-lifecycle.json')),
-      action_registry: json(join(root, 'law/policy/action-registry.json')),
+    git(root, ['commit', '-qm', 'base']);
+    const baseCommit = git(root, ['rev-parse', 'HEAD']);
+    const baseTree = git(root, ['rev-parse', 'HEAD^{tree}']);
+    manifestBytes = `${canonicalJson({
+      name: '@aarusso-nyx/devai',
+      version: '1.5.0',
+      files: ['bin'],
+      bin: { 'mode-fixture': 'bin/mode-fixture.mjs' },
+    })}\n`;
+    writeFileSync(join(root, 'packages/cli/package.json'), manifestBytes);
+    writeFileSync(
+      join(root, 'packages/cli/bin/mode-fixture.mjs'),
+      '#!/usr/bin/env node\n// candidate\n',
+    );
+    const fixture = createFilesystemLifecyclePolicyFixture({
+      root,
+      base: { commit: baseCommit, tree: baseTree },
+      git: (args) => git(root, args),
+      readGitObject: (type, object_id) => {
+        const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
+        if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+          throw new Error('missing fixture Git object');
+        }
+        return result.stdout;
+      },
+      package_manifest: Buffer.from(manifestBytes),
     });
+    const { commit, tree } = fixture.candidate.repository;
+    expect(
+      verifyResolvedReleasePlanReceipt({
+        resolution: fixture.resolution,
+        receipt: fixture.receipt,
+      }),
+    ).toBe(true);
+    writeFileSync(
+      join(root, '.git/info/exclude'),
+      '.devai/\nreceipts/\nrelease-intent.json\nrequest.json\nresume-request.json\ncertify-request.json\nprepare-request.json\nexport-request.json\nunsafe-request.json\n',
+    );
+    mkdirSync(join(root, '.devai/state'), { recursive: true });
+    const intent = fixture.intent;
+    writeFileSync(join(root, 'release-intent.json'), `${canonicalJson(intent)}\n`);
+    const receipt = fixture.receipt;
     writeFileSync(join(root, 'receipts/plan.json'), `${canonicalJson(receipt)}\n`);
+    expect(
+      verifyResolvedReleasePlanReceipt({
+        resolution: fixture.resolution,
+        receipt: json(join(root, 'receipts/plan.json')),
+      }),
+    ).toBe(true);
     const manifestDigest = createHash('sha256').update(manifestBytes).digest('hex');
     const request = {
       schemaVersion: '1.0.0',
@@ -238,8 +344,31 @@ describe('release lifecycle command adapter composition', () => {
         },
       ],
     } as const;
+    const policyResolution = vi.fn(
+      (input: {
+        readonly repository_id: string;
+        readonly candidate: { readonly commit: string; readonly tree: string };
+        readonly release_unit: string;
+      }) => {
+        expect(input).toEqual({
+          repository_id: 'aarusso-nyx/devai',
+          candidate: { commit, tree },
+          release_unit: '@aarusso-nyx/devai',
+        });
+        return fixture.resolution;
+      },
+    );
     const requestPath = join(root, 'request.json');
     writeFileSync(requestPath, `${canonicalJson(request)}\n`);
+    expect(() => validateReleaseLifecycleRequest(request, 'release preflight')).not.toThrow();
+    const persistedRequest = validateReleaseLifecycleRequest(
+      json(requestPath),
+      'release preflight',
+    );
+    expect(
+      () => new ReleaseLifecycleFileStore(join(root, 'state'), persistedRequest),
+    ).not.toThrow();
+    expect(() => createResolvedReleasePlanInputResolver(fixture.resolution)).not.toThrow();
     const provider = vi.fn(() => ({
       outcome: 'success' as const,
       material: {
@@ -279,32 +408,40 @@ describe('release lifecycle command adapter composition', () => {
         artifacts: [],
       },
     }));
-    const uninstall = installReleaseLifecycleCommandAdapters({
-      provider: () => provider,
-      offline_verification_provider: () => undefined,
-      authorization: () => undefined,
-      offline_receipt_verifier: () => undefined,
-      publication_controls: () => undefined,
+    const direct = await executeReleaseLifecycleAction({
+      request: persistedRequest,
+      action: 'release preflight',
+      store: new ReleaseLifecycleFileStore(join(root, 'direct-state'), persistedRequest),
+      provider,
+      authority: {
+        actor: { kind: 'human', role: 'inspector', declaration_source: 'cli-flag' },
+        consent: { write: true, allow_publish: false, experimental: false },
+      },
+      resolveReceipt: () => receipt,
+      resolvePlanInput: fixture.resolve_plan_input,
+      recorded_at: '2026-09-03T00:00:00.000Z',
     });
-    cleanups.push(uninstall);
-    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    await withAuthorityHostTestScope(() =>
-      captureAction()({ request: requestPath, repoRoot: root, stateRoot: join(root, 'state') }),
-    );
-    expect(provider).toHaveBeenCalledOnce();
-    expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"preflight_passed"'));
-
-    uninstall();
-    output.mockClear();
-    const errorOutput = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    expect(direct).toMatchObject({ ok: false, code: 'release-certification-provider-unavailable' });
+    const protectedPlan = {
+      descriptorDigest: canonicalSha256(json(join(root, 'test-tasks.json'))),
+      taskPolicyDigest: 'a'.repeat(64),
+      toolchainDigest: 'b'.repeat(64),
+      taskPolicy: { nodes: ['format'] },
+      tasks: [
+        {
+          nodeId: 'format',
+          taskKey: 'format',
+          argv: ['node', '-e', 'process.exit(0)'],
+          cwd: '.',
+          executable: { path: '/usr/local/bin/node', sha256: 'f'.repeat(64) },
+          outputContract: { kind: 'tracked-files', paths: [] },
+        },
+      ],
+    };
     runChecks.mockReturnValue({
       schemaVersion: '1.0.0',
       operation: 'run',
-      plan: {
-        descriptorDigest: canonicalSha256(json(join(root, 'test-tasks.json'))),
-        taskPolicyDigest: 'a'.repeat(64),
-        toolchainDigest: 'b'.repeat(64),
-      },
+      plan: protectedPlan,
       execution: [
         {
           nodeId: 'format',
@@ -322,16 +459,145 @@ describe('release lifecycle command adapter composition', () => {
       },
       exitCode: 0,
     });
-    await withAuthorityHostTestScope(() =>
-      captureAction()({
-        request: requestPath,
-        repoRoot: root,
-        stateRoot: join(root, 'stock-state'),
-      }),
+    const protectedAdapters = createContainerReleaseCertificationAdapters({
+      repository_root: root,
+      repository_id: 'aarusso-nyx/devai',
+      plans: [
+        {
+          receipt,
+          resolution: fixture.resolution,
+          intent_path: 'release-intent.json',
+          intent,
+          release_verification_profile: fixture.resolution.readInput(
+            'release-verification-profile',
+          ),
+          release_lifecycle_policy: fixture.resolution.readInput('release-lifecycle-policy'),
+          action_registry: fixture.resolution.readInput('action-registry-policy'),
+          packages: [
+            {
+              package_id: '@aarusso-nyx/devai',
+              source_entries: ['packages/cli/package.json'],
+              generated_entries: [],
+            },
+          ],
+        },
+      ],
+      controls: {
+        docker_binary: '/test/docker',
+        docker_binary_sha256: '1'.repeat(64),
+        docker_config_directory: '/test/config',
+        engine_socket: 'unix:///test/docker.sock',
+        engine_version: 'test-engine',
+        image: `test/node@sha256:${'2'.repeat(64)}`,
+        node_version: 'v24.0.0',
+        executables: { node: { path: '/usr/local/bin/node', sha256: 'f'.repeat(64) } },
+        memory_bytes: 64 * 1024 * 1024,
+        cpus: 1,
+        pids_limit: 2,
+        maximum_archive_bytes: 1024 * 1024,
+      },
+      environment: {},
+      toolchain: { node: 'v24.0.0' },
+      timeout_ms: 1_000,
+      content_source: {
+        readGitObject: ({ type, object_id }) => {
+          const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
+          if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+            throw new Error('missing git object');
+          return result.stdout;
+        },
+        readGitBlob: ({ object_id }) => {
+          const result = spawnSync('git', ['-C', root, 'cat-file', 'blob', object_id]);
+          if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+            throw new Error('missing blob');
+          return result.stdout;
+        },
+      },
+      evidence_sink: {
+        kind: 'certification-evidence-sink-v3',
+        protocol: 'two-phase-content-addressed',
+        begin: () => undefined as never,
+        readCertificationEvidenceReceipt: () => {
+          throw new Error('no generated outputs');
+        },
+        readCertificationOutputClosure: (binding) => ({ ...binding, outputs: [] }),
+        readGeneratedBlob: () => {
+          throw new Error('no generated outputs');
+        },
+      },
+    });
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const errorOutput = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    expect(declaredInvocationAuthority()).toEqual({
+      actor: { kind: 'human', role: 'inspector', declaration_source: 'cli-flag' },
+      consent: { write: true, allow_publish: false, experimental: false },
+    });
+    expect(provider).not.toHaveBeenCalled();
+    output.mockClear();
+    errorOutput.mockClear();
+    const preflightHook = vi.fn(() => protectedAdapters.preflight_provider);
+    const uninstallPreflight = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
+      preflight_provider: preflightHook,
+      provider: () => undefined,
+      offline_verification_provider: () => undefined,
+      authorization: () => undefined,
+      offline_receipt_verifier: () => undefined,
+      publication_controls: () => undefined,
+    });
+    cleanups.push(uninstallPreflight);
+    await withProtectedPreflightScope(
+      {
+        repository: request.repository_locator,
+        task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+        plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+        state_root: join(root, 'stock-state'),
+      },
+      () =>
+        captureAction()({
+          request: requestPath,
+          repoRoot: root,
+          stateRoot: join(root, 'stock-state'),
+        }),
     );
-    expect(runChecks).toHaveBeenCalledOnce();
+    expect(preflightHook).toHaveBeenCalledWith(request);
+    expect(errorOutput.mock.calls).toEqual([]);
     expect(errorOutput.mock.calls, JSON.stringify(errorOutput.mock.calls)).toEqual([]);
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"state":"preflight_passed"'));
+
+    const failedPreflightRoot = join(root, 'failed-preflight-state');
+    runChecks.mockImplementationOnce(() => {
+      throw new Error(`native runner fixture path ${root}`);
+    });
+    output.mockClear();
+    errorOutput.mockClear();
+    await withProtectedPreflightScope(
+      {
+        repository: request.repository_locator,
+        task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+        plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+        state_root: failedPreflightRoot,
+      },
+      () =>
+        captureAction()({
+          request: requestPath,
+          repoRoot: root,
+          stateRoot: failedPreflightRoot,
+        }),
+    );
+    const failedPreflightStore = new ReleaseLifecycleFileStore(failedPreflightRoot, request);
+    expect(failedPreflightStore.readStateRecords()).toEqual([]);
+    expect(failedPreflightStore.readStoreRecords()).toMatchObject([
+      { record_kind: 'attempt' },
+      { record_kind: 'failure', failure: { code: 'release-certification-task-failed' } },
+    ]);
+    expect(output).not.toHaveBeenCalled();
+    expect(errorOutput).toHaveBeenCalledWith(
+      expect.stringContaining('release-certification-task-failed'),
+    );
+    expect(errorOutput.mock.calls.flat().join('')).not.toContain(root);
+    output.mockClear();
+    errorOutput.mockClear();
 
     const resumeRequestPath = join(root, 'resume-request.json');
     writeFileSync(
@@ -344,13 +610,23 @@ describe('release lifecycle command adapter composition', () => {
         candidate_locator: request.candidate_locator,
       })}\n`,
     );
+    const resumeReceiptsPath = join(root, 'resume-receipts.json');
+    writeFileSync(resumeReceiptsPath, `${canonicalJson([receipt])}\n`);
+    expect(() =>
+      validateReleaseLifecycleRequest(json(resumeRequestPath), 'release resume'),
+    ).not.toThrow();
     output.mockClear();
-    await captureAction(releaseResume)({
-      request: resumeRequestPath,
-      repoRoot: root,
-      stateRoot: join(root, 'stock-state'),
-    });
+    await withAuthorityHostTestScope(() =>
+      captureAction(releaseResume)({
+        request: resumeRequestPath,
+        repoRoot: root,
+        stateRoot: join(root, 'stock-state'),
+        receipts: resumeReceiptsPath,
+      }),
+    );
+    expect(errorOutput.mock.calls).toEqual([]);
     expect(output).toHaveBeenCalledWith(expect.stringContaining('"next_action":"release certify"'));
+    uninstallPreflight();
 
     const certifyRequestPath = join(root, 'certify-request.json');
     writeFileSync(
@@ -412,6 +688,7 @@ describe('release lifecycle command adapter composition', () => {
     const certificationPolicy = { nodes: ['certify'] };
     const certificationPolicyDigest = canonicalSha256(certificationPolicy);
     const uninstallCertify = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
       certification_provider: (certifyRequest) => ({
         provider: {
           kind: 'protected-certification-provider-v3',
@@ -446,7 +723,8 @@ describe('release lifecycle command adapter composition', () => {
                         entry_order: 'ascending-utf-8-byte-collation-by-path;duplicates-refuse',
                         manifest_digest_contract: {
                           domain: 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0',
-                          payload: 'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes',
+                          payload:
+                            'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes',
                           canonicalization: 'rfc8785-jcs',
                           algorithm: 'sha256',
                         },
@@ -475,8 +753,18 @@ describe('release lifecycle command adapter composition', () => {
                   ],
                 },
               ],
-              inputs: [{ kind: 'task-policy', path: 'host/certify-policy.json', sha256: certificationPolicyDigest }],
-              evidence: { manifest_digest_sha256: manifestDigest, receipt_digests: [], independently_checkable: true },
+              inputs: [
+                {
+                  kind: 'task-policy',
+                  path: 'host/certify-policy.json',
+                  sha256: certificationPolicyDigest,
+                },
+              ],
+              evidence: {
+                manifest_digest_sha256: manifestDigest,
+                receipt_digests: [],
+                independently_checkable: true,
+              },
               artifacts: [],
             },
           }),
@@ -485,23 +773,35 @@ describe('release lifecycle command adapter composition', () => {
           kind: 'certification-evidence-sink-v3',
           protocol: 'two-phase-content-addressed',
           begin: () => undefined as never,
-          readCertificationEvidenceReceipt: () => { throw new Error('no generated outputs'); },
-          readCertificationOutputClosure: binding => ({ ...binding, outputs: [] }),
-          readGeneratedBlob: () => { throw new Error('no generated outputs'); },
+          readCertificationEvidenceReceipt: () => {
+            throw new Error('no generated outputs');
+          },
+          readCertificationOutputClosure: (binding) => ({ ...binding, outputs: [] }),
+          readGeneratedBlob: () => {
+            throw new Error('no generated outputs');
+          },
         },
         content_source: {
           readGitObject: ({ type, object_id }) => {
             const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
-            if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) throw new Error('missing git object');
+            if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+              throw new Error('missing git object');
             return result.stdout;
           },
           readGitBlob: ({ object_id }) => {
             const result = spawnSync('git', ['-C', root, 'cat-file', 'blob', object_id]);
-            if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) throw new Error('missing git blob');
+            if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+              throw new Error('missing git blob');
             return result.stdout;
           },
         },
-        task_policies: [{ release_unit: '@aarusso-nyx/devai', task_policy_digest_sha256: certificationPolicyDigest, document: certificationPolicy }],
+        task_policies: [
+          {
+            release_unit: '@aarusso-nyx/devai',
+            task_policy_digest_sha256: certificationPolicyDigest,
+            document: certificationPolicy,
+          },
+        ],
       }),
       provider: () => undefined,
       offline_verification_provider: () => undefined,
@@ -520,20 +820,14 @@ describe('release lifecycle command adapter composition', () => {
     expect(output.mock.calls, JSON.stringify(errorOutput.mock.calls)).toContainEqual([
       expect.stringContaining('"state":"certified"'),
     ]);
-    uninstallCertify();
 
     const prepareRequestPath = join(root, 'prepare-request.json');
-    writeFileSync(
-      prepareRequestPath,
-      `${canonicalJson({
-        ...request,
-        action_id: 'release prepare',
-      })}\n`,
-    );
+    const prepareRequest = { ...request, action_id: 'release prepare' } as const;
+    writeFileSync(prepareRequestPath, `${canonicalJson(prepareRequest)}\n`);
     declaredRole.value = 'architect';
     output.mockClear();
     errorOutput.mockClear();
-    await withLocalMutationScope(() =>
+    await withReleasePrepareAuthorityFixture(prepareRequest, () =>
       captureAction(releasePrepare)({
         request: prepareRequestPath,
         repoRoot: root,
@@ -549,12 +843,13 @@ describe('release lifecycle command adapter composition', () => {
         {
           repo_root: root,
           resolve_receipt: () => receipt,
-          resolve_plan_input: (input) => json(join(root, String(input['path']))),
+          resolve_plan_input: fixture.resolve_plan_input,
           read_contained_bytes: (path) => readFileSync(join(root, path)),
         },
         'release prepare',
       ),
     ).toBeUndefined();
+    uninstallCertify();
 
     const sinkBytes = new Map<string, Buffer>();
     const sinkCommit = vi.fn((manifest: ArtifactSinkObjectReceipt) => ({
@@ -591,6 +886,7 @@ describe('release lifecycle command adapter composition', () => {
       abort: sinkAbort,
     }));
     const uninstallPrepare = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
       provider: () => undefined,
       offline_verification_provider: () => undefined,
       authorization: () => undefined,
@@ -627,7 +923,7 @@ describe('release lifecycle command adapter composition', () => {
     cleanups.push(uninstallPrepare);
     output.mockClear();
     errorOutput.mockClear();
-    await withLocalMutationScope(() =>
+    await withReleasePrepareAuthorityFixture(prepareRequest, () =>
       captureAction(releasePrepare)({
         request: prepareRequestPath,
         repoRoot: root,
@@ -657,6 +953,7 @@ describe('release lifecycle command adapter composition', () => {
     );
     const exportProvider = vi.fn(() => ({ outcome: 'unknown' as const }));
     const uninstallExport = installReleaseLifecycleCommandAdapters({
+      policy_resolution: policyResolution,
       provider: () => exportProvider,
       offline_verification_provider: () => undefined,
       authorization: () => undefined,
@@ -693,6 +990,7 @@ describe('release lifecycle command adapter composition', () => {
     const unsafeProvider = vi.fn(() => ({ outcome: 'failure' as const }));
     cleanups.push(
       installReleaseLifecycleCommandAdapters({
+        policy_resolution: policyResolution,
         provider: () => unsafeProvider,
         offline_verification_provider: () => undefined,
         authorization: () => undefined,
