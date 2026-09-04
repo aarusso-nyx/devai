@@ -30,6 +30,7 @@ const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
 const authorizationRoot = join(smokeRoot, 'authorization-project');
+let smokePassed = false;
 const secondaryBins = [
   'devai-evidence-policy',
   'devai-evidence-verify',
@@ -1436,6 +1437,8 @@ void adapters;
       runtime_dependencies: dependencyNames.sort(),
     }) + '\n',
   );
+  smokePassed = true;
 } finally {
-  rmSync(smokeRoot, { recursive: true, force: true });
+  if (smokePassed) rmSync(smokeRoot, { recursive: true, force: true });
+  else process.stderr.write(`Installed smoke fixture preserved: ${smokeRoot}\n`);
 }
