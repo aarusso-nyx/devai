@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { canonicalJson } from '@devai-nyx/utils';
 import {
   createProtectedExportSinkAdapter,
+  readProtectedReleaseExportCapacity,
   createProtectedReleaseSinkOwner,
   type ProtectedReleaseExportBinding,
 } from '@devai-nyx/authority';
@@ -189,7 +190,9 @@ function parse<T>(value: Buffer): T {
 function failure(error: unknown): never {
   if (
     error instanceof Error &&
-    (/^AUTHORITY_[A-Z0-9_]+$/u.test(error.message) || error.message === COMMIT_UNKNOWN)
+    (/^AUTHORITY_[A-Z0-9_]+$/u.test(error.message) ||
+      /^release-export-capacity-(?:unavailable|insufficient)$/u.test(error.message) ||
+      error.message === COMMIT_UNKNOWN)
   )
     throw error;
   return fail();
@@ -220,8 +223,9 @@ function identity(receipt: ReleaseExportArtifactObjectReceipt): OpaqueArtifactId
 /**
  * A dedicated append-only extension, not a reopened prepare transaction. Construction and every
  * begin reverify immutable parent/closure inputs without writing. The enclosing provider/broker
- * must enforce the live 2*N+34 capacity gate and verify the single external signature; this store
- * never accepts a self-asserted capacity number or performs signing. No public read credits an
+ * supplies the live bounded account and verifies the single external signature. This store checks
+ * 2*N+34 against that account after full roster/parent verification and before begin; it never
+ * accepts a self-asserted capacity number or performs signing. No public read credits an
  * uncommitted export. Pending transaction reads are explicitly separate from that committed reader.
  */
 export async function createReleaseExportArtifactStore(
@@ -692,6 +696,16 @@ export async function createReleaseExportArtifactStore(
           verifyClosures();
           await verifyParent();
           assertAbsent(reservationPath);
+          const capacity = readProtectedReleaseExportCapacity({
+            action_id: 'release export',
+            repository: binding.repository,
+            candidate: binding.candidate,
+            plan_receipt_digest_sha256: binding.plan_receipt_digest_sha256,
+          });
+          // `packages` is the complete, verified prepared roster, not a caller count.
+          const required = 2 * packages.length + 34;
+          if (capacity.remaining_batches < required || capacity.remaining_targets < required)
+            throw new Error('release-export-capacity-insufficient');
           return adapter.invokeSink(() => {
             for (const name of ['staging', 'objects', 'exports'])
               store.ensureDirectory(join(store.root, name));

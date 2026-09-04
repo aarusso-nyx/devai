@@ -125,3 +125,23 @@ export {
   createReleaseArtifactStore,
   type ReleaseArtifactStoreOptions,
 } from './services/release-artifact-store.js';
+export {
+  createReleaseExportArtifactStore,
+  type ReleaseExportArtifactStoreOptions,
+  type ReleaseExportArtifactObject,
+  type ReleaseExportArtifactObjectReceipt,
+  type ReleaseExportArtifactCommitManifest,
+  type TrustedExportArtifactSink,
+  type TrustedExportArtifactSinkTransaction,
+} from './services/release-export-artifact-store.js';
+export {
+  encodeReleaseExportTranscript,
+  verifyReleaseExportTranscript,
+  encodeReleaseExportProviderResult,
+  verifyReleaseExportProviderResult,
+  type ReleaseExportTranscript,
+  type ReleaseExportTranscriptLimits,
+  type ReleaseExportProviderResultInput,
+  type ReleaseExportProviderResult,
+} from './services/release-export-transcript.js';
+export type { ProtectedReleaseExportBinding } from '@devai-nyx/authority';
