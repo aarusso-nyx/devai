@@ -98,7 +98,7 @@ export async function invokeDevaiCli(args) {
               if (id === join(source, 'commands/release/lifecycle.ts'))
                 return `export { install as installReleaseLifecycleCommandAdapters } from 'test-host-runtime-state';`;
               if (id === join(source, 'services/check-runner/runner.ts'))
-                return `import { fixtureRuntime } from ${JSON.stringify(providerHelper)}; export function runCheckTasks(options) { return fixtureRuntime.runCheckTasks(options); } export async function runCheckTasksAsync(options) { return fixtureRuntime.runCheckTasks(options); } export function readProtectedCompletedTaskResults() { throw new Error('release-certification-task-results-unavailable'); }`;
+                return `import { fixtureRuntime } from ${JSON.stringify(providerHelper)}; export function runCheckTasks(options) { return fixtureRuntime.runCheckTasks(options); } export async function runCheckTasksAsync(options) { return fixtureRuntime.runCheckTasks(options); } export function readProtectedCompletedTaskResults() { throw new Error('release-certification-task-results-unavailable'); } export const PROTECTED_MUTATION_PRODUCER = 'protected-mutation-producer-v21';`;
               return null;
             },
             transform(code: string, id: string) {
