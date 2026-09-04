@@ -353,6 +353,11 @@ const __dirname = __devaiDirname(__filename);`,
   cpSync(bundlePath, join(runtimeIndex, 'release-host.js'));
   cpSync(bootstrapPath, join(runtimeIndex, 'release-host-bootstrap.js'));
   cpSync(executablePath, join(runtimeIndex, 'bin.js'));
+  mkdirSync(join(runtimeRoot, 'host'), { recursive: true });
+  copyFileSync(
+    join(packageRoot, 'scripts/release-host/provision-package.mjs'),
+    join(runtimeRoot, 'host/provision-package.mjs'),
+  );
   cpSync(declarationsRoot, join(runtimeRoot, 'types/cli'), { recursive: true });
   chmodSync(join(runtimeIndex, 'bin.js'), 0o755);
 
@@ -442,6 +447,7 @@ const __dirname = __devaiDirname(__filename);`,
     join(runtimeIndex, 'bin.js'),
     join(runtimeIndex, 'release-host.js'),
     join(runtimeIndex, 'release-host-bootstrap.js'),
+    join(runtimeRoot, 'host/provision-package.mjs'),
     join(runtimeRoot, 'types/cli/release-host-bootstrap.d.ts'),
     join(runtimeIndex, 'lib.d.ts'),
     join(runtimeIndex, 'typescript-libraries.json'),
