@@ -31,6 +31,7 @@ import { verifyReleasePolicyClosure } from './release-policy-closure.js';
 import { reverifySinkArtifacts, verifyCertificationManifest } from './release-prepare-kernel.js';
 import { isProtectedReleaseCertificationProvider } from './release-lifecycle-certification.js';
 import { isProtectedReleasePreflightProvider } from './release-certification-provider.js';
+import type { UnitMutationEvidenceBinding } from './release-unit-mutation-evidence.js';
 
 export const RELEASE_ACTIONS = [
   'release plan',
@@ -812,6 +813,80 @@ function verifyBoundReceipts(
     throw new Error('release-receipt-identity-mismatch');
   }
   return verified;
+}
+
+export interface ReleaseMutationRequirement {
+  readonly release_unit: string;
+  readonly binding: Readonly<
+    Omit<UnitMutationEvidenceBinding, 'task_policy_digests_sha256'>
+  > | null;
+}
+
+/** Derive evidence requirements from replayed, candidate-bound plans, never supplied evidence.
+ * Task-policy identities are bound separately by the protected certification provider. */
+export function resolveReleaseMutationRequirements(
+  requestInput: ReleaseLifecycleRequest,
+  input: {
+    readonly resolve_receipt?: ReceiptResolver;
+    readonly resolve_plan_input?: ReleasePlanInputResolver;
+  },
+): readonly ReleaseMutationRequirement[] {
+  const request = validateReleaseLifecycleRequest(JSON.parse(canonicalJson(requestInput)));
+  const resolveReceipt = input.resolve_receipt;
+  const receipts = verifyBoundReceipts(
+    request,
+    resolveReceipt === undefined
+      ? undefined
+      : (locator) => JSON.parse(canonicalJson(resolveReceipt(locator))) as unknown,
+    input.resolve_plan_input,
+  );
+  if (
+    receipts.length === 0 ||
+    receipts.length !== request.candidate_locator.release_units.length ||
+    receipts.some((receipt) => receipt.kind !== 'release-plan-receipt')
+  )
+    throw new Error('release-receipt-identity-mismatch');
+  return Object.freeze(
+    request.candidate_locator.release_units.map((unit) => {
+      const receipt = receipts.find(
+        (entry) => object(entry.value['candidate'])['release_unit'] === unit.release_unit,
+      )?.value;
+      if (receipt === undefined) throw new Error('release-receipt-identity-mismatch');
+      const determination = object(receipt['determination']);
+      const disposition = object(determination['mutation_disposition']);
+      if (determination['mutation'] === 'none' && disposition['status'] === 'not-required')
+        return Object.freeze({ release_unit: unit.release_unit, binding: null });
+      if (
+        !['affected', 'targeted', 'full-roster'].includes(String(determination['mutation'])) ||
+        disposition['status'] !== 'required'
+      )
+        throw new Error('release-certification-generated-output-untrusted');
+      const resolution = resolutionForReleasePlanInputResolver(input.resolve_plan_input, receipt);
+      if (resolution === undefined) throw new Error('rpl-semantic-verification-not-performed');
+      const profile = object(resolution.readInput('release-verification-profile'));
+      const template = object(profile['mutation_execution']);
+      if (
+        profile['schemaVersion'] !== '1.2.0' ||
+        template['schemaVersion'] !== '1.2.0' ||
+        template['template_id'] !== 'devai.protected-mutation-stryker.v1'
+      )
+        throw new Error('release-certification-generated-output-untrusted');
+      const policy = resolution.tools.readJson('dist/law/policy/mutation-evidence-v2.json');
+      resolution.tools.parse('mutation-evidence-policy-v2.schema.json', policy);
+      return Object.freeze({
+        release_unit: unit.release_unit,
+        binding: Object.freeze({
+          repository_id: request.repository_locator.id,
+          candidate_commit: request.candidate_locator.commit,
+          candidate_tree: request.candidate_locator.tree,
+          release_unit: unit.release_unit,
+          release_plan_receipt_digest_sha256: String(receipt['receipt_digest_sha256']),
+          release_profile_digest_sha256: canonicalSha256(profile),
+          mutation_policy_digest_sha256: canonicalSha256(policy),
+        }),
+      });
+    }),
+  );
 }
 
 export function finalizeReleaseStateV2(
