@@ -1136,6 +1136,71 @@ describe('content-addressed check runner', () => {
     expect(report.releaseVerification?.every((entry) => entry.status !== 'unknown')).toBe(true);
   });
 
+  it('refuses required mutation certification before executing ordinary check callbacks', () => {
+    const state = repository();
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const releaseIntent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.1',
+      support: 'current',
+      changed_paths: ['package.json', 'src/app.ts'],
+      changed_packages: [],
+      candidate: {
+        commit: git(state.root, ['rev-parse', 'HEAD']),
+        tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    const profile = {
+      ...releaseProfile(),
+      mutation_roster: [
+        {
+          id: 'ordinary-unit-check',
+          package: 'example-repo',
+          task_node: 'test:unit',
+          source_selectors: ['src/'],
+          test_selectors: ['tests/'],
+          manifest_path: 'package.json',
+          config_paths: ['test-tasks.json'],
+          sanitizer_paths: ['tools/mutation-sanitizer.mjs'],
+          orchestration_paths: ['test-tasks.json'],
+          lockfile_path: 'lock.yaml',
+          toolchain_keys: ['node'],
+          thresholds: { score_min: 90 },
+        },
+      ],
+    } as const;
+    const preflight = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: profile,
+    });
+    expect(preflight.preflightReceipt?.value.verdict).toBe('pass');
+
+    let callbacks = 0;
+    expect(() =>
+      run(state.root, {
+        target: 'affected',
+        baseCommit: state.base,
+        releaseIntent,
+        releaseProfile: profile,
+        releaseStage: 'certify',
+        preflightReceipt: preflight.preflightReceipt?.value,
+        executeTask: () => {
+          callbacks += 1;
+          return PASS;
+        },
+      }),
+    ).toThrow('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
+    expect(callbacks).toBe(0);
+  });
+
   it('uses the exact release candidate without resolving HEAD and refuses tracked mutation', () => {
     const state = repository();
     const candidateCommit = commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
