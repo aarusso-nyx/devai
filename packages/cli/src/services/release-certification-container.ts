@@ -316,11 +316,17 @@ export class ProtectedCertificationContainer {
     readonly source: readonly ContainerArchiveEntry[];
     readonly prior_outputs: ReadonlyMap<string, ContainerArchiveEntry>;
     readonly declared_outputs: readonly string[];
+    /** Host-selected diagnostic subset only; never ordinary successful task outputs. */
+    readonly diagnostic_output_paths?: readonly string[];
     readonly declared_namespaces?: readonly {
       readonly prefix: string;
       readonly required_paths: readonly string[];
     }[];
-  }): { readonly result: TaskExecutionResult; readonly outputs: readonly ContainerArchiveEntry[] } {
+  }): {
+    readonly result: TaskExecutionResult;
+    readonly outputs: readonly ContainerArchiveEntry[];
+    readonly diagnostic_outputs?: readonly ContainerArchiveEntry[];
+  } {
     const c = this.#controls;
     const id = `devai-certify-${randomUUID()}`;
     const volume = `${id}-workspace`;
@@ -331,12 +337,23 @@ export class ProtectedCertificationContainer {
     let stopped = false;
     let completed = false;
     const expected = new Set(input.declared_outputs);
+    const diagnosticPaths = input.diagnostic_output_paths;
     const namespaces = input.declared_namespaces ?? [];
     const inNamespace = (path: string) =>
       namespaces.some(({ prefix }) => path.startsWith(`${prefix}/`));
     if (
       expected.size !== input.declared_outputs.length ||
       [...expected].some((path) => !canonicalContainerPath(path)) ||
+      (diagnosticPaths !== undefined &&
+        (!Array.isArray(diagnosticPaths) ||
+          [...diagnosticPaths].some(
+            (path, index, paths) =>
+              typeof path !== 'string' ||
+              !canonicalContainerPath(path) ||
+              !expected.has(path) ||
+              (index > 0 &&
+                Buffer.compare(Buffer.from(paths[index - 1] ?? ''), Buffer.from(path)) >= 0),
+          ))) ||
       namespaces.some(
         ({ prefix, required_paths }, index) =>
           !canonicalContainerPath(prefix) ||
@@ -356,6 +373,7 @@ export class ProtectedCertificationContainer {
       (input.task.cwd !== '.' && !canonicalContainerPath(input.task.cwd))
     )
       throw new Error('release-certification-output-closure-invalid');
+    const requestedDiagnostics = diagnosticPaths === undefined ? undefined : [...diagnosticPaths];
     const executable = c.executables[input.task.argv[0] ?? ''];
     if (
       executable === undefined ||
@@ -525,7 +543,9 @@ export class ProtectedCertificationContainer {
           ? {}
           : { errorCode: 'PROTECTED_CONTAINER_ABNORMAL' }),
       };
-      if (result.status !== 0 || result.signal !== null || result.errorCode !== undefined) {
+      const failed =
+        result.status !== 0 || result.signal !== null || result.errorCode !== undefined;
+      if (failed && requestedDiagnostics === undefined) {
         completed = true;
         return { result, outputs: [] };
       }
@@ -575,13 +595,31 @@ export class ProtectedCertificationContainer {
       if (
         observedSources.size !== sources.size ||
         observedDependencies.size !== this.#dependencyTransport.entries.size ||
-        [...expected, ...namespaces.flatMap(({ required_paths }) => required_paths)].some(
-          (path) => !observedOutputs.has(path),
-        )
+        [...input.prior_outputs.keys()].some((path) => !observedOutputs.has(path)) ||
+        (!failed &&
+          [...expected, ...namespaces.flatMap(({ required_paths }) => required_paths)].some(
+            (path) => !observedOutputs.has(path),
+          ))
       )
         throw new Error('release-certification-output-closure-invalid');
       completed = true;
-      return { result, outputs };
+      if (requestedDiagnostics === undefined) return { result, outputs };
+      const outputsByPath = new Map(outputs.map((entry) => [entry.path, entry]));
+      // Failed task bytes remain diagnostic-only. Capture still proves the complete
+      // source/dependency/predecessor population, but missing new outputs are allowed.
+      // No receipt, success status, export permission or reusable artifact is issued.
+      return {
+        result,
+        outputs: failed ? [] : outputs,
+        diagnostic_outputs: Object.freeze(
+          requestedDiagnostics.flatMap((path) => {
+            const entry = outputsByPath.get(path);
+            return entry === undefined
+              ? []
+              : [Object.freeze({ ...entry, bytes: Buffer.from(entry.bytes) })];
+          }),
+        ),
+      };
     } finally {
       // Unproved namespace shutdown preserves resources for diagnosis, never accepts bytes.
       if (created && !stopped) {
