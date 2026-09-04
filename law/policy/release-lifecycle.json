@@ -4,7 +4,7 @@
   "id": "release-lifecycle",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.11.0",
+  "policy_version": "2.12.0",
   "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
   "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
   "receipt_schemas": {
@@ -682,6 +682,33 @@
       "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
       "retry": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
     },
+    "protected_repository_identity": {
+      "binding": [
+        "authority-repository-id",
+        "expected-release-repository-id",
+        "repository-id-commit-tree",
+        "origin-url"
+      ],
+      "authority_repository_id": "the-existing-authority-policy-and-session-repository-id-is-an-exact-local-slug-matching-^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$;it-must-equal-the-broker-source-repository-id-byte-for-byte-and-is-never-derived-from-a-release-repository-id",
+      "expected_release_repository_id": "the-protected-host-receives-one-exact-canonical-owner-slash-repository-identifier-matching-^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?/[a-z0-9][a-z0-9._-]{0,99}$-from-trusted-host-configuration-before-candidate-or-request-input;it-must-equal-the-direct-origin-extraction-and-binding.repository.id-byte-for-byte",
+      "repository": "the-existing-private-binding.repository-object-remains-the-exact-canonical-public-request-repository_locator-projection-with-id-commit-tree;this-adds-no-request-state-or-receipt-field;canonical-repository-identifiers-are-never-filesystem-path-components",
+      "origin_url": {
+        "accepted_forms": [
+          "https://github.com/<lowercase-owner>/<lowercase-repository>.git",
+          "ssh://git@github.com/<lowercase-owner>/<lowercase-repository>.git",
+          "git@github.com:<lowercase-owner>/<lowercase-repository>.git"
+        ],
+        "components": "owner-is-lowercase-ascii-alphanumeric-with-internal-hyphens-only-and-at-most-39-characters;repository-is-lowercase-ascii-alphanumeric-leading-character-followed-by-ascii-alphanumeric-dot-underscore-or-hyphen-and-at-most-100-characters;the-parser-uses-one-anchored-complete-listed-template-and-consumes-the-final-literal-.git-suffix-exactly-once-never-by-search-or-strip;it-refuses-userinfo-password-port-query-fragment-whitespace-percent-encoding-trailing-slash-or-extra-path-segment;the-direct-extraction-must-byte-equal-expected_release_repository_id-and-binding.repository.id",
+        "canonicalization": "the-host-extracts-owner-slash-repository-directly-from-the-accepted-raw-url;it-performs-no-case-folding-percent-decoding-dot-segment-removal-trailing-slash-removal-scp-to-url-rewrite-or-alias-map",
+        "binding": "the-exact-raw-origin-url-byte-sequence-and-its-directly-extracted-canonical-id-are-both-bound;origin-has-exactly-one-fetch-url-and-zero-pushurls;any-effective-url-dot-insteadOf-or-pushInsteadOf-key-refuses;changing-transport-spelling-after-capture-refuses-even-when-the-extracted-id-would-match;origin-match-is-an-identity-label-not-proof-that-content-came-from-a-network-remote"
+      },
+      "host_root": "the-external-protected-host-owns-its-configured-root-and-before-binding-and-immediately-before-every-checkout-bound-protected-effect-realpaths-it-proves-it-is-the-git-worktree-top-level-and-rechecks-pinned-root-and-git-metadata-device-inode-identities-reads-exactly-one-fetch-url-and-zero-pushurls-for-the-named-origin-remote-and-recomputes-HEAD-and-HEAD-tree;candidate-content-is-read-only-through-the-existing-immutable-candidate-snapshot-and-exact-tree-membership-proof-not-re-resolved-paths;the-child-git-environment-has-an-empty-GIT-star-population-and-the-host-disables-system-global-and-include-or-includeIf-config-resolution-and-refuses-worktree-config-or-any-effective-rewrite-key;root-origin-id-commit-and-tree-must-equal-the-bound-values;unrelated-remotes-are-not-authority-inputs;candidate-code-cannot-supply-or-reselect-root-or-origin",
+      "plan_and_candidate": "the-current-freshly-resolved-plan-receipt-repository-id-commit-tree-and-candidate-commit-tree-must-equal-binding.repository-and-the-request-locators-exactly;the-plan-digest-and-every-dependent-protected-binding-must-agree-before-any-provider-sink-signer-or-capacity-effect",
+      "scope": "checkout-bound-protected-preflight-certification-prepare-and-export-host-boundaries-use-this-same-tuple-and-recheck-it-at-their-own-live-effect-boundary;the-host-reloads-its-trusted-expected-release-repository-id-at-each-boundary-and-requires-it-to-equal-the-captured-tuple;no-checkout-bound-effect-accepts-a-tuple-less-binding;pure-committed-artifact-reader-construction-and-read-only-parent-reconstruction-never-require-root-or-origin-access-and-verify-only-their-exact-signed-or-request-canonical-repository-candidate-and-plan-bytes;offline-verification-remains-bundle-only-under-ADR-REL-0019-and-ADR-REL-0022-and-uses-the-signed-canonical-locator-plus-external-expected-identities-and-trust-without-root-or-origin-lookup",
+      "broker": "the-broker-compares-binding.repository.id-only-to-expected_release_repository_id-and-refuses-inequality;it-compares-authority_repository_id-only-to-the-existing-broker-source-repository-id;no-slug-to-canonical-translation-or-cross-domain-equality-is-permitted",
+      "historical": "this-is-forward-only-current-policy authority;an-earlier-receipt-state-or-binding-lacking-the-complete-tuple-is-observation-only-and-cannot-be-reinterpreted-or-upgraded",
+      "refusal": "any-absent-extra-mismatched-noncanonical-or-candidate-selected-member-refuses-before-effect-without-a-slug-alias-origin-alias-or-ambient-fallback"
+    },
     "protected_preflight": {
       "action_id": "release preflight",
       "stage": "preflight",
@@ -690,7 +717,10 @@
       "scope": "execution-only-of-the-preflight-task-subset-derived-from-the-exact-bound-immutable-task-policy-and-plan;never-certification-task-selection-or-promotion",
       "binding": [
         "action_id",
+        "authority-repository-id",
+        "expected-release-repository-id",
         "repository-id-commit-tree",
+        "origin-url",
         "candidate-commit-tree",
         "plan-receipt-digest",
         "task-policy-digest-sha256",
@@ -880,7 +910,10 @@
         },
         "binding": [
           "action_id",
+          "authority-repository-id",
+          "expected-release-repository-id",
           "repository-id-commit-tree",
+          "origin-url",
           "candidate-commit-tree",
           "plan-receipt-digest",
           "parent-prepared-artifact-sink-commit",
