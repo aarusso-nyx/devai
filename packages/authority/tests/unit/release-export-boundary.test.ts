@@ -5,9 +5,11 @@ import {
   createProtectedExportSinkAdapter,
   createProtectedReleaseSinkOwner,
   protectedExportHostEffect,
+  withProtectedReleaseExportCapacity,
   runWithAuthorityHostEffects,
   type AuthorityHostEffectRequest,
   type AuthorityHostEffectScope,
+  type ProtectedReleaseExportCapacityBinding,
   type ProtectedReleaseExportBinding,
 } from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
@@ -57,6 +59,17 @@ function binding(): ProtectedReleaseExportBinding {
   };
 }
 
+function capacityBinding(
+  value: ProtectedReleaseExportBinding,
+): ProtectedReleaseExportCapacityBinding {
+  return {
+    action_id: 'release export',
+    repository: value.repository,
+    candidate: value.candidate,
+    plan_receipt_digest_sha256: value.plan_receipt_digest_sha256,
+  };
+}
+
 function scope(
   actionId: 'release export' | 'release certify' = 'release export',
   applyEffect: (request: AuthorityHostEffectRequest, apply: () => unknown) => unknown = (
@@ -67,6 +80,7 @@ function scope(
       throw new Error('TEST_PROTECTED_EXPORT_OPERATION_REQUIRED');
     return apply();
   },
+  expected = binding(),
 ) {
   const invocationId = `release-export-boundary-${Math.random().toString(16).slice(2)}`;
   const issuer = createAuthorityDecisionIssuer({
@@ -78,14 +92,23 @@ function scope(
     now: () => '2026-09-03T00:00:00.000Z',
     receipt_ttl_ms: 30_000,
   });
+  const expectedCapacity = capacityBinding(expected);
+  let capacityReads = 0;
   return {
     issuer,
+    capacityReads: () => capacityReads,
     scope: {
       action_id: actionId,
       invocation_id: invocationId,
       effect: 'local-write',
       receipt_store: issuer,
       apply_effect: applyEffect,
+      read_export_capacity: (selected) => {
+        capacityReads += 1;
+        if (canonicalSha256(selected) !== canonicalSha256(expectedCapacity))
+          throw new Error('release-export-capacity-unavailable');
+        return { remaining_batches: 128, remaining_targets: 8192 };
+      },
     } satisfies AuthorityHostEffectScope,
   };
 }
@@ -95,6 +118,21 @@ async function within<T>(
   callback: () => T | Promise<T>,
 ): Promise<Awaited<T>> {
   return await runWithAuthorityHostEffects(value, callback);
+}
+
+async function withinCapacity<T>(
+  current: AuthorityHostEffectScope,
+  value: ProtectedReleaseExportBinding,
+  callback: () => T | Promise<T>,
+): Promise<Awaited<T>> {
+  return await within(
+    current,
+    async () =>
+      await withProtectedReleaseExportCapacity(
+        capacityBinding(value),
+        async () => await callback(),
+      ),
+  );
 }
 
 describe('protected release export boundary', () => {
@@ -107,16 +145,23 @@ describe('protected release export boundary', () => {
     source.parent_artifact_sink.sink_id = 'mutated-sink';
     const owner = createProtectedReleaseSinkOwner('export', 'fixture-sink');
     const observed: string[] = [];
-    const current = scope('release export', (request, apply) => {
-      const operation = protectedExportHostEffect(request);
-      if (operation === undefined) throw new Error('TEST_PROTECTED_EXPORT_OPERATION_REQUIRED');
-      observed.push(`${operation.kind}:${operation.binding.sink_id}`);
-      return apply();
-    });
+    const current = scope(
+      'release export',
+      (request, apply) => {
+        const operation = protectedExportHostEffect(request);
+        if (operation === undefined) throw new Error('TEST_PROTECTED_EXPORT_OPERATION_REQUIRED');
+        observed.push(`${operation.kind}:${operation.binding.sink_id}`);
+        return apply();
+      },
+      source,
+    );
     try {
-      await within(current.scope, () => sink.invokeSink(() => 'sink', owner));
-      await within(current.scope, () => signer.invokeSigner(() => 'signature'));
+      await withinCapacity(current.scope, source, async () => {
+        sink.invokeSink(() => 'sink', owner);
+        signer.invokeSigner(() => 'signature');
+      });
       expect(observed).toEqual(['export-sink:fixture-sink', 'export-signer:fixture-sink']);
+      expect(current.capacityReads()).toBe(3);
     } finally {
       current.issuer.dispose();
     }
@@ -142,7 +187,7 @@ describe('protected release export boundary', () => {
     const correctAction = scope();
     try {
       await expect(
-        within(correctAction.scope, () =>
+        withinCapacity(correctAction.scope, binding(), () =>
           adapter.invokeSink(() => {
             called = true;
           }, wrongOwner),
@@ -174,6 +219,32 @@ describe('protected release export boundary', () => {
     expect(maps).toBe(0);
   });
 
+  it('refuses unwrapped export operations before requesting a protected effect', async () => {
+    const adapter = createProtectedExportSinkAdapter(binding());
+    const owner = createProtectedReleaseSinkOwner('export', 'fixture-sink');
+    let effects = 0;
+    let callback = false;
+    const current = scope('release export', (request, apply) => {
+      effects += 1;
+      if (protectedExportHostEffect(request) === undefined)
+        throw new Error('TEST_PROTECTED_EXPORT_OPERATION_REQUIRED');
+      return apply();
+    });
+    try {
+      await expect(
+        within(current.scope, () =>
+          adapter.invokeSink(() => {
+            callback = true;
+          }, owner),
+        ),
+      ).rejects.toThrow('release-export-capacity-unavailable');
+      expect(effects).toBe(0);
+      expect(callback).toBe(false);
+    } finally {
+      current.issuer.dispose();
+    }
+  });
+
   it('consumes each protected operation token once and refuses filesystem escape from its callback', async () => {
     const adapter = createProtectedExportSinkAdapter(binding());
     const owner = createProtectedReleaseSinkOwner('export', 'fixture-sink');
@@ -186,7 +257,7 @@ describe('protected release export boundary', () => {
       return first;
     });
     try {
-      await within(doubleApply.scope, () =>
+      await withinCapacity(doubleApply.scope, binding(), () =>
         adapter.invokeSink(() => {
           callbacks += 1;
         }, owner),
@@ -199,7 +270,7 @@ describe('protected release export boundary', () => {
     const escaped = scope();
     try {
       await expect(
-        within(escaped.scope, () =>
+        withinCapacity(escaped.scope, binding(), () =>
           adapter.invokeSink(
             () =>
               escaped.scope.apply_effect(
@@ -223,16 +294,16 @@ describe('protected release export boundary', () => {
     const second = createProtectedExportSignerAdapter(binding());
     const current = scope();
     try {
-      await expect(
-        within(current.scope, () =>
+      await withinCapacity(current.scope, binding(), async () => {
+        expect(() =>
           first.invokeSigner(() => {
             throw new Error('signer transport failed');
           }),
-        ),
-      ).rejects.toThrow('signer transport failed');
-      await expect(within(current.scope, () => second.invokeSigner(() => 'retry'))).rejects.toThrow(
-        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
-      );
+        ).toThrow('signer transport failed');
+        expect(() => second.invokeSigner(() => 'retry')).toThrow(
+          'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+        );
+      });
     } finally {
       current.issuer.dispose();
     }
@@ -240,12 +311,12 @@ describe('protected release export boundary', () => {
     const successful = scope();
     try {
       const fresh = createProtectedExportSignerAdapter(binding());
-      await within(successful.scope, () => fresh.invokeSigner(() => 'signature'));
-      await expect(
-        within(successful.scope, () =>
+      await withinCapacity(successful.scope, binding(), async () => {
+        fresh.invokeSigner(() => 'signature');
+        expect(() =>
           createProtectedExportSignerAdapter(binding()).invokeSigner(() => 'retry'),
-        ),
-      ).rejects.toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+        ).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      });
     } finally {
       successful.issuer.dispose();
     }
