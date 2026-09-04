@@ -82,7 +82,9 @@ function frozen(path: string): Buffer {
 
 export function installedPackage(
   extraFiles: readonly ReleasePackageFile[] = [],
+  options: { readonly current?: boolean } = {},
 ): ReleasePackageSnapshot {
+  const version = options.current ? '1.5.0' : VERSION;
   const schemaRoot = join(ROOT, 'law/schemas');
   const policyRoot = join(ROOT, 'law/policy');
   const files: ReleasePackageFile[] = [
@@ -90,7 +92,7 @@ export function installedPackage(
     {
       path: 'package.json',
       mode: 0o644,
-      bytes: Buffer.from(JSON.stringify({ name: PACKAGE, version: VERSION }), 'utf8'),
+      bytes: Buffer.from(JSON.stringify({ name: PACKAGE, version }), 'utf8'),
     },
     {
       path: 'dist/law/constitution.md',
@@ -106,7 +108,7 @@ export function installedPackage(
             path: `dist/runtime/index/schemas/${name}`,
             mode: 0o644,
             bytes:
-              name === 'release-verification-profile.schema.json'
+              name === 'release-verification-profile.schema.json' && !options.current
                 ? frozen(`law/schemas/${name}`)
                 : readFileSync(join(schemaRoot, name)),
           }) satisfies ReleasePackageFile,
@@ -152,7 +154,7 @@ export function installedPackage(
   return verifyReleasePackageSnapshot({
     expected: {
       name: PACKAGE,
-      version: VERSION,
+      version,
       archive_sha256: sha256(compressed),
       content_manifest_sha256: canonicalSha256(manifest),
     },
@@ -239,8 +241,24 @@ interface Fixture {
   readonly files: Map<string, Uint8Array>;
 }
 
-export function fixture(installed = installedPackage()): Fixture {
-  const policy = JSON.parse(frozen(POLICY_PATH).toString('utf8')) as Record<string, unknown>;
+export function fixture(
+  installed = installedPackage(),
+  options: {
+    readonly current?: boolean;
+    readonly profileOverrides?: Readonly<Record<string, unknown>>;
+  } = {},
+): Fixture {
+  const version = options.current ? '1.5.0' : VERSION;
+  const policy = JSON.parse(
+    (options.current ? readFileSync(join(ROOT, POLICY_PATH)) : frozen(POLICY_PATH)).toString(
+      'utf8',
+    ),
+  ) as Record<string, unknown>;
+  if (options.profileOverrides)
+    policy['release_verification'] = {
+      ...(policy['release_verification'] as Record<string, unknown>),
+      ...options.profileOverrides,
+    };
   const tools = createReleasePolicyPackageTools(installed);
   const pin = installed.read('dist/law/constitution.md');
   const constitutionVersion = parseConstitutionVersion(pin.toString('utf8'));
@@ -252,7 +270,7 @@ export function fixture(installed = installedPackage()): Fixture {
       project_type: 'framework',
       constitution: { version: constitutionVersion, sha256: sha256(pin) },
     },
-    frameworkVersion: VERSION,
+    frameworkVersion: version,
   });
   const policyBytes = Buffer.from(`${JSON.stringify(policy, null, 2)}\n`, 'utf8');
   const binding = {
@@ -279,7 +297,7 @@ export function fixture(installed = installedPackage()): Fixture {
           name: 'mutation-fixture',
           version: '1.0.0',
           packageManager: 'pnpm@9.15.0',
-          dependencies: { [PACKAGE]: VERSION },
+          dependencies: { [PACKAGE]: version },
         }),
       ),
     ],
@@ -290,10 +308,10 @@ export function fixture(installed = installedPackage()): Fixture {
         stringify({
           lockfileVersion: '9.0',
           importers: {
-            '.': { dependencies: { [PACKAGE]: { specifier: VERSION, version: VERSION } } },
+            '.': { dependencies: { [PACKAGE]: { specifier: version, version } } },
           },
           packages: {
-            [`${PACKAGE}@${VERSION}`]: {
+            [`${PACKAGE}@${version}`]: {
               resolution: {
                 integrity: `sha512-${createHash('sha512').update(installed.readArchive()).digest('base64')}`,
               },
@@ -374,11 +392,17 @@ export function fixture(installed = installedPackage()): Fixture {
   return { installed, files };
 }
 
+/** Explicit assembled v1.5.0 test package; never attributed to published v1.4.5. */
+export function currentFixture(profileOverrides: Readonly<Record<string, unknown>> = {}): Fixture {
+  return fixture(installedPackage([], { current: true }), { current: true, profileOverrides });
+}
+
 type BuildOptions = {
   readonly support?: 'current' | 'lts';
   readonly coverage?: ReleaseMutationExecutionCoverageV21;
   readonly message?: string;
   readonly modePath?: string;
+  readonly mode?: string;
 };
 
 export function build(base: Fixture, files = base.files, options: BuildOptions = {}) {
