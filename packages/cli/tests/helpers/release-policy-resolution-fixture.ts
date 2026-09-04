@@ -372,13 +372,14 @@ export function createFilesystemLifecyclePolicyFixture(input: {
   readonly git: (args: readonly string[]) => string;
   readonly readGitObject: (type: ReleaseGitObject['type'], object_id: string) => Buffer;
   readonly package_manifest: Uint8Array;
+  readonly mutation_roster?: readonly unknown[];
 }): Omit<LifecyclePolicyFixture, 'candidate' | 'resolution' | 'receipt' | 'resolve_plan_input'> & {
   readonly candidate: ReleaseCandidateSnapshot;
   readonly resolution: VerifiedReleasePolicyResolution;
   readonly receipt: ReturnType<typeof buildResolvedReleasePlanReceipt>;
   readonly resolve_plan_input: (input: Readonly<Record<string, unknown>>) => unknown;
 } {
-  const fixture = createLifecyclePolicyFixture();
+  const fixture = createLifecyclePolicyFixture(input.mutation_roster);
   for (const path of fixture.candidate.paths) {
     const target = join(input.root, path);
     mkdirSync(join(target, '..'), { recursive: true });
@@ -458,7 +459,9 @@ export function createFilesystemLifecyclePolicyFixture(input: {
   };
 }
 
-export function createLifecyclePolicyFixture(): LifecyclePolicyFixture {
+export function createLifecyclePolicyFixture(
+  mutationRoster: readonly unknown[] = [],
+): LifecyclePolicyFixture {
   const checked = packageSnapshot();
   const pin = checked.read('dist/law/constitution.md');
   const version = parseConstitutionVersion(pin.toString());
@@ -476,7 +479,7 @@ export function createLifecyclePolicyFixture(): LifecyclePolicyFixture {
       default_support: 'current',
       capability_tasks: { lint: ['lint'] },
       risk_capabilities: {},
-      mutation_roster: [],
+      mutation_roster: mutationRoster,
     },
   };
   const materialized = resolveAdopterPolicyMaterialization({

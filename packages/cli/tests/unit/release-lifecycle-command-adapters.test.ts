@@ -26,7 +26,10 @@ import { withAuthorityHostTestScope } from '../../../authority/tests/unit/author
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
 import { declaredInvocationAuthority } from '../../src/authority/index.js';
 import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
-import { verifyResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import {
+  buildResolvedReleasePlanReceipt,
+  verifyResolvedReleasePlanReceipt,
+} from '../../src/services/release-lifecycle.js';
 import {
   executeReleaseLifecycleAction,
   ReleaseLifecycleFileStore,
@@ -42,7 +45,8 @@ import type {
   CertificationOutputClosureBinding,
 } from '../../src/services/release-prepare-kernel.js';
 
-const { runChecks, declaredRole } = vi.hoisted(() => ({
+const { containerRuns, runChecks, declaredRole } = vi.hoisted(() => ({
+  containerRuns: vi.fn(),
   runChecks: vi.fn(),
   declaredRole: { value: 'inspector' as 'architect' | 'inspector' },
 }));
@@ -50,9 +54,12 @@ vi.mock('../../src/services/release-certification-container.js', () => ({
   ProtectedCertificationContainer: class {
     readonly identity = { protocol: 'test-protected-container-boundary' };
     runBound<T>(_binding: unknown, operation: () => T): T {
+      containerRuns();
       return operation();
     }
-    verifyRuntime(): void {}
+    verifyRuntime(): void {
+      containerRuns();
+    }
   },
 }));
 vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => ({
@@ -88,6 +95,7 @@ const {
 const cleanups: (() => void)[] = [];
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup());
+  containerRuns.mockClear();
   declaredRole.value = 'inspector';
   vi.restoreAllMocks();
 });
@@ -1062,5 +1070,192 @@ describe('release lifecycle command adapter composition', () => {
     expect(errorOutput).toHaveBeenCalledWith(
       expect.stringContaining('release-receipt-path-unsafe'),
     );
+  });
+
+  it('refuses a genuinely mutation-required plan before ordinary Vitest task or sink effects', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-release-mutation-')));
+    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+    const adoption = json(join(process.cwd(), 'law/policy/devai-adoption.json')) as {
+      readonly release_verification: { readonly mutation_roster: readonly unknown[] };
+    };
+    const roster = adoption.release_verification.mutation_roster;
+    expect(roster).toHaveLength(10);
+    const taskNodes = roster.map((entry) => {
+      const value = entry as { readonly task_node?: unknown };
+      if (typeof value.task_node !== 'string')
+        throw new Error('missing ordinary mutation task node');
+      return value.task_node;
+    });
+    expect(new Set(taskNodes).size).toBe(10);
+
+    mkdirSync(join(root, 'packages/cli'), { recursive: true });
+    writeFileSync(
+      join(root, 'packages/cli/package.json'),
+      `${canonicalJson({ name: '@aarusso-nyx/devai', version: '1.4.5' })}\n`,
+    );
+    writeFileSync(
+      join(root, 'test-tasks.json'),
+      `${canonicalJson({
+        schemaVersion: '1.0.0',
+        descriptorVersion: 'mutation-required-v1',
+        repositoryId: 'aarusso-nyx/devai',
+        fallbackNodeId: null,
+        dynamicFallbackSelectors: [],
+        tasks: taskNodes.map((nodeId) => ({
+          nodeId,
+          dependencies: [],
+          argv: ['pnpm', 'run', nodeId, '--configLoader', 'runner', '--no-cache'],
+          cwd: '.',
+          runner: 'vitest-v1',
+          inputSelectors: [{ kind: 'glob', pattern: '**' }],
+          toolchainKeys: ['node', 'pnpm', 'vitest'],
+          allowlistedEnv: [],
+          outputContract: { kind: 'vitest', requiredResult: 'pass' },
+        })),
+        profiles: [{ profileId: 'rc', mode: 'fixed', requiredNodes: taskNodes }],
+      })}\n`,
+    );
+    git(root, ['init', '-q']);
+    git(root, ['config', 'user.name', 'Release Test']);
+    git(root, ['config', 'user.email', 'release@example.invalid']);
+    git(root, ['add', '.']);
+    git(root, ['commit', '-qm', 'base']);
+    const base = {
+      commit: git(root, ['rev-parse', 'HEAD']),
+      tree: git(root, ['rev-parse', 'HEAD^{tree}']),
+    };
+    const manifestBytes = Buffer.from(
+      `${canonicalJson({ name: '@aarusso-nyx/devai', version: '1.5.0' })}\n`,
+    );
+    const fixture = createFilesystemLifecyclePolicyFixture({
+      root,
+      base,
+      git: (args) => git(root, args),
+      readGitObject: (type, objectId) => {
+        const result = spawnSync('git', ['-C', root, 'cat-file', type, objectId]);
+        if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+          throw new Error('missing fixture Git object');
+        return result.stdout;
+      },
+      package_manifest: manifestBytes,
+      mutation_roster: roster,
+    });
+    const intent = { ...fixture.intent, support: 'lts' };
+    const receipt = buildResolvedReleasePlanReceipt({ intent, resolution: fixture.resolution });
+    expect(receipt).toMatchObject({ determination: { mutation: 'full-roster' } });
+    expect(verifyResolvedReleasePlanReceipt({ resolution: fixture.resolution, receipt })).toBe(
+      true,
+    );
+    const manifestDigest = createHash('sha256').update(manifestBytes).digest('hex');
+    const request = {
+      schemaVersion: '1.0.0',
+      request_kind: 'release-lifecycle-request',
+      action_id: 'release certify',
+      repository_locator: fixture.candidate.repository,
+      candidate_locator: {
+        commit: fixture.candidate.repository.commit,
+        tree: fixture.candidate.repository.tree,
+        release_units: [
+          {
+            release_unit: '@aarusso-nyx/devai',
+            version: '1.5.0',
+            package_roster: [
+              {
+                package_id: '@aarusso-nyx/devai',
+                manifest_path: 'packages/cli/package.json',
+                manifest_digest_sha256: manifestDigest,
+              },
+            ],
+          },
+        ],
+      },
+      receipt_locators: [
+        {
+          kind: 'release-plan-receipt',
+          receipt_id: receipt.receipt_id,
+          receipt_digest_sha256: receipt.receipt_digest_sha256,
+          path: 'receipts/plan.json',
+        },
+      ],
+    } as const;
+    const sinkBegin = vi.fn();
+    containerRuns.mockClear();
+    runChecks.mockClear();
+    const adapters = createContainerReleaseCertificationAdapters({
+      repository_root: root,
+      repository_id: 'aarusso-nyx/devai',
+      plans: [
+        {
+          receipt,
+          resolution: fixture.resolution,
+          intent_path: 'release-intent.json',
+          intent,
+          release_verification_profile: fixture.resolution.readInput(
+            'release-verification-profile',
+          ),
+          release_lifecycle_policy: fixture.resolution.readInput('release-lifecycle-policy'),
+          action_registry: fixture.resolution.readInput('action-registry-policy'),
+          packages: [
+            {
+              package_id: '@aarusso-nyx/devai',
+              source_entries: ['packages/cli/package.json'],
+              generated_entries: [],
+            },
+          ],
+        },
+      ],
+      controls: {
+        docker_binary: '/test/docker',
+        docker_binary_sha256: '1'.repeat(64),
+        docker_config_directory: '/test/config',
+        engine_socket: 'unix:///test/docker.sock',
+        engine_version: 'test-engine',
+        image: `test/node@sha256:${'2'.repeat(64)}`,
+        node_version: 'v24.0.0',
+        executables: { node: { path: '/usr/local/bin/node', sha256: 'f'.repeat(64) } },
+        memory_bytes: 64 * 1024 * 1024,
+        cpus: 1,
+        pids_limit: 2,
+        maximum_archive_bytes: 1024 * 1024,
+      },
+      environment: {},
+      toolchain: { node: 'v24.0.0', pnpm: 'test', vitest: 'test' },
+      timeout_ms: 1_000,
+      content_source: {
+        readGitObject: ({ type, object_id }) => {
+          const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
+          if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+            throw new Error('missing Git object');
+          return result.stdout;
+        },
+        readGitBlob: ({ object_id }) => {
+          const result = spawnSync('git', ['-C', root, 'cat-file', 'blob', object_id]);
+          if (result.status !== 0 || !Buffer.isBuffer(result.stdout))
+            throw new Error('missing blob');
+          return result.stdout;
+        },
+      },
+      evidence_sink: {
+        kind: 'certification-evidence-sink-v3',
+        protocol: 'two-phase-content-addressed',
+        begin: sinkBegin,
+        readCertificationEvidenceReceipt: () => {
+          throw new Error('no evidence');
+        },
+        readCertificationOutputClosure: () => {
+          throw new Error('no evidence');
+        },
+        readGeneratedBlob: () => {
+          throw new Error('no evidence');
+        },
+      },
+    });
+
+    expect(() => adapters.certification_provider(request)).toThrow(
+      'release-certification-mutation-evidence-unavailable',
+    );
+    expect(runChecks).not.toHaveBeenCalled();
+    expect(containerRuns).not.toHaveBeenCalled();
+    expect(sinkBegin).not.toHaveBeenCalled();
   });
 });
