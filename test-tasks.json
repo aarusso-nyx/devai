@@ -43,7 +43,7 @@
     {
       "nodeId": "test:authority",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:authority"],
+      "argv": ["pnpm", "run", "test:authority", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -78,7 +78,7 @@
     {
       "nodeId": "test:cli",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:cli"],
+      "argv": ["pnpm", "run", "test:cli", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -157,7 +157,7 @@
     {
       "nodeId": "test:effects",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:effects"],
+      "argv": ["pnpm", "run", "test:effects", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -184,7 +184,7 @@
     {
       "nodeId": "test:evidence",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:evidence"],
+      "argv": ["pnpm", "run", "test:evidence", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -223,7 +223,7 @@
     {
       "nodeId": "test:loop",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:loop"],
+      "argv": ["pnpm", "run", "test:loop", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -282,7 +282,7 @@
     {
       "nodeId": "test:sensors",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:sensors"],
+      "argv": ["pnpm", "run", "test:sensors", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -325,7 +325,7 @@
     {
       "nodeId": "test:schemas",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:schemas"],
+      "argv": ["pnpm", "run", "test:schemas", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -356,7 +356,7 @@
     {
       "nodeId": "test:skills",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:skills"],
+      "argv": ["pnpm", "run", "test:skills", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -419,7 +419,7 @@
     {
       "nodeId": "test:spec",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:spec"],
+      "argv": ["pnpm", "run", "test:spec", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -462,7 +462,7 @@
     {
       "nodeId": "test:utils",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:utils"],
+      "argv": ["pnpm", "run", "test:utils", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -489,7 +489,7 @@
     {
       "nodeId": "test:root",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:root"],
+      "argv": ["pnpm", "run", "test:root", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -841,7 +841,7 @@
     {
       "nodeId": "test:coverage:rc",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:coverage:rc"],
+      "argv": ["pnpm", "run", "test:coverage:rc", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-coverage-v1",
       "inputSelectors": [
