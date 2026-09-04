@@ -577,4 +577,90 @@ describe('protected release export boundary', () => {
       'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
     );
   });
+
+  it('rejects proxy bindings before validation can observe a benign value and capture a substituted one', () => {
+    const root = bindingV3();
+    let rootReads = 0;
+    const rootProxy = new Proxy(root, {
+      get(target, key, receiver) {
+        rootReads += 1;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    expect(() => captureProtectedReleaseExportBinding(rootProxy)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+    expect(rootReads).toBe(0);
+
+    const unitToggle = bindingV3();
+    let unitReads = 0;
+    const originalUnit = present(unitToggle.mutation_units[1], 'missing required unit');
+    const proxiedUnit = new Proxy(originalUnit, {
+      get(target, key, receiver) {
+        if (key === 'mutation_evidence') {
+          unitReads += 1;
+          return unitReads === 1 ? null : { unvalidated_field: true };
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    (unitToggle.mutation_units as ExportMutationUnitProjection[])[1] = proxiedUnit;
+    expect(() => captureProtectedReleaseExportBinding(unitToggle)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+    expect(unitReads).toBe(0);
+
+    const nested = bindingV3();
+    const evidence = present(
+      present(nested.mutation_units[1], 'missing required unit').mutation_evidence,
+      'missing required mutation evidence',
+    );
+    let bindingReads = 0;
+    const toggledBinding = new Proxy(evidence.binding, {
+      get(target, key, receiver) {
+        bindingReads += 1;
+        return key === 'candidate_tree' && bindingReads > 1
+          ? '0'.repeat(40)
+          : Reflect.get(target, key, receiver);
+      },
+    });
+    expect(Reflect.set(evidence, 'binding', toggledBinding)).toBe(true);
+    expect(() => captureProtectedReleaseExportBinding(nested)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+    expect(bindingReads).toBe(0);
+
+    const member = bindingV3();
+    const memberEvidence = present(
+      present(member.mutation_units[1], 'missing required unit').mutation_evidence,
+      'missing required mutation evidence',
+    );
+    let memberReads = 0;
+    const proxiedMember = new Proxy(present(memberEvidence.members[0], 'missing member'), {
+      get(target, key, receiver) {
+        memberReads += 1;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    (memberEvidence.members as unknown as Array<(typeof memberEvidence.members)[number]>)[0] =
+      proxiedMember;
+    expect(() => captureProtectedReleaseExportBinding(member)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+    expect(memberReads).toBe(0);
+
+    const arrays = bindingV3();
+    let arrayReads = 0;
+    const proxiedUnits = new Proxy([...arrays.mutation_units], {
+      get(target, key, receiver) {
+        arrayReads += 1;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    expect(Reflect.set(arrays, 'mutation_units', proxiedUnits)).toBe(true);
+    expect(() => captureProtectedReleaseExportBinding(arrays)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+    expect(arrayReads).toBe(0);
+  });
 });
