@@ -72,6 +72,11 @@ export interface ContainerReleaseCertificationOptions {
   readonly environment: Readonly<Record<string, string>>;
   readonly toolchain: Readonly<Record<string, string>>;
   readonly timeout_ms: number;
+  /** Host-only, preflight-only diagnostic capture; never selected by candidate documents. */
+  readonly diagnostic_outputs?: readonly {
+    readonly task_node: string;
+    readonly paths: readonly string[];
+  }[];
   readonly content_source: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'>;
   readonly evidence_sink: TrustedCertificationEvidenceSink;
 }
@@ -104,6 +109,89 @@ export interface ProtectedPreflightObservation {
     }[];
   };
 }
+
+/** Private raw custody, including failed tasks; not a semantic verdict or execution grant. */
+export interface ProtectedFixtureDiagnosticCustody {
+  readonly read: () => {
+    readonly request: ReleaseLifecycleRequest;
+    readonly execution_identity: Json;
+    readonly runtime_identity: Json;
+    readonly outcome: 'success' | 'failure';
+    readonly runs: readonly {
+      readonly binding: Json;
+      readonly task_node: string;
+      readonly process: {
+        readonly status: number | null;
+        readonly signal: string | null;
+        readonly errorAbsent: boolean;
+      };
+      readonly output_census: readonly {
+        readonly path: string;
+        readonly mode: string;
+        readonly sha256: string;
+        readonly size_bytes: number;
+        readonly task_node: string;
+      }[];
+    }[];
+  };
+  readonly readOutput: (member: {
+    readonly run_index: number;
+    readonly path: string;
+    readonly sha256: string;
+  }) => Buffer;
+}
+
+const fixtureDiagnosticCustodies = new WeakMap<
+  ReleaseProvider,
+  { readonly request_digest: string; readonly custody: ProtectedFixtureDiagnosticCustody }
+>();
+const verifiedFixtureDiagnosticCustodies = new WeakSet<object>();
+
+export function isVerifiedProtectedFixtureDiagnosticCustody(
+  value: unknown,
+): value is ProtectedFixtureDiagnosticCustody {
+  return (
+    value !== null && typeof value === 'object' && verifiedFixtureDiagnosticCustodies.has(value)
+  );
+}
+
+/** Deliberately absent from the public host barrel; wrong requests consume the pending slot. */
+export function takeProtectedFixtureDiagnosticCustody(
+  provider: ReleaseProvider,
+  expectedRequest: ReleaseLifecycleRequest,
+): ProtectedFixtureDiagnosticCustody {
+  const pending = fixtureDiagnosticCustodies.get(provider);
+  fixtureDiagnosticCustodies.delete(provider);
+  if (pending === undefined || pending.request_digest !== canonicalSha256(expectedRequest))
+    throw new Error('release-certification-diagnostic-custody-unavailable');
+  return pending.custody;
+}
+
+interface CapturedDiagnosticRun {
+  readonly binding: Json;
+  readonly task_node: string;
+  readonly process: ReturnType<
+    ProtectedFixtureDiagnosticCustody['read']
+  >['runs'][number]['process'];
+  readonly outputs: readonly ContainerArchiveEntry[];
+}
+
+const RUNTIME_IDENTITY_KEYS = [
+  'protocol',
+  'image',
+  'local_image',
+  'engine_version',
+  'node_version',
+  'docker_binary_sha256',
+  'executables',
+  'network',
+  'rootfs',
+  'capabilities',
+  'privilege_escalation',
+  'pids_limit',
+  'memory_bytes',
+  'cpus',
+] as const;
 
 const preflightObservations = new WeakMap<
   ReleaseProvider,
@@ -148,7 +236,7 @@ function digest(value: Buffer): string {
 function compare(left: string, right: string): number {
   return Buffer.compare(Buffer.from(left), Buffer.from(right));
 }
-function outputPaths(plan: TaskPlan): Map<string, string> {
+function outputPaths(plan: Pick<TaskPlan, 'tasks'>): Map<string, string> {
   const result = new Map<string, string>();
   for (const task of plan.tasks) {
     const paths = task.outputContract.paths ?? [];
@@ -191,6 +279,38 @@ export function createContainerReleaseCertificationAdapters(
   const toolchain = snapshot(input.toolchain);
   const controls = snapshot(input.controls);
   const container = new ProtectedCertificationContainer(controls, input.dependencies);
+  const diagnosticOutputs = snapshot(
+    input.diagnostic_outputs === undefined ? [] : input.diagnostic_outputs,
+  );
+  if (
+    !Array.isArray(diagnosticOutputs) ||
+    diagnosticOutputs.some(
+      (entry, index) =>
+        entry === null ||
+        typeof entry !== 'object' ||
+        Array.isArray(entry) ||
+        Object.keys(entry).some((key) => key !== 'task_node' && key !== 'paths') ||
+        typeof entry.task_node !== 'string' ||
+        entry.task_node.length === 0 ||
+        (index > 0 &&
+          compare(diagnosticOutputs[index - 1]?.task_node ?? '', entry.task_node) >= 0) ||
+        !Array.isArray(entry.paths) ||
+        entry.paths.length === 0 ||
+        entry.paths.some(
+          (path: unknown, pathIndex: number) =>
+            typeof path !== 'string' ||
+            !canonicalContainerPath(path) ||
+            (pathIndex > 0 && compare(entry.paths[pathIndex - 1] ?? '', path) >= 0),
+        ),
+    )
+  )
+    throw new Error('release-certification-diagnostic-controls-invalid');
+  const validatedDiagnosticOutputs: NonNullable<
+    ContainerReleaseCertificationOptions['diagnostic_outputs']
+  > = diagnosticOutputs;
+  const diagnosticsByTask = new Map(
+    validatedDiagnosticOutputs.map((entry) => [entry.task_node, entry.paths]),
+  );
   if (
     !Number.isSafeInteger(input.timeout_ms) ||
     input.timeout_ms <= 0 ||
@@ -233,12 +353,21 @@ export function createContainerReleaseCertificationAdapters(
     candidate_git_metadata: 'verified-candidate-shallow-v1',
     toolchain,
     environment,
+    ...(diagnosticOutputs.length === 0 ? {} : { diagnostic_outputs: diagnosticOutputs }),
     plans: selected.map(({ plan, receipt }) => ({
       receipt_id: receipt.receipt_id,
       receipt_digest_sha256: receipt.receipt_digest_sha256,
       packages: plan.packages,
     })),
   };
+  const runtimeIdentity: Json = snapshot(
+    Object.fromEntries(
+      RUNTIME_IDENTITY_KEYS.filter((key) => Object.hasOwn(container.identity, key)).map((key) => [
+        key,
+        container.identity[key],
+      ]),
+    ),
+  );
   let active = false;
 
   function bindRequest(request: ReleaseLifecycleRequest): TaskDescriptor {
@@ -377,6 +506,7 @@ export function createContainerReleaseCertificationAdapters(
     options: CheckRunnerOptions,
     source: readonly ContainerArchiveEntry[],
     gitMetadata: readonly ContainerArchiveEntry[],
+    diagnosticRuns?: CapturedDiagnosticRun[],
   ) {
     const planned = runCheckTasks(options).plan;
     const descriptor = options.descriptorDocument;
@@ -444,6 +574,8 @@ export function createContainerReleaseCertificationAdapters(
               throw new Error('release-certification-output-closure-invalid');
           }
           for (const path of paths.keys()) expected.add(path);
+          const diagnosticPaths =
+            diagnosticRuns === undefined ? undefined : diagnosticsByTask.get(task.nodeId);
           const result = container.execute({
             task,
             timeout_ms: timeout,
@@ -452,7 +584,31 @@ export function createContainerReleaseCertificationAdapters(
             prior_outputs: outputs,
             declared_outputs: [...expected],
             declared_namespaces: namespaces.filter((entry) => entry.task_node === task.nodeId),
+            ...(diagnosticPaths === undefined
+              ? {}
+              : {
+                  diagnostic_output_paths: diagnosticPaths,
+                }),
           });
+          if (diagnosticRuns !== undefined && diagnosticsByTask.has(task.nodeId)) {
+            if (result.diagnostic_outputs === undefined)
+              throw new Error('release-certification-diagnostic-output-unavailable');
+            // The container has already proved shutdown, isolation and full archive
+            // integrity. Retain bytes separately BEFORE the runner handles a task failure.
+            diagnosticRuns.push({
+              binding: snapshot(binding),
+              task_node: task.nodeId,
+              process: {
+                status: result.result.status,
+                signal: result.result.signal,
+                errorAbsent: result.result.errorCode === undefined,
+              },
+              outputs: result.diagnostic_outputs.map((output) => ({
+                ...output,
+                bytes: Buffer.from(output.bytes),
+              })),
+            });
+          }
           const produced: string[] = [];
           for (const output of result.outputs) {
             if (!outputs.has(output.path)) {
@@ -555,18 +711,89 @@ export function createContainerReleaseCertificationAdapters(
     if (active) return { outcome: 'failure', code: 'release-certification-provider-in-use' };
     active = true;
     preflightObservations.delete(preflight_provider);
+    fixtureDiagnosticCustodies.delete(preflight_provider);
+    const diagnosticRuns: CapturedDiagnosticRun[] = [];
+    const retainDiagnostics = (outcome: 'success' | 'failure'): void => {
+      if (diagnosticRuns.length === 0) return;
+      const bytesByRun = diagnosticRuns.map(
+        (run) =>
+          new Map(run.outputs.map((output) => [output.path, Buffer.from(output.bytes)] as const)),
+      );
+      const captured: ReturnType<ProtectedFixtureDiagnosticCustody['read']> = snapshot({
+        request,
+        execution_identity: bindingIdentity,
+        runtime_identity: runtimeIdentity,
+        outcome,
+        runs: diagnosticRuns.map((run) => ({
+          binding: run.binding,
+          task_node: run.task_node,
+          process: run.process,
+          output_census: run.outputs
+            .map((output) => ({
+              path: output.path,
+              mode: output.mode,
+              sha256: digest(output.bytes),
+              size_bytes: output.bytes.length,
+              task_node: run.task_node,
+            }))
+            .sort((a, b) => compare(a.path, b.path)),
+        })),
+      });
+      const custody: ProtectedFixtureDiagnosticCustody = Object.freeze({
+        read: () => snapshot(captured),
+        readOutput: (member: {
+          readonly run_index: number;
+          readonly path: string;
+          readonly sha256: string;
+        }): Buffer => {
+          if (
+            member === null ||
+            typeof member !== 'object' ||
+            !Number.isSafeInteger(member.run_index) ||
+            member.run_index < 0 ||
+            typeof member.path !== 'string' ||
+            !canonicalContainerPath(member.path)
+          )
+            throw new Error('release-certification-diagnostic-output-unavailable');
+          const expected = captured.runs[member.run_index]?.output_census.find(
+            (output) => output.path === member.path,
+          );
+          const bytes = bytesByRun[member.run_index]?.get(member.path);
+          if (expected === undefined || expected.sha256 !== member.sha256 || bytes === undefined)
+            throw new Error('release-certification-diagnostic-output-unavailable');
+          return Buffer.from(bytes);
+        },
+      });
+      verifiedFixtureDiagnosticCustodies.add(custody);
+      fixtureDiagnosticCustodies.set(preflight_provider, {
+        request_digest: canonicalSha256(request),
+        custody,
+      });
+    };
     try {
       if (request.action_id !== 'release preflight')
         throw new Error('release-certification-plan-binding-invalid');
       const descriptor = bindRequest(request);
       const source = await sourcesFor(request);
-      const runs = selected.map((_entry, index) =>
-        execute(
-          request,
-          optionsFor(request, descriptor, index, 'preflight'),
-          source.source,
-          source.gitMetadata,
-        ),
+      const options = selected.map((_entry, index) =>
+        optionsFor(request, descriptor, index, 'preflight'),
+      );
+      if (diagnosticOutputs.length !== 0) {
+        const tasks = options.flatMap((option) => runCheckTasks(option).plan.tasks);
+        for (const diagnostic of validatedDiagnosticOutputs) {
+          const matched = tasks.filter((task) => task.nodeId === diagnostic.task_node);
+          if (
+            matched.length === 0 ||
+            matched.some((task) => {
+              const paths = outputPaths({ tasks: [task] });
+              return diagnostic.paths.some((path) => !paths.has(path));
+            })
+          )
+            throw new Error('release-certification-diagnostic-controls-invalid');
+        }
+      }
+      const runs = options.map((option) =>
+        execute(request, option, source.source, source.gitMetadata, diagnosticRuns),
       );
       const reports = runs.map((run) => run.report);
       for (const [index, report] of reports.entries()) {
@@ -608,8 +835,11 @@ export function createContainerReleaseCertificationAdapters(
         request_digest: canonicalSha256(request),
         observation,
       });
+      retainDiagnostics('success');
       return { outcome: 'success', material: stateMaterial };
     } catch (error) {
+      preflightObservations.delete(preflight_provider);
+      retainDiagnostics('failure');
       return {
         outcome: 'failure',
         // Native/tool diagnostics are not ledger codes and can expose host paths.
