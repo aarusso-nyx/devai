@@ -27,7 +27,11 @@ function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function gitObjectId(bytes: Buffer, type: 'blob' | 'tree' | 'commit', format: 'sha1' | 'sha256' = 'sha1'): string {
+function gitObjectId(
+  bytes: Buffer,
+  type: 'blob' | 'tree' | 'commit',
+  format: 'sha1' | 'sha256' = 'sha1',
+): string {
   return createHash(format)
     .update(Buffer.from(`${type} ${String(bytes.byteLength)}\0`))
     .update(bytes)
@@ -57,7 +61,9 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
   const demoTree = gitObjectId(demoTreeBytes, 'tree', objectFormat);
   const treeBytes = gitTreeEntry('40000', 'packages', demoTree);
   const tree = gitObjectId(treeBytes, 'tree', objectFormat);
-  const commitBytes = Buffer.from(`tree ${tree}\nauthor Release Test <release@example.invalid> 0 +0000\ncommitter Release Test <release@example.invalid> 0 +0000\n\ncandidate\n`);
+  const commitBytes = Buffer.from(
+    `tree ${tree}\nauthor Release Test <release@example.invalid> 0 +0000\ncommitter Release Test <release@example.invalid> 0 +0000\n\ncandidate\n`,
+  );
   const commit = gitObjectId(commitBytes, 'commit', objectFormat);
   const certificationEvidenceReceipt = finalizeCertificationReceipt({
     candidate_commit: commit,
@@ -201,7 +207,8 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
       if (receipt_digest_sha256 !== certificationEvidenceReceipt.receipt_digest_sha256) {
         throw new Error('wrong certification receipt');
       }
-      if (evidence_sink_id !== generatedHandle.evidence_sink_id) throw new Error('wrong evidence sink');
+      if (evidence_sink_id !== generatedHandle.evidence_sink_id)
+        throw new Error('wrong evidence sink');
       return certificationEvidenceReceipt;
     },
     readCertificationOutputClosure: (binding) => ({
@@ -217,7 +224,8 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
     }),
     readGeneratedBlob: ({ output_blob_sha256, output_blob_handle, receipt }) => {
       if (output_blob_sha256 !== sha256(generated)) throw new Error('wrong generated object');
-      if (output_blob_handle.opaque_handle !== generatedHandle.opaque_handle) throw new Error('wrong generated handle');
+      if (output_blob_handle.opaque_handle !== generatedHandle.opaque_handle)
+        throw new Error('wrong generated handle');
       if (receipt.receipt_digest_sha256 !== certificationEvidenceReceipt.receipt_digest_sha256) {
         throw new Error('wrong certification receipt');
       }
@@ -321,7 +329,7 @@ describe('pure release prepare kernel', () => {
       RELEASE_PACK_SPEC_DIGEST,
     );
     expect(RELEASE_PACK_SPEC_DIGEST).toBe(
-      'd287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd',
+      '46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316',
     );
   });
 
@@ -404,36 +412,39 @@ describe('pure release prepare kernel', () => {
   it.each([
     ['omitted', []],
     ['duplicated', ['dist/index.js', 'dist/index.js']],
-  ])('refuses a %s externally finalized generated-output closure before sink effects', async (_name, paths) => {
-    const value = fixture();
-    const target = memorySink();
-    const generated = value.certificationManifest.entries[0];
-    if (generated === undefined || generated.immutable_blob_locator.kind !== 'generated-output') {
-      throw new Error('generated entry missing');
-    }
-    const locator = generated.immutable_blob_locator;
-    const result = await createReleasePrepareProvider({
-      certified_state: value.state,
-      content_source: {
-        ...value.source,
-        readCertificationOutputClosure: binding => ({
-          ...binding,
-          outputs: paths.map(path => ({
-            path,
-            mode: '100755' as const,
-            output_blob_handle: locator.output_blob_handle,
-            certification_evidence_receipt: locator.certification_evidence_receipt,
-          })),
-        }),
-      },
-      artifact_sink: target.sink,
-    })(value.request);
-    expect(result).toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-output-closure-invalid',
-    });
-    expect(target.begin).not.toHaveBeenCalled();
-  });
+  ])(
+    'refuses a %s externally finalized generated-output closure before sink effects',
+    async (_name, paths) => {
+      const value = fixture();
+      const target = memorySink();
+      const generated = value.certificationManifest.entries[0];
+      if (generated === undefined || generated.immutable_blob_locator.kind !== 'generated-output') {
+        throw new Error('generated entry missing');
+      }
+      const locator = generated.immutable_blob_locator;
+      const result = await createReleasePrepareProvider({
+        certified_state: value.state,
+        content_source: {
+          ...value.source,
+          readCertificationOutputClosure: (binding) => ({
+            ...binding,
+            outputs: paths.map((path) => ({
+              path,
+              mode: '100755' as const,
+              output_blob_handle: locator.output_blob_handle,
+              certification_evidence_receipt: locator.certification_evidence_receipt,
+            })),
+          }),
+        },
+        artifact_sink: target.sink,
+      })(value.request);
+      expect(result).toMatchObject({
+        outcome: 'failure',
+        code: 'release-certification-output-closure-invalid',
+      });
+      expect(target.begin).not.toHaveBeenCalled();
+    },
+  );
 
   it('emits the exact SPDX 2.3 package, file, checksum, and relationship projection', async () => {
     const value = fixture();
@@ -469,7 +480,7 @@ describe('pure release prepare kernel', () => {
       documentNamespace: `https://devai.nyxk.com.br/spdx/${value.request.candidate_locator.commit}/@scope/demo`,
       creationInfo: {
         created: '1970-01-01T00:00:00Z',
-        creators: ['Tool: devai.pure-npm-compatible-pack.v3'],
+        creators: ['Tool: devai.pure-npm-compatible-pack.v4'],
       },
       documentDescribes: ['SPDXRef-Package'],
       packages: [
@@ -651,6 +662,56 @@ describe('pure release prepare kernel', () => {
       code: 'release-certification-output-closure-invalid',
     });
     expect(target.begin).not.toHaveBeenCalled();
+  });
+
+  it('encodes the maximum 256-byte archive path in exact USTAR prefix and name fields', async () => {
+    const value = fixture();
+    const generatedPath = `${'a'.repeat(147)}/${'b'.repeat(100)}`;
+    const archivePath = `package/${generatedPath}`;
+    expect(Buffer.byteLength(archivePath, 'utf8')).toBe(256);
+    const entry = value.certificationManifest.entries[0] as { path: string } | undefined;
+    if (entry === undefined) throw new Error('entry fixture missing');
+    const generated = value.certificationManifest.entries[0];
+    if (generated === undefined || generated.immutable_blob_locator.kind !== 'generated-output')
+      throw new Error('generated entry missing');
+    const locator = generated.immutable_blob_locator;
+    entry.path = generatedPath;
+    const { manifest_digest_sha256: _digest, ...draft } = value.certificationManifest;
+    (value.certificationManifest as { manifest_digest_sha256: string }).manifest_digest_sha256 =
+      finalizeCertificationManifest(draft).manifest_digest_sha256;
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      certified_state: value.state,
+      content_source: {
+        ...value.source,
+        readCertificationOutputClosure: (binding) => ({
+          ...binding,
+          outputs: [
+            {
+              path: generatedPath,
+              mode: '100755',
+              output_blob_handle: locator.output_blob_handle,
+              certification_evidence_receipt: locator.certification_evidence_receipt,
+            },
+          ],
+        }),
+      },
+      artifact_sink: target.sink,
+    })(value.request);
+    if (result.outcome !== 'success' || result.material === undefined)
+      throw new Error('prepare failed');
+    const tarball = result.material.release_units[0]?.packages[0]?.package_tarball;
+    if (tarball === null || tarball === undefined || !('opaque_handle' in tarball))
+      throw new Error('tarball missing');
+    const header = gunzipSync(target.bytes.get(tarball.opaque_handle) ?? Buffer.alloc(0)).subarray(
+      0,
+      512,
+    );
+    expect(header.subarray(0, 100).toString('utf8').replace(/\0.*$/u, '')).toBe('b'.repeat(100));
+    expect(header.subarray(345, 500).toString('utf8').replace(/\0.*$/u, '')).toBe(
+      `package/${'a'.repeat(147)}`,
+    );
+    await result.transaction?.rollback();
   });
 
   it('aborts a pre-commit failure and preserves an uncertain commit attempt for inspection', async () => {
