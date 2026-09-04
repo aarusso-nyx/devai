@@ -1,17 +1,28 @@
 import { createHash } from 'node:crypto';
-import { existsSync, linkSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { canonicalSha256 } from '@devai-nyx/utils';
-import { buildReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
+import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
+import { createReleasePolicyClosure } from '../../src/services/release-policy-closure.js';
 import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
 import { createReleaseCertificationProvider } from '../../src/services/release-lifecycle-certification.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
   ReleaseLifecycleFileStore,
+  computeReleaseRequestDigest,
   executeReleaseLifecycleAction,
   executeOfflineVerification,
+  finalizeReleaseStateV2,
   finalizeStoreRecord,
   reduceStoreRecords,
   resumeReleaseLifecycleExecution,
@@ -26,12 +37,19 @@ import {
   type TrustedReleaseAuthority,
 } from '../../src/services/release-lifecycle-execution.js';
 
-const ARTIFACT_BYTES = Buffer.from(JSON.stringify({ name: '@aarusso-nyx/devai', version: '1.5.0' }));
-const BLOB = createHash('sha1').update(Buffer.from(`blob ${String(ARTIFACT_BYTES.byteLength)}\0`)).update(ARTIFACT_BYTES).digest('hex');
-const TREE_BYTES = Buffer.concat([Buffer.from('100644 package.json\0'), Buffer.from(BLOB, 'hex')]);
-const TREE = createHash('sha1').update(Buffer.from(`tree ${String(TREE_BYTES.byteLength)}\0`)).update(TREE_BYTES).digest('hex');
-const COMMIT_BYTES = Buffer.from(`tree ${TREE}\n\nfixture\n`);
-const COMMIT = createHash('sha1').update(Buffer.from(`commit ${String(COMMIT_BYTES.byteLength)}\0`)).update(COMMIT_BYTES).digest('hex');
+const POLICY_FIXTURE = createLifecyclePolicyFixture();
+const ARTIFACT_BYTES = POLICY_FIXTURE.package_json;
+const COMMIT = POLICY_FIXTURE.candidate.repository.commit;
+const TREE = POLICY_FIXTURE.candidate.repository.tree;
+const COMMIT_BYTES = Buffer.from(POLICY_FIXTURE.objects.get(COMMIT)?.bytes ?? []);
+const TREE_BYTES = Buffer.from(POLICY_FIXTURE.objects.get(TREE)?.bytes ?? []);
+const BLOB =
+  [...POLICY_FIXTURE.objects].find(
+    ([, object]) => object.type === 'blob' && Buffer.from(object.bytes).equals(ARTIFACT_BYTES),
+  )?.[0] ??
+  (() => {
+    throw new Error('fixture package blob missing');
+  })();
 const MANIFEST_DIGEST = createHash('sha256').update(ARTIFACT_BYTES).digest('hex');
 const EVIDENCE_DIGEST = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08';
 const CERTIFICATION_TASK_POLICY = { nodes: ['certify'] };
@@ -41,44 +59,26 @@ const TRANSACTION_HANDLE = 'release-test-transaction';
 const COMMIT_MANIFEST_HANDLE = 'release-test-commit-manifest';
 
 function planReceipt(): Readonly<Record<string, unknown>> {
-  return buildReleasePlanReceipt({
-    repository_id: 'aarusso-nyx/devai',
-    intent_path: 'release-intent.json',
-    intent: {
-      schemaVersion: '1.0.0',
-      release_unit: '@aarusso-nyx/devai',
-      current_version: '1.4.5',
-      target_version: '1.5.0',
-      support: 'current',
-      change_kind: 'behavioral',
-      changed_paths: ['packages/cli/src/services/release-lifecycle-execution.ts'],
-      changed_packages: ['@aarusso-nyx/devai'],
-      candidate: { commit: COMMIT, tree: TREE },
-      base: { commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
-    },
-    release_verification_profile: JSON.parse(
-      readFileSync(join(process.cwd(), 'law/policy/release-verification.json'), 'utf8'),
-    ),
-    release_lifecycle_policy: JSON.parse(
-      readFileSync(join(process.cwd(), 'law/policy/release-lifecycle.json'), 'utf8'),
-    ),
-    action_registry: JSON.parse(
-      readFileSync(join(process.cwd(), 'law/policy/action-registry.json'), 'utf8'),
-    ),
-  });
+  return POLICY_FIXTURE.receipt;
 }
 
-function resolvePlanInput(input: Readonly<Record<string, unknown>>): unknown {
-  if (input['kind'] === 'release-intent') return input['inline_document'];
-  const paths: Readonly<Record<string, string>> = {
-    'release-verification-profile': 'law/policy/release-verification.json',
-    'release-lifecycle-policy': 'law/policy/release-lifecycle.json',
-    'action-registry-policy': 'law/policy/action-registry.json',
-  };
-  const path = paths[String(input['kind'])];
-  if (path === undefined) throw new Error('unknown plan input');
-  return JSON.parse(readFileSync(join(process.cwd(), path), 'utf8')) as unknown;
-}
+const resolvePlanInput = POLICY_FIXTURE.resolve_plan_input;
+const policyClosures = [
+  {
+    closure: createReleasePolicyClosure({
+      plan: POLICY_FIXTURE.receipt,
+      resolution: POLICY_FIXTURE.resolution,
+    }),
+    expected: POLICY_FIXTURE.expected,
+    implementation: POLICY_FIXTURE.package_snapshot,
+    limits: {
+      maximum_archive_bytes: 4 * 1024 * 1024,
+      maximum_unpacked_bytes: 4 * 1024 * 1024,
+      maximum_git_bytes: 4 * 1024 * 1024,
+      maximum_git_entries: 2000,
+    },
+  },
+];
 
 function offlineReceipt(): Readonly<Record<string, unknown>> {
   const schema = JSON.parse(
@@ -302,8 +302,8 @@ function committedSink(artifacts: ReleaseStateMaterial['artifacts']) {
       transaction_handle: TRANSACTION_HANDLE,
       repository: { id: 'aarusso-nyx/devai', commit: COMMIT, tree: TREE },
       candidate: { commit: COMMIT, tree: TREE },
-      pack_spec_id: 'devai.pure-npm-compatible-pack.v3',
-      pack_spec_digest_sha256: 'd287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd',
+      pack_spec_id: 'devai.pure-npm-compatible-pack.v4',
+      pack_spec_digest_sha256: '46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316',
       artifacts,
     }),
   );
@@ -381,7 +381,8 @@ function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseState
 }
 
 function providerFor(action: ReleaseLifecycleRequest['action_id']) {
-  if (action !== 'release certify') return () => ({ outcome: 'success' as const, material: materialFor(action) });
+  if (action !== 'release certify')
+    return () => ({ outcome: 'success' as const, material: materialFor(action) });
   return createReleaseCertificationProvider({
     provider: {
       kind: 'protected-certification-provider-v3',
@@ -391,9 +392,13 @@ function providerFor(action: ReleaseLifecycleRequest['action_id']) {
       kind: 'certification-evidence-sink-v3',
       protocol: 'two-phase-content-addressed',
       begin: () => undefined as never,
-      readCertificationEvidenceReceipt: () => { throw new Error('no generated output'); },
-      readCertificationOutputClosure: binding => ({ ...binding, outputs: [] }),
-      readGeneratedBlob: () => { throw new Error('no generated output'); },
+      readCertificationEvidenceReceipt: () => {
+        throw new Error('no generated output');
+      },
+      readCertificationOutputClosure: (binding) => ({ ...binding, outputs: [] }),
+      readGeneratedBlob: () => {
+        throw new Error('no generated output');
+      },
     },
     content_source: {
       readGitObject: ({ type, object_id }) => {
@@ -745,14 +750,10 @@ function rehashReceipt(
 }
 
 async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void> {
-  for (const action of [
-    'release preflight',
-    'release certify',
-    'release prepare',
-    'release export',
-  ] as const) {
+  await seedPreflight(store);
+  for (const action of ['release certify', 'release prepare', 'release export'] as const) {
     const value = request(action);
-    const result = await withAuthorityHostTestScope(() =>
+    const execute = () =>
       executeReleaseLifecycleAction({
         request: value,
         action,
@@ -764,10 +765,156 @@ async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void
         artifactReader:
           action === 'release export' ? artifactReaderFor('release prepare') : undefined,
         recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
+      });
+    const result =
+      action === 'release prepare'
+        ? await withReleasePrepareAuthorityFixture(value, execute)
+        : await withAuthorityHostTestScope(execute);
     if (!result.ok) throw new Error(`advance failed: ${result.code}`);
   }
+}
+
+/** Valid persisted preflight state for downstream reducer tests. Executing the
+ * protected preflight provider itself is covered by its container acceptance suite. */
+async function seedPreflight(store: ReleaseLifecycleFileStore) {
+  const value = request('release preflight');
+  const requestDigest = computeReleaseRequestDigest(value);
+  const candidate = {
+    commit: value.candidate_locator.commit,
+    tree: value.candidate_locator.tree,
+    release_units: value.candidate_locator.release_units.map((unit) => ({
+      release_unit: unit.release_unit,
+      version: unit.version,
+      packages: unit.package_roster.map((pkg) => ({ package_id: pkg.package_id })),
+    })),
+  };
+  const attemptId = `RLA-${canonicalSha256({
+    request_digest_sha256: requestDigest,
+    action_id: 'release preflight',
+    sequence: 0,
+    predecessor_record: null,
+  }).slice(0, 16)}`;
+  const canonicalization = {
+    json_form: 'rfc8785-jcs' as const,
+    encoding: 'utf-8' as const,
+    digest_algorithm: 'sha256' as const,
+    projection_excludes: ['record_id', 'record_digest_sha256'] as const,
+    id_derivation: 'RLE-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256' as const,
+  };
+  const attempt = finalizeStoreRecord({
+    schemaVersion: '1.0.0',
+    record_kind: 'attempt',
+    canonicalization,
+    sequence: 0,
+    repository: value.repository_locator,
+    candidate,
+    predecessor_record: null,
+    observed_head_before: null,
+    attempt_id: attemptId,
+    action_id: 'release preflight',
+    request_digest_sha256: requestDigest,
+    authorization_event_id: null,
+    provider_handle: null,
+    provider_dispatch: { status: 'not-dispatched', handle_observed: false },
+    completion: null,
+    failure: null,
+    unknown: null,
+  });
+  const material = materialFor('release preflight');
+  const primary = required(value.candidate_locator.release_units[0], 'missing preflight unit');
+  const state = finalizeReleaseStateV2({
+    schemaVersion: '2.0.0',
+    canonicalization: {
+      kernel_id: 'devai.kernel.release-lifecycle-state.v2',
+      encoding: 'utf-8',
+      json_form: 'rfc8785-jcs',
+      digest_algorithm: 'sha256',
+      projection_excludes: ['state_id', 'record_digest_sha256'],
+      id_derivation: 'RLS-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256',
+    },
+    state: 'preflight_passed',
+    action_id: 'release preflight',
+    effect: 'harness-write',
+    prior_state: null,
+    bound_receipts:
+      value.receipt_locators?.map((locator) => ({
+        kind: locator.kind,
+        receipt_id: locator.receipt_id,
+        receipt_digest_sha256: locator.receipt_digest_sha256,
+        verdict: 'pass',
+      })) ?? [],
+    repository: value.repository_locator,
+    candidate: {
+      release_unit: primary.release_unit,
+      version: primary.version,
+      commit: COMMIT,
+      tree: TREE,
+    },
+    release_units: material.release_units,
+    inputs: material.inputs,
+    evidence: material.evidence,
+    artifacts: material.artifacts,
+    actor: authorityFor('release preflight').actor,
+    consent: authorityFor('release preflight').consent,
+    authorization_event_id: null,
+    publication_expectation: null,
+    storage: { generation: 0, head_before: null },
+    recorded_at: '2026-09-03T00:00:00.000Z',
+  });
+  const completion = finalizeStoreRecord({
+    schemaVersion: '1.0.0',
+    record_kind: 'completion',
+    canonicalization,
+    sequence: 1,
+    repository: value.repository_locator,
+    candidate,
+    predecessor_record: {
+      sequence: attempt.sequence,
+      record_id: attempt.record_id,
+      record_digest_sha256: attempt.record_digest_sha256,
+    },
+    observed_head_before: null,
+    attempt_id: attemptId,
+    action_id: 'release preflight',
+    request_digest_sha256: requestDigest,
+    authorization_event_id: null,
+    provider_handle: null,
+    provider_dispatch: { status: 'not-dispatched', handle_observed: false },
+    completion: {
+      state_id: state.state_id,
+      state_digest_sha256: state.record_digest_sha256,
+      state: state.state,
+    },
+    failure: null,
+    unknown: null,
+  });
+  await withAuthorityHostTestScope(() =>
+    store.withExecutionLock(() => {
+      store.appendStoreRecord(attempt);
+      store.appendStoreRecord(completion);
+      store.appendStateAndAdvanceHead(state, completion, null);
+    }),
+  );
+  expect(reduceStoreRecords(store.readStoreRecords())).toMatchObject({ ok: true, failed: false });
+  return { attempt, completion, state };
+}
+
+async function seedCertified(store: ReleaseLifecycleFileStore) {
+  await seedPreflight(store);
+  const result = await withAuthorityHostTestScope(() =>
+    executeReleaseLifecycleAction({
+      request: request('release certify'),
+      action: 'release certify',
+      authority: authorityFor('release certify'),
+      store,
+      resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
+      provider: providerFor('release certify'),
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    }),
+  );
+  if (!result.ok) throw new Error(`certified fixture failed: ${result.code}`);
+  return result;
 }
 
 async function advanceToEvidencePublished(store: ReleaseLifecycleFileStore): Promise<void> {
@@ -798,7 +945,7 @@ async function advanceToEvidencePublished(store: ReleaseLifecycleFileStore): Pro
 }
 
 function root(): string {
-  return mkdtempSync(join(tmpdir(), 'devai-release-lifecycle-'));
+  return realpathSync(mkdtempSync(join(tmpdir(), 'devai-release-lifecycle-')));
 }
 
 function required<T>(value: T | undefined, message: string): T {
@@ -807,10 +954,39 @@ function required<T>(value: T | undefined, message: string): T {
 }
 
 describe('release lifecycle execution kernel', () => {
-  it('refuses v3 certify before task execution or state append without a protected provider and two-phase evidence sink', async () => {
+  it('refuses unprotected preflight and v3 certify before task execution or state append', async () => {
+    const preflight = request('release preflight');
+    const preflightStore = new ReleaseLifecycleFileStore(root(), preflight);
+    const genericPreflight = vi.fn(() => ({
+      outcome: 'success' as const,
+      material: materialFor('release preflight'),
+    }));
+    const preflightResult = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: preflight,
+        action: 'release preflight',
+        authority: authorityFor('release preflight'),
+        store: preflightStore,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: genericPreflight,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(preflightResult).toMatchObject({
+      ok: false,
+      phase: 'provider',
+      code: 'release-certification-provider-unavailable',
+    });
+    expect(genericPreflight).not.toHaveBeenCalled();
+    expect(preflightStore.readStoreRecords()).toEqual([]);
+
     const value = request('release certify');
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const genericProvider = vi.fn(() => ({ outcome: 'success' as const, material: materialFor('release certify') }));
+    const genericProvider = vi.fn(() => ({
+      outcome: 'success' as const,
+      material: materialFor('release certify'),
+    }));
     const result = await withAuthorityHostTestScope(() =>
       executeReleaseLifecycleAction({
         request: value,
@@ -849,32 +1025,50 @@ describe('release lifecycle execution kernel', () => {
   it('preserves an ambiguous prepare sink commit without cleanup or redispatch until external reconciliation', async () => {
     const initial = request();
     const store = new ReleaseLifecycleFileStore(root(), initial);
-    for (const action of ['release preflight', 'release certify'] as const) {
-      const result = await withAuthorityHostTestScope(() =>
-        executeReleaseLifecycleAction({
-          request: request(action), action, authority: authorityFor(action), store,
-          resolveReceipt: () => planReceipt(), resolvePlanInput, provider: providerFor(action),
-          recorded_at: '2026-09-03T00:00:00.000Z',
-        }),
-      );
-      expect(result.ok).toBe(true);
-    }
+    await seedPreflight(store);
+    const certified = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: request('release certify'),
+        action: 'release certify',
+        authority: authorityFor('release certify'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: providerFor('release certify'),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(certified.ok).toBe(true);
     const rollback = vi.fn();
     const dispose = vi.fn();
     const provider = vi.fn(() => ({
       outcome: 'success' as const,
       material: materialFor('release prepare'),
-      transaction: { commit: () => { throw new Error('lost sink response'); }, rollback, dispose },
+      transaction: {
+        commit: () => {
+          throw new Error('lost sink response');
+        },
+        rollback,
+        dispose,
+      },
     }));
-    const prepared = await withAuthorityHostTestScope(() =>
+    const prepared = await withReleasePrepareAuthorityFixture(request('release prepare'), () =>
       executeReleaseLifecycleAction({
-        request: request('release prepare'), action: 'release prepare',
-        authority: authorityFor('release prepare'), store,
-        resolveReceipt: () => planReceipt(), resolvePlanInput, provider,
+        request: request('release prepare'),
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider,
         recorded_at: '2026-09-03T00:00:01.000Z',
       }),
     );
-    expect(prepared).toMatchObject({ ok: false, phase: 'ambiguous', code: 'release-artifact-sink-commit-unknown' });
+    expect(prepared).toMatchObject({
+      ok: false,
+      phase: 'ambiguous',
+      code: 'release-artifact-sink-commit-unknown',
+    });
     expect(rollback).not.toHaveBeenCalled();
     expect(dispose).not.toHaveBeenCalled();
     const terminal = store.readStoreRecords().at(-1);
@@ -882,31 +1076,44 @@ describe('release lifecycle execution kernel', () => {
       record_kind: 'unknown-provider-result',
       provider_dispatch: { status: 'not-dispatched', handle_observed: false },
       unknown: {
-        code: 'release-provider-result-unknown', redispatch_permitted: false,
+        code: 'release-provider-result-unknown',
+        redispatch_permitted: false,
         artifact_sink: materialFor('release prepare').artifact_sink,
         artifacts: materialFor('release prepare').artifacts,
       },
     });
     const observation = await resumeReleaseLifecycleExecution({
-      states: store.readStateRecords(), store_records: store.readStoreRecords(), store_head: store.readHead(),
+      states: store.readStateRecords(),
+      store_records: store.readStoreRecords(),
+      store_head: store.readHead(),
       repository: initial.repository_locator,
       candidate: required(store.readStateRecords().at(-1), 'missing certified state').candidate,
       candidate_locator: request('release prepare').candidate_locator,
-      receipt_documents: [planReceipt()], resolve_plan_input: resolvePlanInput,
+      receipt_documents: [planReceipt()],
+      resolve_plan_input: resolvePlanInput,
     });
     expect(observation).toMatchObject({
-      next_action: null, next_outcome: 'ambiguous',
+      next_action: null,
+      next_outcome: 'ambiguous',
       reconciliation_requirements: ['external_sink_commit_reconciliation_required'],
     });
-    const retry = await withAuthorityHostTestScope(() =>
+    const retry = await withReleasePrepareAuthorityFixture(request('release prepare'), () =>
       executeReleaseLifecycleAction({
-        request: request('release prepare'), action: 'release prepare',
-        authority: authorityFor('release prepare'), store,
-        resolveReceipt: () => planReceipt(), resolvePlanInput, provider,
+        request: request('release prepare'),
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider,
         recorded_at: '2026-09-03T00:00:02.000Z',
       }),
     );
-    expect(retry).toMatchObject({ ok: false, phase: 'reconciliation', code: 'release-provider-result-unknown' });
+    expect(retry).toMatchObject({
+      ok: false,
+      phase: 'reconciliation',
+      code: 'release-provider-result-unknown',
+    });
     expect(provider).toHaveBeenCalledTimes(1);
   });
 
@@ -952,23 +1159,10 @@ describe('release lifecycle execution kernel', () => {
     );
   });
 
-  it('persists a v2 preflight attempt, state, completion, and head durably', async () => {
+  it('persists a valid v2 preflight fixture, completion, and head durably', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const result = await withAuthorityHostTestScope(() =>
-      executeReleaseLifecycleAction({
-        request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
-        store,
-        resolveReceipt: () => planReceipt(),
-        resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
-        recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    const result = await seedPreflight(store);
     expect(result.state.schemaVersion).toBe('2.0.0');
     expect(verifyReleaseStateIdentity(result.state, true).state_id).toBe(result.state.state_id);
     expect(store.readHead()).toMatchObject({
@@ -984,23 +1178,24 @@ describe('release lifecycle execution kernel', () => {
     ]);
   });
 
-  it('commits prepared artifacts only after semantic validation and rolls them back on store failure', async () => {
-    const value = request();
+  it('commits prepared artifacts only after semantic validation and preserves a committed sink on append failure', async () => {
+    const value = request('release prepare');
     const invalidStore = new ReleaseLifecycleFileStore(root(), value);
+    await seedCertified(invalidStore);
     const invalidCommit = vi.fn();
     const invalidRollback = vi.fn();
     const invalidDispose = vi.fn();
-    const invalid = await withAuthorityHostTestScope(() =>
+    const invalid = await withReleasePrepareAuthorityFixture(value, () =>
       executeReleaseLifecycleAction({
         request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
         store: invalidStore,
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
         provider: () => ({
           outcome: 'success',
-          material: { ...material(), release_units: [] },
+          material: { ...materialFor('release prepare'), release_units: [] },
           transaction: {
             commit: invalidCommit,
             rollback: invalidRollback,
@@ -1016,21 +1211,22 @@ describe('release lifecycle execution kernel', () => {
     expect(invalidDispose).toHaveBeenCalledOnce();
 
     const failingStore = new ReleaseLifecycleFileStore(root(), value);
+    await seedCertified(failingStore);
     vi.spyOn(failingStore, 'appendStateAndAdvanceHead').mockImplementation(() => {
       throw new Error('synthetic-append-failure');
     });
     const order: string[] = [];
-    const failed = await withAuthorityHostTestScope(() =>
+    const failed = await withReleasePrepareAuthorityFixture(value, () =>
       executeReleaseLifecycleAction({
         request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
         store: failingStore,
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
         provider: () => ({
           outcome: 'success',
-          material: material(),
+          material: materialFor('release prepare'),
           transaction: {
             commit: () => {
               order.push('commit');
@@ -1051,7 +1247,7 @@ describe('release lifecycle execution kernel', () => {
       phase: 'append',
       code: 'synthetic-append-failure',
     });
-    expect(order).toEqual(['commit', 'rollback', 'dispose']);
+    expect(order).toEqual(['commit']);
   });
 
   it('refuses invalid authorization before provider availability or invocation', async () => {
@@ -1153,7 +1349,7 @@ describe('release lifecycle execution kernel', () => {
       repository: value.repository_locator,
       candidate: required(store.readStateRecords().at(-1), 'missing exported state').candidate,
       candidate_locator: value.candidate_locator,
-      receipt_documents: [receipt],
+      receipt_documents: [planReceipt(), receipt],
       resolve_plan_input: resolvePlanInput,
       offline_receipt_verifier: { verify: ({ receipt: document }) => document },
     });
@@ -1192,20 +1388,7 @@ describe('release lifecycle execution kernel', () => {
   it('reports deterministic next actions, failures, and unknown outcomes without writes', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const success = await withAuthorityHostTestScope(() =>
-      executeReleaseLifecycleAction({
-        request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
-        store,
-        resolveReceipt: () => planReceipt(),
-        resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
-        recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
-    expect(success.ok).toBe(true);
-    if (!success.ok) return;
+    const success = await seedPreflight(store);
     const before = JSON.stringify(store.readStoreRecords());
     const observation = await resumeReleaseLifecycleExecution({
       states: store.readStateRecords(),
@@ -1213,6 +1396,8 @@ describe('release lifecycle execution kernel', () => {
       store_head: store.readHead(),
       repository: value.repository_locator,
       candidate: success.state.candidate,
+      receipt_documents: [planReceipt()],
+      resolve_plan_input: resolvePlanInput,
     });
     expect(observation).toMatchObject({
       next_action: 'release certify',
@@ -1227,6 +1412,8 @@ describe('release lifecycle execution kernel', () => {
       store_head: null,
       repository: value.repository_locator,
       candidate: success.state.candidate,
+      receipt_documents: [planReceipt()],
+      resolve_plan_input: resolvePlanInput,
     });
     expect(ambiguous).toMatchObject({ next_action: null, next_outcome: 'ambiguous' });
   });
@@ -1234,19 +1421,7 @@ describe('release lifecycle execution kernel', () => {
   it('rejects corrupted and forked append-only records and symlinked stores', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const success = await withAuthorityHostTestScope(() =>
-      executeReleaseLifecycleAction({
-        request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
-        store,
-        resolveReceipt: () => planReceipt(),
-        resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
-        recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
-    expect(success.ok).toBe(true);
+    await seedPreflight(store);
     const records = store.readStoreRecords();
     expect(
       reduceStoreRecords([{ ...records[0], request_digest_sha256: 'f'.repeat(64) }, records[1]]).ok,
@@ -1257,15 +1432,15 @@ describe('release lifecycle execution kernel', () => {
     symlinkSync(target, join(unsafeRoot, 'linked'));
     const unsafe = new ReleaseLifecycleFileStore(join(unsafeRoot, 'linked'), value);
     await expect(
-      withAuthorityHostTestScope(() =>
+      withReleasePrepareAuthorityFixture(request('release prepare'), () =>
         executeReleaseLifecycleAction({
-          request: value,
-          action: 'release preflight',
-          authority: authorityFor('release preflight'),
+          request: request('release prepare'),
+          action: 'release prepare',
+          authority: authorityFor('release prepare'),
           store: unsafe,
           resolveReceipt: () => planReceipt(),
           resolvePlanInput,
-          provider: () => ({ outcome: 'success', material: material() }),
+          provider: () => ({ outcome: 'success', material: materialFor('release prepare') }),
           recorded_at: '2026-09-03T00:00:00.000Z',
         }),
       ),
@@ -1279,20 +1454,7 @@ describe('release lifecycle execution kernel', () => {
   it('accepts v1 only for observation and writes only content-derived v2 state', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const success = await withAuthorityHostTestScope(() =>
-      executeReleaseLifecycleAction({
-        request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
-        store,
-        resolveReceipt: () => planReceipt(),
-        resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
-        recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
-    expect(success.ok).toBe(true);
-    if (!success.ok) return;
+    const success = await seedPreflight(store);
     const {
       canonicalization: _canonicalization,
       release_units: _units,
@@ -1444,19 +1606,7 @@ describe('release lifecycle execution kernel', () => {
   it('enforces the v2 head, exact terminal linkage, and one serialized writer', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const success = await withAuthorityHostTestScope(() =>
-      executeReleaseLifecycleAction({
-        request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
-        store,
-        resolveReceipt: () => planReceipt(),
-        resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
-        recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
-    expect(success.ok).toBe(true);
+    await seedPreflight(store);
     const records = store.readStoreRecords();
     const completion = required(records[1], 'missing completion');
     const { record_id: _id, record_digest_sha256: _digest, ...terminalDraft } = completion;
@@ -1475,16 +1625,18 @@ describe('release lifecycle execution kernel', () => {
     );
     const concurrent = await withAuthorityHostTestScope(() =>
       store.withExecutionLock(() =>
-        executeReleaseLifecycleAction({
-          request: value,
-          action: 'release preflight',
-          authority: authorityFor('release preflight'),
-          store: competing,
-          resolveReceipt: () => planReceipt(),
-          resolvePlanInput,
-          provider: () => ({ outcome: 'success', material: material() }),
-          recorded_at: '2026-09-03T00:00:00.000Z',
-        }),
+        withReleasePrepareAuthorityFixture(request('release prepare'), () =>
+          executeReleaseLifecycleAction({
+            request: request('release prepare'),
+            action: 'release prepare',
+            authority: authorityFor('release prepare'),
+            store: competing,
+            resolveReceipt: () => planReceipt(),
+            resolvePlanInput,
+            provider: () => ({ outcome: 'success', material: materialFor('release prepare') }),
+            recorded_at: '2026-09-03T00:00:00.000Z',
+          }),
+        ),
       ),
     );
     expect(concurrent).toMatchObject({
@@ -1607,6 +1759,7 @@ describe('release lifecycle execution kernel', () => {
         request: offlineRequest,
         exported_state: exported,
         artifactReader: artifactReaderFor('release export'),
+        policyClosures,
       }),
     ).toMatchObject({
       ok: false,
@@ -1621,6 +1774,7 @@ describe('release lifecycle execution kernel', () => {
         exported_state: exported,
         artifactReader: artifactReaderFor('release export'),
         provider,
+        policyClosures,
       }),
     ).toMatchObject({ ok: true });
 
@@ -1640,22 +1794,24 @@ describe('release lifecycle execution kernel', () => {
         exported_state: exported,
         artifactReader: artifactReaderFor('release export'),
         provider,
+        policyClosures,
       }),
     ).toMatchObject({ ok: false, code: 'release-offline-receipt-binding-invalid' });
   });
 
   it('separates append-log tail from completed-state head and permits a fresh retry', async () => {
-    const value = request('release preflight');
+    const value = request('release prepare');
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const failed = await withAuthorityHostTestScope(() =>
+    await seedCertified(store);
+    const failed = await withReleasePrepareAuthorityFixture(value, () =>
       executeReleaseLifecycleAction({
         request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
         store,
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
-        provider: () => ({ outcome: 'failure', code: 'release-preflight-failed' }),
+        provider: () => ({ outcome: 'failure', code: 'release-prepare-failed' }),
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
     );
@@ -1676,18 +1832,18 @@ describe('release lifecycle execution kernel', () => {
       resolve_plan_input: resolvePlanInput,
     });
     expect(localFailureObservation).toMatchObject({
-      next_action: 'release preflight',
+      next_action: 'release prepare',
       next_outcome: 'ready',
     });
-    const passed = await withAuthorityHostTestScope(() =>
+    const passed = await withReleasePrepareAuthorityFixture(value, () =>
       executeReleaseLifecycleAction({
         request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
+        action: 'release prepare',
+        authority: authorityFor('release prepare'),
         store,
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
+        provider: () => ({ outcome: 'success', material: materialFor('release prepare') }),
         recorded_at: '2026-09-03T00:00:01.000Z',
       }),
     );
@@ -1695,12 +1851,16 @@ describe('release lifecycle execution kernel', () => {
     const records = store.readStoreRecords();
     expect(records.map((record) => record.record_kind)).toEqual([
       'attempt',
+      'completion',
+      'attempt',
+      'completion',
+      'attempt',
       'failure',
       'attempt',
       'completion',
     ]);
-    expect(records.every((record) => record.observed_head_before === null)).toBe(true);
-    expect(records[2]?.predecessor_record).toMatchObject({ record_id: records[1]?.record_id });
+    expect(records.slice(-4).every((record) => record.observed_head_before !== null)).toBe(true);
+    expect(records[6]?.predecessor_record).toMatchObject({ record_id: records[5]?.record_id });
     expect(reduceStoreRecords(records)).toMatchObject({
       ok: true,
       failed: false,
@@ -1747,7 +1907,7 @@ describe('release lifecycle execution kernel', () => {
       repository: value.repository_locator,
       candidate: exported.candidate,
       candidate_locator: value.candidate_locator,
-      receipt_documents: [receipt],
+      receipt_documents: [planReceipt(), receipt],
       resolve_plan_input: resolvePlanInput,
       offline_receipt_verifier: { verify: ({ receipt: document }) => document },
     });
@@ -1894,19 +2054,7 @@ describe('release lifecycle execution kernel', () => {
   it('refuses hard-linked state records through the no-follow fstat boundary', async () => {
     const value = request('release preflight');
     const store = new ReleaseLifecycleFileStore(root(), value);
-    const result = await withAuthorityHostTestScope(() =>
-      executeReleaseLifecycleAction({
-        request: value,
-        action: 'release preflight',
-        authority: authorityFor('release preflight'),
-        store,
-        resolveReceipt: () => planReceipt(),
-        resolvePlanInput,
-        provider: () => ({ outcome: 'success', material: material() }),
-        recorded_at: '2026-09-03T00:00:00.000Z',
-      }),
-    );
-    expect(result.ok).toBe(true);
+    await seedPreflight(store);
     const attempts = join(store.campaignDirectory, 'attempts');
     const name = required(
       // The store accepts exactly one opening attempt in this fixture.
@@ -1932,7 +2080,7 @@ describe('release lifecycle execution kernel', () => {
     expect(result).toMatchObject({
       ok: false,
       phase: 'provider',
-      code: 'release-provider-unavailable',
+      code: 'release-certification-provider-unavailable',
     });
     expect(existsSync(store.campaignDirectory)).toBe(false);
   });
