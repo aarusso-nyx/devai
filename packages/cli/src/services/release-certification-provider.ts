@@ -305,6 +305,23 @@ function outputPaths(plan: Pick<TaskPlan, 'tasks'>): Map<string, string> {
 export function createContainerReleaseCertificationAdapters(
   input: ContainerReleaseCertificationOptions,
 ): ContainerReleaseCertificationAdapters {
+  return createContainerReleaseAdapters(input);
+}
+
+/** Private diagnostic lane: no evidence store is accepted and no certify surface escapes. */
+export function createContainerReleasePreflightProvider(
+  input: Omit<ContainerReleaseCertificationOptions, 'evidence_sink'>,
+): ReleaseProvider {
+  if ('evidence_sink' in input)
+    throw new Error('release-certification-diagnostic-controls-invalid');
+  return createContainerReleaseAdapters(input).preflight_provider;
+}
+
+function createContainerReleaseAdapters(
+  input: Omit<ContainerReleaseCertificationOptions, 'evidence_sink'> & {
+    readonly evidence_sink?: TrustedCertificationEvidenceSink;
+  },
+): ContainerReleaseCertificationAdapters {
   const root = realpathSync(input.repository_root);
   // Keep the opaque resolution from this runtime. JSON copying would erase its
   // provenance brand; all ordinary caller-owned plan data is still snapshotted.
@@ -959,6 +976,8 @@ export function createContainerReleaseCertificationAdapters(
   return {
     preflight_provider,
     certification_provider(request) {
+      if (input.evidence_sink === undefined)
+        throw new Error('release-certification-evidence-sink-unavailable');
       const descriptor = bindRequest(request);
       // A task's PASS and hashed output paths are not semantic mutation evidence.
       // Until the protected v2.1 producer/verifier bridge is installed here, refuse
