@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import {
   createAuthorityDecisionIssuer,
   protectedArtifactSinkHostEffect,
@@ -20,6 +20,7 @@ import {
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import { createReleaseRepositoryTestFixture } from '../../../authority/tests/unit/release-repository-test-fixture.js';
 import { createReleaseArtifactStore } from '../../src/services/release-artifact-store.js';
 import {
   RELEASE_PACK_SPEC_DIGEST,
@@ -29,7 +30,8 @@ import {
 } from '../../src/services/release-prepare-kernel.js';
 
 const roots: string[] = [];
-const REPOSITORY = { id: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) };
+const REPOSITORY_FIXTURE = createReleaseRepositoryTestFixture();
+const REPOSITORY = REPOSITORY_FIXTURE.repository;
 const SINK_ID = 'fixture-artifact-sink';
 const PLAN_DIGEST = 'c'.repeat(64);
 
@@ -93,7 +95,14 @@ async function invokePrepare<T>(
       const operation = protectedArtifactSinkHostEffect(request);
       if (
         operation?.kind !== 'artifact-sink' ||
-        canonicalJson(operation.binding) !== canonicalJson(binding)
+        operation.binding.action_id !== binding.action_id ||
+        canonicalJson(operation.binding.repository) !== canonicalJson(binding.repository) ||
+        operation.binding.plan_receipt_digest_sha256 !== binding.plan_receipt_digest_sha256 ||
+        operation.binding.pack_spec_digest_sha256 !== binding.pack_spec_digest_sha256 ||
+        operation.binding.sink_id !== binding.sink_id ||
+        operation.binding.authority_repository_id !== 'fixture-repository' ||
+        operation.binding.expected_release_repository_id !== REPOSITORY.id ||
+        operation.binding.origin_url !== `https://github.com/${REPOSITORY.id}.git`
       ) {
         throw new Error('TEST_PROTECTED_ARTIFACT_SINK_OPERATION_REQUIRED');
       }
@@ -101,7 +110,9 @@ async function invokePrepare<T>(
     },
   };
   try {
-    return await runWithAuthorityHostEffects(scope, callback);
+    return await REPOSITORY_FIXTURE.run(
+      async () => await runWithAuthorityHostEffects(scope, callback),
+    );
   } finally {
     issuer.dispose();
   }
@@ -209,6 +220,8 @@ async function refusal(callback: () => unknown | Promise<unknown>): Promise<void
 afterEach(() => {
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
+
+afterAll(() => REPOSITORY_FIXTURE.dispose());
 
 describe('durable external release artifact store', () => {
   it('commits the exact complete manifest and reopens committed artifact bytes', async () => {

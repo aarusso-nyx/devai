@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import {
   createAuthorityDecisionIssuer,
   createProtectedReleaseHostAdapter,
@@ -21,12 +21,14 @@ import {
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import { createReleaseRepositoryTestFixture } from '../../../authority/tests/unit/release-repository-test-fixture.js';
 import { createReleaseCertificationEvidenceStore } from '../../src/services/release-evidence-store.js';
 import type { CertificationOutputClosureBinding } from '../../src/services/release-prepare-kernel.js';
 
 const roots: string[] = [];
-const COMMIT = 'a'.repeat(40);
-const TREE = 'b'.repeat(40);
+const REPOSITORY_FIXTURE = createReleaseRepositoryTestFixture();
+const COMMIT = REPOSITORY_FIXTURE.repository.commit;
+const TREE = REPOSITORY_FIXTURE.repository.tree;
 const TASK_POLICY = 'c'.repeat(64);
 const REFUSAL = 'release-certification-generated-output-untrusted';
 
@@ -45,7 +47,7 @@ function root(prefix: string): string {
 
 function binding(packageId: string, commit = COMMIT): CertificationOutputClosureBinding {
   return {
-    repository: { id: 'fixture/repository', commit, tree: TREE },
+    repository: { id: REPOSITORY_FIXTURE.repository.id, commit, tree: TREE },
     candidate: { commit, tree: TREE },
     task_policy_digest_sha256: TASK_POLICY,
     package_id: packageId,
@@ -94,7 +96,7 @@ async function invokeSink<T>(
       if (
         operation?.kind !== 'sink' ||
         operation.binding.action_id !== 'release certify' ||
-        operation.binding.repository.id !== 'fixture/repository' ||
+        operation.binding.repository.id !== REPOSITORY_FIXTURE.repository.id ||
         operation.binding.repository.commit !== COMMIT ||
         operation.binding.repository.tree !== TREE ||
         operation.binding.task_policy_digest_sha256 !== TASK_POLICY
@@ -107,13 +109,16 @@ async function invokeSink<T>(
   };
   const adapter = createProtectedReleaseHostAdapter({
     action_id: 'release certify',
-    repository: { id: 'fixture/repository', commit: COMMIT, tree: TREE },
+    repository: REPOSITORY_FIXTURE.repository,
     task_policy_digest_sha256: TASK_POLICY,
     plan_receipt_digest_sha256: 'd'.repeat(64),
     helper_identity_sha256: 'e'.repeat(64),
   });
   try {
-    return await runWithAuthorityHostEffects(scope, () => adapter.invokeSink(callback, owner));
+    return await REPOSITORY_FIXTURE.run(
+      async () =>
+        await runWithAuthorityHostEffects(scope, () => adapter.invokeSink(callback, owner)),
+    );
   } finally {
     issuer.dispose();
   }
@@ -135,6 +140,8 @@ function output(handle: {
 afterEach(() => {
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
+
+afterAll(() => REPOSITORY_FIXTURE.dispose());
 
 describe('durable external certification evidence store', () => {
   it('requires protected sink authority before it can begin a transaction', async () => {

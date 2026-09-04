@@ -158,4 +158,20 @@ describe('protected release repository context', () => {
       );
     });
   });
+
+  it('requires the exact named lowercase origin while ignoring unrelated remote subsections', async () => {
+    const unrelated = fixture();
+    git(unrelated.root, ['config', 'remote.Origin.url', 'https://github.com/stynx-nyx/stynx.git']);
+    const accepted = createProtectedReleaseRepositoryContext(unrelated.controls);
+    await withProtectedReleaseRepositoryContext(accepted, async () => {
+      expect(readProtectedReleaseRepositoryIdentity().origin_url).toBe(ORIGIN);
+    });
+
+    const missing = fixture();
+    git(missing.root, ['config', '--unset-all', 'remote.origin.url']);
+    git(missing.root, ['config', 'remote.Origin.url', ORIGIN]);
+    expect(() => createProtectedReleaseRepositoryContext(missing.controls)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   createAuthorityDecisionIssuer,
   createProtectedExportSignerAdapter,
@@ -13,15 +13,17 @@ import {
   type ProtectedReleaseExportBinding,
 } from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import { createReleaseRepositoryTestFixture } from './release-repository-test-fixture.js';
 
-const COMMIT = 'a'.repeat(40);
-const TREE = 'b'.repeat(40);
+const REPOSITORY_FIXTURE = createReleaseRepositoryTestFixture();
+const COMMIT = REPOSITORY_FIXTURE.repository.commit;
+const TREE = REPOSITORY_FIXTURE.repository.tree;
 const DIGEST = (character: string) => character.repeat(64);
 
 function binding(): ProtectedReleaseExportBinding {
   return {
     action_id: 'release export',
-    repository: { id: 'fixture/repository', commit: COMMIT, tree: TREE },
+    repository: REPOSITORY_FIXTURE.repository,
     candidate: { commit: COMMIT, tree: TREE },
     plan_receipt_digest_sha256: DIGEST('c'),
     parent_artifact_sink: {
@@ -117,8 +119,12 @@ async function within<T>(
   value: AuthorityHostEffectScope,
   callback: () => T | Promise<T>,
 ): Promise<Awaited<T>> {
-  return await runWithAuthorityHostEffects(value, callback);
+  return await REPOSITORY_FIXTURE.run(
+    async () => await runWithAuthorityHostEffects(value, callback),
+  );
 }
+
+afterAll(() => REPOSITORY_FIXTURE.dispose());
 
 async function withinCapacity<T>(
   current: AuthorityHostEffectScope,
