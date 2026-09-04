@@ -596,14 +596,66 @@ describe('ADR-v3 public result and semantic authority', () => {
     ]);
   });
 
-  it('freezes the current 41-record authority graph and complete result instance', () => {
+  it('freezes the current accepted-record authority graph and complete result instance', () => {
     const policy = readJson<AdrPolicy>('law/policy/adr-validation.json');
     const adrRoot = resolve(ROOT, 'law/adr');
     const records = currentRecordFixtures(policy, adrRoot);
     const result = resolveAdrFixture(records, markdownFiles(adrRoot).length);
-    expect(records).toHaveLength(41);
-    expect(result.files_scanned).toBe(42);
-    expect(result.subject_authorities).toHaveLength(77);
+    expect(records.map((record) => record.adr_id)).toEqual([
+      'ADR-014',
+      'ADR-AUT-0001',
+      'ADR-GOV-0001',
+      'ADR-GOV-0002',
+      'ADR-GOV-0003',
+      'ADR-GOV-0004',
+      'ADR-GOV-0005',
+      'ADR-GOV-0006',
+      'ADR-GOV-0007',
+      'ADR-GOV-0008',
+      'ADR-GOV-0009',
+      'ADR-GOV-0010',
+      'ADR-GOV-0011',
+      'ADR-GOV-0012',
+      'ADR-GOV-0013',
+      'ADR-GOV-0014',
+      'ADR-GOV-0015',
+      'ADR-GOV-0016',
+      'ADR-MUT-0001',
+      'ADR-MUT-0002',
+      'ADR-MUT-0003',
+      'ADR-MUT-0004',
+      'ADR-MUT-0005',
+      'ADR-MUT-0006',
+      'ADR-MUT-0007',
+      'ADR-REL-0001',
+      'ADR-REL-0002',
+      'ADR-REL-0003',
+      'ADR-REL-0004',
+      'ADR-REL-0005',
+      'ADR-REL-0006',
+      'ADR-REL-0007',
+      'ADR-REL-0008',
+      'ADR-REL-0009',
+      'ADR-REL-0010',
+      'ADR-REL-0011',
+      'ADR-REL-0012',
+      'ADR-REL-0013',
+      'ADR-REL-0014',
+      'ADR-REL-0015',
+      'ADR-REL-0016',
+      'ADR-REL-0017',
+      'ADR-REL-0018',
+      'ADR-REL-0019',
+      'ADR-REL-0020',
+      'ADR-REL-0021',
+    ]);
+    expect(records).toHaveLength(46);
+    expect(
+      records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
+    ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
+    expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
+    expect(result.files_scanned).toBe(47);
+    expect(result.subject_authorities).toHaveLength(95);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -632,6 +684,10 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0014',
       'ADR-REL-0015',
       'ADR-REL-0016',
+      'ADR-REL-0018',
+      'ADR-REL-0019',
+      'ADR-REL-0020',
+      'ADR-REL-0021',
     ]);
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
     expect(matchesAdrSemantics(records, result, markdownFiles(adrRoot).length)).toBe(true);
