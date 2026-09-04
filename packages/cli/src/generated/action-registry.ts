@@ -971,7 +971,7 @@ export const ACTION_REGISTRY = [
         planner_id: 'release-certify-bounded-plan',
         target_kinds: ['fs', 'protected-certification-provider', 'certification-evidence-sink'],
         bounds: {
-          max_batches: 4096,
+          max_batches: 2048,
           max_targets_per_batch: 64,
           max_total_targets: 8192,
         },
@@ -1414,7 +1414,7 @@ export const ACTION_REGISTRY = [
         planner_id: 'release-preflight-bounded-plan',
         target_kinds: ['fs', 'protected-certification-provider'],
         bounds: {
-          max_batches: 4096,
+          max_batches: 2048,
           max_targets_per_batch: 64,
           max_total_targets: 8192,
         },

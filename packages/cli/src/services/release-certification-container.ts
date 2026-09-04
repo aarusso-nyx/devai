@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { createProtectedReleaseHostAdapter } from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
@@ -916,11 +916,6 @@ export class ProtectedCertificationContainer {
           ? {}
           : { errorCode: 'PROTECTED_CONTAINER_ABNORMAL' }),
       };
-      if (process.env.DEVAI_DEBUG_TASK_LOG !== undefined && result.status !== 0)
-        appendFileSync(
-          process.env.DEVAI_DEBUG_TASK_LOG,
-          `===== ${JSON.stringify(input.task.argv)} status=${String(result.status)}\n--- stdout\n${result.stdout}\n--- stderr\n${result.stderr}\n`,
-        );
       const envelope = Buffer.from(execution.stdout ?? '');
       // A broken PID 1 is already an outer failure. It cannot offer a result envelope,
       // but if it did emit one before failing we retain the bounded diagnostic bytes.
