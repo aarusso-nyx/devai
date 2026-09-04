@@ -173,7 +173,10 @@ describe('release lifecycle state and refusal contracts', () => {
       capability: 'protected-certification-provider-v3:execute',
       binding: [
         'action_id',
+        'authority-repository-id',
+        'expected-release-repository-id',
         'repository-id-commit-tree',
+        'origin-url',
         'candidate-commit-tree',
         'plan-receipt-digest',
         'task-policy-digest-sha256',
@@ -207,10 +210,24 @@ describe('release lifecycle state and refusal contracts', () => {
     const alteredPreflight = alteredContract.protected_preflight as Json;
     alteredPreflight.stage = 'certify';
     expect(validateLifecyclePolicy(altered)).toBe(false);
+    for (const removed of [
+      'authority-repository-id',
+      'expected-release-repository-id',
+      'origin-url',
+    ]) {
+      const missingIdentityBinding = structuredClone(policy) as Json;
+      const missingContract = missingIdentityBinding.execution_contract as Json;
+      const missingPreflight = missingContract.protected_preflight as Json;
+      missingPreflight.binding = (missingPreflight.binding as string[]).filter(
+        (entry) => entry !== removed,
+      );
+      expect(validateLifecyclePolicy(missingIdentityBinding)).toBe(false);
+    }
   });
 
-  it('pins v2 plan kernels and the exact deterministic SemVer refusal contract', () => {
-    expect(policy.plan_determination.kernel_id).toBe('devai.kernel.release-plan-determination.v2');
+  it('pins the current v3 plan kernel and the exact deterministic SemVer refusal contract', () => {
+    const validateLifecyclePolicy = getValidator('release-lifecycle-policy.schema.json');
+    expect(policy.plan_determination.kernel_id).toBe('devai.kernel.release-plan-determination.v3');
     expect(policy.plan_determination.blocked_receipt).toMatchObject({
       verdict: 'block',
       state_observed: null,
@@ -231,6 +248,10 @@ describe('release lifecycle state and refusal contracts', () => {
         mutation_disposition_reason: reason,
       })),
     );
+    const downgradedKernel = structuredClone(policy) as Json;
+    const downgradedDetermination = downgradedKernel.plan_determination as Json;
+    downgradedDetermination.kernel_id = 'devai.kernel.release-plan-determination.v2';
+    expect(validateLifecyclePolicy(downgradedKernel)).toBe(false);
   });
 
   it.each(blockedCases)('emits a deterministic non-transition receipt for %s', (reason, input) => {
