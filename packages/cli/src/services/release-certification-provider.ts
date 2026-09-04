@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { createProtectedReleaseHostAdapter, readExactGitTreeSync } from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { parseTaskDescriptor } from './check-runner/policy.js';
-import { runCheckTasks } from './check-runner/runner.js';
+import { runCheckTasks, runCheckTasksAsync } from './check-runner/runner.js';
 import type {
   CheckRunnerOptions,
   CheckRunnerReport,
@@ -649,7 +649,7 @@ function createContainerReleaseAdapters(
     return { source, gitMetadata, locators };
   }
 
-  function execute(
+  async function execute(
     request: ReleaseLifecycleRequest,
     options: CheckRunnerOptions,
     source: readonly ContainerArchiveEntry[],
@@ -698,40 +698,42 @@ function createContainerReleaseAdapters(
     if (fixtureContext !== undefined && diagnosticRuns !== undefined)
       recordProtectedToolchainFixtureBinding(fixtureContext, binding);
     let taskIndex = 0;
-    const report = container.runBound(binding, () => {
-      container.verifyRuntime();
-      return runCheckTasks({
-        ...options,
-        operation: 'run',
-        executeTask: (argv, cwd, timeout, taskEnvironment) => {
+    // A container authorization scope is synchronous. Never retain its private
+    // host capability across an await between DAG tasks or evidence operations.
+    container.runBound(binding, () => container.verifyRuntime());
+    const executionOptions: CheckRunnerOptions = {
+      ...options,
+      operation: 'run',
+      executeTask: (argv, cwd, timeout, taskEnvironment) => {
+        if (
+          fixtureContext !== undefined &&
+          canonicalJson(taskEnvironment) !== canonicalJson(environment)
+        )
+          throw new Error('release-toolchain-fixture-compatibility-invalid');
+        const task = planned.tasks[taskIndex++];
+        if (
+          task === undefined ||
+          canonicalJson(argv) !== canonicalJson(task.argv) ||
+          realpathSync(cwd) !== realpathSync(resolve(root, task.cwd))
+        )
+          throw new Error('release-task-policy-identity-mismatch');
+        const paths = outputPaths({ ...planned, tasks: [task] });
+        const gitView = task.outputContract.git_view;
+        if (gitView !== undefined && gitView !== 'candidate-local-shallow-v1')
+          throw new Error('release-certification-git-view-unsupported');
+        if (task.outputContract.kind === 'tracked-files') {
+          const tracked = task.outputContract.paths;
           if (
-            fixtureContext !== undefined &&
-            canonicalJson(taskEnvironment) !== canonicalJson(environment)
+            !Array.isArray(tracked) ||
+            tracked.some((path) => typeof path !== 'string' || !sourceByPath.has(path))
           )
-            throw new Error('release-toolchain-fixture-compatibility-invalid');
-          const task = planned.tasks[taskIndex++];
-          if (
-            task === undefined ||
-            canonicalJson(argv) !== canonicalJson(task.argv) ||
-            realpathSync(cwd) !== realpathSync(resolve(root, task.cwd))
-          )
-            throw new Error('release-task-policy-identity-mismatch');
-          const paths = outputPaths({ ...planned, tasks: [task] });
-          const gitView = task.outputContract.git_view;
-          if (gitView !== undefined && gitView !== 'candidate-local-shallow-v1')
-            throw new Error('release-certification-git-view-unsupported');
-          if (task.outputContract.kind === 'tracked-files') {
-            const tracked = task.outputContract.paths;
-            if (
-              !Array.isArray(tracked) ||
-              tracked.some((path) => typeof path !== 'string' || !sourceByPath.has(path))
-            )
-              throw new Error('release-certification-output-closure-invalid');
-          }
-          for (const path of paths.keys()) expected.add(path);
-          const diagnosticPaths =
-            diagnosticRuns === undefined ? undefined : diagnosticsByTask.get(task.nodeId);
-          const result = container.execute({
+            throw new Error('release-certification-output-closure-invalid');
+        }
+        for (const path of paths.keys()) expected.add(path);
+        const diagnosticPaths =
+          diagnosticRuns === undefined ? undefined : diagnosticsByTask.get(task.nodeId);
+        const result = container.runBound(binding, () =>
+          container.execute({
             task,
             timeout_ms: timeout,
             environment: taskEnvironment,
@@ -744,55 +746,59 @@ function createContainerReleaseAdapters(
               : {
                   diagnostic_output_paths: diagnosticPaths,
                 }),
+          }),
+        );
+        if (diagnosticRuns !== undefined && diagnosticsByTask.has(task.nodeId)) {
+          if (result.diagnostic_outputs === undefined)
+            throw new Error('release-certification-diagnostic-output-unavailable');
+          // The container has already proved shutdown, isolation and full archive
+          // integrity. Retain bytes separately BEFORE the runner handles a task failure.
+          diagnosticRuns.push({
+            binding: snapshot(binding),
+            task_node: task.nodeId,
+            process: {
+              status: result.result.status,
+              signal: result.result.signal,
+              errorAbsent: result.result.errorCode === undefined,
+            },
+            outputs: result.diagnostic_outputs.map((output) => ({
+              ...output,
+              bytes: Buffer.from(output.bytes),
+            })),
           });
-          if (diagnosticRuns !== undefined && diagnosticsByTask.has(task.nodeId)) {
-            if (result.diagnostic_outputs === undefined)
-              throw new Error('release-certification-diagnostic-output-unavailable');
-            // The container has already proved shutdown, isolation and full archive
-            // integrity. Retain bytes separately BEFORE the runner handles a task failure.
-            diagnosticRuns.push({
-              binding: snapshot(binding),
-              task_node: task.nodeId,
-              process: {
-                status: result.result.status,
-                signal: result.result.signal,
-                errorAbsent: result.result.errorCode === undefined,
-              },
-              outputs: result.diagnostic_outputs.map((output) => ({
-                ...output,
-                bytes: Buffer.from(output.bytes),
-              })),
-            });
+        }
+        const produced: string[] = [];
+        for (const output of result.outputs) {
+          if (!outputs.has(output.path)) {
+            producers.set(output.path, task.nodeId);
+            produced.push(output.path);
           }
-          const produced: string[] = [];
-          for (const output of result.outputs) {
-            if (!outputs.has(output.path)) {
-              producers.set(output.path, task.nodeId);
-              produced.push(output.path);
-            }
-            outputs.set(output.path, output);
-            expected.add(output.path);
-          }
-          capturedPaths.set(task.nodeId, produced.sort(compare));
-          return result.result;
-        },
-        capturedTaskOutputPaths: (task) => capturedPaths.get(task.nodeId) ?? [],
-        readTaskOutput: (path) => {
-          const output =
-            outputs.get(path) ??
-            (planned.tasks.some(
-              (task) =>
-                task.outputContract.kind === 'tracked-files' &&
-                Array.isArray(task.outputContract.paths) &&
-                task.outputContract.paths.includes(path),
-            )
-              ? sourceByPath.get(path)
-              : undefined);
-          if (output === undefined) throw new Error('release-certification-output-closure-invalid');
-          return Buffer.from(output.bytes);
-        },
-      });
-    });
+          outputs.set(output.path, output);
+          expected.add(output.path);
+        }
+        capturedPaths.set(task.nodeId, produced.sort(compare));
+        return result.result;
+      },
+      capturedTaskOutputPaths: (task) => capturedPaths.get(task.nodeId) ?? [],
+      readTaskOutput: (path) => {
+        const output =
+          outputs.get(path) ??
+          (planned.tasks.some(
+            (task) =>
+              task.outputContract.kind === 'tracked-files' &&
+              Array.isArray(task.outputContract.paths) &&
+              task.outputContract.paths.includes(path),
+          )
+            ? sourceByPath.get(path)
+            : undefined);
+        if (output === undefined) throw new Error('release-certification-output-closure-invalid');
+        return Buffer.from(output.bytes);
+      },
+    };
+    const report =
+      request.action_id === 'release certify'
+        ? await runCheckTasksAsync(executionOptions)
+        : runCheckTasks(executionOptions);
     if (
       report.exitCode !== 0 ||
       report.execution?.length !== planned.tasks.length ||
@@ -1002,9 +1008,11 @@ function createContainerReleaseAdapters(
           descriptor,
           tasks: options.flatMap((option) => runCheckTasks(option).plan.tasks),
         });
-      const runs = options.map((option) =>
-        execute(request, option, source.source, source.gitMetadata, diagnosticRuns),
-      );
+      const runs: Awaited<ReturnType<typeof execute>>[] = [];
+      for (const option of options)
+        runs.push(
+          await execute(request, option, source.source, source.gitMetadata, diagnosticRuns),
+        );
       const reports = runs.map((run) => run.report);
       for (const [index, report] of reports.entries()) {
         if (report.preflightReceipt === undefined)
@@ -1118,9 +1126,9 @@ function createContainerReleaseAdapters(
               if (canonicalJson(call.request) !== canonicalJson(request))
                 throw new Error('release-certification-plan-binding-invalid');
               const source = await sourcesFor(request);
-              const runs = options.map((option) =>
-                execute(request, option, source.source, source.gitMetadata),
-              );
+              const runs: Awaited<ReturnType<typeof execute>>[] = [];
+              for (const option of options)
+                runs.push(await execute(request, option, source.source, source.gitMetadata));
               if (
                 runs.some(
                   (run, index) =>
