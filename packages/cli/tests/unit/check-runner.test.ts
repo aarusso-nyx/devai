@@ -1257,8 +1257,13 @@ describe('content-addressed check runner', () => {
       releaseProfile: releaseProfile(),
     });
     expect(preflight.plan.releaseIntentDigest).toBe(sha256Hex(releaseIntent));
-    expect(preflight.plan.taskPolicy.schemaVersion).toBe('1.1.0');
-    expect(preflight.plan.taskPolicy).not.toHaveProperty('inputProjection');
+    expect(preflight.plan.taskPolicy.schemaVersion).toBe('1.2.0');
+    expect(preflight.plan.taskPolicy.inputProjection).toEqual({
+      schemaVersion: '1.0.0',
+      source: 'exact-candidate-tree',
+      excludedPrefixes: ['.devai/state/', 'record/', 'scratch/'],
+      digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    });
     const releasePlan = run(state.root, {
       target: 'release',
       operation: 'plan',
