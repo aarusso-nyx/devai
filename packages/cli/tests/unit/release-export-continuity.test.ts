@@ -5,6 +5,7 @@ import {
   RELEASE_EXPORT_SPEC_DIGEST,
   RELEASE_EXPORT_SPEC_ID,
   type ProtectedReleaseExportBinding,
+  type ProtectedReleaseExportBindingV3,
 } from '../../src/services/release-export-artifact-store.js';
 import {
   encodeReleaseExportProviderResult,
@@ -404,11 +405,45 @@ type V3Disposition = 'required' | 'none' | 'mixed';
 
 interface V3Fixture extends Omit<Fixture, 'binding' | 'finalManifest' | 'exported'> {
   readonly exported: ReleaseLifecycleStateV2;
-  readonly binding: ProtectedReleaseExportBinding;
+  readonly binding: ProtectedReleaseExportBindingV3;
   readonly finalManifest: Readonly<Record<string, unknown>>;
   readonly transcript: Buffer;
   readonly portable: ReadonlyMap<string, ReleaseUnitMutationPortable | null>;
   readonly evidence: readonly UnitMutationFixture[];
+}
+
+function opaqueIdentity(value: unknown): OpaqueArtifactIdentity {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('fixture opaque artifact missing');
+  const record = value as Record<string, unknown>;
+  const kind = record['kind'];
+  if (
+    ![
+      'package-manifest',
+      'package-tarball',
+      'package-sbom',
+      'evidence-manifest',
+      'provider-result',
+    ].includes(String(kind)) ||
+    typeof record['sink_id'] !== 'string' ||
+    typeof record['opaque_handle'] !== 'string' ||
+    typeof record['sha256'] !== 'string' ||
+    typeof record['size_bytes'] !== 'number' ||
+    !Number.isSafeInteger(record['size_bytes'])
+  )
+    throw new Error('fixture opaque artifact missing');
+  return {
+    kind: kind as OpaqueArtifactIdentity['kind'],
+    sink_id: record['sink_id'],
+    opaque_handle: record['opaque_handle'],
+    sha256: record['sha256'],
+    size_bytes: record['size_bytes'],
+  };
+}
+
+function opaqueIdentities(value: unknown): readonly OpaqueArtifactIdentity[] {
+  if (!Array.isArray(value)) throw new Error('fixture artifact population missing');
+  return value.map(opaqueIdentity);
 }
 
 function mutationProjection(
@@ -539,13 +574,13 @@ async function v3Fixture(disposition: V3Disposition = 'mixed'): Promise<V3Fixtur
         throw new Error('fixture release unit missing');
       })(),
   }));
-  const binding: ProtectedReleaseExportBinding = {
+  const binding: ProtectedReleaseExportBindingV3 = {
     ...base.binding,
     export_spec_digest_sha256: RELEASE_EXPORT_SPEC_V3_DIGEST,
     closure_inputs: closureInputs,
     mutation_units: mutationUnits,
   };
-  const parent = base.prepared.artifacts as readonly OpaqueArtifactIdentity[];
+  const parent = opaqueIdentities(base.prepared.artifacts);
   const transcript = encodeReleaseExportTranscriptV2(
     {
       version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
@@ -567,11 +602,7 @@ async function v3Fixture(disposition: V3Disposition = 'mixed'): Promise<V3Fixtur
         return {
           package_id: pkg.package_id,
           release_unit: entry.release_unit,
-          evidence_manifest:
-            pkg.evidence_manifest ??
-            (() => {
-              throw new Error('fixture evidence missing');
-            })(),
+          evidence_manifest: opaqueIdentity(pkg.evidence_manifest),
           expected_installed_package: entry.expected_installed_package,
           policy_resolution_digest_sha256: entry.policy_resolution_digest_sha256,
         };
@@ -620,13 +651,7 @@ async function v3Fixture(disposition: V3Disposition = 'mixed'): Promise<V3Fixtur
   }));
   const artifacts = order([
     ...parent,
-    ...stateUnits.map(
-      (unit) =>
-        unit.packages[0]?.evidence_manifest ??
-        (() => {
-          throw new Error('fixture evidence missing');
-        })(),
-    ),
+    ...stateUnits.map((unit) => opaqueIdentity(unit.packages[0]?.evidence_manifest)),
     ...providers,
   ]);
   const finalManifest = {
@@ -690,27 +715,27 @@ function withV3ProviderMutationEvidence(
   const state = structuredClone(value.exported) as ReleaseLifecycleStateV2;
   let replaced = false;
   let changed: OpaqueArtifactIdentity | undefined;
-  const units = state.release_units.map((unit) => ({
+  const units: ReleaseLifecycleStateV2['release_units'] = state.release_units.map((unit) => ({
     ...unit,
     packages: unit.packages.map((pkg) => {
       if (pkg.package_id !== packageId) return pkg;
-      const original = pkg.provider_result;
-      if (original === null || original === undefined)
-        throw new Error('fixture provider result missing');
+      const original = opaqueIdentity(pkg.provider_result);
       const source = value.bytes.get(original.opaque_handle);
       if (source === undefined) throw new Error('fixture provider bytes missing');
       const document = JSON.parse(source.toString('utf8')) as Record<string, unknown>;
       const bytes = canonical({ ...document, mutation_evidence: mutationEvidence });
-      changed = { ...original, sha256: sha256(bytes), size_bytes: bytes.byteLength };
+      const replacement = { ...original, sha256: sha256(bytes), size_bytes: bytes.byteLength };
+      changed = replacement;
       value.bytes.set(original.opaque_handle, bytes);
       replaced = true;
-      return { ...pkg, provider_result: changed };
+      return { ...pkg, provider_result: replacement };
     }),
   }));
   if (!replaced || changed === undefined) throw new Error('fixture package missing');
+  const replacement = changed;
   const artifacts = order(
-    (state.artifacts as readonly OpaqueArtifactIdentity[]).map((identity) =>
-      identity.opaque_handle === changed?.opaque_handle ? changed : identity,
+    opaqueIdentities(state.artifacts).map((identity) =>
+      identity.opaque_handle === replacement.opaque_handle ? replacement : identity,
     ),
   );
   const manifest = { ...value.finalManifest, artifacts };
@@ -975,10 +1000,18 @@ describe('release export sink continuity', () => {
   });
 
   it.each([
-    ['missing unit carrier', (value: V3Fixture) => value.binding.mutation_units.slice(1)],
+    [
+      'missing unit carrier',
+      (value: V3Fixture): readonly ExportMutationUnitProjection[] =>
+        value.binding.mutation_units.slice(1),
+    ],
     [
       'duplicate unit carrier',
-      (value: V3Fixture) => [value.binding.mutation_units[0], value.binding.mutation_units[0]],
+      (value: V3Fixture): readonly ExportMutationUnitProjection[] => {
+        const first = value.binding.mutation_units[0];
+        if (first === undefined) throw new Error('fixture mutation unit missing');
+        return [first, first];
+      },
     ],
   ] as const)('refuses a signed v3 binding with a %s', async (_name, mutation_units) => {
     const value = await v3Fixture('required');
@@ -993,14 +1026,17 @@ describe('release export sink continuity', () => {
   });
 
   it.each([
-    ['missing elected carrier bytes', (_value: V3Fixture) => null],
+    [
+      'missing elected carrier bytes',
+      (_value: V3Fixture): ReleaseUnitMutationPortable | null => null,
+    ],
     [
       'duplicate carrier bytes',
-      (value: V3Fixture) =>
-        value.portable.get('@fixture/a') ??
-        (() => {
-          throw new Error('fixture carrier missing');
-        })(),
+      (value: V3Fixture): ReleaseUnitMutationPortable | null => {
+        const carrier = value.portable.get('@fixture/a');
+        if (carrier === undefined || carrier === null) throw new Error('fixture carrier missing');
+        return carrier;
+      },
     ],
   ] as const)(
     'refuses a complete v3 provider-result set with %s',

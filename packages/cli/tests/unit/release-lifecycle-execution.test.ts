@@ -2723,9 +2723,17 @@ describe('release lifecycle execution kernel', () => {
       code: 'release-offline-receipt-binding-invalid',
     });
 
-    const substitutedClosure = structuredClone(mutation.evidence.closure);
-    const firstMember = required(substitutedClosure.members[0], 'missing mutation closure member');
-    firstMember.sha256 = '0'.repeat(64);
+    const firstMember = required(
+      mutation.evidence.closure.members[0],
+      'missing mutation closure member',
+    );
+    const substitutedClosure = {
+      ...mutation.evidence.closure,
+      members: [
+        { ...firstMember, sha256: '0'.repeat(64) },
+        ...mutation.evidence.closure.members.slice(1),
+      ],
+    };
     const substituted = rehashReceipt(matchingReceipt, {
       release_units: matchingUnits.map((unit) => ({
         ...unit,
