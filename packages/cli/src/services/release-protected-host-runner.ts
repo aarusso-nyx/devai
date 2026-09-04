@@ -45,6 +45,8 @@ import {
   type ContainerReleaseCertificationOptions,
   type ProtectedReleasePlanMaterial,
 } from './release-certification-provider.js';
+import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
+import type { ProtectedMutationPrerequisiteClosure } from './release-certification-provider.js';
 import {
   buildReleaseMutationInputPlanV21,
   type ReleaseMutationInputControlsV21,
@@ -111,6 +113,8 @@ export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHost
     ReleaseMutationInputControlsV21,
     'execution_coverage' | 'maximum_source_bytes' | 'maximum_source_entries'
   >;
+  /** Externally protected, measured artifact bounds. This runner supplies no default. */
+  readonly mutation_limits?: ReleaseMutationArtifactLimitsV21;
   readonly certification_store: ReleaseCertificationEvidenceStoreOptions;
   readonly artifact_store: Omit<ReleaseArtifactStoreOptions, 'binding'>;
   readonly publication_signature_verifier: PublicationSignatureVerifier;
@@ -461,7 +465,7 @@ export function createProtectedReleaseHostRunner(
       'publication_signature_verifier',
       'later_stages',
     ],
-    ['producer', 'toolchain_fixture', 'mutation_inputs'],
+    ['producer', 'toolchain_fixture', 'mutation_inputs', 'mutation_limits'],
   );
   assertBoundReleaseHostPackageSnapshot(input.installed_package);
   closed(input.later_stages, ['export', 'offline_verify']);
@@ -514,6 +518,22 @@ export function createProtectedReleaseHostRunner(
   }
   const mutationInputs =
     input.mutation_inputs === undefined ? undefined : copy(input.mutation_inputs);
+  const mutationLimits =
+    input.mutation_limits === undefined ? undefined : copy(input.mutation_limits);
+  if (mutationLimits !== undefined) {
+    closed(mutationLimits, [
+      'maximum_raw_report_bytes',
+      'maximum_document_bytes',
+      'maximum_files',
+      'maximum_mutants',
+    ]);
+    if (
+      Object.values(mutationLimits as unknown as Readonly<Record<string, number>>).some(
+        (value) => !Number.isSafeInteger(value) || value < 1 || value > 0x7fffffff,
+      )
+    )
+      fail();
+  }
   if (Object.hasOwn(input, 'mutation_inputs')) {
     closed(mutationInputs, [
       'execution_coverage',
@@ -578,6 +598,17 @@ export function createProtectedReleaseHostRunner(
     plans: [material],
     content_source: git,
     evidence_sink: evidence,
+    // Required mutation is certifiable only when the host owns measured bounds and
+    // the installed producer sources. Absent either, the provider keeps refusing.
+    ...(mutationInputs === undefined || mutationLimits === undefined
+      ? {}
+      : {
+          mutation_driver: {
+            package_snapshot: input.installed_package,
+            limits: mutationLimits,
+            buildInputPlan: (prerequisites) => mutationPlan(prerequisites),
+          },
+        }),
   });
   const content: ImmutableReleaseContentSource = {
     ...git,
@@ -685,7 +716,7 @@ export function createProtectedReleaseHostRunner(
     if (activeLane !== production) fail('release-host-stage-unavailable');
     assertRequest(request);
   };
-  const mutationPlan = () => {
+  const mutationPlan = (prerequisites?: ProtectedMutationPrerequisiteClosure) => {
     if (mutationInputs === undefined)
       return fail('release-host-mutation-input-controls-unavailable');
     return buildReleaseMutationInputPlanV21({
@@ -698,6 +729,7 @@ export function createProtectedReleaseHostRunner(
         dependencies: production.execution.dependencies ?? [],
         environment: production.execution.environment,
         toolchain: production.execution.toolchain,
+        ...(prerequisites === undefined ? {} : { prerequisite_closure: prerequisites }),
         ...(fixtureSucceeded && fixtureProvider !== undefined
           ? { fixture_provider: fixtureProvider }
           : {}),

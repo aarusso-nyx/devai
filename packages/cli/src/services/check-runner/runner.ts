@@ -38,10 +38,9 @@ import type {
 } from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 15 * 60_000;
-const protectedCompletedTaskResults = new WeakMap<
-  CheckRunnerReport,
-  readonly TaskResult[]
->();
+/** Exact declaration a protected host producer must return; nothing else lifts the refusal. */
+export const PROTECTED_MUTATION_PRODUCER = 'protected-mutation-producer-v21';
+const protectedCompletedTaskResults = new WeakMap<CheckRunnerReport, readonly TaskResult[]>();
 
 function snapshotTaskResult(value: TaskResult): TaskResult {
   return Object.freeze({
@@ -452,10 +451,16 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     descriptor.tasks.map((task) => task.nodeId),
   );
   const stage = input.releaseStage ?? 'preflight';
-  // Exit codes and output digests alone cannot satisfy required mutation. Keep
-  // read-only planning and the unconditional preflight floor usable while the
-  // protected semantic evidence producer/verifier bridge is being implemented.
-  if (stage === 'certify' && input.operation === 'run' && decision.mutation !== 'none')
+  // Exit codes and output digests alone cannot satisfy required mutation. Required
+  // mutation may be planned for execution only when a protected semantic producer
+  // declares it will retain the evidence; read-only planning and the unconditional
+  // preflight floor stay usable either way.
+  if (
+    stage === 'certify' &&
+    input.operation === 'run' &&
+    decision.mutation !== 'none' &&
+    input.resolveProtectedMutationProducer?.() !== PROTECTED_MUTATION_PRODUCER
+  )
     throw new Error('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
   return {
     options: {
@@ -986,7 +991,8 @@ function* runCheckTaskSteps(
       Object.freeze(
         plan.tasks.map((task) => {
           const result = taskResults.get(task.nodeId);
-          if (result === undefined) throw new Error('CHECK_RUNNER_INTERNAL: retained task result missing');
+          if (result === undefined)
+            throw new Error('CHECK_RUNNER_INTERNAL: retained task result missing');
           return snapshotTaskResult(result);
         }),
       ),

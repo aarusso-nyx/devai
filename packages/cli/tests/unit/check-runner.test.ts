@@ -1368,6 +1368,45 @@ describe('content-addressed check runner', () => {
       }),
     ).toThrow('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
     expect(callbacks).toBe(0);
+
+    // A wrong or absent declaration is not a producer: only the exact protected
+    // host token lets required mutation be planned for execution.
+    for (const declaration of [() => 'protected-mutation-producer-v20', () => '', () => 'true']) {
+      expect(() =>
+        run(state.root, {
+          target: 'affected',
+          baseCommit: state.base,
+          releaseIntent,
+          releaseProfile: profile,
+          releaseStage: 'certify',
+          preflightReceipt: preflight.preflightReceipt?.value,
+          resolveProtectedMutationProducer: declaration,
+          executeTask: () => {
+            callbacks += 1;
+            return PASS;
+          },
+        }),
+      ).toThrow('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
+    }
+    expect(callbacks).toBe(0);
+
+    // With the protected producer declared, the same plan reaches execution and
+    // binds the roster entry to its task node.
+    const certified = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: profile,
+      releaseStage: 'certify',
+      preflightReceipt: preflight.preflightReceipt?.value,
+      resolveProtectedMutationProducer: () => 'protected-mutation-producer-v21',
+      executeTask: () => {
+        callbacks += 1;
+        return PASS;
+      },
+    });
+    expect(callbacks).toBeGreaterThan(0);
+    expect(certified.plan.releaseDecision?.mutation).not.toBe('none');
   });
 
   it('uses the exact release candidate without resolving HEAD and refuses tracked mutation', () => {

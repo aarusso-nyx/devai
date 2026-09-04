@@ -6,6 +6,7 @@ import type {
   ReleaseProvider,
   ReleaseProviderResult,
 } from './release-lifecycle-execution.js';
+import type { UnitMutationEvidenceSink } from './release-unit-mutation-evidence.js';
 import {
   verifyCertificationMaterial,
   type CertificationOutputClosure,
@@ -80,6 +81,8 @@ export interface TrustedCertificationEvidenceSink extends Pick<
   readonly protocol: 'two-phase-content-addressed';
   /** Externally protected, measured carrier bound. This module supplies no default. */
   readonly certified_evidence_carrier_maximum_bytes?: number;
+  /** Present only on a sink that also owns unit mutation custody; never inferred. */
+  readonly beginUnitMutationEvidence?: UnitMutationEvidenceSink['beginUnitMutationEvidence'];
   readonly begin: (
     bindings: readonly CertificationOutputClosureBinding[],
   ) => CertificationEvidenceTransaction | Promise<CertificationEvidenceTransaction>;

@@ -185,5 +185,11 @@ export interface CheckRunnerOptions {
   readonly readTaskOutput?: (path: string) => Buffer;
   /** Complete sealed namespace census supplied by the protected executor, not a task path list. */
   readonly capturedTaskOutputPaths?: (task: PlannedTask) => readonly string[];
+  /**
+   * Trusted host-only declaration that a protected semantic mutation producer will
+   * retain this unit's evidence. Never populated from CLI documents: a JSON profile
+   * cannot carry a function, so an ordinary `devai check` can never claim it.
+   */
+  readonly resolveProtectedMutationProducer?: () => string;
   readonly now?: () => string;
 }
