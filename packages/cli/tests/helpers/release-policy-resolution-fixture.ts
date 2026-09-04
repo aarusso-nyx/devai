@@ -141,12 +141,13 @@ function packageSnapshot(extraFiles: readonly ReleasePackageFile[] = []): Releas
     maximum_unpacked_bytes: 4 * 1024 * 1024,
   });
 }
-function oid(type: ReleaseGitObject['type'], bytes: Uint8Array): string {
-  return createHash('sha1').update(`${type} ${bytes.byteLength}\0`).update(bytes).digest('hex');
+function oid(type: ReleaseGitObject['type'], bytes: Uint8Array, format = 'sha1'): string {
+  return createHash(format).update(`${type} ${bytes.byteLength}\0`).update(bytes).digest('hex');
 }
 function git(
   files: ReadonlyMap<string, Uint8Array>,
   repository = 'aarusso-nyx/devai',
+  format: 'sha1' | 'sha256' = 'sha1',
 ): {
   readonly snapshot: ReleaseCandidateSnapshot;
   readonly objects: ReadonlyMap<string, ReleaseGitObject>;
@@ -172,7 +173,7 @@ function git(
     const entries = [...node.children]
       .map(([name, child]) => {
         if ('bytes' in child) {
-          const id = oid('blob', child.bytes);
+          const id = oid('blob', child.bytes, format);
           objects.set(id, { type: 'blob', bytes: child.bytes });
           return { name, mode: '100644', id };
         }
@@ -189,7 +190,7 @@ function git(
         Buffer.concat([Buffer.from(`${entry.mode} ${entry.name}\0`), Buffer.from(entry.id, 'hex')]),
       ),
     );
-    const id = oid('tree', bytes);
+    const id = oid('tree', bytes, format);
     objects.set(id, { type: 'tree', bytes });
     return id;
   };
@@ -197,7 +198,7 @@ function git(
   const commitBytes = Buffer.from(
     `tree ${treeId}\nauthor Fixture <fixture@example.invalid> 0 +0000\n\nfixture\n`,
   );
-  const commit = oid('commit', commitBytes);
+  const commit = oid('commit', commitBytes, format);
   objects.set(commit, { type: 'commit', bytes: commitBytes });
   return {
     snapshot: verifyReleaseCandidateSnapshot({
@@ -463,6 +464,14 @@ export function createFilesystemLifecyclePolicyFixture(input: {
 export function createLifecyclePolicyFixture(
   mutationRoster: readonly unknown[] = [],
   profileOverrides: Readonly<Record<string, unknown>> = {},
+  candidateOptions: {
+    readonly repository_id?: string;
+    readonly object_format?: 'sha1' | 'sha256';
+    readonly files?: ReadonlyMap<string, Uint8Array>;
+    readonly current_version?: string;
+    readonly target_version?: string;
+    readonly adopter_dependency?: boolean;
+  } = {},
 ): LifecyclePolicyFixture {
   const checked = packageSnapshot(
     profileOverrides['mutation_execution'] === undefined
@@ -537,7 +546,7 @@ export function createLifecyclePolicyFixture(
     ['package.json', package_json],
     ['package-lock.json', Buffer.from(JSON.stringify(candidateLock))],
   ]);
-  const candidate = git(files);
+  for (const [path, bytes] of candidateOptions.files ?? []) files.set(path, bytes);
   const toolchain = new Map(files);
   const dependency = { [PACKAGE]: VERSION };
   toolchain.set(
@@ -567,6 +576,11 @@ export function createLifecyclePolicyFixture(
         },
       }),
     ),
+  );
+  const candidate = git(
+    candidateOptions.adopter_dependency ? toolchain : files,
+    candidateOptions.repository_id,
+    candidateOptions.object_format,
   );
   const locks = verifyReleasePolicyLockfiles({
     paths: [...toolchain.keys()],
@@ -616,21 +630,25 @@ export function createLifecyclePolicyFixture(
   const expected = {
     repository: candidate.snapshot.repository,
     installed_package: checked.identity,
-    installation_origin: 'external-producer-toolchain',
-    release_unit: PACKAGE,
-    producer_toolchain,
+    installation_origin: candidateOptions.adopter_dependency
+      ? 'candidate-adopter-dependency'
+      : 'external-producer-toolchain',
+    release_unit: String(profileOverrides['release_unit'] ?? PACKAGE),
+    ...(candidateOptions.adopter_dependency ? {} : { producer_toolchain }),
   } as const;
   const resolution = resolveReleasePolicySnapshot({
     expected,
     installed_package: checked,
     candidate: candidate.snapshot,
-    producer: { files: toolchain, source: source.snapshot, build_provenance: provenance },
+    ...(candidateOptions.adopter_dependency
+      ? {}
+      : { producer: { files: toolchain, source: source.snapshot, build_provenance: provenance } }),
   });
   const intent = {
     schemaVersion: '1.0.0',
-    release_unit: PACKAGE,
-    current_version: VERSION,
-    target_version: TARGET,
+    release_unit: String(profileOverrides['release_unit'] ?? PACKAGE),
+    current_version: candidateOptions.current_version ?? VERSION,
+    target_version: candidateOptions.target_version ?? TARGET,
     support: 'current',
     change_kind: 'behavioral',
     changed_paths: ['packages/cli/src/services/release-lifecycle-execution.ts'],

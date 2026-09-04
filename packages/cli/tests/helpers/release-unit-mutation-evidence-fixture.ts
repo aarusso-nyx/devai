@@ -39,6 +39,7 @@ export async function fixture(
     notRequired?: boolean;
     binding?: Partial<UnitMutationEvidenceBinding>;
     sinkId?: string;
+    packages?: readonly { readonly packageName: string; readonly workspace: string }[];
   } = {},
 ) {
   const policy = JSON.parse(
@@ -60,14 +61,20 @@ export async function fixture(
     commit: binding.candidate_commit,
     tree: binding.candidate_tree,
   };
-  const expected = PACKAGE_NAMES.map((packageName) => ({
+  const packagesUnderTest =
+    options.packages ??
+    PACKAGE_NAMES.map((packageName) => ({
+      packageName,
+      workspace: `packages/${packageName.slice('@fixture/'.length)}`,
+    }));
+  const expected = packagesUnderTest.map(({ packageName, workspace }) => ({
     packageName,
-    workspace: `packages/${packageName.slice('@fixture/'.length)}`,
+    workspace,
     inputProjection: {
       schemaVersion: '2.1.0',
       kind: 'mutation-input-projection-v2',
       packageName,
-      workspace: `packages/${packageName.slice('@fixture/'.length)}`,
+      workspace,
       bindings: Object.fromEntries(
         [
           'source',

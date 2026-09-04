@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -9,6 +11,14 @@ import {
   type ProtectedReleasePrepareCapacityBinding,
 } from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
+import { fixture as unitMutationFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
+import {
+  finalizeUnitMutationEvidenceClosure,
+  verifyUnitMutationEvidenceDocuments,
+  type UnitMutationEvidenceBinding,
+} from '../../src/services/release-unit-mutation-evidence.js';
+import { resolveReleaseMutationRequirements } from '../../src/services/release-lifecycle-execution.js';
 import {
   createReleasePrepareProvider as createKernelReleasePrepareProvider,
   finalizeCertificationManifest,
@@ -101,11 +111,11 @@ function gitObjectId(
     .digest('hex');
 }
 
-function gitTreeEntry(mode: string, path: string, objectId: string): Buffer {
-  return Buffer.concat([Buffer.from(`${mode} ${path}\0`, 'utf8'), Buffer.from(objectId, 'hex')]);
-}
-
-function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha1') {
+function fixture(
+  generatedBytes?: Buffer,
+  objectFormat: 'sha1' | 'sha256' = 'sha1',
+  mutationProfile?: Readonly<Record<string, unknown>>,
+) {
   const packageJson = Buffer.from(
     `${JSON.stringify({ name: '@scope/demo', version: '1.2.0', files: ['dist'], main: 'dist/index.js' })}\n`,
   );
@@ -118,16 +128,27 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
     size_bytes: generated.byteLength,
   } as const;
   const packageBlobId = gitObjectId(packageJson, 'blob', objectFormat);
-  const packageTreeBytes = gitTreeEntry('100644', 'package.json', packageBlobId);
-  const packageTree = gitObjectId(packageTreeBytes, 'tree', objectFormat);
-  const demoTreeBytes = gitTreeEntry('40000', 'demo', packageTree);
-  const demoTree = gitObjectId(demoTreeBytes, 'tree', objectFormat);
-  const treeBytes = gitTreeEntry('40000', 'packages', demoTree);
-  const tree = gitObjectId(treeBytes, 'tree', objectFormat);
-  const commitBytes = Buffer.from(
-    `tree ${tree}\nauthor Release Test <release@example.invalid> 0 +0000\ncommitter Release Test <release@example.invalid> 0 +0000\n\ncandidate\n`,
+  const policy = createLifecyclePolicyFixture(
+    [],
+    {
+      ...mutationProfile,
+      release_unit: '@scope/demo',
+      version_source: 'packages/demo/package.json',
+    },
+    {
+      repository_id: 'scope/repository',
+      object_format: objectFormat,
+      files: new Map([['packages/demo/package.json', packageJson]]),
+      current_version: '1.1.0',
+      target_version: '1.2.0',
+      adopter_dependency: true,
+    },
   );
-  const commit = gitObjectId(commitBytes, 'commit', objectFormat);
+  const { commit, tree } = policy.candidate.repository;
+  const resolvers = {
+    resolve_receipt: () => policy.receipt,
+    resolve_plan_input: policy.resolve_plan_input,
+  };
   const certificationEvidenceReceipt = finalizeCertificationReceipt({
     candidate_commit: commit,
     candidate_tree: tree,
@@ -208,8 +229,8 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
     receipt_locators: [
       {
         kind: 'release-plan-receipt',
-        receipt_id: 'RPL-0000000000000000',
-        receipt_digest_sha256: '0'.repeat(64),
+        receipt_id: policy.receipt.receipt_id,
+        receipt_digest_sha256: policy.receipt.receipt_digest_sha256,
         path: 'receipts/plan.json',
       },
     ],
@@ -249,18 +270,16 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
     inputs: [{ kind: 'task-policy', path: 'task-policy/certify/selection', sha256: TASK_POLICY }],
     evidence: {
       manifest_digest_sha256: CERTIFICATION_EVIDENCE,
-      receipt_digests: ['0'.repeat(64)],
+      receipt_digests: [policy.receipt.receipt_digest_sha256],
       independently_checkable: true,
     },
     artifacts: [],
   } as unknown as ReleaseLifecycleStateV2;
   const source: ImmutableReleaseContentSource = {
     readGitObject: ({ object_id, type }) => {
-      if (type === 'commit' && object_id === commit) return commitBytes;
-      if (type === 'tree' && object_id === tree) return treeBytes;
-      if (type === 'tree' && object_id === demoTree) return demoTreeBytes;
-      if (type === 'tree' && object_id === packageTree) return packageTreeBytes;
-      throw new Error('wrong git object');
+      const object = policy.objects.get(object_id);
+      if (object === undefined || object.type !== type) throw new Error('wrong git object');
+      return Buffer.from(object.bytes);
     },
     readGitBlob: ({ object_id }) => {
       if (object_id !== packageBlobId) throw new Error('wrong git object');
@@ -295,7 +314,16 @@ function fixture(generatedBytes?: Buffer, objectFormat: 'sha1' | 'sha256' = 'sha
       return generated;
     },
   };
-  return { packageJson, generated, certificationManifest, request, state, source };
+  return {
+    packageJson,
+    generated,
+    certificationManifest,
+    request,
+    state,
+    source,
+    policy,
+    resolvers,
+  };
 }
 
 function memorySink(
@@ -368,6 +396,66 @@ function fixtureWithGeneratedPath(path: string) {
       }),
     },
   };
+}
+
+async function mutationFixture(rosterFault?: 'omitted-package' | 'substituted-package') {
+  const adoption = JSON.parse(
+    readFileSync(
+      resolve(import.meta.dirname, '../../../../law/policy/devai-adoption.json'),
+      'utf8',
+    ),
+  ) as {
+    release_verification: Record<string, unknown> & {
+      mutation_roster: Array<{ package: string; manifest_path: string }>;
+    };
+  };
+  const profile = adoption.release_verification;
+  const value = fixture(undefined, 'sha1', profile);
+  const required = resolveReleaseMutationRequirements(value.request, value.resolvers)[0];
+  if (required?.binding === null || required?.binding === undefined)
+    throw new Error('fixture requires mutation');
+  const binding: UnitMutationEvidenceBinding = {
+    ...required.binding,
+    task_policy_digests_sha256: [TASK_POLICY],
+  };
+  const packages = profile.mutation_roster.map((row) => ({
+    packageName: row.package,
+    workspace: dirname(row.manifest_path),
+  }));
+  if (rosterFault === 'omitted-package') packages.pop();
+  if (rosterFault === 'substituted-package')
+    packages[0] = { packageName: '@fixture/substituted', workspace: 'packages/substituted' };
+  const evidence = await unitMutationFixture({ binding, packages });
+  const unit = value.state.release_units[0];
+  if (unit === undefined) throw new Error('fixture release unit missing');
+  Object.assign(unit, { mutation_evidence: structuredClone(evidence.closure) });
+  const source = {
+    ...value.source,
+    unit_mutation_maximum_bytes: 1_000_000,
+    readUnitMutationEvidenceClosure: vi.fn((selected: UnitMutationEvidenceBinding) => {
+      expect(selected).toEqual(binding);
+      return structuredClone(evidence.closure);
+    }),
+    readUnitMutationEvidenceReceipt: vi.fn(
+      (selected: { evidence_sink_id: string; receipt_digest_sha256: string }) => {
+        expect(selected).toEqual({
+          evidence_sink_id: evidence.closure.output_contract.evidence_sink_id,
+          receipt_digest_sha256: evidence.closure.receipt.receipt_digest_sha256,
+        });
+        return structuredClone(evidence.closure.receipt);
+      },
+    ),
+    readUnitMutationEvidenceBlob: vi.fn(
+      (selected: {
+        binding: UnitMutationEvidenceBinding;
+        identity: Parameters<typeof evidence.read>[0];
+      }) => {
+        expect(selected.binding).toEqual(binding);
+        return evidence.read(selected.identity);
+      },
+    ),
+  } satisfies ImmutableReleaseContentSource;
+  return { value, source, evidence, binding, profile };
 }
 
 function preparedTarball(
@@ -447,11 +535,13 @@ describe('pure release prepare kernel', () => {
     const first = memorySink();
     const second = memorySink();
     const firstResult = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: first.sink,
     })(value.request);
     const secondResult = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: second.sink,
@@ -510,6 +600,7 @@ describe('pure release prepare kernel', () => {
     const value = fixture(undefined, 'sha256');
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: target.sink,
@@ -532,6 +623,7 @@ describe('pure release prepare kernel', () => {
       }
       const locator = generated.immutable_blob_locator;
       const result = await createReleasePrepareProvider({
+        ...value.resolvers,
         certified_state: value.state,
         content_source: {
           ...value.source,
@@ -559,6 +651,7 @@ describe('pure release prepare kernel', () => {
     const value = fixture();
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: target.sink,
@@ -643,6 +736,7 @@ describe('pure release prepare kernel', () => {
     const value = fixture(Buffer.alloc(140_000, 0xa5));
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: target.sink,
@@ -676,6 +770,7 @@ describe('pure release prepare kernel', () => {
       readGeneratedBlob: vi.fn(value.source.readGeneratedBlob),
     };
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: source,
       artifact_sink: undefined as never,
@@ -719,6 +814,7 @@ describe('pure release prepare kernel', () => {
     mutate(value);
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: target.sink,
@@ -734,6 +830,7 @@ describe('pure release prepare kernel', () => {
       const value = fixture(generated);
       const target = memorySink();
       const result = await createReleasePrepareProvider({
+        ...value.resolvers,
         certified_state: value.state,
         content_source: value.source,
         artifact_sink: target.sink,
@@ -762,6 +859,7 @@ describe('pure release prepare kernel', () => {
       finalizeCertificationManifest(draft).manifest_digest_sha256;
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: target.sink,
@@ -790,6 +888,7 @@ describe('pure release prepare kernel', () => {
       finalizeCertificationManifest(draft).manifest_digest_sha256;
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: {
         ...value.source,
@@ -850,6 +949,7 @@ describe('pure release prepare kernel', () => {
       const archivePath = `package/${path}`;
       const target = memorySink();
       const result = await createReleasePrepareProvider({
+        ...value.resolvers,
         certified_state: value.state,
         content_source: source,
         artifact_sink: target.sink,
@@ -904,6 +1004,7 @@ describe('pure release prepare kernel', () => {
       const { value, source } = fixtureWithGeneratedPath(path);
       const target = memorySink();
       const result = await createReleasePrepareProvider({
+        ...value.resolvers,
         certified_state: value.state,
         content_source: source,
         artifact_sink: target.sink,
@@ -920,6 +1021,7 @@ describe('pure release prepare kernel', () => {
     const value = fixture();
     const corrupt = memorySink({ corruptPut: true });
     const refused = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: corrupt.sink,
@@ -932,6 +1034,7 @@ describe('pure release prepare kernel', () => {
 
     const failing = memorySink({ failCommit: true });
     const staged = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: failing.sink,
@@ -948,6 +1051,7 @@ describe('pure release prepare kernel', () => {
     const value = fixture();
     const target = memorySink();
     const result = await createReleasePrepareProvider({
+      ...value.resolvers,
       certified_state: value.state,
       content_source: value.source,
       artifact_sink: target.sink,
@@ -986,6 +1090,7 @@ describe('pure release prepare kernel', () => {
       const value = fixture();
       const target = memorySink();
       const result = await createReleasePrepareProvider({
+        ...value.resolvers,
         certified_state: value.state,
         content_source: value.source,
         artifact_sink: target.sink,
@@ -1039,4 +1144,219 @@ describe('pure release prepare kernel', () => {
       await result.transaction?.rollback();
     },
   );
+});
+
+describe('verified mutation continuity through prepare (ADR-MUT-0008 IA-001 through IA-004)', () => {
+  it.each(['omitted-package', 'substituted-package'] as const)(
+    'refuses semantically valid %s census against the genuine ten-package profile',
+    async (rosterFault) => {
+      const { value, source, evidence, binding, profile } = await mutationFixture(rosterFault);
+      expect(profile.mutation_roster).toHaveLength(10);
+      expect(evidence.closure.receipt.referent.release_profile_digest_sha256).toBe(
+        resolveReleaseMutationRequirements(value.request, value.resolvers)[0]?.binding
+          ?.release_profile_digest_sha256,
+      );
+      expect(
+        evidence.closure.members.filter(
+          (member) => member.document_kind === 'mutation-package-result-v2',
+        ),
+      ).toHaveLength(rosterFault === 'omitted-package' ? 9 : 10);
+      await expect(
+        verifyUnitMutationEvidenceDocuments({
+          closure: evidence.closure,
+          expected: binding,
+          read: evidence.read,
+          maximum_bytes: 1_000_000,
+        }),
+      ).resolves.toBeUndefined();
+      const target = memorySink();
+      const result = await createReleasePrepareProvider({
+        ...value.resolvers,
+        certified_state: value.state,
+        content_source: source,
+        artifact_sink: target.sink,
+      })(value.request);
+      expect(result).toMatchObject({
+        outcome: 'failure',
+        code: 'release-certification-generated-output-untrusted',
+      });
+      expect(target.begin).not.toHaveBeenCalled();
+    },
+  );
+
+  it('retains all ten internal package pairs on one unit while preserving the exact one-package tarball', async () => {
+    const { value, source, evidence, profile } = await mutationFixture();
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      ...value.resolvers,
+      certified_state: value.state,
+      content_source: source,
+      artifact_sink: target.sink,
+    })(value.request);
+    expect(result.outcome).toBe('success');
+    expect(result.material?.release_units).toHaveLength(1);
+    expect(result.material?.release_units[0]?.packages).toHaveLength(1);
+    expect(result.material?.release_units[0]?.mutation_evidence).toEqual(evidence.closure);
+    expect(result.material?.release_units[0]?.mutation_evidence?.members).toHaveLength(22);
+    const labels = evidence.closure.members
+      .filter((member) => member.document_kind === 'mutation-package-result-v2')
+      .map((member) => member.package_name)
+      .sort();
+    expect(labels).toEqual(profile.mutation_roster.map((row) => row.package).sort());
+    expect(labels).toHaveLength(10);
+    expect(source.readUnitMutationEvidenceClosure).toHaveBeenCalledOnce();
+    expect(source.readUnitMutationEvidenceReceipt).toHaveBeenCalledOnce();
+    expect(source.readUnitMutationEvidenceBlob).toHaveBeenCalledTimes(23);
+    const tarball = preparedTarball(result, target);
+    expect(sha256(tarball)).toBe(
+      '6dde079d83213ddaa496e9d130ccc9839285efe792e0b098596393ec6a109d0e',
+    );
+    expect(tarEntries(tarball)).toEqual([
+      { path: 'package/dist/index.js', mode: 0o755, bytes: value.generated },
+      { path: 'package/package.json', mode: 0o644, bytes: value.packageJson },
+    ]);
+    expect(result.material?.artifacts.map((artifact) => artifact.kind).sort()).toEqual([
+      'package-manifest',
+      'package-sbom',
+      'package-tarball',
+    ]);
+    expect(result.material?.release_units[0]?.packages[0]?.certification_manifest?.entries).toEqual(
+      value.certificationManifest.entries,
+    );
+    await result.transaction?.commit();
+  });
+
+  it('forbids a mutation carrier for a genuinely verified none plan without calling its readers', async () => {
+    const required = await mutationFixture();
+    const value = fixture();
+    expect(
+      resolveReleaseMutationRequirements(value.request, value.resolvers)[0]?.binding,
+    ).toBeNull();
+    Object.assign(value.state.release_units[0] ?? {}, {
+      mutation_evidence: required.evidence.closure,
+    });
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      ...value.resolvers,
+      certified_state: value.state,
+      content_source: { ...required.source, ...value.source },
+      artifact_sink: target.sink,
+    })(value.request);
+    expect(result).toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-generated-output-untrusted',
+    });
+    expect(target.begin).not.toHaveBeenCalled();
+    expect(required.source.readUnitMutationEvidenceClosure).not.toHaveBeenCalled();
+    expect(required.source.readUnitMutationEvidenceReceipt).not.toHaveBeenCalled();
+    expect(required.source.readUnitMutationEvidenceBlob).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'carrier',
+    'closure-reader',
+    'receipt-reader',
+    'blob-reader',
+    'bound',
+    'invalid-bound',
+  ] as const)(
+    'refuses missing or invalid required %s before ArtifactSink effects',
+    async (missing) => {
+      const { value, source } = await mutationFixture();
+      if (missing === 'carrier')
+        Object.assign(value.state.release_units[0] ?? {}, { mutation_evidence: null });
+      else if (missing === 'closure-reader')
+        Object.assign(source, { readUnitMutationEvidenceClosure: undefined });
+      else if (missing === 'receipt-reader')
+        Object.assign(source, { readUnitMutationEvidenceReceipt: undefined });
+      else if (missing === 'blob-reader')
+        Object.assign(source, { readUnitMutationEvidenceBlob: undefined });
+      else
+        Object.assign(source, { unit_mutation_maximum_bytes: missing === 'bound' ? undefined : 0 });
+      const target = memorySink();
+      const result = await createReleasePrepareProvider({
+        ...value.resolvers,
+        certified_state: value.state,
+        content_source: source,
+        artifact_sink: target.sink,
+      })(value.request);
+      expect(result).toMatchObject({
+        outcome: 'failure',
+        code: 'release-certification-generated-output-untrusted',
+      });
+      expect(target.begin).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    'missing-bytes',
+    'corrupt-bytes',
+    'stale-binding',
+    'wrong-receipt',
+    'sink-substitute',
+  ] as const)('refuses required %s before ArtifactSink effects', async (fault) => {
+    const { value, source, evidence, binding } = await mutationFixture();
+    if (fault === 'missing-bytes') evidence.objects.delete(evidence.closure.output_contract.sha256);
+    else if (fault === 'corrupt-bytes') {
+      const original = evidence.objects.get(evidence.closure.output_contract.sha256);
+      if (original === undefined) throw new Error('fixture contract missing');
+      const corrupt = Buffer.from(original);
+      corrupt[0] = 0;
+      evidence.objects.set(evidence.closure.output_contract.sha256, corrupt);
+    } else if (fault === 'stale-binding') {
+      source.readUnitMutationEvidenceClosure.mockImplementation(() =>
+        finalizeUnitMutationEvidenceClosure(
+          { ...binding, candidate_commit: '0'.repeat(40) },
+          evidence.projection,
+        ),
+      );
+    } else if (fault === 'wrong-receipt') {
+      source.readUnitMutationEvidenceReceipt.mockImplementation(() => ({
+        ...evidence.closure.receipt,
+        receipt_digest_sha256: '0'.repeat(64),
+      }));
+    } else {
+      const projection = {
+        ...evidence.projection,
+        output_contract: {
+          ...evidence.projection.output_contract,
+          evidence_sink_id: 'foreign-sink',
+        },
+        members: evidence.projection.members.map((member) => ({
+          ...member,
+          evidence_sink_id: 'foreign-sink',
+        })),
+      };
+      source.readUnitMutationEvidenceClosure.mockImplementation(() =>
+        finalizeUnitMutationEvidenceClosure(binding, projection),
+      );
+    }
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      ...value.resolvers,
+      certified_state: value.state,
+      content_source: source,
+      artifact_sink: target.sink,
+    })(value.request);
+    expect(result).toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-generated-output-untrusted',
+    });
+    expect(target.begin).not.toHaveBeenCalled();
+  });
+
+  it('refuses missing plan resolvers even when the fixture plan requires no mutation', async () => {
+    const value = fixture();
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      certified_state: value.state,
+      content_source: value.source,
+      artifact_sink: target.sink,
+    })(value.request);
+    expect(result).toMatchObject({
+      outcome: 'failure',
+      code: 'release-receipt-provider-unavailable',
+    });
+    expect(target.begin).not.toHaveBeenCalled();
+  });
 });
