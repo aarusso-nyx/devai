@@ -39,6 +39,7 @@ const state = vi.hoisted((): MutationContainerTransportState => ({
   outer_status: 0,
   id: undefined,
   workspace_volume: undefined,
+  nano_cpus: undefined,
   mounts: [],
   launch: undefined,
   mutable_program_mount: false,
@@ -214,6 +215,7 @@ afterEach(() => {
   state.outer_status = 0;
   state.id = undefined;
   state.workspace_volume = undefined;
+  state.nano_cpus = undefined;
   state.mounts = [];
   state.launch = undefined;
   state.mutable_program_mount = false;
@@ -312,6 +314,119 @@ describe('protected mutation-program container transport', () => {
       expect(Object.isFrozen(executables)).toBe(true);
       expect(() => Object.assign(executables, { node: 'substituted' })).toThrow();
       expectCleanup();
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses whole public identity replacement before a mutation-program container effect', () => {
+    const value = fixture();
+    const other = new ProtectedCertificationContainer(
+      { ...value.controls, engine_version: 'distinct-fixture-engine' },
+      [],
+    );
+    try {
+      expect(other.identity).not.toEqual(value.container.identity);
+      executionAssertion.mockImplementation((_program, captured) => {
+        expect(captured.container_identity).toEqual(other.identity);
+      });
+      // TypeScript readonly alone does not prevent this runtime replacement.
+      expect(() =>
+        Object.defineProperty(value.container, 'identity', {
+          value: other.identity,
+          writable: true,
+          configurable: true,
+        }),
+      ).toThrow();
+      expect(state.calls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('derives the public identity from the exact captured controls used for container launch', () => {
+    const value = fixture();
+    let reads = 0;
+    const controls = Object.defineProperty({ ...value.controls }, 'cpus', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? 2 : 1;
+      },
+    }) as ProtectedContainerControls;
+    try {
+      const container = new ProtectedCertificationContainer(controls, []);
+      expect(container.identity).toMatchObject({ cpus: 2 });
+      expect(reads).toBe(1);
+      const result = invoke({ ...value, container, mutation_program: undefined });
+      expect(result.result).toMatchObject({ status: 0 });
+      const create = state.calls.find((args) => args.includes('create') && args.includes('--cpus'));
+      expect(create).toContain('--cpus');
+      expect(create?.[create.indexOf('--cpus') + 1]).toBe('2');
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('samples a mutation program selector once, so an absent first value remains the ordinary route', () => {
+    const value = fixture();
+    let reads = 0;
+    const input = Object.defineProperty(
+      {
+        task: plannedTask(value.controls),
+        timeout_ms: 1_000,
+        environment: {},
+        source: [SOURCE],
+        prior_outputs: new Map<string, ContainerArchiveEntry>(),
+        declared_outputs: [],
+      },
+      'mutation_program',
+      {
+        enumerable: true,
+        get() {
+          reads += 1;
+          return reads === 1 ? undefined : program;
+        },
+      },
+    );
+    try {
+      const result = value.container.runBound(
+        {
+          action_id: 'release preflight',
+          repository: { id: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+          task_policy_digest_sha256: 'c'.repeat(64),
+          plan_receipt_digest_sha256: 'd'.repeat(64),
+          helper_identity_sha256: 'e'.repeat(64),
+        },
+        () => value.container.execute(input),
+      );
+      expect(reads).toBe(1);
+      expect(result).not.toHaveProperty('mutation_observation');
+      expect(() => captureProtectedMutationExecution(result, program)).toThrow(
+        'release-certification-mutation-program-invalid',
+      );
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('copies mutation source through intrinsic array iteration before callbacks can replace map', () => {
+    const value = fixture();
+    const source = [SOURCE];
+    Object.defineProperty(source, 'map', {
+      value: () => {
+        throw new Error('caller-controlled-source-map');
+      },
+    });
+    try {
+      const result = invoke({ ...value, mutation_program: program, source });
+      expect(result.result).toMatchObject({ status: 0 });
+      expect(executionAssertion).toHaveBeenCalledExactlyOnceWith(program, {
+        container_identity: value.container.identity,
+        environment: protectedContainerTaskEnvironment({}),
+        source: [SOURCE],
+        prior_outputs: new Map(),
+      });
     } finally {
       rmSync(value.root, { recursive: true, force: true });
     }

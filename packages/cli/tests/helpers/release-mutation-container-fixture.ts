@@ -25,6 +25,7 @@ export interface MutationContainerTransportState {
   outer_status: number;
   id: string | undefined;
   workspace_volume: string | undefined;
+  nano_cpus: number | undefined;
   mounts: {
     Type: 'volume';
     Name: string;
@@ -133,6 +134,7 @@ export function createMutationContainerTransportFixture(input: {
     outer_status: input.outer_status ?? 0,
     id: undefined,
     workspace_volume: undefined,
+    nano_cpus: undefined,
     mounts: [],
     launch: undefined,
     mutable_program_mount: false,
@@ -149,6 +151,8 @@ export function createMutationContainerTransportFixture(input: {
         state.workspace_volume = state.mounts.find(
           (mount) => mount.Destination === '/workspace',
         )?.Name;
+        const cpus = command[command.indexOf('--cpus') + 1];
+        state.nano_cpus = cpus === undefined ? undefined : Number(cpus) * 1_000_000_000;
         const encoded = command.at(-1);
         if (encoded === undefined) throw new Error('fixture mutation launch missing');
         state.launch = JSON.parse(encoded) as Record<string, unknown>;
@@ -195,7 +199,7 @@ export function createMutationContainerTransportFixture(input: {
                 RestartPolicy: { Name: 'no' },
                 Memory: 64 * 1024 * 1024,
                 MemorySwap: 64 * 1024 * 1024,
-                NanoCpus: 1_000_000_000,
+                NanoCpus: state.nano_cpus ?? 1_000_000_000,
                 PidsLimit: 2,
                 CapDrop: ['ALL'],
                 SecurityOpt: ['no-new-privileges'],
