@@ -48,6 +48,7 @@ import {
   resolveAdopterPolicyMaterialization,
   type JsonObject,
 } from '../services/adopter-policy.js';
+import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
 
 const DEFAULT_REPO_ROOT = '.';
 const DEFAULT_CHAIN_RELATIVE = 'record/proofs/chain.json';
@@ -205,67 +206,12 @@ function checkPolicyMaterializationCurrent(repoRoot: string): CheckResult {
   };
 }
 
-interface AdopterPolicyBinding {
-  readonly schemaVersion: '1.0.0';
-  readonly policy_id: string;
-  readonly policy_version: string;
-  readonly source_path: string;
-  readonly source_digest_sha256: string;
-  readonly materialized: Readonly<Record<string, string>>;
-}
-
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
 
 function policyReasonId(words: string): string {
   return words.toUpperCase().replaceAll('-', '_');
-}
-
-function parseAdopterPolicyBinding(
-  bytes: string,
-):
-  | { readonly binding: AdopterPolicyBinding }
-  | { readonly reason: 'BINDING_MALFORMED' | 'BINDING_VERSION_UNSUPPORTED' } {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes);
-  } catch {
-    return { reason: 'BINDING_MALFORMED' };
-  }
-  if (!isJsonObject(parsed)) return { reason: 'BINDING_MALFORMED' };
-  if (parsed['schemaVersion'] !== '1.0.0') return { reason: 'BINDING_VERSION_UNSUPPORTED' };
-  const bindingKeys = [
-    'materialized',
-    'policy_id',
-    'policy_version',
-    'schemaVersion',
-    'source_digest_sha256',
-    'source_path',
-  ];
-  if (
-    Object.keys(parsed).length !== bindingKeys.length ||
-    bindingKeys.some((key) => !(key in parsed))
-  ) {
-    return { reason: 'BINDING_MALFORMED' };
-  }
-  const materialized = parsed['materialized'];
-  const digest = /^[a-f0-9]{64}$/u;
-  if (
-    typeof parsed['policy_id'] !== 'string' ||
-    parsed['policy_id'].length === 0 ||
-    typeof parsed['policy_version'] !== 'string' ||
-    parsed['policy_version'].length === 0 ||
-    typeof parsed['source_path'] !== 'string' ||
-    parsed['source_path'].length === 0 ||
-    typeof parsed['source_digest_sha256'] !== 'string' ||
-    !digest.test(parsed['source_digest_sha256']) ||
-    !isJsonObject(materialized) ||
-    !Object.values(materialized).every((value) => typeof value === 'string' && digest.test(value))
-  ) {
-    return { reason: 'BINDING_MALFORMED' };
-  }
-  return { binding: parsed as unknown as AdopterPolicyBinding };
 }
 
 function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string): CheckResult {
