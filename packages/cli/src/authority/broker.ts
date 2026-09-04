@@ -22,6 +22,9 @@ import {
   protectedReleaseHostEffect,
   protectedArtifactSinkHostEffect,
   protectedReleaseBoundaryAdapterId,
+  assertProtectedReleasePrepareCapacityEffect,
+  type ProtectedReleasePrepareCapacityBinding,
+  type ProtectedReleasePrepareCapacity,
 } from '@devai-nyx/authority';
 import {
   computeManifestHash,
@@ -1016,6 +1019,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     now: () => new Date().toISOString(),
     receipt_ttl_ms: 30_000,
   }) as JsonRecord;
+  let disposed = false;
   let effectApply: (() => unknown) | undefined;
   let exactUnitApply: (() => unknown) | undefined;
   let effectResult: unknown;
@@ -1117,6 +1121,84 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             invocation_id: invocationId,
           }),
         );
+  const boundedPlanDigest = boundedPlan === undefined ? undefined : canonicalSha256(boundedPlan);
+  let prepareRequestDigest: string | undefined;
+  const readPrepareCapacity = (
+    binding: ProtectedReleasePrepareCapacityBinding,
+  ): ProtectedReleasePrepareCapacity => {
+    try {
+      if (
+        disposed ||
+        input.entry.name !== 'release prepare' ||
+        input.entry.effects !== 'local-write' ||
+        input.role !== 'architect' ||
+        !input.argv.includes('--write') ||
+        binding.action_id !== input.entry.name ||
+        binding.repository.id !== sources.repository_id ||
+        boundedPlan === undefined ||
+        boundedPlanHandle === undefined ||
+        canonicalSha256(boundedPlan) !== boundedPlanDigest ||
+        canonicalSha256(actionPlanner) !==
+          canonicalSha256({
+            kind: 'bounded-batches',
+            planner_id: 'release-prepare-bounded-plan',
+            target_kinds: ['fs', 'artifact-sink'],
+            bounds: { max_batches: 256, max_targets_per_batch: 64, max_total_targets: 8192 },
+            recovery: 'preserve-and-report',
+          })
+      )
+        throw new Error('release-prepare-capacity-unavailable');
+      const requestPath = flagValue(input.argv, '--request');
+      if (requestPath === undefined) throw new Error('release-prepare-capacity-unavailable');
+      const request = JSON.parse(readFileSync(resolve(requestPath), 'utf8')) as unknown;
+      if (
+        !isRecord(request) ||
+        request.action_id !== binding.action_id ||
+        canonicalSha256(request.repository_locator) !== canonicalSha256(binding.repository) ||
+        !isRecord(request.candidate_locator) ||
+        request.candidate_locator.commit !== binding.candidate.commit ||
+        request.candidate_locator.tree !== binding.candidate.tree ||
+        !Array.isArray(request.receipt_locators)
+      )
+        throw new Error('release-prepare-capacity-unavailable');
+      const planReceipts = request.receipt_locators.filter(
+        (locator: unknown): locator is JsonRecord =>
+          isRecord(locator) && locator.kind === 'release-plan-receipt',
+      );
+      const requestDigest = canonicalSha256(request);
+      if (
+        planReceipts.length !== 1 ||
+        planReceipts[0]?.receipt_digest_sha256 !== binding.plan_receipt_digest_sha256 ||
+        (prepareRequestDigest !== undefined && requestDigest !== prepareRequestDigest)
+      )
+        throw new Error('release-prepare-capacity-unavailable');
+      const recovery = expectSuccess<JsonRecord>(
+        (plannerRegistry.recovery as (value: unknown) => unknown)({
+          plan_handle: boundedPlanHandle,
+        }),
+      );
+      const batches = recovery.applied_batch_ids;
+      const targets = recovery.applied_target_count;
+      if (
+        !Array.isArray(batches) ||
+        batches.some((batch: unknown) => typeof batch !== 'string' || batch.length === 0) ||
+        new Set(batches).size !== batches.length ||
+        batches.length > boundedPlan.bounds.max_batches ||
+        typeof targets !== 'number' ||
+        !Number.isSafeInteger(targets) ||
+        targets < batches.length ||
+        targets > boundedPlan.bounds.max_total_targets
+      )
+        throw new Error('release-prepare-capacity-unavailable');
+      prepareRequestDigest = requestDigest;
+      return Object.freeze({
+        remaining_batches: boundedPlan.bounds.max_batches - batches.length,
+        remaining_targets: boundedPlan.bounds.max_total_targets - targets,
+      });
+    } catch {
+      throw new Error('release-prepare-capacity-unavailable');
+    }
+  };
   const exactEffects: CapturedFilesystemEffect[] = [];
   const descriptorTargets = new Map<number, JsonRecord>();
 
@@ -1130,6 +1212,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     target: JsonRecord,
     apply: () => unknown,
   ): unknown => {
+    assertProtectedReleasePrepareCapacityEffect(issuer);
     effectCounter += 1;
     if (target.kind === 'fs') {
       const canonicalPath = String(target.canonical_relative_path ?? '');
@@ -1340,6 +1423,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   };
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
+    assertProtectedReleasePrepareCapacityEffect(issuer);
     if (request.kind === 'protected-release') {
       const operation =
         protectedReleaseHostEffect(request) ?? protectedArtifactSinkHostEffect(request);
@@ -1895,6 +1979,9 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       effect: input.entry.effects,
       receipt_store: issuer,
       apply_effect: applyEffect,
+      ...(input.entry.name === 'release prepare'
+        ? { read_prepare_capacity: readPrepareCapacity }
+        : {}),
     }),
     ...(sessionOperation === undefined ? {} : { session_operation: sessionOperation }),
     ...(policyMaterialization === undefined
@@ -2009,6 +2096,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       });
     },
     dispose: () => {
+      disposed = true;
       if (typeof runtime.dispose === 'function') runtime.dispose();
       else if (typeof issuer.dispose === 'function') issuer.dispose();
     },

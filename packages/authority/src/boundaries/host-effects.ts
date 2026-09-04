@@ -48,6 +48,10 @@ export interface AuthorityHostEffectScope {
   readonly effect: 'read' | 'harness-write' | 'local-write' | 'remote-write';
   readonly receipt_store: object;
   readonly apply_effect: (request: AuthorityHostEffectRequest, apply: () => unknown) => unknown;
+  /** Installed by the prepare broker only; reads its existing bounded-plan account. */
+  readonly read_prepare_capacity?: (
+    binding: ProtectedReleasePrepareCapacityBinding,
+  ) => ProtectedReleasePrepareCapacity;
 }
 
 export interface AuthorityHostEffectRequest {
@@ -62,6 +66,179 @@ export interface AtomicAuthorityHostEffect {
 }
 
 const scopes = new AsyncLocalStorage<AuthorityHostEffectScope>();
+
+export interface ProtectedReleasePrepareCapacityBinding {
+  readonly action_id: 'release prepare';
+  readonly repository: { readonly id: string; readonly commit: string; readonly tree: string };
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly plan_receipt_digest_sha256: string;
+}
+
+export interface ProtectedReleasePrepareCapacity {
+  readonly remaining_batches: number;
+  readonly remaining_targets: number;
+}
+
+interface PrepareCapacitySequence {
+  readonly scope: AuthorityHostEffectScope;
+  readonly binding: ProtectedReleasePrepareCapacityBinding;
+  readonly reader: NonNullable<AuthorityHostEffectScope['read_prepare_capacity']>;
+  active: boolean;
+}
+
+const prepareCapacityContexts = new AsyncLocalStorage<PrepareCapacitySequence>();
+const prepareCapacityAccounts = new WeakMap<object, PrepareCapacitySequence>();
+
+function capacityRecord(value: unknown, keys: readonly string[]): Record<string, unknown> {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value) as object | null) ||
+    Reflect.ownKeys(value).length !== keys.length ||
+    keys.some((key) => !Object.hasOwn(value, key)) ||
+    Object.values(Object.getOwnPropertyDescriptors(value)).some(
+      (descriptor) => !Object.hasOwn(descriptor, 'value'),
+    )
+  )
+    throw new Error('release-prepare-capacity-unavailable');
+  return value as Record<string, unknown>;
+}
+
+function prepareCapacityBinding(value: unknown): ProtectedReleasePrepareCapacityBinding {
+  try {
+    const binding = capacityRecord(value, [
+      'action_id',
+      'repository',
+      'candidate',
+      'plan_receipt_digest_sha256',
+    ]);
+    const repository = capacityRecord(binding['repository'], ['id', 'commit', 'tree']);
+    const candidate = capacityRecord(binding['candidate'], ['commit', 'tree']);
+    const objects = [
+      repository['commit'],
+      repository['tree'],
+      candidate['commit'],
+      candidate['tree'],
+    ];
+    if (
+      binding['action_id'] !== 'release prepare' ||
+      typeof repository['id'] !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/u.test(repository['id']) ||
+      objects.some(
+        (value) => typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+      ) ||
+      new Set(objects.map((value) => (value as string).length)).size !== 1 ||
+      typeof binding['plan_receipt_digest_sha256'] !== 'string' ||
+      !/^[0-9a-f]{64}$/u.test(binding['plan_receipt_digest_sha256'])
+    )
+      throw new Error('release-prepare-capacity-unavailable');
+    return Object.freeze({
+      action_id: 'release prepare',
+      repository: Object.freeze({
+        id: repository['id'],
+        commit: repository['commit'] as string,
+        tree: repository['tree'] as string,
+      }),
+      candidate: Object.freeze({
+        commit: candidate['commit'] as string,
+        tree: candidate['tree'] as string,
+      }),
+      plan_receipt_digest_sha256: binding['plan_receipt_digest_sha256'],
+    });
+  } catch {
+    throw new Error('release-prepare-capacity-unavailable');
+  }
+}
+
+function readPrepareCapacity(sequence: PrepareCapacitySequence): ProtectedReleasePrepareCapacity {
+  try {
+    const capacity = capacityRecord(sequence.reader(sequence.binding), [
+      'remaining_batches',
+      'remaining_targets',
+    ]);
+    const batches = capacity['remaining_batches'];
+    const targets = capacity['remaining_targets'];
+    if (
+      typeof batches !== 'number' ||
+      !Number.isSafeInteger(batches) ||
+      batches < 0 ||
+      batches > 256 ||
+      typeof targets !== 'number' ||
+      !Number.isSafeInteger(targets) ||
+      targets < 0 ||
+      targets > 8192
+    )
+      throw new Error('release-prepare-capacity-unavailable');
+    return Object.freeze({ remaining_batches: batches, remaining_targets: targets });
+  } catch {
+    throw new Error('release-prepare-capacity-unavailable');
+  }
+}
+
+/** Final host/broker guard: exclusivity grants no target, effect, or publication authority. */
+export function assertProtectedReleasePrepareCapacityEffect(receiptStore: object): void {
+  const sequence = prepareCapacityAccounts.get(receiptStore);
+  if (
+    sequence !== undefined &&
+    (!sequence.active ||
+      prepareCapacityContexts.getStore() !== sequence ||
+      scopes.getStore() !== sequence.scope ||
+      issuerState(receiptStore)?.closed !== false)
+  )
+    throw new Error('release-prepare-capacity-unavailable');
+}
+
+/** One prepare sequence per live account, including terminal bookkeeping and lock cleanup. */
+export async function withProtectedReleasePrepareCapacity<T>(
+  binding: ProtectedReleasePrepareCapacityBinding,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const scope = scopes.getStore();
+  const selected = prepareCapacityBinding(binding);
+  if (
+    scope?.action_id !== 'release prepare' ||
+    scope.effect !== 'local-write' ||
+    typeof callback !== 'function' ||
+    typeof scope.read_prepare_capacity !== 'function' ||
+    issuerState(scope.receipt_store)?.closed !== false ||
+    issuerState(scope.receipt_store)?.invocation_id !== scope.invocation_id ||
+    prepareCapacityAccounts.has(scope.receipt_store)
+  )
+    throw new Error('release-prepare-capacity-unavailable');
+  const sequence: PrepareCapacitySequence = {
+    scope,
+    binding: selected,
+    reader: scope.read_prepare_capacity,
+    active: true,
+  };
+  // Validate the broker/account binding without caching an allowance. The kernel reads again
+  // after startup and complete package verification, immediately before its first sink effect.
+  readPrepareCapacity(sequence);
+  prepareCapacityAccounts.set(scope.receipt_store, sequence);
+  try {
+    return await prepareCapacityContexts.run(sequence, callback);
+  } finally {
+    // Retain the closed account marker: escaped descendants cannot reuse or reset its budget.
+    sequence.active = false;
+  }
+}
+
+/** Fresh read of the protected account, available only inside its exact live sequence. */
+export function readProtectedReleasePrepareCapacity(
+  binding: ProtectedReleasePrepareCapacityBinding,
+): ProtectedReleasePrepareCapacity {
+  const selected = prepareCapacityBinding(binding);
+  const sequence = prepareCapacityContexts.getStore();
+  if (
+    sequence === undefined ||
+    prepareCapacityAccounts.get(sequence.scope.receipt_store) !== sequence ||
+    JSON.stringify(selected) !== JSON.stringify(sequence.binding)
+  )
+    throw new Error('release-prepare-capacity-unavailable');
+  assertProtectedReleasePrepareCapacityEffect(sequence.scope.receipt_store);
+  return readPrepareCapacity(sequence);
+}
+
 const protectedSinkScopes = new AsyncLocalStorage<
   Readonly<{
     scope: AuthorityHostEffectScope;
@@ -301,6 +478,7 @@ function requireScope(mode: 'mutation' | 'process'): AuthorityHostEffectScope {
   if (!scope) {
     throw new Error('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
   }
+  assertProtectedReleasePrepareCapacityEffect(scope.receipt_store);
   if (mode === 'mutation' && scope.effect === 'read') {
     throw new Error('AUTHORITY_READ_ACTION_MUTATION_FORBIDDEN');
   }
