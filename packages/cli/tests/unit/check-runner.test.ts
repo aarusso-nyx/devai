@@ -4,9 +4,11 @@ import {
   mkdirSync,
   chmodSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,8 +35,10 @@ import {
   type TaskExecutionResult,
 } from '../../src/services/check-runner/index.js';
 import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 const roots: string[] = [];
+const sourceFixtures: Array<ReturnType<typeof createSelfContainedRepositoryFixture>> = [];
 const TOOLCHAIN = { node: 'v-test' } as const;
 const REPOSITORY_ROOT = resolve(import.meta.dirname, '../../../..');
 const PASS: TaskExecutionResult = {
@@ -261,10 +265,65 @@ function run(root: string, overrides: Partial<CheckRunnerOptions> = {}) {
 }
 
 afterEach(() => {
+  for (const fixture of sourceFixtures.splice(0)) fixture.cleanup();
   while (roots.length > 0) rmSync(roots.pop() ?? '', { recursive: true, force: true });
 });
 
 describe('content-addressed check runner', () => {
+  it('snapshots a Git-free source without traversing excluded directories or directory symlinks', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'devai git-free source ç-'));
+    roots.push(parent);
+    const source = join(parent, 'source');
+    const outside = join(parent, 'outside');
+    file(
+      source,
+      '.gitignore',
+      'dist/\n.devai/state/*\n!.devai/state/.gitkeep\nscratch/*\n!scratch/README.md\n',
+    );
+    file(source, '.devai/state/.gitkeep', 'state placeholder\n');
+    file(source, '.devai/worktrees/.gitkeep', 'worktree placeholder\n');
+    file(source, 'scratch/README.md', 'scratch placeholder\n');
+    file(source, 'src/app.ts', 'export const value = 1;\n');
+    for (const path of [
+      'tmp/never.ts',
+      '.devai/worktrees/never/secret.ts',
+      'node_modules/never.ts',
+      'dist/never.ts',
+      '.devai/state/never.ts',
+      'scratch/never.ts',
+    ])
+      file(source, path, 'must not enter snapshot\n');
+    file(outside, 'never.ts', 'do not follow directory symlinks\n');
+    symlinkSync(outside, join(source, 'linked'));
+    const fixture = createSelfContainedRepositoryFixture(source);
+    sourceFixtures.push(fixture);
+    expect(fixture.paths).toEqual([
+      '.devai/state/.gitkeep',
+      '.devai/worktrees/.gitkeep',
+      '.gitignore',
+      'linked',
+      'scratch/README.md',
+      'src/app.ts',
+    ]);
+    expect(readFileSync(join(fixture.root, 'src/app.ts'))).toEqual(
+      readFileSync(join(source, 'src/app.ts')),
+    );
+    expect(readFileSync(join(fixture.root, '.devai/worktrees/.gitkeep'), 'utf8')).toBe(
+      'worktree placeholder\n',
+    );
+    expect(readlinkSync(join(fixture.root, 'linked'))).toBe(outside);
+    expect(fixture.git(['rev-list', '--count', 'HEAD'])).toBe('1');
+    expect(fixture.git(['remote'])).toBe('');
+    expect(fixture.git(['status', '--porcelain'])).toBe('');
+  });
+
+  it('refuses a full source snapshot when the exact worktree placeholder is absent', () => {
+    const source = mkdtempSync(join(tmpdir(), 'devai missing placeholder ç-'));
+    roots.push(source);
+    file(source, 'src/app.ts', 'export const value = 1;\n');
+    expect(() => createSelfContainedRepositoryFixture(source)).toThrow();
+  });
+
   it('runs the documented pnpm test descriptor shape in a fresh repository', () => {
     const state = repository();
     file(
@@ -544,21 +603,18 @@ describe('content-addressed check runner', () => {
   });
 
   it('selects authority after a committed utils change in a detached repository fixture', () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), 'devai-selector-parity-'));
-    roots.push(fixtureRoot);
-    const clone = join(fixtureRoot, 'candidate');
-    const cloned = spawnSync('git', ['clone', '--quiet', REPOSITORY_ROOT, clone], {
-      encoding: 'utf8',
-    });
-    if (cloned.status !== 0) throw new Error(String(cloned.stderr));
-    git(clone, ['config', 'user.name', 'Selector Test']);
-    git(clone, ['config', 'user.email', 'selector@example.invalid']);
-    const base = git(clone, ['rev-parse', 'HEAD']);
-    commit(
+    const fixture = createSelfContainedRepositoryFixture(REPOSITORY_ROOT);
+    sourceFixtures.push(fixture);
+    const clone = fixture.root;
+    const base = fixture.commit;
+    fixture.git(['checkout', '--detach', '--quiet', base]);
+    file(
       clone,
       'packages/utils/src/index.ts',
       `${readFileSync(join(clone, 'packages/utils/src/index.ts'), 'utf8')}\nexport const selectorFixture = true;\n`,
     );
+    fixture.git(['add', '--', 'packages/utils/src/index.ts']);
+    fixture.git(['commit', '--quiet', '-m', 'change packages/utils/src/index.ts']);
     const affected = withRunnerScope(() =>
       buildTaskPlan({
         repoRoot: clone,

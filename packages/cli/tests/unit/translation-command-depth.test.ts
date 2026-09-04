@@ -1,16 +1,15 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { CAC } from 'cac';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { verifyTranslation } from '../../src/commands/verify/translation.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const parent = mkdtempSync(join(tmpdir(), 'devai-translation-command-'));
-const repository = join(parent, 'repository');
+let fixture: ReturnType<typeof createSelfContainedRepositoryFixture>;
+let repository: string;
 const originalExitCode = process.exitCode;
 const originalStdout = process.stdout.write;
 const originalStderr = process.stderr.write;
@@ -36,11 +35,9 @@ function writeJson(path: string, value: unknown): void {
 }
 
 beforeAll(() => {
-  execFileSync('git', ['clone', '--no-local', '--quiet', ROOT, repository]);
-  const candidate = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: repository,
-    encoding: 'utf8',
-  }).trim();
+  fixture = createSelfContainedRepositoryFixture(ROOT);
+  repository = fixture.root;
+  const candidate = fixture.commit;
   witness = {
     schemaVersion: '1.0.0',
     id: 'TW-0123456789abcdef',
@@ -126,7 +123,7 @@ afterEach(() => {
   process.stderr.write = originalStderr;
 });
 
-afterAll(() => rmSync(parent, { recursive: true, force: true }));
+afterAll(() => fixture?.cleanup());
 
 async function run(options: Options): Promise<{ stdout: string; stderr: string; exit: number }> {
   let stdout = '';

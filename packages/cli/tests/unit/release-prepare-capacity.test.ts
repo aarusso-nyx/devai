@@ -1,13 +1,14 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   createProtectedArtifactSinkAdapter,
+  createProtectedReleaseRepositoryContext,
   readProtectedReleasePrepareCapacity,
   runWithAuthorityHostEffects,
   withProtectedReleasePrepareCapacity,
+  withProtectedReleaseRepositoryContext,
   type ProtectedReleasePrepareCapacityBinding,
 } from '@devai-nyx/authority';
 import { canonicalJson } from '@devai-nyx/utils';
@@ -16,26 +17,43 @@ import { repositoryIdFor } from '../../src/authority/policy.js';
 import { canonicalRegistry } from '../../src/define-command.js';
 import { RELEASE_PACK_SPEC_DIGEST } from '../../src/services/release-prepare-kernel.js';
 import { resolveCliVersion } from '../../src/version.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 // Invariants: INV-AUTH-002, INV-REL-001
 
-function git(args: readonly string[]): string {
-  const result = spawnSync('git', ['-C', process.cwd(), ...args], { encoding: 'utf8' });
-  if (result.status !== 0) throw new Error(String(result.stderr));
-  return String(result.stdout).trim();
-}
+const sourceFixtures: Array<ReturnType<typeof createSelfContainedRepositoryFixture>> = [];
+afterEach(() => {
+  for (const fixture of sourceFixtures.splice(0)) fixture.cleanup();
+});
 
 describe('release prepare broker capacity', () => {
   it('reads the actual 256/8192 account and charges both counters through protected sink effects', async () => {
     const entries = canonicalRegistry();
     const entry = entries.find((candidate) => candidate.name === 'release prepare');
     if (entry === undefined) throw new Error('release prepare action missing');
-    const root = realpathSync(process.cwd());
+    const fixture = createSelfContainedRepositoryFixture(
+      resolve(import.meta.dirname, '../../../..'),
+      {
+        paths: ['.devai/pin/constitution.md'],
+      },
+    );
+    sourceFixtures.push(fixture);
+    const root = fixture.root;
+    // The supported parser requires GitHub-shaped origins. This synthetic local
+    // config is never fetched/pushed; the shared fixture has no remotes by default.
+    const releaseRepositoryId = 'fixture-owner/release-capacity';
+    fixture.git(['config', 'remote.origin.url', `https://github.com/${releaseRepositoryId}.git`]);
     const repository = {
-      id: repositoryIdFor(root),
-      commit: git(['rev-parse', 'HEAD']),
-      tree: git(['rev-parse', 'HEAD^{tree}']),
+      id: releaseRepositoryId,
+      commit: fixture.commit,
+      tree: fixture.tree,
     };
+    const repositoryContext = createProtectedReleaseRepositoryContext({
+      repository_root: root,
+      authority_repository_id: repositoryIdFor(root),
+      read_expected_release_repository_id: () => releaseRepositoryId,
+      repository,
+    });
     const planDigest = '1'.repeat(64);
     const candidate = { commit: repository.commit, tree: repository.tree };
     const binding: ProtectedReleasePrepareCapacityBinding = {
@@ -92,20 +110,22 @@ describe('release prepare broker capacity', () => {
       sink_id: 'capacity-test-sink',
     });
     try {
-      await runWithAuthorityHostEffects(
-        host.scope,
-        async () =>
-          await withProtectedReleasePrepareCapacity(binding, async () => {
-            expect(readProtectedReleasePrepareCapacity(binding)).toEqual({
-              remaining_batches: 256,
-              remaining_targets: 8192,
-            });
-            for (let count = 0; count < 109; count += 1) sink.invokeSink(() => undefined);
-            expect(readProtectedReleasePrepareCapacity(binding)).toEqual({
-              remaining_batches: 147,
-              remaining_targets: 8083,
-            });
-          }),
+      await withProtectedReleaseRepositoryContext(repositoryContext, () =>
+        runWithAuthorityHostEffects(
+          host.scope,
+          async () =>
+            await withProtectedReleasePrepareCapacity(binding, async () => {
+              expect(readProtectedReleasePrepareCapacity(binding)).toEqual({
+                remaining_batches: 256,
+                remaining_targets: 8192,
+              });
+              for (let count = 0; count < 109; count += 1) sink.invokeSink(() => undefined);
+              expect(readProtectedReleasePrepareCapacity(binding)).toEqual({
+                remaining_batches: 147,
+                remaining_targets: 8083,
+              });
+            }),
+        ),
       );
     } finally {
       host.dispose();

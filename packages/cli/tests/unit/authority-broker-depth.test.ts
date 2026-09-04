@@ -1,11 +1,10 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
@@ -18,11 +17,16 @@ import {
   sha256Hex,
 } from '../../src/services/check-runner/index.js';
 import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const originalArgv = [...process.argv];
 const originalStdout = process.stdout.write;
 let entries: readonly RegistryEntry[];
+const sourceFixtures: Array<ReturnType<typeof createSelfContainedRepositoryFixture>> = [];
+afterEach(() => {
+  for (const fixture of sourceFixtures.splice(0)) fixture.cleanup();
+});
 
 beforeAll(async () => {
   process.argv = [process.execPath, 'devai', '--help'];
@@ -122,12 +126,6 @@ function effect(
   return { kind, symbol, arguments: args };
 }
 
-function git(root: string, args: readonly string[]): string {
-  const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
-  if (result.status !== 0) throw new Error(String(result.stderr));
-  return String(result.stdout).trim();
-}
-
 describe('authority broker production boundary depth', () => {
   it('exposes only the exact consent admitted by the production authority boundary', () => {
     const allowed = authorizeCliArgv(
@@ -167,7 +165,12 @@ describe('authority broker production boundary depth', () => {
   });
 
   it('admits only exact declared check tasks for stock release preflight execution', () => {
-    const host = broker('release preflight', 'inspector', [
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['test-tasks.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const root = fixture.root;
+    const host = brokerAt(root, 'release preflight', 'inspector', [
       process.execPath,
       'devai',
       'release',
@@ -178,19 +181,19 @@ describe('authority broker production boundary depth', () => {
       'inspector',
       '--write',
     ]);
-    const descriptor = readTaskDescriptor(join(ROOT, 'test-tasks.json'));
+    const descriptor = readTaskDescriptor(join(root, 'test-tasks.json'));
     const task = descriptor.tasks.find(
       (candidate) =>
         JSON.stringify(candidate.argv) === JSON.stringify(['pnpm', 'run', 'devai:prepare']),
     );
     if (task === undefined) throw new Error('devai:prepare task fixture missing');
-    const identity = resolveTaskExecutable(ROOT, 'pnpm');
+    const identity = resolveTaskExecutable(root, 'pnpm');
     const candidate = {
-      commit: git(ROOT, ['rev-parse', 'HEAD']),
-      tree: git(ROOT, ['rev-parse', 'HEAD^{tree}']),
+      commit: fixture.commit,
+      tree: fixture.tree,
     };
     const options = bindReleaseTaskProcessOptions(
-      { cwd: realpathSync(ROOT), shell: false },
+      { cwd: realpathSync(root), shell: false },
       {
         candidate,
         descriptor_digest: sha256Hex(descriptor),
@@ -203,7 +206,7 @@ describe('authority broker production boundary depth', () => {
     );
     try {
       expect(
-        matchDeclaredReleaseTaskProcess(ROOT, {
+        matchDeclaredReleaseTaskProcess(root, {
           kind: 'process',
           symbol: 'spawnSync',
           arguments: [identity.path, ['run', 'devai:prepare'], options],
@@ -219,7 +222,7 @@ describe('authority broker production boundary depth', () => {
         host.scope.apply_effect(
           effect(
             'spawnSync',
-            ['pnpm', ['run', 'devai:prepare', '--extra'], { cwd: ROOT, shell: false }],
+            ['pnpm', ['run', 'devai:prepare', '--extra'], { cwd: root, shell: false }],
             'process',
           ),
           () => 'forbidden',
@@ -229,7 +232,7 @@ describe('authority broker production boundary depth', () => {
         host.scope.apply_effect(
           effect(
             'spawnSync',
-            ['pnpm', ['run', 'devai:prepare'], { cwd: ROOT, shell: true }],
+            ['pnpm', ['run', 'devai:prepare'], { cwd: root, shell: true }],
             'process',
           ),
           () => 'forbidden',
