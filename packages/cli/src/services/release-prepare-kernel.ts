@@ -20,6 +20,14 @@ import {
   captureReleaseExportTranscriptLimits,
   type ReleaseExportProviderResultV2,
 } from './release-export-transcript-v2.js';
+import {
+  RELEASE_EXPORT_SPEC_V4_ID,
+  RELEASE_EXPORT_SPEC_V4_DIGEST,
+  RELEASE_EXPORT_TRANSCRIPT_V3_FORMAT,
+  encodeReleaseExportTranscriptV3,
+  verifyReleaseExportProviderResultV3,
+  verifyReleaseExportProviderResultSetV3,
+} from './release-export-transcript-v3.js';
 import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
 import type { ReleaseExportArtifactCommitManifest } from './release-export-artifact-store.js';
 import { resolveReleaseMutationRequirements } from './release-lifecycle-execution.js';
@@ -1478,9 +1486,18 @@ async function reverifyExportContinuity(
     return parsed;
   };
   const exported = manifest as unknown as ReleaseExportArtifactCommitManifest;
-  const current = exported.export_spec_id === RELEASE_EXPORT_SPEC_V3_ID;
-  const specId = current ? RELEASE_EXPORT_SPEC_V3_ID : RELEASE_EXPORT_SPEC_ID;
-  const specDigest = current ? RELEASE_EXPORT_SPEC_V3_DIGEST : RELEASE_EXPORT_SPEC_DIGEST;
+  const forward = exported.export_spec_id === RELEASE_EXPORT_SPEC_V4_ID;
+  const current = forward || exported.export_spec_id === RELEASE_EXPORT_SPEC_V3_ID;
+  const specId = forward
+    ? RELEASE_EXPORT_SPEC_V4_ID
+    : current
+      ? RELEASE_EXPORT_SPEC_V3_ID
+      : RELEASE_EXPORT_SPEC_ID;
+  const specDigest = forward
+    ? RELEASE_EXPORT_SPEC_V4_DIGEST
+    : current
+      ? RELEASE_EXPORT_SPEC_V3_DIGEST
+      : RELEASE_EXPORT_SPEC_DIGEST;
   const sink = state.artifact_sink;
   const binding = exported.binding;
   const parent = exported.parent_artifact_sink;
@@ -1636,21 +1653,31 @@ async function reverifyExportContinuity(
       })
       .sort((a, b) => utf8Compare(a.release_unit, b.release_unit));
     if (!same(units, binding.mutation_units)) fail();
-    transcript = encodeReleaseExportTranscriptV2(
-      {
-        ...commonTranscript,
-        version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
-        mutation_units: units,
-        closures: commonTranscript.closures.map((entry) => ({
-          ...entry,
-          release_unit:
-            state.release_units.find((unit) =>
-              unit.packages.some((pkg) => pkg.package_id === entry.package_id),
-            )?.release_unit ?? fail(),
-        })),
-      },
-      limits,
-    );
+    const shared = {
+      ...commonTranscript,
+      mutation_units: units,
+      closures: commonTranscript.closures.map((entry) => ({
+        ...entry,
+        release_unit:
+          state.release_units.find((unit) =>
+            unit.packages.some((pkg) => pkg.package_id === entry.package_id),
+          )?.release_unit ?? fail(),
+      })),
+    };
+    transcript = forward
+      ? encodeReleaseExportTranscriptV3(
+          {
+            ...shared,
+            version: RELEASE_EXPORT_TRANSCRIPT_V3_FORMAT,
+            certification_units:
+              'certification_units' in binding ? binding.certification_units : fail(),
+          },
+          limits,
+        )
+      : encodeReleaseExportTranscriptV2(
+          { ...shared, version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT },
+          limits,
+        );
   } else {
     if ('mutation_units' in binding) fail();
     transcript = encodeReleaseExportTranscript(
@@ -1709,14 +1736,18 @@ async function reverifyExportContinuity(
     const result = parse(value);
     if (typeof result['signature'] !== 'string') fail();
     signature ??= result['signature'] as string;
-    (current ? verifyReleaseExportProviderResultV2 : verifyReleaseExportProviderResult)(
+    (forward
+      ? verifyReleaseExportProviderResultV3
+      : current
+        ? verifyReleaseExportProviderResultV2
+        : verifyReleaseExportProviderResult)(
       value,
       { package_id: pkg.package_id, transcript, signature },
       limits,
     );
   }
   if (current)
-    verifyReleaseExportProviderResultSetV2(
+    (forward ? verifyReleaseExportProviderResultSetV3 : verifyReleaseExportProviderResultSetV2)(
       packages.map(
         (pkg) => observed.get(opaqueIdentity(pkg.provider_result).opaque_handle) ?? fail(),
       ),
@@ -1773,7 +1804,9 @@ export async function reverifySinkArtifacts(
           (commitManifest['export_spec_id'] === RELEASE_EXPORT_SPEC_ID &&
             commitManifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_DIGEST) ||
           (commitManifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V3_ID &&
-            commitManifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V3_DIGEST)
+            commitManifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V3_DIGEST) ||
+          (commitManifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V4_ID &&
+            commitManifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V4_DIGEST)
         )
       : commitManifest['pack_spec_id'] !== RELEASE_PACK_SPEC_ID ||
         commitManifest['pack_spec_digest_sha256'] !== RELEASE_PACK_SPEC_DIGEST) ||
@@ -1912,10 +1945,12 @@ export async function verifyPortableReleaseMutationEvidence(
     if (requirements.some((unit) => unit.binding !== null)) fail();
     return;
   }
-  if (
-    manifest['export_spec_id'] !== RELEASE_EXPORT_SPEC_V3_ID ||
-    manifest['export_spec_digest_sha256'] !== RELEASE_EXPORT_SPEC_V3_DIGEST
-  )
+  if (!(
+    (manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V3_ID &&
+      manifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V3_DIGEST) ||
+    (manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V4_ID &&
+      manifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V4_DIGEST)
+  ))
     fail();
   if (requirements.every((unit) => unit.binding === null)) {
     await verifyCertificationMutationEvidence(request, material, {}, plan);
@@ -1942,11 +1977,11 @@ export async function verifyPortableReleaseMutationEvidence(
   );
   if (typeof first['transcript'] !== 'string' || typeof first['signature'] !== 'string')
     return fail();
-  const results = verifyReleaseExportProviderResultSetV2(
-    raw,
-    { transcript: Buffer.from(first['transcript']), signature: first['signature'] },
-    limits,
-  );
+  const results = (
+    manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V4_ID
+      ? verifyReleaseExportProviderResultSetV3
+      : verifyReleaseExportProviderResultSetV2
+  )(raw, { transcript: Buffer.from(first['transcript']), signature: first['signature'] }, limits);
   const units = new Map<string, NonNullable<ReleaseExportProviderResultV2['mutation_evidence']>>();
   for (const [index, result] of results.entries()) {
     if (result.package_id !== packages[index]?.package_id) fail();

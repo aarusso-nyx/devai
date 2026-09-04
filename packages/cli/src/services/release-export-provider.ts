@@ -14,7 +14,7 @@ import {
 } from './release-lifecycle-execution.js';
 import {
   createReleaseExportArtifactStore,
-  type ProtectedReleaseExportBindingV3,
+  type ProtectedReleaseExportBindingV4,
   type ReleaseExportArtifactObjectReceipt,
   type ReleaseExportArtifactStoreOptions,
   type TrustedExportArtifactSinkTransaction,
@@ -26,11 +26,18 @@ import {
 import {
   captureReleaseExportJson,
   captureReleaseExportTranscriptLimits,
-  encodeReleaseExportProviderResultV2,
-  encodeReleaseExportTranscriptV2,
-  RELEASE_EXPORT_SPEC_V3_DIGEST,
-  type ReleaseExportTranscriptV2,
 } from './release-export-transcript-v2.js';
+import {
+  encodeReleaseExportProviderResultV3,
+  encodeReleaseExportTranscriptV3,
+  RELEASE_EXPORT_SPEC_V4_DIGEST,
+  type ReleaseExportTranscriptV3,
+} from './release-export-transcript-v3.js';
+import {
+  createReleaseExportCertificationEvidence,
+  readReleaseExportCertificationEvidence,
+  type ReleaseCertifiedEvidenceCarrierReader,
+} from './release-export-certification-evidence.js';
 import { decodeReleasePolicyClosure } from './release-policy-closure-transport.js';
 import { verifyReleasePolicyClosure } from './release-policy-closure.js';
 import {
@@ -46,8 +53,10 @@ export interface ReleaseExportProviderOptions {
   >;
   readonly plan: ReleaseMutationPlanReaders;
   readonly mutation_source: ReleaseUnitMutationEvidenceReader;
+  /** Committed certification custody. It reads retained bytes and executes no task. */
+  readonly certification_source: ReleaseCertifiedEvidenceCarrierReader;
   readonly provider: { readonly kind: 'evidence-export'; readonly provider_id: string };
-  readonly destination: ProtectedReleaseExportBindingV3['destination'];
+  readonly destination: ProtectedReleaseExportBindingV4['destination'];
   readonly trust: TrustIdentity;
   readonly signer: {
     /** One synchronous protected operation; implementations must not return a Promise. */
@@ -143,6 +152,19 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
           readUnitMutationEvidenceBlob: source.readUnitMutationEvidenceBlob.bind(source),
         }),
   };
+  const certificationOrigin = input.certification_source;
+  const readCarrier = certificationOrigin?.readCertifiedEvidenceCarrier;
+  const certificationSource: ReleaseCertifiedEvidenceCarrierReader = {
+    ...(certificationOrigin?.certified_evidence_carrier_maximum_bytes === undefined
+      ? {}
+      : {
+          certified_evidence_carrier_maximum_bytes:
+            certificationOrigin.certified_evidence_carrier_maximum_bytes,
+        }),
+    ...(readCarrier === undefined
+      ? {}
+      : { readCertifiedEvidenceCarrier: readCarrier.bind(certificationOrigin) }),
+  };
   const sign = input.signer.sign.bind(input.signer);
   const verify = input.signer.verify.bind(input.signer);
   let exportedReader: TrustedArtifactReader | undefined;
@@ -191,7 +213,20 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
           repository: request.repository_locator,
           plan_receipt_digest_sha256: planDigest,
         });
-        const binding: ProtectedReleaseExportBindingV3 = {
+        // The v4 aggregate signature is Ed25519 only; refuse before any store or signer touch.
+        if (trust.signature_algorithm !== 'ed25519')
+          throw new Error('SIGNATURE_ALGORITHM_UNSUPPORTED');
+        const certification = await createReleaseExportCertificationEvidence({
+          request,
+          material: { release_units: prepared.release_units },
+          source: certificationSource,
+          maximum_provider_result_bytes: controls.transcript_limits.maximum_provider_result_bytes,
+        });
+        const certified = readReleaseExportCertificationEvidence(certification, {
+          repository: request.repository_locator,
+          release_units: prepared.release_units,
+        });
+        const binding: ProtectedReleaseExportBindingV4 = {
           action_id: 'release export',
           repository: request.repository_locator,
           candidate: {
@@ -204,8 +239,9 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
           destination,
           trust,
           attempt_id: context.attempt_id,
-          export_spec_digest_sha256: RELEASE_EXPORT_SPEC_V3_DIGEST,
+          export_spec_digest_sha256: RELEASE_EXPORT_SPEC_V4_DIGEST,
           mutation_units: snapshot.mutation_units,
+          certification_units: certified.certification_units,
           closure_inputs: closures.map((entry) => {
             const resolution = verifyReleasePolicyClosure({
               closure: decodeReleasePolicyClosure(entry.bytes, controls.transport_limits),
@@ -231,6 +267,7 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
           implementation,
           closures,
           mutation_evidence: mutation,
+          certification_evidence: certification,
         });
         const signer = createProtectedExportSignerAdapter(binding);
         transaction = await store.begin();
@@ -255,7 +292,7 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
             receipt.transaction_handle !== tx.transaction_handle ||
             receipt.sha256 !== hash(value) ||
             receipt.size_bytes !== value.length ||
-            receipt.export_spec_digest_sha256 !== RELEASE_EXPORT_SPEC_V3_DIGEST
+            receipt.export_spec_digest_sha256 !== RELEASE_EXPORT_SPEC_V4_DIGEST
           )
             fail();
           const observed = await tx.readArtifact({
@@ -275,11 +312,11 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
         if (Buffer.compare(beforeSigning, transcript) !== 0) fail();
         const parsed = JSON.parse(
           new TextDecoder('utf-8', { fatal: true }).decode(transcript),
-        ) as ReleaseExportTranscriptV2;
+        ) as ReleaseExportTranscriptV3;
         if (
           Buffer.compare(
             transcript,
-            encodeReleaseExportTranscriptV2(parsed, controls.transcript_limits),
+            encodeReleaseExportTranscriptV3(parsed, controls.transcript_limits),
           ) !== 0
         )
           fail();
@@ -301,15 +338,33 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
           const portable =
             snapshot.portable_units.find((row) => row.release_unit === unit.release_unit) ?? fail();
           const isCarrier = unit.mutation_evidence?.carrier_package_id === closure.package_id;
+          const certifiedUnit =
+            certified.certification_units.find(
+              (row) => row.release_unit === closure.expected.release_unit,
+            ) ?? fail();
+          const certifiedPortable =
+            certified.portable_units.find(
+              (row) => row.release_unit === closure.expected.release_unit,
+            ) ?? fail();
+          const carriesCertification = certifiedUnit.carrier_package_id === closure.package_id;
           await put(
             'provider-result',
             closure.package_id,
-            encodeReleaseExportProviderResultV2(
+            encodeReleaseExportProviderResultV3(
               {
                 package_id: closure.package_id,
                 transcript,
                 signature: encodedSignature,
                 mutation_evidence: isCarrier ? portable.mutation_evidence : null,
+                certification_evidence: carriesCertification
+                  ? {
+                      version: 'devai.release-certified-evidence-portable-json.v1',
+                      release_unit: certifiedUnit.release_unit,
+                      sha256: certifiedUnit.carrier.sha256,
+                      size_bytes: certifiedUnit.carrier.size_bytes,
+                      bytes_base64: certifiedPortable.carrier_bytes_base64,
+                    }
+                  : null,
               },
               controls.transcript_limits,
             ),
@@ -410,6 +465,7 @@ export function createReleaseExportProvider(input: ReleaseExportProviderOptions)
         const code =
           error instanceof Error &&
           [
+            'SIGNATURE_ALGORITHM_UNSUPPORTED',
             'release-export-capacity-unavailable',
             'release-export-capacity-insufficient',
             'rpl-package-identity-mismatch',

@@ -59,6 +59,18 @@ import {
   type ReleaseExportMutationEvidence,
 } from './release-export-mutation-evidence.js';
 import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
+import {
+  readReleaseExportCertificationEvidence,
+  reverifyReleaseExportCertificationEvidence,
+  type ReleaseExportCertificationEvidence,
+  type ReleaseExportCertificationUnitProjection,
+} from './release-export-certification-evidence.js';
+import {
+  encodeReleaseExportTranscriptV3,
+  RELEASE_EXPORT_SPEC_V4_DIGEST,
+  RELEASE_EXPORT_SPEC_V4_ID,
+  RELEASE_EXPORT_TRANSCRIPT_V3_FORMAT,
+} from './release-export-transcript-v3.js';
 
 export { RELEASE_EXPORT_SPEC_ID, RELEASE_EXPORT_SPEC_DIGEST } from './release-export-transcript.js';
 const INVALID = 'release-export-artifact-sink-protocol-invalid';
@@ -94,8 +106,13 @@ export interface ProtectedReleaseExportBindingV3 extends Omit<
   })[];
   readonly mutation_units: readonly ReleaseExportMutationUnitProjection[];
 }
+export interface ProtectedReleaseExportBindingV4 extends ProtectedReleaseExportBindingV3 {
+  readonly certification_units: readonly ReleaseExportCertificationUnitProjection[];
+}
 export type ProtectedReleaseExportBinding =
-  LegacyProtectedReleaseExportBinding | ProtectedReleaseExportBindingV3;
+  | LegacyProtectedReleaseExportBinding
+  | ProtectedReleaseExportBindingV3
+  | ProtectedReleaseExportBindingV4;
 
 export interface ReleaseExportArtifactObjectReceipt {
   readonly sink_id: string;
@@ -105,7 +122,10 @@ export interface ReleaseExportArtifactObjectReceipt {
   readonly package_id: string | null;
   readonly sha256: string;
   readonly size_bytes: number;
-  readonly export_spec_id: typeof RELEASE_EXPORT_SPEC_ID | typeof RELEASE_EXPORT_SPEC_V3_ID;
+  readonly export_spec_id:
+    | typeof RELEASE_EXPORT_SPEC_ID
+    | typeof RELEASE_EXPORT_SPEC_V3_ID
+    | typeof RELEASE_EXPORT_SPEC_V4_ID;
   readonly export_spec_digest_sha256: string;
 }
 
@@ -125,7 +145,10 @@ export interface ReleaseExportArtifactCommitManifest {
   readonly transaction_handle: string;
   readonly repository: ProtectedReleaseExportBinding['repository'];
   readonly candidate: ProtectedReleaseExportBinding['candidate'];
-  readonly export_spec_id: typeof RELEASE_EXPORT_SPEC_ID | typeof RELEASE_EXPORT_SPEC_V3_ID;
+  readonly export_spec_id:
+    | typeof RELEASE_EXPORT_SPEC_ID
+    | typeof RELEASE_EXPORT_SPEC_V3_ID
+    | typeof RELEASE_EXPORT_SPEC_V4_ID;
   readonly export_spec_digest_sha256: string;
   readonly parent_artifact_sink: ArtifactSinkCommitIdentity;
   readonly binding: ProtectedReleaseExportBinding;
@@ -169,6 +192,8 @@ export interface ReleaseExportArtifactStoreOptions extends DurableReleaseContent
   readonly transcript_limits: ReleaseExportTranscriptLimits;
   /** Required only in the exact forward v3 branch; legacy export rejects it. */
   readonly mutation_evidence?: ReleaseExportMutationEvidence;
+  /** Required only in the exact forward v4 branch; earlier branches reject it. */
+  readonly certification_evidence?: ReleaseExportCertificationEvidence;
 }
 
 function fail(): never {
@@ -277,7 +302,8 @@ export async function createReleaseExportArtifactStore(
 ): Promise<TrustedExportArtifactSink> {
   return guarded(async () => {
     const binding = copy(options.binding);
-    const current = binding.export_spec_digest_sha256 === RELEASE_EXPORT_SPEC_V3_DIGEST;
+    const forward = binding.export_spec_digest_sha256 === RELEASE_EXPORT_SPEC_V4_DIGEST;
+    const current = forward || binding.export_spec_digest_sha256 === RELEASE_EXPORT_SPEC_V3_DIGEST;
     closed(options, [
       'root',
       'sink_id',
@@ -292,13 +318,23 @@ export async function createReleaseExportArtifactStore(
       'transport_limits',
       'transcript_limits',
       ...(current ? ['mutation_evidence'] : []),
+      ...(forward ? ['certification_evidence'] : []),
     ]);
     assertBoundReleaseHostPackageSnapshot(options.implementation);
     const implementation = options.implementation;
     const adapter = createProtectedExportSinkAdapter(binding);
-    const specId = current ? RELEASE_EXPORT_SPEC_V3_ID : RELEASE_EXPORT_SPEC_ID;
-    const specDigest = current ? RELEASE_EXPORT_SPEC_V3_DIGEST : RELEASE_EXPORT_SPEC_DIGEST;
+    const specId = forward
+      ? RELEASE_EXPORT_SPEC_V4_ID
+      : current
+        ? RELEASE_EXPORT_SPEC_V3_ID
+        : RELEASE_EXPORT_SPEC_ID;
+    const specDigest = forward
+      ? RELEASE_EXPORT_SPEC_V4_DIGEST
+      : current
+        ? RELEASE_EXPORT_SPEC_V3_DIGEST
+        : RELEASE_EXPORT_SPEC_DIGEST;
     const mutationEvidence = current ? (options.mutation_evidence ?? fail()) : undefined;
+    const certificationEvidence = forward ? (options.certification_evidence ?? fail()) : undefined;
     const physical = copy({
       root: options.root,
       sink_id: options.sink_id,
@@ -451,6 +487,17 @@ export async function createReleaseExportArtifactStore(
       if (!('mutation_units' in binding) || !same(snapshot.mutation_units, binding.mutation_units))
         fail();
       await reverifyReleaseExportMutationEvidence(mutationEvidence);
+      if (certificationEvidence === undefined) return;
+      const certification = readReleaseExportCertificationEvidence(certificationEvidence, {
+        repository: binding.repository,
+        release_units: state.release_units,
+      });
+      if (
+        !('certification_units' in binding) ||
+        !same(certification.certification_units, binding.certification_units)
+      )
+        fail();
+      await reverifyReleaseExportCertificationEvidence(certificationEvidence);
     };
     const verifyParent = async (withMutation = true) => {
       if (withMutation) await verifyMutation();
@@ -621,18 +668,29 @@ export async function createReleaseExportArtifactStore(
       };
       if (current) {
         if (!('mutation_units' in binding)) fail();
+        const shared = {
+          ...transcript,
+          closures: transcript.closures.map((entry, index) => ({
+            ...entry,
+            release_unit:
+              (binding as ProtectedReleaseExportBindingV3).closure_inputs[index]?.release_unit ??
+              fail(),
+          })),
+          mutation_units: binding.mutation_units,
+        };
+        if (forward) {
+          if (!('certification_units' in binding)) fail();
+          return encodeReleaseExportTranscriptV3(
+            {
+              ...shared,
+              version: RELEASE_EXPORT_TRANSCRIPT_V3_FORMAT,
+              certification_units: binding.certification_units,
+            },
+            effectiveTranscriptLimits,
+          );
+        }
         return encodeReleaseExportTranscriptV2(
-          {
-            ...transcript,
-            version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
-            closures: transcript.closures.map((entry, index) => ({
-              ...entry,
-              release_unit:
-                (binding as ProtectedReleaseExportBindingV3).closure_inputs[index]?.release_unit ??
-                fail(),
-            })),
-            mutation_units: binding.mutation_units,
-          },
+          { ...shared, version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT },
           effectiveTranscriptLimits,
         );
       }

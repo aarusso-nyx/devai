@@ -598,6 +598,22 @@ export function createProtectedReleaseHostRunner(
           trust: exportControls.trust,
           signer: exportControls.signer,
           mutation_source: content,
+          // Committed certification custody only: no task, checkout or cache is reachable.
+          certification_source: {
+            ...(evidence.certified_evidence_carrier_maximum_bytes === undefined
+              ? {}
+              : {
+                  certified_evidence_carrier_maximum_bytes:
+                    evidence.certified_evidence_carrier_maximum_bytes,
+                }),
+            ...(evidence.readCertifiedEvidenceCarrier === undefined
+              ? {}
+              : {
+                  readCertifiedEvidenceCarrier: (value) =>
+                    evidence.readCertifiedEvidenceCarrier?.(value) ??
+                    fail('release-certification-evidence-carrier-unavailable'),
+                }),
+          },
           plan: {
             resolve_plan_input: createResolvedReleasePlanInputResolver(resolution),
             resolve_receipt: (locator) => {

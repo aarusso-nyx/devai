@@ -3,10 +3,18 @@ import {
   captureExportMutationUnitProjections,
   type ExportMutationUnitProjection,
 } from './release-export-mutation.js';
+import {
+  captureExportCertificationUnitProjections,
+  type ExportCertificationUnitProjection,
+} from './release-export-certification.js';
 export {
   captureExportMutationUnitProjections,
   type ExportMutationUnitProjection,
 } from './release-export-mutation.js';
+export {
+  captureExportCertificationUnitProjections,
+  type ExportCertificationUnitProjection,
+} from './release-export-certification.js';
 
 /** Private host binding; no member supplies an executable callback, key bytes or storage path. */
 export interface LegacyProtectedReleaseExportBinding {
@@ -56,11 +64,18 @@ export interface ProtectedReleaseExportBindingV3 extends Omit<
   readonly mutation_units: readonly ExportMutationUnitProjection[];
 }
 
+export interface ProtectedReleaseExportBindingV4 extends ProtectedReleaseExportBindingV3 {
+  readonly certification_units: readonly ExportCertificationUnitProjection[];
+}
+
 export type ProtectedReleaseExportBinding =
-  LegacyProtectedReleaseExportBinding | ProtectedReleaseExportBindingV3;
+  | LegacyProtectedReleaseExportBinding
+  | ProtectedReleaseExportBindingV3
+  | ProtectedReleaseExportBindingV4;
 
 const EXPORT_SPEC_DIGEST = '77ab8fd69d2b3d4edeaebd12b516eb5c15fe910f93ff4516deadd466f0853f98';
 const EXPORT_SPEC_V3_DIGEST = 'aac1c75a539516a38b567aea9be4490eb3f82fe0ab7b75e46e55e46d3166e37f';
+const EXPORT_SPEC_V4_DIGEST = '245fba3823b7f80a55b73e8721ac5871a40b90cce8789aa49b87228b8d03ac44';
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OPAQUE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u;
 const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/u;
@@ -109,7 +124,8 @@ export function captureProtectedReleaseExportBinding(
     if (value === null || typeof value !== 'object' || types.isProxy(value)) return fail();
     const spec = Object.getOwnPropertyDescriptor(value, 'export_spec_digest_sha256');
     if (!spec?.enumerable || !('value' in spec)) return fail();
-    const current = spec.value === EXPORT_SPEC_V3_DIGEST;
+    const forward = spec.value === EXPORT_SPEC_V4_DIGEST;
+    const current = forward || spec.value === EXPORT_SPEC_V3_DIGEST;
     if (!current && spec.value !== EXPORT_SPEC_DIGEST) return fail();
     const binding = record(value, [
       'action_id',
@@ -124,6 +140,7 @@ export function captureProtectedReleaseExportBinding(
       'export_spec_digest_sha256',
       'closure_inputs',
       ...(current ? ['mutation_units'] : []),
+      ...(forward ? ['certification_units'] : []),
     ]);
     if (binding['action_id'] !== 'release export') return fail();
     const repository = record(binding['repository'], ['id', 'commit', 'tree']);
@@ -179,6 +196,10 @@ export function captureProtectedReleaseExportBinding(
       !['ed25519', 'ecdsa-p256-sha256', 'rsa-pss-sha256'].includes(trust['signature_algorithm'])
     )
       return fail();
+    // A v4 offline-certification claim exists only under the Ed25519 aggregate identity.
+    // Other algorithms stay governed by the legacy branches and refuse here, before any
+    // sink transaction or signer dispatch is reachable.
+    if (forward && trust['signature_algorithm'] !== 'ed25519') return fail();
     const closures = binding['closure_inputs'];
     if (
       !Array.isArray(closures) ||
@@ -226,6 +247,16 @@ export function captureProtectedReleaseExportBinding(
       text(installed['version'], /^[^\p{Cc}\p{Cs}]+$/u, 200);
       text(installed['archive_sha256'], SHA256);
       text(installed['content_manifest_sha256'], SHA256);
+    }
+    if (forward) {
+      captureExportCertificationUnitProjections(
+        binding['certification_units'],
+        closures.map((entry) => ({
+          package_id: entry.package_id as string,
+          release_unit: entry.release_unit as string,
+        })),
+        8192,
+      );
     }
     if (current) {
       captureExportMutationUnitProjections(
