@@ -43,6 +43,7 @@ import { buildResolvedReleasePlanReceipt } from '../../src/services/release-life
 import {
   assertProtectedFixtureProviderCompatibility,
   createContainerReleaseCertificationAdapters,
+  createContainerReleasePreflightProvider,
   takeProtectedFixtureDiagnosticCustody,
   type ContainerReleaseCertificationOptions,
 } from '../../src/services/release-certification-provider.js';
@@ -90,6 +91,15 @@ type Definition = {
 
 const loader = vi.hoisted((): { value: Definition | undefined } => ({ value: undefined }));
 const runner = vi.hoisted(() => vi.fn());
+const certificationStore = vi.hoisted(() =>
+  vi.fn(() => {
+    throw new Error('unexpected certification store construction');
+  }),
+);
+vi.mock('../../src/services/release-evidence-store.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/release-evidence-store.js')>()),
+  createReleaseCertificationEvidenceStore: certificationStore,
+}));
 const containerState = vi.hoisted((): { outputs: Map<string, Buffer>; status: number } => ({
   outputs: new Map(),
   status: 0,
@@ -606,6 +616,7 @@ const temporaryRoots: string[] = [];
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
   runner.mockReset();
+  certificationStore.mockClear();
   containerState.outputs.clear();
   containerState.status = 0;
 });
@@ -815,6 +826,62 @@ function providerFixture(production?: {
 }
 
 describe('release toolchain fixture compatibility', () => {
+  it('runs the private preflight-only factory without an evidence store or any certification surface', async () => {
+    const value = providerFixture();
+    const { evidence_sink: unusedSink, ...options } = value.options;
+    const sinkCalls = [
+      vi.spyOn(unusedSink, 'begin'),
+      vi.spyOn(unusedSink, 'readCertificationEvidenceReceipt'),
+      vi.spyOn(unusedSink, 'readCertificationOutputClosure'),
+      vi.spyOn(unusedSink, 'readGeneratedBlob'),
+    ];
+    expect(Object.hasOwn(options, 'evidence_sink')).toBe(false);
+    const provider = createContainerReleasePreflightProvider(options);
+    expect(typeof provider).toBe('function');
+    expect(Object.keys(provider)).toEqual([]);
+    expect(provider).not.toHaveProperty('certification_provider');
+    expect(await provider(value.request)).toMatchObject({ outcome: 'success' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(provider, value.expected),
+    ).not.toThrow();
+    expect(() => takeProtectedFixtureDiagnosticCustody(provider, value.request)).toThrow(
+      'release-certification-diagnostic-custody-unavailable',
+    );
+    expect(await provider({ ...value.request, action_id: 'release certify' })).toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-plan-binding-invalid',
+    });
+    expect(certificationStore).not.toHaveBeenCalled();
+    for (const call of sinkCalls) expect(call).not.toHaveBeenCalled();
+  });
+
+  it('rejects every supplied evidence sink at the private factory boundary before task or store effects', () => {
+    const value = providerFixture();
+    const { evidence_sink: sink, ...options } = value.options;
+    for (const evidence_sink of [undefined, sink]) {
+      expect(() =>
+        Reflect.apply(createContainerReleasePreflightProvider, undefined, [
+          { ...options, evidence_sink },
+        ]),
+      ).toThrow('release-certification-diagnostic-controls-invalid');
+    }
+    const readSink = vi.fn(() => {
+      throw new Error('evidence sink getter must not run');
+    });
+    const accessor = Object.defineProperty({ ...options }, 'evidence_sink', { get: readSink });
+    expect(() => createContainerReleasePreflightProvider(accessor)).toThrow(
+      'release-certification-diagnostic-controls-invalid',
+    );
+    const inherited = Object.setPrototypeOf({ ...options }, { evidence_sink: sink });
+    expect(Object.hasOwn(inherited, 'evidence_sink')).toBe(false);
+    expect(() => createContainerReleasePreflightProvider(inherited)).toThrow(
+      'release-certification-diagnostic-controls-invalid',
+    );
+    expect(readSink).not.toHaveBeenCalled();
+    expect(runner).not.toHaveBeenCalled();
+    expect(certificationStore).not.toHaveBeenCalled();
+  });
+
   it('removes only the fixture blocker from all ten plans using the genuine provider and preserves every other identity and grant', async () => {
     const base = mutationFixture();
     const production = buildMutationFixture(base);
