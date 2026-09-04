@@ -4,7 +4,7 @@
   "id": "adr-validation",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.6.0",
+  "policy_version": "2.7.0",
   "record_schema": "law/schemas/adr-v2.schema.json",
   "scan": {
     "root": "law/adr",
@@ -179,6 +179,11 @@
         "reference": "ADR-MUT-0005",
         "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
         "disposition": "preserved-invalid-accepted-record"
+      },
+      {
+        "reference": "ADR-REL-0017",
+        "path": "ADR-REL-0017-package-owned-release-policy-resolution.md",
+        "disposition": "preserved-invalid-accepted-record"
       }
     ],
     "algorithm": [
@@ -226,7 +231,7 @@
     "digest_algorithm": "sha256",
     "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
     "ordering": "utf8-bytes-ascending-by-path",
-    "catalog_digest_sha256": "97b3606f309a26f065afe6593db996d94628b72b5b3e4b365e52b8c2fc36698d",
+    "catalog_digest_sha256": "25f16c44e293c0219b48c1cbf2587ec09d4d35c6a2fc3f136432f42c7659bd18",
     "entries": [
       {
         "path": "ADR-014-release-verification-profiles.md",
@@ -262,6 +267,27 @@
             "law/policy/mutation-evidence-v2.json",
             "law/schemas/mutation-evidence-policy-v2.schema.json",
             "law/schemas/mutation-report-set-v2.schema.json"
+          ]
+        }
+      },
+      {
+        "path": "ADR-REL-0017-package-owned-release-policy-resolution.md",
+        "sha256": "07f1d17f88d8c48f25b51cff7e882cb2c7c23a3d529098c51b8c19431a946e19",
+        "disposition": "preserved-invalid-accepted-record",
+        "reason": "Accepted ADR-REL-0017 is preserved byte-for-byte after its noncanonical Consequences heading failed required_sections. Only this exact digest is catalogued; ADR-REL-0019 supersedes it with the same substantive source-resolution contract. No repair in place or general invalid-record exception is authorized.",
+        "legacy_record": {
+          "reference": "ADR-REL-0017",
+          "title": "Bind release planning to installed policy and declarative adoption",
+          "status": "accepted",
+          "date": "2026-09-03",
+          "source_format": "v2-record-missing-required-section",
+          "supersedes": [],
+          "affected_rules": [
+            "law/policy/action-registry.json",
+            "law/policy/release-lifecycle.json",
+            "law/schemas/release-lifecycle-policy.schema.json",
+            "law/schemas/release-plan-receipt-v2.schema.json",
+            "law/schemas/release-policy-resolution.schema.json"
           ]
         }
       },

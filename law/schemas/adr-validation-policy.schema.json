@@ -1051,7 +1051,7 @@
       "id": "adr-validation",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "2.5.0",
+      "policy_version": "2.7.0",
       "record_schema": "law/schemas/adr-v2.schema.json",
       "scan": {
         "root": "law/adr",
@@ -1187,7 +1187,10 @@
                 "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
                 "unique": true
               },
-              { "name": "effective_head", "type": "adr-reference" }
+              {
+                "name": "effective_head",
+                "type": "adr-reference"
+              }
             ],
             "definition": "one entry for every deterministic weakly connected accepted subject-lineage"
           },
@@ -1208,7 +1211,23 @@
             "result-state-must-enforce-ok-iff-semantic-resolution-performed-and-errors-empty-and-ok-false-must-grant-no-effective-authority"
           ]
         },
-        "resolvable_legacy_references": [],
+        "resolvable_legacy_references": [
+          {
+            "reference": "ADR-014",
+            "path": "ADR-014-release-verification-profiles.md",
+            "disposition": "preserved-pre-v2-record"
+          },
+          {
+            "reference": "ADR-MUT-0005",
+            "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+            "disposition": "preserved-invalid-accepted-record"
+          },
+          {
+            "reference": "ADR-REL-0017",
+            "path": "ADR-REL-0017-package-owned-release-policy-resolution.md",
+            "disposition": "preserved-invalid-accepted-record"
+          }
+        ],
         "algorithm": [
           "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
           "materialize-each-catalogued-accepted-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
@@ -1254,13 +1273,71 @@
         "digest_algorithm": "sha256",
         "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
         "ordering": "utf8-bytes-ascending-by-path",
-        "catalog_digest_sha256": "5d948df6b23171e42f9e1da200380acb5adf59dbc20f5e9247d968d2a570d9cf",
+        "catalog_digest_sha256": "25f16c44e293c0219b48c1cbf2587ec09d4d35c6a2fc3f136432f42c7659bd18",
         "entries": [
           {
+            "path": "ADR-014-release-verification-profiles.md",
+            "sha256": "1d644d0221dab66332d24366f12aeaf454444db1876e0c38a58247d6639ea440",
+            "disposition": "preserved-pre-v2-record",
+            "reason": "Pre-v2 record preserved byte-for-byte. Superseded forward by ADR-REL-0001; never edited, never revalidated against the v2 record schema.",
+            "legacy_record": {
+              "reference": "ADR-014",
+              "title": "Capability-based release verification profiles",
+              "status": "accepted",
+              "date": "2026-08-29",
+              "source_format": "numeric-id-frontmatter",
+              "supersedes": [],
+              "affected_rules": [
+                "law/policy/release-verification.json",
+                "law/schemas/release-verification-profile.schema.json"
+              ]
+            }
+          },
+          {
+            "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+            "sha256": "9329c112b76028340cabacf9e9499586e4bb0d34465f8f94152c3353bfe2e13b",
+            "disposition": "preserved-invalid-accepted-record",
+            "reason": "Accepted historical record preserved byte-for-byte after a post-acceptance body-section defect was discovered. Its catalog metadata is the only materialized authority; ADR-MUT-0006 supersedes it forward. This one digest-pinned classification does not authorize repair in place or a general invalid-record exception.",
+            "legacy_record": {
+              "reference": "ADR-MUT-0005",
+              "title": "Unambiguous mutation digest and verification boundaries",
+              "status": "accepted",
+              "date": "2026-09-03",
+              "source_format": "v2-record-missing-required-section",
+              "supersedes": ["ADR-MUT-0004"],
+              "affected_rules": [
+                "law/policy/mutation-evidence-v2.json",
+                "law/schemas/mutation-evidence-policy-v2.schema.json",
+                "law/schemas/mutation-report-set-v2.schema.json"
+              ]
+            }
+          },
+          {
+            "path": "ADR-REL-0017-package-owned-release-policy-resolution.md",
+            "sha256": "07f1d17f88d8c48f25b51cff7e882cb2c7c23a3d529098c51b8c19431a946e19",
+            "disposition": "preserved-invalid-accepted-record",
+            "reason": "Accepted ADR-REL-0017 is preserved byte-for-byte after its noncanonical Consequences heading failed required_sections. Only this exact digest is catalogued; ADR-REL-0019 supersedes it with the same substantive source-resolution contract. No repair in place or general invalid-record exception is authorized.",
+            "legacy_record": {
+              "reference": "ADR-REL-0017",
+              "title": "Bind release planning to installed policy and declarative adoption",
+              "status": "accepted",
+              "date": "2026-09-03",
+              "source_format": "v2-record-missing-required-section",
+              "supersedes": [],
+              "affected_rules": [
+                "law/policy/action-registry.json",
+                "law/policy/release-lifecycle.json",
+                "law/schemas/release-lifecycle-policy.schema.json",
+                "law/schemas/release-plan-receipt-v2.schema.json",
+                "law/schemas/release-policy-resolution.schema.json"
+              ]
+            }
+          },
+          {
             "path": "README.md",
-            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "sha256": "3b1943af6a3024e6bdb6e1c1ec67683707cf3caac66ada69a26f2419ad80671f",
             "disposition": "non-record",
-            "reason": "Directory prose, not a decision record."
+            "reason": "Directory prose describing how adopters add their own records. It is not a decision record and carries no identity."
           }
         ],
         "digest_mismatch_behavior": "fail",
