@@ -38,8 +38,11 @@ import {
 import { builtInReleaseLifecycleLocalProvider } from '../../src/services/release-lifecycle-local-adapters.js';
 import {
   createContainerReleaseCertificationAdapters,
+  isVerifiedProtectedFixtureDiagnosticCustody,
   isVerifiedProtectedPreflightObservation,
+  takeProtectedFixtureDiagnosticCustody,
   takeProtectedPreflightObservation,
+  type ContainerReleaseCertificationOptions,
 } from '../../src/services/release-certification-provider.js';
 import { createResolvedReleasePlanInputResolver } from '../../src/services/release-policy-resolution.js';
 import { createFilesystemLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
@@ -49,8 +52,9 @@ import type {
   CertificationOutputClosureBinding,
 } from '../../src/services/release-prepare-kernel.js';
 
-const { containerRuns, runChecks, declaredRole } = vi.hoisted(() => ({
+const { containerRuns, containerStatus, runChecks, declaredRole } = vi.hoisted(() => ({
   containerRuns: vi.fn(),
+  containerStatus: { value: 0 },
   runChecks: vi.fn(),
   declaredRole: { value: 'inspector' as 'architect' | 'inspector' },
 }));
@@ -64,15 +68,26 @@ vi.mock('../../src/services/release-certification-container.js', () => ({
     verifyRuntime(): void {
       containerRuns();
     }
-    execute(input: { readonly declared_outputs: readonly string[] }) {
+    execute(input: {
+      readonly declared_outputs: readonly string[];
+      readonly diagnostic_output_paths?: readonly string[];
+    }) {
       containerRuns();
+      const outputs = input.declared_outputs.map((path) => ({
+        path,
+        mode: '100644' as const,
+        bytes: Buffer.from('protected preflight observation\n', 'utf8'),
+      }));
       return {
-        result: { status: 0, signal: null, stdout: '', stderr: '' },
-        outputs: input.declared_outputs.map((path) => ({
-          path,
-          mode: '100644',
-          bytes: Buffer.from('protected preflight observation\n', 'utf8'),
-        })),
+        result: { status: containerStatus.value, signal: null, stdout: '', stderr: '' },
+        outputs: containerStatus.value === 0 ? outputs : [],
+        ...(input.diagnostic_output_paths === undefined
+          ? {}
+          : {
+              diagnostic_outputs: input.diagnostic_output_paths.flatMap((path) =>
+                outputs.filter((output) => output.path === path),
+              ),
+            }),
       };
     }
   },
@@ -111,6 +126,7 @@ const cleanups: (() => void)[] = [];
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup());
   containerRuns.mockClear();
+  containerStatus.value = 0;
   declaredRole.value = 'inspector';
   vi.restoreAllMocks();
 });
@@ -491,7 +507,7 @@ describe('release lifecycle command adapter composition', () => {
       }
       return protectedReport;
     });
-    const protectedAdapters = createContainerReleaseCertificationAdapters({
+    const protectedAdapterOptions: ContainerReleaseCertificationOptions = {
       repository_root: root,
       repository_id: 'aarusso-nyx/devai',
       plans: [
@@ -531,6 +547,7 @@ describe('release lifecycle command adapter composition', () => {
       environment: {},
       toolchain: { node: 'v24.0.0' },
       timeout_ms: 1_000,
+      diagnostic_outputs: [{ task_node: 'format', paths: ['reports/preflight-observation.json'] }],
       content_source: {
         readGitObject: ({ type, object_id }) => {
           const result = spawnSync('git', ['-C', root, 'cat-file', type, object_id]);
@@ -557,9 +574,49 @@ describe('release lifecycle command adapter composition', () => {
           throw new Error('no generated outputs');
         },
       },
-    });
+    };
+    const protectedAdapters = createContainerReleaseCertificationAdapters(protectedAdapterOptions);
+    const createWithDiagnosticOutputs = (diagnostic_outputs: unknown) =>
+      Reflect.apply(createContainerReleaseCertificationAdapters, undefined, [
+        { ...protectedAdapterOptions, diagnostic_outputs },
+      ]);
+    for (const diagnostic_outputs of [
+      null,
+      [{ task_node: 'format', paths: ['reports/preflight-observation.json', 1] }],
+      [
+        { task_node: 'format', paths: ['reports/preflight-observation.json'] },
+        { task_node: 'format', paths: ['reports/preflight-observation.json'] },
+      ],
+    ]) {
+      expect(() => createWithDiagnosticOutputs(diagnostic_outputs)).toThrow(
+        'release-certification-diagnostic-controls-invalid',
+      );
+    }
+    const unplannedDiagnosticAdapters = createWithDiagnosticOutputs([
+      { task_node: 'format', paths: ['reports/not-planned.json'] },
+    ]);
     const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const errorOutput = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const unplannedProvider = Reflect.get(unplannedDiagnosticAdapters, 'preflight_provider');
+    if (typeof unplannedProvider !== 'function') {
+      throw new Error('unplanned diagnostic fixture provider missing');
+    }
+    containerRuns.mockClear();
+    const unplannedDiagnostic = await withProtectedPreflightScope(
+      {
+        repository: request.repository_locator,
+        task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+        plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+        state_root: join(root, 'unplanned-diagnostic-state'),
+      },
+      () => Reflect.apply(unplannedProvider, undefined, [request]),
+    );
+    expect(unplannedDiagnostic).toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-diagnostic-controls-invalid',
+    });
+    expect(containerRuns).not.toHaveBeenCalled();
+    containerRuns.mockClear();
     expect(declaredInvocationAuthority()).toEqual({
       actor: { kind: 'human', role: 'inspector', declaration_source: 'cli-flag' },
       consent: { write: true, allow_publish: false, experimental: false },
@@ -673,6 +730,125 @@ describe('release lifecycle command adapter composition', () => {
       takeProtectedPreflightObservation(protectedAdapters.preflight_provider, request),
     ).toThrow('release-certification-preflight-observation-unavailable');
 
+    const mismatchedCustodyRequest = {
+      ...request,
+      candidate_locator: { ...request.candidate_locator, tree: '0'.repeat(40) },
+    };
+    expect(() =>
+      takeProtectedFixtureDiagnosticCustody(
+        protectedAdapters.preflight_provider,
+        mismatchedCustodyRequest,
+      ),
+    ).toThrow('release-certification-diagnostic-custody-unavailable');
+    expect(() =>
+      takeProtectedFixtureDiagnosticCustody(protectedAdapters.preflight_provider, request),
+    ).toThrow('release-certification-diagnostic-custody-unavailable');
+
+    await withProtectedPreflightScope(
+      {
+        repository: request.repository_locator,
+        task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+        plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+        state_root: join(root, 'diagnostic-custody-state'),
+      },
+      () => protectedAdapters.preflight_provider(request),
+    );
+    const custody = takeProtectedFixtureDiagnosticCustody(
+      protectedAdapters.preflight_provider,
+      request,
+    );
+    expect(isVerifiedProtectedFixtureDiagnosticCustody(custody)).toBe(true);
+    expect(
+      isVerifiedProtectedFixtureDiagnosticCustody({
+        read: custody.read,
+        readOutput: custody.readOutput,
+      }),
+    ).toBe(false);
+    const custodyRead = custody.read();
+    expect(custodyRead).toMatchObject({
+      request,
+      runtime_identity: { protocol: 'test-protected-container-boundary' },
+      outcome: 'success',
+      runs: [
+        {
+          task_node: 'format',
+          process: { status: 0, signal: null, errorAbsent: true },
+          output_census: [
+            {
+              path: 'reports/preflight-observation.json',
+              mode: '100644',
+              sha256: createHash('sha256')
+                .update('protected preflight observation\n', 'utf8')
+                .digest('hex'),
+              size_bytes: Buffer.byteLength('protected preflight observation\n', 'utf8'),
+              task_node: 'format',
+            },
+          ],
+        },
+      ],
+    });
+    const capturedOutput = custodyRead.runs[0]?.output_census[0];
+    if (capturedOutput === undefined) throw new Error('missing diagnostic custody output');
+    const capturedPath = capturedOutput.path;
+    const capturedDigest = capturedOutput.sha256;
+    expect(Reflect.set(capturedOutput, 'path', 'mutated.json')).toBe(true);
+    expect(custody.read().runs[0]?.output_census[0]?.path).toBe(capturedPath);
+    const firstDiagnosticBytes = custody.readOutput({
+      run_index: 0,
+      path: capturedPath,
+      sha256: capturedDigest,
+    });
+    firstDiagnosticBytes.fill(0);
+    expect(
+      custody
+        .readOutput({
+          run_index: 0,
+          path: capturedPath,
+          sha256: capturedDigest,
+        })
+        .toString('utf8'),
+    ).toBe('protected preflight observation\n');
+    expect(() =>
+      custody.readOutput({ run_index: 0, path: capturedPath, sha256: '0'.repeat(64) }),
+    ).toThrow('release-certification-diagnostic-output-unavailable');
+    expect(() =>
+      custody.readOutput({
+        run_index: 1,
+        path: capturedPath,
+        sha256: capturedDigest,
+      }),
+    ).toThrow('release-certification-diagnostic-output-unavailable');
+    expect(() =>
+      takeProtectedFixtureDiagnosticCustody(protectedAdapters.preflight_provider, request),
+    ).toThrow('release-certification-diagnostic-custody-unavailable');
+
+    containerStatus.value = 1;
+    const diagnosticFailure = await withProtectedPreflightScope(
+      {
+        repository: request.repository_locator,
+        task_policy_digest_sha256: protectedPlan.taskPolicyDigest,
+        plan_receipt_digest_sha256: receipt.receipt_digest_sha256,
+        state_root: join(root, 'diagnostic-custody-failure-state'),
+      },
+      () => protectedAdapters.preflight_provider(request),
+    );
+    containerStatus.value = 0;
+    expect(diagnosticFailure).toMatchObject({ outcome: 'failure' });
+    const failedCustody = takeProtectedFixtureDiagnosticCustody(
+      protectedAdapters.preflight_provider,
+      request,
+    );
+    expect(failedCustody.read()).toMatchObject({
+      outcome: 'failure',
+      runs: [
+        {
+          task_node: 'format',
+          process: { status: 1, signal: null, errorAbsent: true },
+          output_census: [{ path: 'reports/preflight-observation.json', task_node: 'format' }],
+        },
+      ],
+    });
+
     const failedPreflightRoot = join(root, 'failed-preflight-state');
     runChecks.mockImplementationOnce(() => {
       throw new Error(`native runner fixture path ${root}`);
@@ -707,6 +883,9 @@ describe('release lifecycle command adapter composition', () => {
     expect(() =>
       takeProtectedPreflightObservation(protectedAdapters.preflight_provider, request),
     ).toThrow('release-certification-preflight-observation-unavailable');
+    expect(() =>
+      takeProtectedFixtureDiagnosticCustody(protectedAdapters.preflight_provider, request),
+    ).toThrow('release-certification-diagnostic-custody-unavailable');
     output.mockClear();
     errorOutput.mockClear();
 
