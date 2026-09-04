@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 docker.io/library/node@sha256:e9b5516b06baeaea9a8e65a7aec6a85fbb960a30b52b66968f2c8092b3e2a3eb
+FROM --platform=linux/arm64 docker.io/library/node@sha256:b38e82994ef7f534b41ac5084760354038376be3a7e1af65645beb9bacea49ea
 # Reproducible export requires --output type=image,rewrite-timestamp=true,unpack=false.
 # Always select the protected daemon/config explicitly; never publish this local tool image.
 ARG SOURCE_DATE_EPOCH=1787529600
