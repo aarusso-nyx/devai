@@ -69,8 +69,10 @@ function storeFixture() {
 }
 
 async function invokeSink<T>(
+  owner: object,
   callback: () => T | Promise<T>,
   adapterAction: 'release certify' | 'release preflight' = 'release certify',
+  observeOperation?: () => void,
 ): Promise<Awaited<T>> {
   let ordinal = 0;
   const issuer = createAuthorityDecisionIssuer({
@@ -99,6 +101,7 @@ async function invokeSink<T>(
       ) {
         throw new Error('TEST_PROTECTED_SINK_OPERATION_REQUIRED');
       }
+      observeOperation?.();
       return apply();
     },
   };
@@ -110,7 +113,7 @@ async function invokeSink<T>(
     helper_identity_sha256: 'e'.repeat(64),
   });
   try {
-    return await runWithAuthorityHostEffects(scope, () => adapter.invokeSink(callback));
+    return await runWithAuthorityHostEffects(scope, () => adapter.invokeSink(callback, owner));
   } finally {
     issuer.dispose();
   }
@@ -138,20 +141,76 @@ describe('durable external certification evidence store', () => {
     const fixture = storeFixture();
     await refusal(() => fixture.store.begin([binding('@fixture/package')]));
     await expect(
-      invokeSink(() => fixture.store.begin([binding('@fixture/package')]), 'release preflight'),
+      invokeSink(
+        fixture.store.authority_owner,
+        () => fixture.store.begin([binding('@fixture/package')]),
+        'release preflight',
+      ),
     ).rejects.toThrow('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+  });
+
+  it('binds one sink owner to one live certify call and rejects scope escape', async () => {
+    const first = storeFixture();
+    const second = storeFixture();
+    const selected = binding('@fixture/package');
+    let operations = 0;
+    const transaction = await invokeSink(
+      first.store.authority_owner,
+      () => first.store.begin([selected]),
+      'release certify',
+      () => {
+        operations += 1;
+      },
+    );
+    expect(operations).toBe(1);
+    const bytes = Buffer.from('one logical put');
+    await invokeSink(
+      first.store.authority_owner,
+      () => transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+      'release certify',
+      () => {
+        operations += 1;
+      },
+    );
+    expect(operations).toBe(2);
+
+    await refusal(() =>
+      invokeSink(first.store.authority_owner, () => second.store.begin([selected])),
+    );
+    await refusal(() =>
+      invokeSink(first.store.authority_owner, async () => {
+        await Promise.resolve();
+        return first.store.begin([binding('@fixture/later')]);
+      }),
+    );
+  });
+
+  it('refuses unknown protected host binding keys before the callback can run', () => {
+    const binding = {
+      action_id: 'release certify' as const,
+      repository: { id: 'fixture/repository', commit: COMMIT, tree: TREE },
+      task_policy_digest_sha256: TASK_POLICY,
+      plan_receipt_digest_sha256: 'd'.repeat(64),
+      helper_identity_sha256: 'e'.repeat(64),
+      unrecognized: true,
+    };
+    expect(() => createProtectedReleaseHostAdapter(binding as never)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
   });
 
   it('reopens committed closure, receipt and blob, including an explicit empty package', async () => {
     const fixture = storeFixture();
     const empty = binding('@fixture/empty');
     const generated = binding('@fixture/generated');
-    const transaction = await invokeSink(() => fixture.store.begin([empty, generated]));
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([empty, generated]),
+    );
     const bytes = Buffer.from('{"generated":true}\n');
-    const handle = await invokeSink(() =>
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
       transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
-    const closures = await invokeSink(() =>
+    const closures = await invokeSink(fixture.store.authority_owner, () =>
       transaction.commit([
         { ...empty, outputs: [] },
         { ...generated, outputs: [output(handle)] },
@@ -185,39 +244,51 @@ describe('durable external certification evidence store', () => {
   it('keeps pre-commit and aborted evidence unreadable and makes commit terminal', async () => {
     const fixture = storeFixture();
     const selected = binding('@fixture/package');
-    const transaction = await invokeSink(() => fixture.store.begin([selected]));
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
     const bytes = Buffer.from('staged');
-    const handle = await invokeSink(() =>
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
       transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
     await refusal(() => fixture.store.readCertificationOutputClosure(selected));
-    await invokeSink(() => transaction.abort());
+    await invokeSink(fixture.store.authority_owner, () => transaction.abort());
     await refusal(() => fixture.store.readCertificationOutputClosure(selected));
-    await refusal(() => invokeSink(() => transaction.abort()));
+    await refusal(() => invokeSink(fixture.store.authority_owner, () => transaction.abort()));
     await refusal(() =>
-      invokeSink(() => transaction.commit([{ ...selected, outputs: [output(handle)] }])),
+      invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...selected, outputs: [output(handle)] }]),
+      ),
     );
 
-    const committed = await invokeSink(() => fixture.store.begin([selected]));
-    const committedHandle = await invokeSink(() =>
+    const committed = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const committedHandle = await invokeSink(fixture.store.authority_owner, () =>
       committed.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
-    await invokeSink(() => committed.commit([{ ...selected, outputs: [output(committedHandle)] }]));
-    await refusal(() => invokeSink(() => committed.abort()));
+    await invokeSink(fixture.store.authority_owner, () =>
+      committed.commit([{ ...selected, outputs: [output(committedHandle)] }]),
+    );
+    await refusal(() => invokeSink(fixture.store.authority_owner, () => committed.abort()));
     await refusal(() =>
-      invokeSink(() => committed.commit([{ ...selected, outputs: [output(committedHandle)] }])),
+      invokeSink(fixture.store.authority_owner, () =>
+        committed.commit([{ ...selected, outputs: [output(committedHandle)] }]),
+      ),
     );
   });
 
   it('refuses corrupt bytes and foreign candidate or package closure references', async () => {
     const fixture = storeFixture();
     const selected = binding('@fixture/package');
-    const transaction = await invokeSink(() => fixture.store.begin([selected]));
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
     const bytes = Buffer.from('verified');
-    const handle = await invokeSink(() =>
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
       transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
-    const closure = await invokeSink(() =>
+    const closure = await invokeSink(fixture.store.authority_owner, () =>
       transaction.commit([{ ...selected, outputs: [output(handle)] }]),
     );
     const receipt = closure[0]?.outputs[0]?.certification_evidence_receipt;
@@ -244,50 +315,68 @@ describe('durable external certification evidence store', () => {
     const first = binding('@fixture/one');
     const second = binding('@fixture/two');
     const bytes = Buffer.from('body');
-    const invalid = await invokeSink(() => fixture.store.begin([first]));
-    await refusal(() =>
-      invokeSink(() => invalid.put({ bytes, sha256: '0'.repeat(64), size_bytes: bytes.length })),
+    const invalid = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([first]),
     );
     await refusal(() =>
-      invokeSink(() => invalid.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length + 1 })),
+      invokeSink(fixture.store.authority_owner, () =>
+        invalid.put({ bytes, sha256: '0'.repeat(64), size_bytes: bytes.length }),
+      ),
+    );
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () =>
+        invalid.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length + 1 }),
+      ),
     );
 
-    const transaction = await invokeSink(() => fixture.store.begin([first, second]));
-    await invokeSink(() =>
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([first, second]),
+    );
+    await invokeSink(fixture.store.authority_owner, () =>
       transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
-    await refusal(() => invokeSink(() => transaction.commit([{ ...first, outputs: [] }])));
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...first, outputs: [] }]),
+      ),
+    );
 
-    const duplicate = await invokeSink(() => fixture.store.begin([first]));
-    const duplicateHandle = await invokeSink(() =>
+    const duplicate = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([first]),
+    );
+    const duplicateHandle = await invokeSink(fixture.store.authority_owner, () =>
       duplicate.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
     await refusal(() =>
-      invokeSink(() =>
+      invokeSink(fixture.store.authority_owner, () =>
         duplicate.commit([
           { ...first, outputs: [output(duplicateHandle), output(duplicateHandle)] },
         ]),
       ),
     );
 
-    const hostPath = await invokeSink(() => fixture.store.begin([first]));
-    const hostHandle = await invokeSink(() =>
+    const hostPath = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([first]),
+    );
+    const hostHandle = await invokeSink(fixture.store.authority_owner, () =>
       hostPath.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
     await refusal(() =>
-      invokeSink(() =>
+      invokeSink(fixture.store.authority_owner, () =>
         hostPath.commit([
           { ...first, outputs: [{ ...output(hostHandle), path: '/host/controlled/output.json' }] },
         ]),
       ),
     );
 
-    const foreignHandle = await invokeSink(() => fixture.store.begin([first]));
-    await invokeSink(() =>
+    const foreignHandle = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([first]),
+    );
+    await invokeSink(fixture.store.authority_owner, () =>
       foreignHandle.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
     );
     await refusal(() =>
-      invokeSink(() =>
+      invokeSink(fixture.store.authority_owner, () =>
         foreignHandle.commit([
           {
             ...first,
@@ -314,9 +403,13 @@ describe('durable external certification evidence store', () => {
     writeFileSync(join(fixture.evidenceRoot, 'objects', sha256(bytes)), conflicting, {
       mode: 0o600,
     });
-    const transaction = await invokeSink(() => fixture.store.begin([binding('@fixture/package')]));
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([binding('@fixture/package')]),
+    );
     await refusal(() =>
-      invokeSink(() => transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length })),
+      invokeSink(fixture.store.authority_owner, () =>
+        transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+      ),
     );
     expect(lstatSync(join(fixture.evidenceRoot, 'objects', sha256(bytes))).isFile()).toBe(true);
     expect(readdirSync(join(fixture.evidenceRoot, 'staging'))).not.toHaveLength(0);
