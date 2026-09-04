@@ -459,7 +459,77 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   };
 }
 
+type AsyncTaskExecutor = (
+  ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
+) => TaskExecutionResult | Promise<TaskExecutionResult>;
+
+type TaskExecutionEffect = () => TaskExecutionResult | Promise<TaskExecutionResult>;
+
+/** The synchronous API and protected asynchronous host share every planning/result rule. */
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
+  const steps = runCheckTaskSteps(inputOptions);
+  let step = steps.next();
+  while (!step.done) {
+    let result: TaskExecutionResult | Promise<TaskExecutionResult>;
+    try {
+      result = step.value();
+      if (result !== null && typeof result === 'object' && 'then' in result)
+        throw new Error('CHECK_RUNNER_ASYNC_EXECUTOR_REQUIRES_ASYNC_HOST');
+    } catch (error) {
+      steps.throw(error);
+      throw error;
+    }
+    step = steps.next(result);
+  }
+  return step.value;
+}
+
+/**
+ * Internal host orchestration only: await a task's complete execution/retention
+ * before processing its result or advancing to a dependent task. This adds no
+ * release action, receipt authority, or exception to the mutation producer guard.
+ */
+export async function runCheckTasksAsync(
+  inputOptions: Omit<CheckRunnerOptions, 'executeTask'> & {
+    readonly executeTask?: AsyncTaskExecutor;
+  },
+): Promise<CheckRunnerReport> {
+  const { executeTask, resolveExecutable, readTaskOutput, capturedTaskOutputPaths, now, ...data } =
+    inputOptions;
+  // Host functions are captured once; caller-owned documents cannot drift while
+  // a task is awaited. None of these callbacks is resolved from candidate data.
+  const captured: CheckRunnerOptions = {
+    ...structuredClone(data),
+    ...(resolveExecutable === undefined ? {} : { resolveExecutable }),
+    ...(readTaskOutput === undefined ? {} : { readTaskOutput }),
+    ...(capturedTaskOutputPaths === undefined ? {} : { capturedTaskOutputPaths }),
+    ...(now === undefined ? {} : { now }),
+  };
+  const steps = runCheckTaskSteps(
+    captured,
+    executeTask === undefined
+      ? undefined
+      : (argv, cwd, timeout, environment) =>
+          executeTask([...argv], cwd, timeout, { ...environment }),
+  );
+  let step = steps.next();
+  while (!step.done) {
+    let result: TaskExecutionResult;
+    try {
+      result = await step.value();
+    } catch (error) {
+      steps.throw(error);
+      throw error;
+    }
+    step = steps.next(result);
+  }
+  return step.value;
+}
+
+function* runCheckTaskSteps(
+  inputOptions: CheckRunnerOptions,
+  asyncExecutor?: AsyncTaskExecutor,
+): Generator<TaskExecutionEffect, CheckRunnerReport, TaskExecutionResult> {
   const request = bindReleaseRequest(inputOptions);
   const options = request.options;
   const protectedOutputCapture =
@@ -635,29 +705,31 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     }
     const taskCwd = realpathSync(resolve(options.repoRoot, task.cwd));
     const taskEnv = taskEnvironment(descriptorTask, environment);
-    const result =
-      options.executeTask === undefined
-        ? defaultExecute(
-            [task.executable.path, ...task.argv.slice(1)],
-            taskCwd,
-            timeoutMs,
-            taskEnv,
-            options.target === 'release'
-              ? {
-                  candidate: {
-                    commit: plan.repository.commit,
-                    tree: plan.repository.tree,
-                  },
-                  descriptor_digest: plan.descriptorDigest,
-                  task_policy_digest: plan.taskPolicyDigest,
-                  node_id: task.nodeId,
-                  executable: task.executable,
-                  argv: task.argv,
-                  cwd: task.cwd,
-                }
-              : undefined,
-          )
-        : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv);
+    const result = yield () =>
+      asyncExecutor !== undefined
+        ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv)
+        : options.executeTask === undefined
+          ? defaultExecute(
+              [task.executable.path, ...task.argv.slice(1)],
+              taskCwd,
+              timeoutMs,
+              taskEnv,
+              options.target === 'release'
+                ? {
+                    candidate: {
+                      commit: plan.repository.commit,
+                      tree: plan.repository.tree,
+                    },
+                    descriptor_digest: plan.descriptorDigest,
+                    task_policy_digest: plan.taskPolicyDigest,
+                    node_id: task.nodeId,
+                    executable: task.executable,
+                    argv: task.argv,
+                    cwd: task.cwd,
+                  }
+                : undefined,
+            )
+          : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv);
     const durationMs = Math.max(0, Date.now() - started);
     const finishedAt = now();
     const outcome = executionOutcome(result);
