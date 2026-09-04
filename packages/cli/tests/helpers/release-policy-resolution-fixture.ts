@@ -217,6 +217,7 @@ export interface LifecyclePolicyFixture {
   readonly resolve_plan_input: (input: Readonly<Record<string, unknown>>) => unknown;
   readonly intent: Readonly<Record<string, unknown>>;
   readonly package_json: Buffer;
+  readonly expected: Parameters<typeof resolveReleasePolicySnapshot>[0]['expected'];
 }
 export function createLifecyclePolicyFixture(): LifecyclePolicyFixture {
   const checked = packageSnapshot();
@@ -357,14 +358,15 @@ export function createLifecyclePolicyFixture(): LifecyclePolicyFixture {
       build_provenance_sha256: sha256(provenance),
     },
   };
+  const expected = {
+    repository: candidate.snapshot.repository,
+    installed_package: checked.identity,
+    installation_origin: 'external-producer-toolchain',
+    release_unit: PACKAGE,
+    producer_toolchain,
+  } as const;
   const resolution = resolveReleasePolicySnapshot({
-    expected: {
-      repository: candidate.snapshot.repository,
-      installed_package: checked.identity,
-      installation_origin: 'external-producer-toolchain',
-      release_unit: PACKAGE,
-      producer_toolchain,
-    },
+    expected,
     installed_package: checked,
     candidate: candidate.snapshot,
     producer: { files: toolchain, source: source.snapshot, build_provenance: provenance },
@@ -393,5 +395,6 @@ export function createLifecyclePolicyFixture(): LifecyclePolicyFixture {
     resolve_plan_input: createResolvedReleasePlanInputResolver(resolution),
     intent,
     package_json,
+    expected,
   };
 }
