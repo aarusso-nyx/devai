@@ -16,11 +16,23 @@ import {
   type AuthorityHostEffectScope,
   type ProtectedReleaseExportCapacityBinding,
 } from '@devai-nyx/authority';
-import { canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
 import { createReleasePolicyClosure } from '../../src/services/release-policy-closure.js';
-import { finalizeCertificationManifest } from '../../src/services/release-prepare-kernel.js';
+import {
+  RELEASE_EXPORT_SPEC_DIGEST,
+  RELEASE_EXPORT_SPEC_ID,
+} from '../../src/services/release-export-artifact-store.js';
+import {
+  encodeReleaseExportProviderResult,
+  encodeReleaseExportTranscript,
+} from '../../src/services/release-export-transcript.js';
+import {
+  RELEASE_PACK_SPEC_DIGEST,
+  RELEASE_PACK_SPEC_ID,
+  finalizeCertificationManifest,
+} from '../../src/services/release-prepare-kernel.js';
 import { createReleaseCertificationProvider } from '../../src/services/release-lifecycle-certification.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
@@ -37,6 +49,7 @@ import {
   verifyReleaseStateIdentity,
   type ReleaseLifecycleRequest,
   type ReleaseStateMaterial,
+  type OpaqueArtifactIdentity,
   type StoreRecord,
   type AuthorizationAttemptBinding,
   type AuthorizationBridge,
@@ -290,7 +303,7 @@ function opaqueArtifact(
     | 'evidence-manifest'
     | 'provider-result',
   handle: string,
-) {
+): OpaqueArtifactIdentity {
   return {
     kind,
     sink_id: SINK_ID,
@@ -302,7 +315,7 @@ function opaqueArtifact(
 
 function committedSink(artifacts: ReleaseStateMaterial['artifacts']) {
   const manifest = Buffer.from(
-    JSON.stringify({
+    canonicalJson({
       schemaVersion: '1.0.0',
       kind: 'release-artifact-sink-commit-manifest',
       sink_id: SINK_ID,
@@ -327,6 +340,73 @@ function committedSink(artifacts: ReleaseStateMaterial['artifacts']) {
   };
 }
 
+function opaqueBytes(
+  kind: OpaqueArtifactIdentity['kind'],
+  handle: string,
+  bytes: Buffer,
+): OpaqueArtifactIdentity {
+  return {
+    kind,
+    sink_id: SINK_ID,
+    opaque_handle: handle,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    size_bytes: bytes.byteLength,
+  } as const;
+}
+
+function requireOpaqueArtifact(
+  artifact: ReleaseStateMaterial['artifacts'][number],
+): OpaqueArtifactIdentity {
+  if (!('sink_id' in artifact)) throw new Error('opaque fixture expected');
+  return artifact;
+}
+
+function opaqueArtifacts(
+  artifacts: readonly ReleaseStateMaterial['artifacts'][number][],
+): OpaqueArtifactIdentity[] {
+  return artifacts.map(requireOpaqueArtifact);
+}
+
+function sortOpaque(artifacts: readonly OpaqueArtifactIdentity[]): OpaqueArtifactIdentity[] {
+  return [...artifacts].sort((left, right) => {
+    return Buffer.compare(
+      Buffer.from(
+        `${left.kind}\0${left.sink_id}\0${left.opaque_handle}\0${left.sha256}\0${left.size_bytes}`,
+      ),
+      Buffer.from(
+        `${right.kind}\0${right.sink_id}\0${right.opaque_handle}\0${right.sha256}\0${right.size_bytes}`,
+      ),
+    );
+  });
+}
+
+function preparedPackageManifestBytes(
+  certification: NonNullable<
+    NonNullable<
+      ReleaseStateMaterial['release_units'][number]['packages'][number]['certification_manifest']
+    >
+  >,
+  tarball: ReturnType<typeof opaqueArtifact>,
+  sbom: ReturnType<typeof opaqueArtifact>,
+): Buffer {
+  return Buffer.from(
+    canonicalJson({
+      schemaVersion: '2.0.0',
+      kind: 'release-prepared-package-manifest',
+      candidate: { commit: COMMIT, tree: TREE },
+      package_id: '@aarusso-nyx/devai',
+      package_version: '1.5.0',
+      pack_spec_id: RELEASE_PACK_SPEC_ID,
+      pack_spec_digest_sha256: RELEASE_PACK_SPEC_DIGEST,
+      certification_manifest_digest_sha256: certification.manifest_digest_sha256,
+      artifacts: {
+        tarball: { sha256: tarball.sha256, size_bytes: tarball.size_bytes },
+        sbom: { sha256: sbom.sha256, size_bytes: sbom.size_bytes },
+      },
+    }),
+  );
+}
+
 function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseStateMaterial {
   const base = material();
   const baseUnit = required(base.release_units[0], 'missing base unit');
@@ -342,11 +422,17 @@ function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseState
       release_units: [{ ...baseUnit, packages: [certified] }],
     };
   }
+  const packageTarball = opaqueArtifact('package-tarball', 'package-tarball');
+  const packageSbom = opaqueArtifact('package-sbom', 'package-sbom');
   const prepared = {
     package_id: certified.package_id,
-    package_manifest: opaqueArtifact('package-manifest', 'package-manifest'),
-    package_tarball: opaqueArtifact('package-tarball', 'package-tarball'),
-    package_sbom: opaqueArtifact('package-sbom', 'package-sbom'),
+    package_manifest: opaqueBytes(
+      'package-manifest',
+      'package-manifest',
+      preparedPackageManifestBytes(certified.certification_manifest, packageTarball, packageSbom),
+    ),
+    package_tarball: packageTarball,
+    package_sbom: packageSbom,
     evidence_manifest: null,
     provider_result: null,
     trust: null,
@@ -361,29 +447,150 @@ function materialFor(action: ReleaseLifecycleRequest['action_id']): ReleaseState
       artifact_sink: committedSink(artifacts).identity,
     };
   }
-  const exported = {
-    ...prepared,
-    evidence_manifest: opaqueArtifact('evidence-manifest', 'evidence-manifest'),
-    provider_result: opaqueArtifact('provider-result', 'provider-result'),
-    trust: {
-      trust_root_id: 'release-root',
-      trust_store_digest_sha256: 'b'.repeat(64),
-      key_id: 'release-key',
-      signature_algorithm: 'ed25519' as const,
-    },
+  return exportFixture().material;
+}
+
+function exportFixture(): {
+  readonly material: ReleaseStateMaterial;
+  readonly bytes: ReadonlyMap<string, Buffer>;
+} {
+  const prepared = materialFor('release prepare');
+  const preparedUnit = required(prepared.release_units[0], 'missing prepared release unit');
+  const preparedPackage = required(preparedUnit.packages[0], 'missing prepared package');
+  const preparedArtifacts = opaqueArtifacts(prepared.artifacts);
+  const parent = committedSink(preparedArtifacts);
+  const trust = {
+    trust_root_id: 'release-root',
+    trust_store_digest_sha256: 'b'.repeat(64),
+    key_id: 'release-key',
+    signature_algorithm: 'ed25519' as const,
   };
-  const artifacts = [
-    exported.evidence_manifest,
-    prepared.package_manifest,
-    prepared.package_sbom,
-    prepared.package_tarball,
-    exported.provider_result,
-  ];
+  const closureBytes = Buffer.from(
+    canonicalJson({ format: 'opaque-policy-closure-fixture', package_id: '@aarusso-nyx/devai' }),
+  );
+  const evidenceManifest = opaqueBytes('evidence-manifest', 'evidence-manifest', closureBytes);
+  const closureInput = {
+    package_id: '@aarusso-nyx/devai',
+    sha256: evidenceManifest.sha256,
+    size_bytes: evidenceManifest.size_bytes,
+    expected_installed_package: {
+      name: '@aarusso-nyx/devai' as const,
+      version: '1.5.0',
+      archive_sha256: 'a'.repeat(64),
+      content_manifest_sha256: 'c'.repeat(64),
+    },
+    policy_resolution_digest_sha256: 'd'.repeat(64),
+  };
+  const binding = {
+    action_id: 'release export' as const,
+    repository: { id: 'aarusso-nyx/devai', commit: COMMIT, tree: TREE },
+    candidate: { commit: COMMIT, tree: TREE },
+    plan_receipt_digest_sha256: String(planReceipt()['receipt_digest_sha256']),
+    parent_artifact_sink: parent.identity,
+    sink_id: SINK_ID,
+    destination: { kind: 'evidence-destination', exact_identifier: 'external/devai-1.5.0' },
+    trust,
+    attempt_id: 'RLA-0123456789abcdef',
+    export_spec_digest_sha256: RELEASE_EXPORT_SPEC_DIGEST,
+    closure_inputs: [closureInput],
+  };
+  const transcript = encodeReleaseExportTranscript(
+    {
+      version: 'devai.release-export-transcript-json.v1',
+      binding: {
+        action_id: binding.action_id,
+        repository: binding.repository,
+        candidate: binding.candidate,
+        plan_receipt_digest_sha256: binding.plan_receipt_digest_sha256,
+        parent_artifact_sink: binding.parent_artifact_sink,
+        sink_id: binding.sink_id,
+        destination: binding.destination,
+        trust: binding.trust,
+        attempt_id: binding.attempt_id,
+      },
+      parent: preparedArtifacts,
+      closures: [
+        {
+          package_id: closureInput.package_id,
+          evidence_manifest: evidenceManifest,
+          expected_installed_package: closureInput.expected_installed_package,
+          policy_resolution_digest_sha256: closureInput.policy_resolution_digest_sha256,
+        },
+      ],
+      destination: binding.destination,
+      trust: binding.trust,
+    },
+    {
+      maximum_transcript_bytes: 64 * 1024,
+      maximum_provider_result_bytes: 64 * 1024,
+      maximum_packages: 1,
+    },
+  );
+  const providerBytes = encodeReleaseExportProviderResult(
+    { package_id: closureInput.package_id, transcript, signature: 'AQ==' },
+    {
+      maximum_transcript_bytes: 64 * 1024,
+      maximum_provider_result_bytes: 64 * 1024,
+      maximum_packages: 1,
+    },
+  );
+  const providerResult = opaqueBytes('provider-result', 'provider-result', providerBytes);
+  const exported = {
+    ...preparedPackage,
+    evidence_manifest: evidenceManifest,
+    provider_result: providerResult,
+    trust,
+  };
+  const artifacts = sortOpaque([...preparedArtifacts, evidenceManifest, providerResult]);
+  const manifest = Buffer.from(
+    canonicalJson({
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: SINK_ID,
+      transaction_handle: 'export-transaction',
+      repository: binding.repository,
+      candidate: binding.candidate,
+      export_spec_id: RELEASE_EXPORT_SPEC_ID,
+      export_spec_digest_sha256: RELEASE_EXPORT_SPEC_DIGEST,
+      parent_artifact_sink: parent.identity,
+      binding,
+      artifacts,
+    }),
+  );
+  const exportSink = {
+    sink_id: SINK_ID,
+    transaction_handle: 'export-transaction',
+    committed_manifest_handle: 'export-commit-manifest',
+    committed_manifest_sha256: createHash('sha256').update(manifest).digest('hex'),
+    committed_manifest_size_bytes: manifest.byteLength,
+    commit_protocol: 'devai.artifact-sink.two-phase.v1' as const,
+  };
+  const objectBytes = new Map<string, Buffer>([
+    [parent.identity.committed_manifest_handle, parent.manifest],
+    [exportSink.committed_manifest_handle, manifest],
+    [evidenceManifest.opaque_handle, closureBytes],
+    [providerResult.opaque_handle, providerBytes],
+    ...preparedArtifacts.map((entry) => {
+      return [
+        entry.opaque_handle,
+        entry.kind === 'package-manifest'
+          ? preparedPackageManifestBytes(
+              required(preparedPackage.certification_manifest, 'missing prepared certification'),
+              required(preparedPackage.package_tarball, 'missing prepared tarball'),
+              required(preparedPackage.package_sbom, 'missing prepared sbom'),
+            )
+          : Buffer.from(ARTIFACT_BYTES),
+      ] as const;
+    }),
+  ]);
   return {
-    ...base,
-    release_units: [{ ...baseUnit, packages: [exported] }],
-    artifacts,
-    artifact_sink: committedSink(artifacts).identity,
+    material: {
+      ...prepared,
+      release_units: [{ ...preparedUnit, packages: [exported] }],
+      artifacts,
+      artifact_sink: exportSink,
+    },
+    bytes: objectBytes,
   };
 }
 
@@ -429,11 +636,46 @@ function providerFor(action: ReleaseLifecycleRequest['action_id']) {
 }
 
 function artifactReaderFor(action: ReleaseLifecycleRequest['action_id']) {
+  if (['release export', 'release evidence-publish', 'release publish'].includes(action)) {
+    const exported = exportFixture();
+    return {
+      readArtifact: ({ opaque_handle }: { readonly opaque_handle: string }) => {
+        const bytes = exported.bytes.get(opaque_handle);
+        if (bytes === undefined) throw new Error('fixture export artifact missing');
+        return Buffer.from(bytes);
+      },
+    };
+  }
   const material = materialFor(action);
   const sink = committedSink(material.artifacts);
+  const preparedPackage = material.release_units
+    .flatMap((unit) => unit.packages)
+    .find((entry) => entry.package_manifest !== null && entry.package_manifest !== undefined);
+  const packageManifest =
+    preparedPackage?.package_manifest === null || preparedPackage?.package_manifest === undefined
+      ? undefined
+      : preparedPackage.package_manifest;
+  const packageManifestBytes =
+    packageManifest === undefined ||
+    preparedPackage?.certification_manifest === null ||
+    preparedPackage?.certification_manifest === undefined ||
+    preparedPackage.package_tarball === null ||
+    preparedPackage.package_tarball === undefined ||
+    preparedPackage.package_sbom === null ||
+    preparedPackage.package_sbom === undefined
+      ? undefined
+      : preparedPackageManifestBytes(
+          preparedPackage.certification_manifest,
+          preparedPackage.package_tarball,
+          preparedPackage.package_sbom,
+        );
   return {
-    readArtifact: ({ opaque_handle }: { readonly opaque_handle: string }) =>
-      opaque_handle === COMMIT_MANIFEST_HANDLE ? sink.manifest : ARTIFACT_BYTES,
+    readArtifact: ({ opaque_handle }: { readonly opaque_handle: string }) => {
+      if (opaque_handle === COMMIT_MANIFEST_HANDLE) return sink.manifest;
+      if (opaque_handle === packageManifest?.opaque_handle && packageManifestBytes !== undefined)
+        return packageManifestBytes;
+      return ARTIFACT_BYTES;
+    },
   };
 }
 
@@ -1030,8 +1272,8 @@ function root(): string {
   return realpathSync(mkdtempSync(join(tmpdir(), 'devai-release-lifecycle-')));
 }
 
-function required<T>(value: T | undefined, message: string): T {
-  if (value === undefined) throw new Error(message);
+function required<T>(value: T | null | undefined, message: string): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error(message);
   return value;
 }
 
@@ -1109,6 +1351,7 @@ describe('release lifecycle execution kernel', () => {
     const store = new ReleaseLifecycleFileStore(root(), value);
     await seedCertified(store);
     const parent = required(store.readStateRecords().at(-1), 'missing certified parent');
+    const preparedMaterial = materialFor('release prepare');
     let escaped: unknown;
     const provider = vi.fn((providerRequest, context) => {
       const bound = assertReleaseProviderInvocationContext(providerRequest, context);
@@ -1140,7 +1383,7 @@ describe('release lifecycle execution kernel', () => {
         'release-provider-invocation-unbound',
       );
       escaped = bound;
-      return { outcome: 'success' as const, material: materialFor('release prepare') };
+      return { outcome: 'success' as const, material: preparedMaterial };
     });
 
     const result = await withReleasePrepareAuthorityFixture(value, () =>
@@ -1983,7 +2226,7 @@ describe('release lifecycle execution kernel', () => {
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
     );
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
     expect(result.state['publication_expectation']).toMatchObject(publicationControls());
     expect(
