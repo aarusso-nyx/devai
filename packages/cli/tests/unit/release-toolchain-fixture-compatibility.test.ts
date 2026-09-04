@@ -520,6 +520,51 @@ describe('release toolchain fixture compatibility', () => {
     ).toThrow('release-toolchain-fixture-compatibility-invalid');
   });
 
+  it('binds a wider production toolchain census without unbinding the pinned keys', () => {
+    const value = fixture();
+    const pinned = {
+      node: 'v24.20.0',
+      pnpm: '9.15.0',
+      git: '2.47.3',
+      vitest: '4.1.10',
+      typescript: '5.9.3',
+      stryker: '9.6.1',
+    } as const;
+    const build = (toolchain: Readonly<Record<string, string>>) =>
+      createProtectedToolchainFixtureContext({
+        candidate: value.candidate,
+        installed_package: value.installed,
+        fixture_resolution: value.fixtureResolution,
+        production_resolution: value.productionResolution,
+        controls: value.controls,
+        dependencies: value.dependencies,
+        environment: {},
+        toolchain,
+      });
+    // The production lane shares this object and declares every key its own DAG
+    // binds; an extra key is bound evidence, not an unchecked input.
+    expect(() => build({ ...pinned, eslint: '9.39.5' })).not.toThrow();
+    // Every pinned key stays mandatory.
+    for (const key of Object.keys(pinned)) {
+      const { [key]: _dropped, ...without } = { ...pinned, eslint: '9.39.5' };
+      expect(() => build(without as Readonly<Record<string, string>>)).toThrow(
+        'release-toolchain-fixture-compatibility-invalid',
+      );
+    }
+    // The version-pinned keys stay exact. `git` is bound by the recorded identity
+    // rather than pinned to a literal here, which this contract has never done.
+    for (const [key, value_] of Object.entries(pinned)) {
+      if (key === 'git') continue;
+      expect(() => build({ ...pinned, eslint: '9.39.5', [key]: `${value_}-drift` })).toThrow(
+        'release-toolchain-fixture-compatibility-invalid',
+      );
+    }
+    // An empty extra value is not a declaration.
+    expect(() => build({ ...pinned, eslint: '' })).toThrow(
+      'release-toolchain-fixture-compatibility-invalid',
+    );
+  });
+
   it('consumes a bound context on a malformed task observation', () => {
     const value = fixture();
     const protectedContext = context(value);

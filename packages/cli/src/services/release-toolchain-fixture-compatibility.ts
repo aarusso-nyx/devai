@@ -204,9 +204,15 @@ export function createProtectedToolchainFixtureContext(input: {
       !same(fixture.resolution['installed_package'], input.installed_package.identity) ||
       !same(production.resolution['installed_package'], input.installed_package.identity) ||
       !same(input.environment, {}) ||
-      !same(
-        Object.keys(input.toolchain).sort(),
-        [...Object.keys(VERSIONS), 'git', 'stryker'].sort(),
+      // The pinned census must be present and exact. Additional keys are permitted
+      // because the production lane shares this toolchain object and binds every key
+      // its own selected DAG declares; all of them are recorded in the identity below,
+      // so a wider census is bound evidence rather than an unchecked input.
+      [...Object.keys(VERSIONS), 'git', 'stryker'].some(
+        (key) => typeof input.toolchain[key] !== 'string',
+      ) ||
+      Object.values(input.toolchain).some(
+        (value) => typeof value !== 'string' || value.length === 0,
       ) ||
       input.toolchain['stryker'] !== '9.6.1' ||
       input.dependencies.length === 0 ||
