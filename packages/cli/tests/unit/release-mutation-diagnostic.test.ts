@@ -55,6 +55,17 @@ type DiagnosticModule = {
     readonly stdout: string | undefined;
     readonly abnormal?: unknown;
   }) => DiagnosticRecord;
+  readonly summarizeFixtureDiscovery: (
+    selected: readonly {
+      readonly name: string;
+      readonly content: string;
+      readonly mutate: boolean;
+    }[],
+    result: {
+      readonly files: readonly { readonly name: string }[];
+      readonly mutants: readonly { readonly fileName: string; readonly id: string }[];
+    },
+  ) => Readonly<Record<string, unknown>>;
 };
 
 const diagnostic = (await import(pathToFileURL(SCRIPT).href)) as DiagnosticModule;
@@ -100,6 +111,16 @@ function workerOutput(input?: {
     'utf8',
   );
 }
+
+const FIXTURE_ROOT = '/workspace/candidate/packages/fixture/';
+const selectedFixtureInputs = [
+  {
+    name: `${FIXTURE_ROOT}src/subject.ts`,
+    content: 'export const enabled = true;\n',
+    mutate: true,
+  },
+  { name: `${FIXTURE_ROOT}src/zero.ts`, content: 'export const zero = 0;\n', mutate: true },
+] as const;
 
 function runWithSafeWorker(input: {
   readonly worker_output: Buffer;
@@ -414,5 +435,47 @@ describe('release mutation diagnostic observation', () => {
     expect(result.stdout).not.toContain(cwd);
     expect(result.stdout).not.toContain('AssertionError');
     expect(result.stdout).not.toContain('Stryker');
+  });
+
+  it('summarizes only the complete fixed instrumenter census', () => {
+    const result = diagnostic.summarizeFixtureDiscovery(selectedFixtureInputs, {
+      files: selectedFixtureInputs.map(({ name }) => ({ name })),
+      mutants: [
+        { fileName: `${FIXTURE_ROOT}src/subject.ts`, id: '2' },
+        { fileName: `${FIXTURE_ROOT}src/subject.ts`, id: '1' },
+      ],
+    });
+    expect(result).toMatchObject({
+      algorithm: 'devai.fixed-fixture-instrumenter.v1',
+      instrumenter_version: '9.6.1',
+      options: { plugins: null, excludedMutations: [], ignorers: [] },
+      instrumented: ['src/subject.ts', 'src/zero.ts'],
+      emitted: [{ path: 'src/subject.ts', mutant_ids: ['1', '2'], mutant_count: 2 }],
+    });
+    for (const malformed of [
+      {
+        files: [{ name: `${FIXTURE_ROOT}src/subject.ts` }],
+        mutants: [{ fileName: `${FIXTURE_ROOT}src/subject.ts`, id: '1' }],
+      },
+      { files: selectedFixtureInputs.map(({ name }) => ({ name })), mutants: [] },
+      {
+        files: selectedFixtureInputs.map(({ name }) => ({ name })),
+        mutants: [{ fileName: `${FIXTURE_ROOT}src/zero.ts`, id: '1' }],
+      },
+      {
+        files: selectedFixtureInputs.map(({ name }) => ({ name })),
+        mutants: [
+          { fileName: `${FIXTURE_ROOT}src/subject.ts`, id: '1' },
+          { fileName: `${FIXTURE_ROOT}src/subject.ts`, id: '1' },
+        ],
+      },
+      {
+        files: selectedFixtureInputs.map(({ name }) => ({ name })),
+        mutants: [{ fileName: `${FIXTURE_ROOT}src/foreign.ts`, id: '1' }],
+      },
+    ])
+      expect(() =>
+        diagnostic.summarizeFixtureDiscovery(selectedFixtureInputs, malformed),
+      ).toThrow();
   });
 });
