@@ -11,6 +11,7 @@ import type { ReleaseMutationInputPlanV21 } from '../../src/services/release-mut
 import type { ReleasePackageSnapshot } from '../../src/services/release-package-snapshot.js';
 import {
   captureProtectedMutationProgram,
+  captureProtectedMutationProgramPackage,
   createProtectedMutationProgram,
   assertProtectedMutationProgramExecution,
   type ProtectedMutationProgram,
@@ -172,6 +173,22 @@ describe('protected mutation program factory with explicit upstream-authority is
         source: [{ path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource }],
         prior_outputs: new Map(),
       }),
+    ).toThrow(INVALID);
+  });
+
+  it('defensively rereads the exact factory-bound package inputs and limits', () => {
+    const { input } = factoryUnit();
+    const program = createProtectedMutationProgram(input);
+    const first = captureProtectedMutationProgramPackage(program);
+    const expected = first.package.expected;
+    Object.assign(expected, { packageName: '@caller/substituted' });
+    Object.assign(first.limits, { maximum_files: 1 });
+
+    const reread = captureProtectedMutationProgramPackage(program);
+    expect(reread.package.expected.packageName).toBe('@devai-nyx/utils');
+    expect(reread.limits.maximum_files).toBe(limits.maximum_files);
+    expect(() =>
+      captureProtectedMutationProgramPackage({ ...program } as ProtectedMutationProgram),
     ).toThrow(INVALID);
   });
 

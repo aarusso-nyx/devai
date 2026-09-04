@@ -1,8 +1,4 @@
-import type { SpawnSyncReturns } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canonicalJson } from '@devai-nyx/utils';
 import {
@@ -19,6 +15,11 @@ import {
 } from '../../src/services/release-certification-container.js';
 import type { ProtectedMutationProgram } from '../../src/services/release-mutation-program.js';
 import type { PlannedTask } from '../../src/services/check-runner/types.js';
+import {
+  createMutationContainerTransportFixture,
+  type MutationContainerTransportFixture,
+  type MutationContainerTransportState,
+} from '../helpers/release-mutation-container-fixture.js';
 
 interface CapturedProgram {
   readonly identity_sha256: string;
@@ -28,27 +29,7 @@ interface CapturedProgram {
   readonly maximum_raw_report_bytes: number;
 }
 
-interface TransportState {
-  readonly calls: string[][];
-  source_archive: Buffer;
-  workspace_archive: Buffer | undefined;
-  readback_archive: Buffer;
-  loaded_program: Buffer | undefined;
-  envelope: Buffer;
-  outer_status: number;
-  id: string | undefined;
-  workspace_volume: string | undefined;
-  mounts: {
-    readonly Type: 'volume';
-    readonly Name: string;
-    readonly Destination: string;
-    readonly RW: boolean;
-  }[];
-  launch: Readonly<Record<string, unknown>> | undefined;
-  mutable_program_mount: boolean;
-}
-
-const state = vi.hoisted((): TransportState => ({
+const state = vi.hoisted((): MutationContainerTransportState => ({
   calls: [],
   source_archive: Buffer.alloc(0),
   workspace_archive: undefined,
@@ -111,123 +92,17 @@ vi.mock('@devai-nyx/authority', () => ({
   }),
 }));
 
-const IMAGE = `fixture/node@sha256:${'b'.repeat(64)}`;
 const SOURCE: ContainerArchiveEntry = {
   path: 'src/input.ts',
   mode: '100644',
   bytes: Buffer.from('export const input = true;\n', 'utf8'),
 };
 
-function sha256(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
+let activeFixture: MutationContainerTransportFixture | undefined;
 
-function result(
-  stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0),
-  status = 0,
-): SpawnSyncReturns<Buffer<ArrayBufferLike>> {
-  return {
-    pid: 1,
-    output: [null, stdout, Buffer.alloc(0)],
-    stdout,
-    stderr: Buffer.alloc(0),
-    status,
-    signal: null,
-  };
-}
-
-function parseMounts(command: readonly string[]): TransportState['mounts'] {
-  return command.flatMap((value, index) => {
-    if (value !== '--mount') return [];
-    const raw = command[index + 1];
-    const match = raw?.match(/^type=volume,source=([^,]+),target=([^,]+)(,readonly)?$/u);
-    if (match === null || match === undefined) return [];
-    const [, name, destination, readonly] = match;
-    if (name === undefined || destination === undefined) return [];
-    return [
-      {
-        Type: 'volume' as const,
-        Name: name,
-        Destination: destination,
-        RW:
-          destination === '/devai-host' && state.mutable_program_mount
-            ? true
-            : readonly !== ',readonly',
-      },
-    ];
-  });
-}
-
-function docker(args: readonly string[], input?: Buffer): SpawnSyncReturns<Buffer> {
-  state.calls.push([...args]);
-  const command = args.slice(4);
-  if (command[0] === 'create') {
-    const name = command[command.indexOf('--name') + 1];
-    if (name === undefined) throw new Error('fixture docker create without name');
-    if (name.startsWith('devai-certify-') && !name.endsWith('-loader')) {
-      state.id = name;
-      state.mounts = parseMounts(command);
-      state.workspace_volume = state.mounts.find(
-        (mount) => mount.Destination === '/workspace',
-      )?.Name;
-      const encoded = command.at(-1);
-      if (encoded === undefined) throw new Error('fixture mutation launch missing');
-      state.launch = JSON.parse(encoded) as Record<string, unknown>;
-    }
-    return result();
-  }
-  if (command[0] === 'cp' && command[1] === '-a' && command[2] === '-') {
-    if (command[3]?.endsWith(':/devai-host'))
-      state.loaded_program = input === undefined ? undefined : Buffer.from(input);
-    if (command[3] === `${state.id}:/workspace`)
-      state.workspace_archive = input === undefined ? undefined : Buffer.from(input);
-    return result();
-  }
-  if (command[0] === 'cp' && command[1]?.endsWith(':/devai-host/.'))
-    return result(state.readback_archive);
-  if (command[0] === 'cp' && command[1] === `${state.id}:/workspace/candidate/.`)
-    return result(state.source_archive);
-  if (command[0] === 'start')
-    return result(
-      state.loaded_program === undefined ? Buffer.alloc(0) : state.envelope,
-      state.outer_status,
-    );
-  if (command[0] === 'inspect') {
-    if (state.id === undefined || state.workspace_volume === undefined)
-      throw new Error('fixture inspect before container creation');
-    return result(
-      Buffer.from(
-        JSON.stringify([
-          {
-            State: {
-              Running: false,
-              Pid: 0,
-              Restarting: false,
-              ExitCode: state.outer_status,
-              OOMKilled: false,
-              Error: '',
-            },
-            HostConfig: {
-              NetworkMode: 'none',
-              ReadonlyRootfs: true,
-              Privileged: false,
-              PidMode: '',
-              IpcMode: 'none',
-              RestartPolicy: { Name: 'no' },
-              Memory: 64 * 1024 * 1024,
-              MemorySwap: 64 * 1024 * 1024,
-              NanoCpus: 1_000_000_000,
-              PidsLimit: 2,
-              CapDrop: ['ALL'],
-              SecurityOpt: ['no-new-privileges'],
-            },
-            Mounts: state.mounts,
-          },
-        ]),
-      ),
-    );
-  }
-  return result();
+function docker(args: readonly string[], input?: Buffer) {
+  if (activeFixture === undefined) throw new Error('fixture transport not installed');
+  return activeFixture.docker(args, input);
 }
 
 function envelope(
@@ -255,29 +130,6 @@ function envelope(
     }),
     'utf8',
   );
-}
-
-function controls(root: string): ProtectedContainerControls {
-  const config = join(root, 'config');
-  mkdirSync(config, { mode: 0o700 });
-  writeFileSync(join(config, 'config.json'), JSON.stringify({ auths: {} }), { mode: 0o600 });
-  const binary = join(root, 'docker');
-  writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
-  chmodSync(binary, 0o700);
-  return {
-    docker_binary: binary,
-    docker_binary_sha256: sha256(readFileSync(binary)),
-    docker_config_directory: config,
-    engine_socket: 'unix:///fixture/docker.sock',
-    engine_version: 'fixture-engine',
-    image: IMAGE,
-    node_version: process.version,
-    executables: { node: { path: '/usr/local/bin/node', sha256: 'c'.repeat(64) } },
-    memory_bytes: 64 * 1024 * 1024,
-    cpus: 1,
-    pids_limit: 2,
-    maximum_archive_bytes: 1024 * 1024,
-  };
 }
 
 function plannedTask(value: ProtectedContainerControls, mutation = false): PlannedTask {
@@ -333,14 +185,19 @@ function invoke(input: {
 }
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'devai-mutation-container-'));
-  const value = controls(root);
   state.source_archive = encodeContainerDependencyArchive([SOURCE]);
   state.workspace_archive = undefined;
   state.readback_archive = encodeContainerArchive(capturedProgram.files);
   state.envelope = envelope();
   state.outer_status = 0;
-  return { root, controls: value, container: new ProtectedCertificationContainer(value, []) };
+  activeFixture = createMutationContainerTransportFixture({
+    source: [SOURCE],
+    program_files: capturedProgram.files,
+    envelope: state.envelope,
+    outer_status: state.outer_status,
+    state,
+  });
+  return activeFixture;
 }
 
 function expectCleanup(): void {
@@ -360,6 +217,7 @@ afterEach(() => {
   state.mounts = [];
   state.launch = undefined;
   state.mutable_program_mount = false;
+  activeFixture = undefined;
   executionAssertion.mockReset();
 });
 
