@@ -35,6 +35,7 @@ export function createReleaseRepositoryTestFixture(
     repository,
   });
   return Object.freeze({
+    root,
     repository,
     run: async <T>(callback: () => T | Promise<T>): Promise<T> =>
       await withProtectedReleaseRepositoryContext(context, callback),

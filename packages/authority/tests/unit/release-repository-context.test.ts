@@ -174,4 +174,29 @@ describe('protected release repository context', () => {
       'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
     );
   });
+
+  it('strips inherited Git directory, worktree, and config overrides from the real probe', async () => {
+    const value = fixture();
+    const inherited = {
+      GIT_DIR: process.env.GIT_DIR,
+      GIT_WORK_TREE: process.env.GIT_WORK_TREE,
+      GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
+    };
+    process.env.GIT_DIR = join(value.root, 'nonexistent-git-dir');
+    process.env.GIT_WORK_TREE = join(value.root, 'nonexistent-worktree');
+    process.env.GIT_CONFIG_GLOBAL = join(value.root, 'candidate-global-config');
+    try {
+      const context = createProtectedReleaseRepositoryContext(value.controls);
+      await withProtectedReleaseRepositoryContext(context, async () => {
+        expect(readProtectedReleaseRepositoryIdentity().repository).toEqual(
+          value.controls.repository,
+        );
+      });
+    } finally {
+      for (const [key, prior] of Object.entries(inherited)) {
+        if (prior === undefined) Reflect.deleteProperty(process.env, key);
+        else process.env[key] = prior;
+      }
+    }
+  });
 });
