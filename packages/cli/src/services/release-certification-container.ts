@@ -5,10 +5,17 @@ import { createProtectedReleaseHostAdapter } from '@devai-nyx/authority';
 import { canonicalJson } from '@devai-nyx/utils';
 import {
   canonicalContainerPath,
-  decodeContainerArchive,
+  decodeContainerDependencyArchive,
   encodeContainerArchive,
+  encodeContainerDependencyArchive,
   type ContainerArchiveEntry,
 } from './container-archive.js';
+import {
+  validateProtectedDependencyTransport,
+  verifyProtectedDependencyInputs,
+  type ProtectedDependencyInputs,
+  type ProtectedDependencyTransport,
+} from './release-dependency-transport.js';
 import type { PlannedTask, TaskExecutionResult } from './check-runner/types.js';
 
 export interface ProtectedContainerControls {
@@ -19,6 +26,11 @@ export interface ProtectedContainerControls {
   readonly engine_socket: string;
   readonly engine_version: string;
   readonly image: string;
+  /** Required for an unpublished local image Id; independently verified from exported config/layers. */
+  readonly local_image?: {
+    readonly configuration_sha256: string;
+    readonly rootfs_diff_ids: readonly string[];
+  };
   readonly node_version: string;
   readonly executables: Readonly<
     Record<string, { readonly path: string; readonly sha256: string }>
@@ -29,11 +41,12 @@ export interface ProtectedContainerControls {
   readonly maximum_archive_bytes: number;
 }
 
-/** Host-selected dependency bytes. Regular-file closure; callers must resolve links before selection. */
+/** Frozen Linux dependency bytes; relative links are independently validated, never followed on host. */
 export interface ProtectedContainerDependency {
   readonly mount_path: string;
   readonly archive: Buffer;
   readonly sha256: string;
+  readonly inputs: ProtectedDependencyInputs;
 }
 
 interface ProtectedContainerExecutionBinding {
@@ -60,6 +73,7 @@ const TASK_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'
 export class ProtectedCertificationContainer {
   readonly #controls: ProtectedContainerControls;
   readonly #dependencies: readonly ProtectedContainerDependency[];
+  readonly #dependencyTransport: ProtectedDependencyTransport;
   readonly identity: Readonly<Record<string, unknown>>;
   #host: ReturnType<typeof createProtectedReleaseHostAdapter> | undefined;
 
@@ -82,7 +96,16 @@ export class ProtectedCertificationContainer {
       !isAbsolute(controls.docker_binary) ||
       !isAbsolute(controls.docker_config_directory) ||
       !/^unix:\/\/\/[^\0\r\n]+$/u.test(controls.engine_socket) ||
-      !/@sha256:[0-9a-f]{64}$/u.test(controls.image) ||
+      !(
+        /@sha256:[0-9a-f]{64}$/u.test(controls.image) ||
+        /^sha256:[0-9a-f]{64}$/u.test(controls.image)
+      ) ||
+      (controls.image.startsWith('sha256:')
+        ? controls.local_image === undefined ||
+          !/^[0-9a-f]{64}$/u.test(controls.local_image.configuration_sha256) ||
+          controls.local_image.rootfs_diff_ids.length === 0 ||
+          controls.local_image.rootfs_diff_ids.some((id) => !/^sha256:[0-9a-f]{64}$/u.test(id))
+        : controls.local_image !== undefined) ||
       !/^[0-9a-f]{64}$/u.test(controls.docker_binary_sha256) ||
       !/^v24\./u.test(controls.node_version) ||
       !controls.engine_version ||
@@ -126,17 +149,28 @@ export class ProtectedCertificationContainer {
         throw new Error('release-certification-dependency-identity-invalid');
       }
       mountPaths.add(dependency.mount_path);
-      decodeContainerArchive(dependency.archive, controls.maximum_archive_bytes);
-      return { ...dependency, archive: Buffer.from(dependency.archive) };
+      return {
+        ...dependency,
+        archive: Buffer.from(dependency.archive),
+        inputs: JSON.parse(canonicalJson(dependency.inputs)) as ProtectedDependencyInputs,
+      };
     });
+    this.#dependencyTransport = validateProtectedDependencyTransport(
+      this.#dependencies,
+      controls.maximum_archive_bytes,
+    );
     this.identity = Object.freeze({
       protocol: 'devai.protected-container-certification.v1',
       image: controls.image,
+      ...(controls.local_image === undefined
+        ? {}
+        : { local_image: JSON.parse(canonicalJson(this.#controls.local_image)) as unknown }),
       engine_version: controls.engine_version,
       node_version: controls.node_version,
       docker_binary_sha256: controls.docker_binary_sha256,
       executables: JSON.parse(canonicalJson(this.#controls.executables)) as unknown,
       dependencies: this.#dependencies.map(({ mount_path, sha256 }) => ({ mount_path, sha256 })),
+      dependency_transport_sha256: this.#dependencyTransport.identity_sha256,
       network: 'none',
       rootfs: 'read-only',
       capabilities: 'none',
@@ -233,12 +267,20 @@ export class ProtectedCertificationContainer {
       version !== this.#controls.engine_version ||
       image.Os !== 'linux' ||
       image.Architecture !== 'arm64' ||
-      !Array.isArray(image.RepoDigests) ||
-      !image.RepoDigests.some(
-        (value: unknown) =>
-          typeof value === 'string' &&
-          value.endsWith(this.#controls.image.slice(this.#controls.image.indexOf('@'))),
-      )
+      (this.#controls.local_image === undefined
+        ? !Array.isArray(image.RepoDigests) ||
+          !image.RepoDigests.some(
+            (value: unknown) =>
+              typeof value === 'string' &&
+              value.endsWith(this.#controls.image.slice(this.#controls.image.indexOf('@'))),
+          )
+        : image.Id !== this.#controls.image ||
+          (image.Id !== `sha256:${this.#controls.local_image.configuration_sha256}` &&
+            object(object(image.Descriptor).annotations)['config.digest'] !==
+              `sha256:${this.#controls.local_image.configuration_sha256}`) ||
+          object(image.RootFS).Type !== 'layers' ||
+          canonicalJson(object(image.RootFS).Layers) !==
+            canonicalJson(this.#controls.local_image.rootfs_diff_ids))
     ) {
       throw new Error('release-certification-container-identity-mismatch');
     }
@@ -317,6 +359,7 @@ export class ProtectedCertificationContainer {
     )
       throw new Error('release-certification-container-toolchain-mismatch');
     const sources = new Map(input.source.map((entry) => [entry.path, entry]));
+    verifyProtectedDependencyInputs(this.#dependencyTransport, input.source);
     if (
       sources.size !== input.source.length ||
       [...expected].some((path) => sources.has(path)) ||
@@ -332,9 +375,8 @@ export class ProtectedCertificationContainer {
     try {
       this.#checked(['volume', 'create', '--label', `devai.certification=${id}`, volume]);
       volumeCreated = true;
-      for (const [index, dependency] of this.#dependencies.entries()) {
+      for (const [index] of this.#dependencies.entries()) {
         const dependencyVolume = `${id}-dependency-${index}`;
-        const loader = `${id}-loader-${index}`;
         this.#checked([
           'volume',
           'create',
@@ -343,19 +385,36 @@ export class ProtectedCertificationContainer {
           dependencyVolume,
         ]);
         dependencyVolumes.push(dependencyVolume);
+      }
+      if (this.#dependencies.length !== 0) {
+        const loader = `${id}-dependency-loader`;
         this.#checked([
           'create',
           '--name',
           loader,
           ...this.#restrictions(),
           '--mount',
-          `type=volume,source=${dependencyVolume},target=/dependency`,
+          `type=volume,source=${volume},target=/workspace`,
+          ...this.#dependencies.flatMap((dependency, index) => [
+            '--mount',
+            `type=volume,source=${dependencyVolumes[index]},target=/workspace/candidate/${dependency.mount_path}`,
+          ]),
           c.image,
           '/usr/local/bin/node',
           '--version',
         ]);
         loaders.push(loader);
-        this.#checked(['cp', '-a', '-', `${loader}:/dependency`], dependency.archive);
+        // Cross-volume pnpm links must be unpacked in their already-validated final
+        // namespace. A temporary /dependency root changes their meaning and cannot work.
+        this.#checked(
+          ['cp', '-a', '-', `${loader}:/workspace`],
+          encodeContainerDependencyArchive(
+            [...this.#dependencyTransport.entries.values()].map((entry) => ({
+              ...entry,
+              path: `candidate/${entry.path}`,
+            })),
+          ),
+        );
       }
       const launch = {
         node_version: c.node_version,
@@ -466,25 +525,36 @@ export class ProtectedCertificationContainer {
         completed = true;
         return { result, outputs: [] };
       }
-      const captured = decodeContainerArchive(
+      const captured = decodeContainerDependencyArchive(
         this.#checked(['cp', `${id}:/workspace/candidate/.`, '-']),
         c.maximum_archive_bytes,
       );
       const outputs: ContainerArchiveEntry[] = [];
       const observedSources = new Set<string>();
       const observedOutputs = new Set<string>();
+      const observedDependencies = new Set<string>();
       for (const entry of captured) {
+        const dependency = this.#dependencyTransport.entries.get(entry.path);
+        if (dependency !== undefined) {
+          if (
+            dependency.mode !== entry.mode ||
+            (dependency.mode === '120000' && entry.mode === '120000'
+              ? dependency.target !== entry.target
+              : dependency.mode === '120000' ||
+                entry.mode === '120000' ||
+                !dependency.bytes.equals(entry.bytes))
+          )
+            throw new Error('release-certification-dependency-changed');
+          observedDependencies.add(entry.path);
+          continue;
+        }
+        if (entry.mode === '120000')
+          throw new Error('release-certification-source-mode-unsupported');
         const source = sources.get(entry.path);
         if (source !== undefined) {
           if (source.mode !== entry.mode || !source.bytes.equals(entry.bytes))
             throw new Error('release-certification-source-changed');
           observedSources.add(entry.path);
-        } else if (
-          this.#dependencies.some((dependency) =>
-            entry.path.startsWith(`${dependency.mount_path}/`),
-          )
-        ) {
-          // A separately mounted read-only dependency archive is not generated evidence.
         } else {
           if (!expected.has(entry.path) && !inNamespace(entry.path))
             throw new Error('release-certification-output-closure-invalid');
@@ -500,6 +570,7 @@ export class ProtectedCertificationContainer {
       }
       if (
         observedSources.size !== sources.size ||
+        observedDependencies.size !== this.#dependencyTransport.entries.size ||
         [...expected, ...namespaces.flatMap(({ required_paths }) => required_paths)].some(
           (path) => !observedOutputs.has(path),
         )

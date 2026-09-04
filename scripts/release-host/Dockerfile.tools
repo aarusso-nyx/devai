@@ -1,0 +1,8 @@
+FROM --platform=linux/arm64 docker.io/library/node@sha256:e9b5516b06baeaea9a8e65a7aec6a85fbb960a30b52b66968f2c8092b3e2a3eb
+# Reproducible export requires --output type=image,rewrite-timestamp=true,unpack=false.
+# Always select the protected daemon/config explicitly; never publish this local tool image.
+ARG SOURCE_DATE_EPOCH=1787529600
+COPY install-toolchain.mjs /opt/devai-build/install-toolchain.mjs
+RUN node /opt/devai-build/install-toolchain.mjs
+ENTRYPOINT []
+CMD ["/usr/local/bin/node", "--version"]
