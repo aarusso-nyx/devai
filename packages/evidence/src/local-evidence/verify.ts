@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 import { computeSourceHash } from './source-hash.js';
 import { dirname } from 'node:path';
 import { resolveLocalEvidencePolicy, type LocalEvidencePolicy } from './config.js';
 import type { LocalEvidenceManifest } from './collect.js';
 import { deriveExactSubject, deriveTrailerParentSubject } from './subject.js';
 
-const validateLocalEvidenceManifest = getValidator('local-evidence-manifest.schema.json');
+const validateLocalEvidenceManifest = validators.localEvidenceManifest;
 
 /**
  * `devai evidence local verify` core (D-117): validate a

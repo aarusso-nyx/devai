@@ -13,6 +13,10 @@ import { createRequire, registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { getValidator } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import {
+  isVerifiedReleasePackageSnapshot,
+  type ReleasePackageSnapshot,
+} from './release-package-snapshot.js';
 
 type JsonObject = Readonly<Record<string, unknown>>;
 
@@ -240,8 +244,26 @@ interface PinnedModules {
   };
 }
 
-// Cached code is immutable; every invocation still validates the complete on-disk gate.
+// Cached code is immutable; every invocation still validates the complete selected
+// gate, from captured package bytes when bound or the source installation otherwise.
 const pinnedModules = new Map<string, PinnedModules>();
+let protectedPackageSnapshot: ReleasePackageSnapshot | undefined;
+let verifierUsed = false;
+
+/**
+ * Trusted bootstrap only: bind the very snapshot whose runtime bytes were loaded.
+ * A snapshot is not by itself proof of loaded-code identity; the host bootstrap
+ * establishes that before this call. No candidate/request selects these bytes.
+ */
+export function bindMutationEvidenceV21PackageSnapshot(snapshot: ReleasePackageSnapshot): void {
+  if (
+    verifierUsed ||
+    protectedPackageSnapshot !== undefined ||
+    !isVerifiedReleasePackageSnapshot(snapshot)
+  )
+    refuse();
+  protectedPackageSnapshot = snapshot;
+}
 
 function loadVerifiedSnapshot(
   files: readonly { readonly path: string; readonly bytes: Buffer }[],
@@ -306,7 +328,30 @@ function loadVerifiedSnapshot(
 }
 
 async function loadPinnedVerifier() {
+  verifierUsed = true;
   try {
+    if (protectedPackageSnapshot !== undefined) {
+      const snapshot = protectedPackageSnapshot;
+      const vendorPrefix = 'dist/runtime/evidence-verification/';
+      const policy = JSON.parse(
+        new TextDecoder('utf-8', { fatal: true }).decode(
+          snapshot.read('dist/law/policy/mutation-evidence-v2.json'),
+        ),
+      ) as unknown;
+      const manifestBytes = snapshot.read(`${vendorPrefix}provenance.json`);
+      const files = snapshot.manifest
+        .filter(
+          (entry) =>
+            entry.path.startsWith(vendorPrefix) && entry.path !== `${vendorPrefix}provenance.json`,
+        )
+        .map((entry) => ({
+          path: entry.path.slice(vendorPrefix.length),
+          bytes: snapshot.read(entry.path),
+        }));
+      const provenance = validateMutationV21ActivationSnapshot({ policy, manifestBytes, files });
+      const modules = loadVerifiedSnapshot(files, provenance.source.byteSetDigest);
+      return { ...modules, provenance, policyDigest: modules.canonical.sha256Hex(policy) };
+    }
     const here = dirname(fileURLToPath(import.meta.url));
     const installed = basename(here) === 'index' && basename(dirname(here)) === 'runtime';
     const source =

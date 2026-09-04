@@ -17,6 +17,11 @@
     "devai-evidence-publish": "./dist/runtime/evidence-verification/src/publish-cli.js"
   },
   "exports": {
+    "./release-host-bootstrap": {
+      "types": "./dist/runtime/types/cli/release-host-bootstrap.d.ts",
+      "import": "./dist/runtime/index/release-host-bootstrap.js",
+      "default": "./dist/runtime/index/release-host-bootstrap.js"
+    },
     "./release-host": {
       "types": "./dist/runtime/types/cli/release-host.d.ts",
       "import": "./dist/runtime/index/release-host.js",

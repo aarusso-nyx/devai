@@ -66,6 +66,20 @@ export interface SensorDescriptor {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+/** Assembly replaces only this fixed function with the package-owned asset bytes. */
+function bundledSensorRegistry(): string | undefined {
+  return undefined;
+}
+const CODE_BOUND_REGISTRY = bundledSensorRegistry();
+
+/** Trusted host binder compares the already code-bound data with its approved archive. */
+export function assertBundledSensorRegistry(bytes: Uint8Array): void {
+  if (
+    CODE_BOUND_REGISTRY === undefined ||
+    !Buffer.from(CODE_BOUND_REGISTRY).equals(Buffer.from(bytes))
+  )
+    throw new Error('rpl-package-identity-mismatch');
+}
 const BUNDLED_REGISTRY_PATH = join(HERE, 'sensor-registry.json');
 const DEVELOPMENT_REGISTRY_PATH = join(
   HERE,
@@ -96,10 +110,10 @@ function freezeRegistry(registry: SensorRegistry): SensorRegistry {
 }
 
 function loadRegistry(): SensorRegistry {
-  const path = registryPath();
+  const path = CODE_BOUND_REGISTRY === undefined ? registryPath() : '<code-bound sensor registry>';
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    parsed = JSON.parse(CODE_BOUND_REGISTRY ?? readFileSync(path, 'utf8')) as unknown;
   } catch (error) {
     throw new Error(`canonical sensor registry could not be read at ${path}`, { cause: error });
   }

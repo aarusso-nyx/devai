@@ -7,9 +7,9 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { dirname } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 
-const validateEvidence = getValidator('evidence.schema.json');
+const validateEvidence = validators.evidence;
 
 export interface EvidenceContext {
   repo_root: string;

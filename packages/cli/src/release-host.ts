@@ -5,6 +5,7 @@ import {
 } from './commands/release/lifecycle.js';
 
 export { invokeDevaiCli, startDevaiCli, type CliInvocationResult } from './cli-runtime.js';
+export { bindReleaseHostPackageSnapshot } from './services/release-host-package-binding.js';
 export {
   verifyReleasePackageSnapshot,
   type ReleasePackageSnapshot,
@@ -38,6 +39,7 @@ export type {
 } from './services/release-certification-container.js';
 export type { ReleaseLifecycleCommandAdapters } from './commands/release/lifecycle.js';
 export {
+  bindMutationEvidenceV21PackageSnapshot,
   composeMutationEvidenceV21,
   finalizeMutationEvidenceV21,
   verifyMutationEvidenceV21,

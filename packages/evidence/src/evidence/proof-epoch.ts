@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from '@devai-nyx/authority';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 import { dirname, join } from 'node:path';
 
-const validateProofEpochLine = getValidator('proof-epoch.schema.json');
+const validateProofEpochLine = validators.proofEpoch;
 const EMPTY_EPOCH_HASH = createHash('sha256').update('DEVAI-PROOF-EPOCH-EMPTY').digest('hex');
 
 export type ProofEpochLineType = 'record' | 'errata' | 'terminal';
