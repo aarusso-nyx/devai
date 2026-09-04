@@ -154,6 +154,26 @@ describe('protected release export boundary', () => {
     }
   });
 
+  it('rejects non-native closure-input arrays before inherited hooks can run', () => {
+    const value = binding();
+    const closures = [...value.closure_inputs];
+    let maps = 0;
+    Object.setPrototypeOf(closures, {
+      map: () => {
+        maps += 1;
+        return [];
+      },
+    });
+
+    expect(() =>
+      createProtectedExportSinkAdapter({
+        ...value,
+        closure_inputs: closures as unknown as ProtectedReleaseExportBinding['closure_inputs'],
+      }),
+    ).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+    expect(maps).toBe(0);
+  });
+
   it('consumes each protected operation token once and refuses filesystem escape from its callback', async () => {
     const adapter = createProtectedExportSinkAdapter(binding());
     const owner = createProtectedReleaseSinkOwner('export', 'fixture-sink');

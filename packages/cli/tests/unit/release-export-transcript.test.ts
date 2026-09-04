@@ -282,6 +282,26 @@ describe('release export transcript transport', () => {
     expect(accesses).toBe(0);
   });
 
+  it('refuses an array with an inherited serializer before invoking it', () => {
+    const value = transcript();
+    let serializations = 0;
+    const parent = [...value.parent];
+    Object.setPrototypeOf(parent, {
+      toJSON: () => {
+        serializations += 1;
+        return [];
+      },
+    });
+
+    refusal(() =>
+      encodeReleaseExportTranscript(
+        { ...value, parent: parent as unknown as ReleaseExportTranscript['parent'] },
+        LIMITS,
+      ),
+    );
+    expect(serializations).toBe(0);
+  });
+
   it('retains distinct handles for byte-identical artifacts and refuses shared handles', () => {
     const value = transcript();
     const equalBytes = {
