@@ -27,6 +27,7 @@ import {
   verifyResolvedReleasePlanReceipt,
 } from '../../src/services/release-lifecycle.js';
 import { verifyReleasePolicyLockfiles } from '../../src/services/release-policy-lockfiles.js';
+import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCHEMAS = join(ROOT, 'law/schemas');
@@ -320,6 +321,12 @@ function resolve(value: ReturnType<typeof adopterFixture>) {
 }
 
 describe('release policy resolution snapshot', () => {
+  it('provides a reusable raw-Git v2 lifecycle fixture with no structural brands', () => {
+    const fixture = createLifecyclePolicyFixture();
+    expect(fixture.receipt).toMatchObject({ schemaVersion: '2.0.0' });
+    expect(fixture.candidate.read('package.json')).toEqual(fixture.package_json);
+  });
+
   it('resolves a candidate-adopter from only branded package and Git snapshots', () => {
     const value = adopterFixture();
     const result = resolve(value);
