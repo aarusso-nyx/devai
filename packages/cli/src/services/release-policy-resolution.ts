@@ -51,7 +51,7 @@ export interface ReleasePolicyResolutionEvidence {
 }
 
 const verified = new WeakSet<object>();
-const inputResolvers = new WeakMap<object, VerifiedReleasePolicyResolution>();
+const inputResolvers = new WeakMap<object, readonly VerifiedReleasePolicyResolution[]>();
 const evidenceReaders = new WeakMap<object, () => ReleasePolicyResolutionEvidence>();
 const INVALID = 'rpl-policy-resolution-mismatch';
 const PROFILE = '.devai/config/release-verification.json';
@@ -116,15 +116,35 @@ export function readReleasePolicyResolutionEvidence(
 
 export function resolutionForReleasePlanInputResolver(
   resolver: unknown,
+  receipt?: Readonly<Record<string, unknown>>,
 ): VerifiedReleasePolicyResolution | undefined {
-  return typeof resolver === 'function' ? inputResolvers.get(resolver) : undefined;
+  const resolutions = typeof resolver === 'function' ? inputResolvers.get(resolver) : undefined;
+  if (receipt === undefined) return resolutions?.length === 1 ? resolutions[0] : undefined;
+  const candidate = receipt['candidate'];
+  if (!isJsonObject(candidate)) return undefined;
+  return resolutions?.find((resolution) => resolution.release_unit === candidate['release_unit']);
 }
 
 export function createResolvedReleasePlanInputResolver(
-  resolution: VerifiedReleasePolicyResolution,
+  input: VerifiedReleasePolicyResolution | readonly VerifiedReleasePolicyResolution[],
 ): (input: Readonly<Record<string, unknown>>) => unknown {
-  if (!isVerifiedReleasePolicyResolution(resolution)) return fail();
+  const resolutions = Object.freeze(Array.isArray(input) ? [...input] : [input]);
+  if (
+    resolutions.length === 0 ||
+    resolutions.some((resolution) => !isVerifiedReleasePolicyResolution(resolution)) ||
+    new Set(resolutions.map((resolution) => resolution.release_unit)).size !== resolutions.length ||
+    resolutions.some(
+      (resolution) =>
+        !same(resolution.repository, resolutions[0]?.repository) ||
+        !same(resolution.resolution, resolutions[0]?.resolution),
+    )
+  )
+    return fail();
   const resolver = (input: Readonly<Record<string, unknown>>): unknown => {
+    // Unscoped input reads remain available only for the existing single-unit
+    // interface. Current replay selects a genuine resolution from the receipt.
+    const resolution = resolutions.length === 1 ? resolutions[0] : undefined;
+    if (resolution === undefined) return fail('rpl-input-unresolved');
     const kind = input['kind'];
     if (kind === 'release-intent')
       return resolution.tools.parse('release-intent.schema.json', input['inline_document']);
@@ -136,7 +156,7 @@ export function createResolvedReleasePlanInputResolver(
       return fail('rpl-input-unresolved');
     return resolution.readInput(kind);
   };
-  inputResolvers.set(resolver, resolution);
+  inputResolvers.set(resolver, resolutions);
   return Object.freeze(resolver);
 }
 

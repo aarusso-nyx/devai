@@ -615,7 +615,7 @@ function verifyPlanReceiptSemantics(
   resolveInput: ReleasePlanInputResolver | undefined,
 ): void {
   if (receipt['schemaVersion'] !== '2.0.0') throw new Error('rpl-legacy-plan-non-authoritative');
-  const resolution = resolutionForReleasePlanInputResolver(resolveInput);
+  const resolution = resolutionForReleasePlanInputResolver(resolveInput, receipt);
   if (resolution === undefined || !verifyResolvedReleasePlanReceipt({ receipt, resolution })) {
     throw new Error('rpl-semantic-verification-not-performed');
   }
@@ -634,7 +634,7 @@ function verifyReceiptDocument(
     throw new Error('rpl-legacy-plan-non-authoritative');
   if (kind === 'release-plan-receipt' && value['schemaVersion'] !== '2.0.0')
     throw new Error('release-receipt-identity-mismatch');
-  const resolution = resolutionForReleasePlanInputResolver(resolvePlanInput);
+  const resolution = resolutionForReleasePlanInputResolver(resolvePlanInput, value);
   if (kind === 'release-plan-receipt') {
     if (resolution === undefined) throw new Error('rpl-semantic-verification-not-performed');
     resolution.tools.parse('release-plan-receipt-v2.schema.json', value);

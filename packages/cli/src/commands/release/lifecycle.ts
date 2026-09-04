@@ -208,7 +208,7 @@ function readContainedJson(root: string, path: string): unknown {
 
 function localResolvers(
   root: string,
-  resolution?: VerifiedReleasePolicyResolution,
+  resolution?: VerifiedReleasePolicyResolution | readonly VerifiedReleasePolicyResolution[],
 ): {
   readonly receipt: (
     locator: NonNullable<ReleaseLifecycleRequest['receipt_locators']>[number],
@@ -244,17 +244,19 @@ function resolvePolicyFor(input: {
   return resolution;
 }
 
-function requestPolicy(request: ReleaseLifecycleRequest): VerifiedReleasePolicyResolution {
-  const unit = request.candidate_locator.release_units[0];
-  if (unit === undefined) throw new Error('rpl-policy-resolution-mismatch');
-  return resolvePolicyFor({
-    repository_id: request.repository_locator.id,
-    candidate: {
-      commit: request.candidate_locator.commit,
-      tree: request.candidate_locator.tree,
-    },
-    release_unit: unit.release_unit,
-  });
+function requestPolicy(
+  request: ReleaseLifecycleRequest,
+): readonly VerifiedReleasePolicyResolution[] {
+  return request.candidate_locator.release_units.map((unit) =>
+    resolvePolicyFor({
+      repository_id: request.repository_locator.id,
+      candidate: {
+        commit: request.candidate_locator.commit,
+        tree: request.candidate_locator.tree,
+      },
+      release_unit: unit.release_unit,
+    }),
+  );
 }
 
 function fail(action: string, code: string, detail: string, exit = EXIT_FAIL): void {
@@ -695,11 +697,16 @@ export const releaseResume = defineCommand({
           const resolvers = localResolvers(
             root,
             currentPlan
-              ? resolvePolicyFor({
-                  repository_id: repository.id,
-                  candidate: { commit: candidate.commit, tree: candidate.tree },
-                  release_unit: candidate.release_unit,
-                })
+              ? (
+                  request?.candidate_locator.release_units ??
+                  first?.release_units ?? [candidate]
+                ).map((unit) =>
+                  resolvePolicyFor({
+                    repository_id: repository.id,
+                    candidate: { commit: candidate.commit, tree: candidate.tree },
+                    release_unit: unit.release_unit,
+                  }),
+                )
               : undefined,
           );
           const observation = await resumeReleaseLifecycleExecution({
