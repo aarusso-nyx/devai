@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "project_type": "runtime-host",
+  "authority_enforcement": {
+    "mode": "cli-only"
+  },
+  "profile": "tier3",
+  "constitution": {
+    "version": "1.0.0",
+    "sha256": "3f0e2ddc45d0f4102eda34776700d8da7a1e56aab30c6ab43cc6ee6dbe972542"
+  },
+  "devai_version": "1.5.0"
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "policy_id": "devai.devai-adoption",
+  "policy_version": "1.1.0",
+  "source_path": "law/policy/devai-adoption.json",
+  "source_digest_sha256": "7f58ab0f24b754013d183a82656bb89b5b9cdfe8d08a0c21eb9d4837ebe6b53d",
+  "materialized": {
+    ".devai/config/project.json": "eb677f643820de0d9bf4574068581847ee42132d896e701ea90b1d7d3eb50fb7",
+    ".devai/config/domains.json": "fc8951b34c145b46fde1853013347838bebfbe5f54c40c5380f78c4ffb9efd39",
+    ".devai/config/thresholds.json": "19bff20b5d9531d15a30227fb958ea34be660d88655ef46e45888f1fc1559751",
+    ".devai/config/scorecard-na.json": "32cb9cf7c790a9b3824305de638c1c1598a60f7ac7a4caf46948c1c145003d20",
+    ".devai/config/glob-guards.json": "a444e9fb4113e15e2810c4ac6e29fe4b967bf4951b78cd20f66658e9983da761",
+    ".devai/config/release-verification.json": "0bb7fe622aaa160c69b199750244dd597602a29161f76854e341a9b70aae66d6"
+  }
+}
