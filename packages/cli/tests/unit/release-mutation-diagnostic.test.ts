@@ -101,6 +101,89 @@ function workerOutput(input?: {
   );
 }
 
+function runWithSafeWorker(input: {
+  readonly worker_output: Buffer;
+  readonly status: number;
+  readonly oversized_fd3?: boolean;
+}): {
+  readonly emitted: string;
+  readonly source_exit_code: number;
+  readonly spawn: {
+    readonly command: string;
+    readonly argv: readonly string[];
+    readonly environment: Readonly<Record<string, string>>;
+  };
+} {
+  const harness = `
+import { EventEmitter } from 'node:events';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import { PassThrough } from 'node:stream';
+const captured = {};
+const payload = Buffer.from(${JSON.stringify(input.worker_output.toString('base64'))}, 'base64');
+const oversized = ${input.oversized_fd3 === true ? 'true' : 'false'};
+const childStatus = ${JSON.stringify(input.status)};
+Object.assign(process.env, {
+  PATH: '/trusted/bin', HOME: '/trusted/home', TMPDIR: '/trusted/tmp', CI: '1', NO_COLOR: '1',
+  LANG: 'C', LC_ALL: 'C', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_OPTIONAL_LOCKS: '0', NODE_OPTIONS: '--trace-warnings', DEVAI_UNTRUSTED: 'forbidden',
+});
+childProcess.spawn = (command, argv, options) => {
+  captured.command = command;
+  captured.argv = argv;
+  captured.environment = options.env;
+  const child = new EventEmitter();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const diagnostic = new PassThrough();
+  child.stdout = stdout;
+  child.stderr = stderr;
+  child.stdio = [null, stdout, stderr, diagnostic];
+  let closed = false;
+  child.kill = () => {
+    if (!closed) {
+      closed = true;
+      setImmediate(() => child.emit('close', null, 'SIGKILL'));
+    }
+    return true;
+  };
+  queueMicrotask(() => {
+    if (oversized) {
+      diagnostic.end(Buffer.alloc(8193, 0x71));
+      return;
+    }
+    stdout.write('Creating 1 checker process(es) and 1 test runner process(es).');
+    stdout.end('S'.repeat(2 * 1024 * 1024 + 17));
+    stderr.end('E'.repeat(2 * 1024 * 1024 + 19));
+    diagnostic.end(payload);
+    setImmediate(() => {
+      if (!closed) {
+        closed = true;
+        child.emit('close', childStatus, null);
+      }
+    });
+  });
+  return child;
+};
+syncBuiltinESMExports();
+const originalWrite = process.stdout.write;
+let emitted = '';
+process.stdout.write = (value) => { emitted += String(value); return true; };
+const driver = await import(${JSON.stringify(pathToFileURL(SCRIPT).href)});
+await driver.runDiagnostic();
+const sourceExitCode = process.exitCode;
+process.stdout.write = originalWrite;
+process.exitCode = 0;
+originalWrite.call(process.stdout, JSON.stringify({ emitted, source_exit_code: sourceExitCode, spawn: captured }) + '\\n');
+`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', harness], {
+    encoding: 'utf8',
+  });
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
+  return JSON.parse(result.stdout) as ReturnType<typeof runWithSafeWorker>;
+}
+
 describe('release mutation diagnostic observation', () => {
   it('retains only a closed status population and fixed diagnostic facts', () => {
     const summary = diagnostic.summarizeDiagnostic({
@@ -256,6 +339,59 @@ describe('release mutation diagnostic observation', () => {
       checker_created: true,
       assertions_passed: false,
     });
+  });
+
+  it('drains oversized child logs while retaining only the bounded fd3 observation and failure', () => {
+    const result = runWithSafeWorker({ worker_output: workerOutput(), status: 17 });
+    expect(result.source_exit_code).toBe(17);
+    expect(result.spawn).toMatchObject({
+      command: process.execPath,
+      argv: [SCRIPT, '--worker'],
+      environment: {
+        PATH: '/trusted/bin',
+        HOME: '/trusted/home',
+        TMPDIR: '/trusted/tmp',
+        CI: '1',
+        NO_COLOR: '1',
+        LANG: 'C',
+        LC_ALL: 'C',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_OPTIONAL_LOCKS: '0',
+      },
+    });
+    expect(result.spawn.environment).not.toHaveProperty('NODE_OPTIONS');
+    expect(result.spawn.environment).not.toHaveProperty('DEVAI_UNTRUSTED');
+    const lines = result.emitted.trim().split('\n');
+    expect(lines).toHaveLength(1);
+    const summary = JSON.parse(lines[0] ?? '') as DiagnosticRecord;
+    expect(summary).toMatchObject({
+      process: { status: 17, signal: null, abnormal: false, observation_valid: true },
+      checker_created: true,
+      report: { present: true, parseable: true, zero_file_present: true },
+      mutants: { total: 1, status_counts: { Killed: 1 } },
+      assertions_passed: false,
+    });
+    expect(result.emitted).not.toContain('S'.repeat(128));
+    expect(result.emitted).not.toContain('E'.repeat(128));
+  });
+
+  it('marks an oversized fd3 payload abnormal without retaining the child bytes', () => {
+    const result = runWithSafeWorker({
+      worker_output: workerOutput(),
+      status: 0,
+      oversized_fd3: true,
+    });
+    expect(result.source_exit_code).toBe(1);
+    const summary = JSON.parse(result.emitted.trim()) as DiagnosticRecord;
+    expect(summary).toMatchObject({
+      process: { status: null, signal: 'SIGKILL', abnormal: true, observation_valid: false },
+      checker_created: null,
+      report: { present: null, parseable: null, zero_file_present: null },
+      mutants: { total: null, unknown_status_count: null },
+      assertions_passed: false,
+    });
+    expect(result.emitted).not.toContain('q'.repeat(128));
   });
 
   it('emits one bounded path-free refusal record before the fixed worker can import Stryker', () => {
