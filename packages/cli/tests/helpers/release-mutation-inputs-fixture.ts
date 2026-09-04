@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,9 +26,23 @@ import {
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const PACKAGE = '@aarusso-nyx/devai';
 const VERSION = '1.4.5';
-const FROZEN_POLICY_REVISION = '8ce7f7d';
 const POLICY_PATH = 'law/policy/devai-adoption.json';
 const BINDING_PATH = '.devai/config/adopter-policy-binding.json';
+// Exact raw documents from Git revision 8ce7f7d, captured without reformatting.
+// Tracked fixture bytes preserve the v1.1 reference in Stryker's history-free sandbox.
+const FROZEN_DOCUMENTS: Readonly<
+  Record<string, { readonly name: string; readonly sha256: string }>
+> = {
+  [POLICY_PATH]: {
+    name: 'devai-adoption.json',
+    sha256: '24982a246ee22c18779114f079e020bfbb7e23cb1fd34c002f5865c6508391b1',
+  },
+  'law/schemas/release-verification-profile.schema.json': {
+    name: 'release-verification-profile.schema.json',
+    sha256: '973db5abc11fa3511e063a17ce34caf06e861534a675303638f5e6ce1364ae52',
+  },
+};
+const FROZEN_ROOT = join(ROOT, 'packages/cli/tests/fixtures/historical-mutation-inputs');
 
 function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -74,10 +87,12 @@ function archive(files: readonly ReleasePackageFile[]): Buffer {
 }
 
 function frozen(path: string): Buffer {
-  return execFileSync('git', ['show', `${FROZEN_POLICY_REVISION}:${path}`], {
-    cwd: ROOT,
-    maxBuffer: 16 * 1024 * 1024,
-  });
+  const document = FROZEN_DOCUMENTS[path];
+  if (document === undefined) throw new Error('historical mutation fixture path unknown');
+  const bytes = readFileSync(join(FROZEN_ROOT, document.name));
+  if (sha256(bytes) !== document.sha256)
+    throw new Error('historical mutation fixture digest mismatch');
+  return bytes;
 }
 
 export function installedPackage(
