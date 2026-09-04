@@ -40,6 +40,7 @@
     "ajv-formats": "^3.0.1",
     "cac": "^6.7.0",
     "minimatch": "^9.0.0",
+    "semver": "7.8.5",
     "typescript": "^5.6.0",
     "yaml": "^2.9.0"
   },
@@ -59,6 +60,7 @@
     "@devai-nyx/spec": "workspace:*",
     "@devai-nyx/utils": "workspace:*",
     "@types/istanbul-lib-coverage": "^2.0.6",
+    "@types/semver": "7.8.0",
     "istanbul-lib-coverage": "^3.2.2",
     "rolldown": "1.1.5",
     "typescript": "^5.6.0",
