@@ -30,6 +30,7 @@ import { buildReleaseMutationInputPlanV21 } from '../../src/services/release-mut
 import {
   fixture as mutationFixture,
   build as buildMutationFixture,
+  currentFixture,
 } from '../helpers/release-mutation-inputs-fixture.js';
 import {
   DYNAMIC,
@@ -141,6 +142,30 @@ describe('release toolchain fixture compatibility', () => {
     });
     expect(certificationStore).not.toHaveBeenCalled();
     for (const call of sinkCalls) expect(call).not.toHaveBeenCalled();
+  });
+
+  it('accepts the exact assembled current v1.2 profile and template in a one-shot private context', async () => {
+    const base = currentFixture();
+    const production = buildMutationFixture(base);
+    const value = providerFixture({ installed: base.installed, resolution: production.resolution });
+    const template = production.resolution.readInput('release-verification-profile') as {
+      readonly schemaVersion: string;
+      readonly mutation_execution: { readonly schemaVersion: string };
+    };
+
+    expect(template).toMatchObject({
+      schemaVersion: '1.2.0',
+      mutation_execution: { schemaVersion: '1.2.0' },
+    });
+    const adapters = createContainerReleaseCertificationAdapters(value.options);
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'success' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, value.expected),
+    ).not.toThrow();
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'failure' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, value.expected),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
   });
 
   it('rejects every supplied evidence sink at the private factory boundary before task or store effects', () => {
@@ -380,7 +405,12 @@ describe('release toolchain fixture compatibility', () => {
     ).toThrow('release-toolchain-fixture-compatibility-invalid');
   });
   it('uses genuine candidate and policy resolution brands at the mocked fixed-definition unit seam', () => {
-    const value = fixture();
+    const historical = mutationFixture();
+    const historicalProduction = buildMutationFixture(historical);
+    const value = fixture({
+      installed: historical.installed,
+      productionResolution: historicalProduction.resolution,
+    });
     const definition = loader.value;
     if (definition === undefined) throw new Error('missing mocked fixture definition');
     const expectedPaths = [...definition.manifest.map((entry) => entry.path), ...DYNAMIC].sort();

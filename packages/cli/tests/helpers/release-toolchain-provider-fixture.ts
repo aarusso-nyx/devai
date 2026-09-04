@@ -40,7 +40,6 @@ import type { ContainerReleaseCertificationOptions } from '../../src/services/re
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const FIXTURE_ROOT = resolve(import.meta.dirname, '../fixtures/mutation-toolchain');
 const PACKAGE = '@aarusso-nyx/devai';
-const VERSION = '1.4.5';
 const REPOSITORY = 'devai-diagnostic/mutation-toolchain-diagnostic';
 const SOURCE_POLICY = 'law/policy/diagnostic-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
@@ -258,6 +257,7 @@ function resolutionFor(
   repository: string,
 ): VerifiedReleasePolicyResolution {
   const pin = installed.read('dist/law/constitution.md');
+  const installedVersion = installed.identity.version;
   const version = parseConstitutionVersion(pin.toString('utf8'));
   if (version === null) throw new Error('fixture constitution version');
   const policy = JSON.parse(policyBytes.toString('utf8')) as Record<string, unknown>;
@@ -268,7 +268,7 @@ function resolutionFor(
       project_type: 'framework',
       constitution: { version, sha256: sha256(pin) },
     },
-    frameworkVersion: VERSION,
+    frameworkVersion: installedVersion,
   });
   const binding = {
     schemaVersion: '1.0.0',
@@ -301,7 +301,7 @@ function resolutionFor(
       },
       packages: {
         [`${PACKAGE}@file:host/devai.tgz`]: {
-          version: VERSION,
+          version: installedVersion,
           resolution: { integrity: archiveSRI },
         },
       },
@@ -341,6 +341,7 @@ function fixture(
   } = {},
 ): Fixture {
   const installed = options.installed ?? createLifecyclePolicyFixture().package_snapshot;
+  const installedVersion = installed.identity.version;
   const { definition, files: fixed } = fixedDefinition();
   loader.value = definition;
   const pin = installed.read('dist/law/constitution.md');
@@ -357,7 +358,7 @@ function fixture(
       project_type: 'framework',
       constitution: { version: constitutionVersion, sha256: sha256(pin) },
     },
-    frameworkVersion: VERSION,
+    frameworkVersion: installedVersion,
   });
   const policyBytes = fixed.get(SOURCE_POLICY);
   if (policyBytes === undefined) throw new Error('missing diagnostic policy');
@@ -391,7 +392,7 @@ function fixture(
     },
     packages: {
       '@aarusso-nyx/devai@file:host/devai.tgz': {
-        version: VERSION,
+        version: installedVersion,
         resolution: { integrity: archiveSRI },
       },
     },
