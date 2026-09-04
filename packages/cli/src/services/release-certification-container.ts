@@ -256,8 +256,12 @@ export class ProtectedCertificationContainer {
   readonly #controls: ProtectedContainerControls;
   readonly #dependencies: readonly ProtectedContainerDependency[];
   readonly #dependencyTransport: ProtectedDependencyTransport;
-  readonly identity: Readonly<Record<string, unknown>>;
+  readonly #identity: Readonly<Record<string, unknown>>;
   #host: ReturnType<typeof createProtectedReleaseHostAdapter> | undefined;
+
+  get identity(): Readonly<Record<string, unknown>> {
+    return this.#identity;
+  }
 
   runBound<T>(binding: ProtectedContainerExecutionBinding, operation: () => T): T {
     if (this.#host !== undefined) throw new Error('release-certification-container-in-use');
@@ -270,10 +274,13 @@ export class ProtectedCertificationContainer {
   }
 
   constructor(
-    controls: ProtectedContainerControls,
+    inputControls: ProtectedContainerControls,
     dependencies: readonly ProtectedContainerDependency[] = [],
   ) {
-    this.#controls = JSON.parse(canonicalJson(controls)) as ProtectedContainerControls;
+    // Capture once: validation, advertised identity and execution must never read
+    // independently changing values from the caller's original object.
+    const controls = JSON.parse(canonicalJson(inputControls)) as ProtectedContainerControls;
+    this.#controls = controls;
     if (
       !isAbsolute(controls.docker_binary) ||
       !isAbsolute(controls.docker_config_directory) ||
@@ -341,7 +348,7 @@ export class ProtectedCertificationContainer {
       this.#dependencies,
       controls.maximum_archive_bytes,
     );
-    this.identity = freezeIdentity({
+    this.#identity = freezeIdentity({
       protocol: 'devai.protected-container-certification.v1',
       image: controls.image,
       ...(controls.local_image === undefined
@@ -360,6 +367,13 @@ export class ProtectedCertificationContainer {
       pids_limit: controls.pids_limit,
       memory_bytes: controls.memory_bytes,
       cpus: controls.cpus,
+    });
+    // Prevent replacement or shadowing of the public view. Execution consumes
+    // the private identity regardless of public prototype modifications.
+    Object.defineProperty(this, 'identity', {
+      configurable: false,
+      enumerable: true,
+      get: () => this.#identity,
     });
   }
 
@@ -519,6 +533,24 @@ export class ProtectedCertificationContainer {
     readonly mutation_report?: Buffer;
   } {
     const c = this.#controls;
+    // Select the execution path once. A changing accessor must not bypass the
+    // mutation snapshot and then supply a protected program on a later read.
+    const mutationProgram = input.mutation_program;
+    const diagnosticOutputPaths = input.diagnostic_output_paths;
+    const declaredNamespaces = input.declared_namespaces;
+    input = {
+      task: input.task,
+      timeout_ms: input.timeout_ms,
+      environment: input.environment,
+      source: input.source,
+      prior_outputs: input.prior_outputs,
+      declared_outputs: input.declared_outputs,
+      ...(mutationProgram === undefined ? {} : { mutation_program: mutationProgram }),
+      ...(diagnosticOutputPaths === undefined
+        ? {}
+        : { diagnostic_output_paths: diagnosticOutputPaths }),
+      ...(declaredNamespaces === undefined ? {} : { declared_namespaces: declaredNamespaces }),
+    };
     if (input.mutation_program !== undefined) {
       // The bytes validated below are the bytes transported later. A host
       // callback or shared caller buffer cannot swap candidate inputs between
@@ -534,9 +566,9 @@ export class ProtectedCertificationContainer {
         environment: JSON.parse(canonicalJson(input.environment)) as Readonly<
           Record<string, string>
         >,
-        source: input.source.map(copy),
+        source: Array.from(input.source, copy),
         prior_outputs: new Map(
-          [...input.prior_outputs].map(([path, entry]) => [path, copy(entry)]),
+          Array.from(input.prior_outputs, ([path, entry]) => [path, copy(entry)] as const),
         ),
         declared_outputs: [...input.declared_outputs],
         ...(input.diagnostic_output_paths === undefined
@@ -545,7 +577,7 @@ export class ProtectedCertificationContainer {
         ...(input.declared_namespaces === undefined
           ? {}
           : {
-              declared_namespaces: input.declared_namespaces.map((entry) => ({
+              declared_namespaces: Array.from(input.declared_namespaces, (entry) => ({
                 prefix: entry.prefix,
                 required_paths: [...entry.required_paths],
               })),
@@ -562,7 +594,7 @@ export class ProtectedCertificationContainer {
         : mutationProgramManifest(mutation.files, c.maximum_archive_bytes);
     if (input.mutation_program !== undefined)
       assertProtectedMutationProgramExecution(input.mutation_program, {
-        container_identity: this.identity,
+        container_identity: this.#identity,
         environment: protectedContainerTaskEnvironment(input.environment),
         source: input.source,
         prior_outputs: input.prior_outputs,
