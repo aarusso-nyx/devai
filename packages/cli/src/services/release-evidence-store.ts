@@ -6,8 +6,11 @@ import { createProtectedReleaseSinkOwner } from '@devai-nyx/authority';
 import { createDurableReleaseContentStore } from './release-content-store.js';
 import type {
   CertificationEvidenceTransaction,
+  CertifiedEvidenceCarrierBinding,
+  CertifiedEvidenceCarrierIdentity,
   TrustedCertificationEvidenceSink,
 } from './release-lifecycle-certification.js';
+import { readCertifiedEvidenceCarrier } from './release-certified-evidence-carrier.js';
 import {
   finalizeCertificationReceipt,
   type CertificationOutputClosure,
@@ -29,6 +32,7 @@ import {
 const DIGEST = /^[0-9a-f]{64}$/u;
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const TRANSACTION = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const RELEASE_UNIT = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
 
 function fail(): never {
   throw new Error('release-certification-generated-output-untrusted');
@@ -108,6 +112,7 @@ function createStore(
   input: ReleaseCertificationEvidenceStoreOptions,
 ): ReleaseCertificationEvidenceStore {
   const maximumUnitBytes = input.max_blob_bytes;
+  const maximumCarrierBytes = input.max_blob_bytes;
   const owner = createProtectedReleaseSinkOwner('certification', input.evidence_sink_id);
   const {
     root,
@@ -199,10 +204,19 @@ function createStore(
     }
     return values;
   };
+  type CarrierDerivation = Pick<
+    CertificationOutputClosureBinding,
+    'repository' | 'candidate' | 'task_policy_digest_sha256'
+  >;
+  type CommittedCarrier = CertifiedEvidenceCarrierIdentity & {
+    readonly derivation: CarrierDerivation;
+  };
+  const committedCarriers: CommittedCarrier[] = [];
   const commits = (): readonly CertificationOutputClosure[] => {
     checkRoot();
     const directory = join(root, 'certification');
     inspectAncestors(directory);
+    committedCarriers.length = 0;
     const closures: CertificationOutputClosure[] = [];
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
       a.name.localeCompare(b.name, 'en'),
@@ -219,13 +233,25 @@ function createStore(
         evidence_sink_id: string;
         transaction_handle: string;
         closures: CertificationOutputClosure[];
+        carriers?: CertifiedEvidenceCarrierIdentity[];
       };
+      // Historical commits carry no carrier member and stay byte-identical under this branch.
       if (
-        !same(commit, {
-          evidence_sink_id: sinkId,
-          transaction_handle: entry.name,
-          closures: commit.closures,
-        }) ||
+        !same(
+          commit,
+          commit.carriers === undefined
+            ? {
+                evidence_sink_id: sinkId,
+                transaction_handle: entry.name,
+                closures: commit.closures,
+              }
+            : {
+                evidence_sink_id: sinkId,
+                transaction_handle: entry.name,
+                closures: commit.closures,
+                carriers: commit.carriers,
+              },
+        ) ||
         !Array.isArray(commit.closures) ||
         !value.equals(bytes(commit))
       )
@@ -295,12 +321,75 @@ function createStore(
             fail();
         }
       }
+      if (commit.carriers !== undefined) {
+        if (!Array.isArray(commit.carriers)) fail();
+        const units = commit.carriers.map((carrier) => carrier.release_unit);
+        if (
+          new Set(units).size !== units.length ||
+          !same(
+            units,
+            [...units].sort((a, b) => a.localeCompare(b, 'en')),
+          )
+        )
+          fail();
+        // Each carrier records its own protected derivation. It must equal one of this
+        // transaction's committed package bindings; nothing is inferred positionally.
+        const derivations = commit.closures.map(({ outputs: _ignored, ...binding }) => ({
+          repository: binding.repository,
+          candidate: binding.candidate,
+          task_policy_digest_sha256: binding.task_policy_digest_sha256,
+        }));
+        for (const carrier of commit.carriers as (CertifiedEvidenceCarrierIdentity & {
+          derivation: CarrierDerivation;
+        })[]) {
+          if (
+            !same(carrier, {
+              evidence_sink_id: sinkId,
+              release_unit: carrier.release_unit,
+              derivation: carrier.derivation,
+              opaque_handle: `sha256:${carrier.sha256}`,
+              sha256: carrier.sha256,
+              size_bytes: carrier.size_bytes,
+            }) ||
+            typeof carrier.release_unit !== 'string' ||
+            !RELEASE_UNIT.test(carrier.release_unit) ||
+            !DIGEST.test(carrier.sha256) ||
+            !Number.isSafeInteger(carrier.size_bytes) ||
+            carrier.size_bytes < 1 ||
+            !derivations.some((derivation) => same(derivation, carrier.derivation))
+          )
+            fail();
+          committedCarriers.push(snapshot(carrier));
+        }
+      }
       closures.push(...commit.closures);
     }
     return closures;
   };
+  const carrierBytes = (identity: CertifiedEvidenceCarrierIdentity): Buffer => {
+    const value = read(objectPath(identity.sha256));
+    if (value.length !== identity.size_bytes || digest(value) !== identity.sha256) fail();
+    return value;
+  };
+  const assertCarrierDerivation = (
+    value: Buffer,
+    derivation: CarrierDerivation,
+    release_unit: string,
+  ): void => {
+    const decoded = readCertifiedEvidenceCarrier(value, maximumCarrierBytes);
+    if (
+      decoded.carrier.release_unit !== release_unit ||
+      !same(decoded.carrier.derivation, {
+        repository: derivation.repository,
+        candidate: derivation.candidate,
+        task_policy_digest_sha256: derivation.task_policy_digest_sha256,
+      })
+    )
+      fail();
+  };
   return Object.freeze<ReleaseCertificationEvidenceStore>({
     unit_mutation_maximum_bytes: maximumUnitBytes,
+    certified_evidence_carrier_maximum_bytes: maximumCarrierBytes,
     authority_owner: owner,
     kind: 'certification-evidence-sink-v3' as const,
     protocol: 'two-phase-content-addressed' as const,
@@ -464,6 +553,12 @@ function createStore(
         bytes({ evidence_sink_id: sinkId, transaction_handle: transaction, bindings: selected }),
       );
       const handles = new Map<string, CertificationOutputBlobHandle>();
+      const carriers = new Map<string, CommittedCarrier>();
+      const derivations = selected.map((binding) => ({
+        repository: binding.repository,
+        candidate: binding.candidate,
+        task_policy_digest_sha256: binding.task_policy_digest_sha256,
+      }));
       let terminal = false;
       return Object.freeze<CertificationEvidenceTransaction>({
         evidence_sink_id: sinkId,
@@ -486,6 +581,45 @@ function createStore(
           };
           handles.set(handle.opaque_handle, handle);
           return snapshot(handle);
+        },
+        putCertifiedEvidenceCarrier(value) {
+          if (
+            terminal ||
+            typeof value.release_unit !== 'string' ||
+            !RELEASE_UNIT.test(value.release_unit) ||
+            carriers.has(value.release_unit) ||
+            !Buffer.isBuffer(value.bytes) ||
+            value.bytes.length !== value.size_bytes ||
+            value.bytes.length < 1 ||
+            value.bytes.length > maximumCarrierBytes ||
+            digest(value.bytes) !== value.sha256
+          )
+            fail();
+          const captured = Buffer.from(value.bytes);
+          // The sink, never the producer, decodes and elects the derivation.
+          const decoded = readCertifiedEvidenceCarrier(captured, maximumCarrierBytes);
+          if (decoded.carrier.release_unit !== value.release_unit) fail();
+          const derivation = derivations.find((candidate) =>
+            same(candidate, decoded.carrier.derivation),
+          );
+          if (derivation === undefined) fail();
+          install(objectPath(value.sha256), captured);
+          const identity: CommittedCarrier = {
+            evidence_sink_id: sinkId,
+            release_unit: value.release_unit,
+            derivation: snapshot(derivation),
+            opaque_handle: `sha256:${value.sha256}`,
+            sha256: value.sha256,
+            size_bytes: captured.length,
+          };
+          carriers.set(value.release_unit, identity);
+          return snapshot({
+            evidence_sink_id: identity.evidence_sink_id,
+            release_unit: identity.release_unit,
+            opaque_handle: identity.opaque_handle,
+            sha256: identity.sha256,
+            size_bytes: identity.size_bytes,
+          });
         },
         commit(values) {
           if (terminal || values.length !== selected.length) fail();
@@ -536,12 +670,32 @@ function createStore(
               }),
             };
           });
+          // Rehash and re-decode every retained carrier against its elected derivation
+          // before the atomic effect. A producer cache never substitutes for these bytes.
+          const retained = [...carriers.values()].sort((a, b) =>
+            a.release_unit.localeCompare(b.release_unit, 'en'),
+          );
+          for (const carrier of retained)
+            assertCarrierDerivation(
+              carrierBytes(carrier),
+              carrier.derivation,
+              carrier.release_unit,
+            );
           // Commit outcome becomes terminal before the atomic effect: any lost
           // fsync/response requires reading durable state, never abort/retry.
           terminal = true;
           install(
             join(directory, 'commit.json'),
-            bytes({ evidence_sink_id: sinkId, transaction_handle: transaction, closures }),
+            bytes(
+              retained.length === 0
+                ? { evidence_sink_id: sinkId, transaction_handle: transaction, closures }
+                : {
+                    evidence_sink_id: sinkId,
+                    transaction_handle: transaction,
+                    closures,
+                    carriers: retained,
+                  },
+            ),
           );
           return snapshot(closures);
         },
@@ -554,6 +708,34 @@ function createStore(
           );
         },
       });
+    },
+    readCertifiedEvidenceCarrier(binding: CertifiedEvidenceCarrierBinding): Buffer {
+      if (
+        !same(binding, {
+          repository: binding.repository,
+          candidate: binding.candidate,
+          task_policy_digest_sha256: binding.task_policy_digest_sha256,
+          release_unit: binding.release_unit,
+        }) ||
+        typeof binding.release_unit !== 'string' ||
+        !RELEASE_UNIT.test(binding.release_unit)
+      )
+        fail();
+      const derivation = {
+        repository: binding.repository,
+        candidate: binding.candidate,
+        task_policy_digest_sha256: binding.task_policy_digest_sha256,
+      };
+      commits();
+      const found = committedCarriers.filter(
+        (carrier) =>
+          carrier.release_unit === binding.release_unit && same(carrier.derivation, derivation),
+      );
+      const first = found[0];
+      if (first === undefined || found.some((carrier) => !same(carrier, first))) fail();
+      const value = carrierBytes(first);
+      assertCarrierDerivation(value, first.derivation, first.release_unit);
+      return Buffer.from(value);
     },
     readCertificationOutputClosure(binding) {
       assertBinding(binding);
@@ -621,6 +803,7 @@ export function createReleaseCertificationEvidenceStore(
   const store = storageBoundary(() => createStore(input));
   return Object.freeze<ReleaseCertificationEvidenceStore>({
     unit_mutation_maximum_bytes: store.unit_mutation_maximum_bytes,
+    certified_evidence_carrier_maximum_bytes: store.certified_evidence_carrier_maximum_bytes,
     authority_owner: store.authority_owner,
     kind: store.kind,
     protocol: store.protocol,
@@ -654,10 +837,20 @@ export function createReleaseCertificationEvidenceStore(
         evidence_sink_id: transaction.evidence_sink_id,
         transaction_handle: transaction.transaction_handle,
         put: (input) => storageBoundary(() => transaction.put(input)),
+        putCertifiedEvidenceCarrier: (input) =>
+          storageBoundary(() => {
+            if (typeof transaction.putCertifiedEvidenceCarrier !== 'function') fail();
+            return transaction.putCertifiedEvidenceCarrier(input);
+          }),
         commit: (input) => storageBoundary(() => transaction.commit(input)),
         abort: () => storageBoundary(() => transaction.abort()),
       });
     },
+    readCertifiedEvidenceCarrier: (input) =>
+      storageBoundary(() => {
+        if (typeof store.readCertifiedEvidenceCarrier !== 'function') fail();
+        return store.readCertifiedEvidenceCarrier(input);
+      }),
     readCertificationOutputClosure: (input) =>
       storageBoundary(() => store.readCertificationOutputClosure(input)),
     readCertificationEvidenceReceipt: (input) =>

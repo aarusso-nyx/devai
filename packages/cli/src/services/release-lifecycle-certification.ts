@@ -21,6 +21,22 @@ export interface ImmutableCertificationTaskPolicy {
   readonly document: unknown;
 }
 
+/** Durable identity of one release unit's complete certification evidence carrier. */
+export interface CertifiedEvidenceCarrierIdentity {
+  readonly evidence_sink_id: string;
+  readonly release_unit: string;
+  readonly opaque_handle: string;
+  readonly sha256: string;
+  readonly size_bytes: number;
+}
+
+export interface CertifiedEvidenceCarrierBinding {
+  readonly repository: ReleaseLifecycleRequest['repository_locator'];
+  readonly candidate: Pick<ReleaseLifecycleRequest['candidate_locator'], 'commit' | 'tree'>;
+  readonly task_policy_digest_sha256: string;
+  readonly release_unit: string;
+}
+
 export interface CertificationEvidenceTransaction {
   readonly evidence_sink_id: string;
   readonly transaction_handle: string;
@@ -29,6 +45,14 @@ export interface CertificationEvidenceTransaction {
     readonly sha256: string;
     readonly size_bytes: number;
   }) => CertificationOutputBlobHandle | Promise<CertificationOutputBlobHandle>;
+  /** Retains one complete carrier per release unit inside this same atomic transaction.
+   * The sink re-decodes and re-hashes the bytes; a producer never supplies its identity. */
+  readonly putCertifiedEvidenceCarrier?: (input: {
+    readonly release_unit: string;
+    readonly bytes: Buffer;
+    readonly sha256: string;
+    readonly size_bytes: number;
+  }) => CertifiedEvidenceCarrierIdentity | Promise<CertifiedEvidenceCarrierIdentity>;
   /** The external sink, not the producer, creates and atomically finalizes the receipts. */
   readonly commit: (
     closures: readonly (CertificationOutputClosureBinding & {
@@ -54,9 +78,15 @@ export interface TrustedCertificationEvidenceSink extends Pick<
   readonly authority_owner?: object;
   readonly kind: 'certification-evidence-sink-v3';
   readonly protocol: 'two-phase-content-addressed';
+  /** Externally protected, measured carrier bound. This module supplies no default. */
+  readonly certified_evidence_carrier_maximum_bytes?: number;
   readonly begin: (
     bindings: readonly CertificationOutputClosureBinding[],
   ) => CertificationEvidenceTransaction | Promise<CertificationEvidenceTransaction>;
+  /** Reads committed carrier bytes without executing tasks or trusting a producer cache. */
+  readonly readCertifiedEvidenceCarrier?: (
+    binding: CertifiedEvidenceCarrierBinding,
+  ) => Buffer | Promise<Buffer>;
 }
 
 export interface ProtectedCertificationProvider {
