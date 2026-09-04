@@ -39,7 +39,7 @@
     },
     "risk_capabilities": {},
     "mutation_execution": {
-      "schemaVersion": "1.0.0",
+      "schemaVersion": "1.1.0",
       "template_id": "devai.protected-mutation-stryker.v1",
       "runner": {
         "kind": "stryker-vitest-typescript",
@@ -59,6 +59,37 @@
         "configuration": "host-derived-ephemeral-from-roster-only",
         "invocation": "fixed-host-template-not-profile-or-candidate-script"
       },
+      "mutation_targets": {
+        "root": "parent-of-roster.manifest_path/src",
+        "include_extensions": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
+        "exclude_suffixes": [
+          ".d.ts",
+          ".d.tsx",
+          ".d.mts",
+          ".d.cts",
+          ".test.ts",
+          ".test.tsx",
+          ".test.mts",
+          ".test.cts",
+          ".test.js",
+          ".test.jsx",
+          ".test.mjs",
+          ".test.cjs",
+          ".spec.ts",
+          ".spec.tsx",
+          ".spec.mts",
+          ".spec.cts",
+          ".spec.js",
+          ".spec.jsx",
+          ".spec.mjs",
+          ".spec.cjs"
+        ],
+        "exclude_path_segments": ["__tests__", "test", "tests"],
+        "entry_type": "regular-file",
+        "order": "utf8-lexicographic-relative-package-path",
+        "empty": "refuse-production-mutation",
+        "binding": "separate-actual-target-population-and-projection-rule-digest-in-mutationConfiguration;never-replace-full-roster-input-identity"
+      },
       "roster_order": "id-lexicographic",
       "output": {
         "raw": "protected-container-only",
@@ -76,7 +107,21 @@
           "survivedMax": "survived_max"
         }
       },
-      "toolchain_fixture_validation": "pending-engineer-pinned-toolchain-fixture-validation-before-protected-invocation"
+      "toolchain_fixture_validation": {
+        "production_gate": "pending-engineer-pinned-toolchain-fixture-validation-before-production-certification-invocation",
+        "diagnostic_fixture_exception": {
+          "execution": "existing-protected-preflight-provider-broker-on-the-fixed-host-template",
+          "scope": "fixed-host-owned-diagnostic-fixture-candidate-and-frozen-dependency-identities-only",
+          "result": "bounded-toolchain-compatibility-observation-only",
+          "prohibitions": [
+            "production-candidate-or-production-certification",
+            "pass-or-certification-projection",
+            "certification-evidence-semantic-receipt-or-reusable-artifact",
+            "production-lifecycle-state-or-artifact-sink",
+            "signing-publication-or-production-credential"
+          ]
+        }
+      }
     },
     "mutation_roster": [
       {

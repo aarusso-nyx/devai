@@ -161,13 +161,14 @@
         "template_id",
         "runner",
         "selection",
+        "mutation_targets",
         "roster_order",
         "output",
         "threshold_projection",
         "toolchain_fixture_validation"
       ],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
+        "schemaVersion": { "const": "1.1.0" },
         "template_id": { "const": "devai.protected-mutation-stryker.v1" },
         "runner": {
           "type": "object",
@@ -206,6 +207,57 @@
             "invocation": { "const": "fixed-host-template-not-profile-or-candidate-script" }
           }
         },
+        "mutation_targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "include_extensions",
+            "exclude_suffixes",
+            "exclude_path_segments",
+            "entry_type",
+            "order",
+            "empty",
+            "binding"
+          ],
+          "properties": {
+            "root": { "const": "parent-of-roster.manifest_path/src" },
+            "include_extensions": {
+              "const": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]
+            },
+            "exclude_suffixes": {
+              "const": [
+                ".d.ts",
+                ".d.tsx",
+                ".d.mts",
+                ".d.cts",
+                ".test.ts",
+                ".test.tsx",
+                ".test.mts",
+                ".test.cts",
+                ".test.js",
+                ".test.jsx",
+                ".test.mjs",
+                ".test.cjs",
+                ".spec.ts",
+                ".spec.tsx",
+                ".spec.mts",
+                ".spec.cts",
+                ".spec.js",
+                ".spec.jsx",
+                ".spec.mjs",
+                ".spec.cjs"
+              ]
+            },
+            "exclude_path_segments": { "const": ["__tests__", "test", "tests"] },
+            "entry_type": { "const": "regular-file" },
+            "order": { "const": "utf8-lexicographic-relative-package-path" },
+            "empty": { "const": "refuse-production-mutation" },
+            "binding": {
+              "const": "separate-actual-target-population-and-projection-rule-digest-in-mutationConfiguration;never-replace-full-roster-input-identity"
+            }
+          }
+        },
         "roster_order": { "const": "id-lexicographic" },
         "output": {
           "type": "object",
@@ -238,7 +290,37 @@
           }
         },
         "toolchain_fixture_validation": {
-          "const": "pending-engineer-pinned-toolchain-fixture-validation-before-protected-invocation"
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["production_gate", "diagnostic_fixture_exception"],
+          "properties": {
+            "production_gate": {
+              "const": "pending-engineer-pinned-toolchain-fixture-validation-before-production-certification-invocation"
+            },
+            "diagnostic_fixture_exception": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["execution", "scope", "result", "prohibitions"],
+              "properties": {
+                "execution": {
+                  "const": "existing-protected-preflight-provider-broker-on-the-fixed-host-template"
+                },
+                "scope": {
+                  "const": "fixed-host-owned-diagnostic-fixture-candidate-and-frozen-dependency-identities-only"
+                },
+                "result": { "const": "bounded-toolchain-compatibility-observation-only" },
+                "prohibitions": {
+                  "const": [
+                    "production-candidate-or-production-certification",
+                    "pass-or-certification-projection",
+                    "certification-evidence-semantic-receipt-or-reusable-artifact",
+                    "production-lifecycle-state-or-artifact-sink",
+                    "signing-publication-or-production-credential"
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     },
