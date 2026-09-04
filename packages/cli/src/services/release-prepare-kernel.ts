@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@devai-nyx/utils';
 import { readProtectedReleasePrepareCapacity } from '@devai-nyx/authority';
+import {
+  RELEASE_EXPORT_SPEC_ID,
+  RELEASE_EXPORT_SPEC_DIGEST,
+  RELEASE_EXPORT_TRANSCRIPT_FORMAT,
+  encodeReleaseExportTranscript,
+  verifyReleaseExportProviderResult,
+} from './release-export-transcript.js';
+import type { ReleaseExportArtifactCommitManifest } from './release-export-artifact-store.js';
 import type {
   ArtifactSinkCommitIdentity,
   CertificationOutputBlobHandle,
@@ -916,6 +924,44 @@ async function verifyReceiptBytes(
   return bytes;
 }
 
+/** Rebind retained prepared bytes to their package row; digest checks alone do not prevent swaps. */
+export function verifyPreparedPackageManifest(input: {
+  readonly bytes: Buffer;
+  readonly package: PackageEvidence;
+  readonly version: string;
+  readonly candidate: { readonly commit: string; readonly tree: string };
+}): void {
+  const pkg = input.package;
+  const certification = pkg.certification_manifest;
+  const tarball = pkg.package_tarball;
+  const sbom = pkg.package_sbom;
+  if (certification == null || tarball == null || sbom == null)
+    throw new Error('release-downstream-artifact-reverification-failed');
+  const { manifest_digest_sha256, ...draft } = certification;
+  const expected = {
+    schemaVersion: '2.0.0',
+    kind: 'release-prepared-package-manifest',
+    candidate: input.candidate,
+    package_id: pkg.package_id,
+    package_version: input.version,
+    pack_spec_id: RELEASE_PACK_SPEC_ID,
+    pack_spec_digest_sha256: RELEASE_PACK_SPEC_DIGEST,
+    certification_manifest_digest_sha256: manifest_digest_sha256,
+    artifacts: {
+      tarball: { sha256: tarball.sha256, size_bytes: tarball.size_bytes },
+      sbom: { sha256: sbom.sha256, size_bytes: sbom.size_bytes },
+    },
+  };
+  if (
+    certificationManifestDigest(draft) !== manifest_digest_sha256 ||
+    certification.package_id !== pkg.package_id ||
+    certification.package_version !== input.version ||
+    !same(certification.candidate, input.candidate) ||
+    !input.bytes.equals(Buffer.from(canonicalJson(expected), 'utf8'))
+  )
+    throw new Error('release-downstream-artifact-reverification-failed');
+}
+
 async function abort(transaction: TrustedArtifactSinkTransaction): Promise<void> {
   try {
     await transaction.abort();
@@ -1204,6 +1250,185 @@ function artifactProjectionKey(value: OpaqueArtifactIdentity): string {
   return `${value.kind}\0${value.sink_id}\0${value.opaque_handle}\0${value.sha256}\0${String(value.size_bytes)}`;
 }
 
+/** Byte and membership continuity only; neither a signature nor a policy verdict. */
+async function reverifyExportContinuity(
+  state: ReleaseLifecycleStateV2,
+  manifest: Readonly<Record<string, unknown>>,
+  manifestBytes: Buffer,
+  reader: TrustedArtifactReader,
+  observed: ReadonlyMap<string, Buffer>,
+): Promise<void> {
+  const fail = (): never => {
+    throw new Error('release-downstream-artifact-reverification-failed');
+  };
+  const parse = (value: Buffer): Readonly<Record<string, unknown>> => {
+    const parsed = object(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(value)));
+    if (!value.equals(Buffer.from(canonicalJson(parsed), 'utf8'))) fail();
+    return parsed;
+  };
+  const exported = manifest as unknown as ReleaseExportArtifactCommitManifest;
+  const sink = state.artifact_sink;
+  const binding = exported.binding;
+  const parent = exported.parent_artifact_sink;
+  if (sink == null) return fail();
+  if (
+    !same(parse(manifestBytes), manifest) ||
+    !same(manifest, {
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: sink.sink_id,
+      transaction_handle: sink.transaction_handle,
+      repository: state.repository,
+      candidate: { commit: state.candidate.commit, tree: state.candidate.tree },
+      export_spec_id: RELEASE_EXPORT_SPEC_ID,
+      export_spec_digest_sha256: RELEASE_EXPORT_SPEC_DIGEST,
+      parent_artifact_sink: parent,
+      binding,
+      artifacts: state['artifacts'],
+    }) ||
+    parent.sink_id !== sink.sink_id ||
+    parent.transaction_handle === sink.transaction_handle ||
+    parent.committed_manifest_handle === sink.committed_manifest_handle ||
+    sink.commit_protocol !== COMMIT_PROTOCOL ||
+    !same(binding.parent_artifact_sink, parent) ||
+    !same(binding.repository, state.repository) ||
+    !same(binding.candidate, exported.candidate) ||
+    binding.sink_id !== sink.sink_id ||
+    binding.export_spec_digest_sha256 !== RELEASE_EXPORT_SPEC_DIGEST
+  )
+    fail();
+  const planBindings = (state['bound_receipts'] as readonly Record<string, unknown>[]).filter(
+    (entry) => entry['kind'] === 'release-plan-receipt',
+  );
+  // Later actions bind their own required receipts (notably offline verification), not a
+  // fabricated copy of the export plan receipt. Their exact sink/parent chain remains pinned.
+  if (
+    (state.state === 'exported' || planBindings.length > 0) &&
+    !same(planBindings, [
+      {
+        kind: 'release-plan-receipt',
+        receipt_id: `RPL-${binding.plan_receipt_digest_sha256.slice(0, 16)}`,
+        receipt_digest_sha256: binding.plan_receipt_digest_sha256,
+        verdict: 'pass',
+      },
+    ])
+  )
+    fail();
+  const packages = state.release_units
+    .flatMap((unit) => unit.packages)
+    .sort((a, b) => utf8Compare(a.package_id, b.package_id));
+  if (
+    packages.length === 0 ||
+    new Set(packages.map((pkg) => pkg.package_id)).size !== packages.length ||
+    !Array.isArray(binding.closure_inputs) ||
+    binding.closure_inputs.length !== packages.length
+  )
+    fail();
+  const parents = packages
+    .flatMap((pkg) => [pkg.package_manifest, pkg.package_tarball, pkg.package_sbom])
+    .map(opaqueIdentity)
+    .sort((a, b) => utf8Compare(artifactProjectionKey(a), artifactProjectionKey(b)));
+  const providerSizes = packages.map((pkg) => opaqueIdentity(pkg.provider_result).size_bytes);
+  // Bounds derive from the already-pinned artifact sizes, never from embedded transcript text.
+  // The protected reader/host separately imposes its absolute storage/transport limits.
+  const limits = {
+    maximum_transcript_bytes: Math.max(...providerSizes),
+    maximum_provider_result_bytes: Math.max(...providerSizes),
+    maximum_packages: packages.length,
+  };
+  const { export_spec_digest_sha256, closure_inputs, ...transcriptBinding } = binding;
+  if (export_spec_digest_sha256 !== RELEASE_EXPORT_SPEC_DIGEST) fail();
+  const transcript = encodeReleaseExportTranscript(
+    {
+      version: RELEASE_EXPORT_TRANSCRIPT_FORMAT,
+      binding: transcriptBinding,
+      parent: parents,
+      closures: packages.map((pkg, index) => {
+        const closure = closure_inputs[index];
+        const evidence = opaqueIdentity(pkg.evidence_manifest);
+        if (
+          closure === undefined ||
+          !same(pkg.trust, binding.trust) ||
+          !same(closure, {
+            package_id: pkg.package_id,
+            sha256: evidence.sha256,
+            size_bytes: evidence.size_bytes,
+            expected_installed_package: closure.expected_installed_package,
+            policy_resolution_digest_sha256: closure.policy_resolution_digest_sha256,
+          })
+        )
+          return fail();
+        return {
+          package_id: pkg.package_id,
+          evidence_manifest: evidence,
+          expected_installed_package: closure.expected_installed_package,
+          policy_resolution_digest_sha256: closure.policy_resolution_digest_sha256,
+        };
+      }),
+      destination: binding.destination,
+      trust: binding.trust,
+    },
+    limits,
+  );
+  // Transcript validation above closes every parent identity before it reaches the reader.
+  if (
+    observed.has(parent.committed_manifest_handle) ||
+    observed.has(sink.committed_manifest_handle)
+  )
+    fail();
+  const parentBytes = await verifyReceiptBytes(
+    reader,
+    {
+      sink_id: parent.sink_id,
+      opaque_handle: parent.committed_manifest_handle,
+      sha256: parent.committed_manifest_sha256,
+      size_bytes: parent.committed_manifest_size_bytes,
+    },
+    'release-downstream-artifact-reverification-failed',
+  );
+  if (
+    !same(parse(parentBytes), {
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: parent.sink_id,
+      transaction_handle: parent.transaction_handle,
+      repository: state.repository,
+      candidate: exported.candidate,
+      pack_spec_id: RELEASE_PACK_SPEC_ID,
+      pack_spec_digest_sha256: RELEASE_PACK_SPEC_DIGEST,
+      artifacts: parents,
+    })
+  )
+    fail();
+  for (const unit of state.release_units) {
+    for (const pkg of unit.packages) {
+      const identity = opaqueIdentity(pkg.package_manifest);
+      const value = observed.get(identity.opaque_handle);
+      if (value === undefined) return fail();
+      verifyPreparedPackageManifest({
+        bytes: value,
+        package: pkg,
+        version: unit.version,
+        candidate: exported.candidate,
+      });
+    }
+  }
+  let signature: string | undefined;
+  for (const pkg of packages) {
+    const identity = opaqueIdentity(pkg.provider_result);
+    const value = observed.get(identity.opaque_handle);
+    if (value === undefined) return fail();
+    const result = parse(value);
+    if (typeof result['signature'] !== 'string') fail();
+    signature ??= result['signature'] as string;
+    verifyReleaseExportProviderResult(
+      value,
+      { package_id: pkg.package_id, transcript, signature },
+      limits,
+    );
+  }
+}
+
 export async function reverifySinkArtifacts(
   state: ReleaseLifecycleStateV2,
   reader: TrustedArtifactReader | undefined,
@@ -1230,13 +1455,19 @@ export async function reverifySinkArtifacts(
     throw new Error('release-downstream-artifact-reverification-failed');
   }
   const members = commitManifest['artifacts'];
+  const isExport = ['exported', 'evidence_published', 'publication_dispatched'].includes(
+    state.state,
+  );
   if (
     commitManifest['schemaVersion'] !== '1.0.0' ||
     commitManifest['kind'] !== 'release-artifact-sink-commit-manifest' ||
     commitManifest['sink_id'] !== sink.sink_id ||
     commitManifest['transaction_handle'] !== sink.transaction_handle ||
-    commitManifest['pack_spec_id'] !== RELEASE_PACK_SPEC_ID ||
-    commitManifest['pack_spec_digest_sha256'] !== RELEASE_PACK_SPEC_DIGEST ||
+    (isExport
+      ? commitManifest['export_spec_id'] !== RELEASE_EXPORT_SPEC_ID ||
+        commitManifest['export_spec_digest_sha256'] !== RELEASE_EXPORT_SPEC_DIGEST
+      : commitManifest['pack_spec_id'] !== RELEASE_PACK_SPEC_ID ||
+        commitManifest['pack_spec_digest_sha256'] !== RELEASE_PACK_SPEC_DIGEST) ||
     !same(commitManifest['repository'], state.repository) ||
     !same(commitManifest['candidate'], {
       commit: state.candidate.commit,
@@ -1260,7 +1491,10 @@ export async function reverifySinkArtifacts(
         ['evidence-manifest', pkg.evidence_manifest],
         ['provider-result', pkg.provider_result],
       ].flatMap(([expectedKind, identity]) => {
-        if (identity === null || identity === undefined) return [];
+        if (identity === null || identity === undefined) {
+          if (isExport) throw new Error('release-downstream-artifact-reverification-failed');
+          return [];
+        }
         const normalized = opaqueIdentity(identity);
         if (normalized.kind !== expectedKind || normalized.sink_id !== sink.sink_id) {
           throw new Error('release-downstream-artifact-reverification-failed');
@@ -1274,6 +1508,12 @@ export async function reverifySinkArtifacts(
   );
   if (
     new Set(expected.map(artifactProjectionKey)).size !== expected.length ||
+    new Set(expected.map((artifact) => artifact.opaque_handle)).size !== expected.length ||
+    expected.some((artifact) => artifact.opaque_handle === sink.committed_manifest_handle) ||
+    (!isExport &&
+      expected.some((artifact) =>
+        ['evidence-manifest', 'provider-result'].includes(artifact.kind),
+      )) ||
     expected.some((artifact) => artifact.sink_id !== sink.sink_id) ||
     !same(expected, sortedExpected) ||
     !same(normalizedMembers, expected) ||
@@ -1281,10 +1521,26 @@ export async function reverifySinkArtifacts(
   ) {
     throw new Error('release-downstream-artifact-reverification-failed');
   }
+  const observed = new Map<string, Buffer>();
   for (const identity of expected) {
     if (identity.sink_id !== sink.sink_id) {
       throw new Error('release-downstream-artifact-reverification-failed');
     }
-    await verifyReceiptBytes(reader, identity, 'release-downstream-artifact-reverification-failed');
+    const verified = await verifyReceiptBytes(
+      reader,
+      identity,
+      'release-downstream-artifact-reverification-failed',
+    );
+    // Hash large parent tarballs/closures independently; retain only small manifests/results
+    // for the subsequent package association and aggregate transcript continuity checks.
+    if (isExport && ['package-manifest', 'provider-result'].includes(identity.kind))
+      observed.set(identity.opaque_handle, verified);
+  }
+  if (isExport) {
+    try {
+      await reverifyExportContinuity(state, commitManifest, manifestBytes, reader, observed);
+    } catch {
+      throw new Error('release-downstream-artifact-reverification-failed');
+    }
   }
 }

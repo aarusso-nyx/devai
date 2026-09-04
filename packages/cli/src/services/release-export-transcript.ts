@@ -10,6 +10,9 @@ import type { ReleasePackageIdentity } from './release-package-snapshot.js';
 
 export const RELEASE_EXPORT_TRANSCRIPT_FORMAT = 'devai.release-export-transcript-json.v1';
 export const RELEASE_EXPORT_PROVIDER_RESULT_FORMAT = 'devai.release-export-provider-result-json.v1';
+export const RELEASE_EXPORT_SPEC_ID = 'devai.release-export-closure.v2';
+export const RELEASE_EXPORT_SPEC_DIGEST =
+  '77ab8fd69d2b3d4edeaebd12b516eb5c15fe910f93ff4516deadd466f0853f98';
 
 export interface ReleaseExportTranscriptBinding {
   readonly action_id: 'release export';

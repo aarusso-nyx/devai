@@ -20,8 +20,7 @@ import {
 } from './release-lifecycle-execution.js';
 import {
   RELEASE_PACK_SPEC_DIGEST,
-  RELEASE_PACK_SPEC_ID,
-  finalizeCertificationManifest,
+  verifyPreparedPackageManifest,
   reverifySinkArtifacts,
   type ArtifactSinkCommitReceipt,
 } from './release-prepare-kernel.js';
@@ -37,6 +36,8 @@ import {
 } from './release-policy-closure-transport.js';
 import type { ReleasePolicyExpectedIdentity } from './release-policy-resolution.js';
 import {
+  RELEASE_EXPORT_SPEC_ID,
+  RELEASE_EXPORT_SPEC_DIGEST,
   encodeReleaseExportTranscript,
   verifyReleaseExportProviderResult,
   type ReleaseExportProviderResult,
@@ -45,9 +46,7 @@ import {
   type ReleaseExportTranscriptLimits,
 } from './release-export-transcript.js';
 
-export const RELEASE_EXPORT_SPEC_ID = 'devai.release-export-closure.v2';
-export const RELEASE_EXPORT_SPEC_DIGEST =
-  '77ab8fd69d2b3d4edeaebd12b516eb5c15fe910f93ff4516deadd466f0853f98';
+export { RELEASE_EXPORT_SPEC_ID, RELEASE_EXPORT_SPEC_DIGEST } from './release-export-transcript.js';
 const INVALID = 'release-export-artifact-sink-protocol-invalid';
 const COMMIT_UNKNOWN = 'release-export-artifact-sink-commit-unknown';
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
@@ -394,45 +393,16 @@ export async function createReleaseExportArtifactStore(
       await reverifySinkArtifacts(state, checkedParentReader);
       for (const { pkg, version } of packages) {
         const manifestIdentity = pkg.package_manifest;
-        const tarball = pkg.package_tarball;
-        const sbom = pkg.package_sbom;
-        if (
-          manifestIdentity == null ||
-          tarball == null ||
-          sbom == null ||
-          pkg.certification_manifest == null
-        )
-          fail();
-        const { manifest_digest_sha256: certificationDigest, ...certification } =
-          pkg.certification_manifest;
-        if (
-          finalizeCertificationManifest(certification).manifest_digest_sha256 !==
-          certificationDigest
-        )
-          fail();
-        const manifest = parse(
-          await checkedParentReader.readArtifact({
+        if (manifestIdentity == null) fail();
+        verifyPreparedPackageManifest({
+          bytes: await checkedParentReader.readArtifact({
             sink_id: manifestIdentity.sink_id,
             opaque_handle: manifestIdentity.opaque_handle,
           }),
-        );
-        if (
-          !same(manifest, {
-            schemaVersion: '2.0.0',
-            kind: 'release-prepared-package-manifest',
-            candidate: binding.candidate,
-            package_id: pkg.package_id,
-            package_version: version,
-            pack_spec_id: RELEASE_PACK_SPEC_ID,
-            pack_spec_digest_sha256: RELEASE_PACK_SPEC_DIGEST,
-            certification_manifest_digest_sha256: pkg.certification_manifest.manifest_digest_sha256,
-            artifacts: {
-              tarball: { sha256: tarball.sha256, size_bytes: tarball.size_bytes },
-              sbom: { sha256: sbom.sha256, size_bytes: sbom.size_bytes },
-            },
-          })
-        )
-          fail();
+          package: pkg,
+          version,
+          candidate: binding.candidate,
+        });
       }
       store.checkRoot();
     };
