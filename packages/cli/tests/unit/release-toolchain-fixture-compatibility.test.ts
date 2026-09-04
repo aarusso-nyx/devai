@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { canonicalJson, canonicalSha256, parseConstitutionVersion } from '@devai-nyx/utils';
 import { stringify } from 'yaml';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveAdopterPolicyMaterialization } from '../../src/services/adopter-policy.js';
 import { encodeContainerDependencyArchive } from '../../src/services/container-archive.js';
 import type { ContainerArchiveEntry } from '../../src/services/container-archive.js';
@@ -23,6 +25,9 @@ import {
   createProtectedToolchainFixtureContext,
   bindProtectedToolchainFixtureContext,
   observeProtectedToolchainFixtureInputs,
+  recordProtectedToolchainFixtureBinding,
+  attachProtectedToolchainFixtureCustody,
+  issueProtectedToolchainFixtureCompatibility,
   type ProtectedToolchainFixtureContext,
 } from '../../src/services/release-toolchain-fixture-compatibility.js';
 import {
@@ -34,6 +39,14 @@ import {
   verifyProtectedDependencyInputs,
 } from '../../src/services/release-dependency-transport.js';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
+import { buildResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import {
+  assertProtectedFixtureProviderCompatibility,
+  createContainerReleaseCertificationAdapters,
+  takeProtectedFixtureDiagnosticCustody,
+  type ContainerReleaseCertificationOptions,
+} from '../../src/services/release-certification-provider.js';
+import type { CheckRunnerOptions } from '../../src/services/check-runner/types.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const FIXTURE_ROOT = resolve(import.meta.dirname, '../fixtures/mutation-toolchain');
@@ -71,10 +84,72 @@ type Definition = {
 };
 
 const loader = vi.hoisted((): { value: Definition | undefined } => ({ value: undefined }));
+const runner = vi.hoisted(() => vi.fn());
+const containerState = vi.hoisted((): { outputs: Map<string, Buffer>; status: number } => ({
+  outputs: new Map(),
+  status: 0,
+}));
 vi.mock('../../src/services/release-toolchain-fixture-definition.js', () => ({
   loadReleaseToolchainFixtureDefinition: () => {
     if (loader.value === undefined) throw new Error('fixture definition unavailable');
     return loader.value;
+  },
+}));
+vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/check-runner/runner.js')>()),
+  runCheckTasks: runner,
+}));
+vi.mock('../../src/services/release-certification-container.js', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../src/services/release-certification-container.js')
+  >()),
+  ProtectedCertificationContainer: class {
+    readonly identity: Record<string, unknown>;
+    constructor(
+      controls: ProtectedContainerControls,
+      dependencies: readonly ProtectedContainerDependency[],
+    ) {
+      this.identity = {
+        protocol: 'devai.protected-container-certification.v1',
+        image: controls.image,
+        engine_version: controls.engine_version,
+        node_version: controls.node_version,
+        docker_binary_sha256: controls.docker_binary_sha256,
+        executables: controls.executables,
+        network: 'none',
+        rootfs: 'readonly',
+        capabilities: ['ALL'],
+        privilege_escalation: false,
+        pids_limit: controls.pids_limit,
+        memory_bytes: controls.memory_bytes,
+        cpus: controls.cpus,
+        dependencies: dependencies.map((entry) => entry.sha256),
+        dependency_transport_sha256: '0'.repeat(64),
+      };
+    }
+    runBound<T>(_binding: unknown, operation: () => T): T {
+      return operation();
+    }
+    verifyRuntime(): void {}
+    execute(input: {
+      readonly declared_outputs: readonly string[];
+      readonly diagnostic_output_paths?: readonly string[];
+    }) {
+      const select = (paths: readonly string[]) =>
+        paths.flatMap((path) => {
+          const bytes = containerState.outputs.get(path);
+          return bytes === undefined
+            ? []
+            : [{ path, mode: '100644' as const, bytes: Buffer.from(bytes) }];
+        });
+      return {
+        result: { status: containerState.status, signal: null, stdout: '', stderr: '' },
+        outputs: containerState.status === 0 ? select(input.declared_outputs) : [],
+        ...(input.diagnostic_output_paths === undefined
+          ? {}
+          : { diagnostic_outputs: select(input.diagnostic_output_paths) }),
+      };
+    }
   },
 }));
 
@@ -191,7 +266,7 @@ function candidate(
   };
   const treeId = tree(root);
   const commitBytes = Buffer.from(
-    `tree ${treeId}\nauthor Fixture <fixture@example.invalid> 0 +0000\n\nfixture\n`,
+    `tree ${treeId}\nauthor Fixture <fixture@example.invalid> 0 +0000\ncommitter Fixture <fixture@example.invalid> 0 +0000\n\nfixture\n`,
   );
   const commit = oid('commit', commitBytes);
   objects.set(commit, { type: 'commit', bytes: commitBytes });
@@ -443,13 +518,15 @@ function fixture(
   const descriptor = JSON.parse(
     snapshot.read('test-tasks.json').toString('utf8'),
   ) as TaskDescriptor;
+  const executable = controls.executables.node;
+  if (executable === undefined) throw new Error('missing fixture executable');
   const task: PlannedTask = {
     nodeId: 'diagnostic:mutation-toolchain',
     taskKey: 'd'.repeat(64),
     dependencies: [],
     outputContract: descriptor.tasks[0]?.outputContract ?? {},
     argv: ['node', '../../host/run-diagnostic.mjs'],
-    executable: controls.executables.node,
+    executable,
     cwd: 'packages/fixture',
     inputDigest: 'e'.repeat(64),
     inputPaths: [],
@@ -524,7 +601,308 @@ function request(value: Fixture) {
   };
 }
 
+const temporaryRoots: string[] = [];
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+  runner.mockReset();
+  containerState.outputs.clear();
+  containerState.status = 0;
+});
+
+function providerFixture() {
+  const value = fixture();
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-toolchain-provider-')));
+  temporaryRoots.push(root);
+  const git = (args: readonly string[], input?: Uint8Array): Buffer => {
+    const result = spawnSync('git', ['-C', root, ...args], { input });
+    if (result.status !== 0) throw new Error(result.stderr.toString());
+    return result.stdout;
+  };
+  git(['init', '-q']);
+  for (const [id, object] of value.candidate.readProof(value.candidate.paths)) {
+    expect(
+      git(['hash-object', '-w', '-t', object.type, '--stdin'], object.bytes).toString().trim(),
+    ).toBe(id);
+  }
+  git(['checkout', '--detach', value.candidate.repository.commit]);
+  expect(git(['rev-parse', 'HEAD']).toString().trim()).toBe(value.candidate.repository.commit);
+  expect(git(['rev-parse', 'HEAD^{tree}']).toString().trim()).toBe(value.candidate.repository.tree);
+  const intent = {
+    schemaVersion: '1.0.0',
+    release_unit: '@devai-toolchain/diagnostic',
+    current_version: '0.9.0',
+    target_version: '1.0.0',
+    support: 'current',
+    change_kind: 'behavioral',
+    changed_paths: ['packages/fixture/src/subject.ts'],
+    changed_packages: ['@devai-toolchain/diagnostic'],
+    candidate: { commit: value.candidate.repository.commit, tree: value.candidate.repository.tree },
+    base: { commit: value.candidate.repository.commit, tree: value.candidate.repository.tree },
+  };
+  const receipt = buildResolvedReleasePlanReceipt({ intent, resolution: value.fixtureResolution });
+  expect(receipt.verdict).toBe('pass');
+  const boundRequest = {
+    ...request(value),
+    receipt_locators: [
+      {
+        kind: 'release-plan-receipt' as const,
+        receipt_id: receipt.receipt_id,
+        receipt_digest_sha256: receipt.receipt_digest_sha256,
+        path: '.devai/receipts/fixture.json',
+      },
+    ],
+  };
+  const plan = {
+    taskPolicyDigest: '1'.repeat(64),
+    taskPolicy: { nodes: [value.task.nodeId] },
+    tasks: [value.task],
+  };
+  runner.mockImplementation((options: CheckRunnerOptions) => {
+    const result = options.executeTask?.(value.task.argv, join(root, value.task.cwd), 1000, {});
+    return {
+      schemaVersion: '1.0.0',
+      operation: options.operation,
+      plan,
+      execution: [
+        {
+          nodeId: value.task.nodeId,
+          taskKey: value.task.taskKey,
+          disposition: 'executed',
+          outcome: result?.status === undefined || result.status === 0 ? 'PASS' : 'FAIL',
+          reason: 'fixture',
+          durationMs: 1,
+        },
+      ],
+      preflightReceipt: { digest: '2'.repeat(64), path: '.devai/cache/preflight.json', value: {} },
+      exitCode: result?.status ?? 0,
+    };
+  });
+  const options: ContainerReleaseCertificationOptions = {
+    repository_root: root,
+    repository_id: REPOSITORY,
+    plans: [
+      {
+        receipt,
+        resolution: value.fixtureResolution,
+        intent_path: 'release-intent.json',
+        intent,
+        release_verification_profile: value.fixtureResolution.readInput(
+          'release-verification-profile',
+        ),
+        release_lifecycle_policy: value.fixtureResolution.readInput('release-lifecycle-policy'),
+        action_registry: value.fixtureResolution.readInput('action-registry-policy'),
+        packages: [
+          {
+            package_id: '@devai-toolchain/diagnostic',
+            source_entries: ['package.json'],
+            generated_entries: [],
+          },
+        ],
+      },
+    ],
+    controls: value.controls,
+    dependencies: value.dependencies,
+    environment: {},
+    toolchain: {
+      node: 'v24.20.0',
+      pnpm: '9.15.0',
+      git: '2.47.3',
+      vitest: '4.1.10',
+      typescript: '5.9.3',
+      stryker: '9.6.1',
+    },
+    timeout_ms: 1000,
+    diagnostic_outputs: [
+      {
+        task_node: value.task.nodeId,
+        paths: [
+          'packages/fixture/reports/mutation/compatibility.json',
+          'packages/fixture/reports/mutation/raw.json',
+        ],
+      },
+    ],
+    toolchain_fixture: {
+      candidate: value.candidate,
+      installed_package: value.installed,
+      production_resolution: value.productionResolution,
+    },
+    content_source: {
+      readGitObject: ({ type, object_id }) => git(['cat-file', type, object_id]),
+      readGitBlob: ({ object_id }) => git(['cat-file', 'blob', object_id]),
+    },
+    evidence_sink: {
+      kind: 'certification-evidence-sink-v3',
+      protocol: 'two-phase-content-addressed',
+      begin: () => {
+        throw new Error('unexpected certification');
+      },
+      readCertificationEvidenceReceipt: () => {
+        throw new Error('unexpected certification');
+      },
+      readCertificationOutputClosure: (binding) => ({ ...binding, outputs: [] }),
+      readGeneratedBlob: () => {
+        throw new Error('unexpected certification');
+      },
+    },
+  };
+  const subject = value.candidate.read('packages/fixture/src/subject.ts');
+  const zero = value.candidate.read('packages/fixture/src/zero.ts');
+  const raw = {
+    schemaVersion: '1.0',
+    projectRoot: '/workspace/candidate/packages/fixture',
+    framework: { name: 'StrykerJS', version: '9.6.1' },
+    thresholds: { break: 60, high: 60, low: 60 },
+    files: {
+      'src/subject.ts': {
+        source: subject.toString(),
+        language: 'typescript',
+        mutants: [
+          { id: '0', status: 'Killed' as unknown },
+          { id: '1', status: 'Killed' as unknown },
+          { id: '2', status: 'Survived' as unknown },
+        ],
+      },
+    },
+  };
+  const compatibility = {
+    scope: 'toolchain-compatibility-diagnostic-only',
+    core: '9.6.1',
+    checker: '9.6.1',
+    runner: '9.6.1',
+    vitest: '4.1.10',
+    typescript: '5.9.3',
+    node: 'v24.20.0',
+    projectVitestResolved: true,
+    readonlyDependencies: true,
+    realMutationObserved: true,
+    certification: false,
+    reusable: false,
+    discovery: {
+      algorithm: 'devai.fixed-fixture-instrumenter.v1',
+      instrumenter_version: '9.6.1',
+      options: { plugins: null, excludedMutations: [], ignorers: [] },
+      selected: [
+        { path: 'src/subject.ts', source_sha256: sha256(subject) },
+        { path: 'src/zero.ts', source_sha256: sha256(zero) },
+      ],
+      instrumented: ['src/subject.ts', 'src/zero.ts'],
+      emitted: [{ path: 'src/subject.ts', mutant_ids: ['0', '1', '2'], mutant_count: 3 }],
+    },
+  };
+  containerState.outputs.set(
+    'packages/fixture/reports/mutation/raw.json',
+    Buffer.from(JSON.stringify(raw)),
+  );
+  containerState.outputs.set(
+    'packages/fixture/reports/mutation/compatibility.json',
+    Buffer.from(JSON.stringify(compatibility)),
+  );
+  const expected = {
+    resolution: value.productionResolution,
+    container_identity: new ProtectedCertificationContainer(value.controls, value.dependencies)
+      .identity,
+    toolchain: options.toolchain,
+    environment: {},
+  };
+  return { value, options, request: boundRequest, raw, expected };
+}
+
 describe('release toolchain fixture compatibility', () => {
+  it('autoissues compatibility only inside the actual protected provider and consumes raw custody', async () => {
+    const value = providerFixture();
+    const adapters = createContainerReleaseCertificationAdapters(value.options);
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'success' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, value.expected),
+    ).not.toThrow();
+    expect(() =>
+      takeProtectedFixtureDiagnosticCustody(adapters.preflight_provider, value.request),
+    ).toThrow('release-certification-diagnostic-custody-unavailable');
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(
+        async () => ({ outcome: 'failure', code: 'fixture' }),
+        value.expected,
+      ),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, {
+        ...value.expected,
+        toolchain: { ...value.expected.toolchain, node: 'v24.0.0' },
+      }),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'failure' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, value.expected),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+  });
+
+  it('refuses a raw mutant status array instead of coercing it to Survived', async () => {
+    const value = providerFixture();
+    const mutant = value.raw.files['src/subject.ts'].mutants[2];
+    if (mutant === undefined) throw new Error('missing fixture mutant');
+    mutant.status = ['Survived'];
+    containerState.outputs.set(
+      'packages/fixture/reports/mutation/raw.json',
+      Buffer.from(JSON.stringify(value.raw)),
+    );
+    const adapters = createContainerReleaseCertificationAdapters(value.options);
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({
+      outcome: 'failure',
+      code: 'release-toolchain-fixture-compatibility-invalid',
+    });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, value.expected),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+  });
+
+  it('never reattaches an already consumed global custody to another genuine context', async () => {
+    const value = providerFixture();
+    const firstContext = context(value.value);
+    const options = { ...value.options, toolchain_fixture: undefined };
+    const first = createContainerReleaseCertificationAdapters({
+      ...options,
+      fixture_context: firstContext,
+    });
+    expect(await first.preflight_provider(value.request)).toMatchObject({ outcome: 'success' });
+    const custody = takeProtectedFixtureDiagnosticCustody(first.preflight_provider, value.request);
+    expect(() => issueProtectedToolchainFixtureCompatibility(custody)).not.toThrow();
+
+    const secondContext = context(value.value);
+    createContainerReleaseCertificationAdapters({ ...options, fixture_context: secondContext });
+    observeProtectedToolchainFixtureInputs(secondContext, {
+      request: value.request,
+      source: value.value.source,
+      descriptor: value.value.descriptor,
+      tasks: [value.value.task],
+    });
+    const binding = custody.read().runs[0]?.binding;
+    if (binding === undefined) throw new Error('missing fixture binding');
+    recordProtectedToolchainFixtureBinding(secondContext, binding);
+    expect(() => attachProtectedToolchainFixtureCustody(secondContext, custody)).toThrow(
+      'release-toolchain-fixture-compatibility-invalid',
+    );
+    expect(() => issueProtectedToolchainFixtureCompatibility(custody)).toThrow(
+      'release-toolchain-fixture-compatibility-invalid',
+    );
+  });
+
+  it('does not issue compatibility after transport failure and rejects substituted runtime controls', async () => {
+    const value = providerFixture();
+    const adapters = createContainerReleaseCertificationAdapters(value.options);
+    expect(await adapters.preflight_provider(value.request)).toMatchObject({ outcome: 'success' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(adapters.preflight_provider, {
+        ...value.expected,
+        container_identity: { ...value.expected.container_identity, memory_bytes: 1 },
+      }),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+    const failed = createContainerReleaseCertificationAdapters(value.options);
+    containerState.status = 1;
+    expect(await failed.preflight_provider(value.request)).toMatchObject({ outcome: 'failure' });
+    expect(() =>
+      assertProtectedFixtureProviderCompatibility(failed.preflight_provider, value.expected),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+  });
   it('uses genuine candidate and policy resolution brands at the mocked fixed-definition unit seam', () => {
     const value = fixture();
     const definition = loader.value;
