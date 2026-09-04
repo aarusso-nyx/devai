@@ -238,7 +238,8 @@ export function createProtectedToolchainFixtureContext(input: {
     const profile = object(production.readInput('release-verification-profile'));
     const template = object(profile['mutation_execution']);
     if (
-      template['schemaVersion'] !== '1.1.0' ||
+      !['1.1.0', '1.2.0'].includes(String(template['schemaVersion'])) ||
+      profile['schemaVersion'] !== template['schemaVersion'] ||
       template['template_id'] !== 'devai.protected-mutation-stryker.v1' ||
       container['node_version'] !== VERSIONS.node
     )

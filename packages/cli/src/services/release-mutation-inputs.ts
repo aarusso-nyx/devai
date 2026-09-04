@@ -79,6 +79,13 @@ export interface ReleaseMutationInputPackageV21 {
   readonly mutation_target_projection_digest: string;
   readonly workspace_dependencies: readonly string[];
   readonly prerequisite_nodes: readonly string[];
+  /** v1.2 exact execution inputs; deliberately absent on historical v1.1 plans. */
+  readonly execution_configuration?: {
+    readonly task_node: string;
+    readonly vitest_config: ReleaseMutationSourceMemberV21;
+    readonly typescript_config: ReleaseMutationSourceMemberV21;
+    readonly typescript_closure: readonly ReleaseMutationSourceMemberV21[];
+  };
   readonly reuse: {
     readonly eligible: boolean;
     /** Unresolved selection/configuration also forbids constructing a production producer. */
@@ -93,6 +100,7 @@ export interface ReleaseMutationInputPlanV21 {
   readonly release_profile_digest: string;
   readonly mutation_policy_digest: string;
   readonly template_id: typeof TEMPLATE;
+  readonly execution_template_version: '1.1.0' | '1.2.0';
   /** Host execution coverage; never rewrites the verified plan's determination. */
   readonly execution_coverage: Readonly<{
     kind: ReleaseMutationExecutionCoverageV21['kind'];
@@ -336,7 +344,7 @@ export function assertReleaseMutationInputProjectionV21(
 }
 
 /**
- * Fixed DEVAI template input derivation. Every file read comes from a verified exact Git object
+ * Protected template input derivation. Every file read comes from a verified exact Git object
  * snapshot; no checkout, shell, network, candidate module evaluation or caller digest is used.
  * Package bytes intentionally exclude candidate commit/tree and the plan receipt: those bind the
  * later composition, while exact source/config/runner/roster/environment/toolchain drift changes
@@ -364,16 +372,19 @@ export function buildReleaseMutationInputPlanV21(input: {
     const candidate = input.candidate,
       resolution = input.resolution;
     const receipt = object(immutable(input.plan_receipt));
-    if (receipt['verdict'] !== 'pass' || resolution.release_unit !== '@aarusso-nyx/devai')
-      fail('MUTATION_ROSTER_MISMATCH');
+    if (receipt['verdict'] !== 'pass') fail('MUTATION_ROSTER_MISMATCH');
     const profile = object(resolution.readInput('release-verification-profile'));
     const template = object(profile['mutation_execution']);
+    const templateVersion = template['schemaVersion'];
     if (
-      profile['schemaVersion'] !== '1.1.0' ||
-      template['schemaVersion'] !== '1.1.0' ||
+      (templateVersion !== '1.1.0' && templateVersion !== '1.2.0') ||
+      profile['schemaVersion'] !== templateVersion ||
       template['template_id'] !== TEMPLATE
     )
       fail();
+    const currentTemplate = templateVersion === '1.2.0';
+    if (!currentTemplate && resolution.release_unit !== '@aarusso-nyx/devai')
+      fail('MUTATION_ROSTER_MISMATCH');
     const targetRule = object(template['mutation_targets']);
     const targetExtensions = strings(targetRule['include_extensions']);
     const targetExclusions = strings(targetRule['exclude_suffixes']);
@@ -383,10 +394,13 @@ export function buildReleaseMutationInputPlanV21(input: {
     if (!Array.isArray(rawRoster)) return fail();
     const roster = rawRoster.map(object).sort((a, b) => compare(text(a['id']), text(b['id'])));
     if (
-      !same(
-        roster.map((entry) => entry['id']),
-        PACKAGE_IDS,
-      )
+      roster.length === 0 ||
+      new Set(roster.map((entry) => entry['id'])).size !== roster.length ||
+      (!currentTemplate &&
+        !same(
+          roster.map((entry) => entry['id']),
+          PACKAGE_IDS,
+        ))
     )
       fail('MUTATION_ROSTER_MISMATCH');
     const controls = input.controls;
@@ -422,6 +436,11 @@ export function buildReleaseMutationInputPlanV21(input: {
       requestedCoverage.kind !== 'owner-approved-complete-devai-roster' ||
       !same(requestedCoverage, { kind: requestedCoverage.kind, ...coverageIdentity }) ||
       candidate.repository.id !== 'aarusso-nyx/devai' ||
+      resolution.release_unit !== '@aarusso-nyx/devai' ||
+      !same(
+        roster.map((entry) => entry['id']),
+        PACKAGE_IDS,
+      ) ||
       coverageIdentity.target_version !== '1.5.0' ||
       determination['support'] !== 'current' ||
       determination['mutation'] !== 'targeted'
@@ -625,15 +644,28 @@ export function buildReleaseMutationInputPlanV21(input: {
         posix.dirname(path(byPackage.get(name)?.entry['manifest_path'])),
       );
       // Root shared TypeScript settings are inputs, not executable configuration or authority.
-      const queue = candidate.paths.filter(
-        (name) =>
-          /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/u.test(name) &&
-          (posix.dirname(name) === '.' || roots.includes(posix.dirname(name))),
-      );
+      const queue = currentTemplate
+        ? [
+            ...new Set(
+              dependencyNames.map((name) => {
+                const entry = byPackage.get(name)?.entry;
+                const configured = path(entry?.['typescript_config_path']);
+                if (!select(entry?.['config_paths']).some((member) => member.path === configured))
+                  fail();
+                file(configured);
+                return configured;
+              }),
+            ),
+          ]
+        : candidate.paths.filter(
+            (name) =>
+              /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/u.test(name) &&
+              (posix.dirname(name) === '.' || roots.includes(posix.dirname(name))),
+          );
       const selected = new Map<string, ReleaseMutationSourceMemberV21>();
       const edges = new Map<string, string[]>();
       for (const root of roots)
-        if (!members.has(`${root}/tsconfig.json`))
+        if (!currentTemplate && !members.has(`${root}/tsconfig.json`))
           unresolved.add('typescript-package-configuration-missing');
       const reference = (parent: string, raw: unknown, directory: boolean): void => {
         if (
@@ -668,7 +700,7 @@ export function buildReleaseMutationInputPlanV21(input: {
         // supply complete reusable inputs. The shared root project graph is captured as config.
         if (
           directory &&
-          roots.includes(posix.dirname(parent)) &&
+          (currentTemplate || roots.includes(posix.dirname(parent))) &&
           !roots.includes(posix.dirname(resolved))
         )
           unresolved.add('typescript-project-dependency-unresolved');
@@ -865,14 +897,39 @@ export function buildReleaseMutationInputPlanV21(input: {
       for (const key of strings(entry['toolchain_keys']))
         if (!Object.hasOwn(toolchain, key)) fail();
       const sourceThresholds = object(entry['thresholds']);
-      if (!same(sourceThresholds, { score_min: 60, survived_max: 50 }))
+      if (
+        (!currentTemplate && !same(sourceThresholds, { score_min: 60, survived_max: 50 })) ||
+        typeof sourceThresholds['score_min'] !== 'number' ||
+        !Number.isFinite(sourceThresholds['score_min']) ||
+        sourceThresholds['score_min'] < 0 ||
+        sourceThresholds['score_min'] > 100 ||
+        typeof sourceThresholds['survived_max'] !== 'number' ||
+        !Number.isSafeInteger(sourceThresholds['survived_max']) ||
+        sourceThresholds['survived_max'] < 0
+      )
         fail('MUTATION_THRESHOLD_MISMATCH');
-      const thresholds = { break: 60, high: 60, low: 60, scoreMin: 60, survivedMax: 50 };
-      const config = uniqueFiles([
-          ...select(entry['config_paths']),
-          ...configurationClosure(dependencyNames, unresolved),
-        ]),
+      const scoreMin = sourceThresholds['score_min'],
+        survivedMax = sourceThresholds['survived_max'];
+      const thresholds = { break: scoreMin, high: scoreMin, low: scoreMin, scoreMin, survivedMax };
+      const declaredConfig = select(entry['config_paths']);
+      const typescriptClosure = configurationClosure(dependencyNames, unresolved);
+      const config = uniqueFiles([...declaredConfig, ...typescriptClosure]),
         sanitizer = select(entry['sanitizer_paths']);
+      const executionConfiguration = currentTemplate
+        ? {
+            task_node: task.nodeId,
+            vitest_config: file(path(entry['vitest_config_path'])),
+            typescript_config: file(path(entry['typescript_config_path'])),
+            typescript_closure: typescriptClosure,
+          }
+        : undefined;
+      if (
+        executionConfiguration !== undefined &&
+        [executionConfiguration.vitest_config, executionConfiguration.typescript_config].some(
+          (selected) => !declaredConfig.some((member) => member.path === selected.path),
+        )
+      )
+        fail();
       const orchestration = select(entry['orchestration_paths']);
       const lock = file(path(entry['lockfile_path']));
       const toolVersions: Record<string, string> = {};
@@ -1002,6 +1059,9 @@ export function buildReleaseMutationInputPlanV21(input: {
         prerequisite_nodes: nodes
           .filter((node) => node.nodeId !== task.nodeId)
           .map((node) => node.nodeId),
+        ...(executionConfiguration === undefined
+          ? {}
+          : { execution_configuration: executionConfiguration }),
         reuse: { eligible: unresolved.size === 0, unresolved: [...unresolved].sort(compare) },
       });
     });
@@ -1013,6 +1073,7 @@ export function buildReleaseMutationInputPlanV21(input: {
       release_profile_digest: canonicalSha256(profile),
       mutation_policy_digest: mutationPolicyDigest,
       template_id: TEMPLATE,
+      execution_template_version: templateVersion,
       execution_coverage: immutable({
         kind: requestedCoverage.kind,
         ...coverageIdentity,
