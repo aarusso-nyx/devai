@@ -15,11 +15,18 @@ import type {
   TrustedArtifactReader,
 } from './release-lifecycle-execution.js';
 
-export const RELEASE_PACK_SPEC_ID = 'devai.pure-npm-compatible-pack.v3';
-export const RELEASE_PACK_SPEC_CANONICAL_BYTES =
+/** Historical identity only; current prepare and downstream authority never select v3. */
+export const RELEASE_PACK_SPEC_V3_ID = 'devai.pure-npm-compatible-pack.v3';
+export const RELEASE_PACK_SPEC_V3_CANONICAL_BYTES =
   'devai.pure-npm-compatible-pack.v3\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;utf-8;no-backslash;maximum-100-bytes;no-pax\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=archive-path;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=empty\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v3];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n';
-export const RELEASE_PACK_SPEC_DIGEST =
+export const RELEASE_PACK_SPEC_V3_DIGEST =
   'd287db048eb09efaea20c7e4d6b8b721d34e08eb05b6cbc7f19fba4c666917bd';
+
+export const RELEASE_PACK_SPEC_ID = 'devai.pure-npm-compatible-pack.v4';
+export const RELEASE_PACK_SPEC_CANONICAL_BYTES =
+  'devai.pure-npm-compatible-pack.v4\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;valid-unicode-scalar-values;utf-8;relative;no-backslash-no-nul-no-empty-dot-or-dotdot-segments;no-pax\nustar-path=if-archive-path-utf8-bytes<=100:name=archive-path,prefix=empty;otherwise-split-at-rightmost-slash-with-nonempty-prefix-utf8-bytes<=155-and-nonempty-name-utf8-bytes<=100;separator-not-stored;refuse-if-no-valid-split;no-truncation-no-unicode-normalization;name-offset=0,width=100;prefix-offset=345,width=155;unused-bytes=zero;full-width-fields=no-extra-nul\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=ustar-name;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=ustar-prefix\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v4];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n';
+export const RELEASE_PACK_SPEC_DIGEST =
+  '46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316';
 
 const CERTIFICATION_MANIFEST_DOMAIN = 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0';
 const CERTIFICATION_MANIFEST_DIGEST_CONTRACT = {
@@ -229,12 +236,31 @@ function writeOctal(target: Buffer, offset: number, length: number, value: numbe
   target[offset + length - 1] = 0;
 }
 
-function tarHeader(path: string, mode: number, size: number): Buffer {
-  if (!safeRelativePath(path) || Buffer.byteLength(path, 'utf8') > 100) {
+function ustarPath(path: string): { readonly name: Buffer; readonly prefix: Buffer } {
+  if (!safeRelativePath(path)) {
     throw new Error('release-prepare-unsupported-package-semantics');
   }
+  const bytes = Buffer.from(path, 'utf8');
+  if (bytes.byteLength <= 100) return { name: bytes, prefix: Buffer.alloc(0) };
+  // A slash is one complete UTF-8 byte, so slicing here cannot split a scalar value.
+  for (
+    let separator = bytes.lastIndexOf(0x2f);
+    separator > 0;
+    separator = bytes.lastIndexOf(0x2f, separator - 1)
+  ) {
+    const nameLength = bytes.byteLength - separator - 1;
+    if (separator <= 155 && nameLength > 0 && nameLength <= 100) {
+      return { name: bytes.subarray(separator + 1), prefix: bytes.subarray(0, separator) };
+    }
+  }
+  throw new Error('release-prepare-unsupported-package-semantics');
+}
+
+function tarHeader(path: string, mode: number, size: number): Buffer {
+  const fields = ustarPath(path);
   const header = Buffer.alloc(512);
-  header.write(path, 0, 100, 'utf8');
+  fields.name.copy(header, 0);
+  fields.prefix.copy(header, 345);
   writeOctal(header, 100, 8, mode);
   writeOctal(header, 108, 8, 0);
   writeOctal(header, 116, 8, 0);
