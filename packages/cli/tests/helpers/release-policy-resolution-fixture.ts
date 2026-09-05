@@ -100,7 +100,11 @@ function packageSnapshot(extraFiles: readonly ReleasePackageFile[] = []): Releas
         bytes: Buffer.from(resolveCanonicalPolicyContent(name)),
       }),
     ),
-    ...['release-lifecycle.json', 'action-registry.json'].map((name) => ({
+    // The shipped package carries every canonical policy source, and the adopter
+    // materializer preserves those bytes rather than re-serializing when it can read
+    // them. Omitting one here made the fixture's own materialization disagree with the
+    // verification's, and only in a tree without build outputs.
+    ...['release-lifecycle.json', 'action-registry.json', 'release-verification.json'].map((name) => ({
       path: `dist/law/policy/${name}`,
       mode: 0o644,
       bytes: readFileSync(join(policyRoot, name)),

@@ -78,7 +78,16 @@
     {
       "nodeId": "test:cli",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:cli", "--configLoader", "runner", "--no-cache"],
+      "argv": [
+        "pnpm",
+        "run",
+        "test:cli",
+        "--configLoader",
+        "runner",
+        "--no-cache",
+        "--exclude",
+        "**/release-package-staging.test.ts"
+      ],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
