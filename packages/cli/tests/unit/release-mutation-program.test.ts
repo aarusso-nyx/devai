@@ -331,7 +331,7 @@ describe('protected mutation program factory with explicit upstream-authority is
       testRunner: 'devai-vitest',
       checkers: ['typescript'],
       coverageAnalysis: 'perTest',
-      concurrency: 1,
+      concurrency: 4,
       thresholds: { break: 60, high: 60, low: 60 },
       reporters: ['json'],
       jsonReporter: { fileName: '/tmp/devai-mutation-report.json' },

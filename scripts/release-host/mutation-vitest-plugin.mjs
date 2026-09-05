@@ -13,6 +13,19 @@ const { vitestTestRunnerFactory } = await import(
 const { strykerValidationSchema } = await import(
   pathToFileURL(join(base, 'dist/src/index.js')).href
 );
+// Vite bundles a TypeScript config into <root>/node_modules/.vite-temp, and the
+// protected container mounts every node_modules read-only, so the bundling loader
+// cannot run here. The candidate's own test tasks already avoid it with
+// `--configLoader runner`; the runner loader resolves the same config through the
+// module runner and writes nothing. The wrapper is a plain object, so the option is
+// injected without forking Stryker's runner.
+const { vitestWrapper } = await import(
+  pathToFileURL(join(base, 'dist/src/vitest-wrapper.js')).href
+);
+const createVitestWithRunnerLoader = vitestWrapper.createVitest;
+vitestWrapper.createVitest = (mode, options, ...rest) =>
+  createVitestWithRunnerLoader(mode, { ...options, configLoader: 'runner' }, ...rest);
+
 const coreRequire = createRequire(require.resolve('@stryker-mutator/core/package.json'));
 const { declareFactoryPlugin, PluginKind } = await import(
   pathToFileURL(coreRequire.resolve('@stryker-mutator/api/plugin')).href

@@ -959,7 +959,40 @@ export function buildReleaseMutationInputPlanV21(input: {
       const dependencySource = uniqueFiles(
         dependencyNames.flatMap((name) => select(byPackage.get(name)?.entry['source_selectors'])),
       );
-      const nodes = taskClosure(task);
+      // A package's own test task runs Vitest from source and never needs its workspace
+      // dependencies built. The mutation program additionally runs Stryker's TypeScript
+      // checker, which resolves each workspace dependency through its generated
+      // declarations, so the closure must also cover the tasks that produce those dist
+      // namespaces. Without them the checker cannot resolve the dependency and the
+      // program exits before emitting any report.
+      const dependencyManifests = new Set(
+        dependencyNames
+          .map((name) => byPackage.get(name)?.entry['manifest_path'])
+          .filter((value): value is string => typeof value === 'string'),
+      );
+      const declarationProducers = descriptor.tasks.filter((node) => {
+        const declared = node.outputContract['generated_namespaces'];
+        return (
+          Array.isArray(declared) &&
+          declared.some(
+            (raw) =>
+              raw !== null &&
+              typeof raw === 'object' &&
+              !Array.isArray(raw) &&
+              typeof (raw as Record<string, unknown>)['package_manifest'] === 'string' &&
+              dependencyManifests.has(
+                (raw as Record<string, unknown>)['package_manifest'] as string,
+              ),
+          )
+        );
+      });
+      const nodes = [
+        ...new Map(
+          [task, ...declarationProducers]
+            .flatMap((node) => taskClosure(node))
+            .map((node) => [node.nodeId, node] as const),
+        ).values(),
+      ];
       const prerequisiteNodes = nodes.filter((node) => node.nodeId !== task.nodeId);
       const generatedPrerequisites = prerequisiteOutputs.filter((output) =>
         prerequisiteNodes.some((node) => node.nodeId === output.producer_task_node),

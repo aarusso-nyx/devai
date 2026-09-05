@@ -162,7 +162,11 @@ export function createProtectedMutationProgram(input: {
     testRunner: 'devai-vitest',
     checkers: ['typescript'],
     coverageAnalysis: 'perTest',
-    concurrency: 1,
+    // Must not exceed the protected container's cpu allocation: Stryker resolves a
+    // mutant's verdict from its covering tests, so parallelism does not change which
+    // mutants are killed, but an oversubscribed host can turn a slow run into a
+    // spurious Timeout and move the score.
+    concurrency: 4,
     thresholds: {
       break: pkg.expected.thresholds.break,
       high: pkg.expected.thresholds.high,
