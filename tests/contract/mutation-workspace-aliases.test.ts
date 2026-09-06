@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
@@ -50,3 +50,11 @@ it.each(['../outside.ts', './src/missing.ts'])(
     expect(() => sandboxWorkspaceAliases(root)).toThrow('release-mutation-workspace-entry-invalid');
   },
 );
+
+it('refuses an entrypoint symlink that escapes the instrumented package', () => {
+  const { root, directory } = fixture({ '.': { development: './src/index.ts' } });
+  writeFileSync(join(root, 'original.ts'), 'export const value = 3;');
+  rmSync(join(directory, 'src/index.ts'));
+  symlinkSync(join(root, 'original.ts'), join(directory, 'src/index.ts'));
+  expect(() => sandboxWorkspaceAliases(root)).toThrow('release-mutation-workspace-entry-invalid');
+});

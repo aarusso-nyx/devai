@@ -1,8 +1,18 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
@@ -153,6 +163,39 @@ describe('normalized release package staging', () => {
       }),
     ).toThrow('RELEASE_MANIFEST_VERIFIER_IDENTITY_INVALID');
     expect(existsSync(manifest)).toBe(false);
+  });
+
+  it('checks the real source archive without Git metadata and catches added stale documentation', () => {
+    const archive = join(output, 'source archive ç');
+    cpSync(root, archive, {
+      recursive: true,
+      filter: (path) => {
+        const name = relative(root, path);
+        return !name
+          .split('/')
+          .some((part) => ['.git', 'node_modules', 'scratch', 'worktrees'].includes(part));
+      },
+    });
+    symlinkSync(join(root, 'node_modules'), join(archive, 'node_modules'), 'dir');
+    for (const name of readdirSync(join(root, 'packages'))) {
+      const dependencies = join(root, 'packages', name, 'node_modules');
+      if (existsSync(dependencies))
+        symlinkSync(dependencies, join(archive, 'packages', name, 'node_modules'), 'dir');
+    }
+    expect(existsSync(join(archive, '.git'))).toBe(false);
+    const check = () =>
+      execFileSync(process.execPath, [join(archive, 'scripts/check-publishable-closure.mjs')], {
+        cwd: archive,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
+    expect(JSON.parse(check()).package).toBe(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
+    writeFileSync(join(archive, 'docs/stale-package.md'), '@devai-nyx/cli');
+    expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/stale-package.md');
+    rmSync(join(archive, 'docs/stale-package.md'));
+    mkdirSync(join(archive, 'docs/site/build'), { recursive: true });
+    writeFileSync(join(archive, 'docs/site/build/stale.html'), '@devai-nyx/cli');
+    expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/site/build/stale.html');
   });
 
   it('keeps release closure bound to the selected public package version', () => {

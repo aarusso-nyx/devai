@@ -220,17 +220,23 @@ if (
   fail('PUBLISHABLE_CHECK_SUITE_POPULATION_INVALID', definedMembers.join(','));
 }
 
-const trackedPublicFiles = execFileSync('git', ['ls-files', '-z', 'docs', '.github/workflows'], {
-  cwd: ROOT,
-  encoding: 'utf8',
-})
-  .split('\0')
-  .filter((path) => path.length > 0 && existsSync(join(ROOT, path)));
+// Closure inspection also runs on source archives and Stryker sandboxes,
+// which have no Git metadata. Inspect documentation bytes directly, including
+// generated or untracked documentation; installed dependency trees are separate.
+function documentationFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const child = join(directory, entry.name);
+    if (entry.name === 'node_modules') return [];
+    if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile()))
+      fail('PUBLISHABLE_DOCUMENTATION_MEMBER_INVALID', relative(ROOT, child));
+    return entry.isDirectory() ? documentationFiles(child) : [relative(ROOT, child)];
+  });
+}
 const publicFiles = [
   'README.md',
   'CHANGELOG.md',
   '.github/SECURITY.md',
-  ...trackedPublicFiles,
+  ...documentationFiles(join(ROOT, 'docs')),
   ...filesUnder(join(ROOT, '.github/workflows')).map((path) => relative(ROOT, path)),
   ...filesUnder(join(ROOT, 'packages/cli/dist')).map((path) => relative(ROOT, path)),
 ];
