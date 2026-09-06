@@ -180,7 +180,9 @@ export function checkAdopterSchemas(repoRoot: string): AdopterSchemaReport {
   return { ok: findings.length === 0, mode: 'adopter-binding', checked, findings };
 }
 
-export function checkSchemasForRepository(repoRoot: string): SchemaCanonReport | AdopterSchemaReport {
+export function checkSchemasForRepository(
+  repoRoot: string,
+): SchemaCanonReport | AdopterSchemaReport {
   const root = resolve(repoRoot);
   return isDevaiSourceRepository(root) ? checkSchemaCanon(root) : checkAdopterSchemas(root);
 }

@@ -144,7 +144,10 @@ export function validateModelRuntimeRegistry(candidate: unknown): ModelRuntimeRe
     const entry = record(raw, 'runtime entry must be an object');
     const id = nonemptyString(entry['id'], 'runtime id is required');
     if (ids.has(id)) {
-      throw new ModelRuntimeRegistryError('TASK_MODEL_REGISTRY_DUPLICATE', `duplicate runtime ${id}`);
+      throw new ModelRuntimeRegistryError(
+        'TASK_MODEL_REGISTRY_DUPLICATE',
+        `duplicate runtime ${id}`,
+      );
     }
     ids.add(id);
     const adapterModule = nonemptyString(

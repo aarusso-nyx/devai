@@ -65,13 +65,13 @@ export const auditScorecard = defineCommand({
             timestamp,
             integrationHead: options.at,
             readings,
-            naCells: scorecardNaCellSet(
-              loadScorecardNaConfig(resolveScorecardNaPath(repoRoot)),
-            ),
+            naCells: scorecardNaCellSet(loadScorecardNaConfig(resolveScorecardNaPath(repoRoot))),
             staleFailAfterMs: loadScorecardFailureMaxAgeMs(repoRoot),
           });
           if (!validators.scorecard(scorecard)) {
-            throw new Error(`AUDIT_SCORECARD_INVALID:${JSON.stringify(validators.scorecard.errors)}`);
+            throw new Error(
+              `AUDIT_SCORECARD_INVALID:${JSON.stringify(validators.scorecard.errors)}`,
+            );
           }
           process.stdout.write(
             options.human === true

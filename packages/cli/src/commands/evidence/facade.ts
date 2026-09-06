@@ -385,10 +385,7 @@ export const evidenceRecord = defineCommand({
               repoRoot,
               action: 'evidence.record.generic',
               status: 'completed',
-              notes: [
-                `round_id=${options.round}`,
-                `proof_sequence=${String(proof.sequence)}`,
-              ],
+              notes: [`round_id=${options.round}`, `proof_sequence=${String(proof.sequence)}`],
             });
             if (!chain.ok) {
               throw new Error(`EVIDENCE_CHAIN_APPEND_FAILED:${chain.error ?? 'unknown error'}`);

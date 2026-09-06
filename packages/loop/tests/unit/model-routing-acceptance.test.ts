@@ -33,7 +33,8 @@ describe('runtime bridge registry', () => {
       structuredClone((duplicate['runtimes'] as unknown[])[0]),
     );
     invalid.push(duplicate);
-    for (const candidate of invalid) expect(() => validateModelRuntimeRegistry(candidate)).toThrow();
+    for (const candidate of invalid)
+      expect(() => validateModelRuntimeRegistry(candidate)).toThrow();
   });
 });
 
@@ -75,11 +76,16 @@ describe('exact host-selected model resolution', () => {
         code: 'TASK_REGISTRY_IDENTITY_MISMATCH',
       },
       { request: { ...request, effort: 'default' }, code: 'TASK_EFFORT_UNSUPPORTED' },
-      { request: { ...request, capabilities: ['missing'] }, code: 'TASK_MODEL_CAPABILITY_UNSUPPORTED' },
+      {
+        request: { ...request, capabilities: ['missing'] },
+        code: 'TASK_MODEL_CAPABILITY_UNSUPPORTED',
+      },
       { request: { ...request, runtime: 'missing' }, code: 'TASK_REGISTRY_IDENTITY_MISMATCH' },
     ];
     for (const item of cases) {
-      expect(resolveAgentExecutor({ request: item.request, registry, reportedIdentity: report })).toMatchObject({
+      expect(
+        resolveAgentExecutor({ request: item.request, registry, reportedIdentity: report }),
+      ).toMatchObject({
         ok: false,
         code: item.code,
       });

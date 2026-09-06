@@ -655,7 +655,7 @@
     {
       "nodeId": "format",
       "dependencies": [],
-      "argv": ["pnpm", "run", "format:check"],
+      "argv": ["pnpm", "run", "format:check:all"],
       "cwd": ".",
       "runner": "pnpm-script-v1",
       "inputSelectors": [
@@ -665,7 +665,7 @@
         }
       ],
       "toolchainKeys": ["node", "pnpm"],
-      "allowlistedEnv": ["DEVAI_FORMAT_BASE"],
+      "allowlistedEnv": [],
       "outputContract": {
         "kind": "command-result",
         "requiredResult": "pass",

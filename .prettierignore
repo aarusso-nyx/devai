@@ -23,3 +23,6 @@ packages/cli/vendor/evidence-verification/
 
 # Fixed mutation compatibility fixture bytes have an explicit checksum contract.
 packages/cli/tests/fixtures/mutation-toolchain/
+
+# Third-party site dependency; preserve the separately reviewed upstream patch.
+docs/site/vendor/

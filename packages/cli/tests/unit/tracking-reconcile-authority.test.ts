@@ -143,11 +143,7 @@ describe('replaying a recorded Owner authorization', () => {
     ] as const) {
       const root = bound();
       activate(root, { state });
-      expectRefusal(
-        () => verify(root),
-        'TRACKING_RECONCILE_ACTIVATION_INACTIVE',
-        label,
-      );
+      expectRefusal(() => verify(root), 'TRACKING_RECONCILE_ACTIVATION_INACTIVE', label);
     }
   });
 

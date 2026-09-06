@@ -12,6 +12,12 @@ The [remote preflight lane](remote-preflight-contract.md) keeps the protected RC
 ledger and publication boundary unchanged. DEVAI 1.4 adds release-profile task
 nodes, so a 1.3.x task-policy attestation cannot certify a 1.4.0 candidate.
 
+Protected preflight runs `format:check:all` against the complete tracked candidate.
+Its shallow Git view needs no historical base or `DEVAI_FORMAT_BASE` value; a clean
+checkout cannot turn formatting into an empty check. Commit hooks still fix only
+staged files. Vendored dependencies and checksum-controlled fixtures retain their
+existing byte-verification contracts instead of being reformatted.
+
 ## Inspect
 
 ```bash

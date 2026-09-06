@@ -24,20 +24,20 @@ explicitly uncovered rather than omitted or claimed as tracked.
 
 Events are recorded at these boundaries:
 
-| Boundary | Event kind |
-| --- | --- |
-| Owner activation of a round | `session_opened`, `authorization_recorded` |
-| Task started or resumed | `action_intended` |
-| Task completed | `action_completed` |
-| Task paused for a reference gap, or escalated | `failure_observed` |
-| Reference gap emitted | `finding_emitted` |
-| Reference gap resolved | `finding_classified` |
-| Routine executor verification receipt | `verification_result` (with exact commit and tree) |
-| Round closed | `round_verdict` |
-| Tracking disabled | `tracking_disabled` |
-| Sensor failure triaged (`triage classify --round`) | `finding_classified` |
-| Auditor observation (`audit observe --round`) | `finding_emitted` |
-| Authority granted an outward-reaching action | `authorization_recorded` |
+| Boundary                                           | Event kind                                         |
+| -------------------------------------------------- | -------------------------------------------------- |
+| Owner activation of a round                        | `session_opened`, `authorization_recorded`         |
+| Task started or resumed                            | `action_intended`                                  |
+| Task completed                                     | `action_completed`                                 |
+| Task paused for a reference gap, or escalated      | `failure_observed`                                 |
+| Reference gap emitted                              | `finding_emitted`                                  |
+| Reference gap resolved                             | `finding_classified`                               |
+| Routine executor verification receipt              | `verification_result` (with exact commit and tree) |
+| Round closed                                       | `round_verdict`                                    |
+| Tracking disabled                                  | `tracking_disabled`                                |
+| Sensor failure triaged (`triage classify --round`) | `finding_classified`                               |
+| Auditor observation (`audit observe --round`)      | `finding_emitted`                                  |
+| Authority granted an outward-reaching action       | `authorization_recorded`                           |
 
 `triage classify` and `audit observe` are not inherently round-scoped, so attribution there is
 **opt-in per invocation** via an optional `--round`. Without it they behave exactly as they did
@@ -71,11 +71,11 @@ devai init bind --tracking-adapter github-issues --tracking-repository owner/nam
 
 Binding materializes three things:
 
-| Path | Contents |
-| --- | --- |
-| `.devai/config/github-issues-tracking.json` | The canonical policy defaults, verbatim, plus this repository's exact identity and digests |
-| `.github/workflows/devai-issue-tracking.yml` | The generated reconciliation workflow |
-| `.devai/config/project.json` | A `governance_tracking` binding |
+| Path                                         | Contents                                                                                   |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `.devai/config/github-issues-tracking.json`  | The canonical policy defaults, verbatim, plus this repository's exact identity and digests |
+| `.github/workflows/devai-issue-tracking.yml` | The generated reconciliation workflow                                                      |
+| `.devai/config/project.json`                 | A `governance_tracking` binding                                                            |
 
 `--tracking-repository` takes the exact `owner/name` remote (an `https://` or `ssh` URL is also
 accepted and normalized). Any other repository is refused at activation time rather than silently
@@ -153,8 +153,8 @@ because no human is present, and declaring `--as-role owner` from a workflow wou
 silent role elevation Article 7 forbids.
 
 It does not need to. The Owner already made the decision, at activation, and that decision is
-explicitly standing: activation *"authorizes automatic publication only for validated public-safe
-events belonging to that round"*. CI **replays** that recorded authorization; it never grants one.
+explicitly standing: activation _"authorizes automatic publication only for validated public-safe
+events belonging to that round"_. CI **replays** that recorded authorization; it never grants one.
 
 This follows the pattern `round close --post-merge-receipt` already establishes in DEVAI —
 caller-declared identity forbidden, authority derived from a verified artifact, effect scope
@@ -202,12 +202,12 @@ workflow edit cannot grant itself publication rights the Owner never recorded.
 
 ## Doctor behavior
 
-| Situation | Verdict |
-| --- | --- |
-| No binding | Pass — valid opt-out, no network call |
-| Binding byte-identical to canonical policy | Pass |
-| Wrong repository, workflow drift, excess permissions, mutable action reference, credential fallback, malformed schema, or a false coverage claim | Fail |
-| GitHub unreachable, issue absent before first sync, events queued | Advisory tracking status only |
+| Situation                                                                                                                                        | Verdict                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| No binding                                                                                                                                       | Pass — valid opt-out, no network call |
+| Binding byte-identical to canonical policy                                                                                                       | Pass                                  |
+| Wrong repository, workflow drift, excess permissions, mutable action reference, credential fallback, malformed schema, or a false coverage claim | Fail                                  |
+| GitHub unreachable, issue absent before first sync, events queued                                                                                | Advisory tracking status only         |
 
 Round close always records and seals its final tracking event and never waits for GitHub. Any
 remaining outbox is projected later, from sealed evidence, by a manual `sync` or by the

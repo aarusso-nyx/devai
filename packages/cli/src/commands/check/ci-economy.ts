@@ -257,8 +257,7 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
       ? {
           ruleId: 'ci-economy.concurrency-cancel',
           severity: 'pass',
-          message:
-            'every pull_request-triggered workflow cancels superseded pull-request runs',
+          message: 'every pull_request-triggered workflow cancels superseded pull-request runs',
         }
       : {
           ruleId: 'ci-economy.concurrency-cancel',

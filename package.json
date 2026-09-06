@@ -33,6 +33,7 @@
     "release:static-integrity": "node scripts/check-release-static-integrity.mjs",
     "release:pr-gate": "node scripts/run-pr-release-gate.mjs",
     "format:check": "node scripts/check-formatting.mjs",
+    "format:check:all": "node scripts/check-formatting.mjs --all-tracked",
     "hooks:install": "node scripts/install-repository-hooks.mjs",
     "authority:materialize": "node packages/cli/dist/runtime/index/bin.js init bind --target . --as-role architect --write --format json",
     "build": "pnpm run devai:prepare && pnpm -r build",

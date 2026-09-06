@@ -4,7 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const explicitBase = process.argv[2] ?? process.env.DEVAI_FORMAT_BASE;
+const allTracked = process.argv[2] === '--all-tracked';
+const explicitBase = allTracked ? undefined : (process.argv[2] ?? process.env.DEVAI_FORMAT_BASE);
 
 function git(args, allowFailure = false) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
@@ -21,17 +22,21 @@ const addLines = (value) =>
     .split('\n')
     .filter(Boolean)
     .forEach((path) => files.add(path));
-addLines(git(['diff', '--name-only', '--diff-filter=ACMR']));
-addLines(git(['diff', '--cached', '--name-only', '--diff-filter=ACMR']));
-addLines(git(['ls-files', '--others', '--exclude-standard']));
+if (allTracked) {
+  for (const path of git(['ls-files', '-z']).split('\0').filter(Boolean)) files.add(path);
+} else {
+  addLines(git(['diff', '--name-only', '--diff-filter=ACMR']));
+  addLines(git(['diff', '--cached', '--name-only', '--diff-filter=ACMR']));
+  addLines(git(['ls-files', '--others', '--exclude-standard']));
 
-let base = explicitBase;
-if (base === undefined && files.size === 0) {
-  base = git(['rev-parse', '--verify', 'HEAD^'], true).trim() || undefined;
-}
-if (base !== undefined) {
-  const resolvedBase = git(['rev-parse', '--verify', `${base}^{commit}`]).trim();
-  addLines(git(['diff', '--name-only', '--diff-filter=ACMR', resolvedBase, 'HEAD']));
+  let base = explicitBase;
+  if (base === undefined && files.size === 0) {
+    base = git(['rev-parse', '--verify', 'HEAD^'], true).trim() || undefined;
+  }
+  if (base !== undefined) {
+    const resolvedBase = git(['rev-parse', '--verify', `${base}^{commit}`]).trim();
+    addLines(git(['diff', '--name-only', '--diff-filter=ACMR', resolvedBase, 'HEAD']));
+  }
 }
 
 const selected = [...files].sort();
@@ -44,4 +49,6 @@ const result = spawnSync('pnpm', ['exec', 'prettier', '--check', '--ignore-unkno
   stdio: 'inherit',
 });
 if (result.status !== 0) process.exit(result.status ?? 1);
-process.stdout.write(`formatting: PASS (${String(selected.length)} changed files)\n`);
+process.stdout.write(
+  `formatting: PASS (${String(selected.length)} ${allTracked ? 'tracked' : 'changed'} files)\n`,
+);

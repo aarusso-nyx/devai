@@ -245,9 +245,7 @@ describe('hooks install planning and execution', () => {
       '"merge_sha"',
     );
     expect(
-      await withAuthorityHostTestScope(() =>
-        verifyInstalledPostMergeAdapter(linked, '1.1.0-rc.2'),
-      ),
+      await withAuthorityHostTestScope(() => verifyInstalledPostMergeAdapter(linked, '1.1.0-rc.2')),
     ).toMatchObject({
       ok: true,
       errors: [],
