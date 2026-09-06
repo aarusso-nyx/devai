@@ -45,7 +45,11 @@ const { FileMatcher } = (await import(
 )) as {
   FileMatcher: new (pattern: string) => { matches: (fileName: string) => boolean };
 };
-const ASSETS = ['mutation-production.mjs', 'mutation-vitest-plugin.mjs'] as const;
+const ASSETS = [
+  'mutation-production.mjs',
+  'mutation-vitest-plugin.mjs',
+  'mutation-workspace-aliases.mjs',
+] as const;
 const INVALID = 'release-mutation-program-invalid';
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const isolatedSource = Buffer.from('export const isolated = true;\n', 'utf8');
@@ -315,6 +319,7 @@ describe('protected mutation program factory with explicit upstream-authority is
       'invocation.json',
       'mutation-production.mjs',
       'mutation-vitest-plugin.mjs',
+      'mutation-workspace-aliases.mjs',
       'run.mjs',
       'stryker.config.json',
     ]);
@@ -341,7 +346,8 @@ describe('protected mutation program factory with explicit upstream-authority is
       cleanTempDir: 'always',
       symlinkNodeModules: true,
       fileLogLevel: 'off',
-      logLevel: 'off',
+      logLevel: 'error',
+      disableTypeChecks: 'packages/*/{src,tests}/**/*.{js,ts,jsx,tsx,mjs,mts,cts,cjs}',
       timeoutMS: 10000,
       timeoutFactor: 2,
       ignorePatterns: [],

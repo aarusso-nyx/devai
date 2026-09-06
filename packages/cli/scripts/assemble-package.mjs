@@ -366,7 +366,11 @@ const __dirname = __devaiDirname(__filename);`,
     join(packageRoot, 'scripts/release-host/provision-package.mjs'),
     join(runtimeRoot, 'host/provision-package.mjs'),
   );
-  for (const name of ['mutation-production.mjs', 'mutation-vitest-plugin.mjs']) {
+  for (const name of [
+    'mutation-production.mjs',
+    'mutation-vitest-plugin.mjs',
+    'mutation-workspace-aliases.mjs',
+  ]) {
     const target = join(runtimeRoot, 'host', name);
     copyFileSync(join(repositoryRoot, 'scripts/release-host', name), target);
     chmodSync(target, 0o644);

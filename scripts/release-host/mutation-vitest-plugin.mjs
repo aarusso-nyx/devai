@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { sandboxWorkspaceAliases } from './mutation-workspace-aliases.mjs';
 import { pathToFileURL } from 'node:url';
 
 // Loaded only from the host's read-only program mount, including in Stryker's
@@ -23,8 +24,29 @@ const { vitestWrapper } = await import(
   pathToFileURL(join(base, 'dist/src/vitest-wrapper.js')).href
 );
 const createVitestWithRunnerLoader = vitestWrapper.createVitest;
-vitestWrapper.createVitest = (mode, options, ...rest) =>
-  createVitestWithRunnerLoader(mode, { ...options, configLoader: 'runner' }, ...rest);
+// Workspace links in a symlinked node_modules still point at the original checkout.
+// Resolve declared development entrypoints to the sandbox so tests observe the
+// instrumented source and share one authority runtime with relative test imports.
+
+vitestWrapper.createVitest = (mode, options, ...rest) => {
+  const inline = rest[0] ?? {};
+  return createVitestWithRunnerLoader(
+    mode,
+    { ...options, configLoader: 'runner' },
+    {
+      ...inline,
+      plugins: [
+        ...(inline.plugins ?? []),
+        {
+          name: 'devai-mutation-sandbox-workspace',
+          enforce: 'pre',
+          config: () => ({ resolve: { alias: sandboxWorkspaceAliases(process.cwd()) } }),
+        },
+      ],
+    },
+    ...rest.slice(1),
+  );
+};
 
 const coreRequire = createRequire(require.resolve('@stryker-mutator/core/package.json'));
 const { declareFactoryPlugin, PluginKind } = await import(

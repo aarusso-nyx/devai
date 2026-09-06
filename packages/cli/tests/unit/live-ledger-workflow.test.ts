@@ -49,7 +49,12 @@ const VERIFIER_POLICY = JSON.parse(
     integrity_sri: string;
     release_source: { repository: string; commit: string; tree: string };
   };
-  verifier: { provenance_sha256: string; root: string };
+  verifier: {
+    provenance_sha256: string;
+    root: string;
+    payload_file_count: number;
+    source_commit: string;
+  };
 };
 const roots: string[] = [];
 const EXPLICIT_PUBLISH_CONDITION =

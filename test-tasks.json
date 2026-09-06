@@ -77,7 +77,7 @@
     },
     {
       "nodeId": "test:cli",
-      "dependencies": ["build"],
+      "dependencies": ["build", "test:package-staging"],
       "argv": [
         "pnpm",
         "run",
@@ -154,6 +154,108 @@
         {
           "kind": "exact",
           "pattern": "vitest.config.ts"
+        }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "vitest",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "test:package-staging",
+      "dependencies": ["build"],
+      "argv": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "tests/config/local.config.ts",
+        "--configLoader",
+        "runner",
+        "--no-cache",
+        "packages/cli/tests/unit/release-package-staging.test.ts"
+      ],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        {
+          "kind": "prefix",
+          "pattern": "packages/cli/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/authority/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/effects-check/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/evidence/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/loop/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/schemas/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/sensors/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/skills/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/spec/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/utils/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/authority/src/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/evidence/src/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/sensors/src/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/skills/src/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "vitest.config.ts"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "pnpm-lock.yaml"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -996,7 +1098,8 @@
         "lint",
         "typecheck",
         "release:static-integrity",
-        "release:closure"
+        "release:closure",
+        "test:package-staging"
       ]
     },
     {

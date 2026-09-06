@@ -289,10 +289,7 @@ function artifactPaths(policy) {
 function namespacePaths(policy, results, namespaceCensus) {
   if (namespaceCensus === undefined) return new Map();
   if (policy.schemaVersion !== '1.2.0') {
-    throw new VerificationError(
-      'SCHEMA_INVALID',
-      'namespace census requires task-policy schema 1.2',
-    );
+    throw new VerificationError('SCHEMA_INVALID', 'namespace census requires task-policy schema 1.2');
   }
   assertExactKeys(namespaceCensus, ['namespaces', 'schemaVersion'], 'namespace census');
   if (namespaceCensus.schemaVersion !== '1.0.0' || !Array.isArray(namespaceCensus.namespaces)) {
@@ -352,20 +349,14 @@ function namespacePaths(policy, results, namespaceCensus) {
       if (!Number.isSafeInteger(entry.size) || entry.size < 0) {
         throw new VerificationError('SCHEMA_INVALID', `${entryLabel}.size is invalid`);
       }
-      if (
-        !entry.path.startsWith(namespace.prefix) ||
-        (previous !== undefined && previous >= entry.path)
-      ) {
+      if (!entry.path.startsWith(namespace.prefix) || (previous !== undefined && previous >= entry.path)) {
         throw new VerificationError('SCHEMA_INVALID', `${entryLabel}.path is outside or unordered`);
       }
       if (seenPaths.has(entry.path)) {
         throw new VerificationError('SCHEMA_INVALID', `${entryLabel}.path is duplicated`);
       }
       if (resultByNode.get(namespace.taskNode).outputDigests[entry.path] !== entry.sha256) {
-        throw new VerificationError(
-          'ARTIFACT_DIGEST_MISMATCH',
-          `${entryLabel}.sha256 does not match task result`,
-        );
+        throw new VerificationError('ARTIFACT_DIGEST_MISMATCH', `${entryLabel}.sha256 does not match task result`);
       }
       seenPaths.add(entry.path);
       paths.push(entry.path);
@@ -404,17 +395,11 @@ function verifyArtifacts(
 ) {
   const { artifactsDir, readEvidenceFile, namespaceCensus } = context;
   const pathsByNode = namespacePaths(policy, results, namespaceCensus);
-  const expectedPaths = [
-    ...new Set([...artifactPaths(policy), ...[...pathsByNode.values()].flat()]),
-  ].sort();
+  const expectedPaths = [...new Set([...artifactPaths(policy), ...[...pathsByNode.values()].flat()])].sort();
   // Legacy results did not declare an exact stdout/stderr/artifact population.
   // A pathless v1.1 contract still declares exactly the two stream digests.
   if (policy.schemaVersion === '1.0.0') return { paths: [], mutation: [] };
-  if (
-    expectedPaths.length > 0 &&
-    typeof artifactsDir !== 'string' &&
-    readEvidenceFile === undefined
-  ) {
+  if (expectedPaths.length > 0 && typeof artifactsDir !== 'string' && readEvidenceFile === undefined) {
     throw new VerificationError(
       'ARTIFACTS_MISSING',
       'schema 1.1 or 1.2 output artifacts directory is required',

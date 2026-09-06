@@ -13,7 +13,11 @@ import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifa
 
 const INVALID = 'release-mutation-program-invalid';
 const PREFIX = 'dist/runtime/host/';
-const SOURCES = ['mutation-production.mjs', 'mutation-vitest-plugin.mjs'] as const;
+const SOURCES = [
+  'mutation-production.mjs',
+  'mutation-vitest-plugin.mjs',
+  'mutation-workspace-aliases.mjs',
+] as const;
 const MAXIMUM_DRIVER_BYTES = 128 * 1024;
 const programs = new WeakMap<object, CapturedProtectedMutationProgram>();
 const executionContexts = new WeakMap<object, ReleaseMutationInputExecutionContext>();
@@ -169,6 +173,9 @@ export function createProtectedMutationProgram(input: {
     appendPlugins: [],
     testRunner: 'devai-vitest',
     checkers: ['typescript'],
+    // Stryker must not rewrite the byte-pinned verifier while inserting @ts-nocheck.
+    // Targets and test selection remain unchanged; this scopes preprocessing only.
+    disableTypeChecks: 'packages/*/{src,tests}/**/*.{js,ts,jsx,tsx,mjs,mts,cts,cjs}',
     coverageAnalysis: 'perTest',
     // Must not exceed the protected container's cpu allocation: Stryker resolves a
     // mutant's verdict from its covering tests, so parallelism does not change which

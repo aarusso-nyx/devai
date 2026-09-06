@@ -17,3 +17,6 @@ work/rounds/R-0001/
 work/rounds/R-0003/reviews/
 work/audit/R-0001/
 work/devai-ii-succession-dossier.md
+
+# Immutable verifier bytes are checked against their provenance manifest.
+packages/cli/vendor/evidence-verification/

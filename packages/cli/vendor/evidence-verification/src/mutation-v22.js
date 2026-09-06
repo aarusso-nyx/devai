@@ -772,12 +772,7 @@ export function buildMutationSemanticReceiptV22({
   receiptId,
   verifierProvenance,
 }) {
-  string(
-    receiptId,
-    'mutation semantic receipt.receiptId',
-    RECEIPT_ID,
-    'MUTATION_SEMANTIC_RECEIPT_MISMATCH',
-  );
+  string(receiptId, 'mutation semantic receipt.receiptId', RECEIPT_ID, 'MUTATION_SEMANTIC_RECEIPT_MISMATCH');
   validateVerifierProvenance(verifierProvenance);
   const packages = contract.packages.map((contractEntry, index) => {
     const summaryEntry = summary.packages[index];
@@ -824,12 +819,7 @@ export function buildMutationSemanticReceiptV22({
 }
 
 function validateSemanticReceipt(receipt, contract, summary, expectedProvenance) {
-  exact(
-    receipt,
-    SEMANTIC_RECEIPT_KEYS,
-    'mutation semantic receipt',
-    'MUTATION_SEMANTIC_RECEIPT_MISMATCH',
-  );
+  exact(receipt, SEMANTIC_RECEIPT_KEYS, 'mutation semantic receipt', 'MUTATION_SEMANTIC_RECEIPT_MISMATCH');
   if (
     receipt.schemaVersion !== MUTATION_V22_SCHEMA ||
     receipt.kind !== MUTATION_V22_SEMANTIC_RECEIPT_KIND
@@ -980,12 +970,7 @@ function validateExpectedExecutionBindings(contract, referent, supplied) {
       'MUTATION_OFFLINE_EXPECTATION_MISSING',
     );
     const { packageName, ...binding } = entry;
-    string(
-      packageName,
-      `${label}.packageName`,
-      PACKAGE_NAME,
-      'MUTATION_OFFLINE_EXPECTATION_MISSING',
-    );
+    string(packageName, `${label}.packageName`, PACKAGE_NAME, 'MUTATION_OFFLINE_EXPECTATION_MISSING');
     validateExecutionBinding(binding, label, 'MUTATION_OFFLINE_EXPECTATION_MISSING');
     if (bindings.has(packageName)) {
       fail('MUTATION_ROSTER_MISMATCH', 'mutation expected execution bindings are duplicated');

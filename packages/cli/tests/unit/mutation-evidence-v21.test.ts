@@ -483,15 +483,35 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     },
   );
 
-  it('does not provide a no-follow fallback when the platform lacks O_NOFOLLOW', () => {
-    // Node exposes this constant as non-configurable, so this is the portable
-    // sensor for the required fail-closed branch rather than a monkeypatch.
-    const source = readFileSync(
-      join(ROOT, 'packages/cli/src/services/mutation-evidence-v21.ts'),
-      'utf8',
-    );
-    expect(source).toContain("typeof constants.O_NOFOLLOW !== 'number'");
-    expect(source).toContain('constants.O_RDONLY | constants.O_NOFOLLOW');
+  it('refuses before opening verifier files when the platform lacks O_NOFOLLOW', async () => {
+    const snapshot = activationSnapshot();
+    const contract = exactNotRequiredContract(canonicalSha256(snapshot.policy));
+    const opened = vi.fn();
+    vi.resetModules();
+    vi.doMock('node:fs', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:fs')>();
+      return {
+        ...actual,
+        constants: { ...actual.constants, O_NOFOLLOW: undefined },
+        openSync: opened,
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await expect(
+        isolated.finalizeMutationEvidenceV21({
+          contract,
+          candidate: CANDIDATE,
+          packages: [
+            { disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' },
+          ],
+        }),
+      ).rejects.toThrow('MUTATION_VENDOR_PROVENANCE_MISMATCH');
+      expect(opened).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('node:fs');
+      vi.resetModules();
+    }
   });
 
   it('finalizes without launching mutation work and verifies only the exact current receipt provenance', async () => {
