@@ -465,7 +465,29 @@ export interface TrustedArtifactReader {
 export type OfflineVerificationProvider = (
   request: ReleaseLifecycleRequest,
   exportedState: ReleaseLifecycleStateV2,
+  context?: VerifiedReleaseOfflineContext,
 ) => unknown | Promise<unknown>;
+
+/** A completed validation pass, issued only by executeOfflineVerification. */
+export interface VerifiedReleaseOfflineContext {
+  readonly kind: 'verified-release-offline-context';
+}
+interface OfflineContextCapture {
+  readonly request: ReleaseLifecycleRequest;
+  readonly state: ReleaseLifecycleStateV2;
+  readonly plan_receipts: readonly Readonly<Record<string, unknown>>[];
+}
+const offlineContexts = new WeakMap<VerifiedReleaseOfflineContext, OfflineContextCapture>();
+export function readVerifiedReleaseOfflineContext(
+  context: VerifiedReleaseOfflineContext | undefined,
+  request: ReleaseLifecycleRequest,
+  state: ReleaseLifecycleStateV2,
+): OfflineContextCapture {
+  const captured = context === undefined ? undefined : offlineContexts.get(context);
+  if (captured === undefined || !same(captured.request, request) || !same(captured.state, state))
+    throw new Error('release-offline-verification-context-invalid');
+  return JSON.parse(canonicalJson(captured)) as OfflineContextCapture;
+}
 
 export type ReleasePlanInputResolver = (input: Readonly<Record<string, unknown>>) => unknown;
 
@@ -3042,6 +3064,7 @@ export async function executeOfflineVerification(input: {
   let request: ReleaseLifecycleRequest;
   let state: ReleaseLifecycleStateV2;
   let mutationPlan: ReleaseMutationPlanReaders;
+  let planReceipts: readonly Readonly<Record<string, unknown>>[] = [];
   let exportLimits: ReleaseExportTranscriptLimits | undefined;
   try {
     exportLimits =
@@ -3087,6 +3110,7 @@ export async function executeOfflineVerification(input: {
         return JSON.parse(canonicalJson(value)) as unknown;
       },
     };
+    planReceipts = checkedPlans.map(({ value }) => value);
     const supplied = checkedPlans
       .map(({ value }) => ({
         candidate: value['candidate'],
@@ -3137,12 +3161,41 @@ export async function executeOfflineVerification(input: {
       code: error instanceof Error ? error.message : 'release-offline-input-invalid',
     };
   }
+  try {
+    await verifyPortableReleaseMutationEvidence(
+      request,
+      state,
+      input.artifactReader,
+      mutationPlan,
+      exportLimits,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      phase: 'validation',
+      code:
+        error instanceof Error ? error.message : 'release-certification-generated-output-untrusted',
+    };
+  }
   if (input.provider === undefined) {
     return { ok: false, phase: 'provider', code: 'release-offline-verifier-provider-unavailable' };
   }
   let raw: unknown;
   try {
-    raw = await input.provider(request, state);
+    const context: VerifiedReleaseOfflineContext = Object.freeze({
+      kind: 'verified-release-offline-context',
+    });
+    offlineContexts.set(
+      context,
+      JSON.parse(
+        canonicalJson({ request, state, plan_receipts: planReceipts }),
+      ) as OfflineContextCapture,
+    );
+    try {
+      raw = await input.provider(request, state, context);
+    } finally {
+      offlineContexts.delete(context);
+    }
   } catch {
     return { ok: false, phase: 'provider', code: 'release-offline-verifier-failed' };
   }
@@ -3177,22 +3230,6 @@ export async function executeOfflineVerification(input: {
     !trustMatches
   ) {
     return { ok: false, phase: 'validation', code: 'release-offline-receipt-binding-invalid' };
-  }
-  try {
-    await verifyPortableReleaseMutationEvidence(
-      request,
-      state,
-      input.artifactReader,
-      mutationPlan,
-      exportLimits,
-    );
-  } catch (error) {
-    return {
-      ok: false,
-      phase: 'validation',
-      code:
-        error instanceof Error ? error.message : 'release-certification-generated-output-untrusted',
-    };
   }
   return { ok: true, receipt };
 }

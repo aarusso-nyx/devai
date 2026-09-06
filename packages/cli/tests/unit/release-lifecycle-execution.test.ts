@@ -43,6 +43,8 @@ import {
   computeReleaseRequestDigest,
   executeReleaseLifecycleAction,
   executeOfflineVerification,
+  readVerifiedReleaseOfflineContext,
+  type VerifiedReleaseOfflineContext,
   finalizeReleaseStateV2,
   finalizeStoreRecord,
   reduceStoreRecords,
@@ -2686,6 +2688,58 @@ describe('release lifecycle execution kernel', () => {
         policyClosures,
       }),
     ).toMatchObject({ ok: false, code: 'release-offline-receipt-binding-invalid' });
+  });
+
+  it('issues offline context only during a validated provider invocation and binds its inputs', async () => {
+    const store = new ReleaseLifecycleFileStore(root(), request('release export'));
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const offlineRequest = request('release offline-verify');
+    let retained: VerifiedReleaseOfflineContext | undefined;
+    expect(() =>
+      readVerifiedReleaseOfflineContext(
+        { kind: 'verified-release-offline-context' },
+        offlineRequest,
+        exported,
+      ),
+    ).toThrow('release-offline-verification-context-invalid');
+    const result = await executeOfflineVerification({
+      request: offlineRequest,
+      exported_state: exported,
+      artifactReader: artifactReaderFor('release export'),
+      policyClosures,
+      provider: (validatedRequest, validatedState, context) => {
+        retained = context;
+        const captured = readVerifiedReleaseOfflineContext(
+          context,
+          validatedRequest,
+          validatedState,
+        );
+        expect(captured.plan_receipts).toEqual([planReceipt()]);
+        expect(() =>
+          readVerifiedReleaseOfflineContext(
+            context,
+            {
+              ...validatedRequest,
+              request_id: 'changed-request',
+            },
+            validatedState,
+          ),
+        ).toThrow('release-offline-verification-context-invalid');
+        // Consumers receive a copy and cannot change the captured validation.
+        (captured.plan_receipts as unknown[]).length = 0;
+        expect(
+          readVerifiedReleaseOfflineContext(context, validatedRequest, validatedState)
+            .plan_receipts,
+        ).toHaveLength(1);
+        return boundOfflineReceipt(exported);
+      },
+    });
+    expect(result).toMatchObject({ ok: true });
+    expect(retained).toBeDefined();
+    expect(() => readVerifiedReleaseOfflineContext(retained, offlineRequest, exported)).toThrow(
+      'release-offline-verification-context-invalid',
+    );
   });
 
   it('binds an optional v2.1 unit mutation closure into offline receipts without claiming portable mutation semantics', async () => {
