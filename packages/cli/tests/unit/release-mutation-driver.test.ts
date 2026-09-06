@@ -24,6 +24,7 @@ import {
   protectedMutationProgramTask,
   PROTECTED_MUTATION_TASK_ARGV,
   type ProtectedMutationExecutionRequest,
+  type ProtectedMutationPackageObservation,
 } from '../../src/services/release-mutation-driver.js';
 import type { ReleaseMutationRetentionInputV21 } from '../../src/services/release-mutation-retention.js';
 
@@ -342,6 +343,74 @@ describe('protected unit mutation driver', () => {
       workspace: 'packages/package',
     });
     expect(produced.artifacts.inputDigest).toMatch(/^[a-f0-9]{64}$/u);
+  });
+
+  it('awaits per-package retention and gives the observer only defensive artifact copies', async () => {
+    const value = driverFixture();
+    let finish!: () => void;
+    const held = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    let record!: ProtectedMutationPackageObservation;
+    const observer = vi.fn((observation: ProtectedMutationPackageObservation) => {
+      record = observation;
+      return held;
+    });
+    const run = runDriver(value, { observe_package: observer });
+    expect(observer).toHaveBeenCalledTimes(1);
+    expect(retention.retain).not.toHaveBeenCalled();
+    expect(record).toMatchObject({
+      kind: 'protected-mutation-package-observation-v1',
+      repository: { id: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+      package_name: '@fixture/package',
+      input_digest: value.plan.packages[0]?.input_digest,
+      task_policy_digests_sha256: ['c'.repeat(64)],
+    });
+    const request = run.requests[0];
+    if (request === undefined) throw new Error('missing observed execution');
+    expect(record.program_identity_sha256).toBe(
+      captureProtectedMutationProgram(request.program).identity_sha256,
+    );
+    const report = Buffer.from(record.artifacts.report.bytes);
+    const result = Buffer.from(record.artifacts.result.bytes);
+    record.artifacts.report.bytes.fill(0);
+    record.artifacts.result.bytes.fill(0);
+    finish();
+    await expect(run.result).resolves.toEqual({ retained: true });
+    const retained = retention.retain.mock.calls[0]?.[0] as ReleaseMutationRetentionInputV21;
+    expect(retained.packages[0]?.artifacts.report.bytes).toEqual(report);
+    expect(retained.packages[0]?.artifacts.result.bytes).toEqual(result);
+    expect(retained.packages[0]?.disposition).toBe('executed');
+    expect(retained.packages[0]?.origin).toBeNull();
+  });
+
+  it('blocks aggregate completion on retention refusal and never observes fabricated execution', async () => {
+    const value = driverFixture();
+    const observer = vi.fn(() => {
+      throw new Error('disk-full');
+    });
+    await expect(runDriver(value, { observe_package: observer }).result).rejects.toThrow(
+      'disk-full',
+    );
+    expect(observer).toHaveBeenCalledTimes(1);
+    expect(retention.retain).not.toHaveBeenCalled();
+    observer.mockClear();
+    await expect(
+      runDriver(value, { observe_package: observer, execute: () => ({}) }).result,
+    ).rejects.toThrow('release-certification-mutation-program-invalid');
+    expect(observer).not.toHaveBeenCalled();
+    expect(retention.retain).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-callable observers and refuses any observer-provided result', async () => {
+    const value = driverFixture();
+    const invalid = runDriver(value, { observe_package: true });
+    await expect(invalid.result).rejects.toThrow('release-certification-mutation-program-invalid');
+    expect(invalid.requests).toHaveLength(0);
+    await expect(
+      runDriver(value, { observe_package: () => ({ ready: true }) }).result,
+    ).rejects.toThrow('release-certification-mutation-program-invalid');
+    expect(retention.retain).not.toHaveBeenCalled();
   });
 
   it('refuses a package whose container execution is not its own program custody', async () => {

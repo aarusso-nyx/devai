@@ -138,3 +138,28 @@ exact production candidate, and refuses diagnostic-lane publication. Evidence pu
 binds its offline receipt; package publication binds its plan receipt. Missing controls,
 missing consent, stale authorization, or incompatible evidence remain refusals. This host
 interface does not change DEVAI's own rehearsal-and-promotion workflow described above.
+
+## Mutation baseline and interrupted execution
+
+The protected mutation program gives the complete unmutated baseline 15 minutes.
+This is separate from the unchanged per-mutant `timeoutMS: 10000` and
+`timeoutFactor: 2`. The CLI baseline includes offline package-staging checks and
+per-test coverage; the five-minute Stryker default can expire while those tests
+are still executing. A baseline timeout remains a failure and never permits
+mutation execution to start.
+
+An installed host may supply `observe_mutation_package` to retain each package
+before the driver advances. The callback receives the candidate identity, package
+name, exact program and input digests, task-policy digests, and defensive copies
+of the normalized report and result. The driver awaits the callback; a refusal
+prevents aggregate completion. Candidate requests cannot select this callback,
+and diagnostic preflight does not invoke it.
+
+Repository-local operators can write these observations through
+`scripts/process/mutation-checkpoints.mjs` using a private directory outside the
+candidate, finite byte bounds, exact bindings, and an independently approved
+verification callback. The store retains rejected attempts and refuses to replace
+an existing different record. Neither observing nor storing a report grants
+execution custody, a reuse origin, or candidate readiness. Restarted execution
+must independently establish those proofs; the installed driver still declares
+its own results as executed and does not replay these checkpoints.

@@ -9,11 +9,15 @@ import {
   type ReleaseMutationPrerequisiteMember,
 } from './release-mutation-inputs.js';
 import {
+  captureProtectedMutationProgram,
   captureProtectedMutationProgramPackage,
   createProtectedMutationProgram,
   type ProtectedMutationProgram,
 } from './release-mutation-program.js';
-import { normalizeProtectedMutationExecutionV21 } from './release-mutation-production.js';
+import {
+  captureProducedMutationPackageV21,
+  normalizeProtectedMutationExecutionV21,
+} from './release-mutation-production.js';
 import { retainReleaseMutationEvidenceV21 } from './release-mutation-retention.js';
 import type {
   ReleaseUnitMutationEvidenceClosure,
@@ -68,6 +72,18 @@ export interface ProtectedMutationExecutionRequest {
   readonly prerequisite_members: readonly ReleaseMutationPrerequisiteMember[];
 }
 
+/** Defensive observation for an explicitly installed host retention control.
+ * These bytes do not grant replay custody, reuse authority, or readiness. */
+export interface ProtectedMutationPackageObservation {
+  readonly kind: 'protected-mutation-package-observation-v1';
+  readonly repository: ReleaseMutationInputPlanV21['repository'];
+  readonly package_name: string;
+  readonly program_identity_sha256: string;
+  readonly input_digest: string;
+  readonly task_policy_digests_sha256: readonly string[];
+  readonly artifacts: ReturnType<typeof normalizeProtectedMutationExecutionV21>;
+}
+
 export interface ProduceUnitMutationEvidenceInput {
   readonly input_plan: ReleaseMutationInputPlanV21;
   readonly package_snapshot: ReleasePackageSnapshot;
@@ -79,6 +95,10 @@ export interface ProduceUnitMutationEvidenceInput {
   readonly executable: Readonly<{ path: string; sha256: string }>;
   /** Runs one protected program in the host's own container scope and returns its result. */
   readonly execute: (request: ProtectedMutationExecutionRequest) => unknown;
+  /** Await durable host retention before advancing; refusal prevents aggregate completion. */
+  readonly observe_package?: (
+    observation: ProtectedMutationPackageObservation,
+  ) => void | Promise<void>;
 }
 
 /**
@@ -96,12 +116,21 @@ export async function produceUnitMutationEvidenceV21(
   input: ProduceUnitMutationEvidenceInput,
 ): Promise<ReleaseUnitMutationEvidenceClosure> {
   const plan = input.input_plan;
+  const observePackage = input.observe_package;
+  const execute = input.execute;
+  const packageSnapshot = input.package_snapshot;
+  const evidenceSink = input.evidence_sink;
+  const authorityOwner = input.authority_owner;
+  const sinkHost = input.sink_host;
+  const executable = { ...input.executable };
+  const taskPolicyDigests = [...input.task_policy_digests_sha256];
   if (
     plan === null ||
     typeof plan !== 'object' ||
     !Array.isArray(plan.packages) ||
     plan.packages.length === 0 ||
-    typeof input.execute !== 'function'
+    typeof execute !== 'function' ||
+    (observePackage !== undefined && typeof observePackage !== 'function')
   )
     refuse();
   const limits = JSON.parse(canonicalJson(input.limits)) as ReleaseMutationArtifactLimitsV21;
@@ -119,7 +148,7 @@ export async function produceUnitMutationEvidenceV21(
       refuse();
     seen.add(packageName);
     const program = createProtectedMutationProgram({
-      package_snapshot: input.package_snapshot,
+      package_snapshot: packageSnapshot,
       input_plan: plan,
       package_name: packageName,
       limits,
@@ -130,32 +159,46 @@ export async function produceUnitMutationEvidenceV21(
     const prerequisiteMembers = (context.prerequisite_outputs ?? []).filter((member) =>
       captured.package.prerequisite_nodes.includes(member.producer_task_node),
     );
-    const execution = input.execute({
+    const execution = execute({
       program,
       package_name: packageName,
       prerequisite_members: prerequisiteMembers,
       task: protectedMutationProgramTask({
         node_id: `mutation:${packageName}`,
         task_key: `mutation:${packageName}@${entry.input_digest}`,
-        executable: input.executable,
+        executable,
         input_digest: entry.input_digest,
       }),
     });
+    const artifacts = normalizeProtectedMutationExecutionV21({ program, execution });
+    if (observePackage !== undefined) {
+      const observation: ProtectedMutationPackageObservation = {
+        kind: 'protected-mutation-package-observation-v1',
+        repository: JSON.parse(canonicalJson(context.repository)),
+        package_name: packageName,
+        program_identity_sha256: captureProtectedMutationProgram(program).identity_sha256,
+        input_digest: entry.input_digest,
+        task_policy_digests_sha256: [...taskPolicyDigests],
+        artifacts: captureProducedMutationPackageV21(artifacts),
+      };
+      // The observer receives no live artifact buffers or authority-bearing objects.
+      if ((await observePackage(observation)) !== undefined) refuse();
+    }
     produced.push({
       packageName,
       disposition: 'executed',
       origin: null,
       // Normalization re-derives every identity from the private execution capture.
-      artifacts: normalizeProtectedMutationExecutionV21({ program, execution }),
+      artifacts,
     });
   }
   if (produced.length !== plan.packages.length) refuse();
   return await retainReleaseMutationEvidenceV21({
     plan,
     packages: produced,
-    task_policy_digests_sha256: [...input.task_policy_digests_sha256],
-    evidence_sink: input.evidence_sink,
-    authority_owner: input.authority_owner,
-    sink_host: input.sink_host,
+    task_policy_digests_sha256: [...taskPolicyDigests],
+    evidence_sink: evidenceSink,
+    authority_owner: authorityOwner,
+    sink_host: sinkHost,
   });
 }

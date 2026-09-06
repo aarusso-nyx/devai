@@ -49,6 +49,7 @@ import {
   type ContainerReleaseCertificationAdapters,
   type ProtectedReleasePlanMaterial,
 } from './release-certification-provider.js';
+import type { ProduceUnitMutationEvidenceInput } from './release-mutation-driver.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
 import type { ProtectedMutationPrerequisiteClosure } from './release-certification-provider.js';
 import {
@@ -119,6 +120,8 @@ export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHost
   >;
   /** Externally protected, measured artifact bounds. This runner supplies no default. */
   readonly mutation_limits?: ReleaseMutationArtifactLimitsV21;
+  /** Explicit host retention observer; never a candidate request or a reuse provider. */
+  readonly observe_mutation_package?: ProduceUnitMutationEvidenceInput['observe_package'];
   readonly certification_store: ReleaseCertificationEvidenceStoreOptions;
   readonly artifact_store: Omit<ReleaseArtifactStoreOptions, 'binding'>;
   readonly publication_signature_verifier: PublicationSignatureVerifier;
@@ -505,7 +508,13 @@ export function createProtectedReleaseHostRunner(
       'publication_signature_verifier',
       'later_stages',
     ],
-    ['producer', 'toolchain_fixture', 'mutation_inputs', 'mutation_limits'],
+    [
+      'producer',
+      'toolchain_fixture',
+      'mutation_inputs',
+      'mutation_limits',
+      'observe_mutation_package',
+    ],
   );
   assertBoundReleaseHostPackageSnapshot(input.installed_package);
   closed(input.later_stages, ['export', 'offline_verify'], ['evidence_publish', 'publish']);
@@ -583,6 +592,8 @@ export function createProtectedReleaseHostRunner(
     )
       fail();
   }
+  const observeMutationPackage = input.observe_mutation_package;
+  if (observeMutationPackage !== undefined && typeof observeMutationPackage !== 'function') fail();
   const mutationInputs =
     input.mutation_inputs === undefined ? undefined : copy(input.mutation_inputs);
   const mutationLimits =
@@ -673,6 +684,7 @@ export function createProtectedReleaseHostRunner(
           mutation_driver: {
             package_snapshot: input.installed_package,
             limits: mutationLimits,
+            observe_package: observeMutationPackage,
             buildInputPlan: (prerequisites) => mutationPlan(prerequisites),
           },
         }),

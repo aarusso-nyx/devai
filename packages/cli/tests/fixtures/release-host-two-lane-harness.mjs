@@ -149,6 +149,9 @@ try {
       },
       execution: { ...execution, dependencies: diagnostic.options.dependencies },
     },
+    observe_mutation_package: () => {
+      throw new Error('non-mutation lane invoked mutation observer');
+    },
     mutation_inputs: {
       execution_coverage: production.controls.execution_coverage,
       maximum_source_bytes: 8 * 1024 * 1024,
@@ -158,6 +161,10 @@ try {
   assert.throws(
     () => createProtectedReleaseHostRunner({ ...controls, installed_package: { ...installed } }),
     /rpl-package-identity-mismatch/,
+  );
+  assert.throws(
+    () => createProtectedReleaseHostRunner({ ...controls, observe_mutation_package: true }),
+    /release-host-controls-invalid/,
   );
   assert.equal(observations.calls.length, 0);
   assert.equal(observations.stores.length, 0);
