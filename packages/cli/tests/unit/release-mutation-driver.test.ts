@@ -149,11 +149,13 @@ interface DriverFixture {
 
 function driverFixture(): DriverFixture {
   const installed = installedPackage(
-    ['mutation-production.mjs', 'mutation-vitest-plugin.mjs'].map((name) => ({
-      path: `dist/runtime/host/${name}`,
-      mode: 0o644,
-      bytes: readFileSync(resolve(ROOT, 'scripts/release-host', name)),
-    })),
+    ['mutation-production.mjs', 'mutation-vitest-plugin.mjs', 'mutation-workspace-aliases.mjs'].map(
+      (name) => ({
+        path: `dist/runtime/host/${name}`,
+        mode: 0o644,
+        bytes: readFileSync(resolve(ROOT, 'scripts/release-host', name)),
+      }),
+    ),
     { current: true },
   );
   const built = build(fixture(installed, { current: true }));
