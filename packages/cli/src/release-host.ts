@@ -161,4 +161,7 @@ export {
   type ProtectedOfflineDagControl,
 } from './services/release-offline-provider.js';
 
-export type { ProtectedMutationPackageObservation } from './services/release-mutation-driver.js';
+export type {
+  ProtectedMutationPackageObservation,
+  ProtectedMutationPackageObserver,
+} from './services/release-mutation-observation.js';

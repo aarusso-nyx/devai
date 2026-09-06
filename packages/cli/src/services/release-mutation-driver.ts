@@ -1,3 +1,8 @@
+import type {
+  ProtectedMutationPackageObservation,
+  ProtectedMutationPackageObserver,
+} from './release-mutation-observation.js';
+export type { ProtectedMutationPackageObservation } from './release-mutation-observation.js';
 import { canonicalJson } from '@devai-nyx/utils';
 import type { createProtectedReleaseHostAdapter } from '@devai-nyx/authority';
 import type { PlannedTask } from './check-runner/types.js';
@@ -72,18 +77,6 @@ export interface ProtectedMutationExecutionRequest {
   readonly prerequisite_members: readonly ReleaseMutationPrerequisiteMember[];
 }
 
-/** Defensive observation for an explicitly installed host retention control.
- * These bytes do not grant replay custody, reuse authority, or readiness. */
-export interface ProtectedMutationPackageObservation {
-  readonly kind: 'protected-mutation-package-observation-v1';
-  readonly repository: ReleaseMutationInputPlanV21['repository'];
-  readonly package_name: string;
-  readonly program_identity_sha256: string;
-  readonly input_digest: string;
-  readonly task_policy_digests_sha256: readonly string[];
-  readonly artifacts: ReturnType<typeof normalizeProtectedMutationExecutionV21>;
-}
-
 export interface ProduceUnitMutationEvidenceInput {
   readonly input_plan: ReleaseMutationInputPlanV21;
   readonly package_snapshot: ReleasePackageSnapshot;
@@ -96,9 +89,7 @@ export interface ProduceUnitMutationEvidenceInput {
   /** Runs one protected program in the host's own container scope and returns its result. */
   readonly execute: (request: ProtectedMutationExecutionRequest) => unknown;
   /** Await durable host retention before advancing; refusal prevents aggregate completion. */
-  readonly observe_package?: (
-    observation: ProtectedMutationPackageObservation,
-  ) => void | Promise<void>;
+  readonly observe_package?: ProtectedMutationPackageObserver;
 }
 
 /**

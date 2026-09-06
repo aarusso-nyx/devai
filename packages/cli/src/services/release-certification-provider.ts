@@ -14,10 +14,8 @@ import {
   createCertifiedEvidenceCarrier,
   finalizeCertifiedEvidenceNamespaceCensus,
 } from './release-certified-evidence-carrier.js';
-import {
-  produceUnitMutationEvidenceV21,
-  type ProduceUnitMutationEvidenceInput,
-} from './release-mutation-driver.js';
+import { produceUnitMutationEvidenceV21 } from './release-mutation-driver.js';
+import type { ProtectedMutationPackageObserver } from './release-mutation-observation.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
 import type { ReleaseMutationInputPlanV21 } from './release-mutation-inputs.js';
 import type {
@@ -126,7 +124,7 @@ export interface ContainerReleaseCertificationOptions {
    */
   readonly mutation_driver?: {
     readonly package_snapshot: ReleasePackageSnapshot;
-    readonly observe_package?: ProduceUnitMutationEvidenceInput['observe_package'];
+    readonly observe_package?: ProtectedMutationPackageObserver;
     readonly limits: ReleaseMutationArtifactLimitsV21;
     /** Derives the plan for this exact run's discharged prerequisite closure. */
     readonly buildInputPlan: (

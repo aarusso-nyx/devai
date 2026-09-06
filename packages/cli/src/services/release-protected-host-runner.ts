@@ -49,7 +49,7 @@ import {
   type ContainerReleaseCertificationAdapters,
   type ProtectedReleasePlanMaterial,
 } from './release-certification-provider.js';
-import type { ProduceUnitMutationEvidenceInput } from './release-mutation-driver.js';
+import type { ProtectedMutationPackageObserver } from './release-mutation-observation.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
 import type { ProtectedMutationPrerequisiteClosure } from './release-certification-provider.js';
 import {
@@ -121,7 +121,7 @@ export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHost
   /** Externally protected, measured artifact bounds. This runner supplies no default. */
   readonly mutation_limits?: ReleaseMutationArtifactLimitsV21;
   /** Explicit host retention observer; never a candidate request or a reuse provider. */
-  readonly observe_mutation_package?: ProduceUnitMutationEvidenceInput['observe_package'];
+  readonly observe_mutation_package?: ProtectedMutationPackageObserver;
   readonly certification_store: ReleaseCertificationEvidenceStoreOptions;
   readonly artifact_store: Omit<ReleaseArtifactStoreOptions, 'binding'>;
   readonly publication_signature_verifier: PublicationSignatureVerifier;
