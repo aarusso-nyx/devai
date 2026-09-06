@@ -67,6 +67,8 @@ import {
 } from './release-export-certification-evidence.js';
 import {
   encodeReleaseExportTranscriptV3,
+  verifyReleaseExportProviderResultV3,
+  verifyReleaseExportProviderResultSetV3,
   RELEASE_EXPORT_SPEC_V4_DIGEST,
   RELEASE_EXPORT_SPEC_V4_ID,
   RELEASE_EXPORT_TRANSCRIPT_V3_FORMAT,
@@ -711,14 +713,18 @@ export async function createReleaseExportArtifactStore(
         const value = readObject(receipt);
         const result = parse<ReleaseExportProviderResult>(value);
         signature ??= result.signature;
-        (current ? verifyReleaseExportProviderResultV2 : verifyReleaseExportProviderResult)(
+        (forward
+          ? verifyReleaseExportProviderResultV3
+          : current
+            ? verifyReleaseExportProviderResultV2
+            : verifyReleaseExportProviderResult)(
           value,
           { package_id: pkg.package_id, transcript, signature },
           effectiveTranscriptLimits,
         );
       }
       if (current)
-        verifyReleaseExportProviderResultSetV2(
+        (forward ? verifyReleaseExportProviderResultSetV3 : verifyReleaseExportProviderResultSetV2)(
           receipts.filter((entry) => entry.kind === 'provider-result').map(readObject),
           { transcript, signature: signature ?? fail() },
           effectiveTranscriptLimits,
@@ -927,9 +933,11 @@ export async function createReleaseExportArtifactStore(
                       prior === undefined
                         ? result.signature
                         : parse<ReleaseExportProviderResult>(readObject(prior)).signature;
-                    (current
-                      ? verifyReleaseExportProviderResultV2
-                      : verifyReleaseExportProviderResult)(
+                    (forward
+                      ? verifyReleaseExportProviderResultV3
+                      : current
+                        ? verifyReleaseExportProviderResultV2
+                        : verifyReleaseExportProviderResult)(
                       captured,
                       {
                         package_id: input.package_id,
