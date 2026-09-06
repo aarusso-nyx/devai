@@ -5,6 +5,7 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -28,6 +29,17 @@ const packagePins = {
   'git-man': { version: '1:2.47.3-0+deb13u1', architecture: 'all' },
   procps: { version: '2:4.0.4-9', architecture: 'arm64' },
   'libproc2-0': { version: '2:4.0.4-9', architecture: 'arm64' },
+  'libpython3.13-minimal': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+  'python3.13-minimal': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+  'python3-minimal': { version: '3.13.5-1', architecture: 'arm64' },
+  'media-types': { version: '13.0.0', architecture: 'all' },
+  netbase: { version: '6.5', architecture: 'all' },
+  'readline-common': { version: '8.2-6', architecture: 'all' },
+  libreadline8t64: { version: '8.2-6', architecture: 'arm64' },
+  'libpython3.13-stdlib': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+  'python3.13': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+  'libpython3-stdlib': { version: '3.13.5-1', architecture: 'arm64' },
+  python3: { version: '3.13.5-1', architecture: 'arm64' },
 };
 const pnpmIntegrity =
   '76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c';
@@ -114,16 +126,20 @@ writeFileSync(
   '#!/bin/sh\nexec /usr/local/bin/node /opt/pnpm/bin/pnpm.cjs "$@"\n',
   { mode: 0o755 },
 );
+if (realpathSync('/usr/bin/python3') !== '/usr/bin/python3.13')
+  throw new Error('DEVAI_TOOLCHAIN_PYTHON_ALIAS_INVALID');
 const versions = {
   node: process.version,
   pnpm: run('/usr/local/bin/pnpm', ['--version'], true),
   git: run('/usr/bin/git', ['--version'], true),
   ps: run('/usr/bin/ps', ['--version'], true),
+  python3: run('/usr/bin/python3', ['--version'], true),
 };
 if (
   versions.pnpm !== '9.15.0' ||
   versions.git !== 'git version 2.47.3' ||
-  versions.ps !== 'ps from procps-ng 4.0.4'
+  versions.ps !== 'ps from procps-ng 4.0.4' ||
+  versions.python3 !== 'Python 3.13.5'
 )
   throw new Error('DEVAI_TOOLCHAIN_VERSION_MISMATCH');
 // Exercise tree-kill's actual Linux interface, not merely ps --version. This
@@ -158,6 +174,7 @@ writeFileSync(
           ['pnpm', '/usr/local/bin/pnpm'],
           ['git', '/usr/bin/git'],
           ['ps', '/usr/bin/ps'],
+          ['python3', '/usr/bin/python3.13'],
         ].map(([name, path]) => {
           const stat = lstatSync(path);
           if (!stat.isFile() || (stat.mode & 0o111) === 0)

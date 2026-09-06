@@ -73,6 +73,11 @@ closure, and creates a normalized public manifest with development workspace dep
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
 that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
 
+The protected Linux toolchain includes checksum-verified Python 3.13.5 and its explicitly
+pinned Debian snapshot dependencies. Repository evidence-transport and adopter-migration
+checks require Python; its executable identity and the complete image digest must be
+revalidated before certification after any toolchain change.
+
 For network-isolated package-staging checks, the repository-local dependency provisioner
 accepts an explicit `npm_install_cache` control with external canonical `directory` and
 `manifest` paths plus `manifest_sha256`. The manifest lists every cache file's `path`,

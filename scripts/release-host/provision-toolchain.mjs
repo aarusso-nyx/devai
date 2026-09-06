@@ -20,12 +20,24 @@ const expectedIdentity = {
     'git-man': { version: '1:2.47.3-0+deb13u1', architecture: 'all' },
     procps: { version: '2:4.0.4-9', architecture: 'arm64' },
     'libproc2-0': { version: '2:4.0.4-9', architecture: 'arm64' },
+    'libpython3.13-minimal': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+    'python3.13-minimal': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+    'python3-minimal': { version: '3.13.5-1', architecture: 'arm64' },
+    'media-types': { version: '13.0.0', architecture: 'all' },
+    netbase: { version: '6.5', architecture: 'all' },
+    'readline-common': { version: '8.2-6', architecture: 'all' },
+    libreadline8t64: { version: '8.2-6', architecture: 'arm64' },
+    'libpython3.13-stdlib': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+    'python3.13': { version: '3.13.5-2+deb13u4', architecture: 'arm64' },
+    'libpython3-stdlib': { version: '3.13.5-1', architecture: 'arm64' },
+    python3: { version: '3.13.5-1', architecture: 'arm64' },
   },
   versions: {
     node: 'v24.20.0',
     pnpm: '9.15.0',
     git: 'git version 2.47.3',
     ps: 'ps from procps-ng 4.0.4',
+    python3: 'Python 3.13.5',
   },
 };
 for (const value of [c.docker_binary, c.docker_config_directory, c.output_directory])
@@ -134,7 +146,8 @@ assert(!fs.existsSync('/etc/apt/sources.list')||fs.readFileSync('/etc/apt/source
 const aptSources=['debian','debian-security'].map(archive=>'Types: deb\\nURIs: https://snapshot.debian.org/archive/'+archive+'/'+expected.snapshot+'\\nSuites: '+(archive==='debian'?'trixie trixie-updates':'trixie-security')+'\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\\nCheck-Valid-Until: no\\n').join('\\n');
 assert.equal(fs.readFileSync('/etc/apt/sources.list.d/debian.sources','utf8'),aptSources);assert.equal(identity.apt_sources_sha256,hash(aptSources));
 const environment={PATH:'/usr/local/bin:/usr/bin:/bin',HOME:'/tmp',LANG:'C',LC_ALL:'C'};
-const executablePaths={node:'/usr/local/bin/node',pnpm:'/usr/local/bin/pnpm',git:'/usr/bin/git',ps:'/usr/bin/ps'};
+const executablePaths={node:'/usr/local/bin/node',pnpm:'/usr/local/bin/pnpm',git:'/usr/bin/git',ps:'/usr/bin/ps',python3:'/usr/bin/python3.13'};
+assert.equal(fs.realpathSync('/usr/bin/python3'),'/usr/bin/python3.13');
 assert.deepEqual(Object.keys(identity.executables).sort(),Object.keys(executablePaths).sort());
 for(const [name,path]of Object.entries(executablePaths)){
  const entry=identity.executables[name],stat=fs.lstatSync(path);assert.equal(entry.path,path);assert(stat.isFile()&&(stat.mode&0o111)!==0);assert.match(entry.sha256,/^[a-f0-9]{64}$/);assert.equal(hash(fs.readFileSync(path)),entry.sha256);
