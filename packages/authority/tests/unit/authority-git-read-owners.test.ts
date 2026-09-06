@@ -22,7 +22,10 @@ describe('immutable Git read helper ownership', () => {
         : [];
     expect(
       unauthorized.filter(
-        ({ symbol }) => symbol === 'readExactGitTreeSync' || symbol === 'readGitObjectSync',
+        ({ symbol }) =>
+          symbol === 'readExactGitTreeSync' ||
+          symbol === 'readGitObjectSync' ||
+          symbol === 'readCheckPolicyGitSync',
       ),
     ).toEqual([]);
   });
@@ -40,6 +43,19 @@ describe('immutable Git read helper ownership', () => {
     });
 
     expect(result).toMatchObject({ ok: true, value: { unauthorized_call_sites: 0 } });
+  });
+
+  it('limits policy inspection to the policy builder owner', async () => {
+    const source =
+      "import { readCheckPolicyGitSync as read } from '@devai-nyx/authority';\nread();";
+    expect(
+      await inventoryFor({ 'packages/cli/src/services/check-runner/policy.ts': source }),
+    ).toMatchObject({ ok: true });
+    expectBoundaryFailure(
+      await inventoryFor({ 'packages/cli/src/services/untrusted.ts': source }),
+      'refused',
+      'AUTHORITY_DIRECT_MUTATOR_INVENTORY_STALE',
+    );
   });
 
   it.each([

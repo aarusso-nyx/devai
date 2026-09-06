@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +16,7 @@ import {
   fstatSync,
   openReadOnlyNoFollowSync,
   readExactGitTreeSync,
+  readCheckPolicyGitSync,
 } from '../../src/index.js';
 
 function git(root: string, args: readonly string[]): string {
@@ -36,6 +45,64 @@ describe('read-only no-follow host seam', () => {
     writeFileSync(target, '{}\n');
     symlinkSync(target, link);
     expect(() => openReadOnlyNoFollowSync(link)).toThrow();
+  });
+
+  it('reconstructs policy Git reads without index writes or candidate programs', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-policy-read-'));
+    git(root, ['init', '-q']);
+    git(root, ['config', 'user.name', 'Test']);
+    git(root, ['config', 'user.email', 'test@example.invalid']);
+    writeFileSync(join(root, 'file ç.txt'), 'one\n');
+    git(root, ['add', '.']);
+    git(root, ['commit', '-qm', 'one']);
+    const first = git(root, ['rev-parse', 'HEAD']);
+    const blob = git(root, ['rev-parse', 'HEAD:file ç.txt']);
+    writeFileSync(join(root, 'file ç.txt'), 'two\n');
+    git(root, ['add', '.']);
+    git(root, ['commit', '-qm', 'two']);
+    const second = git(root, ['rev-parse', 'HEAD']);
+    const index = readFileSync(join(root, '.git/index'));
+    const hook = join(root, 'monitor.sh');
+    writeFileSync(hook, '#!/bin/sh\ntouch "' + join(root, 'executed') + '"\n');
+    chmodSync(hook, 0o755);
+    git(root, ['config', 'core.fsmonitor', hook]);
+    git(root, ['config', 'diff.external', hook]);
+    expect(
+      readCheckPolicyGitSync(root, ['rev-parse', '--verify', 'HEAD^{commit}']).toString().trim(),
+    ).toBe(second);
+    expect(
+      readCheckPolicyGitSync(root, ['cat-file', 'blob', first + ':file ç.txt']).toString(),
+    ).toBe('one\n');
+    expect(readCheckPolicyGitSync(root, ['cat-file', '--batch'], blob + '\n').toString()).toContain(
+      'one\n',
+    );
+    expect(
+      readCheckPolicyGitSync(root, [
+        'diff',
+        '--name-status',
+        '-z',
+        '-M',
+        '--find-renames',
+        first,
+        second,
+      ]).toString(),
+    ).toContain('file ç.txt');
+    readCheckPolicyGitSync(root, ['status', '--porcelain=v1', '--untracked-files=all']);
+    readCheckPolicyGitSync(root, ['ls-files', '-s', '-z']);
+    expect(readFileSync(join(root, '.git/index')).equals(index)).toBe(true);
+    expect(existsSync(join(root, 'executed'))).toBe(false);
+    for (const args of [
+      ['checkout', first],
+      ['config', 'user.name', 'changed'],
+      ['cat-file', '--filters', first + ':file ç.txt'],
+      ['diff', '--ext-diff', first, second],
+      ['rev-parse', '--verify', '--output=/tmp/forbidden'],
+    ])
+      expect(() => readCheckPolicyGitSync(root, args)).toThrow('GIT_POLICY_READ_ARGUMENTS_INVALID');
+    for (const input of ['HEAD\n', blob + '\ncheckout\n', blob, ''])
+      expect(() => readCheckPolicyGitSync(root, ['cat-file', '--batch'], input)).toThrow(
+        'GIT_POLICY_READ_INPUT_INVALID',
+      );
   });
 
   it('reads exact immutable Git blobs with their executable and symlink modes', () => {

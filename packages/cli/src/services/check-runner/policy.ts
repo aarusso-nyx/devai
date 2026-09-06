@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from '@devai-nyx/authority';
+import { readCheckPolicyGitSync } from '@devai-nyx/authority';
 import { sha256Hex } from './canonical.js';
 import type {
   InputSelector,
@@ -67,22 +67,11 @@ function git(
   args: readonly string[],
   options: Readonly<{
     encoding?: BufferEncoding | null;
-    allowFailure?: boolean;
     input?: string | Buffer;
   }> = {},
 ): string | Buffer {
-  const encoding = options.encoding === null ? null : (options.encoding ?? 'utf8');
-  const result = spawnSync('git', [...args], {
-    cwd: repoRoot,
-    encoding,
-    maxBuffer: 64 * 1024 * 1024,
-    ...(options.input !== undefined && { input: options.input }),
-  });
-  if (result.error !== undefined || (result.status !== 0 && options.allowFailure !== true)) {
-    const detail = result.error?.message ?? String(result.stderr || result.stdout).trim();
-    throw new Error(`CHECK_RUNNER_GIT: git ${args.join(' ')} failed: ${detail}`);
-  }
-  return result.stdout ?? (encoding === null ? Buffer.alloc(0) : '');
+  const result = readCheckPolicyGitSync(repoRoot, args, options.input);
+  return options.encoding === null ? result : result.toString(options.encoding ?? 'utf8');
 }
 
 function objectContentDigests(
@@ -599,11 +588,12 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       throw new Error('CHECK_RUNNER_BASE_REQUIRED: affected and release targets require --base');
     }
     assertCommit(repoRoot, options.baseCommit, 'BASE');
-    const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', options.baseCommit, commit], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-    });
-    if (ancestor.status !== 0) throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
+    try {
+      const ancestor = gitText(repoRoot, ['merge-base', options.baseCommit, commit]).trim();
+      if (ancestor !== options.baseCommit) throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
+    } catch {
+      throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
+    }
     changes = changedPaths(repoRoot, options.baseCommit, commit, clean);
   } else if (!clean) {
     changes = changedPaths(repoRoot, commit, commit, false);

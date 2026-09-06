@@ -54,6 +54,7 @@ const READ_PROCESS_OWNERS = new Set([
 ]);
 const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
   readGitObjectSync: new Set<string>(),
+  readCheckPolicyGitSync: new Set(['packages/cli/src/services/check-runner/policy.ts']),
   readExactGitTreeSync: new Set([
     'packages/cli/src/services/check-runner/authority-process.ts',
     'packages/cli/src/services/release-certification-provider.ts',

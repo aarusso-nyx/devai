@@ -629,6 +629,7 @@ describe('content-addressed check runner', () => {
           vitest: '4.1.10',
           typescript: '5.9.3',
           postgres: 'psql-test',
+          git: 'git-test',
         },
         environment: {},
         cacheState: () => ({ cacheState: 'execute', reason: 'fixture' }),

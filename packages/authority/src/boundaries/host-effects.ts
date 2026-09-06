@@ -1419,6 +1419,83 @@ function rawGitRead(repoRoot: string, args: readonly string[]): Buffer {
   return result.stdout;
 }
 
+/** Closed, read-only Git grammar for task-policy reconstruction, never task execution. */
+export function readCheckPolicyGitSync(
+  repoRoot: string,
+  args: readonly string[],
+  input?: string | Buffer,
+): Buffer {
+  const matches = (...expected: string[]) =>
+    args.length === expected.length && args.every((value, index) => value === expected[index]);
+  const revision = (value: string | undefined) =>
+    typeof value === 'string' &&
+    /^(?:HEAD|[a-f0-9]{40}|[a-f0-9]{64})\^\{(?:commit|tree)\}$/u.test(value);
+  const batch = matches('cat-file', '--batch');
+  const separator = args[2]?.indexOf(':') ?? -1;
+  const objectPath =
+    separator < 0 ? undefined : [args[2]?.slice(0, separator), args[2]?.slice(separator + 1)];
+  const valid =
+    (args.length === 3 &&
+      args[0] === 'merge-base' &&
+      validGitObject(args[1] ?? '') &&
+      validGitObject(args[2] ?? '')) ||
+    (args.length === 3 && args[0] === 'rev-parse' && args[1] === '--verify' && revision(args[2])) ||
+    matches('status', '--porcelain=v1', '--untracked-files=all') ||
+    (args.length === 5 &&
+      args.slice(0, 4).join(',') === 'ls-tree,-r,-z,--full-tree' &&
+      validGitObject(args[4] ?? '')) ||
+    matches('ls-files', '-s', '-z') ||
+    matches('ls-files', '-z', '--cached', '--others', '--exclude-standard') ||
+    matches('ls-files', '-z', '--others', '--exclude-standard') ||
+    (args.length === 7 &&
+      args.slice(0, 5).join(',') === 'diff,--name-status,-z,-M,--find-renames' &&
+      validGitObject(args[5] ?? '') &&
+      (args[6] === '--' || validGitObject(args[6] ?? ''))) ||
+    (args.length === 3 &&
+      args[0] === 'cat-file' &&
+      args[1] === 'blob' &&
+      objectPath?.length === 2 &&
+      validGitObject(objectPath[0] ?? '') &&
+      validGitPath(objectPath[1] ?? '')) ||
+    batch;
+  if (!valid) throw new Error('GIT_POLICY_READ_ARGUMENTS_INVALID');
+  if (batch) {
+    const bytes = typeof input === 'string' ? Buffer.from(input) : input;
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > 64 * 1024 * 1024)
+      throw new Error('GIT_POLICY_READ_INPUT_INVALID');
+    const lines = bytes.toString('utf8').split('\n');
+    if (lines.pop() !== '' || !lines.every(validGitObject))
+      throw new Error('GIT_POLICY_READ_INPUT_INVALID');
+  } else if (input !== undefined) throw new Error('GIT_POLICY_READ_INPUT_INVALID');
+  // Candidate filters, external diff drivers, fsmonitor hooks and inherited Git
+  // configuration must never turn policy inspection into program execution.
+  const command =
+    args[0] === 'diff' ? ['diff', '--no-ext-diff', '--no-textconv', ...args.slice(1)] : [...args];
+  const result = Reflect.apply(nodeSpawnSync, undefined, [
+    'git',
+    ['--no-optional-locks', '-c', 'core.fsmonitor=false', ...command],
+    {
+      cwd: repoRoot,
+      encoding: null,
+      input,
+      shell: false,
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: 60_000,
+      env: {
+        PATH: process.env.PATH,
+        LANG: 'C',
+        LC_ALL: 'C',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_OPTIONAL_LOCKS: '0',
+      },
+    },
+  ]) as ReturnType<typeof nodeSpawnSync>;
+  if (result.error !== undefined || result.status !== 0 || !Buffer.isBuffer(result.stdout))
+    throw new Error('GIT_POLICY_READ_FAILED');
+  return result.stdout;
+}
+
 /**
  * Read a regular-file/symlink projection from one exact immutable Git tree.
  * The caller must still decide which Git modes are safe to materialize.
