@@ -14,6 +14,7 @@ import {
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CAC } from 'cac';
+import type { CheckRunnerOptions } from '../../src/services/check-runner/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuthorityDecisionIssuer,
@@ -530,11 +531,19 @@ describe('release lifecycle command adapter composition', () => {
       },
       exitCode: 0,
     };
-    runChecks.mockImplementation((options) => {
+    runChecks.mockImplementation((options: CheckRunnerOptions) => {
       const task = protectedPlan.tasks[0];
       if (options.executeTask !== undefined) {
         if (task === undefined) throw new Error('missing protected preflight execution fixture');
-        expect(options.executeTask(task.argv, root, 1_000, {})).toMatchObject({
+        expect(
+          options.executeTask(
+            task.argv,
+            root,
+            1_000,
+            {},
+            { nodeId: task.nodeId, taskKey: task.taskKey },
+          ),
+        ).toMatchObject({
           status: 0,
           signal: null,
           stdout: '',
