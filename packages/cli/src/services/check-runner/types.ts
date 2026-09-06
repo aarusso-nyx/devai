@@ -177,6 +177,8 @@ export interface CheckRunnerOptions {
     cwd: string,
     timeoutMs: number,
     environment: Readonly<Record<string, string>>,
+    /** Exact planned identity, including when earlier nodes were skipped or reused. */
+    taskIdentity: Readonly<{ nodeId: string; taskKey: string }>,
   ) => TaskExecutionResult;
   /** Trusted host-only execution identity; never populated from CLI documents. */
   readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;

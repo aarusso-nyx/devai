@@ -600,7 +600,13 @@ function providerFixture(production?: {
     tasks: [value.task],
   };
   fixtureRuntime.runCheckTasks = (options: CheckRunnerOptions) => {
-    const result = options.executeTask?.(value.task.argv, join(root, value.task.cwd), 1000, {});
+    const result = options.executeTask?.(
+      value.task.argv,
+      join(root, value.task.cwd),
+      1000,
+      {},
+      { nodeId: value.task.nodeId, taskKey: value.task.taskKey },
+    );
     return {
       schemaVersion: '1.0.0',
       operation: options.operation,

@@ -251,6 +251,51 @@ describe('internal asynchronous check runner', () => {
     ]);
   });
 
+  it.each(['sync', 'async'] as const)(
+    'delivers exact task identities after a failed dependency in the %s runner',
+    async (mode) => {
+      const root = repository();
+      const document = descriptor();
+      const changed = {
+        ...document,
+        tasks: document.tasks.map((task) =>
+          task.nodeId === 'test:local-full' ? { ...task, dependencies: [] } : task,
+        ),
+        profiles: document.profiles.map((profile) =>
+          profile.profileId === 'rc'
+            ? { ...profile, requiredNodes: ['build', 'test:unit', 'test:local-full'] }
+            : profile,
+        ),
+      };
+      const seen: Array<{ nodeId: string; taskKey: string }> = [];
+      const input = {
+        ...options(root, (_argv, _cwd, _timeout, _environment, identity) => {
+          seen.push({ ...identity });
+          return identity.nodeId === 'build' ? { ...PASS, status: 1 } : PASS;
+        }),
+        target: 'rc' as const,
+        descriptorDocument: changed,
+      };
+      const report = await withScope(async () =>
+        mode === 'sync' ? runCheckTasks(input) : runCheckTasksAsync(input),
+      );
+      expect(report.exitCode).not.toBe(0);
+      expect(seen.map((task) => task.nodeId)).toEqual(['build', 'test:local-full']);
+      for (const identity of seen) {
+        expect(report.plan.tasks.find((task) => task.nodeId === identity.nodeId)?.taskKey).toBe(
+          identity.taskKey,
+        );
+      }
+      expect(report.execution).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ nodeId: 'build', outcome: 'FAIL' }),
+          expect.objectContaining({ nodeId: 'test:unit', outcome: 'ABORTED' }),
+          expect.objectContaining({ nodeId: 'test:local-full', outcome: 'PASS' }),
+        ]),
+      );
+    },
+  );
+
   it('shares synchronous planning, reports, and reusable cache behavior', async () => {
     const root = repository();
     const syncReport = await withScope(async () =>

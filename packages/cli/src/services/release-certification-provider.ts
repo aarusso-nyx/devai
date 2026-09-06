@@ -732,7 +732,8 @@ function createContainerReleaseAdapters(
     };
     if (fixtureContext !== undefined && diagnosticRuns !== undefined)
       recordProtectedToolchainFixtureBinding(fixtureContext, binding);
-    let taskIndex = 0;
+    const tasksByNode = new Map(planned.tasks.map((task) => [task.nodeId, task]));
+    const executedNodes = new Set<string>();
     // A container authorization scope is synchronous. Never retain its private
     // host capability across an await between DAG tasks or evidence operations.
     container.runBound(binding, () => container.verifyRuntime());
@@ -744,19 +745,22 @@ function createContainerReleaseAdapters(
       ...(request.action_id === 'release certify' && input.mutation_driver !== undefined
         ? { resolveProtectedMutationProducer: () => PROTECTED_MUTATION_PRODUCER }
         : {}),
-      executeTask: (argv, cwd, timeout, taskEnvironment) => {
+      executeTask: (argv, cwd, timeout, taskEnvironment, taskIdentity) => {
         if (
           fixtureContext !== undefined &&
           canonicalJson(taskEnvironment) !== canonicalJson(environment)
         )
           throw new Error('release-toolchain-fixture-compatibility-invalid');
-        const task = planned.tasks[taskIndex++];
+        const task = tasksByNode.get(taskIdentity.nodeId);
         if (
           task === undefined ||
+          task.taskKey !== taskIdentity.taskKey ||
+          executedNodes.has(task.nodeId) ||
           canonicalJson(argv) !== canonicalJson(task.argv) ||
           realpathSync(cwd) !== realpathSync(resolve(root, task.cwd))
         )
           throw new Error('release-task-policy-identity-mismatch');
+        executedNodes.add(task.nodeId);
         const paths = outputPaths({ ...planned, tasks: [task] });
         const gitView = task.outputContract.git_view;
         if (gitView !== undefined && gitView !== 'candidate-local-shallow-v1')

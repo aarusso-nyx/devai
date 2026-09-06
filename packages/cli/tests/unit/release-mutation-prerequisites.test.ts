@@ -112,6 +112,37 @@ async function completeDag() {
 }
 
 describe('protected mutation prerequisites', () => {
+  it.each(['node', 'key', 'duplicate'] as const)(
+    'rejects a %s execution identity before an unauthorized container invocation',
+    async (defect) => {
+      const value = certificationFixture();
+      const original = fixtureRuntime.runCheckTasks;
+      if (original === undefined) throw new Error('fixture runner missing');
+      fixtureRuntime.runCheckTasks = (options) => {
+        const executeTask = options.executeTask;
+        if (executeTask === undefined) return original(options);
+        return original({
+          ...options,
+          executeTask: (argv, cwd, timeout, environment, identity) => {
+            if (defect === 'duplicate') executeTask(argv, cwd, timeout, environment, identity);
+            return executeTask(argv, cwd, timeout, environment, {
+              nodeId: defect === 'node' ? 'undeclared-task' : identity.nodeId,
+              taskKey: defect === 'key' ? 'f'.repeat(64) : identity.taskKey,
+            });
+          },
+        });
+      };
+      await expect(
+        value.assembly.provider.certify({
+          request: value.request,
+          task_policies: value.assembly.task_policies,
+          evidence_sink: value.assembly.evidence_sink,
+        }),
+      ).rejects.toThrow('release-task-policy-identity-mismatch');
+      expect(execute).toHaveBeenCalledTimes(defect === 'duplicate' ? 1 : 0);
+    },
+  );
+
   it('reads exact defensive policies without executing tasks or granting certification', () => {
     const value = certificationFixture();
     const policies = value.adapters.read_task_policies(value.request);

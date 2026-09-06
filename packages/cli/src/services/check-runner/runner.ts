@@ -547,8 +547,8 @@ export async function runCheckTasksAsync(
     captured,
     executeTask === undefined
       ? undefined
-      : (argv, cwd, timeout, environment) =>
-          executeTask([...argv], cwd, timeout, { ...environment }),
+      : (argv, cwd, timeout, environment, taskIdentity) =>
+          executeTask([...argv], cwd, timeout, { ...environment }, { ...taskIdentity }),
   );
   let step = steps.next();
   while (!step.done) {
@@ -749,7 +749,10 @@ function* runCheckTaskSteps(
     const taskEnv = taskEnvironment(descriptorTask, environment);
     const result = yield () =>
       asyncExecutor !== undefined
-        ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv)
+        ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv, {
+            nodeId: task.nodeId,
+            taskKey: task.taskKey,
+          })
         : options.executeTask === undefined
           ? defaultExecute(
               [task.executable.path, ...task.argv.slice(1)],
@@ -771,7 +774,10 @@ function* runCheckTaskSteps(
                   }
                 : undefined,
             )
-          : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv);
+          : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv, {
+              nodeId: task.nodeId,
+              taskKey: task.taskKey,
+            });
     const durationMs = Math.max(0, Date.now() - started);
     const finishedAt = now();
     const outcome = executionOutcome(result);
