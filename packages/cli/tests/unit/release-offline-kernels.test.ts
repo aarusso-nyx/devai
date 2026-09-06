@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   verifyPinnedCandidateReceiptEvidence,
   verifyPinnedDetachedSignature,
+  verifyPinnedArtifactContent,
   type OfflineCandidateEvidenceInput,
 } from '../../src/services/mutation-evidence-v21.js';
 
@@ -62,6 +63,27 @@ function evidence() {
 }
 
 describe('activated offline kernels', () => {
+  it('checks retained text for credential-shaped material, host paths and invalid encoding', async () => {
+    await expect(
+      verifyPinnedArtifactContent({ path: 'report.json', bytes: Buffer.from('{}') }),
+    ).resolves.toBeUndefined();
+    await expect(
+      verifyPinnedArtifactContent({
+        path: 'report.json',
+        bytes: Buffer.from('-----BEGIN PRIVATE KEY-----'),
+      }),
+    ).rejects.toMatchObject({ code: 'ARTIFACT_CREDENTIAL_MATERIAL' });
+    await expect(
+      verifyPinnedArtifactContent({
+        path: 'report.json',
+        bytes: Buffer.from('/Users/fixture/private.txt'),
+      }),
+    ).rejects.toMatchObject({ code: 'ARTIFACT_HOST_PATH' });
+    await expect(
+      verifyPinnedArtifactContent({ path: 'report.json', bytes: Buffer.from([0xff]) }),
+    ).rejects.toMatchObject({ code: 'ARTIFACT_INVALID' });
+  });
+
   it('checks the real result DAG entirely through supplied bytes', async () => {
     await expect(verifyPinnedCandidateReceiptEvidence(evidence().input)).resolves.toMatchObject({
       ok: true,

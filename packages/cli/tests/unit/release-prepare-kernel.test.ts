@@ -10,7 +10,7 @@ import {
   type AuthorityHostEffectScope,
   type ProtectedReleasePrepareCapacityBinding,
 } from '@devai-nyx/authority';
-import { canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 import { fixture as unitMutationFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
 import {
@@ -27,6 +27,7 @@ import {
   RELEASE_PACK_SPEC_DIGEST,
   RELEASE_PACK_SPEC_ID,
   reverifySinkArtifacts,
+  verifyPreparedPackageArchive,
   type ArtifactSinkObject,
   type ArtifactSinkObjectReceipt,
   type CertificationOutputClosureBinding,
@@ -528,6 +529,63 @@ describe('pure release prepare kernel', () => {
     expect(RELEASE_PACK_SPEC_DIGEST).toBe(
       '46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316',
     );
+  });
+
+  it('independently verifies retained archive and SBOM semantics after the source is absent', async () => {
+    const value = fixture();
+    const target = memorySink();
+    const result = await createReleasePrepareProvider({
+      ...value.resolvers,
+      certified_state: value.state,
+      content_source: value.source,
+      artifact_sink: target.sink,
+    })(value.request);
+    const unit = result.material?.release_units[0];
+    const pkg = unit?.packages[0];
+    if (result.outcome !== 'success' || !unit || !pkg || !pkg.package_sbom)
+      throw new Error('prepare fixture failed');
+    const read = (identity: unknown) => {
+      const ref = identity as { opaque_handle: string };
+      const bytes = target.bytes.get(ref.opaque_handle);
+      if (!bytes) throw new Error('missing prepared bytes');
+      return Buffer.from(bytes);
+    };
+    const input = {
+      package: pkg,
+      release_unit: unit.release_unit,
+      version: unit.version,
+      candidate: value.request.candidate_locator,
+      manifest: read(pkg.package_manifest),
+      tarball: read(pkg.package_tarball),
+      sbom: read(pkg.package_sbom),
+      maximum_archive_bytes: 1024 * 1024,
+    };
+    expect(verifyPreparedPackageArchive(input).map((entry) => entry.path)).toEqual([
+      'dist/index.js',
+      'package.json',
+    ]);
+    expect(() => verifyPreparedPackageArchive({ ...input, maximum_archive_bytes: 1024 })).toThrow();
+    const changedSbom = Buffer.from('{}');
+    const changedIdentity = {
+      ...pkg.package_sbom,
+      sha256: sha256(changedSbom),
+      size_bytes: changedSbom.length,
+    };
+    const manifest = JSON.parse(input.manifest.toString('utf8')) as {
+      artifacts: { sbom: { sha256: string; size_bytes: number } };
+    };
+    manifest.artifacts.sbom = {
+      sha256: changedIdentity.sha256,
+      size_bytes: changedIdentity.size_bytes,
+    };
+    expect(() =>
+      verifyPreparedPackageArchive({
+        ...input,
+        package: { ...pkg, package_sbom: changedIdentity },
+        sbom: changedSbom,
+        manifest: Buffer.from(canonicalJson(manifest)),
+      }),
+    ).toThrow('release-downstream-artifact-reverification-failed');
   });
 
   it('produces stable npm-layout gzip bytes from verified Git and generated blobs while preserving mode', async () => {

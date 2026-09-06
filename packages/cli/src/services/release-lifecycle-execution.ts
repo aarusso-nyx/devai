@@ -2241,7 +2241,7 @@ function verifiedPlanBindings(receipts: readonly VerifiedReceipt[]): readonly un
   );
 }
 
-function offlineArtifactProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
+export function offlineArtifactProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
   if (state.schemaVersion === '2.1.0') {
     return state['artifacts'] as readonly unknown[];
   }
@@ -2275,7 +2275,7 @@ function offlineArtifactProjection(state: ReleaseLifecycleStateV2): readonly unk
   return sortedArtifacts([...unique.values()]);
 }
 
-function offlineReleaseUnitsProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
+export function offlineReleaseUnitsProjection(state: ReleaseLifecycleStateV2): readonly unknown[] {
   if (state.schemaVersion !== '2.1.0') return state.release_units;
   return state.release_units.map((unit) => ({
     release_unit: unit.release_unit,

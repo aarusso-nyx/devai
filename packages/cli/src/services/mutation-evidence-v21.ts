@@ -268,7 +268,7 @@ interface PinnedModules {
     readonly validateArtifactContent: (input: {
       bytes: Buffer;
       path: string;
-      mediaType: string;
+      mediaType?: string;
     }) => void;
   };
   readonly canonical: {
@@ -716,4 +716,14 @@ export async function verifyPinnedDetachedSignature(
 ): Promise<unknown> {
   const verifier = await loadPinnedVerifier();
   return verifier.trust.verifyDetachedSignature(input);
+}
+
+/** Apply the activated content-safety kernel to retained evidence bytes. */
+export async function verifyPinnedArtifactContent(input: {
+  readonly bytes: Buffer;
+  readonly path: string;
+  readonly mediaType?: string;
+}): Promise<void> {
+  const verifier = await loadPinnedVerifier();
+  verifier.safety.validateArtifactContent(input);
 }

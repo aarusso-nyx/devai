@@ -152,3 +152,9 @@ export {
   type ReleaseExportProviderResultInput,
   type ReleaseExportProviderResult,
 } from './services/release-export-transcript.js';
+
+export {
+  createReleaseOfflineVerifierProvider,
+  type ReleaseOfflineProviderControls,
+  type ProtectedOfflineDagControl,
+} from './services/release-offline-provider.js';
