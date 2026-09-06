@@ -230,6 +230,52 @@ try {
       /release-host-controls-invalid/,
     );
   }
+  for (const stage of ['evidence_publish', 'publish']) {
+    for (const invalid of [
+      {},
+      { provider: () => ({}) },
+      { provider: 1, authorization: () => undefined, offline_receipt_verifier: () => undefined },
+    ]) {
+      assert.throws(
+        () =>
+          createProtectedReleaseHostRunner({
+            ...controls,
+            later_stages: { ...controls.later_stages, [stage]: invalid },
+          }),
+        /release-host-controls-invalid/,
+      );
+    }
+  }
+  const publicationMode = process.argv[2] === 'publication';
+  const routed = [];
+  if (publicationMode) {
+    controls.later_stages.evidence_publish = {
+      provider: async () => {
+        throw Error('must not dispatch in routing test');
+      },
+      authorization: (request) => {
+        routed.push(['evidence-authorization', request.action_id]);
+        return undefined;
+      },
+      offline_receipt_verifier: (request) => {
+        routed.push(['offline-receipt', request.action_id]);
+        return undefined;
+      },
+    };
+    controls.later_stages.publish = {
+      provider: async () => {
+        throw Error('must not dispatch in routing test');
+      },
+      authorization: (request) => {
+        routed.push(['publication-authorization', request.action_id]);
+        return undefined;
+      },
+      publication_controls: (request) => {
+        routed.push(['publication-controls', request.action_id]);
+        return undefined;
+      },
+    };
+  }
   const runner = createProtectedReleaseHostRunner(controls);
   await assert.rejects(
     () =>
@@ -240,6 +286,19 @@ try {
       }),
     /release-host-stage-unavailable/,
   );
+  for (const action of publicationMode ? [] : ['release evidence-publish', 'release publish']) {
+    await assert.rejects(
+      () =>
+        runner.invoke({
+          action,
+          as_role: 'owner',
+          write: true,
+          allow_publish: true,
+          request: { path: '/must-not-be-read', sha256: 'a'.repeat(64) },
+        }),
+      /release-host-stage-unavailable/,
+    );
+  }
   check: {
     if (withoutFixture) {
       assert.throws(() => runner.readFixturePlan(), /release-host-fixture-unavailable/);
@@ -396,6 +455,51 @@ try {
     );
     assert.equal(observations.calls.at(-1).root, productionRoot);
     assert.equal(observations.calls.at(-1).repository, production.snapshot.repository.id);
+    if (publicationMode) {
+      for (const action of ['release evidence-publish', 'release publish']) {
+        const remote = {
+          ...productionRequest,
+          action_id: action,
+          provider: { kind: 'protected-dispatch', provider_id: 'fixture-control' },
+          destination: {
+            kind: 'publication-destination',
+            exact_identifier: 'fixture-only',
+            trust: {
+              trust_root_id: 'fixture-root',
+              trust_store_digest_sha256: 'b'.repeat(64),
+              key_id: 'fixture-key',
+              signature_algorithm: 'ed25519',
+            },
+          },
+          receipt_locators:
+            action === 'release evidence-publish'
+              ? [
+                  {
+                    kind: 'release-offline-verification-receipt',
+                    receipt_id: 'ROV-' + 'b'.repeat(16),
+                    receipt_digest_sha256: 'b'.repeat(64),
+                    path: 'receipts/offline.json',
+                  },
+                ]
+              : productionRequest.receipt_locators,
+        };
+        const result = await runner.invoke({
+          action,
+          as_role: 'owner',
+          write: true,
+          allow_publish: action === 'release publish',
+          request: document(action.replace(' ', '-') + '.json', remote),
+        });
+        assert.equal(result.exit_code, 0);
+        assert.equal(observations.calls.at(-1).allowPublish, action === 'release publish');
+      }
+      assert.deepEqual(routed, [
+        ['evidence-authorization', 'release evidence-publish'],
+        ['offline-receipt', 'release evidence-publish'],
+        ['publication-authorization', 'release publish'],
+        ['publication-controls', 'release publish'],
+      ]);
+    }
     assert.equal(observations.stores.length - storeCountBeforeSuccess, 2);
     assert.deepEqual(
       observations.stores

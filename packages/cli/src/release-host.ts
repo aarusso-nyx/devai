@@ -9,6 +9,8 @@ export {
   createProtectedReleaseHostRunner,
   type ProtectedReleaseHostRunnerControls,
   type ProtectedReleaseHostOfflineControls,
+  type ProtectedReleaseHostEvidencePublicationControls,
+  type ProtectedReleaseHostPublicationControls,
   type ProtectedReleaseHostRunner,
   type ProtectedReleaseHostInvocation,
   type ProtectedReleaseInputFile,

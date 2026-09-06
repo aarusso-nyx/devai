@@ -73,6 +73,13 @@ export async function invokeDevaiCli(args) {
  const resolution = adapters.policy_resolution({repository_id:request.repository_locator.id,candidate:{commit:request.candidate_locator.commit,tree:request.candidate_locator.tree},release_unit:request.candidate_locator.release_units[0].release_unit});
  if (resolution.repository.id !== identity.repository.id) throw Error('wrong routed policy');
  observations.calls.push({action,root,state,repository:identity.repository.id});
+ if(action === 'release evidence-publish' || action === 'release publish') {
+   observations.calls.at(-1).allowPublish=args.includes('--allow-publish');
+   if(typeof adapters.provider(action,request)!=='function') throw Error('missing protected provider');
+   adapters.authorization(request);
+   if(action === 'release evidence-publish') adapters.offline_receipt_verifier(request); else adapters.publication_controls(request);
+   return {exit_code:0,stdout:'routing-only',stderr:''};
+ }
  if(action === 'release certify') { adapters.certification_provider(request); throw Error('certification unexpectedly escaped'); }
  const outcome = await adapters.preflight_provider(request)(request);
  return {exit_code:outcome.outcome==='success'?0:1, stdout:JSON.stringify(outcome),stderr:''};
@@ -181,6 +188,12 @@ export class ProtectedCertificationContainer extends OriginalProtectedCertificat
         fixture: true,
         store_count: 2,
       });
+      const publication = execFileSync(process.execPath, [output, 'publication'], {
+        encoding: 'utf8',
+        timeout: 25000,
+        maxBuffer: 8 * 1024 * 1024,
+      });
+      expect(JSON.parse(publication)).toMatchObject({ verdict: 'pass', packages: 10 });
       const absent = execFileSync(process.execPath, [output, 'without-fixture'], {
         encoding: 'utf8',
         timeout: 25000,

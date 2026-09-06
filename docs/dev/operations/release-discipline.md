@@ -120,3 +120,21 @@ Repository settings are separate Owner-authorized effects: enable immutable Rele
 prohibit update/deletion of `v*` tags, require signed annotated release tags, protect the
 release and Pages environments, and select GitHub Actions as the Pages source. None of those
 settings is changed by the source workflow itself.
+
+## Installed host publication controls
+
+The 1.5 installed host runner exposes the existing `release evidence-publish` and
+`release publish` actions only when the operator supplies their respective
+`later_stages.evidence_publish` or `later_stages.publish` controls. Omission or
+`'unavailable'` disables that stage. Each stage needs a provider and an authorization
+callback. Evidence publication also needs an independent offline-receipt verifier;
+package publication needs publication controls. These callbacks come from the installed
+control process, never request JSON. Supplying a callback does not establish approval:
+the lifecycle still validates its returned authorization, receipts, and current state.
+
+A remote invocation must explicitly provide `as_role`, `write`, and `allow_publish`.
+The runner forwards consent without supplying a default grant, binds the request to its
+exact production candidate, and refuses diagnostic-lane publication. Evidence publication
+binds its offline receipt; package publication binds its plan receipt. Missing controls,
+missing consent, stale authorization, or incompatible evidence remain refusals. This host
+interface does not change DEVAI's own rehearsal-and-promotion workflow described above.

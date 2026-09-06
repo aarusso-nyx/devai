@@ -126,6 +126,8 @@ export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHost
   readonly later_stages: {
     readonly export: 'unavailable' | ProtectedReleaseHostExportControls;
     readonly offline_verify: 'unavailable' | ProtectedReleaseHostOfflineControls;
+    readonly evidence_publish?: 'unavailable' | ProtectedReleaseHostEvidencePublicationControls;
+    readonly publish?: 'unavailable' | ProtectedReleaseHostPublicationControls;
   };
 }
 
@@ -146,6 +148,18 @@ export interface ProtectedReleaseHostOfflineControls {
   readonly policy_closures: NonNullable<ReleaseLifecycleCommandAdapters['offline_policy_closures']>;
 }
 
+/** External effects remain unavailable unless installed controls explicitly supply every gate. */
+export interface ProtectedReleaseHostEvidencePublicationControls {
+  readonly provider: NonNullable<ReturnType<ReleaseLifecycleCommandAdapters['provider']>>;
+  readonly authorization: ReleaseLifecycleCommandAdapters['authorization'];
+  readonly offline_receipt_verifier: ReleaseLifecycleCommandAdapters['offline_receipt_verifier'];
+}
+export interface ProtectedReleaseHostPublicationControls {
+  readonly provider: NonNullable<ReturnType<ReleaseLifecycleCommandAdapters['provider']>>;
+  readonly authorization: ReleaseLifecycleCommandAdapters['authorization'];
+  readonly publication_controls: ReleaseLifecycleCommandAdapters['publication_controls'];
+}
+
 interface InvocationAuthority {
   /** No role is inferred by this runner; the normal CLI checks this explicit declaration. */
   readonly as_role: 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
@@ -158,6 +172,11 @@ export type ProtectedReleaseHostInvocation =
       readonly action:
         'release preflight' | 'release certify' | 'release prepare' | 'release export';
       readonly request: ProtectedReleaseInputFile;
+    })
+  | (InvocationAuthority & {
+      readonly action: 'release evidence-publish' | 'release publish';
+      readonly request: ProtectedReleaseInputFile;
+      readonly allow_publish: boolean;
     })
   | {
       readonly action: 'release offline-verify';
@@ -489,7 +508,26 @@ export function createProtectedReleaseHostRunner(
     ['producer', 'toolchain_fixture', 'mutation_inputs', 'mutation_limits'],
   );
   assertBoundReleaseHostPackageSnapshot(input.installed_package);
-  closed(input.later_stages, ['export', 'offline_verify']);
+  closed(input.later_stages, ['export', 'offline_verify'], ['evidence_publish', 'publish']);
+  function publicationStage<T extends object>(
+    value: T | 'unavailable' | undefined,
+    keys: string[],
+  ): T | undefined {
+    if (value === undefined || value === 'unavailable') return undefined;
+    closed(value, keys);
+    if (Object.values(value).some((callback) => typeof callback !== 'function')) fail();
+    return Object.freeze({ ...value });
+  }
+  const evidencePublication = publicationStage(input.later_stages.evidence_publish, [
+    'provider',
+    'authorization',
+    'offline_receipt_verifier',
+  ]);
+  const publication = publicationStage(input.later_stages.publish, [
+    'provider',
+    'authorization',
+    'publication_controls',
+  ]);
   if (typeof input.publication_signature_verifier !== 'function') fail();
   const offlineControls = input.later_stages.offline_verify;
   if (offlineControls !== 'unavailable') {
@@ -720,7 +758,10 @@ export function createProtectedReleaseHostRunner(
       fail(INPUT_INVALID);
     // Resume forbids receipt locators in its request; its separately pinned
     // receipt-document array below must contain this exact plan instead.
-    if (request.action_id === 'release resume') return;
+    // Evidence publication binds the independently verified offline receipt; its
+    // plan is reconstructed from the pinned host policy, not a second request locator.
+    if (request.action_id === 'release resume' || request.action_id === 'release evidence-publish')
+      return;
     const plans =
       request.receipt_locators?.filter((value) => value.kind === 'release-plan-receipt') ?? [];
     if (
@@ -816,7 +857,13 @@ export function createProtectedReleaseHostRunner(
     },
     provider(action, request) {
       requireProduction(request);
-      return action === 'release export' ? exportDelivery?.provider : undefined;
+      return action === 'release export'
+        ? exportDelivery?.provider
+        : action === 'release evidence-publish'
+          ? evidencePublication?.provider
+          : action === 'release publish'
+            ? publication?.provider
+            : undefined;
     },
     offline_verification_provider(request) {
       requireProduction(request);
@@ -826,9 +873,26 @@ export function createProtectedReleaseHostRunner(
       requireProduction(request);
       return offlineClosures?.(copy(request));
     },
-    authorization: () => undefined,
-    offline_receipt_verifier: () => undefined,
-    publication_controls: () => undefined,
+    authorization(request) {
+      requireProduction(request);
+      return request.action_id === 'release evidence-publish'
+        ? evidencePublication?.authorization(copy(request))
+        : request.action_id === 'release publish'
+          ? publication?.authorization(copy(request))
+          : undefined;
+    },
+    offline_receipt_verifier(request) {
+      requireProduction(request);
+      return request.action_id === 'release evidence-publish'
+        ? evidencePublication?.offline_receipt_verifier(copy(request))
+        : undefined;
+    },
+    publication_controls(request) {
+      requireProduction(request);
+      return request.action_id === 'release publish'
+        ? publication?.publication_controls(copy(request))
+        : undefined;
+    },
   });
   return Object.freeze({
     readPlan: () => copy(receipt),
@@ -872,6 +936,8 @@ export function createProtectedReleaseHostRunner(
             ...(exportDelivery === undefined ? [] : ['release export']),
             'release resume',
             ...(offlineProvider === undefined ? [] : ['release offline-verify']),
+            ...(evidencePublication === undefined ? [] : ['release evidence-publish']),
+            ...(publication === undefined ? [] : ['release publish']),
           ].includes(action)
         )
           fail('release-host-stage-unavailable');
@@ -884,6 +950,9 @@ export function createProtectedReleaseHostRunner(
               : ['as_role', 'write']),
             ...(action === 'release plan' ? ['intent'] : ['request']),
             ...(action === 'release resume' ? ['receipts'] : []),
+            ...(['release evidence-publish', 'release publish'].includes(action)
+              ? ['allow_publish']
+              : []),
             ...(action === 'release offline-verify' ? ['exported_state'] : []),
           ],
           action === 'release resume' ? ['publication_receipt'] : [],
@@ -897,6 +966,7 @@ export function createProtectedReleaseHostRunner(
             typeof invocation.write !== 'boolean')
         )
           fail();
+        if ('allow_publish' in invocation && typeof invocation.allow_publish !== 'boolean') fail();
         let request: ReleaseLifecycleRequest | undefined;
         if (invocation.action !== 'release plan') {
           request = validateReleaseLifecycleRequest(
@@ -916,6 +986,7 @@ export function createProtectedReleaseHostRunner(
         }
         const args = [
           ...action.split(' '),
+          ...('allow_publish' in invocation && invocation.allow_publish ? ['--allow-publish'] : []),
           '--repo-root',
           activeLane.root,
           ...('as_role' in invocation
