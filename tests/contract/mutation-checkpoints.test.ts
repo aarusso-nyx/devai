@@ -44,7 +44,7 @@ function fixture() {
   const artifacts = { report: Buffer.from('verified fixture report') };
   const verify = vi.fn(
     (_binding: unknown, actual: Record<string, Buffer>) =>
-      Object.keys(actual).join() === 'report' && actual.report.equals(artifacts.report),
+      Object.keys(actual).join() === 'report' && actual.report?.equals(artifacts.report) === true,
   );
   const controls = { root, candidateRoot, maximumBytes: 1024, verify };
   return {
@@ -70,10 +70,8 @@ describe('local mutation checkpoints', () => {
   it('invalidates reuse for every changed binding', async () => {
     const f = fixture();
     await f.store.write(f.binding, f.artifacts);
-    for (const key of Object.keys(f.binding))
-      expect(
-        await f.store.read({ ...f.binding, [key]: 'b'.repeat(f.binding[key].length) }),
-      ).toBeUndefined();
+    for (const [key, value] of Object.entries(f.binding))
+      expect(await f.store.read({ ...f.binding, [key]: 'b'.repeat(value.length) })).toBeUndefined();
     expect(f.verify).toHaveBeenCalledTimes(1);
   });
   it('retains rejected attempts without making them reusable', async () => {

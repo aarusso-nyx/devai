@@ -23,7 +23,9 @@ it('checks clean tracked files without a base and preserves bytes, including unu
     tasks: { nodeId: string; argv: string[]; allowlistedEnv: string[] }[];
   };
   const task = descriptor.tasks.find((entry) => entry.nodeId === 'format');
-  if (task === undefined || task.argv[0] === undefined) throw new Error('FORMAT_TASK_REQUIRED');
+  if (task === undefined) throw new Error('FORMAT_TASK_REQUIRED');
+  const [executable, ...argv] = task.argv;
+  if (executable === undefined) throw new Error('FORMAT_EXECUTABLE_REQUIRED');
   expect(task.allowlistedEnv).toEqual([]);
   const { scripts } = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
     scripts: Record<string, string>;
@@ -53,7 +55,7 @@ it('checks clean tracked files without a base and preserves bytes, including unu
   );
   const index = readFileSync(join(root, '.git/index'));
   const check = () =>
-    spawnSync(task.argv[0], task.argv.slice(1), {
+    spawnSync(executable, argv, {
       cwd: root,
       encoding: 'utf8',
       env: { ...process.env, DEVAI_FORMAT_BASE: 'unavailable-base' },
