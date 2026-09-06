@@ -20,3 +20,6 @@ work/devai-ii-succession-dossier.md
 
 # Immutable verifier bytes are checked against their provenance manifest.
 packages/cli/vendor/evidence-verification/
+
+# Fixed mutation compatibility fixture bytes have an explicit checksum contract.
+packages/cli/tests/fixtures/mutation-toolchain/

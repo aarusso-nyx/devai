@@ -1,3 +1,1 @@
-export interface ZeroMutantSelection {
-  value: boolean;
-}
+export interface ZeroMutantSelection { value: boolean }

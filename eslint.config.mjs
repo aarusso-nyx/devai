@@ -17,6 +17,8 @@ export default tseslint.config(
       // Byte-pinned upstream source: provenance.json is the integrity control here,
       // and any lint fix would break that pin rather than be applied in this repo.
       'packages/cli/vendor/evidence-verification/**',
+      // Fixed compatibility inputs are verified by mutation-toolchain-fixture.test.ts.
+      'packages/cli/tests/fixtures/mutation-toolchain/**',
     ],
   },
   js.configs.recommended,
