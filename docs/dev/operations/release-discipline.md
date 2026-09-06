@@ -91,17 +91,25 @@ without a SemVer prerelease component creates a normal GitHub Release and uses `
 manifest records the derived release type, prerelease boolean, and dist-tag; recovery verifies
 that the existing Release and registry tag match that identity.
 
-A signed annotated version-tag push is a non-publishing rehearsal trigger. It runs protected-ledger
-verification, frozen installation, build, publishable-closure checks, deterministic double-pack,
-SBOM creation, the npm adopter check, site creation, and manifest assembly. The publication and
-Pages jobs are structurally skipped for the tag-push event.
+A signed annotated version-tag push validates identity without rebuilding or publishing.
+Rehearsal is an explicit dispatch with `publish: false`, an exact `candidate_commit`
+on main, and an intended `release_tag` matching the package version. No tag need exist.
+Every required rehearsal job, including Linux adoption, must pass before a completion
+record binds the run/attempt, workflow commit, source identity and retained artifact digests.
+Artifacts and completion records are retained for 30 days.
 
-A manual dispatch with the exact existing `release_tag` and `publish: false` repeats the same
-non-publishing rehearsal. Only an explicit `workflow_dispatch` with `publish: true` may finalize
-the canonical Release, mirror the exact tarball to GitHub Packages, and deploy the manifest-bound
-Pages archive after a successful rehearsal and separate Owner authorization. Publication and
-recovery never move a tag or replace a mismatched asset; byte-identical existing effects are
-no-ops and any identity mismatch fails closed.
+Only an explicit `workflow_dispatch` with `publish: true` may finalize
+publication. Supply `release_tag`, `rehearsal_run_id` and `rehearsal_attempt` after
+separate Owner authorization. Create the signed annotated tag only after rehearsal;
+it must point to that exact candidate commit. Publication rechecks current protected
+trust, policy, evidence and tag identity and promotes the exact retained bytes. It
+never rebuilds, repacks or regenerates the site. Missing/expired artifacts or changed
+verification identities require another rehearsal. Existing immutable assets are never
+replaced. A failed remote read is unknown, not proof that a publication is absent.
+
+Protected jobs load repository-local process helpers from the separately approved
+`DEVAI_PROCESS_CONTROL_COMMIT`. Candidate files cannot select that revision.
+See [process simplification rollout](process-simplification-rollout.md) for staged setup.
 
 The release build also runs `npm --prefix docs/site run security:check`. DEVAI temporarily vendors
 the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no patched npm release;

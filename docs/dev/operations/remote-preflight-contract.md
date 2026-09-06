@@ -1,107 +1,54 @@
 # Remote preflight contract
 
-Amends the remote-workflow posture of [CI economy](../../adopters/ci-economy.md).
-Status: proposed. Supersedes nothing; narrows one previously absolute statement.
+Status: accepted for DEVAI's own repository. Adopter workflow authority is unchanged.
 
-## What changed and why
-
-Before this amendment `scripts/check-workflows.mjs` accepted exactly two workflow
-files and `ci-economy.md` stated without qualification that "Remote CI does not
-rerun product tests." Read together they forbade any remote execution of lint,
-typecheck, or tests in this repository.
-
-That reading is stronger than the doctrine requires. The economy argument is
-about the _attested RC closure_: heavy, database-backed, coverage-instrumented
-nodes whose results are bound into a signed receipt. Re-running that closure
-remotely costs real money and proves nothing the receipt does not already claim.
-It is not an argument against cheap, unprivileged, non-attesting execution.
-
-The absolute reading has a cost the doctrine never intended to pay. Every
-quality gate in this repository executes on one maintainer's machine and reaches
-CI only as an attestation which, as `ci-economy.md` says plainly, "does not prove
-that the signer actually executed the commands." Nothing independent observes
-whether lint, typecheck, or the local suite ran at all.
-
-This amendment permits exactly one additional workflow, under a contract narrow
-enough that it cannot become a second evidence path.
-
-## The invariant, restated
+## Invariant
 
 Remote CI does not execute the attested RC closure, and remote execution never
-produces, substitutes for, or supplements a candidate receipt.
+produces, substitutes for, or supplements a candidate receipt in the protected
+ledger. A transient preflight receipt coordinates the current run; it is not uploaded.
+An unsigned local cache record from an untrusted run is not signing authority.
 
-Remote CI may execute the unconditional release floor and the profile-selected
-internal DAG as a non-attesting preflight signal. The transient preflight
-receipt coordinates later expensive work but is not a candidate receipt,
-protected-ledger attestation, or publication authority and is not uploaded.
+One required `devai-release-gate` runs on pull requests. It validates verifier-package
+materialization and executes the unconditional cheap floor plus affected selection on
+Linux. It proves only execution outcomes and consistency on that runner. It does not
+prove the local RC closure executed, and a signed local claim does not prove Linux
+execution. These observations answer different questions.
 
-The distinction is provenance, not cost. A preflight run is a fast contradiction
-check: if it fails, the candidate is wrong and no candidate receipt should be
-signed. Its transient preflight receipt gates expensive work but is not attested
-or uploaded. The ledger remains the sole path by which a release claim becomes
-authoritative evidence.
+## Own-repository workflow set
 
-## Permitted workflow set
+| File                      | Required purpose                                                   |
+| ------------------------- | ------------------------------------------------------------------ |
+| `pull-request-checks.yml` | Unprivileged merge preflight                                       |
+| `devai-ledger-verify.yml` | Protected post-merge observation and explicit dispatch             |
+| `release.yml`             | Candidate rehearsal, tag validation, authorized artifact promotion |
 
-| File                      | Status   | Role                                 |
-| ------------------------- | -------- | ------------------------------------ |
-| `devai-ledger-verify.yml` | required | Protected ledger verification        |
-| `release.yml`             | required | Rehearsal and authorized publication |
-| `pull-request-checks.yml` | optional | Non-attesting preflight              |
+The PR lane has `contents: read`, no environment, secrets or protected variables,
+pinned actions, exact head checkout without persisted credentials, Linux runners and
+a bounded timeout. It never uploads evidence or executes the local-only RC closure.
+Verifier materialization validates bytes; it never invokes signing or receipt verification.
 
-`pull-request-checks.yml` is the only permitted addition. Any other file remains
-`CI_WORKFLOW_SET_INVALID`. Absence of the preflight file is not a finding: the
-repository's contract is unchanged for anyone who does not adopt it.
+Cancellation uses workflow identity and PR number, so a new head cancels the previous
+head's work. Main and release runs are never cancelled by this mechanism.
 
-## Preflight contract
+Installation, verifier validation and runner bootstrap report their outcomes. The
+final required step rejects failed, cancelled, skipped or missing prerequisites.
+The task DAG aggregates independent failures and explicitly blocks dependents.
+It owns formatting, lint, type integrity, schema/generated checks, static integrity,
+package closure and selected tests. Both ordinary and version-changing PRs require
+the floor. Compile-only bootstrap makes the typed runner executable; it does not
+assemble a release package or claim a candidate build result.
 
-A conforming `pull-request-checks.yml`:
+## Authority and settings
 
-1. triggers on `pull_request` only — never `push`, `schedule`, or
-   `workflow_dispatch`, so it cannot run on a protected ref;
-2. declares `permissions: { contents: read }` and nothing else;
-3. declares `concurrency` with `cancel-in-progress: true`;
-4. runs every job on a Linux runner with an explicit `timeout-minutes`;
-5. declares no `environment:` on any job, and references no `secrets` context —
-   it therefore cannot reach the protected ledger environment, the verifier
-   provenance value, or any package token;
-6. pins every `uses` to a 40-character object, matching the pins the workflow
-   contract already declares for checkout, setup-node, and pnpm setup;
-7. checks out with `persist-credentials: false`;
-8. invokes only `install --frozen-lockfile` and the allowed script closure —
-   `build`, `format:check`, `lint`, `typecheck`, `release:static-integrity`, and
-   `release:pr-gate`;
-9. never invokes an RC script (`test:coverage:rc`, `test:db:rc`, `test:e2e:rc`,
-   `test:performance:rc`, `test:containment:rc`) or a release script;
-10. contains no candidate-evidence export, attestation, verifier, or signing
-    token, and uploads no artifact; its preflight receipt remains transient.
+Merge-ready is not release-ready. Main may contain work that passes cheap checks but
+has not completed RC certification. Protected verification on main is observation;
+it cannot retroactively prevent a merge. Complete RC evidence and rehearsal remain
+mandatory before publication.
 
-Rules 1–7 make the job untrusted. Rules 8–10 make it non-attesting. Both
-properties are checked mechanically; neither depends on reviewer vigilance.
+The policy's `required_check` is effective only when GitHub requires that actual check.
+Changing branch protection is a separate Owner-authorized effect. Remove the sole-owner
+approving-review quota while retaining agent role separation and strict up-to-date checks.
 
-## What this does not change
-
-- The task-policy digest is unchanged. No RC node is added, removed, or reordered,
-  so the existing ledger attestation stays valid.
-- The published product is unchanged. `check --only ci-economy` already permits an
-  adopter to run tests remotely — its binding rules are concurrency cancellation,
-  no macOS on pull requests, no triple trigger, evidence-gate wiring, and
-  `local_only_nodes` reachability. None of them forbids a preflight lane. The
-  prohibition existed only in this repository's own checker and in one sentence of
-  adopter prose.
-- No schema, action, sensor, or authority contract is touched. The public action
-  count stays at 48.
-- `ci_economy.attested_rc.local_only_nodes` remains the adopter-facing mechanism
-  for declaring what must never run remotely. This amendment makes DEVAI's own
-  repository consistent with the mechanism it already ships.
-
-## Honest limits
-
-A green preflight is a weaker claim than a signed receipt and must never be
-described as a stronger one. It proves that a GitHub-hosted runner executed three
-commands against the pull-request head and they exited zero. It does not prove
-the RC closure passed, does not observe the database, coverage, end-to-end,
-performance, or containment lanes, and does not bind a tree.
-
-What it does provide is the property the trust model currently lacks entirely:
-one execution of the cheap gates that the signer did not perform and cannot forge.
+The generic adopter contract remains controlled by its constitution and materialized
+policy. No own-repository exception weakens adopter roles, gates or trust anchors.

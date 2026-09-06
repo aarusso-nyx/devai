@@ -1,8 +1,8 @@
-name: Publish DEVAI release
-
+name: Rehearse or promote DEVAI release
 on:
   push:
-    tags: ['v*']
+    tags:
+      - v*
   workflow_dispatch:
     inputs:
       release_tag:
@@ -14,19 +14,28 @@ on:
         required: false
         default: false
         type: boolean
-
+      candidate_commit:
+        description: Exact commit on main to rehearse; omitted for promotion
+        required: false
+        type: string
+      rehearsal_run_id:
+        description: Exact successful rehearsal run to promote
+        required: false
+        type: string
+      rehearsal_attempt:
+        description: Exact successful rehearsal run attempt
+        required: false
+        type: string
 permissions:
   contents: read
-
 concurrency:
   group: devai-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   cancel-in-progress: false
-
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
   EXPECTED_ACTION_COUNT: 48
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
-
+  CANDIDATE_REF: ${{ github.event_name == 'workflow_dispatch' && (inputs.publish && inputs.release_tag || inputs.candidate_commit) || github.ref }}
 jobs:
   verify-ledger:
     name: Verify protected RC ledger
@@ -47,20 +56,19 @@ jobs:
       policy_digest: ${{ steps.bindings.outputs.policy_digest }}
       verifier_package_version: ${{ steps.verifier-package.outputs.version }}
       verifier_provenance_sha256: ${{ steps.verifier-package.outputs.provenance_sha256 }}
+      ledger_json: ${{ steps.bindings.outputs.ledger_json }}
     steps:
       - name: Check out exact release commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.CANDIDATE_REF }}
           path: candidate
           fetch-depth: 0
           persist-credentials: false
-
       - name: Set up verifier runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 24
-
       - name: Materialize protected DEVAI verifier package
         id: verifier-package
         shell: bash
@@ -128,7 +136,20 @@ jobs:
           package_version="$(node -e 'process.stdout.write(require("./" + process.argv[1] + "/package.json").version)' "$package_root")"
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
-
+      - name: Check out approved process controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+          path: release-control
+          persist-credentials: false
+      - name: Bind approved process controls
+        shell: bash
+        env:
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |-
+          set -euo pipefail
+          [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Materialize protected ledger inputs
         shell: bash
         env:
@@ -140,53 +161,41 @@ jobs:
           TOOLCHAIN_B64: ${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
           ENVIRONMENT_B64: ${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 }}
           RELEASE_SIGNERS_B64: ${{ secrets.DEVAI_RELEASE_SIGNERS_B64 }}
-        run: |
+          LEDGER_TRANSPORT: ${{ vars.DEVAI_LEDGER_TRANSPORT }}
+          BUNDLE_SHA256: ${{ vars.DEVAI_LEDGER_BUNDLE_SHA256 }}
+          EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN }}
+        run: |-
           set -euo pipefail
-          test -n "$ENVELOPE_B64"
-          test -n "$RESULTS_TGZ_B64"
-          test -n "$ARTIFACTS_TGZ_B64"
-          test -n "$TASK_POLICY_B64"
-          test -n "$TRUST_STORE_B64"
-          test -n "$TOOLCHAIN_B64"
-          test -n "$ENVIRONMENT_B64"
-          test -n "$RELEASE_SIGNERS_B64"
-          control="$RUNNER_TEMP/devai-ledger-control"
-          mkdir -p "$control/results" "$control/artifacts"
-          printf '%s' "$ENVELOPE_B64" | base64 --decode > "$control/envelope.json"
-          printf '%s' "$RESULTS_TGZ_B64" | base64 --decode > "$control/results.tgz"
-          printf '%s' "$ARTIFACTS_TGZ_B64" | base64 --decode > "$control/artifacts.tgz"
-          printf '%s' "$TASK_POLICY_B64" | base64 --decode > "$control/task-policy.json"
-          printf '%s' "$TRUST_STORE_B64" | base64 --decode > "$control/trust-store.json"
-          printf '%s' "$TOOLCHAIN_B64" | base64 --decode > "$control/toolchain.json"
-          printf '%s' "$ENVIRONMENT_B64" | base64 --decode > "$control/environment.json"
-          printf '%s' "$RELEASE_SIGNERS_B64" | base64 --decode > "$control/release-allowed-signers"
-          if tar -tzf "$control/results.tgz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
-            echo 'DEVAI_LEDGER_RESULTS_ARCHIVE_PATH_INVALID' >&2
-            exit 2
-          fi
-          tar -xzf "$control/results.tgz" -C "$control/results"
-          if tar -tzf "$control/artifacts.tgz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
-            echo 'DEVAI_LEDGER_ARTIFACTS_ARCHIVE_PATH_INVALID' >&2
-            exit 2
-          fi
-          tar -xzf "$control/artifacts.tgz" -C "$control/artifacts"
-
+          umask 077
+          python3 release-control/scripts/process/evidence_transport.py materialize --output "$RUNNER_TEMP/devai-ledger-control"
       - name: Bind and verify exact release evidence
         id: bindings
         shell: bash
         env:
           POLICY_DIGEST: ${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
+          REQUIRE_TAG: ${{ github.event_name == 'push' || inputs.publish }}
+          CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
+          VERIFIER_PROVENANCE: ${{ vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 }}
+          VERIFIER_PACKAGE_VERSION: ${{ steps.verifier-package.outputs.version }}
         run: |
           set -euo pipefail
           test -n "$POLICY_DIGEST"
-          test "$(git -C candidate cat-file -t "$RELEASE_TAG")" = tag
           control="$RUNNER_TEMP/devai-ledger-control"
-          git -C candidate config gpg.format ssh
-          git -C candidate config gpg.ssh.allowedSignersFile "$control/release-allowed-signers"
-          git -C candidate verify-tag "$RELEASE_TAG"
-          commit="$(git -C candidate rev-parse "${RELEASE_TAG}^{commit}")"
-          test "$(git -C candidate rev-parse HEAD)" = "$commit"
-          tree="$(git -C candidate rev-parse "${commit}^{tree}")"
+          commit="$(git -C candidate rev-parse HEAD)"
+          tree="$(git -C candidate rev-parse HEAD^{tree})"
+          git -C candidate merge-base --is-ancestor "$commit" origin/main
+          package_version="$(node -p "require('./candidate/packages/cli/package.json').version")"
+          test "$RELEASE_TAG" = "v$package_version"
+          if test "$REQUIRE_TAG" = true; then
+            test "$(git -C candidate cat-file -t "$RELEASE_TAG")" = tag
+            git -C candidate config gpg.format ssh
+            git -C candidate config gpg.ssh.allowedSignersFile "$control/release-allowed-signers"
+            git -C candidate verify-tag "$RELEASE_TAG"
+            test "$(git -C candidate rev-parse "$RELEASE_TAG^{commit}")" = "$commit"
+          else
+            [[ "$CANDIDATE_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+            test "$CANDIDATE_COMMIT" = "$commit"
+          fi
           node "$DEVAI_EVIDENCE_POLICY" \
             --repo candidate \
             --descriptor candidate/test-tasks.json \
@@ -221,6 +230,19 @@ jobs:
           echo "release_signers_sha256=$(sha256sum "$control/release-allowed-signers" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "policy_digest=$POLICY_DIGEST" >> "$GITHUB_OUTPUT"
 
+          node - "$control" >> "$GITHUB_OUTPUT" <<'NODE'
+          const {createHash}=require('node:crypto');
+          const {readFileSync}=require('node:fs');
+          const root=process.argv[2];
+          const fields={envelope_sha256:'envelope.json',results_archive_sha256:'results.tgz',artifacts_archive_sha256:'artifacts.tgz',task_policy_sha256:'task-policy.json',trust_store_sha256:'trust-store.json',toolchain_sha256:'toolchain.json',environment_sha256:'environment.json',release_signers_sha256:'release-allowed-signers'};
+          const ledger=Object.fromEntries(Object.entries(fields).map(([key,file])=>[key,createHash('sha256').update(readFileSync(root+'/'+file)).digest('hex')]));
+          ledger.verifier_package='@aarusso-nyx/devai';
+          ledger.verifier_package_version=process.env.VERIFIER_PACKAGE_VERSION;
+          ledger.verifier_source_commit='37e75a5c27569d4cb3fdb4a3dc97a140da4d78de';
+          ledger.policy_digest=process.env.POLICY_DIGEST;
+          ledger.verifier_provenance_sha256=process.env.VERIFIER_PROVENANCE;
+          console.log('ledger_json='+JSON.stringify(ledger));
+          NODE
   build-release:
     name: Build normalized release artifacts
     needs: verify-ledger
@@ -231,32 +253,28 @@ jobs:
       contents: read
     steps:
       - name: Check out exact tagged source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.verify-ledger.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
-
       - name: Set up pnpm
-        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d
         with:
           run_install: false
-
       - name: Set up Node and GitHub Packages
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: '@aarusso-nyx'
-
       - name: Verify immutable source identity
         shell: bash
         run: |
           set -euo pipefail
           package_version="$(node -p "require('./packages/cli/package.json').version")"
           test "$RELEASE_TAG" = "v$package_version"
-          test "$(git cat-file -t "$RELEASE_TAG")" = tag
-          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "${{ needs.verify-ledger.outputs.commit }}"
+          test "$(git rev-parse HEAD)" = "${{ needs.verify-ledger.outputs.commit }}"
           test "$(git rev-parse "${{ needs.verify-ledger.outputs.commit }}^{tree}")" = "${{ needs.verify-ledger.outputs.tree }}"
           test "$(node -p "require('./packages/cli/package.json').name")" = "$PACKAGE_NAME"
           channel="$(node scripts/release-channel.mjs "$package_version")"
@@ -264,10 +282,8 @@ jobs:
           echo "PACKAGE_DIST_TAG=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")" >> "$GITHUB_ENV"
           echo "RELEASE_IS_PRERELEASE=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.prerelease))' "$channel")" >> "$GITHUB_ENV"
           test -z "$(git status --porcelain --untracked-files=all)"
-
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Build package and site once
         shell: bash
         run: |
@@ -283,7 +299,6 @@ jobs:
           npm --prefix docs/site run security:check
           npm --prefix docs/site run typecheck
           npm --prefix docs/site run build
-
       - name: Assemble immutable release artifacts
         id: artifacts
         shell: bash
@@ -322,15 +337,18 @@ jobs:
             "$(basename "$site")" "$(basename "$manifest")" | sort -k2 > SHA256SUMS)
           echo "release_dir=$release_dir" >> "$GITHUB_OUTPUT"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
-
       - name: Upload release candidate assets
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: devai-release-assets
+          name: devai-release-assets-${{ github.run_attempt }}
           path: ${{ steps.artifacts.outputs.release_dir }}/*
           if-no-files-found: error
           retention-days: 30
-
+        id: upload
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
   verify-linux-adopter:
     name: Verify npm adopter quickstart on Linux
     needs: build-release
@@ -340,16 +358,14 @@ jobs:
       contents: read
     steps:
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 24
-
       - name: Download exact release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: devai-release-assets
+          name: devai-release-assets-${{ github.run_attempt }}
           path: release-assets
-
       - name: Exercise fresh npm adoption, execution, and reuse
         shell: bash
         run: |
@@ -424,10 +440,12 @@ jobs:
           if (!first.every((task) => task.disposition === 'executed')) process.exit(1);
           if (!second.every((task) => task.disposition === 'reused')) process.exit(1);
           NODE
-
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
   finalize-release:
     name: Create canonical Release and mirror exact package
-    needs: [verify-ledger, build-release, verify-linux-adopter]
+    needs:
+      - verify-ledger
+      - promote-assets
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     environment: devai-rc-publication
@@ -436,20 +454,32 @@ jobs:
       contents: write
       packages: write
     steps:
+      - name: Check out approved process controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+          path: release-control
+          persist-credentials: false
+      - name: Bind approved process controls
+        shell: bash
+        env:
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |-
+          set -euo pipefail
+          [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Check out exact release commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 1
           persist-credentials: false
-
       - name: Set up Node and GitHub Packages
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: '@aarusso-nyx'
-
       - name: Bind parameterized release identity
         shell: bash
         run: |
@@ -460,17 +490,14 @@ jobs:
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
           echo "PACKAGE_DIST_TAG=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")" >> "$GITHUB_ENV"
           echo "RELEASE_IS_PRERELEASE=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.prerelease))' "$channel")" >> "$GITHUB_ENV"
-
       - name: Download exact release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: devai-release-assets
+          name: devai-release-assets-${{ github.run_attempt }}
           path: release-assets
-
       - name: Verify canonical asset set
         shell: bash
         run: (cd release-assets && sha256sum --check SHA256SUMS)
-
       - name: Create or verify immutable GitHub Release
         shell: bash
         env:
@@ -478,7 +505,8 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          state="$(node release-control/scripts/process/publication-state.mjs release "$RELEASE_TAG")"
+          if test "$state" = present; then
             test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" = "$RELEASE_IS_PRERELEASE"
             existing="$RUNNER_TEMP/existing-release"
             mkdir -p "$existing"
@@ -501,7 +529,6 @@ jobs:
               --title "DEVAI $PACKAGE_VERSION" \
               --notes-file CHANGELOG.md
           fi
-
       - name: Publish or verify exact GitHub Packages mirror
         shell: bash
         env:
@@ -510,7 +537,8 @@ jobs:
           set -euo pipefail
           source_tgz="$(realpath "$(find release-assets -maxdepth 1 -name '*.tgz' -print -quit)")"
           test -n "$source_tgz"
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+          state="$(node release-control/scripts/process/publication-state.mjs registry "$PACKAGE_VERSION")"
+          if test "$state" = present; then
             test "$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
           else
             npm publish "$source_tgz" --tag "$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com
@@ -534,7 +562,6 @@ jobs:
             npm dist-tag add "$PACKAGE_NAME@$PACKAGE_VERSION" "$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com
           fi
           test "$(npm view "$PACKAGE_NAME" "dist-tags.$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
-
   deploy-pages:
     name: Deploy and verify GitHub Pages
     needs: finalize-release
@@ -550,11 +577,10 @@ jobs:
       id-token: write
     steps:
       - name: Download canonical release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: devai-release-assets
+          name: devai-release-assets-${{ github.run_attempt }}
           path: release-assets
-
       - name: Materialize the manifest-bound site archive
         shell: bash
         run: |
@@ -563,19 +589,15 @@ jobs:
           site="$(node -e "const m=require('./release-assets/release-manifest.json'); process.stdout.write(m.artifacts.site.file)")"
           mkdir -p pages-site
           tar -xzf "release-assets/$site" -C pages-site
-
       - name: Upload exact Pages artifact
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
         with:
           path: pages-site
-
       - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
-
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
       - name: Deploy Pages artifact
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
-
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
       - name: Verify live documentation
         shell: bash
         run: |
@@ -596,32 +618,120 @@ jobs:
           done
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/adopters/install" >/dev/null
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/reference/cli" >/dev/null
-
   rehearsal-summary:
     name: Verify non-publishing rehearsal assets
-    needs: [verify-ledger, build-release]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}
+    needs:
+      - verify-ledger
+      - build-release
+      - verify-linux-adopter
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
     steps:
-      - name: Download exact rehearsal assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Check out approved process controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          name: devai-release-assets
-          path: release-assets
-
-      - name: Verify and summarize rehearsal
+          ref: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+          path: release-control
+          persist-credentials: false
+      - name: Bind approved process controls
         shell: bash
-        run: |
+        env:
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |-
           set -euo pipefail
-          (cd release-assets && sha256sum --check SHA256SUMS)
-          {
-            echo '## DEVAI release rehearsal'
-            echo
-            echo "Candidate: \`${{ needs.verify-ledger.outputs.commit }}\`"
-            echo "Tag: \`$RELEASE_TAG\`"
-            echo
-            echo 'The exact release build and artifact assembly completed without publication.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Download exact rehearsal assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: devai-release-assets-${{ github.run_attempt }}
+          path: release-assets
+      - name: Record completed rehearsal
+        env:
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          ARTIFACT_ID: ${{ needs.build-release.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ needs.build-release.outputs.artifact_digest }}
+          WORKFLOW_COMMIT: ${{ github.workflow_sha }}
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |-
+          set -euo pipefail
+          mkdir completion
+          node - <<'NODE'
+          const {writeFileSync}=require('node:fs');
+          const e=process.env;
+          writeFileSync(e.RUNNER_TEMP+'/rehearsal-context.json',JSON.stringify({repository:e.REPOSITORY,runId:e.RUN_ID,attempt:e.RUN_ATTEMPT,artifactId:e.ARTIFACT_ID,artifactDigest:e.ARTIFACT_DIGEST,workflowCommit:e.WORKFLOW_COMMIT,controlCommit:e.CONTROL_COMMIT}));
+          NODE
+          node release-control/scripts/process/rehearsal.mjs complete release-assets "$RUNNER_TEMP/rehearsal-context.json" completion/rehearsal-completion.json
+          printf '%s\n' 'All required rehearsal checks passed. No publication occurred.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain rehearsal completion
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-rehearsal-${{ github.run_attempt }}
+          path: completion/rehearsal-completion.json
+          if-no-files-found: error
+          retention-days: 30
+    environment: devai-rc-release
+  promote-assets:
+    name: Verify and retain exact rehearsed assets
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: verify-ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: devai-ledger-verification
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out approved process controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+          path: release-control
+          persist-credentials: false
+      - name: Bind approved process controls
+        shell: bash
+        env:
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |-
+          set -euo pipefail
+          [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Verify selected rehearsal
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REHEARSAL_RUN: ${{ inputs.rehearsal_run_id }}
+          REHEARSAL_ATTEMPT: ${{ inputs.rehearsal_attempt }}
+          RELEASE_COMMIT: ${{ needs.verify-ledger.outputs.commit }}
+          RELEASE_TREE: ${{ needs.verify-ledger.outputs.tree }}
+          CURRENT_LEDGER: ${{ needs.verify-ledger.outputs.ledger_json }}
+          WORKFLOW_COMMIT: ${{ github.workflow_sha }}
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |-
+          set -euo pipefail
+          node - <<'NODE'
+          const {writeFileSync}=require('node:fs');
+          const e=process.env;
+          const expected={repository:'aarusso-nyx/devai',runId:e.REHEARSAL_RUN,attempt:e.REHEARSAL_ATTEMPT,tag:e.RELEASE_TAG,commit:e.RELEASE_COMMIT,tree:e.RELEASE_TREE,workflowCommit:e.WORKFLOW_COMMIT,controlCommit:e.CONTROL_COMMIT,ledger:JSON.parse(e.CURRENT_LEDGER)};
+          writeFileSync(e.RUNNER_TEMP+'/promotion.json',JSON.stringify(expected));
+          NODE
+          node release-control/scripts/process/rehearsal.mjs promote release-assets "$RUNNER_TEMP/promotion.json"
+      - name: Retain verified promotion assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-release-assets-${{ github.run_attempt }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30

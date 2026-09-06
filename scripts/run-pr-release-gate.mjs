@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { runCheckTasks } from '../packages/cli/dist/services/check-runner/index.js';
 
 const root = resolve(import.meta.dirname, '..');
 const base = process.argv.slice(2).find((argument) => argument !== '--');
@@ -51,21 +51,42 @@ const targetVersion = JSON.parse(
 ).version;
 const changedPaths = changedPathsBetween(base, candidateCommit);
 
-const cli = join(root, 'packages/cli/dist/runtime/index/bin.js');
-const common = ['--repo-root', root, '--base', base, '--run', '--write', '--as-role', 'inspector'];
-const binding = spawnSync(
-  process.execPath,
-  [cli, 'init', 'bind', '--target', root, '--as-role', 'architect', '--write', '--format', 'json'],
-  { cwd: root, stdio: 'inherit' },
-);
-if (binding.status !== 0) process.exit(binding.status ?? 1);
-if (currentVersion === targetVersion) {
-  const result = spawnSync(process.execPath, [cli, 'check', '--affected', ...common], {
-    cwd: root,
-    stdio: 'inherit',
+function executeTask(argv, cwd, timeout, environment) {
+  const result = spawnSync(argv[0], argv.slice(1), {
+    cwd,
+    timeout,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, ...environment },
   });
-  process.exit(result.status ?? 1);
+  return {
+    status: result.status,
+    signal: result.signal,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    ...(result.error ? { errorCode: result.error.code } : {}),
+  };
 }
+function run(options) {
+  const report = runCheckTasks({
+    repoRoot: root,
+    baseCommit: base,
+    operation: 'execute',
+    environment: { DEVAI_FORMAT_BASE: base },
+    executeTask,
+    ...options,
+  });
+  // No candidate receipt or protected artifact is exposed by PR orchestration.
+  process.stdout.write(
+    `${JSON.stringify({
+      nonAttesting: true,
+      tasks: report.execution,
+      exitCode: report.exitCode,
+    })}\n`,
+  );
+  return report.exitCode;
+}
+if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));
 
 const risks = new Set();
 for (const path of changedPaths) {
@@ -106,26 +127,15 @@ const intent = {
   candidate: { commit: candidateCommit, tree: candidateTree },
   base: { commit: base, tree: baseTree },
 };
-const temporary = mkdtempSync(join(tmpdir(), 'devai-release-intent-'));
-const intentPath = join(temporary, 'release-intent.json');
-try {
-  writeFileSync(intentPath, `${JSON.stringify(intent, null, 2)}\n`, { mode: 0o600 });
-  const result = spawnSync(
-    process.execPath,
-    [
-      cli,
-      'check',
-      '--release-intent',
-      intentPath,
-      '--release-profile',
-      '.devai/config/release-verification.json',
-      '--release-stage',
-      'preflight',
-      ...common,
-    ],
-    { cwd: root, stdio: 'inherit' },
-  );
-  process.exitCode = result.status ?? 1;
-} finally {
-  rmSync(temporary, { recursive: true, force: true });
-}
+const preflight = run({
+  target: 'release',
+  releaseIntent: intent,
+  releaseProfile: JSON.parse(
+    readFileSync(join(root, 'law/policy/release-verification.json'), 'utf8'),
+  ),
+  releaseStage: 'preflight',
+});
+// Profile preflight establishes the floor; affected selection runs afterwards
+// against the same cache and reuses only exact matching keys.
+const affected = run({ target: 'affected' });
+process.exitCode = preflight || affected;

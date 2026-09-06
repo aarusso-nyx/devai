@@ -14,3 +14,6 @@ scratch/*
 .devai/config/authority-policy.json
 .devai/worktrees/*
 !.devai/worktrees/.gitkeep
+
+# Repository-local process helper bytecode
+scripts/process/__pycache__/

@@ -10,7 +10,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
-  group: devai-preflight-${{ github.event.pull_request.head.sha }}
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -41,23 +41,96 @@ jobs:
           cache: pnpm
 
       - name: Install workspace
+        id: install
+        continue-on-error: true
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm run build
-
-      - name: Formatting and static candidate integrity
-        env:
-          DEVAI_FORMAT_BASE: ${{ github.event.pull_request.base.sha }}
+      - name: Materialize protected DEVAI verifier package
+        id: verifier-package
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
         run: |
-          pnpm run format:check
-          pnpm run release:static-integrity
+          set -euo pipefail
+          control="$RUNNER_TEMP/devai-verifier-package"
+          package_root="packages/cli"
+          source_root="$package_root/vendor/evidence-verification"
+          provenance="$source_root/provenance.json"
+          actual_provenance_sha256="$(sha256sum "$provenance" | cut -d' ' -f1)"
+          verifier_root="$control/evidence-verification"
+          mkdir -p "$verifier_root"
+          cp "$source_root/provenance.json" "$verifier_root/provenance.json"
+          cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"
+          node - "$package_root" "$verifier_root" <<'NODE'
+          const { createHash } = require('node:crypto');
+          const { readFileSync, readdirSync } = require('node:fs');
+          const { join, relative } = require('node:path');
+          const [packageRoot, verifierRoot] = process.argv.slice(2);
+          const expectedBins = {
+            'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+            'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+            'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+            'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+            'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+          };
+          const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+          if (manifest.name !== '@aarusso-nyx/devai') throw new Error('DEVAI_VERIFIER_PACKAGE_IDENTITY_INVALID');
+          for (const [name, path] of Object.entries(expectedBins)) {
+            if (manifest.bin?.[name] !== path) throw new Error('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:' + name);
+          }
+          const provenancePath = join(verifierRoot, 'provenance.json');
+          const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
+          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de') {
+            throw new Error('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
+          }
+          const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));
+          const walk = (root, directory = root) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+            const path = join(directory, entry.name);
+            if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) {
+              throw new Error('DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID:' + relative(root, path));
+            }
+            return entry.isDirectory() ? walk(root, path) : [relative(root, path)];
+          });
+          const actual = walk(verifierRoot).filter((path) => path !== 'provenance.json').sort();
+          if (JSON.stringify(actual) !== JSON.stringify([...listed.keys()].sort())) {
+            throw new Error('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
+          }
+          for (const [path, expected] of listed) {
+            const file = join(verifierRoot, path);
+            const actualDigest = createHash('sha256').update(readFileSync(file)).digest('hex');
+            if (actualDigest !== expected) throw new Error('DEVAI_VERIFIER_PACKAGE_FILE_DIGEST_INVALID:' + path);
+          }
+          NODE
+          {
+            echo "DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js"
+            echo "DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js"
+            echo "DEVAI_EVIDENCE_BUNDLE_VERIFY=$verifier_root/src/bundle-cli.js"
+          } >> "$GITHUB_ENV"
+          package_version="$(node -e 'process.stdout.write(require("./" + process.argv[1] + "/package.json").version)' "$package_root")"
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
 
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Typecheck
-        run: pnpm run typecheck
+      - name: Compile the check runner bootstrap
+        id: bootstrap
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        continue-on-error: true
+        run: pnpm run release:bootstrap
 
       - name: Profile-selected candidate preflight
+        id: product
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
+        continue-on-error: true
         run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }}
+
+      - name: Require every preflight result
+        if: ${{ !cancelled() }}
+        env:
+          RESULTS: ${{ toJSON(steps) }}
+        run: |
+          node - <<'NODE'
+          const steps = JSON.parse(process.env.RESULTS);
+          const required = ['install', 'verifier-package', 'bootstrap', 'product'];
+          const findings = required.map(id => ({ id, outcome: steps[id]?.outcome ?? 'missing' }));
+          console.log(JSON.stringify({ nonAttesting: true, findings }));
+          if (findings.some(({ outcome }) => outcome !== 'success')) process.exit(1);
+          NODE

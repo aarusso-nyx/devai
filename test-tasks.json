@@ -543,10 +543,18 @@
       "argv": ["pnpm", "run", "format:check"],
       "cwd": ".",
       "runner": "pnpm-script-v1",
-      "inputSelectors": [{ "kind": "glob", "pattern": "**" }],
+      "inputSelectors": [
+        {
+          "kind": "glob",
+          "pattern": "**"
+        }
+      ],
       "toolchainKeys": ["node", "pnpm"],
-      "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "allowlistedEnv": ["DEVAI_FORMAT_BASE"],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
     },
     {
       "nodeId": "release:static-integrity",
@@ -555,16 +563,37 @@
       "cwd": ".",
       "runner": "pnpm-script-v1",
       "inputSelectors": [
-        { "kind": "prefix", "pattern": "packages/" },
-        { "kind": "prefix", "pattern": "law/policy/" },
-        { "kind": "prefix", "pattern": "law/schemas/" },
-        { "kind": "prefix", "pattern": "scripts/" },
-        { "kind": "exact", "pattern": "package.json" },
-        { "kind": "exact", "pattern": "pnpm-lock.yaml" }
+        {
+          "kind": "prefix",
+          "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/policy/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/schemas/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "pnpm-lock.yaml"
+        }
       ],
       "toolchainKeys": ["node", "pnpm"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
     },
     {
       "nodeId": "release:closure",
@@ -573,18 +602,45 @@
       "cwd": ".",
       "runner": "pnpm-script-v1",
       "inputSelectors": [
-        { "kind": "prefix", "pattern": "packages/" },
-        { "kind": "prefix", "pattern": "docs/" },
-        { "kind": "prefix", "pattern": ".github/workflows/" },
-        { "kind": "prefix", "pattern": "law/" },
-        { "kind": "prefix", "pattern": "scripts/" },
-        { "kind": "exact", "pattern": "package.json" },
-        { "kind": "exact", "pattern": "pnpm-lock.yaml" },
-        { "kind": "exact", "pattern": "test-tasks.json" }
+        {
+          "kind": "prefix",
+          "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": ".github/workflows/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "pnpm-lock.yaml"
+        },
+        {
+          "kind": "exact",
+          "pattern": "test-tasks.json"
+        }
       ],
       "toolchainKeys": ["node", "pnpm"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
     },
     {
       "nodeId": "release:affected-anchor",
@@ -592,10 +648,18 @@
       "argv": ["node", "-e", "process.stdout.write('affected release selection complete\\n')"],
       "cwd": ".",
       "runner": "node-builtin-v1",
-      "inputSelectors": [{ "kind": "exact", "pattern": "test-tasks.json" }],
+      "inputSelectors": [
+        {
+          "kind": "exact",
+          "pattern": "test-tasks.json"
+        }
+      ],
       "toolchainKeys": ["node"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "marker", "value": "affected release selection complete" }
+      "outputContract": {
+        "kind": "marker",
+        "value": "affected release selection complete"
+      }
     },
     {
       "nodeId": "test:local-full",
@@ -799,7 +863,15 @@
     {
       "profileId": "affected",
       "mode": "affected",
-      "requiredNodes": ["generate"],
+      "requiredNodes": [
+        "generate",
+        "format",
+        "lint",
+        "typecheck",
+        "test:schemas",
+        "release:static-integrity",
+        "release:closure"
+      ],
       "eligibleNodes": [
         "generate",
         "test:authority",
@@ -817,7 +889,9 @@
         "build",
         "format",
         "lint",
-        "typecheck"
+        "typecheck",
+        "release:static-integrity",
+        "release:closure"
       ]
     },
     {

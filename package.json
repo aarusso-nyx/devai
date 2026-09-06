@@ -55,7 +55,8 @@
     "test:db:rc": "vitest run --config tests/config/rc.db.config.ts",
     "test:e2e:rc": "vitest run --config tests/config/rc.e2e.config.ts",
     "test:performance:rc": "vitest run --config tests/config/rc.performance.config.ts",
-    "test:containment:rc": "vitest run --config tests/config/rc.containment.config.ts"
+    "test:containment:rc": "vitest run --config tests/config/rc.containment.config.ts",
+    "release:bootstrap": "tsc -b packages/cli/tsconfig.json --force"
   },
   "devDependencies": {
     "@bcoe/v8-coverage": "1.0.2",
@@ -67,6 +68,7 @@
     "ajv-formats": "^3.0.1",
     "eslint": "^9.0.0",
     "globals": "^17.4.0",
+    "lint-staged": "16.2.7",
     "prettier": "^3.9.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",
