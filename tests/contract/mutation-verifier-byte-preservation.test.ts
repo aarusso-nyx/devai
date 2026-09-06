@@ -15,11 +15,12 @@ it('keeps pinned vendor bytes exact through the real Stryker preprocessor', asyn
     pathToFileURL(coreRequire.resolve('@stryker-mutator/instrumenter')).href
   );
   const source = readFileSync('packages/cli/src/services/release-mutation-program.ts', 'utf8');
-  const pattern = /disableTypeChecks: '([^']+)'/u.exec(source)?.[1];
-  expect(pattern).toBeDefined();
+  const setting = /disableTypeChecks: (false)/u.exec(source)?.[1];
+  expect(setting).toBe('false');
   const paths = [
     'packages/cli/vendor/evidence-verification/src/verify.js',
     'packages/cli/vendor/evidence-verification/test/verifier.test.js',
+    'packages/cli/tests/fixtures/mutation-toolchain/subject.ts',
     'packages/cli/src/example.ts',
     'packages/authority/tests/example.test.ts',
   ];
@@ -39,7 +40,7 @@ it('keeps pinned vendor bytes exact through the real Stryker preprocessor', asyn
   await new DisableTypeChecksPreprocessor(
     { warn: () => undefined },
     {
-      disableTypeChecks: pattern,
+      disableTypeChecks: setting !== 'false',
       mutator: { plugins: [] },
       warnings: true,
     },
@@ -47,6 +48,5 @@ it('keeps pinned vendor bytes exact through the real Stryker preprocessor', asyn
   ).preprocess(project);
   expect(observed.get(paths[0] ?? '')).toBe(content);
   expect(observed.get(paths[1] ?? '')).toBe(content);
-  expect(observed.get(paths[2] ?? '')).toContain('@ts-nocheck');
-  expect(observed.get(paths[3] ?? '')).toContain('@ts-nocheck');
+  for (const path of paths) expect(observed.get(path)).toBe(content);
 });

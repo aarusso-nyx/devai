@@ -175,7 +175,7 @@ export function createProtectedMutationProgram(input: {
     checkers: ['typescript'],
     // Stryker must not rewrite the byte-pinned verifier while inserting @ts-nocheck.
     // Targets and test selection remain unchanged; this scopes preprocessing only.
-    disableTypeChecks: 'packages/*/{src,tests}/**/*.{js,ts,jsx,tsx,mjs,mts,cts,cjs}',
+    disableTypeChecks: false,
     coverageAnalysis: 'perTest',
     // Must not exceed the protected container's cpu allocation: Stryker resolves a
     // mutant's verdict from its covering tests, so parallelism does not change which

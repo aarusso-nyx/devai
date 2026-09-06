@@ -347,7 +347,7 @@ describe('protected mutation program factory with explicit upstream-authority is
       symlinkNodeModules: true,
       fileLogLevel: 'off',
       logLevel: 'error',
-      disableTypeChecks: 'packages/*/{src,tests}/**/*.{js,ts,jsx,tsx,mjs,mts,cts,cjs}',
+      disableTypeChecks: false,
       timeoutMS: 10000,
       timeoutFactor: 2,
       ignorePatterns: [],
