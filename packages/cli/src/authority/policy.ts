@@ -492,17 +492,18 @@ export function buildTrustedAuthoritySources(
       subjects: [machineSubject('harness')],
       rationale: 'Article 6 verb-attributed harness state directory transition.',
     }),
-    ...['.devai/state/release-lifecycle', '.devai/state/release-lifecycle/**'].map((path, index) =>
-      rule({
-        id: `core-architect-release-prepare-output-${String(index + 1)}`,
-        origin: 'immutable-core',
-        precedence: 900,
-        actionIds: groups.architect.includes('release prepare') ? ['release prepare'] : [],
-        selector: fsSelector(repositoryId, path),
-        subjects: human('architect'),
-        rationale:
-          'Release prepare may append only lifecycle state; artifact bytes cross the trusted sink boundary.',
-      }),
+    ...['release prepare', 'release export'].flatMap((action) =>
+      ['.devai/state/release-lifecycle', '.devai/state/release-lifecycle/**'].map((path, index) =>
+        rule({
+          id: `core-architect-${action.replace(' ', '-')}-output-${String(index + 1)}`,
+          origin: 'immutable-core',
+          precedence: 900,
+          actionIds: groups.architect.includes(action) ? [action] : [],
+          selector: fsSelector(repositoryId, path),
+          subjects: human('architect'),
+          rationale: `${action} may append only lifecycle state; artifact bytes cross the dedicated trusted sink boundary.`,
+        }),
+      ),
     ),
     rule({
       id: 'core-harness-worktrees',

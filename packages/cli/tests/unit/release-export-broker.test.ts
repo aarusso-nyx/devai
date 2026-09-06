@@ -2,6 +2,10 @@ import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  openSync as guardedOpen,
+  writeSync as guardedWrite,
+  closeSync as guardedClose,
+  unlinkSync as guardedUnlink,
   createProtectedArtifactSinkAdapter,
   createProtectedExportSignerAdapter,
   createProtectedExportSinkAdapter,
@@ -180,6 +184,33 @@ async function withExportBroker<T>(
 }
 
 describe('release export broker protected adapters', () => {
+  it('permits the lifecycle lock while denying unrelated state and product writes', async () => {
+    const repository = fixture();
+    const binding = exportBinding(repository);
+    const directory = join(repository.root, '.devai/state/release-lifecycle/campaign');
+    mkdirSync(directory, { recursive: true });
+    const lock = join(directory, '.EXECUTION.lock');
+    try {
+      await withExportBroker(repository, binding, binding.destination, async () => {
+        const fd = guardedOpen(lock, 'wx', 0o600);
+        try {
+          guardedWrite(fd, 'release-lifecycle-v2\n');
+        } finally {
+          guardedClose(fd);
+        }
+        guardedUnlink(lock);
+        for (const [path, code] of [
+          ['.devai/state/unrelated.json', 'AUTHORITY_ACTION_DENIED'],
+          ['package.json', 'AUTHORITY_ACTION_DENIED'],
+          ['.devai/config/project.json', 'AUTHORITY_PATH_DOMAIN_VIOLATION'],
+        ] as const)
+          expect(() => guardedOpen(join(repository.root, path), 'w', 0o600)).toThrow(code);
+      });
+    } finally {
+      repository.dispose();
+    }
+  });
+
   it('routes exactly one export sink and one signer through the live export account', async () => {
     const repository = fixture();
     const binding = exportBinding(repository);
