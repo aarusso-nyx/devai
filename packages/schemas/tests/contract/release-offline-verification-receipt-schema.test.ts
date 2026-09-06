@@ -142,6 +142,40 @@ describe('release offline verification receipt schema', () => {
     expect(validate(receipt), JSON.stringify(validate.errors)).toBe(true);
   });
 
+  it('accepts current unit mutation evidence without inventing a retired MA2 report', () => {
+    const validate = getValidator('release-offline-verification-receipt.schema.json');
+    const receipt = currentReceipt() as unknown as Record<string, unknown>;
+    const check = {
+      check_id: 'mutation-semantics',
+      evidence_kind: 'devai.release-unit-mutation-check.v1',
+      status: 'not-applicable',
+      result_digest_sha256: sha('a'),
+      units: [
+        {
+          release_unit: '@aarusso-nyx/devai',
+          version: '1.5.0',
+          plan_receipt_digest_sha256: sha('b'),
+          requirement: 'none',
+          mutation_evidence: null,
+        },
+      ],
+    };
+    (receipt['checks'] as unknown[])[8] = check;
+    expect(validate(receipt), JSON.stringify(validate.errors)).toBe(true);
+    const unit = check.units[0];
+    if (unit === undefined) throw new Error('missing test unit');
+    check.status = 'pass';
+    expect(validate(receipt)).toBe(false);
+    unit.requirement = 'required';
+    expect(validate(receipt)).toBe(false);
+    check.status = 'not-applicable';
+    expect(validate(receipt)).toBe(false);
+    unit.requirement = 'none';
+    const historical = structuredClone(receiptSchema.examples[0]) as Record<string, unknown>;
+    (historical['checks'] as unknown[])[8] = check;
+    expect(validate(historical)).toBe(false);
+  });
+
   it('rejects a current receipt with a pathname artifact or no committed sink identity', () => {
     const validate = getValidator('release-offline-verification-receipt.schema.json');
     const pathname = currentReceipt();

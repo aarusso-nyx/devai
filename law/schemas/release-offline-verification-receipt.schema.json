@@ -52,10 +52,18 @@
             "devai.kernel.release-offline-verification-receipt-canonicalization.v3"
           ]
         },
-        "encoding": { "const": "utf-8" },
-        "json_form": { "const": "rfc8785-jcs" },
-        "digest_algorithm": { "const": "sha256" },
-        "receipt_projection_excludes": { "const": ["receipt_id", "receipt_digest_sha256"] },
+        "encoding": {
+          "const": "utf-8"
+        },
+        "json_form": {
+          "const": "rfc8785-jcs"
+        },
+        "digest_algorithm": {
+          "const": "sha256"
+        },
+        "receipt_projection_excludes": {
+          "const": ["receipt_id", "receipt_digest_sha256"]
+        },
         "calculation_order": {
           "const": [
             "compute-receipt_digest_sha256-over-the-receipt-projection",
@@ -108,13 +116,24 @@
       "description": "Every artifact this verification rehashed. Legacy forms are pathname-bound read-only observations; current 2.1 forms are sink-bound opaque handles.",
       "items": {
         "oneOf": [
-          { "$ref": "#/$defs/legacy_aggregate_artifact_ref" },
-          { "$ref": "#/$defs/v3_opaque_artifact_ref" }
+          {
+            "$ref": "#/$defs/legacy_aggregate_artifact_ref"
+          },
+          {
+            "$ref": "#/$defs/v3_opaque_artifact_ref"
+          }
         ]
       }
     },
     "artifact_sink_commit": {
-      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_sink_commit" }],
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/artifact_sink_commit"
+        }
+      ],
       "description": "The exact two-phase sink transaction and committed-manifest identity. It is required for current 2.1 receipts and absent from legacy pathname receipts."
     },
     "release_units": {
@@ -124,8 +143,12 @@
       "description": "The v2 legacy or v2.1 current per-release-unit package roster. A passing receipt binds each exported package artifact and the exact external trust identity used to verify it.",
       "items": {
         "oneOf": [
-          { "$ref": "#/$defs/release_unit_evidence" },
-          { "$ref": "#/$defs/release_unit_handle_evidence" }
+          {
+            "$ref": "#/$defs/release_unit_evidence"
+          },
+          {
+            "$ref": "#/$defs/release_unit_handle_evidence"
+          }
         ]
       }
     },
@@ -370,7 +393,14 @@
           }
         },
         {
-          "$ref": "#/$defs/mutation_semantics_check"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/mutation_semantics_check"
+            },
+            {
+              "$ref": "#/$defs/unit_mutation_semantics_check"
+            }
+          ]
         }
       ]
     },
@@ -454,30 +484,55 @@
   "allOf": [
     {
       "if": {
-        "properties": { "schemaVersion": { "const": "1.0.0" } },
+        "properties": {
+          "schemaVersion": {
+            "const": "1.0.0"
+          }
+        },
         "required": ["schemaVersion"]
       },
       "then": {
         "properties": {
-          "canonicalization": {
-            "properties": {
-              "kernel_id": {
-                "const": "devai.kernel.release-offline-verification-receipt-canonicalization.v1"
-              }
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/legacy_aggregate_artifact_ref"
             }
+          },
+          "checks": {
+            "prefixItems": [
+              {},
+              {},
+              {},
+              {},
+              {},
+              {},
+              {},
+              {},
+              {
+                "$ref": "#/$defs/mutation_semantics_check"
+              }
+            ]
           }
         },
-        "properties": {
-          "artifacts": { "items": { "$ref": "#/$defs/legacy_aggregate_artifact_ref" } }
-        },
         "not": {
-          "anyOf": [{ "required": ["release_units"] }, { "required": ["artifact_sink_commit"] }]
+          "anyOf": [
+            {
+              "required": ["release_units"]
+            },
+            {
+              "required": ["artifact_sink_commit"]
+            }
+          ]
         }
       }
     },
     {
       "if": {
-        "properties": { "schemaVersion": { "const": "2.0.0" } },
+        "properties": {
+          "schemaVersion": {
+            "const": "2.0.0"
+          }
+        },
         "required": ["schemaVersion"]
       },
       "then": {
@@ -490,15 +545,44 @@
               }
             }
           },
-          "artifacts": { "items": { "$ref": "#/$defs/legacy_aggregate_artifact_ref" } },
-          "release_units": { "items": { "$ref": "#/$defs/release_unit_evidence" } }
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/legacy_aggregate_artifact_ref"
+            }
+          },
+          "release_units": {
+            "items": {
+              "$ref": "#/$defs/release_unit_evidence"
+            }
+          },
+          "checks": {
+            "prefixItems": [
+              {},
+              {},
+              {},
+              {},
+              {},
+              {},
+              {},
+              {},
+              {
+                "$ref": "#/$defs/mutation_semantics_check"
+              }
+            ]
+          }
         },
-        "not": { "required": ["artifact_sink_commit"] }
+        "not": {
+          "required": ["artifact_sink_commit"]
+        }
       }
     },
     {
       "if": {
-        "properties": { "schemaVersion": { "const": "2.1.0" } },
+        "properties": {
+          "schemaVersion": {
+            "const": "2.1.0"
+          }
+        },
         "required": ["schemaVersion"]
       },
       "then": {
@@ -514,12 +598,24 @@
           "verification_kernel": {
             "required": ["v3_sink_handle_closure", "v3_sink_handle_errors"],
             "properties": {
-              "kernel_id": { "const": "devai.kernel.offline-verification-receipt.v3" }
+              "kernel_id": {
+                "const": "devai.kernel.offline-verification-receipt.v3"
+              }
             }
           },
-          "artifacts": { "items": { "$ref": "#/$defs/v3_opaque_artifact_ref" } },
-          "artifact_sink_commit": { "$ref": "#/$defs/artifact_sink_commit" },
-          "release_units": { "items": { "$ref": "#/$defs/release_unit_handle_evidence" } }
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/v3_opaque_artifact_ref"
+            }
+          },
+          "artifact_sink_commit": {
+            "$ref": "#/$defs/artifact_sink_commit"
+          },
+          "release_units": {
+            "items": {
+              "$ref": "#/$defs/release_unit_handle_evidence"
+            }
+          }
         }
       }
     },
@@ -591,17 +687,29 @@
       "additionalProperties": false,
       "required": ["release_unit", "version", "packages"],
       "properties": {
-        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
         "packages": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/package_evidence" }
+          "items": {
+            "$ref": "#/$defs/package_evidence"
+          }
         },
         "mutation_evidence": {
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "$ref": "#/$defs/release_unit_mutation_evidence_closure"
             }
@@ -624,20 +732,40 @@
         "receipt"
       ],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
-        "kind": { "const": "release-unit-mutation-evidence-closure-v1" },
-        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "member_order": { "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse" },
-        "output_contract": { "$ref": "#/$defs/release_unit_mutation_output_contract" },
-        "summary_path": { "$ref": "#/$defs/relative_path" },
-        "semantic_receipt_path": { "$ref": "#/$defs/relative_path" },
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "release-unit-mutation-evidence-closure-v1"
+        },
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "member_order": {
+          "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse"
+        },
+        "output_contract": {
+          "$ref": "#/$defs/release_unit_mutation_output_contract"
+        },
+        "summary_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "semantic_receipt_path": {
+          "$ref": "#/$defs/relative_path"
+        },
         "members": {
           "type": "array",
           "minItems": 2,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/release_unit_mutation_evidence_member" }
+          "items": {
+            "$ref": "#/$defs/release_unit_mutation_evidence_member"
+          }
         },
-        "receipt": { "$ref": "#/$defs/release_unit_mutation_evidence_receipt" }
+        "receipt": {
+          "$ref": "#/$defs/release_unit_mutation_evidence_receipt"
+        }
       }
     },
     "release_unit_mutation_output_contract": {
@@ -645,11 +773,24 @@
       "additionalProperties": false,
       "required": ["path", "sha256", "size_bytes", "evidence_sink_id", "opaque_handle"],
       "properties": {
-        "path": { "$ref": "#/$defs/relative_path" },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "size_bytes": { "type": "integer", "minimum": 1 },
-        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
-        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" }
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_sink_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
+        "opaque_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        }
       }
     },
     "release_unit_mutation_evidence_member": {
@@ -674,13 +815,35 @@
           ]
         },
         "package_name": {
-          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 200 }]
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          ]
         },
-        "path": { "$ref": "#/$defs/relative_path" },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "size_bytes": { "type": "integer", "minimum": 1 },
-        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
-        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" }
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_sink_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
+        "opaque_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        }
       },
       "allOf": [
         {
@@ -693,9 +856,21 @@
             "required": ["document_kind"]
           },
           "then": {
-            "properties": { "package_name": { "type": "string", "minLength": 1, "maxLength": 200 } }
+            "properties": {
+              "package_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
           },
-          "else": { "properties": { "package_name": { "type": "null" } } }
+          "else": {
+            "properties": {
+              "package_name": {
+                "type": "null"
+              }
+            }
+          }
         }
       ]
     },
@@ -704,9 +879,15 @@
       "additionalProperties": false,
       "required": ["kind", "receipt_digest_sha256", "canonicalization", "referent"],
       "properties": {
-        "kind": { "const": "release-unit-mutation-evidence-receipt-v1" },
-        "receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
-        "canonicalization": { "const": "utf-8-rfc8785-jcs-sha256" },
+        "kind": {
+          "const": "release-unit-mutation-evidence-receipt-v1"
+        },
+        "receipt_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "canonicalization": {
+          "const": "utf-8-rfc8785-jcs-sha256"
+        },
         "referent": {
           "type": "object",
           "additionalProperties": false,
@@ -723,21 +904,45 @@
             "member_projection_digest_sha256"
           ],
           "properties": {
-            "repository_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-            "candidate_commit": { "$ref": "#/$defs/git_object" },
-            "candidate_tree": { "$ref": "#/$defs/git_object" },
-            "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
-            "release_plan_receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
-            "release_profile_digest_sha256": { "$ref": "#/$defs/sha256" },
-            "mutation_policy_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "repository_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "candidate_commit": {
+              "$ref": "#/$defs/git_object"
+            },
+            "candidate_tree": {
+              "$ref": "#/$defs/git_object"
+            },
+            "release_unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "release_plan_receipt_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "release_profile_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "mutation_policy_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
             "task_policy_digests_sha256": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "$ref": "#/$defs/sha256" }
+              "items": {
+                "$ref": "#/$defs/sha256"
+              }
             },
-            "output_contract_digest_sha256": { "$ref": "#/$defs/sha256" },
-            "member_projection_digest_sha256": { "$ref": "#/$defs/sha256" }
+            "output_contract_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "member_projection_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
           }
         }
       }
@@ -755,13 +960,29 @@
         "trust"
       ],
       "properties": {
-        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "manifest": { "$ref": "#/$defs/legacy_artifact_ref" },
-        "tarball": { "$ref": "#/$defs/legacy_artifact_ref" },
-        "sbom": { "$ref": "#/$defs/legacy_artifact_ref" },
-        "evidence_manifest": { "$ref": "#/$defs/legacy_artifact_ref" },
-        "provider_result": { "$ref": "#/$defs/legacy_artifact_ref" },
-        "trust": { "$ref": "#/$defs/trust_identity" }
+        "package_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "manifest": {
+          "$ref": "#/$defs/legacy_artifact_ref"
+        },
+        "tarball": {
+          "$ref": "#/$defs/legacy_artifact_ref"
+        },
+        "sbom": {
+          "$ref": "#/$defs/legacy_artifact_ref"
+        },
+        "evidence_manifest": {
+          "$ref": "#/$defs/legacy_artifact_ref"
+        },
+        "provider_result": {
+          "$ref": "#/$defs/legacy_artifact_ref"
+        },
+        "trust": {
+          "$ref": "#/$defs/trust_identity"
+        }
       }
     },
     "legacy_artifact_ref": {
@@ -769,9 +990,16 @@
       "additionalProperties": false,
       "required": ["path", "sha256", "size_bytes"],
       "properties": {
-        "path": { "$ref": "#/$defs/relative_path" },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "size_bytes": { "type": "integer", "minimum": 0 }
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "legacy_aggregate_artifact_ref": {
@@ -779,10 +1007,19 @@
       "additionalProperties": false,
       "required": ["kind", "path", "sha256", "size_bytes"],
       "properties": {
-        "kind": { "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"] },
-        "path": { "$ref": "#/$defs/relative_path" },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "size_bytes": { "type": "integer", "minimum": 0 }
+        "kind": {
+          "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
+        },
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "v3_opaque_artifact_ref": {
@@ -799,13 +1036,21 @@
             "provider-result"
           ]
         },
-        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "sink_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
         "opaque_handle": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
         },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "size_bytes": { "type": "integer", "minimum": 0 }
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "artifact_sink_commit": {
@@ -820,7 +1065,10 @@
         "commit_protocol"
       ],
       "properties": {
-        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "sink_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
         "transaction_handle": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
@@ -829,9 +1077,16 @@
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
         },
-        "committed_manifest_sha256": { "$ref": "#/$defs/sha256" },
-        "committed_manifest_size_bytes": { "type": "integer", "minimum": 1 },
-        "commit_protocol": { "const": "devai.artifact-sink.two-phase.v1" }
+        "committed_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "committed_manifest_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commit_protocol": {
+          "const": "devai.artifact-sink.two-phase.v1"
+        }
       }
     },
     "release_unit_handle_evidence": {
@@ -839,17 +1094,29 @@
       "additionalProperties": false,
       "required": ["release_unit", "version", "packages"],
       "properties": {
-        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
         "packages": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/package_handle_evidence" }
+          "items": {
+            "$ref": "#/$defs/package_handle_evidence"
+          }
         },
         "mutation_evidence": {
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "$ref": "#/$defs/release_unit_mutation_evidence_closure"
             }
@@ -870,28 +1137,74 @@
         "trust"
       ],
       "properties": {
-        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "package_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
         "package_manifest": {
-          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "package-manifest" } }
+          "allOf": [
+            {
+              "$ref": "#/$defs/v3_opaque_artifact_ref"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "package-manifest"
+            }
+          }
         },
         "package_tarball": {
-          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "package-tarball" } }
+          "allOf": [
+            {
+              "$ref": "#/$defs/v3_opaque_artifact_ref"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "package-tarball"
+            }
+          }
         },
         "package_sbom": {
-          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "package-sbom" } }
+          "allOf": [
+            {
+              "$ref": "#/$defs/v3_opaque_artifact_ref"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "package-sbom"
+            }
+          }
         },
         "evidence_manifest": {
-          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "evidence-manifest" } }
+          "allOf": [
+            {
+              "$ref": "#/$defs/v3_opaque_artifact_ref"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "evidence-manifest"
+            }
+          }
         },
         "provider_result": {
-          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
-          "properties": { "kind": { "const": "provider-result" } }
+          "allOf": [
+            {
+              "$ref": "#/$defs/v3_opaque_artifact_ref"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "provider-result"
+            }
+          }
         },
-        "trust": { "$ref": "#/$defs/trust_identity" }
+        "trust": {
+          "$ref": "#/$defs/trust_identity"
+        }
       }
     },
     "trust_identity": {
@@ -899,10 +1212,20 @@
       "additionalProperties": false,
       "required": ["trust_root_id", "trust_store_digest_sha256", "key_id", "signature_algorithm"],
       "properties": {
-        "trust_root_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
-        "trust_store_digest_sha256": { "$ref": "#/$defs/sha256" },
-        "key_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
-        "signature_algorithm": { "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"] }
+        "trust_root_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "trust_store_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "key_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
+        "signature_algorithm": {
+          "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"]
+        }
       }
     },
     "sha256": {
@@ -1059,6 +1382,133 @@
           "$ref": "#/$defs/git_object"
         }
       }
+    },
+    "unit_mutation_semantics_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Current unit mutation semantics, derived from reverified candidate-bound plans and portable closures. Historical MA2 receipts remain readable through the distinct legacy branch.",
+      "required": ["check_id", "evidence_kind", "status", "result_digest_sha256", "units"],
+      "properties": {
+        "check_id": {
+          "const": "mutation-semantics"
+        },
+        "evidence_kind": {
+          "const": "devai.release-unit-mutation-check.v1"
+        },
+        "status": {
+          "enum": ["pass", "not-applicable"]
+        },
+        "result_digest_sha256": {
+          "$ref": "#/$defs/result_digest"
+        },
+        "units": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "release_unit",
+              "version",
+              "plan_receipt_digest_sha256",
+              "requirement",
+              "mutation_evidence"
+            ],
+            "properties": {
+              "release_unit": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "plan_receipt_digest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "requirement": {
+                "enum": ["required", "none"]
+              },
+              "mutation_evidence": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/release_unit_mutation_evidence_closure"
+                  }
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "requirement": {
+                      "const": "none"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "mutation_evidence": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "mutation_evidence": {
+                      "$ref": "#/$defs/release_unit_mutation_evidence_closure"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not-applicable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "units": {
+                "items": {
+                  "properties": {
+                    "requirement": {
+                      "const": "none"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "units": {
+                "contains": {
+                  "properties": {
+                    "requirement": {
+                      "const": "required"
+                    }
+                  }
+                },
+                "minContains": 1
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "examples": [

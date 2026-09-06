@@ -44,6 +44,7 @@ import {
   executeReleaseLifecycleAction,
   executeOfflineVerification,
   readVerifiedReleaseOfflineContext,
+  createVerifiedReleaseMutationCheck,
   type VerifiedReleaseOfflineContext,
   finalizeReleaseStateV2,
   finalizeStoreRecord,
@@ -2740,6 +2741,51 @@ describe('release lifecycle execution kernel', () => {
     expect(() => readVerifiedReleaseOfflineContext(retained, offlineRequest, exported)).toThrow(
       'release-offline-verification-context-invalid',
     );
+  });
+
+  it('binds current mutation-none evidence to verified plans and rejects a rehashed substitution', async () => {
+    const store = new ReleaseLifecycleFileStore(root(), request('release export'));
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const offlineRequest = request('release offline-verify');
+    for (const substitute of [false, true]) {
+      const result = await executeOfflineVerification({
+        request: offlineRequest,
+        exported_state: exported,
+        artifactReader: artifactReaderFor('release export'),
+        policyClosures,
+        provider: (validatedRequest, validatedState, context) => {
+          const check = createVerifiedReleaseMutationCheck(
+            context,
+            validatedRequest,
+            validatedState,
+          );
+          expect(check['status']).toBe('not-applicable');
+          expect(check['evidence_kind']).toBe('devai.release-unit-mutation-check.v1');
+          expect(check).not.toHaveProperty('mutation_report_id');
+          const receipt = boundOfflineReceipt(exported);
+          const checks = [...(receipt['checks'] as unknown[])];
+          checks[8] = substitute
+            ? {
+                ...check,
+                units: (check['units'] as Readonly<Record<string, unknown>>[]).map((unit) => ({
+                  ...unit,
+                  plan_receipt_digest_sha256: 'a'.repeat(64),
+                })),
+              }
+            : check;
+          return rehashReceipt(receipt, { checks });
+        },
+      });
+      expect(result).toMatchObject(
+        substitute
+          ? {
+              ok: false,
+              code: 'release-offline-receipt-binding-invalid',
+            }
+          : { ok: true },
+      );
+    }
   });
 
   it('binds an optional v2.1 unit mutation closure into offline receipts without claiming portable mutation semantics', async () => {

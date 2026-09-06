@@ -489,6 +489,61 @@ export function readVerifiedReleaseOfflineContext(
   return JSON.parse(canonicalJson(captured)) as OfflineContextCapture;
 }
 
+/** Emit current mutation evidence only from this invocation's verified inputs. */
+export function createVerifiedReleaseMutationCheck(
+  context: VerifiedReleaseOfflineContext | undefined,
+  request: ReleaseLifecycleRequest,
+  state: ReleaseLifecycleStateV2,
+): Readonly<Record<string, unknown>> {
+  const capture = readVerifiedReleaseOfflineContext(context, request, state);
+  return unitMutationOfflineCheck(capture.plan_receipts, state);
+}
+
+function unitMutationOfflineCheck(
+  plans: readonly Readonly<Record<string, unknown>>[],
+  state: ReleaseLifecycleStateV2,
+): Readonly<Record<string, unknown>> {
+  if (state.schemaVersion !== '2.1.0') throw new Error('release-offline-receipt-binding-invalid');
+  const units = state.release_units.map((unit) => {
+    const plan = plans.find(
+      (entry) => object(entry['candidate'])['release_unit'] === unit.release_unit,
+    );
+    if (plan === undefined) throw new Error('release-offline-receipt-binding-invalid');
+    const determination = object(plan['determination']);
+    const disposition = object(determination['mutation_disposition']);
+    const none = determination['mutation'] === 'none' && disposition['status'] === 'not-required';
+    if (
+      !none &&
+      (!['affected', 'targeted', 'full-roster'].includes(String(determination['mutation'])) ||
+        disposition['status'] !== 'required' ||
+        unit.mutation_evidence == null)
+    ) {
+      throw new Error('release-offline-receipt-binding-invalid');
+    }
+    return {
+      release_unit: unit.release_unit,
+      version: unit.version,
+      plan_receipt_digest_sha256: plan['receipt_digest_sha256'],
+      requirement: none ? 'none' : 'required',
+      mutation_evidence: none ? null : unit.mutation_evidence,
+    };
+  });
+  const projection = {
+    check_id: 'mutation-semantics',
+    evidence_kind: 'devai.release-unit-mutation-check.v1',
+    status: units.every((unit) => unit.requirement === 'none') ? 'not-applicable' : 'pass',
+    units,
+  };
+  return {
+    ...projection,
+    result_digest_sha256: canonicalSha256({
+      repository: state.repository,
+      candidate: state.candidate,
+      ...projection,
+    }),
+  };
+}
+
 export type ReleasePlanInputResolver = (input: Readonly<Record<string, unknown>>) => unknown;
 
 export interface TrustedOfflineReceiptVerifier {
@@ -3208,6 +3263,16 @@ export async function executeOfflineVerification(input: {
   const expectedState = stateReference(state);
   const trust = request.destination?.trust;
   const releaseUnits = receipt['release_units'];
+  const mutationCheck = object((receipt['checks'] as readonly unknown[])[8]);
+  if (mutationCheck['evidence_kind'] === 'devai.release-unit-mutation-check.v1') {
+    try {
+      if (!same(mutationCheck, unitMutationOfflineCheck(planReceipts, state))) {
+        return { ok: false, phase: 'validation', code: 'release-offline-receipt-binding-invalid' };
+      }
+    } catch {
+      return { ok: false, phase: 'validation', code: 'release-offline-receipt-binding-invalid' };
+    }
+  }
   const trustMatches =
     trust !== undefined &&
     Array.isArray(releaseUnits) &&
