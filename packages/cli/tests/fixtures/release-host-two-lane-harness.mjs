@@ -220,7 +220,26 @@ try {
     delete controls.toolchain_fixture;
     delete controls.mutation_inputs;
   }
+  for (const offline of [undefined, {}, { provider: () => ({}), policy_closures: 1 }]) {
+    assert.throws(
+      () =>
+        createProtectedReleaseHostRunner({
+          ...controls,
+          later_stages: { ...controls.later_stages, offline_verify: offline },
+        }),
+      /release-host-controls-invalid/,
+    );
+  }
   const runner = createProtectedReleaseHostRunner(controls);
+  await assert.rejects(
+    () =>
+      runner.invoke({
+        action: 'release offline-verify',
+        request: { path: '/must-not-be-read', sha256: 'a'.repeat(64) },
+        exported_state: { path: '/must-not-be-read', sha256: 'b'.repeat(64) },
+      }),
+    /release-host-stage-unavailable/,
+  );
   check: {
     if (withoutFixture) {
       assert.throws(() => runner.readFixturePlan(), /release-host-fixture-unavailable/);

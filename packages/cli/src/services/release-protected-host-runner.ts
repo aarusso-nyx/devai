@@ -19,7 +19,10 @@ import {
   invokeDevaiCli,
   type CliInvocationResult,
 } from '../cli-runtime.js';
-import { installReleaseLifecycleCommandAdapters } from '../commands/release/lifecycle.js';
+import {
+  installReleaseLifecycleCommandAdapters,
+  type ReleaseLifecycleCommandAdapters,
+} from '../commands/release/lifecycle.js';
 import { assertBoundReleaseHostPackageSnapshot } from './release-host-package-binding.js';
 import {
   isVerifiedReleaseCandidateSnapshot,
@@ -121,7 +124,7 @@ export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHost
   /** Protected host choices only; absent stages have no ambient fallback. */
   readonly later_stages: {
     readonly export: 'unavailable' | ProtectedReleaseHostExportControls;
-    readonly offline_verify: 'unavailable';
+    readonly offline_verify: 'unavailable' | ProtectedReleaseHostOfflineControls;
   };
 }
 
@@ -133,6 +136,14 @@ export type ProtectedReleaseHostExportControls = Pick<
     ReleaseExportProviderOptions['store'],
     'closure_limits' | 'transport_limits' | 'transcript_limits'
   >;
+
+/** Installed control callbacks only; request files cannot select an offline verifier. */
+export interface ProtectedReleaseHostOfflineControls {
+  readonly provider: NonNullable<
+    ReturnType<ReleaseLifecycleCommandAdapters['offline_verification_provider']>
+  >;
+  readonly policy_closures: NonNullable<ReleaseLifecycleCommandAdapters['offline_policy_closures']>;
+}
 
 interface InvocationAuthority {
   /** No role is inferred by this runner; the normal CLI checks this explicit declaration. */
@@ -147,6 +158,11 @@ export type ProtectedReleaseHostInvocation =
         'release preflight' | 'release certify' | 'release prepare' | 'release export';
       readonly request: ProtectedReleaseInputFile;
     })
+  | {
+      readonly action: 'release offline-verify';
+      readonly request: ProtectedReleaseInputFile;
+      readonly exported_state: ProtectedReleaseInputFile;
+    }
   | {
       readonly action: 'release resume';
       readonly request: ProtectedReleaseInputFile;
@@ -469,11 +485,19 @@ export function createProtectedReleaseHostRunner(
   );
   assertBoundReleaseHostPackageSnapshot(input.installed_package);
   closed(input.later_stages, ['export', 'offline_verify']);
-  if (
-    input.later_stages.offline_verify !== 'unavailable' ||
-    typeof input.publication_signature_verifier !== 'function'
-  )
-    fail();
+  if (typeof input.publication_signature_verifier !== 'function') fail();
+  const offlineControls = input.later_stages.offline_verify;
+  if (offlineControls !== 'unavailable') {
+    closed(offlineControls, ['provider', 'policy_closures']);
+    if (
+      typeof offlineControls.provider !== 'function' ||
+      typeof offlineControls.policy_closures !== 'function'
+    )
+      fail();
+  }
+  const offlineProvider = offlineControls === 'unavailable' ? undefined : offlineControls.provider;
+  const offlineClosures =
+    offlineControls === 'unavailable' ? undefined : offlineControls.policy_closures;
   const exportControls = input.later_stages.export;
   if (exportControls !== 'unavailable') {
     closed(exportControls, [
@@ -789,7 +813,14 @@ export function createProtectedReleaseHostRunner(
       requireProduction(request);
       return action === 'release export' ? exportDelivery?.provider : undefined;
     },
-    offline_verification_provider: () => undefined,
+    offline_verification_provider(request) {
+      requireProduction(request);
+      return offlineProvider;
+    },
+    offline_policy_closures(request) {
+      requireProduction(request);
+      return offlineClosures?.(copy(request));
+    },
     authorization: () => undefined,
     offline_receipt_verifier: () => undefined,
     publication_controls: () => undefined,
@@ -826,6 +857,7 @@ export function createProtectedReleaseHostRunner(
             'release prepare',
             ...(exportDelivery === undefined ? [] : ['release export']),
             'release resume',
+            ...(offlineProvider === undefined ? [] : ['release offline-verify']),
           ].includes(action)
         )
           fail('release-host-stage-unavailable');
@@ -833,9 +865,12 @@ export function createProtectedReleaseHostRunner(
           value,
           [
             'action',
-            ...(['release plan', 'release resume'].includes(action) ? [] : ['as_role', 'write']),
+            ...(['release plan', 'release resume', 'release offline-verify'].includes(action)
+              ? []
+              : ['as_role', 'write']),
             ...(action === 'release plan' ? ['intent'] : ['request']),
             ...(action === 'release resume' ? ['receipts'] : []),
+            ...(action === 'release offline-verify' ? ['exported_state'] : []),
           ],
           action === 'release resume' ? ['publication_receipt'] : [],
         );
@@ -878,7 +913,13 @@ export function createProtectedReleaseHostRunner(
             fail(INPUT_INVALID);
           args.push('--intent', invocation.intent.path, '--repository', repository.id);
         } else {
-          args.push('--request', invocation.request.path, '--state-root', activeLane.stateRoot);
+          args.push('--request', invocation.request.path);
+          if (invocation.action === 'release offline-verify') {
+            regularInput(invocation.exported_state, production.maximum);
+            args.push('--exported-state', invocation.exported_state.path);
+          } else {
+            args.push('--state-root', activeLane.stateRoot);
+          }
           if (invocation.action === 'release resume') {
             const receipts = regularInput(invocation.receipts, production.maximum);
             if (!Array.isArray(receipts) || !receipts.some((value) => same(value, receipt)))

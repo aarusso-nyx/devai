@@ -8,6 +8,7 @@ export { invokeDevaiCli, startDevaiCli, type CliInvocationResult } from './cli-r
 export {
   createProtectedReleaseHostRunner,
   type ProtectedReleaseHostRunnerControls,
+  type ProtectedReleaseHostOfflineControls,
   type ProtectedReleaseHostRunner,
   type ProtectedReleaseHostInvocation,
   type ProtectedReleaseInputFile,
