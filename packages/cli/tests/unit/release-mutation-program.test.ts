@@ -348,6 +348,7 @@ describe('protected mutation program factory with explicit upstream-authority is
       fileLogLevel: 'off',
       logLevel: 'error',
       disableTypeChecks: false,
+      dryRunTimeoutMinutes: 15,
       timeoutMS: 10000,
       timeoutFactor: 2,
       ignorePatterns: [],

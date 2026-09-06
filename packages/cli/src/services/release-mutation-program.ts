@@ -196,6 +196,10 @@ export function createProtectedMutationProgram(input: {
     symlinkNodeModules: true,
     fileLogLevel: 'off',
     logLevel: 'error',
+    // The complete CLI baseline includes offline package-staging checks and exceeds
+    // Stryker's five-minute default under per-test coverage. This bounds only the
+    // unmutated baseline; individual mutant timing and verdicts remain unchanged.
+    dryRunTimeoutMinutes: 15,
     timeoutMS: 10000,
     timeoutFactor: 2,
     ignorePatterns: [],
