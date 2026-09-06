@@ -3,7 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { runCheckTasks } from '../packages/cli/dist/services/check-runner/index.js';
+import { runCheckTasks } from '../.devai/state/pr-bootstrap/cli/services/check-runner/index.js';
 
 const root = resolve(import.meta.dirname, '..');
 const base = process.argv.slice(2).find((argument) => argument !== '--');

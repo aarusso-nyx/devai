@@ -56,7 +56,7 @@
     "test:e2e:rc": "vitest run --config tests/config/rc.e2e.config.ts",
     "test:performance:rc": "vitest run --config tests/config/rc.performance.config.ts",
     "test:containment:rc": "vitest run --config tests/config/rc.containment.config.ts",
-    "release:bootstrap": "tsc -b packages/cli/tsconfig.json --force"
+    "release:bootstrap": "node scripts/process/bootstrap-check-runner.mjs"
   },
   "devDependencies": {
     "@bcoe/v8-coverage": "1.0.2",
