@@ -1,0 +1,852 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-observation.schema.json",
+  "title": "Release lifecycle observation",
+  "description": "The deterministic document emitted to stdout by release resume. It reports the exact recorded persisted head for one candidate, and the derived states it could verify from supplied or located receipts. It writes nothing: no state record, no evidence, no receipt file. It advances, repairs, and revives nothing. published is reported only when a signed publication receipt verifies against the exact recorded publication_dispatched state, candidate, artifact, and trust identity; an unverifiable receipt derives nothing, and the observation never appends published.",
+  "schema_version": "1.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "observation_kind",
+    "observation_id",
+    "repository",
+    "candidate",
+    "verification_kernel",
+    "head",
+    "derived_states",
+    "published",
+    "next_action",
+    "next_outcome",
+    "emitted_by",
+    "grants",
+    "determinism",
+    "observation_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": ["1.0.0", "1.1.0"],
+      "description": "Current emitters use 1.1.0. Historical 1.0.0 observations remain readable under their original closed shape; legacy-plan-non-authoritative is accepted only in 1.1.0."
+    },
+    "observation_kind": {
+      "const": "release-lifecycle-observation"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^RLO-[0-9a-f]{16}$",
+      "description": "Content-derived identity: canonical sha256 over every field of this observation except observation_id and observation_digest_sha256, truncated to 16 hex characters."
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "verification_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel_id", "policy_source", "schema_validation_alone_derives_published"],
+      "description": "The named kernel that produced this observation. Its ordered algorithm and its exact error codes are frozen in the canonical release lifecycle policy; this field binds the observation to that procedure so a document asserting published cannot have been produced by a looser one.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.release-lifecycle-observation.v1"
+        },
+        "policy_source": {
+          "const": "law/policy/release-lifecycle.json#/observation_kernel"
+        },
+        "schema_validation_alone_derives_published": {
+          "const": false,
+          "description": "This observation validating against this schema derives nothing. published is derived only by a completed run of the kernel over the recorded dispatch and the signed receipt."
+        }
+      }
+    },
+    "head": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["state", "state_id", "record_digest_sha256"],
+      "description": "The exact recorded persisted head. Null when no state record exists for this candidate. A blocked or stale lifecycle reports its actual head and nothing more.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/persisted_state"
+        },
+        "state_id": {
+          "type": "string",
+          "pattern": "^RLS-[0-9a-f]{16}$"
+        },
+        "record_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "derived_states": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Derived states this observation verified from receipts. A derived state is reported, never recorded.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "receipt_kind", "receipt_id", "receipt_digest_sha256", "verified"],
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/derived_state"
+          },
+          "receipt_kind": {
+            "$ref": "#/$defs/receipt_kind"
+          },
+          "receipt_id": {
+            "type": "string",
+            "pattern": "^(?:RPL|ROV|RPU)-[0-9a-f]{16}$"
+          },
+          "receipt_digest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "verified": {
+            "const": true,
+            "description": "Only a verified receipt yields a derived state. An unverifiable receipt is not weaker evidence; it is no evidence and is omitted."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "planned"
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "receipt_kind": {
+                  "const": "release-plan-receipt"
+                },
+                "receipt_id": {
+                  "pattern": "^RPL-[0-9a-f]{16}$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "offline_verified"
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "receipt_kind": {
+                  "const": "release-offline-verification-receipt"
+                },
+                "receipt_id": {
+                  "pattern": "^ROV-[0-9a-f]{16}$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "published"
+                }
+              },
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "receipt_kind": {
+                  "const": "release-publication-receipt"
+                },
+                "receipt_id": {
+                  "pattern": "^RPU-[0-9a-f]{16}$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "published": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed", "receipt", "verified_against"],
+      "description": "The only route to published. It requires a verified signed publication receipt bound to the exact recorded dispatch.",
+      "properties": {
+        "observed": {
+          "type": "boolean"
+        },
+        "receipt": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "receipt_id",
+            "receipt_digest_sha256",
+            "trust_root_id",
+            "trust_store_digest_sha256",
+            "key_id",
+            "signature_algorithm",
+            "signature_verified"
+          ],
+          "properties": {
+            "kind": {
+              "const": "release-publication-receipt"
+            },
+            "receipt_id": {
+              "type": "string",
+              "pattern": "^RPU-[0-9a-f]{16}$"
+            },
+            "receipt_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "trust_root_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+            },
+            "trust_store_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "key_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+            },
+            "signature_algorithm": {
+              "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"]
+            },
+            "signature_verified": {
+              "const": true
+            }
+          }
+        },
+        "verified_against": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "state_id",
+            "record_digest_sha256",
+            "candidate_identity_verified",
+            "artifact_identity_verified",
+            "destination_identity_verified",
+            "workflow_identity_verified",
+            "trust_identity_verified"
+          ],
+          "description": "The exact publication_dispatched record the receipt was checked against. Every binding must verify; a near match is a mismatch.",
+          "properties": {
+            "state": {
+              "const": "publication_dispatched"
+            },
+            "state_id": {
+              "type": "string",
+              "pattern": "^RLS-[0-9a-f]{16}$"
+            },
+            "record_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_identity_verified": {
+              "const": true
+            },
+            "artifact_identity_verified": {
+              "const": true
+            },
+            "destination_identity_verified": {
+              "const": true
+            },
+            "workflow_identity_verified": {
+              "const": true
+            },
+            "trust_identity_verified": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "next_action": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "release plan",
+        "release preflight",
+        "release certify",
+        "release prepare",
+        "release export",
+        "release offline-verify",
+        "release evidence-publish",
+        "release publish",
+        "release resume"
+      ],
+      "description": "The deterministic action reported by pure resume. It is null on complete and ambiguous outcomes. It is normally null when blocked; the sole exception is a failed remote attempt blocked only on fresh exact Owner authorization, which reports its exact remote retry action without granting authority or executing it."
+    },
+    "next_outcome": {
+      "enum": ["ready", "awaiting-external-receipt", "complete", "blocked", "ambiguous"],
+      "description": "A blocked result is non-authoritative. Only the closed fresh-authorization retry shape may carry a reported next_action; an ambiguous result always has null next_action. Unknown provider results are always ambiguous and never authorize redispatch."
+    },
+    "blocked_reason": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "broken-chain",
+        "stale-head",
+        "orphan-record",
+        "unterminated-attempt",
+        "unknown-provider-result",
+        "authorization-consumed",
+        "fresh-exact-authorization-required",
+        "candidate-identity-mismatch",
+        "receipt-identity-mismatch",
+        "legacy-plan-non-authoritative"
+      ],
+      "description": "Closed stable reason for a blocked observation. It is required only for next_outcome blocked; unknown provider results remain ambiguous, non-retriable, and do not use this retry shape. The 1.1.0-only legacy-plan-non-authoritative reason explicitly labels historical plan evidence without deriving any state, current readiness, next action or publication."
+    },
+    "blocked_requirements": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 1,
+      "items": {
+        "enum": ["fresh_exact_owner_authorization_required"]
+      },
+      "description": "Closed requirements for a blocked observation. The sole non-empty value identifies the one fresh exact Owner authorization required before a new remote attempt may be authorized."
+    },
+    "reconciliation_requirements": {
+      "const": ["external_sink_commit_reconciliation_required"],
+      "description": "Emitted only when the semantic kernel verifies an unknown terminal release prepare record retaining its ArtifactSink transaction and opaque handles. External reconciliation is the sole next requirement; this observation grants no reconciliation, rollback, retry, or redispatch authority. Omitted for an unterminated attempt or a remote provider unknown result."
+    },
+    "emitted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "effect",
+        "output_channel",
+        "persists_repository_state",
+        "appends_state_record",
+        "writes_receipt_file"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "release resume"
+        },
+        "effect": {
+          "const": "read"
+        },
+        "output_channel": {
+          "const": "stdout"
+        },
+        "persists_repository_state": {
+          "const": false
+        },
+        "appends_state_record": {
+          "const": false
+        },
+        "writes_receipt_file": {
+          "const": false
+        }
+      }
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "publication_authority",
+        "lifecycle_transition",
+        "appends_published_state"
+      ],
+      "properties": {
+        "authority": {
+          "const": false
+        },
+        "publication_authority": {
+          "const": false
+        },
+        "lifecycle_transition": {
+          "const": false
+        },
+        "appends_published_state": {
+          "const": false,
+          "description": "Deriving published is reporting a verified fact. It is never a write."
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deterministic", "derived_from_bound_inputs_only", "contains_wall_clock_time"],
+      "properties": {
+        "deterministic": {
+          "const": true
+        },
+        "derived_from_bound_inputs_only": {
+          "const": true
+        },
+        "contains_wall_clock_time": {
+          "const": false
+        }
+      }
+    },
+    "observation_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest of this observation with observation_id and this field omitted. Audit integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "blocked_reason": { "const": "legacy-plan-non-authoritative" } },
+        "required": ["blocked_reason"]
+      },
+      "then": {
+        "properties": {
+          "schemaVersion": { "const": "1.1.0" },
+          "next_outcome": { "const": "blocked" },
+          "next_action": { "type": "null" },
+          "blocked_requirements": { "const": [] },
+          "derived_states": { "const": [] },
+          "published": {
+            "properties": {
+              "observed": { "const": false },
+              "receipt": { "type": "null" },
+              "verified_against": { "type": "null" }
+            }
+          },
+          "reconciliation_requirements": false
+        }
+      }
+    },
+    {
+      "if": { "required": ["reconciliation_requirements"] },
+      "then": {
+        "properties": {
+          "next_outcome": { "const": "ambiguous" },
+          "next_action": { "type": "null" },
+          "head": {
+            "type": "object",
+            "properties": { "state": { "const": "certified" } }
+          },
+          "published": { "properties": { "observed": { "const": false } } },
+          "blocked_requirements": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "enum": ["complete", "ambiguous"] } },
+        "required": ["next_outcome"]
+      },
+      "then": { "properties": { "next_action": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "const": "blocked" } },
+        "required": ["next_outcome"]
+      },
+      "then": {
+        "required": ["blocked_reason", "blocked_requirements"],
+        "oneOf": [
+          {
+            "properties": {
+              "blocked_reason": { "const": "fresh-exact-authorization-required" },
+              "blocked_requirements": {
+                "const": ["fresh_exact_owner_authorization_required"]
+              },
+              "next_action": {
+                "enum": ["release evidence-publish", "release publish"]
+              }
+            }
+          },
+          {
+            "properties": {
+              "blocked_reason": {
+                "enum": [
+                  "broken-chain",
+                  "stale-head",
+                  "orphan-record",
+                  "unterminated-attempt",
+                  "unknown-provider-result",
+                  "authorization-consumed",
+                  "candidate-identity-mismatch",
+                  "receipt-identity-mismatch",
+                  "legacy-plan-non-authoritative"
+                ]
+              },
+              "blocked_requirements": { "const": [] },
+              "next_action": { "type": "null" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "const": "ready" } },
+        "required": ["next_outcome"]
+      },
+      "then": { "properties": { "next_action": { "type": "string" } } }
+    },
+    {
+      "if": {
+        "properties": { "next_outcome": { "const": "awaiting-external-receipt" } },
+        "required": ["next_outcome"]
+      },
+      "then": { "properties": { "next_action": { "const": "release resume" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "published": {
+            "properties": {
+              "observed": {
+                "const": true
+              }
+            },
+            "required": ["observed"]
+          }
+        },
+        "required": ["published"]
+      },
+      "then": {
+        "properties": {
+          "head": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "publication_dispatched",
+                "description": "published is observable only over a recorded dispatch. Any other head means there is nothing to have completed."
+              }
+            }
+          },
+          "published": {
+            "properties": {
+              "receipt": {
+                "type": "object"
+              },
+              "verified_against": {
+                "type": "object"
+              }
+            }
+          },
+          "derived_states": {
+            "contains": {
+              "type": "object",
+              "required": ["state"],
+              "properties": {
+                "state": {
+                  "const": "published"
+                }
+              }
+            },
+            "minContains": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "published": {
+            "properties": {
+              "receipt": {
+                "type": "null"
+              },
+              "verified_against": {
+                "type": "null"
+              }
+            }
+          },
+          "derived_states": {
+            "not": {
+              "contains": {
+                "type": "object",
+                "required": ["state"],
+                "properties": {
+                  "state": {
+                    "const": "published"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "persisted_state": {
+      "enum": [
+        "preflight_passed",
+        "certified",
+        "prepared",
+        "exported",
+        "evidence_published",
+        "publication_dispatched"
+      ]
+    },
+    "derived_state": {
+      "enum": ["planned", "offline_verified", "published"]
+    },
+    "receipt_kind": {
+      "enum": [
+        "release-plan-receipt",
+        "release-offline-verification-receipt",
+        "release-publication-receipt"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "observation_kind": "release-lifecycle-observation",
+      "observation_id": "RLO-298828dd9e39dd07",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "policy_source": "law/policy/release-lifecycle.json#/observation_kernel",
+        "schema_validation_alone_derives_published": false
+      },
+      "head": {
+        "state": "publication_dispatched",
+        "state_id": "RLS-fedcba9876543210",
+        "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
+      },
+      "derived_states": [
+        {
+          "state": "published",
+          "receipt_kind": "release-publication-receipt",
+          "receipt_id": "RPU-edcb1c9d7bf4e5ce",
+          "receipt_digest_sha256": "61d9347d6740ebc6a53dcbd2e5d803c6dea891dfc6d0b65c1cab51edf5ef313f",
+          "verified": true
+        }
+      ],
+      "published": {
+        "observed": true,
+        "receipt": {
+          "kind": "release-publication-receipt",
+          "receipt_id": "RPU-edcb1c9d7bf4e5ce",
+          "receipt_digest_sha256": "61d9347d6740ebc6a53dcbd2e5d803c6dea891dfc6d0b65c1cab51edf5ef313f",
+          "trust_root_id": "devai-publication-receipt-root",
+          "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
+          "key_id": "publication-receipt-2026-09",
+          "signature_algorithm": "ed25519",
+          "signature_verified": true
+        },
+        "verified_against": {
+          "state": "publication_dispatched",
+          "state_id": "RLS-fedcba9876543210",
+          "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64",
+          "candidate_identity_verified": true,
+          "artifact_identity_verified": true,
+          "destination_identity_verified": true,
+          "workflow_identity_verified": true,
+          "trust_identity_verified": true
+        }
+      },
+      "next_action": null,
+      "next_outcome": "complete",
+      "emitted_by": {
+        "action_id": "release resume",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appends_published_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "observation_digest_sha256": "298828dd9e39dd076dc379937a4fe99b0e073fdf538173ba87ca5ea41b84fa3d"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "observation_kind": "release-lifecycle-observation",
+      "observation_id": "RLO-a001454061bfbcdc",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "policy_source": "law/policy/release-lifecycle.json#/observation_kernel",
+        "schema_validation_alone_derives_published": false
+      },
+      "head": {
+        "state": "exported",
+        "state_id": "RLS-89abcdef01234567",
+        "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      },
+      "derived_states": [
+        {
+          "state": "offline_verified",
+          "receipt_kind": "release-offline-verification-receipt",
+          "receipt_id": "ROV-0eca1bdad698a5db",
+          "receipt_digest_sha256": "0eca1bdad698a5db560528da47fa11bd5129f3e9ddb0fe1220bec789740b1e5c",
+          "verified": true
+        }
+      ],
+      "published": {
+        "observed": false,
+        "receipt": null,
+        "verified_against": null
+      },
+      "next_action": "release evidence-publish",
+      "next_outcome": "ready",
+      "emitted_by": {
+        "action_id": "release resume",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appends_published_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "observation_digest_sha256": "a001454061bfbcdcd3538839c8faa47624b9aed63ef518f8573661008e159f09"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "observation_kind": "release-lifecycle-observation",
+      "observation_id": "RLO-b001454061bfbcdc",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+        "policy_source": "law/policy/release-lifecycle.json#/observation_kernel",
+        "schema_validation_alone_derives_published": false
+      },
+      "head": {
+        "state": "exported",
+        "state_id": "RLS-0123456789abcdef",
+        "record_digest_sha256": "b1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
+      },
+      "derived_states": [
+        {
+          "state": "offline_verified",
+          "receipt_kind": "release-offline-verification-receipt",
+          "receipt_id": "ROV-0eca1bdad698a5db",
+          "receipt_digest_sha256": "0eca1bdad698a5db560528da47fa11bd5129f3e9ddb0fe1220bec789740b1e5c",
+          "verified": true
+        }
+      ],
+      "published": {
+        "observed": false,
+        "receipt": null,
+        "verified_against": null
+      },
+      "next_action": "release evidence-publish",
+      "next_outcome": "blocked",
+      "blocked_reason": "fresh-exact-authorization-required",
+      "blocked_requirements": ["fresh_exact_owner_authorization_required"],
+      "emitted_by": {
+        "action_id": "release resume",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appends_published_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "observation_digest_sha256": "b001454061bfbcdcd3538839c8faa47624b9aed63ef518f8573661008e159f09"
+    }
+  ]
+}

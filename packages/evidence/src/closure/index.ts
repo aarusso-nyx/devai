@@ -7,9 +7,9 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { join } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 
-const validatePhaseClosure = getValidator('phase-closure.schema.json');
+const validatePhaseClosure = validators.phaseClosure;
 
 /**
  * Phase/round closure ledger (D-110; governance-roadmap item 4).

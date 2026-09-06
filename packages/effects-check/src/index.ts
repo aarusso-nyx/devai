@@ -436,6 +436,8 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
       'The authority seam is the audited implementation boundary for wrapped host functions.',
     'packages/cli/src/commands/mutation/run.ts':
       'Mutation adapter loads the previously resolved local runner URL; runtime charter and authority checks precede execution.',
+    'packages/cli/src/release-host-bootstrap.ts':
+      'Native import of the verified installed host entry is required: a loader hook denies every other importer, and require(ESM) can return stale exports past a load denial.',
   };
   for (const sourceFile of sourceFiles) {
     const packageSuffix = sourceFile.fileName.split('/packages/')[1];

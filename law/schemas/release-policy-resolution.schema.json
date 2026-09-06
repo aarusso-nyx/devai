@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-policy-resolution.schema.json",
+  "title": "Package-owned release policy resolution",
+  "description": "Exact portable provenance for the current release plan. Hashes bind raw file bytes unless explicitly named content_manifest_sha256. A schema assertion is not source verification or authority.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "resolver_id",
+    "installed_package",
+    "package_manager",
+    "adopter_package",
+    "lockfiles",
+    "project",
+    "constitution",
+    "adopter_policy",
+    "binding_receipt",
+    "materialized",
+    "installation_origin"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "resolver_id": {
+      "const": "devai.release-policy-resolution.v1"
+    },
+    "installed_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "archive_sha256", "content_manifest_sha256"],
+      "properties": {
+        "name": {
+          "const": "@aarusso-nyx/devai"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "archive_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "content_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "package_manager": {
+      "enum": ["npm", "pnpm"]
+    },
+    "adopter_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "const": "package.json"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "lockfiles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "const": ".devai/config/project.json"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "constitution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "const": ".devai/pin/constitution.md"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "adopter_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relative_path",
+          "pattern": "^law/policy/.+\\.json$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "binding_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "const": ".devai/config/adopter-policy-binding.json"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "materialized": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "installation_origin": {
+      "enum": ["candidate-adopter-dependency", "external-producer-toolchain"]
+    },
+    "producer_toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_manager", "package_manifest", "lockfiles", "producer_source"],
+      "properties": {
+        "package_manager": {
+          "enum": ["npm", "pnpm"]
+        },
+        "package_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {
+              "const": "package.json"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "lockfiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/file"
+          }
+        },
+        "producer_source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_id",
+            "commit",
+            "tree",
+            "package_manifest",
+            "build_provenance_sha256"
+          ],
+          "properties": {
+            "repository_id": {
+              "const": "aarusso-nyx/devai"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "tree": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "package_manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": {
+                  "$ref": "#/$defs/relative_path"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "build_provenance_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000-\\u001f]+$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "producer_build_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "producer_source", "installed_package", "toolchain"],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "producer_source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_id", "commit", "tree", "package_manifest"],
+          "properties": {
+            "repository_id": {
+              "const": "aarusso-nyx/devai"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "tree": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "package_manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": {
+                  "$ref": "#/$defs/relative_path"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            }
+          }
+        },
+        "installed_package": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version", "archive_sha256", "content_manifest_sha256"],
+          "properties": {
+            "name": {
+              "const": "@aarusso-nyx/devai"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "archive_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "content_manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "toolchain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["package_manager", "package_manifest", "lockfiles"],
+          "properties": {
+            "package_manager": {
+              "enum": ["npm", "pnpm"]
+            },
+            "package_manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": {
+                  "const": "package.json"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "lockfiles": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/file"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "installation_origin": {
+            "const": "external-producer-toolchain"
+          }
+        },
+        "required": ["installation_origin"]
+      },
+      "then": {
+        "required": ["producer_toolchain"]
+      },
+      "else": {
+        "not": {
+          "required": ["producer_toolchain"]
+        }
+      }
+    }
+  ]
+}

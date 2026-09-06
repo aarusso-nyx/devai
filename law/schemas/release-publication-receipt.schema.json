@@ -1,0 +1,494 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-publication-receipt.schema.json",
+  "title": "Signed release publication receipt",
+  "description": "The signed attestation emitted by the protected external workflow after a dispatched publication completes. No DEVAI action emits it. It binds the exact publication_dispatched state it answers, the exact candidate and artifacts that were published, the exact workflow identity that observed the publication, and the exact trust identity that signed it. release resume may derive the observation-only state published from it, and only when every one of those bindings matches the recorded dispatch. The receipt grants no authority: it is evidence that a publication happened, never permission for one, and it is never appended as a state record. Every digest it carries is computed under one frozen canonicalization kernel in one computable order, so no digest is an input to itself.",
+  "$comment": "The embedded example signature is verified only with the external fixture devai-publication-receipt-example-trust-fixture-v1, identified by trust_root_id, trust_store_digest_sha256, and key_id. Its signed-payload, receipt-id, and whole-receipt digests remain exact without embedding key material.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "receipt_kind",
+    "canonicalization",
+    "receipt_id",
+    "attests_state",
+    "outcome",
+    "repository",
+    "candidate",
+    "dispatched_state",
+    "artifacts",
+    "publication",
+    "workflow",
+    "trust",
+    "emitted_by",
+    "grants",
+    "emitted_at",
+    "receipt_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "receipt_kind": {
+      "const": "release-publication-receipt"
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "encoding",
+        "json_form",
+        "digest_algorithm",
+        "signed_payload_projection_excludes",
+        "whole_receipt_projection_excludes",
+        "calculation_order"
+      ],
+      "description": "The frozen projection and calculation order every digest in this receipt is computed under. The two projections are nested rather than mutual: the signed payload excludes all three derived fields, and the whole-receipt projection excludes only the field being computed. No digest in this receipt is an input to itself.",
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.publication-receipt-canonicalization.v1",
+          "description": "Named canonicalization kernel. A receipt computed under any other kernel is a different document and does not verify."
+        },
+        "encoding": {
+          "const": "utf-8"
+        },
+        "json_form": {
+          "const": "rfc8785-jcs",
+          "description": "RFC 8785 JSON Canonicalization Scheme: lexicographic member ordering, no insignificant whitespace, canonical number and string escaping."
+        },
+        "digest_algorithm": {
+          "const": "sha256"
+        },
+        "signed_payload_projection_excludes": {
+          "const": [
+            "receipt_id",
+            "trust.signature",
+            "trust.signed_payload_digest_sha256",
+            "receipt_digest_sha256"
+          ],
+          "description": "The signed payload omits every derived field, including the identity derived from it. Signing a payload that contained receipt_id or its own digest would be circular."
+        },
+        "whole_receipt_projection_excludes": {
+          "const": ["receipt_digest_sha256"],
+          "description": "The whole-receipt projection omits only the field being computed. receipt_id, trust.signed_payload_digest_sha256, and trust.signature are all present in it, so the receipt digest covers the identity and the signature."
+        },
+        "calculation_order": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": false,
+          "description": "The four steps in the only order in which they are computable. Each step consumes only values fixed by an earlier step.",
+          "prefixItems": [
+            {
+              "const": "compute-signed-payload-digest-sha256-over-the-signed-payload-projection"
+            },
+            {
+              "const": "derive-receipt-id-as-RPU-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-signed-payload-digest"
+            },
+            {
+              "const": "sign-the-signed-payload-digest-into-trust-signature"
+            },
+            {
+              "const": "compute-receipt-digest-sha256-over-the-whole-receipt-projection"
+            }
+          ]
+        }
+      }
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^RPU-[0-9a-f]{16}$",
+      "description": "Content-derived identity: RPU- followed by the first 16 lowercase hex characters of trust.signed_payload_digest_sha256. It is derived from the signed payload digest and is never an input to it."
+    },
+    "attests_state": {
+      "type": ["string", "null"],
+      "enum": [null, "published"],
+      "description": "The derived state this receipt attests. Null when the publication did not complete. An attestation is not a state record and is never appended."
+    },
+    "outcome": {
+      "enum": ["published", "failed"]
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "dispatched_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "state_id", "record_digest_sha256"],
+      "description": "The exact publication_dispatched record this receipt answers. A receipt naming a different dispatch derives nothing about this one.",
+      "properties": {
+        "state": {
+          "const": "publication_dispatched"
+        },
+        "state_id": {
+          "type": "string",
+          "pattern": "^RLS-[0-9a-f]{16}$"
+        },
+        "record_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The exact artifacts the workflow observed published, pinned by content digest. A digest that differs from the dispatched artifact is a different artifact.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "path", "sha256", "size_bytes"],
+        "properties": {
+          "kind": {
+            "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
+          },
+          "path": {
+            "$ref": "#/$defs/relative_path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "exact_identifier", "operation"],
+      "description": "Exactly one publication target. Identifiers are literal: no glob, no prefix match, no default remainder.",
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "exact_identifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "^(?!.*[*?\\[\\]])[^\\u0000]+$"
+        },
+        "operation": {
+          "const": "publish"
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow_path",
+        "workflow_sha",
+        "protected_environment",
+        "run_id",
+        "run_attempt",
+        "protected",
+        "candidate_product_execution"
+      ],
+      "description": "Exact identity of the protected workflow that observed the publication. An unprotected or unidentified workflow attests nothing.",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "workflow_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "workflow_sha": {
+          "$ref": "#/$defs/git_object",
+          "description": "The immutable commit the workflow ran from. A branch or tag name would let the attested logic change under a stable label."
+        },
+        "protected_environment": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[0-9]{1,32}$"
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "protected": {
+          "const": true
+        },
+        "candidate_product_execution": {
+          "const": false,
+          "description": "The workflow observes the publication; it never executes the candidate product to decide the outcome."
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trust_root_id",
+        "trust_store_digest_sha256",
+        "key_id",
+        "signature_algorithm",
+        "signature",
+        "signed_payload_digest_sha256"
+      ],
+      "description": "Exact signing identity. Signature validity is necessary and never sufficient: a validly signed receipt for a different dispatch, candidate, or artifact is a statement about something else.",
+      "properties": {
+        "trust_root_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "trust_store_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the exact external public trust store expected by the recorded dispatch; no key material is embedded."
+        },
+        "key_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
+        "signature_algorithm": {
+          "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"]
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+          "description": "Base64 signature over the exact bytes of trust.signed_payload_digest_sha256. The signature covers the payload digest, never the receipt digest."
+        },
+        "signed_payload_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Canonical sha256 over the signed payload projection: this receipt with receipt_id, trust.signature, trust.signed_payload_digest_sha256, and receipt_digest_sha256 omitted. receipt_id is derived from this value."
+        }
+      }
+    },
+    "emitted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["emitter", "devai_action_id", "emitted_by_devai_action"],
+      "properties": {
+        "emitter": {
+          "const": "protected-external-workflow"
+        },
+        "devai_action_id": {
+          "type": "null",
+          "description": "No DEVAI action emits this receipt. A receipt claiming a DEVAI emitter is self-attestation, which the separation exists to prevent."
+        },
+        "emitted_by_devai_action": {
+          "const": false
+        }
+      }
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "publication_authority",
+        "lifecycle_transition",
+        "appended_as_state_record"
+      ],
+      "properties": {
+        "authority": {
+          "const": false
+        },
+        "publication_authority": {
+          "const": false,
+          "description": "Evidence that a publication happened never authorizes another one."
+        },
+        "lifecycle_transition": {
+          "const": false
+        },
+        "appended_as_state_record": {
+          "const": false,
+          "description": "published is observation-only. This receipt is verified and reported, never appended."
+        }
+      }
+    },
+    "emitted_at": {
+      "$ref": "common-defs.schema.json#/$defs/timestamp",
+      "description": "When the workflow signed the attestation. This receipt is signed rather than deterministic: the observation that consumes it is the deterministic document."
+    },
+    "receipt_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical sha256 over the whole-receipt projection: this receipt with only this field omitted. It covers receipt_id, trust.signed_payload_digest_sha256, and trust.signature. Identity and integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "published"
+          }
+        },
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "attests_state": {
+            "const": "published"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "attests_state": {
+            "type": "null",
+            "description": "A failed publication attests no state. The lifecycle stays at publication_dispatched, which is the honest reading of that situation."
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "receipt_kind": "release-publication-receipt",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.publication-receipt-canonicalization.v1",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "signed_payload_projection_excludes": [
+          "receipt_id",
+          "trust.signature",
+          "trust.signed_payload_digest_sha256",
+          "receipt_digest_sha256"
+        ],
+        "whole_receipt_projection_excludes": ["receipt_digest_sha256"],
+        "calculation_order": [
+          "compute-signed-payload-digest-sha256-over-the-signed-payload-projection",
+          "derive-receipt-id-as-RPU-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-signed-payload-digest",
+          "sign-the-signed-payload-digest-into-trust-signature",
+          "compute-receipt-digest-sha256-over-the-whole-receipt-projection"
+        ]
+      },
+      "receipt_id": "RPU-edcb1c9d7bf4e5ce",
+      "attests_state": "published",
+      "outcome": "published",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "dispatched_state": {
+        "state": "publication_dispatched",
+        "state_id": "RLS-fedcba9876543210",
+        "record_digest_sha256": "d1b42a8b41c7ef33295685cf5f0847eb00b9f5f003623050ae0ec45a97709a64"
+      },
+      "artifacts": [
+        {
+          "kind": "package-tarball",
+          "path": "dist/aarusso-nyx-devai-1.5.0.tgz",
+          "sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "size_bytes": 1048576
+        }
+      ],
+      "publication": {
+        "system_id": "npm.pkg.github.com",
+        "exact_identifier": "@aarusso-nyx/devai@1.5.0",
+        "operation": "publish"
+      },
+      "workflow": {
+        "repository": "aarusso-nyx/devai",
+        "workflow_path": ".github/workflows/publication-receipt.yml",
+        "workflow_sha": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
+        "protected_environment": "release",
+        "run_id": "1234567890",
+        "run_attempt": 1,
+        "protected": true,
+        "candidate_product_execution": false
+      },
+      "trust": {
+        "trust_root_id": "devai-publication-receipt-root",
+        "trust_store_digest_sha256": "e526c28a6fa8cbeb69058d562398b05061ca3469f200356558c4d152a60363a8",
+        "key_id": "publication-receipt-2026-09",
+        "signature_algorithm": "ed25519",
+        "signature": "CQZvCofbrH4NqollqwazLetn3079dq9FbNIjnJa/WgR2O3IfdjhU617iXteBFFSUE+kERf1aNdmLlFYuhWbuBg==",
+        "signed_payload_digest_sha256": "edcb1c9d7bf4e5ce50a9849f8895af9cf51b796fd6012ff7f04ad4d6a3a951bf"
+      },
+      "emitted_by": {
+        "emitter": "protected-external-workflow",
+        "devai_action_id": null,
+        "emitted_by_devai_action": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "appended_as_state_record": false
+      },
+      "emitted_at": "2026-09-03T00:00:00.000Z",
+      "receipt_digest_sha256": "61d9347d6740ebc6a53dcbd2e5d803c6dea891dfc6d0b65c1cab51edf5ef313f"
+    }
+  ]
+}

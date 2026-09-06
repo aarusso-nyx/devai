@@ -1,0 +1,1349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/adr-validation-policy.schema.json",
+  "title": "ADR validation policy",
+  "description": "Fail-closed contract for validating every Markdown file under law/adr/. The scan is recursive and total: a file is either a conforming ADR v2 record or an exact catalogued exception, and anything else is a failure. Exceptions are pinned by exact repository-relative path and sha256, and the catalog itself is digest-bound so an entry cannot be added, removed, or repointed silently. Validation is two passes: every record is checked against the record schema, and the record set is then resolved by the named semantic resolver, which decides the effective accepted authority of each exact affected-rule subject and explicit supersession-connected lineage.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "record_schema",
+    "scan",
+    "identity",
+    "lifecycle",
+    "body",
+    "supersession",
+    "semantic_resolver",
+    "exception_catalog",
+    "fail_closed"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "adr-validation"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "record_schema": {
+      "const": "law/schemas/adr-v2.schema.json"
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "recursive",
+        "include",
+        "extension_match",
+        "follow_symlinks",
+        "unreadable_behavior",
+        "unmatched_file_behavior",
+        "empty_directory_behavior"
+      ],
+      "properties": {
+        "root": {
+          "const": "law/adr"
+        },
+        "recursive": {
+          "const": true,
+          "description": "Every descendant directory is scanned. A nested directory never hides a record."
+        },
+        "include": {
+          "const": ["*.md", "**/*.md"],
+          "description": "Root-level and recursively nested Markdown files are both in the census; extension matching is case-insensitive."
+        },
+        "extension_match": {
+          "const": "case-insensitive",
+          "description": "A .MD or .Md file is a Markdown file. Case is never an escape hatch from the scan."
+        },
+        "follow_symlinks": {
+          "const": false
+        },
+        "unreadable_behavior": {
+          "const": "fail",
+          "description": "Article 41: a failure to read is a failure to observe and never a pass."
+        },
+        "unmatched_file_behavior": {
+          "const": "fail",
+          "description": "A Markdown file that is neither a conforming record nor a catalogued exception fails the scan."
+        },
+        "empty_directory_behavior": {
+          "const": "pass"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id_pattern", "id_required", "scope_source", "filename_binding", "uniqueness"],
+      "properties": {
+        "id_pattern": {
+          "const": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$"
+        },
+        "id_required": {
+          "const": true,
+          "description": "A missing id is a validation failure. An id is never derived from the filename, the path, or the directory sequence."
+        },
+        "scope_source": {
+          "const": "id-scope-segments"
+        },
+        "filename_binding": {
+          "const": "basename-starts-with-id-followed-by-hyphen"
+        },
+        "uniqueness": {
+          "const": "id-unique-across-recursive-scan"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statuses", "binding_statuses", "unknown_status_behavior"],
+      "properties": {
+        "statuses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["proposed", "accepted", "rejected", "superseded"]
+          }
+        },
+        "binding_statuses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "accepted"
+          }
+        },
+        "unknown_status_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_sections", "missing_section_behavior"],
+      "properties": {
+        "required_sections": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "missing_section_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "supersession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recorded_on",
+        "edit_superseded_record",
+        "unresolved_reference_behavior",
+        "self_reference_behavior"
+      ],
+      "properties": {
+        "recorded_on": {
+          "const": "superseding-record-only",
+          "description": "Supersession is a forward assertion by a new record. The superseded record's bytes are never modified."
+        },
+        "edit_superseded_record": {
+          "const": false
+        },
+        "unresolved_reference_behavior": {
+          "const": "fail",
+          "description": "A supersedes entry must resolve to a scanned record or to a catalogued preserved exception."
+        },
+        "self_reference_behavior": {
+          "const": "fail"
+        }
+      }
+    },
+    "semantic_resolver": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The mandatory semantic pass over the scanned record set. Per-record schema validation says a record is well formed; it never says which accepted record is the effective authority. Effective authority is computed per exact affected-rule subject and explicit supersession-connected lineage. Independent decisions with no supersession edge may coexist on a file; within one subject-lineage there is exactly one effective accepted head. A supersession transfers authority only for the normalized subjects shared by the superseding and superseded records; it never erases an unrelated subject.",
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_validation_alone_establishes_effective_authority",
+        "effective_authority_rule",
+        "status_rewrite_permitted",
+        "superseded_record_edit_permitted",
+        "affected_rule_subject_contract",
+        "output_contract",
+        "resolvable_legacy_references",
+        "algorithm",
+        "errors"
+      ],
+      "properties": {
+        "kernel_id": {
+          "const": "devai.kernel.adr-supersession-resolution.v3",
+          "description": "The named resolver. An implementation that resolves supersession by any other procedure is not this kernel and does not discharge the obligation."
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_validation_alone_establishes_effective_authority": {
+          "const": false,
+          "description": "Article 41: a record validating against adr-v2 is not a demonstration that it still binds."
+        },
+        "effective_authority_rule": {
+          "const": "unique-effective-accepted-head-per-affected-rule-subject-lineage",
+          "description": "An accepted record becomes non-effective only for a normalized affected-rule subject transferred to it by an accepted successor. Each deterministic supersession-connected lineage for that subject must resolve to exactly one effective accepted head; independent lineages may coexist."
+        },
+        "status_rewrite_permitted": {
+          "const": false,
+          "description": "Non-effective is a computed property. The superseded record keeps its recorded accepted status and its bytes."
+        },
+        "superseded_record_edit_permitted": {
+          "const": false
+        },
+        "affected_rule_subject_contract": {
+          "$ref": "#/$defs/affected_rule_subject_contract"
+        },
+        "output_contract": {
+          "$ref": "#/$defs/output_contract"
+        },
+        "resolvable_legacy_references": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "The exact digest-pinned historical identities a supersedes entry may resolve to. This list is a bijection with catalogued accepted-record entries by reference, path, and disposition; catalog presence alone never makes a historical identity resolvable.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "path", "disposition"],
+            "properties": {
+              "reference": {
+                "$ref": "#/$defs/legacy_reference"
+              },
+              "path": {
+                "$ref": "#/$defs/relative_path"
+              },
+              "disposition": {
+                "enum": ["preserved-pre-v2-record", "preserved-invalid-accepted-record"]
+              }
+            }
+          }
+        },
+        "algorithm": {
+          "type": "array",
+          "minItems": 23,
+          "maxItems": 23,
+          "items": false,
+          "description": "The frozen ordered procedure. Steps are evaluated in this order and a rejection at any step ends the resolution; no step is optional, reorderable, or replaceable by a weaker check.",
+          "prefixItems": [
+            {
+              "const": "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field"
+            },
+            {
+              "const": "materialize-each-catalogued-accepted-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match"
+            },
+            {
+              "const": "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references"
+            },
+            {
+              "const": "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects"
+            },
+            {
+              "const": "validate-every-affected-rule-subject-as-an-already-nfc-canonical-repository-relative-posix-governed-or-review-subject-without-filesystem-or-git-access-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set"
+            },
+            {
+              "const": "reject-when-two-scanned-records-declare-the-same-id"
+            },
+            {
+              "const": "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference"
+            },
+            {
+              "const": "reject-when-a-supersedes-entry-resolves-to-nothing"
+            },
+            {
+              "const": "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself"
+            },
+            {
+              "const": "build-one-global-directed-supersession-edge-for-every-resolved-record-reference-before-subject-projection"
+            },
+            {
+              "const": "reject-when-the-global-supersession-graph-contains-any-cycle"
+            },
+            {
+              "const": "build-one-directed-edge-for-each-normalized-affected-rule-subject-in-the-intersection-of-an-accepted-superseding-record-and-its-resolved-target"
+            },
+            {
+              "const": "reject-when-an-affected-rule-subject-supersession-graph-contains-any-cycle"
+            },
+            {
+              "const": "partition-each-affected-rule-subject-supersession-graph-into-deterministic-weakly-connected-subject-lineages"
+            },
+            {
+              "const": "compute-the-transitive-closure-of-supersession-over-accepted-records-per-affected-rule-subject-lineage"
+            },
+            {
+              "const": "mark-an-accepted-record-non-effective-only-for-an-affected-rule-subject-lineage-superseded-directly-or-transitively-by-an-accepted-record"
+            },
+            {
+              "const": "define-the-effective-accepted-head-of-an-affected-rule-subject-lineage-as-an-accepted-record-for-that-subject-not-marked-non-effective"
+            },
+            {
+              "const": "reject-when-one-target-has-more-than-one-effective-accepted-direct-successor-for-the-same-affected-rule-subject"
+            },
+            {
+              "const": "reject-when-an-affected-rule-subject-lineage-has-more-than-one-effective-accepted-head"
+            },
+            {
+              "const": "emit-an-instance-validatable-adr-validation-result-with-sorted-adrs-that-preserve-affected-rules-and-add-sorted-effective-affected-rules-and-derived-effective"
+            },
+            {
+              "const": "emit-effective-authorities-as-the-sorted-unique-union-of-subject-authority-effective-heads"
+            },
+            {
+              "const": "emit-sorted-subject-authorities-with-subject-sorted-lineage-members-and-effective-head"
+            },
+            {
+              "const": "require-every-downstream-coverage-consumer-to-use-adrs-effective-affected-rules"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "items": false,
+          "description": "The exact codes this kernel may report. An implementation reporting a different code, or passing where one of these applies, is not this kernel.",
+          "prefixItems": [
+            {
+              "const": "adr-legacy-catalog-metadata-invalid"
+            },
+            {
+              "const": "adr-legacy-reference-allowlist-mismatch"
+            },
+            {
+              "const": "adr-affected-rule-subject-invalid"
+            },
+            {
+              "const": "adr-duplicate-id"
+            },
+            {
+              "const": "adr-unresolved-supersedes-reference"
+            },
+            {
+              "const": "adr-uncatalogued-legacy-reference"
+            },
+            {
+              "const": "adr-self-supersedes-reference"
+            },
+            {
+              "const": "adr-supersession-cycle"
+            },
+            {
+              "const": "adr-multiple-accepted-direct-successors"
+            },
+            {
+              "const": "adr-conflicting-supersession-branch"
+            },
+            {
+              "const": "adr-multiple-effective-accepted-heads"
+            },
+            {
+              "const": "adr-superseded-record-edited"
+            },
+            {
+              "const": "adr-semantic-resolution-not-performed"
+            }
+          ]
+        }
+      }
+    },
+    "exception_catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest_algorithm",
+        "canonical_form",
+        "ordering",
+        "catalog_digest_sha256",
+        "entries",
+        "digest_mismatch_behavior",
+        "content_mismatch_behavior"
+      ],
+      "properties": {
+        "digest_algorithm": {
+          "const": "sha256"
+        },
+        "canonical_form": {
+          "const": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
+          "description": "The UTF-8 RFC 8785 canonical JSON bytes of the complete entries array after sorting entries by path as UTF-8 bytes. This binds disposition, reason, and every catalog-supplied legacy metadata field as well as path and file digest."
+        },
+        "ordering": {
+          "const": "utf8-bytes-ascending-by-path"
+        },
+        "catalog_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "sha256 over the canonical form of entries. Binds the catalog as a whole so an entry cannot be added or dropped without changing this value."
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "disposition", "reason"],
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/relative_path",
+                "description": "Exact path relative to scan.root. No glob, no prefix, no directory exception."
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "disposition": {
+                "enum": [
+                  "non-record",
+                  "preserved-pre-v2-record",
+                  "preserved-invalid-accepted-record"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 500
+              },
+              "legacy_record": {
+                "$ref": "#/$defs/legacy_record"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "disposition": {
+                      "enum": ["preserved-pre-v2-record", "preserved-invalid-accepted-record"]
+                    }
+                  },
+                  "required": ["disposition"]
+                },
+                "then": { "required": ["legacy_record"] },
+                "else": { "not": { "required": ["legacy_record"] } }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "disposition": { "const": "preserved-invalid-accepted-record" }
+                  },
+                  "required": ["disposition"]
+                },
+                "then": {
+                  "properties": {
+                    "legacy_record": {
+                      "required": ["status", "source_format"],
+                      "properties": {
+                        "status": { "const": "accepted" },
+                        "source_format": { "const": "v2-record-missing-required-section" }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "digest_mismatch_behavior": {
+          "const": "fail"
+        },
+        "content_mismatch_behavior": {
+          "const": "fail",
+          "description": "A catalogued file whose bytes no longer hash to its pinned sha256 fails the scan; the exception does not migrate to the new content."
+        }
+      }
+    },
+    "fail_closed": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    },
+    "legacy_reference": {
+      "type": "string",
+      "pattern": "^(?:ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$",
+      "description": "Stable catalog-supplied identity for one exact digest-pinned historical record. It may name a pre-v2 record or the explicitly classified accepted record whose invalid body must remain byte-preserved; catalog presence never permits a general repair-in-place exception."
+    },
+    "adr_reference": {
+      "type": "string",
+      "pattern": "^(?:ADR-(?:[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}|[0-9]{3,})|LEGACY:[A-Za-z0-9][A-Za-z0-9._-]{0,199})$"
+    },
+    "legacy_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "title",
+        "status",
+        "date",
+        "source_format",
+        "supersedes",
+        "affected_rules"
+      ],
+      "description": "Architect-supplied normalized metadata for one immutable historical record. Validators do not infer missing identity or lifecycle data from historical bytes.",
+      "properties": {
+        "reference": { "$ref": "#/$defs/legacy_reference" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["proposed", "accepted", "rejected", "superseded"] },
+        "date": { "type": ["string", "null"], "format": "date" },
+        "source_format": {
+          "enum": [
+            "numeric-id-frontmatter",
+            "date-id-frontmatter",
+            "scoped-id-frontmatter",
+            "no-frontmatter",
+            "adr_id-frontmatter",
+            "v2-record-missing-required-section"
+          ]
+        },
+        "supersedes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/adr_reference" }
+        },
+        "affected_rules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/affected_rule_subject" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "accepted" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "affected_rules": { "minItems": 1 } }
+          }
+        }
+      ]
+    },
+    "affected_rule_subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^(?!/)(?![A-Za-z]:/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)(?!.*[*?\\[\\]{}])(?:[^/\\u0000\\\\]+/)*[^/\\u0000\\\\]+$",
+      "description": "Lexically canonical repository-relative POSIX governed or review subject. Semantic resolution requires input already normalized to Unicode NFC and performs no filesystem or Git lookup."
+    },
+    "affected_rule_subject_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "unicode_normalization",
+        "input_must_already_be_nfc",
+        "forbidden",
+        "comparison"
+      ],
+      "properties": {
+        "kind": { "const": "canonical-nfc-repository-relative-posix-governed-or-review-subject" },
+        "unicode_normalization": { "const": "NFC" },
+        "input_must_already_be_nfc": { "const": true },
+        "forbidden": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false,
+          "prefixItems": [
+            { "const": "absolute-path" },
+            { "const": "windows-drive-absolute" },
+            { "const": "backslash" },
+            { "const": "empty-segment" },
+            { "const": "dot-segment" },
+            { "const": "dotdot-segment" },
+            { "const": "duplicate-separator" },
+            { "const": "nul" },
+            { "const": "glob" },
+            { "const": "trailing-separator" },
+            { "const": "non-nfc-alias" }
+          ]
+        },
+        "comparison": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" }
+      }
+    },
+    "output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_schema_pointer",
+        "canonical_comparison",
+        "validate_adrs_envelope",
+        "adr_projection",
+        "effective_authorities",
+        "subject_authorities",
+        "downstream_coverage_subject_source",
+        "result_state",
+        "semantic_rules"
+      ],
+      "properties": {
+        "result_schema_pointer": {
+          "const": "law/schemas/adr-validation-policy.schema.json#/$defs/adrValidationResult"
+        },
+        "canonical_comparison": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" },
+        "validate_adrs_envelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["top_level_fields", "additional_properties", "error_entry"],
+          "properties": {
+            "top_level_fields": {
+              "type": "array",
+              "minItems": 8,
+              "maxItems": 8,
+              "items": false,
+              "prefixItems": [
+                { "const": "ok" },
+                { "const": "kernel_id" },
+                { "const": "semantic_resolution_performed" },
+                { "const": "files_scanned" },
+                { "const": "errors" },
+                { "const": "adrs" },
+                { "const": "effective_authorities" },
+                { "const": "subject_authorities" }
+              ]
+            },
+            "additional_properties": { "const": false },
+            "error_entry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["required_fields", "optional_fields", "additional_properties"],
+              "properties": {
+                "required_fields": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": false,
+                  "prefixItems": [{ "const": "file" }, { "const": "message" }]
+                },
+                "optional_fields": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": false,
+                  "prefixItems": [{ "const": "code" }, { "const": "pointer" }]
+                },
+                "additional_properties": { "const": false }
+              }
+            }
+          }
+        },
+        "adr_projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "array_field",
+            "adr_order",
+            "adr_id_field",
+            "public_fields",
+            "format_values",
+            "preserved_declared_fields",
+            "affected_rules_order",
+            "effective_affected_rules",
+            "effective"
+          ],
+          "properties": {
+            "array_field": { "const": "adrs" },
+            "adr_order": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" },
+            "adr_id_field": { "const": "adr_id" },
+            "format_values": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": false,
+              "prefixItems": [{ "const": "v2" }, { "const": "legacy-catalog" }]
+            },
+            "public_fields": {
+              "type": "array",
+              "minItems": 10,
+              "maxItems": 10,
+              "items": false,
+              "prefixItems": [
+                { "const": "file" },
+                { "const": "adr_id" },
+                { "const": "title" },
+                { "const": "status" },
+                { "const": "date" },
+                { "const": "format" },
+                { "const": "supersedes" },
+                { "const": "affected_rules" },
+                { "const": "effective" },
+                { "const": "effective_affected_rules" }
+              ]
+            },
+            "preserved_declared_fields": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": false,
+              "prefixItems": [{ "const": "adr_id" }, { "const": "affected_rules" }]
+            },
+            "affected_rules_order": { "const": "declaration-order-preserved" },
+            "effective_affected_rules": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["field", "type", "ordering", "unique", "definition"],
+              "properties": {
+                "field": { "const": "effective_affected_rules" },
+                "type": { "const": "array<affected-rule-subject>" },
+                "ordering": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" },
+                "unique": { "const": true },
+                "definition": {
+                  "const": "declared subjects for which this record is the effective accepted head of at least one subject-lineage"
+                }
+              }
+            },
+            "effective": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["field", "type", "definition"],
+              "properties": {
+                "field": { "const": "effective" },
+                "type": { "const": "boolean" },
+                "definition": {
+                  "const": "true-if-and-only-if-effective_affected_rules-is-nonempty"
+                }
+              }
+            }
+          }
+        },
+        "effective_authorities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field", "type", "ordering", "unique", "definition"],
+          "properties": {
+            "field": { "const": "effective_authorities" },
+            "type": { "const": "array<adr-reference>" },
+            "ordering": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" },
+            "unique": { "const": true },
+            "definition": {
+              "const": "sorted-unique compatibility union of every subject_authorities effective_head"
+            }
+          }
+        },
+        "subject_authorities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field", "type", "ordering", "entry_fields", "definition"],
+          "properties": {
+            "field": { "const": "subject_authorities" },
+            "type": { "const": "array<subject-authority-entry>" },
+            "ordering": {
+              "const": "subject-then-lineage_members-rfc8785-jcs-utf8-byte-lexicographic-ascending"
+            },
+            "entry_fields": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": false,
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "type", "ordering"],
+                  "properties": {
+                    "name": { "const": "subject" },
+                    "type": { "const": "affected-rule-subject" },
+                    "ordering": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "type", "ordering", "unique"],
+                  "properties": {
+                    "name": { "const": "lineage_members" },
+                    "type": { "const": "array<adr-reference>" },
+                    "ordering": { "const": "rfc8785-jcs-utf8-byte-lexicographic-ascending" },
+                    "unique": { "const": true }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "type"],
+                  "properties": {
+                    "name": { "const": "effective_head" },
+                    "type": { "const": "adr-reference" }
+                  }
+                }
+              ]
+            },
+            "definition": {
+              "const": "one entry for every deterministic weakly connected accepted subject-lineage"
+            }
+          }
+        },
+        "downstream_coverage_subject_source": { "const": "adrs[].effective_affected_rules" },
+        "result_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ok_true_iff", "semantic_resolution_false", "ok_false_authority"],
+          "properties": {
+            "ok_true_iff": { "const": "semantic-resolution-performed-and-errors-empty" },
+            "semantic_resolution_false": {
+              "const": "ok-false-and-at-least-one-adr-semantic-resolution-not-performed-error"
+            },
+            "ok_false_authority": {
+              "const": "all-adrs-non-effective-with-empty-effective-affected-rules-and-empty-top-level-authorities"
+            }
+          }
+        },
+        "semantic_rules": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "adrs-must-be-sorted-by-adr-id-rfc8785-jcs-utf8-byte-lexicographic-ascending-and-adr-id-must-be-unique"
+            },
+            {
+              "const": "each-effective-affected-rules-array-must-be-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-and-a-subset-of-that-adrs-declared-affected-rules"
+            },
+            {
+              "const": "each-effective-must-equal-whether-that-adrs-effective-affected-rules-array-is-nonempty"
+            },
+            {
+              "const": "subject-authorities-must-be-sorted-by-subject-then-lineage-members-rfc8785-jcs-utf8-byte-lexicographic-ascending-each-lineage-members-array-must-be-sorted-unique-and-contain-its-effective-head"
+            },
+            {
+              "const": "each-subject-authority-member-and-head-must-reference-a-known-adr-member-must-declare-the-subject-and-members-must-exactly-equal-that-subjects-weak-component"
+            },
+            {
+              "const": "each-subject-authority-head-must-be-the-unique-effective-adr-for-its-subject-lineage-and-biject-with-that-heads-effective-affected-rules-subject"
+            },
+            {
+              "const": "effective-authorities-must-equal-the-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-set-of-subject-authority-effective-heads-and-of-adr-ids-with-nonempty-effective-affected-rules"
+            },
+            {
+              "const": "result-state-must-enforce-ok-iff-semantic-resolution-performed-and-errors-empty-and-ok-false-must-grant-no-effective-authority"
+            }
+          ]
+        }
+      }
+    },
+    "adrValidationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "kernel_id",
+        "semantic_resolution_performed",
+        "files_scanned",
+        "errors",
+        "adrs",
+        "effective_authorities",
+        "subject_authorities"
+      ],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "kernel_id": { "const": "devai.kernel.adr-supersession-resolution.v3" },
+        "semantic_resolution_performed": { "type": "boolean" },
+        "files_scanned": { "type": "integer", "minimum": 0 },
+        "errors": { "type": "array", "items": { "$ref": "#/$defs/adrValidationError" } },
+        "adrs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/adrValidationResultAdr" }
+        },
+        "effective_authorities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/adr_reference" }
+        },
+        "subject_authorities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/adrValidationSubjectAuthority" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+          "then": {
+            "properties": {
+              "semantic_resolution_performed": { "const": true },
+              "errors": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "semantic_resolution_performed": { "const": true },
+              "errors": { "maxItems": 0 }
+            },
+            "required": ["semantic_resolution_performed", "errors"]
+          },
+          "then": { "properties": { "ok": { "const": true } } }
+        },
+        {
+          "if": {
+            "properties": { "semantic_resolution_performed": { "const": false } },
+            "required": ["semantic_resolution_performed"]
+          },
+          "then": {
+            "properties": {
+              "ok": { "const": false },
+              "errors": {
+                "contains": {
+                  "type": "object",
+                  "required": ["code"],
+                  "properties": { "code": { "const": "adr-semantic-resolution-not-performed" } }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
+          "then": {
+            "properties": {
+              "effective_authorities": { "maxItems": 0 },
+              "subject_authorities": { "maxItems": 0 },
+              "adrs": {
+                "items": {
+                  "properties": {
+                    "effective": { "const": false },
+                    "effective_affected_rules": { "maxItems": 0 }
+                  }
+                }
+              }
+            },
+            "anyOf": [
+              { "properties": { "semantic_resolution_performed": { "const": false } } },
+              { "properties": { "errors": { "minItems": 1 } } }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "semantic_resolution_performed": { "const": true },
+              "errors": { "minItems": 1 }
+            },
+            "required": ["semantic_resolution_performed", "errors"]
+          },
+          "then": { "properties": { "ok": { "const": false } } }
+        }
+      ]
+    },
+    "adrValidationResultAdr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "adr_id",
+        "title",
+        "status",
+        "date",
+        "format",
+        "supersedes",
+        "affected_rules",
+        "effective",
+        "effective_affected_rules"
+      ],
+      "properties": {
+        "file": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "adr_id": { "$ref": "#/$defs/adr_reference" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["proposed", "accepted", "rejected", "superseded"] },
+        "date": { "type": ["string", "null"], "format": "date" },
+        "format": { "enum": ["v2", "legacy-catalog"] },
+        "supersedes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/adr_reference" }
+        },
+        "affected_rules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/affected_rule_subject" }
+        },
+        "effective_affected_rules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/affected_rule_subject" }
+        },
+        "effective": { "type": "boolean" }
+      }
+    },
+    "adrValidationError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "pointer": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "file": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "adrValidationSubjectAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "lineage_members", "effective_head"],
+      "properties": {
+        "subject": { "$ref": "#/$defs/affected_rule_subject" },
+        "lineage_members": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/adr_reference" }
+        },
+        "effective_head": { "$ref": "#/$defs/adr_reference" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "adr-validation",
+      "status": "active",
+      "authority": "Architect",
+      "policy_version": "2.7.0",
+      "record_schema": "law/schemas/adr-v2.schema.json",
+      "scan": {
+        "root": "law/adr",
+        "recursive": true,
+        "include": ["*.md", "**/*.md"],
+        "extension_match": "case-insensitive",
+        "follow_symlinks": false,
+        "unreadable_behavior": "fail",
+        "unmatched_file_behavior": "fail",
+        "empty_directory_behavior": "pass"
+      },
+      "identity": {
+        "id_pattern": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$",
+        "id_required": true,
+        "scope_source": "id-scope-segments",
+        "filename_binding": "basename-starts-with-id-followed-by-hyphen",
+        "uniqueness": "id-unique-across-recursive-scan"
+      },
+      "lifecycle": {
+        "statuses": ["proposed", "accepted", "rejected", "superseded"],
+        "binding_statuses": ["accepted"],
+        "unknown_status_behavior": "fail"
+      },
+      "body": {
+        "required_sections": ["Status"],
+        "missing_section_behavior": "fail"
+      },
+      "supersession": {
+        "recorded_on": "superseding-record-only",
+        "edit_superseded_record": false,
+        "unresolved_reference_behavior": "fail",
+        "self_reference_behavior": "fail"
+      },
+      "semantic_resolver": {
+        "kernel_id": "devai.kernel.adr-supersession-resolution.v3",
+        "mandatory": true,
+        "schema_validation_alone_establishes_effective_authority": false,
+        "effective_authority_rule": "unique-effective-accepted-head-per-affected-rule-subject-lineage",
+        "status_rewrite_permitted": false,
+        "superseded_record_edit_permitted": false,
+        "affected_rule_subject_contract": {
+          "kind": "canonical-nfc-repository-relative-posix-governed-or-review-subject",
+          "unicode_normalization": "NFC",
+          "input_must_already_be_nfc": true,
+          "forbidden": [
+            "absolute-path",
+            "windows-drive-absolute",
+            "backslash",
+            "empty-segment",
+            "dot-segment",
+            "dotdot-segment",
+            "duplicate-separator",
+            "nul",
+            "glob",
+            "trailing-separator",
+            "non-nfc-alias"
+          ],
+          "comparison": "rfc8785-jcs-utf8-byte-lexicographic-ascending"
+        },
+        "output_contract": {
+          "result_schema_pointer": "law/schemas/adr-validation-policy.schema.json#/$defs/adrValidationResult",
+          "canonical_comparison": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
+          "validate_adrs_envelope": {
+            "top_level_fields": [
+              "ok",
+              "kernel_id",
+              "semantic_resolution_performed",
+              "files_scanned",
+              "errors",
+              "adrs",
+              "effective_authorities",
+              "subject_authorities"
+            ],
+            "additional_properties": false,
+            "error_entry": {
+              "required_fields": ["file", "message"],
+              "optional_fields": ["code", "pointer"],
+              "additional_properties": false
+            }
+          },
+          "adr_projection": {
+            "array_field": "adrs",
+            "adr_order": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
+            "adr_id_field": "adr_id",
+            "format_values": ["v2", "legacy-catalog"],
+            "public_fields": [
+              "file",
+              "adr_id",
+              "title",
+              "status",
+              "date",
+              "format",
+              "supersedes",
+              "affected_rules",
+              "effective",
+              "effective_affected_rules"
+            ],
+            "preserved_declared_fields": ["adr_id", "affected_rules"],
+            "affected_rules_order": "declaration-order-preserved",
+            "effective_affected_rules": {
+              "field": "effective_affected_rules",
+              "type": "array<affected-rule-subject>",
+              "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
+              "unique": true,
+              "definition": "declared subjects for which this record is the effective accepted head of at least one subject-lineage"
+            },
+            "effective": {
+              "field": "effective",
+              "type": "boolean",
+              "definition": "true-if-and-only-if-effective_affected_rules-is-nonempty"
+            }
+          },
+          "effective_authorities": {
+            "field": "effective_authorities",
+            "type": "array<adr-reference>",
+            "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
+            "unique": true,
+            "definition": "sorted-unique compatibility union of every subject_authorities effective_head"
+          },
+          "subject_authorities": {
+            "field": "subject_authorities",
+            "type": "array<subject-authority-entry>",
+            "ordering": "subject-then-lineage_members-rfc8785-jcs-utf8-byte-lexicographic-ascending",
+            "entry_fields": [
+              {
+                "name": "subject",
+                "type": "affected-rule-subject",
+                "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending"
+              },
+              {
+                "name": "lineage_members",
+                "type": "array<adr-reference>",
+                "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
+                "unique": true
+              },
+              {
+                "name": "effective_head",
+                "type": "adr-reference"
+              }
+            ],
+            "definition": "one entry for every deterministic weakly connected accepted subject-lineage"
+          },
+          "downstream_coverage_subject_source": "adrs[].effective_affected_rules",
+          "result_state": {
+            "ok_true_iff": "semantic-resolution-performed-and-errors-empty",
+            "semantic_resolution_false": "ok-false-and-at-least-one-adr-semantic-resolution-not-performed-error",
+            "ok_false_authority": "all-adrs-non-effective-with-empty-effective-affected-rules-and-empty-top-level-authorities"
+          },
+          "semantic_rules": [
+            "adrs-must-be-sorted-by-adr-id-rfc8785-jcs-utf8-byte-lexicographic-ascending-and-adr-id-must-be-unique",
+            "each-effective-affected-rules-array-must-be-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-and-a-subset-of-that-adrs-declared-affected-rules",
+            "each-effective-must-equal-whether-that-adrs-effective-affected-rules-array-is-nonempty",
+            "subject-authorities-must-be-sorted-by-subject-then-lineage-members-rfc8785-jcs-utf8-byte-lexicographic-ascending-each-lineage-members-array-must-be-sorted-unique-and-contain-its-effective-head",
+            "each-subject-authority-member-and-head-must-reference-a-known-adr-member-must-declare-the-subject-and-members-must-exactly-equal-that-subjects-weak-component",
+            "each-subject-authority-head-must-be-the-unique-effective-adr-for-its-subject-lineage-and-biject-with-that-heads-effective-affected-rules-subject",
+            "effective-authorities-must-equal-the-rfc8785-jcs-utf8-byte-lexicographic-sorted-unique-set-of-subject-authority-effective-heads-and-of-adr-ids-with-nonempty-effective-affected-rules",
+            "result-state-must-enforce-ok-iff-semantic-resolution-performed-and-errors-empty-and-ok-false-must-grant-no-effective-authority"
+          ]
+        },
+        "resolvable_legacy_references": [
+          {
+            "reference": "ADR-014",
+            "path": "ADR-014-release-verification-profiles.md",
+            "disposition": "preserved-pre-v2-record"
+          },
+          {
+            "reference": "ADR-MUT-0005",
+            "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+            "disposition": "preserved-invalid-accepted-record"
+          },
+          {
+            "reference": "ADR-REL-0017",
+            "path": "ADR-REL-0017-package-owned-release-policy-resolution.md",
+            "disposition": "preserved-invalid-accepted-record"
+          }
+        ],
+        "algorithm": [
+          "verify-the-exception-catalog-digest-over-the-rfc8785-jcs-canonical-entries-array-including-every-legacy-metadata-field",
+          "materialize-each-catalogued-accepted-record-from-catalog-metadata-only-after-its-path-and-file-byte-digest-match",
+          "require-an-exact-bijection-between-materialized-legacy-record-reference-path-pairs-and-resolvable_legacy_references",
+          "collect-every-v2-and-materialized-legacy-record-with-its-id-status-supersedes-list-and-affected-rule-subjects",
+          "validate-every-affected-rule-subject-as-an-already-nfc-canonical-repository-relative-posix-governed-or-review-subject-without-filesystem-or-git-access-and-reject-an-accepted-record-with-an-empty-invalid-or-duplicate-subject-set",
+          "reject-when-two-scanned-records-declare-the-same-id",
+          "resolve-every-supersedes-entry-to-exactly-one-scanned-record-id-or-one-catalogued-legacy-reference",
+          "reject-when-a-supersedes-entry-resolves-to-nothing",
+          "reject-when-a-supersedes-entry-resolves-to-the-declaring-record-itself",
+          "build-one-global-directed-supersession-edge-for-every-resolved-record-reference-before-subject-projection",
+          "reject-when-the-global-supersession-graph-contains-any-cycle",
+          "build-one-directed-edge-for-each-normalized-affected-rule-subject-in-the-intersection-of-an-accepted-superseding-record-and-its-resolved-target",
+          "reject-when-an-affected-rule-subject-supersession-graph-contains-any-cycle",
+          "partition-each-affected-rule-subject-supersession-graph-into-deterministic-weakly-connected-subject-lineages",
+          "compute-the-transitive-closure-of-supersession-over-accepted-records-per-affected-rule-subject-lineage",
+          "mark-an-accepted-record-non-effective-only-for-an-affected-rule-subject-lineage-superseded-directly-or-transitively-by-an-accepted-record",
+          "define-the-effective-accepted-head-of-an-affected-rule-subject-lineage-as-an-accepted-record-for-that-subject-not-marked-non-effective",
+          "reject-when-one-target-has-more-than-one-effective-accepted-direct-successor-for-the-same-affected-rule-subject",
+          "reject-when-an-affected-rule-subject-lineage-has-more-than-one-effective-accepted-head",
+          "emit-an-instance-validatable-adr-validation-result-with-sorted-adrs-that-preserve-affected-rules-and-add-sorted-effective-affected-rules-and-derived-effective",
+          "emit-effective-authorities-as-the-sorted-unique-union-of-subject-authority-effective-heads",
+          "emit-sorted-subject-authorities-with-subject-sorted-lineage-members-and-effective-head",
+          "require-every-downstream-coverage-consumer-to-use-adrs-effective-affected-rules"
+        ],
+        "errors": [
+          "adr-legacy-catalog-metadata-invalid",
+          "adr-legacy-reference-allowlist-mismatch",
+          "adr-affected-rule-subject-invalid",
+          "adr-duplicate-id",
+          "adr-unresolved-supersedes-reference",
+          "adr-uncatalogued-legacy-reference",
+          "adr-self-supersedes-reference",
+          "adr-supersession-cycle",
+          "adr-multiple-accepted-direct-successors",
+          "adr-conflicting-supersession-branch",
+          "adr-multiple-effective-accepted-heads",
+          "adr-superseded-record-edited",
+          "adr-semantic-resolution-not-performed"
+        ]
+      },
+      "exception_catalog": {
+        "digest_algorithm": "sha256",
+        "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
+        "ordering": "utf8-bytes-ascending-by-path",
+        "catalog_digest_sha256": "25f16c44e293c0219b48c1cbf2587ec09d4d35c6a2fc3f136432f42c7659bd18",
+        "entries": [
+          {
+            "path": "ADR-014-release-verification-profiles.md",
+            "sha256": "1d644d0221dab66332d24366f12aeaf454444db1876e0c38a58247d6639ea440",
+            "disposition": "preserved-pre-v2-record",
+            "reason": "Pre-v2 record preserved byte-for-byte. Superseded forward by ADR-REL-0001; never edited, never revalidated against the v2 record schema.",
+            "legacy_record": {
+              "reference": "ADR-014",
+              "title": "Capability-based release verification profiles",
+              "status": "accepted",
+              "date": "2026-08-29",
+              "source_format": "numeric-id-frontmatter",
+              "supersedes": [],
+              "affected_rules": [
+                "law/policy/release-verification.json",
+                "law/schemas/release-verification-profile.schema.json"
+              ]
+            }
+          },
+          {
+            "path": "ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+            "sha256": "9329c112b76028340cabacf9e9499586e4bb0d34465f8f94152c3353bfe2e13b",
+            "disposition": "preserved-invalid-accepted-record",
+            "reason": "Accepted historical record preserved byte-for-byte after a post-acceptance body-section defect was discovered. Its catalog metadata is the only materialized authority; ADR-MUT-0006 supersedes it forward. This one digest-pinned classification does not authorize repair in place or a general invalid-record exception.",
+            "legacy_record": {
+              "reference": "ADR-MUT-0005",
+              "title": "Unambiguous mutation digest and verification boundaries",
+              "status": "accepted",
+              "date": "2026-09-03",
+              "source_format": "v2-record-missing-required-section",
+              "supersedes": ["ADR-MUT-0004"],
+              "affected_rules": [
+                "law/policy/mutation-evidence-v2.json",
+                "law/schemas/mutation-evidence-policy-v2.schema.json",
+                "law/schemas/mutation-report-set-v2.schema.json"
+              ]
+            }
+          },
+          {
+            "path": "ADR-REL-0017-package-owned-release-policy-resolution.md",
+            "sha256": "07f1d17f88d8c48f25b51cff7e882cb2c7c23a3d529098c51b8c19431a946e19",
+            "disposition": "preserved-invalid-accepted-record",
+            "reason": "Accepted ADR-REL-0017 is preserved byte-for-byte after its noncanonical Consequences heading failed required_sections. Only this exact digest is catalogued; ADR-REL-0019 supersedes it with the same substantive source-resolution contract. No repair in place or general invalid-record exception is authorized.",
+            "legacy_record": {
+              "reference": "ADR-REL-0017",
+              "title": "Bind release planning to installed policy and declarative adoption",
+              "status": "accepted",
+              "date": "2026-09-03",
+              "source_format": "v2-record-missing-required-section",
+              "supersedes": [],
+              "affected_rules": [
+                "law/policy/action-registry.json",
+                "law/policy/release-lifecycle.json",
+                "law/schemas/release-lifecycle-policy.schema.json",
+                "law/schemas/release-plan-receipt-v2.schema.json",
+                "law/schemas/release-policy-resolution.schema.json"
+              ]
+            }
+          },
+          {
+            "path": "README.md",
+            "sha256": "3b1943af6a3024e6bdb6e1c1ec67683707cf3caac66ada69a26f2419ad80671f",
+            "disposition": "non-record",
+            "reason": "Directory prose describing how adopters add their own records. It is not a decision record and carries no identity."
+          }
+        ],
+        "digest_mismatch_behavior": "fail",
+        "content_mismatch_behavior": "fail"
+      },
+      "fail_closed": ["unparseable-frontmatter"]
+    }
+  ]
+}

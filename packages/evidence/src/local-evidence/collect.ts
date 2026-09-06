@@ -8,12 +8,12 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { dirname, join, relative } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 import { computeSourceHash, type SourceHash } from './source-hash.js';
 import { resolveLocalEvidencePolicy, type LocalEvidencePolicy } from './config.js';
 import { deriveExactSubject, type LocalEvidenceSubject } from './subject.js';
 
-const validateLocalEvidenceManifest = getValidator('local-evidence-manifest.schema.json');
+const validateLocalEvidenceManifest = validators.localEvidenceManifest;
 
 /**
  * `devai evidence local collect` core (D-117): assemble a

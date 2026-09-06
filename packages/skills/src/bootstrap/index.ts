@@ -37,10 +37,7 @@ const POLICY_FILES = [
 ] as const;
 const ADOPTER_LAW_POLICY_FILES = ['mutation-strength.json'] as const;
 
-export const MATERIALIZED_POLICY_FILES = [
-  ...POLICY_FILES,
-  'subprocess-effects.json',
-] as const;
+export const MATERIALIZED_POLICY_FILES = [...POLICY_FILES, 'subprocess-effects.json'] as const;
 
 const _CANONICAL_POLICY_FILES = [
   ...POLICY_FILES,
@@ -151,7 +148,11 @@ const REGISTERED_POLICY_SCHEMAS: Partial<
   'scorecard-na.json': 'scorecard-na-config.schema.json',
 };
 
-export function validateCanonicalPolicyContent(file: BootstrapPolicyFile, bytes: string): string {
+export function validateCanonicalPolicyContent(
+  file: BootstrapPolicyFile,
+  bytes: string,
+  resolveValidator: typeof getValidator = getValidator,
+): string {
   let parsed: unknown;
   try {
     parsed = JSON.parse(bytes);
@@ -162,8 +163,8 @@ export function validateCanonicalPolicyContent(file: BootstrapPolicyFile, bytes:
   }
   const schemaName = REGISTERED_POLICY_SCHEMAS[file];
   if (schemaName !== undefined) {
-    const validate = getValidator(schemaName);
-    if (!validate(parsed)) {
+    const validate = resolveValidator(schemaName);
+    if (validate(parsed) !== true) {
       const detail = (validate.errors ?? [])
         .map((error) => `${error.instancePath || '/'} ${error.message ?? ''}`)
         .join('; ');

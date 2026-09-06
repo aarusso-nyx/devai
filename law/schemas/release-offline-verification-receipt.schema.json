@@ -1,0 +1,1232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-offline-verification-receipt.schema.json",
+  "title": "Release offline verification receipt",
+  "description": "The deterministic document emitted to stdout by release offline-verify. It verifies an exported artifact and its evidence bundle without network access and writes nothing: no state record, no evidence, no receipt file. A passing receipt observes the derived state offline_verified, which is never persisted. Legacy 1.0/2.0 receipts retain pathname references for read-only observation only. Current 2.1 receipts bind the exact exported state, complete per-package and aggregate opaque ArtifactSink handles, one committed-manifest transaction identity, the rehashed bytes they resolve, and external verifier/trust inputs. It reports the complete ordered verification roster by fixed identifier, so a receipt that omits, reorders, substitutes, or invents a check is rejected rather than read as a shorter pass. It grants no authority and satisfies no prior state: release evidence-publish must bind a passing receipt as checkable evidence, and binding it is not the same as being permitted by it.",
+  "schema_version": "2.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "receipt_kind",
+    "canonicalization",
+    "receipt_id",
+    "verdict",
+    "state_observed",
+    "repository",
+    "candidate",
+    "verified_state",
+    "artifacts",
+    "verifier",
+    "verification_kernel",
+    "checks",
+    "network_access",
+    "emitted_by",
+    "grants",
+    "determinism",
+    "receipt_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": ["1.0.0", "2.0.0", "2.1.0"]
+    },
+    "receipt_kind": {
+      "const": "release-offline-verification-receipt"
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "encoding",
+        "json_form",
+        "digest_algorithm",
+        "receipt_projection_excludes",
+        "calculation_order"
+      ],
+      "properties": {
+        "kernel_id": {
+          "enum": [
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v2",
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v3"
+          ]
+        },
+        "encoding": { "const": "utf-8" },
+        "json_form": { "const": "rfc8785-jcs" },
+        "digest_algorithm": { "const": "sha256" },
+        "receipt_projection_excludes": { "const": ["receipt_id", "receipt_digest_sha256"] },
+        "calculation_order": {
+          "const": [
+            "compute-receipt_digest_sha256-over-the-receipt-projection",
+            "derive-receipt_id-as-ROV-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"
+          ]
+        }
+      }
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^ROV-[0-9a-f]{16}$",
+      "description": "Content-derived identity: canonical sha256 over every field of this receipt except receipt_id and receipt_digest_sha256, truncated to 16 hex characters."
+    },
+    "verdict": {
+      "enum": ["pass", "fail"]
+    },
+    "state_observed": {
+      "type": ["string", "null"],
+      "enum": [null, "offline_verified"],
+      "description": "A derived state. It exists in this receipt and never in a state record. Null on a failing verification."
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "verified_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "state_id", "record_digest_sha256"],
+      "description": "The exact exported state record whose artifacts this verification read. A receipt bound to a different exported record is a statement about something else.",
+      "properties": {
+        "state": {
+          "const": "exported"
+        },
+        "state_id": {
+          "type": "string",
+          "pattern": "^RLS-[0-9a-f]{16}$"
+        },
+        "record_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every artifact this verification rehashed. Legacy forms are pathname-bound read-only observations; current 2.1 forms are sink-bound opaque handles.",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/legacy_aggregate_artifact_ref" },
+          { "$ref": "#/$defs/v3_opaque_artifact_ref" }
+        ]
+      }
+    },
+    "artifact_sink_commit": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact_sink_commit" }],
+      "description": "The exact two-phase sink transaction and committed-manifest identity. It is required for current 2.1 receipts and absent from legacy pathname receipts."
+    },
+    "release_units": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The v2 legacy or v2.1 current per-release-unit package roster. A passing receipt binds each exported package artifact and the exact external trust identity used to verify it.",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/release_unit_evidence" },
+          { "$ref": "#/$defs/release_unit_handle_evidence" }
+        ]
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_name",
+        "package_version",
+        "registry",
+        "integrity_sri",
+        "provenance_sha256",
+        "source_commit"
+      ],
+      "description": "Exact identity of the verifier package that produced this verdict. An unidentified verifier produces an unattributable verdict, which is not evidence.",
+      "properties": {
+        "package_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "package_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "registry": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "integrity_sri": {
+          "type": "string",
+          "pattern": "^sha512-[A-Za-z0-9+/]+={0,2}$"
+        },
+        "provenance_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "verification_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_id",
+        "mandatory",
+        "schema_validation_alone_establishes_pass",
+        "supported_canonicalization_kernels",
+        "v2_package_trust_result_closure",
+        "roster",
+        "roster_complete",
+        "unknown_check_permitted",
+        "not_applicable_permitted_for",
+        "algorithm",
+        "errors"
+      ],
+      "description": "The named verifier that produced this roster and the exact roster it is obliged to run. A verification that ran a shorter list is not a weaker verification; it is a different one, and this receipt is not the document it may emit.",
+      "properties": {
+        "kernel_id": {
+          "enum": [
+            "devai.kernel.offline-verification-receipt.v1",
+            "devai.kernel.offline-verification-receipt.v2",
+            "devai.kernel.offline-verification-receipt.v3"
+          ]
+        },
+        "mandatory": {
+          "const": true
+        },
+        "schema_validation_alone_establishes_pass": {
+          "const": false
+        },
+        "supported_canonicalization_kernels": {
+          "const": [
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v2",
+            "devai.kernel.release-offline-verification-receipt-canonicalization.v3"
+          ]
+        },
+        "v2_package_trust_result_closure": {
+          "const": "for-a-v2-receipt-recompute-the-v2-canonicalization-and-require-the-release-unit-package-roster-to-close-exactly-over-manifest-tarball-sbom-evidence-manifest-provider-result-and-trust-root-trust-store-digest-key-id-and-signature-algorithm"
+        },
+        "v3_sink_handle_closure": {
+          "const": "for-a-v2.1-receipt-resolve-every-aggregate-and-per-package-opaque-handle-through-the-external-sink-rehash-byte-digest-and-size-require-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-with-the-exported-state-and-evidence-publish-input-and-verify-artifact-sink-commit-and-external-trust-inputs"
+        },
+        "v3_sink_handle_errors": {
+          "const": [
+            "rov-v3-opaque-artifact-closure-invalid",
+            "rov-v3-artifact-sink-commit-mismatch",
+            "rov-v3-external-sink-reverification-failed",
+            "rov-v3-evidence-publish-continuity-invalid"
+          ]
+        },
+        "roster": {
+          "const": [
+            "candidate-tree-identity",
+            "receipt-envelope-canonicality",
+            "signer-trust",
+            "policy-identity",
+            "result-dag-integrity",
+            "artifact-population",
+            "artifact-digests",
+            "artifact-safety",
+            "mutation-semantics"
+          ],
+          "description": "The complete ordered roster. checks reports exactly these nine identifiers in exactly this order: none omitted, none added, none reordered, none substituted."
+        },
+        "roster_complete": {
+          "const": true
+        },
+        "unknown_check_permitted": {
+          "const": false,
+          "description": "A check identifier outside the roster is not an extra assurance; it is an unrecognised claim and fails the receipt."
+        },
+        "not_applicable_permitted_for": {
+          "const": ["mutation-semantics"],
+          "description": "Exactly one check may report not-applicable, and only with a reason the canonical mutation policy permits. The other eight have no such status."
+        },
+        "algorithm": {
+          "const": [
+            "resolve-the-candidate-policy-verifier-artifacts-and-all-nine-check-results",
+            "recompute-every-resolved-identity-and-digest-and-reject-any-mismatch",
+            "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
+            "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
+            "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
+            "recompute-receipt_digest_sha256-and-receipt_id-under-the-schemaVersion-bound-release-offline-verification-receipt-canonicalization-kernel",
+            "reject-pass-when-any-preceding-step-fails"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": false,
+          "prefixItems": [
+            {
+              "const": "rov-check-roster-incomplete"
+            },
+            {
+              "const": "rov-check-roster-reordered"
+            },
+            {
+              "const": "rov-unknown-check-id"
+            },
+            {
+              "const": "rov-placeholder-check-result"
+            },
+            {
+              "const": "rov-required-check-not-passed"
+            },
+            {
+              "const": "rov-mutation-semantics-not-applicable-not-permitted"
+            },
+            {
+              "const": "rov-artifact-digest-mismatch"
+            },
+            {
+              "const": "rov-receipt-digest-mismatch"
+            },
+            {
+              "const": "rov-v2-package-trust-result-closure-invalid"
+            },
+            {
+              "const": "rov-semantic-verification-not-performed"
+            }
+          ]
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": false,
+      "description": "The complete ordered verification roster. Position is the identity of each check: the first eight are the checks a pass requires, and the ninth is the mutation-semantics check, which may be typed not-applicable only when the canonical mutation policy permits that reason.",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "candidate-tree-identity"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "receipt-envelope-canonicality"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "signer-trust"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "policy-identity"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "result-dag-integrity"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "artifact-population"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "artifact-digests"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/check",
+          "properties": {
+            "check_id": {
+              "const": "artifact-safety"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/mutation_semantics_check"
+        }
+      ]
+    },
+    "network_access": {
+      "const": false,
+      "description": "Offline is a property of the verification, not a preference. A verification that reached the network is not this receipt."
+    },
+    "emitted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "effect",
+        "output_channel",
+        "persists_repository_state",
+        "appends_state_record",
+        "writes_receipt_file"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "release offline-verify"
+        },
+        "effect": {
+          "const": "read"
+        },
+        "output_channel": {
+          "const": "stdout"
+        },
+        "persists_repository_state": {
+          "const": false
+        },
+        "appends_state_record": {
+          "const": false
+        },
+        "writes_receipt_file": {
+          "const": false
+        }
+      }
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "publication_authority", "lifecycle_transition", "satisfies_state"],
+      "properties": {
+        "authority": {
+          "const": false
+        },
+        "publication_authority": {
+          "const": false
+        },
+        "lifecycle_transition": {
+          "const": false
+        },
+        "satisfies_state": {
+          "const": false,
+          "description": "A passing verification never satisfies the exported prerequisite it checked, and never authorizes a publication."
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deterministic", "derived_from_bound_inputs_only", "contains_wall_clock_time"],
+      "properties": {
+        "deterministic": {
+          "const": true
+        },
+        "derived_from_bound_inputs_only": {
+          "const": true
+        },
+        "contains_wall_clock_time": {
+          "const": false
+        }
+      }
+    },
+    "receipt_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical digest of this receipt with receipt_id and this field omitted. Identity and integrity only; it is never a capability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "canonicalization": {
+            "properties": {
+              "kernel_id": {
+                "const": "devai.kernel.release-offline-verification-receipt-canonicalization.v1"
+              }
+            }
+          }
+        },
+        "properties": {
+          "artifacts": { "items": { "$ref": "#/$defs/legacy_aggregate_artifact_ref" } }
+        },
+        "not": {
+          "anyOf": [{ "required": ["release_units"] }, { "required": ["artifact_sink_commit"] }]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "2.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "required": ["release_units"],
+        "properties": {
+          "canonicalization": {
+            "properties": {
+              "kernel_id": {
+                "const": "devai.kernel.release-offline-verification-receipt-canonicalization.v2"
+              }
+            }
+          },
+          "artifacts": { "items": { "$ref": "#/$defs/legacy_aggregate_artifact_ref" } },
+          "release_units": { "items": { "$ref": "#/$defs/release_unit_evidence" } }
+        },
+        "not": { "required": ["artifact_sink_commit"] }
+      }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "2.1.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "required": ["release_units", "artifact_sink_commit"],
+        "properties": {
+          "canonicalization": {
+            "properties": {
+              "kernel_id": {
+                "const": "devai.kernel.release-offline-verification-receipt-canonicalization.v3"
+              }
+            }
+          },
+          "verification_kernel": {
+            "required": ["v3_sink_handle_closure", "v3_sink_handle_errors"],
+            "properties": {
+              "kernel_id": { "const": "devai.kernel.offline-verification-receipt.v3" }
+            }
+          },
+          "artifacts": { "items": { "$ref": "#/$defs/v3_opaque_artifact_ref" } },
+          "artifact_sink_commit": { "$ref": "#/$defs/artifact_sink_commit" },
+          "release_units": { "items": { "$ref": "#/$defs/release_unit_handle_evidence" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "pass"
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "state_observed": {
+            "const": "offline_verified"
+          },
+          "checks": {
+            "description": "A pass requires all eight required checks to have passed and the mutation-semantics check to have passed or to be typed not-applicable under the canonical mutation policy. There is no ninth outcome and no skipped check.",
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "$ref": "#/$defs/passed_check"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "enum": ["pass", "not-applicable"]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "state_observed": {
+            "type": "null",
+            "description": "A failing verification observes no state. It is a reason to stop, never a weaker pass."
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "release_unit_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "packages"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/package_evidence" }
+        },
+        "mutation_evidence": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/$defs/release_unit_mutation_evidence_closure"
+            }
+          ]
+        }
+      }
+    },
+    "release_unit_mutation_evidence_closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "release_unit",
+        "member_order",
+        "output_contract",
+        "summary_path",
+        "semantic_receipt_path",
+        "members",
+        "receipt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "kind": { "const": "release-unit-mutation-evidence-closure-v1" },
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "member_order": { "const": "ascending-utf-8-byte-collation-by-path;duplicates-refuse" },
+        "output_contract": { "$ref": "#/$defs/release_unit_mutation_output_contract" },
+        "summary_path": { "$ref": "#/$defs/relative_path" },
+        "semantic_receipt_path": { "$ref": "#/$defs/relative_path" },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/release_unit_mutation_evidence_member" }
+        },
+        "receipt": { "$ref": "#/$defs/release_unit_mutation_evidence_receipt" }
+      }
+    },
+    "release_unit_mutation_output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "evidence_sink_id", "opaque_handle"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" }
+      }
+    },
+    "release_unit_mutation_evidence_member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document_kind",
+        "package_name",
+        "path",
+        "sha256",
+        "size_bytes",
+        "evidence_sink_id",
+        "opaque_handle"
+      ],
+      "properties": {
+        "document_kind": {
+          "enum": [
+            "mutation-normalized-stryker-report-v2",
+            "mutation-package-result-v2",
+            "mutation-composed-report-set-v2",
+            "mutation-semantic-verification-receipt-v2"
+          ]
+        },
+        "package_name": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 200 }]
+        },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "evidence_sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "document_kind": {
+                "enum": ["mutation-normalized-stryker-report-v2", "mutation-package-result-v2"]
+              }
+            },
+            "required": ["document_kind"]
+          },
+          "then": {
+            "properties": { "package_name": { "type": "string", "minLength": 1, "maxLength": 200 } }
+          },
+          "else": { "properties": { "package_name": { "type": "null" } } }
+        }
+      ]
+    },
+    "release_unit_mutation_evidence_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt_digest_sha256", "canonicalization", "referent"],
+      "properties": {
+        "kind": { "const": "release-unit-mutation-evidence-receipt-v1" },
+        "receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "canonicalization": { "const": "utf-8-rfc8785-jcs-sha256" },
+        "referent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_id",
+            "candidate_commit",
+            "candidate_tree",
+            "release_unit",
+            "release_plan_receipt_digest_sha256",
+            "release_profile_digest_sha256",
+            "mutation_policy_digest_sha256",
+            "task_policy_digests_sha256",
+            "output_contract_digest_sha256",
+            "member_projection_digest_sha256"
+          ],
+          "properties": {
+            "repository_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "candidate_commit": { "$ref": "#/$defs/git_object" },
+            "candidate_tree": { "$ref": "#/$defs/git_object" },
+            "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "release_plan_receipt_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "release_profile_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "mutation_policy_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "task_policy_digests_sha256": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/sha256" }
+            },
+            "output_contract_digest_sha256": { "$ref": "#/$defs/sha256" },
+            "member_projection_digest_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "package_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "manifest",
+        "tarball",
+        "sbom",
+        "evidence_manifest",
+        "provider_result",
+        "trust"
+      ],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "manifest": { "$ref": "#/$defs/legacy_artifact_ref" },
+        "tarball": { "$ref": "#/$defs/legacy_artifact_ref" },
+        "sbom": { "$ref": "#/$defs/legacy_artifact_ref" },
+        "evidence_manifest": { "$ref": "#/$defs/legacy_artifact_ref" },
+        "provider_result": { "$ref": "#/$defs/legacy_artifact_ref" },
+        "trust": { "$ref": "#/$defs/trust_identity" }
+      }
+    },
+    "legacy_artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "legacy_aggregate_artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "size_bytes"],
+      "properties": {
+        "kind": { "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"] },
+        "path": { "$ref": "#/$defs/relative_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "v3_opaque_artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sink_id", "opaque_handle", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "package-manifest",
+            "package-tarball",
+            "package-sbom",
+            "evidence-manifest",
+            "provider-result"
+          ]
+        },
+        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "opaque_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "artifact_sink_commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sink_id",
+        "transaction_handle",
+        "committed_manifest_handle",
+        "committed_manifest_sha256",
+        "committed_manifest_size_bytes",
+        "commit_protocol"
+      ],
+      "properties": {
+        "sink_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "transaction_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        },
+        "committed_manifest_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        },
+        "committed_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "committed_manifest_size_bytes": { "type": "integer", "minimum": 1 },
+        "commit_protocol": { "const": "devai.artifact-sink.two-phase.v1" }
+      }
+    },
+    "release_unit_handle_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "packages"],
+      "properties": {
+        "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/package_handle_evidence" }
+        },
+        "mutation_evidence": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/$defs/release_unit_mutation_evidence_closure"
+            }
+          ]
+        }
+      }
+    },
+    "package_handle_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "package_manifest",
+        "package_tarball",
+        "package_sbom",
+        "evidence_manifest",
+        "provider_result",
+        "trust"
+      ],
+      "properties": {
+        "package_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "package_manifest": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-manifest" } }
+        },
+        "package_tarball": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-tarball" } }
+        },
+        "package_sbom": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "package-sbom" } }
+        },
+        "evidence_manifest": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "evidence-manifest" } }
+        },
+        "provider_result": {
+          "allOf": [{ "$ref": "#/$defs/v3_opaque_artifact_ref" }],
+          "properties": { "kind": { "const": "provider-result" } }
+        },
+        "trust": { "$ref": "#/$defs/trust_identity" }
+      }
+    },
+    "trust_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_root_id", "trust_store_digest_sha256", "key_id", "signature_algorithm"],
+      "properties": {
+        "trust_root_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "trust_store_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "key_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" },
+        "signature_algorithm": { "enum": ["ed25519", "ecdsa-p256-sha256", "rsa-pss-sha256"] }
+      }
+    },
+    "sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "result_digest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ],
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "description": "The digest of what the check actually computed. The all-zero digest is the shape a placeholder takes and is rejected: a check that computed nothing did not run."
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "result_digest_sha256"],
+      "description": "One required check. It passed or it failed; it has no third outcome and no absent result.",
+      "properties": {
+        "check_id": {
+          "enum": [
+            "candidate-tree-identity",
+            "receipt-envelope-canonicality",
+            "signer-trust",
+            "policy-identity",
+            "result-dag-integrity",
+            "artifact-population",
+            "artifact-digests",
+            "artifact-safety"
+          ]
+        },
+        "status": {
+          "enum": ["pass", "fail"]
+        },
+        "result_digest_sha256": {
+          "$ref": "#/$defs/result_digest"
+        }
+      }
+    },
+    "passed_check": {
+      "properties": {
+        "status": {
+          "const": "pass"
+        }
+      }
+    },
+    "mutation_semantics_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "result_digest_sha256"],
+      "description": "The mutation-semantics check. It is the only roster entry that may be typed not-applicable, and only for a reason the canonical mutation policy already permits. Silence is not one of its outcomes.",
+      "properties": {
+        "check_id": {
+          "const": "mutation-semantics"
+        },
+        "status": {
+          "enum": ["pass", "fail", "not-applicable"]
+        },
+        "result_digest_sha256": {
+          "$ref": "#/$defs/result_digest"
+        },
+        "not_applicable_reason": {
+          "enum": [
+            "documentation-only-change",
+            "metadata-only-change",
+            "no-behavioral-surface-selected"
+          ]
+        },
+        "not_applicable_permitted_by": {
+          "const": "law/policy/mutation-assurance-v2.json#/not_required/permitted_reasons"
+        },
+        "mutation_report_id": {
+          "type": "string",
+          "pattern": "^MA2-[0-9a-f]{16}$"
+        },
+        "mutation_report_digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not-applicable"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["not_applicable_reason", "not_applicable_permitted_by"],
+            "not": {
+              "required": ["mutation_report_id"]
+            }
+          },
+          "else": {
+            "required": ["mutation_report_id", "mutation_report_digest_sha256"],
+            "not": {
+              "required": ["not_applicable_reason"]
+            }
+          }
+        }
+      ]
+    },
+    "git_object": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_unit", "version", "commit", "tree"],
+      "properties": {
+        "release_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commit": {
+          "$ref": "#/$defs/git_object"
+        },
+        "tree": {
+          "$ref": "#/$defs/git_object"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "receipt_kind": "release-offline-verification-receipt",
+      "canonicalization": {
+        "kernel_id": "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "digest_algorithm": "sha256",
+        "receipt_projection_excludes": ["receipt_id", "receipt_digest_sha256"],
+        "calculation_order": [
+          "compute-receipt_digest_sha256-over-the-receipt-projection",
+          "derive-receipt_id-as-ROV-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"
+        ]
+      },
+      "receipt_id": "ROV-9b13f1e992921de5",
+      "verdict": "pass",
+      "state_observed": "offline_verified",
+      "repository": {
+        "id": "aarusso-nyx/devai",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "candidate": {
+        "release_unit": "@aarusso-nyx/devai",
+        "version": "1.5.0",
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "verified_state": {
+        "state": "exported",
+        "state_id": "RLS-89abcdef01234567",
+        "record_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      },
+      "artifacts": [
+        {
+          "kind": "package-tarball",
+          "path": "dist/aarusso-nyx-devai-1.5.0.tgz",
+          "sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "size_bytes": 1048576
+        }
+      ],
+      "verifier": {
+        "package_name": "@aarusso-nyx/devai",
+        "package_version": "1.4.4",
+        "registry": "https://npm.pkg.github.com",
+        "integrity_sri": "sha512-B1AJzDAZNw+UM1m7bQjwHT9q0gO3cutNpGPRAXFEBtq3L6AZymI6RvLc4ghh05ssOoREynXKuJyjsayRJbWPEQ==",
+        "provenance_sha256": "8ebafff53524031a3207a2256ebcd0fa6e0cc4271fd4bb6bca5aa003395034bd",
+        "source_commit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de"
+      },
+      "verification_kernel": {
+        "kernel_id": "devai.kernel.offline-verification-receipt.v1",
+        "mandatory": true,
+        "schema_validation_alone_establishes_pass": false,
+        "supported_canonicalization_kernels": [
+          "devai.kernel.release-offline-verification-receipt-canonicalization.v1",
+          "devai.kernel.release-offline-verification-receipt-canonicalization.v2",
+          "devai.kernel.release-offline-verification-receipt-canonicalization.v3"
+        ],
+        "v2_package_trust_result_closure": "for-a-v2-receipt-recompute-the-v2-canonicalization-and-require-the-release-unit-package-roster-to-close-exactly-over-manifest-tarball-sbom-evidence-manifest-provider-result-and-trust-root-trust-store-digest-key-id-and-signature-algorithm",
+        "roster": [
+          "candidate-tree-identity",
+          "receipt-envelope-canonicality",
+          "signer-trust",
+          "policy-identity",
+          "result-dag-integrity",
+          "artifact-population",
+          "artifact-digests",
+          "artifact-safety",
+          "mutation-semantics"
+        ],
+        "roster_complete": true,
+        "unknown_check_permitted": false,
+        "not_applicable_permitted_for": ["mutation-semantics"],
+        "algorithm": [
+          "resolve-the-candidate-policy-verifier-artifacts-and-all-nine-check-results",
+          "recompute-every-resolved-identity-and-digest-and-reject-any-mismatch",
+          "verify-the-exact-ordered-nine-check-roster-with-no-omission-addition-reordering-or-substitution",
+          "require-the-first-eight-checks-to-pass-with-non-placeholder-result-digests",
+          "recompute-mutation-semantics-or-validate-its-policy-authorized-not-applicable-reason",
+          "recompute-receipt_digest_sha256-and-receipt_id-under-the-schemaVersion-bound-release-offline-verification-receipt-canonicalization-kernel",
+          "reject-pass-when-any-preceding-step-fails"
+        ],
+        "errors": [
+          "rov-check-roster-incomplete",
+          "rov-check-roster-reordered",
+          "rov-unknown-check-id",
+          "rov-placeholder-check-result",
+          "rov-required-check-not-passed",
+          "rov-mutation-semantics-not-applicable-not-permitted",
+          "rov-artifact-digest-mismatch",
+          "rov-receipt-digest-mismatch",
+          "rov-v2-package-trust-result-closure-invalid",
+          "rov-semantic-verification-not-performed"
+        ]
+      },
+      "checks": [
+        {
+          "check_id": "candidate-tree-identity",
+          "status": "pass",
+          "result_digest_sha256": "2cad519aba8117a1850eee85d41eae452d51a141a1850eee85d41eae452d51a1"
+        },
+        {
+          "check_id": "receipt-envelope-canonicality",
+          "status": "pass",
+          "result_digest_sha256": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
+        },
+        {
+          "check_id": "signer-trust",
+          "status": "pass",
+          "result_digest_sha256": "7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730"
+        },
+        {
+          "check_id": "policy-identity",
+          "status": "pass",
+          "result_digest_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        },
+        {
+          "check_id": "result-dag-integrity",
+          "status": "pass",
+          "result_digest_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+        },
+        {
+          "check_id": "artifact-population",
+          "status": "pass",
+          "result_digest_sha256": "6b51d431df5d7f141cbececcf79edf3dd861c3b4069f0b11661a3eefacbba918"
+        },
+        {
+          "check_id": "artifact-digests",
+          "status": "pass",
+          "result_digest_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+        },
+        {
+          "check_id": "artifact-safety",
+          "status": "pass",
+          "result_digest_sha256": "d10b4c3ff123b26dc068d43a8bef2d23767c4270dcfa8c357cf1f5c8e5ad1d47"
+        },
+        {
+          "check_id": "mutation-semantics",
+          "status": "not-applicable",
+          "result_digest_sha256": "8722616204217eddb39e7df969e0698aed8e599ba62ed2de1ce49b03ade0fede",
+          "not_applicable_reason": "documentation-only-change",
+          "not_applicable_permitted_by": "law/policy/mutation-assurance-v2.json#/not_required/permitted_reasons"
+        }
+      ],
+      "network_access": false,
+      "emitted_by": {
+        "action_id": "release offline-verify",
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "appends_state_record": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "publication_authority": false,
+        "lifecycle_transition": false,
+        "satisfies_state": false
+      },
+      "determinism": {
+        "deterministic": true,
+        "derived_from_bound_inputs_only": true,
+        "contains_wall_clock_time": false
+      },
+      "receipt_digest_sha256": "9b13f1e992921de5b21b75725293492110edd05356084dae6ebbb3d07a9fd66e"
+    }
+  ]
+}

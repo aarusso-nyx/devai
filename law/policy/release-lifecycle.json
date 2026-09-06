@@ -1,0 +1,1581 @@
+{
+  "$schema": "../schemas/release-lifecycle-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "release-lifecycle",
+  "status": "active",
+  "authority": "Architect",
+  "policy_version": "2.15.0",
+  "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
+  "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+  "receipt_schemas": {
+    "plan_receipt_schema": "law/schemas/release-plan-receipt-v2.schema.json",
+    "offline_verification_receipt_schema": "law/schemas/release-offline-verification-receipt.schema.json",
+    "publication_receipt_schema": "law/schemas/release-publication-receipt.schema.json",
+    "lifecycle_observation_schema": "law/schemas/release-lifecycle-observation.schema.json"
+  },
+  "plan_determination": {
+    "kernel_id": "devai.kernel.release-plan-determination.v3",
+    "required_inputs": [
+      {
+        "order": 1,
+        "kind": "release-intent",
+        "source": "invocation-provided-release-intent-document",
+        "schema": "law/schemas/release-intent.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "invocation"
+      },
+      {
+        "order": 2,
+        "kind": "release-verification-profile",
+        "source": ".devai/config/release-verification.json",
+        "schema": "law/schemas/release-verification-profile.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "generated-adopter",
+        "path": ".devai/config/release-verification.json"
+      },
+      {
+        "order": 3,
+        "kind": "release-lifecycle-policy",
+        "source": "dist/law/policy/release-lifecycle.json",
+        "schema": "law/schemas/release-lifecycle-policy.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "installed-package",
+        "path": "dist/law/policy/release-lifecycle.json"
+      },
+      {
+        "order": 4,
+        "kind": "action-registry-policy",
+        "source": "dist/law/policy/action-registry.json",
+        "schema": "law/schemas/action-registry.schema.json",
+        "canonical_bytes": "utf-8-rfc8785-jcs",
+        "origin": "installed-package",
+        "path": "dist/law/policy/action-registry.json"
+      }
+    ],
+    "semver": {
+      "grammar": "semver-2.0.0",
+      "transition_order": ["patch", "minor", "major", "prerelease", "support-promotion"],
+      "block_conditions": [
+        "invalid-semver",
+        "downgrade",
+        "same-version-without-support-promotion",
+        "support-promotion-requires-lts"
+      ]
+    },
+    "blocked_receipt": {
+      "verdict": "block",
+      "state_observed": null,
+      "plan": [],
+      "profile_verdict": "block",
+      "transition": null,
+      "capabilities": [],
+      "mutation": "none",
+      "mutation_disposition_status": "blocked",
+      "bindable_by_mutating_action": false,
+      "lifecycle_transition": false,
+      "semver_reason_precedence": [
+        "invalid-semver",
+        "downgrade",
+        "same-version-without-support-promotion",
+        "support-promotion-requires-lts"
+      ],
+      "semver_outcomes": [
+        {
+          "condition": "invalid-semver",
+          "blocking_reasons": ["invalid-semver"],
+          "mutation_disposition_reason": "invalid-semver"
+        },
+        {
+          "condition": "downgrade",
+          "blocking_reasons": ["downgrade"],
+          "mutation_disposition_reason": "downgrade"
+        },
+        {
+          "condition": "same-version-without-support-promotion",
+          "blocking_reasons": ["same-version-without-support-promotion"],
+          "mutation_disposition_reason": "same-version-without-support-promotion"
+        },
+        {
+          "condition": "support-promotion-requires-lts",
+          "blocking_reasons": ["support-promotion-requires-lts"],
+          "mutation_disposition_reason": "support-promotion-requires-lts"
+        }
+      ]
+    },
+    "support": {
+      "source": "release-intent.support",
+      "values": ["preview", "current", "lts"],
+      "lts_requires_nonempty_mutation_roster": true
+    },
+    "impact": {
+      "source": "release-intent.change_kind",
+      "values": ["documentation", "metadata", "behavioral"],
+      "missing_defaults_to": "behavioral"
+    },
+    "known_risks": [
+      "authentication",
+      "authorization",
+      "tenancy",
+      "rls",
+      "cryptography",
+      "secrets",
+      "credentials",
+      "database",
+      "migration",
+      "release-integrity",
+      "evidence",
+      "provenance",
+      "publication",
+      "ledger",
+      "mutation-policy",
+      "test-policy",
+      "test-configuration",
+      "sanitization",
+      "public-api",
+      "export-map",
+      "package-boundary",
+      "lockfile",
+      "toolchain",
+      "cross-package",
+      "large-change",
+      "protected-resource"
+    ],
+    "unknown_risk_behavior": "block",
+    "unconditional_floor": [
+      "formatting-hygiene",
+      "lint",
+      "type-integrity",
+      "schema-consistency",
+      "secret-scan",
+      "path-portability",
+      "package-integrity",
+      "exact-candidate"
+    ],
+    "transition_capabilities": {
+      "patch": ["affected-checks", "dependent-checks", "build-integrity"],
+      "prerelease": ["affected-checks", "dependent-checks", "build-integrity"],
+      "minor": [
+        "unit",
+        "integration",
+        "e2e",
+        "consumer",
+        "api-compatibility",
+        "adopter-materialization"
+      ],
+      "major": [
+        "unit",
+        "integration",
+        "e2e",
+        "consumer",
+        "api-compatibility",
+        "migration",
+        "rollback",
+        "adopter-materialization",
+        "security",
+        "database",
+        "tenancy",
+        "provenance",
+        "reproducibility"
+      ],
+      "support-promotion": [
+        "unit",
+        "integration",
+        "e2e",
+        "consumer",
+        "api-compatibility",
+        "migration",
+        "rollback",
+        "adopter-materialization",
+        "security",
+        "database",
+        "tenancy",
+        "provenance",
+        "reproducibility",
+        "operational-matrix"
+      ]
+    },
+    "lts_capabilities": [
+      "unit",
+      "integration",
+      "e2e",
+      "consumer",
+      "api-compatibility",
+      "migration",
+      "rollback",
+      "adopter-materialization",
+      "security",
+      "database",
+      "tenancy",
+      "provenance",
+      "reproducibility",
+      "operational-matrix"
+    ],
+    "risk_capability_rules": [
+      {
+        "when_any_risk": true,
+        "add": ["security", "integration"]
+      },
+      {
+        "risks": ["tenancy", "rls"],
+        "add": ["tenancy"]
+      },
+      {
+        "risks": ["database", "migration"],
+        "add": ["database"]
+      },
+      {
+        "risks": ["public-api", "export-map", "package-boundary"],
+        "add": ["api-compatibility", "consumer"]
+      },
+      {
+        "risks": ["release-integrity", "evidence", "provenance", "publication", "ledger"],
+        "add": ["provenance", "reproducibility"]
+      },
+      {
+        "risks": ["lockfile", "toolchain", "cross-package", "large-change"],
+        "add": ["integration", "consumer"]
+      }
+    ],
+    "capability_selection": "sorted-unique-union-of-unconditional-floor-transition-support-risk-profile-risk-and-owner-escalation-capabilities",
+    "missing_capability_or_unknown_task_behavior": "block",
+    "mutation_selection": [
+      "lts-selects-full-roster",
+      "otherwise-any-risk-or-major-or-minor-selects-targeted",
+      "otherwise-behavioral-selects-affected",
+      "otherwise-selects-none",
+      "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"
+    ],
+    "policy_resolution": {
+      "resolver_id": "devai.release-policy-resolution.v1",
+      "receipt_schema": "law/schemas/release-policy-resolution.schema.json",
+      "plan_receipt_version": "2.0.0",
+      "verification_kernel": "devai.kernel.release-plan-receipt.v3",
+      "installed_package": "externally-approved-archive-and-exact-installed-content-manifest-not-version-alone",
+      "content_manifest": "sha256-rfc8785-jcs-of-lexically-path-sorted-complete-archive-regular-file-array-path-mode-size-sha256-with-package-prefix-removed-no-exclusions",
+      "source_rules": [
+        "intent-inline-invocation-document",
+        "profile-only-explicit-adopter-policy-materialization-at-.devai/config/release-verification.json",
+        "lifecycle-and-action-registry-only-dist/law/policy-in-the-verified-installed-package",
+        "schemas-and-materializer-only-the-same-verified-installed-package",
+        "portable-origin-relative-paths-never-physical-install-locators",
+        "no-repository-law-policy-or-source-layout-or-default-profile-fallback"
+      ],
+      "binding_checks": [
+        "external-expected-package-name-version-archive-sha256-and-content-manifest-sha256-match-before-input-use",
+        "exact-installed-regular-file-population-and-bytes-match-approved-archive-no-links-or-extra-members",
+        "all-adopter-binding-files-belong-to-the-exact-candidate-tree-and-match-raw-digests",
+        "active-origin-declaration-lock-resolution-project-version-and-installed-package-agree",
+        "project-constitution-version-digest-and-pinned-bytes-match-installed-constitution",
+        "closed-adopter-binding-v1-source-policy-id-version-raw-digest-and-complete-materialized-set-match",
+        "recompute-pure-materialization-with-same-installed-package-and-project-input-and-compare-every-target-byte",
+        "release-verification-is-explicit-in-adopter-source-and-exactly-the-generated-profile",
+        "all-four-semantic-documents-validate-with-installed-schemas-and-match-jcs-input-digests",
+        "reverify-same-source-and-binding-identity-before-each-dependent-operation"
+      ],
+      "replay": "same-resolution-contract-for-plan-preflight-certify-prepare-export-offline-verify-publication-and-resume",
+      "offline": "complete-immutable-input-and-binding-byte-closure-plus-approved-package-archive-with-external-expected-package-and-candidate-identity-no-network-or-ambient-fallback",
+      "legacy": "plan-v1-observation-only-under-original-contract-never-relabel-rehash-upgrade-or-authorize-current-lifecycle",
+      "refusal_codes": [
+        "rpl-policy-source-unresolved",
+        "rpl-package-identity-mismatch",
+        "rpl-adopter-binding-mismatch",
+        "rpl-policy-resolution-mismatch",
+        "rpl-legacy-plan-non-authoritative"
+      ],
+      "refusal_effect": "no-current-pass-no-task-or-provider-invocation-no-sink-effect-no-success-state-append-no-publication",
+      "trust_claim": "trusted-local-not-independent-attestation",
+      "installation_origins": {
+        "selection": "externally-expected-origin-never-candidate-selected",
+        "candidate_adopter_dependency": "candidate-declaration-and-complete-lockfile-set-resolve-the-exact-approved-installed-archive-producer-toolchain-forbidden",
+        "external_producer_toolchain": "only-aarusso-nyx/devai-releasing-@aarusso-nyx/devai-independent-candidate-inputs-plus-separate-immutable-toolchain-declaration-and-lockfiles-resolving-the-exact-approved-installed-archive",
+        "producer_provenance": "externally-expected-complete-producer-toolchain-object-with-exact-producer-repository-commit-tree-source-package-manifest-and-approved-build-provenance-binding-source-toolchain-and-installed-artifact-no-self-assertion",
+        "offline": "include-and-reverify-complete-toolchain-and-producer-build-source-evidence-under-the-same-external-expectation",
+        "producer_build_provenance_schema": "law/schemas/release-policy-resolution.schema.json#/$defs/producer_build_provenance"
+      }
+    }
+  },
+  "execution_seams": {
+    "status": "deprecated-read-only-v1-non-authoritative",
+    "kernel_id": "devai.kernel.release-execution-seams.v1",
+    "applicability": {
+      "read_scope": "wire-compatible-legacy-v1-observation-only",
+      "write_or_execution_authority": "none-for-v2-or-v3",
+      "active_kernel_rule": "v2-and-v3-active-kernels-must-ignore-execution_seams.state_store-generation-head-and-cas-constraints"
+    },
+    "request_projection": {
+      "allowed_fields": [
+        "candidate_locator",
+        "repository_locator",
+        "receipt_locators",
+        "provider",
+        "destination"
+      ],
+      "forbidden_fields": [
+        "state_id",
+        "generation",
+        "head",
+        "digest",
+        "record_digest_sha256",
+        "actor",
+        "role",
+        "authority",
+        "authorization",
+        "consent",
+        "effective_authorities"
+      ],
+      "actions": [
+        { "action_id": "release plan", "fields": ["candidate_locator", "repository_locator"] },
+        {
+          "action_id": "release preflight",
+          "fields": ["candidate_locator", "repository_locator", "receipt_locators"]
+        },
+        {
+          "action_id": "release certify",
+          "fields": ["candidate_locator", "repository_locator", "receipt_locators"]
+        },
+        {
+          "action_id": "release prepare",
+          "fields": ["candidate_locator", "repository_locator", "receipt_locators", "destination"]
+        },
+        {
+          "action_id": "release export",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release offline-verify",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release evidence-publish",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release publish",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        },
+        {
+          "action_id": "release resume",
+          "fields": [
+            "candidate_locator",
+            "repository_locator",
+            "receipt_locators",
+            "provider",
+            "destination"
+          ]
+        }
+      ]
+    },
+    "state_store": {
+      "root": ".devai/state/release/v1",
+      "campaign_path": "{root}/{repository-id-sha256}/{candidate-commit}",
+      "head_path": "{campaign-path}/HEAD.json",
+      "record_path": "{campaign-path}/records/{generation}-{record-digest-sha256}.json",
+      "attempt_path": "{campaign-path}/attempts/{attempt-id}.json",
+      "failure_path": "{campaign-path}/failures/{attempt-id}.json",
+      "head_fields": ["generation", "record_digest_sha256"],
+      "record_fields": ["generation", "head_before"],
+      "record_layout": "each-record-carries-its-nonnegative-generation-and-the-exact-head-observed-before-cas;core-requires-generation-zero-and-null-head-before-for-the-opening-record-and-successor-generation-equals-head-before-generation-plus-one",
+      "generation": "nonnegative-integer-starting-at-zero-and-incrementing-by-one-only-on-successful-cas",
+      "cas": "read-head-recheck-candidate-and-predecessor-atomic-create-record-atomic-replace-head-then-fsync-directory",
+      "crash_recovery": "resume-scans-regular-records-recomputes-chain-and-reports-next-action-without-repairing-or-overwriting"
+    },
+    "filesystem_safety": [
+      "lstat-every-parent-and-target",
+      "reject-symlink",
+      "require-regular-file-for-existing-record-or-head",
+      "mkdir-new-private-directories-only",
+      "atomic-create-with-o_excl",
+      "no-overwrite",
+      "atomic-rename-only-for-head-replacement",
+      "fsync-file-and-parent-before-success"
+    ],
+    "producer_boundary": {
+      "adapters_return": ["bounded-raw-output", "opaque-provider-handle"],
+      "adapters_may_not_return": [
+        "lifecycle-record",
+        "state-id",
+        "state-digest",
+        "authority-decision"
+      ],
+      "core": "revalidates-locators-candidate-receipts-and-provider-output-then-composes-and-hashes-record"
+    },
+    "attempts": {
+      "append_before_adapter": true,
+      "success_advances_state": true,
+      "failure_record": "append-only-and-never-advances-state",
+      "replay": "same-request-and-consumed-authorization-refuses"
+    },
+    "evidence_binding": {
+      "check_runner": "core-rehashes-output-and-binds-manifest-and-receipt-digests-into-state-evidence",
+      "prepare_artifacts": ["package-tarball", "manifest", "sbom"],
+      "export": ["evidence-bundle", "provider-result"],
+      "offline_verify": "requires-external-trust-inputs-and-emits-no-state-record"
+    },
+    "remote_order": {
+      "evidence_publish": [
+        "revalidate-state-and-offline-receipt",
+        "verify-unconsumed-exact-authorization-in-ledger",
+        "append-durable-attempt-record",
+        "consume-authorization-in-ledger",
+        "dispatch-provider",
+        "append-success-record",
+        "fsync-success-record-and-head"
+      ],
+      "publish": [
+        "revalidate-state-and-offline-receipt",
+        "verify-unconsumed-exact-authorization-in-ledger",
+        "append-durable-attempt-record",
+        "consume-authorization-in-ledger",
+        "dispatch-protected-provider",
+        "append-publication-dispatched-record",
+        "fsync-success-record-and-head"
+      ],
+      "provider_unavailable": "fail-without-state-advance",
+      "provider_failure": "append-failure-without-state-advance-and-require-fresh-exact-authorization",
+      "crash_after_authorization_consumption": "resume-must-not-dispatch-with-the-consumed-authorization"
+    },
+    "errors": [
+      "release-request-projection-invalid",
+      "release-state-store-unsafe",
+      "release-state-cas-stale-head",
+      "release-adapter-output-invalid",
+      "release-provider-unavailable",
+      "release-provider-failed",
+      "release-authorization-replay",
+      "release-evidence-binding-invalid"
+    ]
+  },
+  "execution_contract": {
+    "kernel_id": "devai.kernel.release-execution-contract.v2",
+    "compatibility": {
+      "v1_state_read": "accept-wire-compatible-v1-state-records-for-observation-only",
+      "v2_state_write": "all-new-persisted-state-records-must-satisfy-the-v2-semantic-kernel",
+      "v1_execution_seams": "legacy-v1-observation-only-and-ignored-by-v2-and-v3-active-kernels-for-generation-head-and-cas-semantics",
+      "client_drafted_state": "never-trusted"
+    },
+    "request": {
+      "schema": "law/schemas/release-lifecycle-request.schema.json",
+      "canonicalization": "core-hashes-the-closed-request-projection-as-utf-8-rfc8785-jcs",
+      "recursive_forbidden": [
+        "state_id",
+        "generation",
+        "head",
+        "digest",
+        "record_digest_sha256",
+        "actor",
+        "role",
+        "authority",
+        "authorization",
+        "consent",
+        "effective_authorities",
+        "provider_result",
+        "provider_handle"
+      ],
+      "identity_bindings": [
+        "repository.commit",
+        "repository.tree",
+        "candidate.commit",
+        "candidate.tree",
+        "release_units",
+        "receipt_locators"
+      ]
+    },
+    "store": {
+      "schema": "law/schemas/release-lifecycle-store-record.schema.json",
+      "head_schema": "law/schemas/release-lifecycle-store-head.schema.json",
+      "canonicalization": "utf-8-rfc8785-jcs-sha256-with-id-derived-from-the-first-16-lowercase-hex-characters",
+      "paths": {
+        "head": "{campaign-path}/HEAD.json",
+        "attempt": "{campaign-path}/attempts/{sequence}-{record-digest-sha256}.json",
+        "completion": "{campaign-path}/completions/{sequence}-{record-digest-sha256}.json",
+        "failure": "{campaign-path}/failures/{sequence}-{record-digest-sha256}.json",
+        "unknown": "{campaign-path}/unknown/{sequence}-{record-digest-sha256}.json"
+      },
+      "append_order": [
+        "lstat-parents-and-targets-and-reject-nonsafe-paths",
+        "recompute-request-append-log-tail-and-observed-completed-head-identities",
+        "atomic-create-append-only-record-with-o_excl",
+        "fsync-record-and-parent-directory",
+        "for-completion-only-recheck-head-equals-attempt-observed_head_before-and-atomically-replace-head",
+        "fsync-head-and-parent-directory"
+      ],
+      "orphan_handling": "resume-sorts-regular-records-by-sequence-and-rfc8785-jcs-record-id-recomputes-the-single-chain-from-genesis-and-reports-orphan-or-conflict-without-linking-deleting-or-overwriting",
+      "head_compare_and_swap": "completion-alone-may-advance-HEAD-and-only-when-the-current-full-v2-canonical-head-is-byte-equal-to-the-attempt-observed_head_before;-failure-and-unknown-never-write-HEAD",
+      "semantic_kernel": {
+        "kernel_id": "devai.kernel.release-lifecycle-store.v3",
+        "rules": [
+          "the-opening-attempt-has-null-predecessor_record-and-null-observed_head_before",
+          "each-successor-attempt-after-a-completion-or-failure-names-predecessor_record-as-the-exact-append-log-tail-and-observed_head_before-as-the-exact-current-full-v2-canonical-completed-state-head-or-null-when-no-action-has-ever-completed",
+          "each-terminal-record-names-predecessor_record-as-its-exact-attempt-and-copies-that-attempt-observed_head_before-byte-for-byte-and-each-attempt-id-has-at-most-one-terminal-record",
+          "completion-alone-advances-HEAD-by-compare-and-swap-from-observed_head_before;-failure-leaves-HEAD-unchanged-but-advances-the-append-log-tail;-unknown-is-terminal-leaves-HEAD-unchanged-and-is-non-retriable",
+          "a-failed-remote-attempt-may-be-followed-only-by-a-new-attempt-bound-to-a-fresh-exact-owner-authorization-and-the-failed-attempt-is-never-redispatched",
+          "resume-validates-the-single-append-chain-and-full-v2-canonical-head-then-derives-the-exact-next-action-or-blocked-reason-from-both-the-log-tail-and-head-without-writing-or-repairing",
+          "the-head-names-exactly-one-completion-record-with-the-same-candidate-and-repository-and-head.state_id-and-head.state_digest_sha256-equal-completion.state_id-and-completion.state_digest_sha256;head.generation-equals-the-generation-of-that-separately-verified-state-document;head.completion_record.sequence-is-only-the-append-log-sequence"
+        ],
+        "errors": [
+          "release-store-opening-attempt-invalid",
+          "release-store-append-tail-mismatch",
+          "release-store-observed-head-mismatch",
+          "release-store-terminal-attempt-link-invalid",
+          "release-store-terminal-observed-head-mismatch",
+          "release-store-terminal-attempt-conflict",
+          "release-store-completion-unknown-conflict",
+          "release-store-failure-advanced-head",
+          "release-store-unknown-successor-conflict",
+          "release-store-attempt-redispatch",
+          "release-store-retry-authorization-reuse",
+          "release-store-resume-history-divergence",
+          "release-store-legacy-seam-authority-conflict",
+          "release-store-head-state-generation-mismatch",
+          "release-store-head-completion-mismatch"
+        ],
+        "negative_fixtures": [
+          {
+            "fixture": "successor-after-failure-predecessor-points-to-completed-head-instead-of-log-tail",
+            "expected_error": "release-store-append-tail-mismatch"
+          },
+          {
+            "fixture": "successor-after-failure-observed_head_before-points-to-failure-instead-of-completed-head",
+            "expected_error": "release-store-observed-head-mismatch"
+          },
+          {
+            "fixture": "terminal-observed_head_before-differs-from-its-attempt",
+            "expected_error": "release-store-terminal-observed-head-mismatch"
+          },
+          {
+            "fixture": "failure-record-advances-completed-state-head",
+            "expected_error": "release-store-failure-advanced-head"
+          },
+          {
+            "fixture": "unknown-provider-result-is-followed-by-another-attempt",
+            "expected_error": "release-store-unknown-successor-conflict"
+          },
+          {
+            "fixture": "failed-remote-attempt-is-redispatched",
+            "expected_error": "release-store-attempt-redispatch"
+          },
+          {
+            "fixture": "failed-remote-successor-reuses-consumed-authorization",
+            "expected_error": "release-store-retry-authorization-reuse"
+          },
+          {
+            "fixture": "resume-derives-next-action-from-head-without-validating-log-tail",
+            "expected_error": "release-store-resume-history-divergence"
+          },
+          {
+            "fixture": "resume-derives-blocked-reason-from-log-tail-without-validating-head",
+            "expected_error": "release-store-resume-history-divergence"
+          },
+          {
+            "fixture": "active-v3-store-applies-legacy-v1-generation-head-or-cas-constraint",
+            "expected_error": "release-store-legacy-seam-authority-conflict"
+          },
+          {
+            "fixture": "head-generation-is-copied-from-completion-record-sequence-instead-of-the-verified-state-document-generation",
+            "expected_error": "release-store-head-state-generation-mismatch"
+          }
+        ]
+      }
+    },
+    "resume": {
+      "schema": "law/schemas/release-lifecycle-observation.schema.json",
+      "emitted_observation_schema_version": "1.1.0",
+      "readable_observation_schema_versions": ["1.0.0", "1.1.0"],
+      "always_pure": true,
+      "next_actions": [
+        { "from": "none", "next_action": "release plan", "outcome": "ready" },
+        { "from": "planned", "next_action": "release preflight", "outcome": "ready" },
+        { "from": "preflight_passed", "next_action": "release certify", "outcome": "ready" },
+        { "from": "certified", "next_action": "release prepare", "outcome": "ready" },
+        { "from": "prepared", "next_action": "release export", "outcome": "ready" },
+        { "from": "exported", "next_action": "release offline-verify", "outcome": "ready" },
+        {
+          "from": "offline_verified",
+          "next_action": "release evidence-publish",
+          "outcome": "ready"
+        },
+        { "from": "evidence_published", "next_action": "release publish", "outcome": "ready" },
+        {
+          "from": "publication_dispatched",
+          "next_action": "release resume",
+          "outcome": "awaiting-external-receipt"
+        },
+        { "from": "published", "next_action": null, "outcome": "complete" }
+      ],
+      "blocked_outcomes": [
+        "broken-chain",
+        "stale-head",
+        "orphan-record",
+        "unterminated-attempt",
+        "unknown-provider-result",
+        "authorization-consumed",
+        "fresh-exact-authorization-required",
+        "candidate-identity-mismatch",
+        "receipt-identity-mismatch",
+        "legacy-plan-non-authoritative"
+      ],
+      "historical_plan_observation": {
+        "outcome": "blocked",
+        "reason": "legacy-plan-non-authoritative",
+        "requirements": [],
+        "next_action": null,
+        "derived_states": [],
+        "published_observed": false,
+        "receipt_scope": "plan-v1-valid-under-original-schema-canonical-id-digest-and-exact-observed-identity;recorded-history-must-independently-validate;no-historical-pass-or-input-reconstruction-claim",
+        "invalid_evidence": "retain-existing-receipt-or-chain-refusal;invalid-or-mismatched-evidence-is-never-labelled-valid-historical",
+        "authority": "read-only-historical-label-never-relabels-rehashes-upgrades-wraps-or-authorizes-current-evidence-readiness-transition-retry-or-publication"
+      },
+      "blocked_retry_observation": {
+        "outcome": "blocked",
+        "reason": "fresh-exact-authorization-required",
+        "requirements": ["fresh_exact_owner_authorization_required"],
+        "next_action": "the-exact-remote-action-of-the-failed-attempt",
+        "authority": "reporting-this-action-never-authorizes-or-dispatches-it;a-distinct-new-attempt-still-requires-a-fresh-exact-owner-authorization"
+      },
+      "history_resolution": {
+        "inputs": ["validated-append-log-tail", "validated-full-v2-canonical-completed-state-head"],
+        "completion": "derive-next-action-from-the-completed-state-head",
+        "failure": "derive-the-same-state-next-action-from-the-unchanged-head;-a-local-or-harness-action-may-open-a-new-attempt;-a-failed-remote-action-is-reported-as-blocked-with-its-exact-retry-action-and-fresh_exact_owner_authorization_required-until-a-fresh-exact-owner-authorization-is-supplied",
+        "unknown": "next-action-null-and-blocked-reason-unknown-provider-result-with-no-retry-or-redispatch",
+        "unterminated_attempt": "next-action-null-and-blocked-reason-unterminated-attempt-with-no-automatic-terminal-inference",
+        "divergence": "next-action-null-and-the-exact-store-validation-error-as-blocked-reason"
+      },
+      "ambiguous_outcome": "next_action-null-and-no-automatic-redispatch-or-state-advance"
+    },
+    "remote_effect": {
+      "attempt_authorization_binding": "the-consumed-authorization-event-must-name-the-exact-attempt-id-request-digest-repository-candidate-action-and-destination-before-dispatch",
+      "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
+      "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
+      "pre_dispatch_handle": "a-remote-attempt-must-record-provider-dispatch-not-dispatched-handle-observed-false-and-provider-handle-null",
+      "terminal_handle": "a-dispatched-completion-must-record-handle-observed-true-and-a-nonempty-provider-handle;-a-failure-may-record-failed-before-dispatch-with-null-handle;-an-unknown-provider-result-must-preserve-whether-a-handle-was-observed",
+      "order": [
+        "append-and-fsync-attempt",
+        "verify-live-unconsumed-exact-authorization",
+        "append-and-fsync-authorization-consumption-bound-to-attempt",
+        "dispatch-provider-once",
+        "append-completion-or-failure-or-unknown-provider-result"
+      ],
+      "unknown_result": "append-and-fsync-unknown-provider-result-and-block-without-redispatch",
+      "retry": "a-failed-remote-attempt-is-never-redispatched;-only-a-new-attempt-with-a-distinct-attempt-id-and-fresh-exact-owner-authorization-may-dispatch"
+    },
+    "protected_repository_identity": {
+      "binding": [
+        "authority-repository-id",
+        "expected-release-repository-id",
+        "repository-id-commit-tree",
+        "origin-url"
+      ],
+      "authority_repository_id": "the-existing-authority-policy-and-session-repository-id-is-an-exact-local-slug-matching-^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$;it-must-equal-the-broker-source-repository-id-byte-for-byte-and-is-never-derived-from-a-release-repository-id",
+      "expected_release_repository_id": "the-protected-host-receives-one-exact-canonical-owner-slash-repository-identifier-matching-^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?/[a-z0-9][a-z0-9._-]{0,99}$-from-trusted-host-configuration-before-candidate-or-request-input;it-must-equal-the-direct-origin-extraction-and-binding.repository.id-byte-for-byte",
+      "repository": "the-existing-private-binding.repository-object-remains-the-exact-canonical-public-request-repository_locator-projection-with-id-commit-tree;this-adds-no-request-state-or-receipt-field;canonical-repository-identifiers-are-never-filesystem-path-components",
+      "origin_url": {
+        "accepted_forms": [
+          "https://github.com/<lowercase-owner>/<lowercase-repository>.git",
+          "ssh://git@github.com/<lowercase-owner>/<lowercase-repository>.git",
+          "git@github.com:<lowercase-owner>/<lowercase-repository>.git"
+        ],
+        "components": "owner-is-lowercase-ascii-alphanumeric-with-internal-hyphens-only-and-at-most-39-characters;repository-is-lowercase-ascii-alphanumeric-leading-character-followed-by-ascii-alphanumeric-dot-underscore-or-hyphen-and-at-most-100-characters;the-parser-uses-one-anchored-complete-listed-template-and-consumes-the-final-literal-.git-suffix-exactly-once-never-by-search-or-strip;it-refuses-userinfo-password-port-query-fragment-whitespace-percent-encoding-trailing-slash-or-extra-path-segment;the-direct-extraction-must-byte-equal-expected_release_repository_id-and-binding.repository.id",
+        "canonicalization": "the-host-extracts-owner-slash-repository-directly-from-the-accepted-raw-url;it-performs-no-case-folding-percent-decoding-dot-segment-removal-trailing-slash-removal-scp-to-url-rewrite-or-alias-map",
+        "binding": "the-exact-raw-origin-url-byte-sequence-and-its-directly-extracted-canonical-id-are-both-bound;origin-has-exactly-one-fetch-url-and-zero-pushurls;any-effective-url-dot-insteadOf-or-pushInsteadOf-key-refuses;changing-transport-spelling-after-capture-refuses-even-when-the-extracted-id-would-match;origin-match-is-an-identity-label-not-proof-that-content-came-from-a-network-remote"
+      },
+      "host_root": "the-external-protected-host-owns-its-configured-root-and-before-binding-and-immediately-before-every-checkout-bound-protected-effect-realpaths-it-proves-it-is-the-git-worktree-top-level-and-rechecks-pinned-root-and-git-metadata-device-inode-identities-reads-exactly-one-fetch-url-and-zero-pushurls-for-the-named-origin-remote-and-recomputes-HEAD-and-HEAD-tree;candidate-content-is-read-only-through-the-existing-immutable-candidate-snapshot-and-exact-tree-membership-proof-not-re-resolved-paths;the-host-scrubs-every-inherited-or-candidate-supplied-GIT-star-member-and-constructs-the-child-git-environment-with-only-host-set-GIT_CONFIG_NOSYSTEM=1-GIT_CONFIG_SYSTEM=/dev/null-and-GIT_CONFIG_GLOBAL=/dev/null;before-rev-parse-it-reads-local-config-with-git-config---local---no-includes-and-refuses-any-include.path-includeIf-dot-star.path-extensions.worktreeConfig-or-url-dot-star.insteadOf-or-pushInsteadOf-key;root-origin-id-commit-and-tree-must-equal-the-bound-values;unrelated-remotes-are-not-authority-inputs;candidate-code-cannot-supply-or-reselect-root-or-origin",
+      "plan_and_candidate": "the-current-freshly-resolved-plan-receipt-repository-id-commit-tree-and-candidate-commit-tree-must-equal-binding.repository-and-the-request-locators-exactly;the-plan-digest-and-every-dependent-protected-binding-must-agree-before-any-provider-sink-signer-or-capacity-effect",
+      "scope": "checkout-bound-protected-preflight-certification-prepare-and-export-host-boundaries-use-this-same-tuple-and-recheck-it-at-their-own-live-effect-boundary;the-host-reloads-its-trusted-expected-release-repository-id-at-each-boundary-and-requires-it-to-equal-the-captured-tuple;no-checkout-bound-effect-accepts-a-tuple-less-binding;pure-committed-artifact-reader-construction-and-read-only-parent-reconstruction-never-require-root-or-origin-access-and-verify-only-their-exact-signed-or-request-canonical-repository-candidate-and-plan-bytes;offline-verification-remains-bundle-only-under-ADR-REL-0019-and-ADR-REL-0022-and-uses-the-signed-canonical-locator-plus-external-expected-identities-and-trust-without-root-or-origin-lookup",
+      "broker": "the-broker-compares-binding.repository.id-only-to-expected_release_repository_id-and-refuses-inequality;it-compares-authority_repository_id-only-to-the-existing-broker-source-repository-id;no-slug-to-canonical-translation-or-cross-domain-equality-is-permitted",
+      "historical": "this-is-forward-only-current-policy authority;an-earlier-receipt-state-or-binding-lacking-the-complete-tuple-is-observation-only-and-cannot-be-reinterpreted-or-upgraded",
+      "refusal": "any-absent-extra-mismatched-noncanonical-or-candidate-selected-member-refuses-before-effect-without-a-slug-alias-origin-alias-or-ambient-fallback"
+    },
+    "protected_preflight": {
+      "action_id": "release preflight",
+      "stage": "preflight",
+      "boundary": "protected-certification-provider-v3",
+      "capability": "protected-certification-provider-v3:execute",
+      "scope": "execution-only-of-the-preflight-task-subset-derived-from-the-exact-bound-immutable-task-policy-and-plan;never-certification-task-selection-or-promotion",
+      "binding": [
+        "action_id",
+        "authority-repository-id",
+        "expected-release-repository-id",
+        "repository-id-commit-tree",
+        "origin-url",
+        "candidate-commit-tree",
+        "plan-receipt-digest",
+        "task-policy-digest-sha256",
+        "helper-identity-sha256"
+      ],
+      "helper_identity": "bind-the-exact-stage-selected-task-ids-argv-cwd-executable-digests-plan-toolchain-container-image-platform-and-dependency-identities;preflight-and-certify-use-the-same-immutable-execution-toolchain-and-candidate-not-identical-stage-task-subsets",
+      "invocation": "host-owned-opaque-single-use-capability-bound-to-the-exact-live-action-scope;reverify-all-bindings-before-execution;candidate-cannot-select-helper-code-profile-toolchain-or-ambient-environment",
+      "isolation": "tasks-run-outside-candidate-authority-without-sink-signing-control-or-publication-capabilities;capture-bounded-output-in-host-owned-proofs-and-prove-descendant-quiescence-before-acceptance",
+      "projection": {
+        "kind": "remote",
+        "system_id": "devai-protected-certification-provider-v3",
+        "endpoint_id": "host",
+        "operation_id": "execute",
+        "publication": false,
+        "adapter_id": "protected-certification-provider-v3"
+      },
+      "projection_guard": "fixed-internal-semantic-representation-only;selector-materialization-prepare-apply-and-final-reverification-check-the-same-named-boundary-and-opaque-binding;target-id-alone-or-a-generic-remote-process-docker-or-filesystem-cache-rule-never-grants-execution",
+      "permitted_transition": "only-the-existing-planned-to-preflight_passed-transition-after-core-verification",
+      "forbidden": [
+        "certification-evidence-sink",
+        "certification-manifest-or-generated-output-receipt",
+        "certified-state-promotion",
+        "artifact-sink",
+        "prepare",
+        "export",
+        "offline-verification",
+        "remote-publication",
+        "generic-process-execution"
+      ],
+      "missing_or_mismatched_provider": "refuse-before-task-execution-or-success-state-append;no-ambient-or-unprotected-fallback"
+    },
+    "prepare_kernel": {
+      "kernel_id": "devai.kernel.release-prepare.v4",
+      "compatibility": {
+        "v1_v2_local_path_and_npm_adapter": "deprecated-read-only-compatibility-only;never-select-for-current-prepare",
+        "v3_pack": "historical-read-only-under-original-specification;never-relabel-repack-rehash-or-wrap-as-v4-authority",
+        "v4_prepare": "pure-in-memory-and-sink-mediated-only;exact-current-pack-specification-and-live-capacity-required"
+      },
+      "stock_composition": {
+        "built_in_actions": ["release plan", "release preflight", "release resume"],
+        "preflight": "built-in-orchestration-requires-injected-execution-only-protected-preflight;missing-or-mismatched-helper-refuses-without-ambient-fallback",
+        "certify": "requires-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink;legacy-certify-is-read-only-deprecated-compatibility-only",
+        "prepare": "requires-injected-trusted-artifact-sink-and-has-no-stock-pathname-sink",
+        "export": "requires-injected-dedicated-export-extension-sink-and-protected-aggregate-signer-and-has-no-stock-pathname-or-unprotected-provider-fallback"
+      },
+      "certification_manifest": {
+        "produced_by": "release certify",
+        "producer": "injected-protected-certification-provider-v3-executes-the-selected-immutable-task-policy-outside-candidate-authority-and-returns-the-complete-package-output-closure",
+        "evidence_sink": "injected-two-phase-content-addressed-certification-evidence-sink;missing-provider-or-sink-fails-before-task-execution-output-exposure-or-state-append",
+        "schema": "law/schemas/release-lifecycle-state.schema.json#/$defs/certification_package_entry_manifest",
+        "binding": [
+          "repository.commit",
+          "repository.tree",
+          "candidate.commit",
+          "candidate.tree",
+          "task-policy-digest-sha256",
+          "release-unit-and-package-roster"
+        ],
+        "coverage": "one-complete-sorted-unique-package-entry-manifest-per-package-including-all-certified-generated-outputs",
+        "entry_fields": ["path", "mode", "size_bytes", "sha256", "immutable_blob_locator"],
+        "entry_origins": ["git-object", "generated-output"],
+        "entry_order": "ascending-utf-8-byte-collation-by-path;duplicates-refuse",
+        "manifest_digest": "sha256-of-domain-DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1-nul-followed-by-utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted",
+        "missing_or_extra_entry": "fail-closed"
+      },
+      "content_source": {
+        "git_object": "require-exact-repository-commit-tree-object_format-path-mode-object_id-size-and-content_digest-sha256;prove-path-mode-object-membership-in-the-exact-candidate-tree-then-recompute-the-declared-sha1-or-sha256-git-blob-framing-over-blob-space-decimal-byte-length-nul-raw-bytes-and-recompute-sha256-over-the-raw-bytes-before-use",
+        "generated_output": "resolve-the-externally-finalized-release-certification-evidence-receipt-v1-by-its-rfc8785-jcs-sha256-digest-and-opaque-content-addressed-evidence-sink-handle;verify-its-exact-candidate-commit-tree-task-policy-package-output-blob-handle-size-and-sha256-referent-and-complete-package-output-closure-then-read-only-and-recompute-sha256-over-the-returned-bytes-before-use",
+        "locator_rule": "every-entry-uses-an-immutable-content-addressed-locator;host-paths-symlinks-ambient-worktree-reads-self-issued-generated-receipts-and-foreign-git-objects-are-forbidden",
+        "mismatch": "fail-closed"
+      },
+      "pack": {
+        "implementation": "pure-in-memory-npm-compatible-tar-gzip",
+        "pack_spec_id": "devai.pure-npm-compatible-pack.v4",
+        "pack_spec_canonical_bytes": "devai.pure-npm-compatible-pack.v4\nselection=only-certification-package-entry-manifest.entries;exact-set;no-npmignore-no-gitignore-no-files-field-no-default-additions\nentry-order=utf-8-byte-ascending-by-entry.path;duplicate-paths-refuse\narchive-path=package/<entry.path>;valid-unicode-scalar-values;utf-8;relative;no-backslash-no-nul-no-empty-dot-or-dotdot-segments;no-pax\nustar-path=if-archive-path-utf8-bytes<=100:name=archive-path,prefix=empty;otherwise-split-at-rightmost-slash-with-nonempty-prefix-utf8-bytes<=155-and-nonempty-name-utf8-bytes<=100;separator-not-stored;refuse-if-no-valid-split;no-truncation-no-unicode-normalization;name-offset=0,width=100;prefix-offset=345,width=155;unused-bytes=zero;full-width-fields=no-extra-nul\nentry-types=regular-only;directories-symlinks-hardlinks-device-fifo-pax-global-pax-refuse\nmodes=100644-or-100755-only\nsize=0..8589934591-decimal-bytes\ntar=format-ustar;block=512;name=ustar-name;mode=entry.mode;uid=0;gid=0;size=entry.size_bytes;mtime=0;typeflag=0;linkname=empty;magic=ustar\\0;version=00;uname=empty;gname=empty;devmajor=0;devminor=0;prefix=ustar-prefix\nnumeric-fields=ascii-octal-zero-padded-with-terminal-nul;checksum=unsigned-byte-sum-with-checksum-field-eight-ascii-spaces;payload-padding=zero-to-next-512;end=two-zero-512-blocks\ngzip=header-id1-31-id2-139-cm-8-flg-0-mtime-0-xfl-0-os-255;deflate=stored-blocks-only;block-rule=greedy-consecutive-65535-byte-blocks-in-tar-order-plus-one-final-remainder-block;BFINAL=1-only-on-final-block;empty-tar-stream=one-zero-length-stored-block-with-BFINAL-1;trailer=crc32-ieee-little-endian-plus-isize-mod-2^32-little-endian\nsbom=spdx-json-2.3;utf-8-rfc8785-jcs;spdxVersion=SPDX-2.3;dataLicense=CC0-1.0;SPDXID=SPDXRef-DOCUMENT;name=<package_id>@<package_version>;documentNamespace=https://devai.nyxk.com.br/spdx/<candidate.commit>/<package_id>;creationInfo.created=1970-01-01T00:00:00Z;creationInfo.creators=[Tool: devai.pure-npm-compatible-pack.v4];creationInfo.optionalFields=comment-licenseListVersion=absent;documentDescribes=[SPDXRef-Package];document.optionalFields=comment-externalDocumentRefs-annotations-hasExtractedLicensingInfos-revieweds-snippets=absent;packages=[SPDXRef-Package];package.name=<package_id>@<package_version>;package.SPDXID=SPDXRef-Package;package.downloadLocation=NOASSERTION;package.filesAnalyzed=true;package.packageVerificationCode.value=lowercase-hex(SHA1(utf8-concatenation-of-each-file-raw-byte-SHA1-lowercase-hex-sorted-ascending-lexicographically-by-checksum-value));package.packageVerificationCode.excludedFiles=absent;package.licenseConcluded=NOASSERTION;package.licenseDeclared=NOASSERTION;package.copyrightText=NOASSERTION;package.supplier=NOASSERTION;package.originator=NOASSERTION;package.optionalFields=absent\nfiles=entries-in-entry-order;file.SPDXID=SPDXRef-File-<lowercase-sha256-of-utf8-archive-path>;file.fileName=archive-path;file.checksums=[SHA1:lowercase-raw-byte-sha1,SHA256:lowercase-entry.sha256];file.licenseConcluded=NOASSERTION;file.licenseInfoInFiles=[NOASSERTION];file.copyrightText=NOASSERTION;file.optionalFields=absent\nrelationships=document-DESCRIBES-package-then-package-CONTAINS-file-in-entry-order;annotations-externalRefs-extractedLicensingInfos=absent\n",
+        "pack_spec_digest_sha256": "46ba1063f36f48fb6d5082548024b17b274cf475e24a5c1df89faa5f07a46316",
+        "outputs": ["package-tarball", "package-sbom", "package-manifest"],
+        "determinism": "all-output-bytes-derive-only-from-the-certified-entry-manifest-and-frozen-pack-spec",
+        "forbidden_execution": [
+          "npm-subprocess",
+          "tool-subprocess",
+          "shell",
+          "ambient-path-resolution"
+        ],
+        "unsupported_semantics": "fail-closed-before-any-sink-effect"
+      },
+      "artifact_sink": {
+        "required": true,
+        "trust_boundary": "injected-trusted-artifact-sink-outside-the-candidate-repository",
+        "forbidden_implementations": [
+          "built-in-pathname-sink",
+          "repository-contained-sink",
+          "direct-filesystem-destination"
+        ],
+        "protocol": [
+          "begin-transaction-and-receive-opaque-transaction-handle",
+          "put-verified-in-memory-artifacts-and-receive-opaque-artifact-handles",
+          "sink-verifies-each-artifact-byte-digest-size-and-pack-spec-binding",
+          "core-reverifies-the-sink-reported-handles-and-digests",
+          "commit-one-complete-manifest-atomically-once",
+          "abort-the-open-transaction-only-on-a-proven-pre-commit-failure",
+          "append-unknown-terminal-evidence-and-preserve-handles-without-abort-or-rollback-on-timeout-lost-response-or-unverifiable-commit"
+        ],
+        "missing_sink": "fail-before-package-generation-or-exposure",
+        "partial_or_unverifiable_commit": "append-unknown-ambiguous-terminal-evidence-preserve-the-sink-transaction-and-handles-without-abort-rollback-retry-or-redispatch-until-external-reconciliation"
+      },
+      "prepared_state": "v4-prepared-state-must-use-schemaVersion-2.1.0-and-carry-only-opaque-artifact-handles-plus-the-sink-id-transaction-handle-and-single-committed-manifest-handle-digest-and-size;legacy-path-forms-are-read-only-v1-v2-compatibility-only",
+      "downstream_reverification": "release-export-offline-verify-evidence-publish-and-publish-must-load-artifacts-only-through-opaque-sink-handles-and-the-exact-committed-manifest-handle-then-recompute-byte-digest-size-and-manifest-membership-before-use",
+      "errors": [
+        "release-prepare-certification-manifest-invalid",
+        "release-prepare-package-entry-coverage-invalid",
+        "release-prepare-immutable-blob-locator-invalid",
+        "release-prepare-content-digest-mismatch",
+        "release-prepare-pack-spec-digest-mismatch",
+        "release-prepare-unsupported-package-semantics",
+        "release-prepare-subprocess-forbidden",
+        "release-certification-provider-unavailable",
+        "release-certification-evidence-sink-unavailable",
+        "release-certification-ambient-input-forbidden",
+        "release-certification-generated-output-untrusted",
+        "release-certification-output-closure-invalid",
+        "release-prepare-git-locator-invalid",
+        "release-prepare-git-tree-membership-invalid",
+        "release-artifact-sink-unavailable",
+        "release-artifact-sink-protocol-invalid",
+        "release-artifact-sink-verification-failed",
+        "release-artifact-sink-commit-failed",
+        "release-artifact-sink-commit-unknown",
+        "release-artifact-sink-abort-failed",
+        "release-downstream-artifact-reverification-failed",
+        "release-prepare-capacity-unavailable",
+        "release-prepare-capacity-insufficient"
+      ],
+      "capacity": {
+        "contract_id": "devai.release-prepare-capacity.v1",
+        "action_id": "release prepare",
+        "bounds": {
+          "max_batches": 256,
+          "max_targets_per_batch": 64,
+          "max_total_targets": 8192
+        },
+        "reader": "host-owned-read-only-non-transferable-live-invocation-and-exact-bounded-plan-account;no-request-field-candidate-callback-or-numeric-self-assertion",
+        "check_point": "after-complete-certified-package-and-packed-artifact-count-verification-immediately-before-sink.begin",
+        "package_count": "complete-request-bound-certified-package-roster;safe-integer;no-subset",
+        "package_artifacts_per_package": 3,
+        "commit_manifest_objects": 1,
+        "sink_batches": {
+          "begin": 1,
+          "package_puts_per_package": 3,
+          "commit_manifest_put": 1,
+          "commit": 1,
+          "pre_commit_abort_allowance": 1
+        },
+        "state_batches": {
+          "exclusive_write": 7,
+          "completion": 7,
+          "state_record": 7,
+          "temporary_head": 7,
+          "head_rename": 1,
+          "head_directory_sync": 3,
+          "execution_lock_cleanup": 4,
+          "success_reserve": 29,
+          "failure_or_unknown_terminal_plus_cleanup": 11
+        },
+        "required_remaining_batches": "3 * package_count + 33",
+        "required_remaining_targets": "3 * package_count + 33",
+        "acceptance_cohort": {
+          "package_count": 38,
+          "required_remaining_batches": 147,
+          "required_remaining_targets": 147
+        },
+        "initialization": "already-charged-before-check;pin-campaign-and-records-attempts-completions-failures-unknown-directory-identities-under-execution-lock;append-validates-and-refuses-drift-never-recreates",
+        "sequencing": "exclusive-through-completion-or-protected-reservation-in-same-account;no-concurrent-or-unaccounted-effect-may-spend-required-capacity",
+        "accounting": "one-batch-and-target-per-logical-sink-operation;ordinary-state-filesystem-effects-separate;read-only-reverification-has-no-mutation-effect;no-counter-reset-cross-invocation-credit-or-missing-reader-fallback",
+        "refusal_codes": [
+          "release-prepare-capacity-unavailable",
+          "release-prepare-capacity-insufficient"
+        ],
+        "refusal_effect": "before-sink.begin-or-artifact-exposure;no-success-state;existing-bounded-failure-bookkeeping-only;unknown-commit-preserves-handles-without-abort-or-retry"
+      },
+      "export_extension": {
+        "artifact_spec": {
+          "artifact_spec_id": "devai.release-export-closure.v4",
+          "artifact_spec_canonical_bytes": "devai.release-export-closure.v4\nparent=exact-prepared-artifact-sink-commit;same-sink-id;retain-parent-opaque-handles;rehash-parent-members-before-begin;final-manifest-carries-exact-parent-commit-identity\nclosure=exact-sorted-duplicate-free-five-kind-projection-per-package;parent-kinds=package-manifest,package-tarball,package-sbom;new-kinds=evidence-manifest,provider-result\nevidence=evidence-manifest-is-exact-canonical-utf8-devai.release-policy-closure-json.v1;one-opaque-handle-per-package;contains-plan-approved-archive-candidate-git-objects-and-when-required-producer-toolchain-source-and-build-provenance;byte-identical-closures-may-be-content-deduplicated-only-by-the-trusted-same-sink-under-distinct-recorded-opaque-identities;offline-rehashes-each-identity-and-may-cache-by-equal-sha256-and-size-only-after-resolution;decode-and-verifyReleasePolicyClosure-under-signed-expected-installed-package-identity-and-checked-implementation;no-ambient-dereference\ncertification=one-complete-non-null-canonical-devai.release-certified-evidence-carrier-json.v1-per-release-unit-in-its-elected-provider-result;carrier-exactly-retains-original-candidate-receipt-task-policy-every-required-task-result-and-one-digest-only-namespace-census;all-carrier-member-identities-and-census-protected-derivation-binding-are-fully-enumerated-in-the-signed-transcript;mutation-none-remains-carrier-required;no-raw-stdout-stderr-or-generated-bytes\npolicy=release-inputProjection-requires-task-policy-schemaVersion-1.2.0-exactly;task-policy-1.0-and-1.1-remain-strict-unchanged-and-1.1-with-inputProjection-refuses\ncensus=canonical-digest-only-namespace-census-with-producer-task-protected-derivation-binding-and-sorted-path-mode-sha256-size-identities;verifier-requires-disjointness-prefix-and-node-containment-and-full-result-digest-equality;generated-bytes-and-raw-streams-are-never-carrier-members\ntranscript=one-exact-canonical-utf8-devai.release-export-transcript-json.v3-sorted-by-package;signing-preimage-fully-enumerates-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-package-release-unit-mapping-complete-unit-mutation-projections-and-every-certification-carrier-policy-receipt-result-census-and-derivation-binding-identity-plus-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-excluded\nbinding=action-id,repository-id-commit-tree,candidate-commit-tree,plan-receipt-digest,parent-sink-commit,sink-id,destination-kind-exact-identifier,trust-root-id-trust-store-digest-key-id-signature-algorithm,expected-installed-package-identity,policy-resolution-digest,evidence-manifest-closure-digest,attempt-identity,closure-release-unit-mapping,carrier-package-identity,unit-mutation-closure-digest-and-size,unit-receipt-full-byte-identity-and-receipt-digest,output-contract-identity,complete-unit-member-projection-and-digest,certification-carrier-package-identity,certification-candidate-receipt-byte-identity-and-digest,certification-task-policy-byte-identity-and-digest,certification-task-result-byte-identities-and-digests,certification-namespace-census-byte-identity-and-digest,certification-namespace-derivation-binding-digest,certification-census-digest-only-member-projection\nsigning=v4-requires-ed25519-64-byte-aggregate-detached-signature-and-non-ed25519-refuses-SIGNATURE_ALGORITHM_UNSUPPORTED-before-store.begin-or-signer-dispatch;one-host-protected-aggregate-detached-signature-over-the-transcript-only;provider-result-is-post-signature-canonical-utf8-devai.release-export-provider-result-json.v3-with-exact-unit-portable-mutation-copy-and-exact-unit-certified-evidence-carrier-and-must-bind-transcript-digest-signature-trust-and-its-evidence-manifest-digest;final-manifest-continuity-reverifies-provider-result-without-rehashing-it-into-the-preimage\ncommit=append-only-extension-transaction;one-complete-canonical-manifest;atomic-once;new-export-commit-is-state-artifact-sink-commit\nreader=resolve-only-exact-parent-or-extension-handles-through-trusted-host-reader;offline-uses-only-evidence-manifest-policy-closure-parent-artifacts-signed-transcript-external-expected-identity-provider-result-embedded-unit-mutation-bytes-and-bounded-certified-evidence-carrier-bytes;never-resolve-certification-or-mutation-sink-handles-checkout-cache-network-host-path-or-ambient-source-offline;reject-unknown-cross-sink-extra-duplicate-or-noncanonical-members\nrecovery=precommit-failure-abort-only;after-commit-timeout-lost-response-or-unverifiable-commit-preserve-handles-append-unknown-and-never-abort-rollback-retry-or-redispatch\nmutation=devai.release-unit-mutation-portable-json.v1;one-unit-keyed-exact-carrier-in-signed-utf8-minimum-request-package-provider-result;noncarriers-null;required-carrier-missing-or-duplicate-refuses;strict-canonical-padded-base64-of-jcs-utf8-closure-output-contract-external-unit-receipt-and-exact-2N+2-members;complete-unit-projection-in-transcript-and-protected-binding;full-profile-roster-thresholds-task-policy-and-version-matched-source-semantics;not-required-unit-has-null-and-no-carrier;exactly-one-carrier-per-required-unit-verified-across-complete-five-kind-artifact-set\noffline=all-nine-required-offline-checks-have-distinct-nonzero-evidence-projections-and-no-synthetic-rows;legacy-v2-or-v3-closure-lacks-complete-certified-carrier-and-fails-mandatory-result-dag-integrity-never-not-applicable\nacyclic=finalized-unit-evidence-before-transcript-before-one-signature-before-provider-results-before-final-export-commit;no-provider-result-signature-or-final-export-commit-identity-in-preimage\ncompatibility=historical-export-closure.v2-transcript.v1-provider-result.v1-and-export-closure.v3-transcript.v2-provider-result.v2-read-unchanged-under-exact-legacy-branch;legacy-never-satisfies-current-mutation-required-plan-or-mandatory-result-dag-integrity;current-emission-export-closure.v4-transcript.v3-provider-result.v3;mutation-contract-summary-receipt-2.1-or-2.2-explicit-version-match;2.2-only-after-approved-source-and-byte-equal-vendor-pin;immutable-package-pairs-remain-2.1\n",
+          "artifact_spec_digest_sha256": "245fba3823b7f80a55b73e8721ac5871a40b90cce8789aa49b87228b8d03ac44",
+          "outputs": ["evidence-manifest", "provider-result"]
+        },
+        "binding": [
+          "action_id",
+          "authority-repository-id",
+          "expected-release-repository-id",
+          "repository-id-commit-tree",
+          "origin-url",
+          "candidate-commit-tree",
+          "plan-receipt-digest",
+          "parent-prepared-artifact-sink-commit",
+          "sink-id",
+          "destination-kind-exact-identifier",
+          "trust-root-id-trust-store-digest-key-id-signature-algorithm",
+          "expected-installed-package-identity",
+          "policy-resolution-digest",
+          "evidence-manifest-closure-digest",
+          "attempt-identity",
+          "closure-release-unit-mapping",
+          "carrier-package-identity",
+          "unit-mutation-closure-digest-and-size",
+          "unit-receipt-full-byte-identity-and-receipt-digest",
+          "output-contract-identity",
+          "complete-unit-member-projection-and-digest",
+          "certification-carrier-package-identity",
+          "certification-candidate-receipt-byte-identity-and-digest",
+          "certification-task-policy-byte-identity-and-digest",
+          "certification-task-result-byte-identities-and-digests",
+          "certification-namespace-census-byte-identity-and-digest",
+          "certification-namespace-derivation-binding-digest",
+          "certification-census-digest-only-member-projection"
+        ],
+        "parent": "before-begin-require-the-exact-prepared-predecessor-commit-manifest-and-its-complete-sorted-three-kind-per-package-closure-through-the-trusted-reader;preserve-every-parent-opaque-identity-byte-for-byte-and-never-repack-or-relabel-it",
+        "resolution": "before-begin-replay-the-exact-installed-policy-resolution-and-retain-one-exact-canonical-devai.release-policy-closure-json.v1-evidence-manifest-per-package;verify-each-under-the-signed-expected-installed-package-identity-and-checked-implementation;no-checkout-network-source-layout-or-ambient-installed-input-fallback;for-every-verified-request-release-unit-retain-one-complete-non-null-canonical-certified-evidence-carrier-containing-the-unchanged-candidate-receipt-task-policy-every-required-task-result-and-digest-only-namespace-census-through-the-existing-certification-evidence-sink-under-protected-measured-preallocated-bounds-and-rehash-every-byte-before-begin;including-mutation-none-units;retain-immutable-canonical-bytes-and-compare-rereads-before-signing-never-silently-replace",
+        "signing": "v4-requires-ed25519-64-byte-aggregate-detached-signature-and-refuses-SIGNATURE_ALGORITHM_UNSUPPORTED-before-store.begin-or-signer-dispatch-for-any-other-algorithm;one-host-owned-externally-protected-aggregate-signature-only;the-signer-reverifies-one-acyclic-canonical-devai.release-export-transcript-json.v3-over-the-closed-binding-parent-identities-evidence-manifest-digests-policy-resolution-digests-expected-installed-package-identities-package-release-unit-mapping-complete-unit-mutation-projections-and-fully-enumerated-certification-carrier-policy-receipt-result-census-and-derivation-binding-identities-plus-destination-trust-and-attempt;provider-result-signature-bytes-and-final-manifest-bytes-are-not-preimage-members;candidate-code-never-selects-a-key-or-signing-implementation",
+        "preflight": "validate-all-binding-parent-resolution-complete-non-null-certification-carrier-election-every-carrier-member-identity-digest-only-census-derivation-binding-destination-ed25519-trust-measured-preallocated-capacity-and-canonical-bytes-before-begin-or-signing;any-failure-has-no-sink-or-signing-effect",
+        "protocol": [
+          "begin-one-dedicated-export-extension-transaction-after-preflight",
+          "put-exactly-one-canonical-devai.release-policy-closure-json.v1-evidence-manifest-per-package-and-reverify-every-new-handle-byte-digest-and-size",
+          "construct-and-sign-exactly-one-acyclic-canonical-devai.release-export-transcript-json.v3-with-complete-request-package-to-release-unit-mapping-sorted-unit-mutation-projections-and-fully-enumerated-certification-carrier-policy-receipt-every-result-census-and-derivation-binding-identities-before-its-dependent-provider-results-are-accepted",
+          "put-exactly-one-post-signature-canonical-devai.release-export-provider-result-json.v3-per-package-binding-the-signed-transcript-digest-signature-trust-and-evidence-manifest-digest;for-each-release-unit-in-its-elected-provider-result-carry-one-complete-non-null-canonical-certified-evidence-carrier-containing-unchanged-candidate-receipt-task-policy-every-required-task-result-and-digest-only-namespace-census-even-when-mutation-is-none;missing-duplicate-extra-substituted-or-cross-unit-carriers-refuse-across-the-complete-five-kind-artifact-set;reverify-every-new-handle-byte-digest-and-size",
+          "commit-one-complete-canonical-five-kind-manifest-atomically-once-and-use-that-new-commit-as-the-exported-state-sink-identity",
+          "abort-only-on-proven-pre-commit-failure",
+          "after-signing-or-commit-ambiguity-preserve-the-transaction-and-handles-append-unknown-and-never-abort-rollback-retry-or-redispatch"
+        ],
+        "capacity": {
+          "contract_id": "devai.release-export-capacity.v1",
+          "action_id": "release export",
+          "bounds": {
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
+          },
+          "reader": "host-owned-read-only-non-transferable-live-invocation-and-exact-bounded-plan-account;no-request-field-candidate-callback-or-numeric-self-assertion",
+          "check_point": "after-all-read-only-parent-resolution-and-closure-verification-immediately-before-export-sink.begin-or-signer-dispatch",
+          "package_count": "complete-request-bound-prepared-package-roster;safe-integer;no-subset",
+          "package_artifacts_per_package": 2,
+          "protected_aggregate_signature_operations": 1,
+          "commit_manifest_objects": 1,
+          "sink_batches": {
+            "begin": 1,
+            "package_puts_per_package": 2,
+            "protected_aggregate_signature": 1,
+            "commit_manifest_put": 1,
+            "commit": 1,
+            "pre_commit_abort_allowance": 1
+          },
+          "state_batches": {
+            "exclusive_write": 7,
+            "completion": 7,
+            "state_record": 7,
+            "temporary_head": 7,
+            "head_rename": 1,
+            "head_directory_sync": 3,
+            "execution_lock_cleanup": 4,
+            "success_reserve": 29,
+            "failure_or_unknown_terminal_plus_cleanup": 11
+          },
+          "required_remaining_batches": "2 * package_count + 34",
+          "required_remaining_targets": "2 * package_count + 34",
+          "acceptance_cohort": {
+            "package_count": 38,
+            "required_remaining_batches": 110,
+            "required_remaining_targets": 110
+          },
+          "initialization": "already-charged-before-check;pin-campaign-and-records-attempts-completions-failures-unknown-directory-identities-under-execution-lock;append-validates-and-refuses-drift-never-recreates",
+          "sequencing": "exclusive-through-completion-or-protected-reservation-in-same-account;no-concurrent-or-unaccounted-effect-may-spend-required-capacity",
+          "accounting": "one-batch-and-target-per-logical-export-sink-or-protected-aggregate-signing-operation;ordinary-state-filesystem-effects-separate;all-parent-and-closure-reverification-is-read-only;no-counter-reset-cross-invocation-credit-or-missing-reader-fallback",
+          "refusal_codes": [
+            "release-export-capacity-unavailable",
+            "release-export-capacity-insufficient"
+          ],
+          "refusal_effect": "before-sink.begin-or-signer-dispatch;no-success-state;existing-bounded-failure-bookkeeping-only;unknown-signing-or-commit-preserves-handles-without-abort-or-retry"
+        }
+      }
+    },
+    "release_unit_bijection": {
+      "state_schema": "law/schemas/release-lifecycle-state.schema.json",
+      "store_schema": "law/schemas/release-lifecycle-store-record.schema.json",
+      "unit_roster": "the-sorted-unique-release-unit-and-package-roster-is-identical-in-request-state-store-record-evidence-and-provider-result",
+      "artifact_requirements": {
+        "release preflight": [],
+        "release certify": [],
+        "release prepare": ["package-manifest", "package-tarball", "package-sbom"],
+        "release export": [
+          "package-manifest",
+          "package-tarball",
+          "package-sbom",
+          "evidence-manifest",
+          "provider-result",
+          "trust"
+        ],
+        "release evidence-publish": [
+          "package-manifest",
+          "package-tarball",
+          "package-sbom",
+          "evidence-manifest",
+          "provider-result",
+          "trust"
+        ],
+        "release publish": [
+          "package-manifest",
+          "package-tarball",
+          "package-sbom",
+          "evidence-manifest",
+          "provider-result",
+          "trust"
+        ]
+      },
+      "prepare": "each-package-has-exactly-one-package-manifest-package-tarball-and-package-sbom",
+      "export": "each-package-has-exactly-one-evidence-manifest-and-provider-result",
+      "offline_verify": "a-schemaVersion-2.1.0-receipt-resolves-the-complete-aggregate-and-per-package-opaque-artifact-set-through-the-external-sink-rehashes-byte-digest-and-size-and-requires-sorted-duplicate-free-one-to-one-equality-by-kind-sink_id-opaque_handle-sha256-size_bytes-across-exported-state-per-package-evidence-offline-receipt-and-evidence-publish-input;current-kinds-are-package-manifest-package-tarball-package-sbom-evidence-manifest-provider-result;legacy-path-receipts-are-read-only;release-evidence-publish-recompares-that-exact-continuity-before-remote-dispatch",
+      "trust": "trust-root-id-trust-store-digest-key-id-and-signature-algorithm-are-bound-per-provider-result-and-never-contain-key-material"
+    },
+    "state_semantic_kernel": {
+      "kernel_id": "devai.kernel.release-lifecycle-state.v2",
+      "state_schema": "law/schemas/release-lifecycle-state.schema.json",
+      "schema_validation_alone_establishes_state": false,
+      "algorithm": [
+        "accept-v1-only-for-wire-compatible-read-and-never-as-a-v2-write",
+        "require-v2-canonicalization-and-recompute-state-digest-and-RLS-id",
+        "require-repository-and-candidate-commit-tree-and-release-unit-roster-equality-with-the-core-resolved-request",
+        "require-release-certify-to-emit-one-complete-candidate-tree-task-policy-bound-package-entry-manifest-per-package-before-a-v3-prepare",
+        "require-v3-certify-to-use-only-the-injected-protected-certification-provider-v3-and-two-phase-content-addressed-certification-evidence-sink-and-never-scan-ambient-worktree-or-self-issue-generated-output-receipts",
+        "require-every-v3-git-source-locator-to-prove-exact-repository-candidate-commit-tree-path-mode-object-format-object-id-size-and-content-digest-membership-before-pack-and-preserve-unprovable-sink-commit-outcomes-as-unknown-without-abort-or-retry",
+        "require-prior-state-storage-head-and-completion-record-to-agree-exactly",
+        "require-generation-zero-with-null-predecessor-for-preflight-and-exact-predecessor-generation-plus-one-for-every-successor",
+        "require-package-artifact-and-evidence-bijections-for-the-action",
+        "require-current-v3-artifact-projection-to-use-only-package-manifest-package-tarball-package-sbom-evidence-manifest-provider-result-and-to-be-sorted-duplicate-free-and-one-to-one-equal-by-kind-sink_id-opaque_handle-sha256-size_bytes-across-state-package-evidence-offline-receipt-and-evidence-publish-input",
+        "require-provider-and-trust-identities-to-equal-the-core-resolved-locators-and-never-accept-client-derived-results",
+        "require-a-remote-attempt-to-be-durable-before-consumption-and-dispatch-and-reject-fabricated-absent-handles-after-a-dispatch-could-have-occurred",
+        "require-the-v2-consumed-authorization-binding-to-equal-the-attempt-request-repository-candidate-action-destination-grant-and-ledger-predecessor-before-dispatch"
+      ],
+      "errors": [
+        "release-request-identity-mismatch",
+        "release-state-v2-canonicalization-invalid",
+        "release-state-id-or-digest-mismatch",
+        "release-state-predecessor-mismatch",
+        "release-state-head-mismatch",
+        "release-release-unit-bijection-invalid",
+        "release-provider-result-unknown",
+        "release-provider-trust-identity-mismatch",
+        "release-provider-handle-observation-invalid",
+        "release-authorization-attempt-binding-invalid",
+        "release-authorization-consumption-not-durable"
+      ]
+    }
+  },
+  "states": [
+    {
+      "state": "planned",
+      "order": 1,
+      "persisted": false,
+      "appendable": false,
+      "derivation": "plan-receipt",
+      "produced_by_action": null,
+      "derived_by_action": "release plan",
+      "derived_from_receipt": "release-plan-receipt",
+      "requires_state": null
+    },
+    {
+      "state": "preflight_passed",
+      "order": 2,
+      "persisted": true,
+      "appendable": true,
+      "derivation": "state-record",
+      "produced_by_action": "release preflight",
+      "derived_by_action": null,
+      "derived_from_receipt": null,
+      "requires_state": null
+    },
+    {
+      "state": "certified",
+      "order": 3,
+      "persisted": true,
+      "appendable": true,
+      "derivation": "state-record",
+      "produced_by_action": "release certify",
+      "derived_by_action": null,
+      "derived_from_receipt": null,
+      "requires_state": "preflight_passed"
+    },
+    {
+      "state": "prepared",
+      "order": 4,
+      "persisted": true,
+      "appendable": true,
+      "derivation": "state-record",
+      "produced_by_action": "release prepare",
+      "derived_by_action": null,
+      "derived_from_receipt": null,
+      "requires_state": "certified"
+    },
+    {
+      "state": "exported",
+      "order": 5,
+      "persisted": true,
+      "appendable": true,
+      "derivation": "state-record",
+      "produced_by_action": "release export",
+      "derived_by_action": null,
+      "derived_from_receipt": null,
+      "requires_state": "prepared"
+    },
+    {
+      "state": "offline_verified",
+      "order": 6,
+      "persisted": false,
+      "appendable": false,
+      "derivation": "offline-verification-receipt",
+      "produced_by_action": null,
+      "derived_by_action": "release offline-verify",
+      "derived_from_receipt": "release-offline-verification-receipt",
+      "requires_state": "exported"
+    },
+    {
+      "state": "evidence_published",
+      "order": 7,
+      "persisted": true,
+      "appendable": true,
+      "derivation": "state-record",
+      "produced_by_action": "release evidence-publish",
+      "derived_by_action": null,
+      "derived_from_receipt": null,
+      "requires_state": "exported"
+    },
+    {
+      "state": "publication_dispatched",
+      "order": 8,
+      "persisted": true,
+      "appendable": true,
+      "derivation": "state-record",
+      "produced_by_action": "release publish",
+      "derived_by_action": null,
+      "derived_from_receipt": null,
+      "requires_state": "evidence_published"
+    },
+    {
+      "state": "published",
+      "order": 9,
+      "persisted": false,
+      "appendable": false,
+      "derivation": "publication-receipt",
+      "produced_by_action": null,
+      "derived_by_action": "release resume",
+      "derived_from_receipt": "release-publication-receipt",
+      "requires_state": "publication_dispatched"
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "release certify",
+      "effect": "harness-write",
+      "initiator_roles": ["inspector"],
+      "requires_prior_state": ["preflight_passed"],
+      "requires_receipts": [],
+      "produces_state": "certified",
+      "appends_state_record": true,
+      "persists_repository_state": true,
+      "emits_receipt": null,
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input", "evidence", "prior-state"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release evidence-publish",
+      "effect": "remote-write",
+      "initiator_roles": ["owner"],
+      "requires_prior_state": ["exported"],
+      "requires_receipts": ["release-offline-verification-receipt"],
+      "produces_state": "evidence_published",
+      "appends_state_record": true,
+      "persists_repository_state": true,
+      "emits_receipt": null,
+      "observational": false,
+      "grants_publication_authority": true,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "input",
+        "evidence",
+        "artifact",
+        "prior-state",
+        "offline-verification-receipt"
+      ],
+      "authorization": {
+        "required": true,
+        "authorized_by": "owner",
+        "one_time": true,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release export",
+      "effect": "local-write",
+      "initiator_roles": ["architect"],
+      "requires_prior_state": ["prepared"],
+      "requires_receipts": [],
+      "produces_state": "exported",
+      "appends_state_record": true,
+      "persists_repository_state": true,
+      "emits_receipt": null,
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release offline-verify",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "requires_prior_state": ["exported"],
+      "requires_receipts": [],
+      "produces_state": null,
+      "appends_state_record": false,
+      "persists_repository_state": false,
+      "emits_receipt": "release-offline-verification-receipt",
+      "observational": true,
+      "grants_publication_authority": false,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "evidence",
+        "artifact",
+        "prior-state",
+        "verifier",
+        "trust"
+      ],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release plan",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "requires_prior_state": [],
+      "requires_receipts": [],
+      "produces_state": null,
+      "appends_state_record": false,
+      "persists_repository_state": false,
+      "emits_receipt": "release-plan-receipt",
+      "observational": true,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release preflight",
+      "effect": "harness-write",
+      "initiator_roles": ["inspector"],
+      "requires_prior_state": [],
+      "requires_receipts": ["release-plan-receipt"],
+      "produces_state": "preflight_passed",
+      "appends_state_record": true,
+      "persists_repository_state": true,
+      "emits_receipt": null,
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input", "evidence", "plan-receipt"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release prepare",
+      "effect": "local-write",
+      "initiator_roles": ["architect"],
+      "requires_prior_state": ["certified"],
+      "requires_receipts": [],
+      "produces_state": "prepared",
+      "appends_state_record": true,
+      "persists_repository_state": true,
+      "emits_receipt": null,
+      "observational": false,
+      "grants_publication_authority": false,
+      "binds_identity": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release publish",
+      "effect": "remote-write",
+      "initiator_roles": ["owner"],
+      "requires_prior_state": ["evidence_published"],
+      "requires_receipts": [],
+      "produces_state": "publication_dispatched",
+      "appends_state_record": true,
+      "persists_repository_state": true,
+      "emits_receipt": null,
+      "observational": false,
+      "grants_publication_authority": true,
+      "binds_identity": ["repository", "candidate", "input", "evidence", "artifact", "prior-state"],
+      "authorization": {
+        "required": true,
+        "authorized_by": "owner",
+        "one_time": true,
+        "wildcard_permitted": false
+      }
+    },
+    {
+      "action_id": "release resume",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"],
+      "requires_prior_state": [],
+      "requires_receipts": [],
+      "produces_state": null,
+      "appends_state_record": false,
+      "persists_repository_state": false,
+      "emits_receipt": "release-lifecycle-observation",
+      "observational": true,
+      "grants_publication_authority": false,
+      "binds_identity": [
+        "repository",
+        "candidate",
+        "artifact",
+        "prior-state",
+        "publication-receipt",
+        "workflow",
+        "trust"
+      ],
+      "authorization": {
+        "required": false,
+        "authorized_by": null,
+        "one_time": false,
+        "wildcard_permitted": false
+      }
+    }
+  ],
+  "read_action_purity": {
+    "actions": ["release plan", "release offline-verify", "release resume"],
+    "persists_repository_state": false,
+    "appends_state_record": false,
+    "writes_receipt_file": false,
+    "emits_to": "stdout",
+    "deterministic": true,
+    "grants_authority": false
+  },
+  "publication_separation": {
+    "evidence_action": "release evidence-publish",
+    "product_action": "release publish",
+    "evidence_implies_product": false,
+    "product_implies_evidence": false,
+    "shared_authorization": false
+  },
+  "publication_dispatch": {
+    "dispatch_action": "release publish",
+    "dispatch_state": "publication_dispatched",
+    "terminal_state": "published",
+    "terminal_state_persisted": false,
+    "terminal_state_appendable": false,
+    "observed_by_action": "release resume",
+    "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",
+    "receipt_kind": "release-publication-receipt",
+    "receipt_schema": "law/schemas/release-publication-receipt.schema.json",
+    "receipt_emitter": "protected-external-workflow",
+    "receipt_emitted_by_devai_action": false,
+    "receipt_grants_authority": false,
+    "state_expectation_field": "publication_expectation",
+    "state_binding_kernel": {
+      "kernel_id": "devai.kernel.release-publication-dispatch-binding.v1",
+      "mandatory": true,
+      "schema_validation_alone_establishes_binding": false,
+      "algorithm": [
+        "require-action-release-publish-state-publication_dispatched-effect-remote-write-and-owner-actor",
+        "require-publication_expectation-authorization_event_id-to-equal-state-authorization_event_id",
+        "resolve-the-authorization-event-through-the-verified-exact-effect-authorization-ledger",
+        "require-the-live-unconsumed-grant-to-bind-owner-release-publish-remote-write-repository-candidate-destination-and-publish-operation-exactly",
+        "require-publication_expectation-workflow-repository-path-sha-protected-environment-and-protected-true",
+        "require-publication_expectation-trust-root-trust-store-digest-key-id-and-signature-algorithm-with-no-key-material",
+        "deny-and-append-no-state-when-any-preceding-step-fails"
+      ],
+      "errors": [
+        "rpd-action-state-effect-role-mismatch",
+        "rpd-owner-grant-id-mismatch",
+        "rpd-owner-grant-unresolved",
+        "rpd-owner-grant-not-live",
+        "rpd-owner-grant-identity-mismatch",
+        "rpd-destination-mismatch",
+        "rpd-workflow-expectation-invalid",
+        "rpd-trust-expectation-invalid",
+        "rpd-semantic-verification-not-performed"
+      ]
+    },
+    "receipt_binds_identity": [
+      "publication-dispatched-state",
+      "candidate",
+      "artifact",
+      "destination",
+      "workflow",
+      "trust"
+    ]
+  },
+  "observation_kernel": {
+    "status": "active",
+    "kernel_id": "devai.kernel.release-lifecycle-observation.v1",
+    "mandatory": true,
+    "observation_schema": "law/schemas/release-lifecycle-observation.schema.json",
+    "receipt_canonicalization_kernel_id": "devai.kernel.publication-receipt-canonicalization.v1",
+    "schema_validation_alone_derives_published": false,
+    "mismatch_behavior": "derive-no-published",
+    "algorithm": [
+      "load-the-recorded-persisted-head-for-the-exact-observed-candidate",
+      "require-the-head-state-to-be-publication_dispatched",
+      "require-published-verified_against-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256",
+      "require-the-publication-receipt-dispatched_state-state_id-and-record_digest_sha256-to-equal-the-head-state_id-and-record_digest_sha256",
+      "require-published-receipt-receipt_id-and-receipt_digest_sha256-to-equal-the-published-derived-state-entry-receipt_id-and-receipt_digest_sha256",
+      "recompute-the-publication-receipt-signed-payload-digest-receipt-id-and-receipt-digest-under-the-receipt-canonicalization-kernel-and-compare",
+      "require-the-receipt-candidate-release_unit-version-commit-and-tree-to-equal-the-observed-candidate",
+      "require-the-receipt-artifact-set-to-equal-the-dispatched-artifact-set-by-kind-path-sha256-and-size_bytes",
+      "require-the-receipt-publication-system_id-exact_identifier-and-operation-to-equal-the-publication_expectation-destination",
+      "require-the-receipt-workflow-repository-workflow_path-workflow_sha-protected_environment-and-protected-to-equal-the-publication_expectation-workflow",
+      "require-the-receipt-trust_root_id-trust_store_digest_sha256-key_id-and-signature_algorithm-to-equal-the-publication_expectation-trust-and-verify-the-signature-with-that-exact-trust-store-and-key",
+      "derive-published-only-when-every-preceding-step-holds-and-otherwise-derive-no-published"
+    ],
+    "errors": [
+      "rlo-head-not-publication-dispatched",
+      "rlo-head-verified-against-mismatch",
+      "rlo-receipt-dispatched-state-mismatch",
+      "rlo-derived-state-receipt-mismatch",
+      "rlo-receipt-digest-mismatch",
+      "rlo-candidate-identity-mismatch",
+      "rlo-artifact-identity-mismatch",
+      "rlo-destination-identity-mismatch",
+      "rlo-workflow-identity-mismatch",
+      "rlo-trust-store-digest-mismatch",
+      "rlo-trust-identity-mismatch",
+      "rlo-signature-invalid",
+      "rlo-semantic-verification-not-performed"
+    ]
+  },
+  "fail_closed": [
+    "missing-prior-state",
+    "prior-state-digest-mismatch",
+    "repository-identity-mismatch",
+    "candidate-identity-mismatch",
+    "input-digest-mismatch",
+    "evidence-digest-mismatch",
+    "artifact-digest-mismatch",
+    "absent-effect-authorization",
+    "consumed-effect-authorization",
+    "revoked-effect-authorization",
+    "expired-effect-authorization",
+    "authorization-identity-mismatch",
+    "initiator-role-mismatch",
+    "absent-publish-consent",
+    "observational-action-attempted-transition",
+    "offline-verify-treated-as-grant",
+    "resume-treated-as-transition",
+    "absent-plan-receipt",
+    "invalid-plan-receipt",
+    "plan-receipt-digest-mismatch",
+    "plan-receipt-identity-mismatch",
+    "absent-offline-verification-receipt",
+    "invalid-offline-verification-receipt",
+    "failing-offline-verification-receipt",
+    "offline-verification-receipt-digest-mismatch",
+    "offline-verification-receipt-identity-mismatch",
+    "offline-verification-verifier-identity-mismatch",
+    "absent-publication-receipt",
+    "invalid-publication-receipt",
+    "unsigned-publication-receipt",
+    "untrusted-publication-receipt-signer",
+    "publication-receipt-signature-invalid",
+    "publication-receipt-digest-mismatch",
+    "publication-receipt-identity-mismatch",
+    "publication-receipt-state-identity-mismatch",
+    "publication-receipt-artifact-mismatch",
+    "publication-receipt-workflow-identity-mismatch",
+    "publication-receipt-emitted-by-devai-action",
+    "published-state-record-appended",
+    "publish-produced-published-state",
+    "derived-state-persisted",
+    "read-action-persisted-state",
+    "read-action-nondeterministic-output",
+    "receipt-treated-as-authorization",
+    "observation-treated-as-transition",
+    "unknown-receipt-kind",
+    "unknown-action-id",
+    "unknown-state",
+    "rlo-head-not-publication-dispatched",
+    "rlo-head-verified-against-mismatch",
+    "rlo-receipt-dispatched-state-mismatch",
+    "rlo-derived-state-receipt-mismatch",
+    "rlo-receipt-digest-mismatch",
+    "rlo-candidate-identity-mismatch",
+    "rlo-artifact-identity-mismatch",
+    "rlo-destination-identity-mismatch",
+    "rlo-workflow-identity-mismatch",
+    "rlo-trust-store-digest-mismatch",
+    "rlo-trust-identity-mismatch",
+    "rlo-signature-invalid",
+    "rlo-semantic-verification-not-performed",
+    "rpd-action-state-effect-role-mismatch",
+    "rpd-owner-grant-id-mismatch",
+    "rpd-owner-grant-unresolved",
+    "rpd-owner-grant-not-live",
+    "rpd-owner-grant-identity-mismatch",
+    "rpd-destination-mismatch",
+    "rpd-workflow-expectation-invalid",
+    "rpd-trust-expectation-invalid",
+    "rpd-semantic-verification-not-performed",
+    "release-store-append-tail-mismatch",
+    "release-store-observed-head-mismatch",
+    "release-store-unknown-successor-conflict",
+    "release-store-attempt-redispatch",
+    "release-store-retry-authorization-reuse",
+    "release-store-resume-history-divergence",
+    "release-store-legacy-seam-authority-conflict",
+    "release-store-head-state-generation-mismatch",
+    "release-prepare-certification-manifest-invalid",
+    "release-prepare-package-entry-coverage-invalid",
+    "release-prepare-immutable-blob-locator-invalid",
+    "release-prepare-content-digest-mismatch",
+    "release-prepare-pack-spec-digest-mismatch",
+    "release-prepare-unsupported-package-semantics",
+    "release-prepare-subprocess-forbidden",
+    "release-artifact-sink-unavailable",
+    "release-artifact-sink-protocol-invalid",
+    "release-artifact-sink-verification-failed",
+    "release-artifact-sink-commit-failed",
+    "release-artifact-sink-abort-failed",
+    "release-downstream-artifact-reverification-failed",
+    "release-prepare-capacity-unavailable",
+    "release-prepare-capacity-insufficient"
+  ]
+}

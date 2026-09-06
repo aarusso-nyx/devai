@@ -1,0 +1,168 @@
+{
+  "$schema": "../schemas/mutation-assurance-policy-v2.schema.json",
+  "schemaVersion": "2.0.0",
+  "id": "mutation-assurance-v2",
+  "status": "deprecated-read-only-pending-verifier-alignment",
+  "authority": "Architect",
+  "policy_version": "2.0.0",
+  "report_schema": "law/schemas/mutation-assurance-v2.schema.json",
+  "successor_contract": {
+    "source_commit": "fcefd0ad9b1210f5d460509f801a16fc3c4dcbd1",
+    "report_set_schema": "mutation-report-set-v2",
+    "composed_report_set_schema": "mutation-composed-report-set-v2",
+    "adoption_status": "blocking-alignment",
+    "non_scored_statuses": ["CompileError", "Ignored"],
+    "prohibition": "no-new-release-may-treat-this-divergent-assurance-v2-policy-as-the-canonical-verifier-contract"
+  },
+  "supersedes_policy": ["law/policy/mutation-strength.json"],
+  "required_identity_bindings": [
+    "candidate",
+    "source",
+    "test",
+    "config",
+    "toolchain",
+    "roster",
+    "threshold",
+    "sanitizer",
+    "orchestration",
+    "lockfile"
+  ],
+  "modes": {
+    "declared": ["targeted", "full"],
+    "interchangeable": false,
+    "targeted": {
+      "selection_must_be_nonempty": true,
+      "roster_complete_required": false,
+      "satisfies": "targeted"
+    },
+    "full": {
+      "selection_must_be_nonempty": true,
+      "roster_complete_required": true,
+      "satisfies": "full"
+    }
+  },
+  "dispositions": [
+    {
+      "disposition": "executed",
+      "pass_permitted": true,
+      "blocks_required_readiness": false
+    },
+    {
+      "disposition": "reused",
+      "pass_permitted": true,
+      "blocks_required_readiness": false
+    },
+    {
+      "disposition": "not-required",
+      "pass_permitted": false,
+      "blocks_required_readiness": false
+    },
+    {
+      "disposition": "failed",
+      "pass_permitted": false,
+      "blocks_required_readiness": true
+    },
+    {
+      "disposition": "unknown",
+      "pass_permitted": false,
+      "blocks_required_readiness": true
+    }
+  ],
+  "reuse": {
+    "permitted_when": "every-required-identity-binding-matches-exactly",
+    "partial_match_behavior": "deny",
+    "missing_identity_behavior": "deny",
+    "cross_mode_reuse": "deny"
+  },
+  "not_required": {
+    "verdict": "not-applicable",
+    "requires_typed_reason": true,
+    "permitted_reasons": [
+      "documentation-only-change",
+      "metadata-only-change",
+      "no-behavioral-surface-selected"
+    ],
+    "is_pass": false
+  },
+  "thresholds": {
+    "source": "law/policy/thresholds.json#/mutation",
+    "score_operator": ">=",
+    "survived_operator": "<="
+  },
+  "semantic_verifier": {
+    "kernel_id": "devai.kernel.mutation-assurance-v2.v1",
+    "mandatory": true,
+    "schema_assertion_establishes_pass": false,
+    "required_report_references": [
+      "mutant-roster",
+      "per-mutant-outcome-log",
+      "runner-output",
+      "score-computation",
+      "threshold-snapshot"
+    ],
+    "score_model": {
+      "model": "stryker-detected-over-scored-v1",
+      "numeric_model": "ieee-754-binary64-round-to-nearest-ties-to-even",
+      "outcomes": [
+        "killed",
+        "timeout",
+        "survived",
+        "no_coverage",
+        "runtime_error",
+        "infrastructure_error"
+      ],
+      "count_domain": "nonnegative-safe-integer-counts-converted-exactly-to-binary64;nan-infinity-and-non-safe-integer-counts-fail",
+      "detected": "binary64-add(killed,timeout)",
+      "scored": "binary64-add(binary64-add(detected,survived),no_coverage)",
+      "score": "scored-binary64-equals-zero-question-binary64-100-colon-binary64-multiply(binary64-divide(detected,scored),binary64-100)",
+      "reported_number_comparison": "parse-reported-json-number-as-binary64-and-require-samevalue-with-recomputed-score;negative-zero-fails",
+      "thresholds_met": "recomputed-binary64-score-greater-than-or-equal-to-canonical-score_min-parsed-as-binary64-and-integer-survived-less-than-or-equal-to-canonical-survived_max",
+      "runtime_or_infrastructure_error": "always-blocks-pass"
+    },
+    "algorithm": [
+      "resolve-every-declared-execution-artifact-and-recompute-its-sha256",
+      "recompute-killed-timeout-survived-no_coverage-runtime_error-and-infrastructure_error-counts-from-the-per-mutant-outcome-log-require-each-count-to-be-a-nonnegative-safe-integer-convert-each-exactly-to-ieee-754-binary64-and-reject-nan-infinity-or-non-safe-integers",
+      "recompute-detected-with-binary64-add-killed-timeout-then-scored-with-binary64-add-detected-survived-then-binary64-add-that-result-no_coverage-using-round-to-nearest-ties-to-even",
+      "recompute-score-as-scored-equals-zero-question-binary64-100-colon-binary64-multiply-of-binary64-divide-detected-by-scored-and-binary64-100-in-that-order-using-round-to-nearest-ties-to-even-then-require-reported-json-number-parsed-as-binary64-samevalue-and-not-negative-zero",
+      "load-the-canonical-thresholds-parse-score_min-as-binary64-and-compare-them-to-thresholds_applied",
+      "recompute-thresholds_met-by-comparing-recomputed-binary64-score-greater-than-or-equal-to-canonical-binary64-score_min-and-integer-survived-less-than-or-equal-to-canonical-survived_max",
+      "recompute-verdict-and-block-pass-when-runtime_error-or-infrastructure_error-is-nonzero",
+      "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
+    ],
+    "errors": [
+      "ma2-execution-artifact-unresolved",
+      "ma2-execution-artifact-digest-mismatch",
+      "ma2-killed-count-mismatch",
+      "ma2-timeout-count-mismatch",
+      "ma2-survivor-count-mismatch",
+      "ma2-no-coverage-count-mismatch",
+      "ma2-runtime-error-count-mismatch",
+      "ma2-infrastructure-error-count-mismatch",
+      "ma2-count-not-nonnegative-safe-integer",
+      "ma2-count-not-finite",
+      "ma2-reported-score-negative-zero",
+      "ma2-score-samevalue-mismatch",
+      "ma2-threshold-source-mismatch",
+      "ma2-threshold-value-mismatch",
+      "ma2-thresholds-met-mismatch",
+      "ma2-verdict-mismatch",
+      "ma2-semantic-verification-not-performed"
+    ]
+  },
+  "prohibitions": [
+    "targeted-result-discharging-full-requirement",
+    "full-requirement-satisfied-by-reused-targeted-report",
+    "not-required-reported-as-pass",
+    "reuse-on-partial-identity-match",
+    "reuse-without-declared-identity",
+    "caller-trimmed-selection",
+    "empty-selection-pass",
+    "judge-only-substitution",
+    "mutation-pass-as-sole-readiness-evidence",
+    "threshold-override-outside-canonical-policy",
+    "infrastructure-error-reported-as-fail",
+    "infrastructure-error-reported-as-pass",
+    "schema-assertion-treated-as-pass",
+    "reported-score-accepted-without-recomputation"
+  ]
+}

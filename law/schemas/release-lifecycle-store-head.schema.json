@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-store-head.schema.json",
+  "title": "Release lifecycle v2 store head",
+  "description": "The sole atomically replaced pointer for a release campaign. It names one completed state record; attempts, failures, and unknown provider outcomes never advance it. Its fields are core-derived and are never client request input.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalization",
+    "repository",
+    "candidate",
+    "generation",
+    "state_id",
+    "state_digest_sha256",
+    "completion_record",
+    "head_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2.0.0" },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "projection_excludes"],
+      "properties": {
+        "kernel_id": { "const": "devai.kernel.release-lifecycle-store-head.v2" },
+        "encoding": { "const": "utf-8" },
+        "json_form": { "const": "rfc8785-jcs" },
+        "digest_algorithm": { "const": "sha256" },
+        "projection_excludes": { "const": ["head_digest_sha256"] }
+      }
+    },
+    "repository": { "$ref": "#/$defs/repository" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "state_id": { "type": "string", "pattern": "^RLS-[0-9a-f]{16}$" },
+    "state_digest_sha256": { "$ref": "#/$defs/sha256" },
+    "completion_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "record_id", "record_digest_sha256", "attempt_id"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "record_id": { "type": "string", "pattern": "^RLE-[0-9a-f]{16}$" },
+        "record_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "attempt_id": { "type": "string", "pattern": "^RLA-[0-9a-f]{16}$" }
+      }
+    },
+    "head_digest_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "$ref": "common-defs.schema.json#/$defs/sha256" },
+    "git_object": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    }
+  }
+}

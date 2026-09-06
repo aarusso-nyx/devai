@@ -1,0 +1,1646 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/mutation-report-set-v2.schema.json",
+  "title": "Canonical mutation report set v2",
+  "description": "Sole forward mutation-v2 schema. The strict union retains the isolated v2.1 output-contract, composition, and semantic-receipt branch and adds the forward v2.2 contract, composition, semantic receipt, and embedded package-execution-origin branch. Schema validation never establishes a pass or activates a forward branch.",
+  "schema_version": "2.2.0",
+  "oneOf": [
+    { "$ref": "#/$defs/output_contract" },
+    { "$ref": "#/$defs/normalized_report" },
+    { "$ref": "#/$defs/package_result" },
+    { "$ref": "#/$defs/composition" },
+    { "$ref": "#/$defs/semantic_receipt" },
+    { "$ref": "#/$defs/output_contract_v22" },
+    { "$ref": "#/$defs/composition_v22" },
+    { "$ref": "#/$defs/semantic_receipt_v22" }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "git_object": {
+      "type": "string",
+      "pattern": "^(?!0+$)(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "portable_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!//)(?!.*[\\u0000-\\u001f\\u007f])(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)[^/]+(?:/[^/]+)*$"
+    },
+    "package_name": {
+      "type": "string",
+      "pattern": "^@[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
+    },
+    "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "stryker_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["break", "high", "low"],
+      "properties": {
+        "break": { "type": "number", "minimum": 0, "maximum": 100 },
+        "high": { "type": "number", "minimum": 0, "maximum": 100 },
+        "low": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "effective_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["break", "high", "low", "scoreMin", "survivedMax"],
+      "properties": {
+        "break": { "type": "number", "minimum": 0, "maximum": 100 },
+        "high": { "type": "number", "minimum": 0, "maximum": 100 },
+        "low": { "type": "number", "minimum": 0, "maximum": 100 },
+        "scoreMin": { "type": "number", "minimum": 0, "maximum": 100 },
+        "survivedMax": { "$ref": "#/$defs/count" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseUnit", "commit", "tree"],
+      "properties": {
+        "releaseUnit": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "population_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalization", "memberCount", "populationDigest", "selectionRuleDigest"],
+      "properties": {
+        "canonicalization": { "const": "rfc8785-jcs-utf8" },
+        "memberCount": { "$ref": "#/$defs/count" },
+        "populationDigest": { "$ref": "#/$defs/sha256" },
+        "selectionRuleDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "input_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "packageName", "workspace", "bindings"],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-input-projection-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "tests",
+            "manifests",
+            "mutationConfiguration",
+            "runner",
+            "roster",
+            "thresholds",
+            "sanitizer",
+            "lockfile",
+            "environment",
+            "toolchain",
+            "semanticRebind"
+          ],
+          "properties": {
+            "source": { "$ref": "#/$defs/population_binding" },
+            "tests": { "$ref": "#/$defs/population_binding" },
+            "manifests": { "$ref": "#/$defs/population_binding" },
+            "mutationConfiguration": { "$ref": "#/$defs/population_binding" },
+            "runner": { "$ref": "#/$defs/population_binding" },
+            "roster": { "$ref": "#/$defs/population_binding" },
+            "thresholds": { "$ref": "#/$defs/population_binding" },
+            "sanitizer": { "$ref": "#/$defs/population_binding" },
+            "lockfile": { "$ref": "#/$defs/population_binding" },
+            "environment": { "$ref": "#/$defs/population_binding" },
+            "toolchain": { "$ref": "#/$defs/population_binding" },
+            "semanticRebind": { "$ref": "#/$defs/population_binding" }
+          }
+        }
+      }
+    },
+    "status_totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "CompileError",
+        "Ignored",
+        "Killed",
+        "NoCoverage",
+        "Pending",
+        "RuntimeError",
+        "Survived",
+        "Timeout"
+      ],
+      "properties": {
+        "CompileError": { "$ref": "#/$defs/count" },
+        "Ignored": { "$ref": "#/$defs/count" },
+        "Killed": { "$ref": "#/$defs/count" },
+        "NoCoverage": { "$ref": "#/$defs/count" },
+        "Pending": { "$ref": "#/$defs/count" },
+        "RuntimeError": { "$ref": "#/$defs/count" },
+        "Survived": { "$ref": "#/$defs/count" },
+        "Timeout": { "$ref": "#/$defs/count" }
+      }
+    },
+    "zero_scored_status_totals": {
+      "type": "object",
+      "required": ["Killed", "Timeout", "Survived", "NoCoverage"],
+      "properties": {
+        "Killed": { "const": 0 },
+        "Timeout": { "const": 0 },
+        "Survived": { "const": 0 },
+        "NoCoverage": { "const": 0 }
+      }
+    },
+    "zero_status_totals": {
+      "const": {
+        "CompileError": 0,
+        "Ignored": 0,
+        "Killed": 0,
+        "NoCoverage": 0,
+        "Pending": 0,
+        "RuntimeError": 0,
+        "Survived": 0,
+        "Timeout": 0
+      }
+    },
+    "required_measurement_is_empty": {
+      "anyOf": [
+        {
+          "properties": {
+            "targetCensus": {
+              "properties": { "totalMutants": { "const": 0 } },
+              "required": ["totalMutants"]
+            }
+          },
+          "required": ["targetCensus"]
+        },
+        {
+          "properties": { "statusTotals": { "$ref": "#/$defs/zero_scored_status_totals" } },
+          "required": ["statusTotals"]
+        }
+      ]
+    },
+    "contains_required_package": {
+      "properties": {
+        "packages": {
+          "contains": {
+            "type": "object",
+            "required": ["requirement"],
+            "properties": { "requirement": { "const": "required" } }
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "contains_incomplete_required_package": {
+      "properties": {
+        "packages": {
+          "contains": {
+            "type": "object",
+            "required": ["requirement", "complete"],
+            "properties": {
+              "requirement": { "const": "required" },
+              "complete": { "const": false }
+            }
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "contains_not_passed_required_package": {
+      "properties": {
+        "packages": {
+          "contains": {
+            "type": "object",
+            "required": ["requirement", "passed"],
+            "properties": {
+              "requirement": { "const": "required" },
+              "passed": { "const": false }
+            }
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "aggregate_scored_is_zero": {
+      "properties": {
+        "aggregate": {
+          "properties": { "statusTotals": { "$ref": "#/$defs/zero_scored_status_totals" } },
+          "required": ["statusTotals"]
+        }
+      },
+      "required": ["aggregate"]
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errorAbsent", "signal", "status"],
+      "properties": {
+        "errorAbsent": { "type": "boolean" },
+        "signal": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^SIG[A-Z0-9]{1,20}$" }]
+        },
+        "status": {
+          "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0, "maximum": 255 }]
+        }
+      }
+    },
+    "tool_versions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:-]*$"
+      },
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "column"],
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" }
+      }
+    },
+    "mutant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mutatorName", "replacementDigest", "location", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+        "mutatorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\u0000-\\u001f\\u007f/\\\\]+$"
+        },
+        "replacementDigest": { "$ref": "#/$defs/sha256" },
+        "location": { "$ref": "#/$defs/location" },
+        "status": {
+          "enum": [
+            "CompileError",
+            "Ignored",
+            "Killed",
+            "NoCoverage",
+            "Pending",
+            "RuntimeError",
+            "Survived",
+            "Timeout"
+          ]
+        }
+      }
+    },
+    "normalized_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "strykerSchemaVersion",
+        "projectRoot",
+        "thresholds",
+        "files",
+        "testFiles",
+        "config",
+        "framework"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-normalized-stryker-report-v2" },
+        "strykerSchemaVersion": { "const": "1" },
+        "projectRoot": { "const": "." },
+        "thresholds": { "$ref": "#/$defs/stryker_thresholds" },
+        "files": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/portable_path" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["language", "mutants"],
+            "properties": {
+              "language": { "enum": ["javascript", "typescript"] },
+              "mutants": { "type": "array", "items": { "$ref": "#/$defs/mutant" } }
+            }
+          }
+        },
+        "testFiles": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/portable_path" },
+          "additionalProperties": { "const": {} }
+        },
+        "config": { "const": {} },
+        "framework": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": { "name": { "const": "StrykerJS" } }
+        }
+      }
+    },
+    "required_package_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "reportPath",
+        "resultPath",
+        "inputProjection",
+        "inputDigest",
+        "thresholds"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "inputProjection": { "$ref": "#/$defs/input_projection" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" }
+      }
+    },
+    "not_required_package_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packageName", "workspace", "requirement", "reasonCode"],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "not-required" },
+        "reasonCode": {
+          "enum": [
+            "no-mutatable-production-surface",
+            "package-excluded-by-approved-release-profile"
+          ]
+        }
+      }
+    },
+    "output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "expectedPackageCount",
+        "summaryPath",
+        "semanticReceiptPath",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "packages",
+        "paths"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-report-set-v2" },
+        "expectedPackageCount": { "type": "integer", "minimum": 1 },
+        "summaryPath": { "$ref": "#/$defs/portable_path" },
+        "semanticReceiptPath": { "$ref": "#/$defs/portable_path" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/required_package_contract" },
+              { "$ref": "#/$defs/not_required_package_contract" }
+            ]
+          }
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/portable_path" }
+        }
+      }
+    },
+    "package_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "packageName",
+        "workspace",
+        "inputProjection",
+        "inputDigest",
+        "reportDigest",
+        "toolVersions",
+        "process",
+        "thresholds",
+        "statusTotals",
+        "targetCensus",
+        "score",
+        "complete",
+        "passed"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-package-result-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "inputProjection": { "$ref": "#/$defs/input_projection" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "toolVersions": { "$ref": "#/$defs/tool_versions" },
+        "process": { "$ref": "#/$defs/process" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "targetCensus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFileCount", "totalMutants"],
+          "properties": {
+            "targetFileCount": { "$ref": "#/$defs/count" },
+            "totalMutants": { "$ref": "#/$defs/count" }
+          }
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "complete": { "type": "boolean" },
+        "passed": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/required_measurement_is_empty" },
+          "then": {
+            "properties": { "complete": { "const": false }, "passed": { "const": false } }
+          }
+        },
+        {
+          "if": { "properties": { "complete": { "const": false } }, "required": ["complete"] },
+          "then": { "properties": { "passed": { "const": false } } }
+        },
+        {
+          "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
+          "then": { "properties": { "complete": { "const": true } } }
+        }
+      ]
+    },
+    "reuse_origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "semanticReceiptDigest", "evidenceSetDigest"],
+      "properties": {
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "semanticReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "kind",
+        "packageName",
+        "workspace",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputDigest",
+        "provenance",
+        "origin"
+      ],
+      "properties": {
+        "kind": { "const": "mutation-package-evidence-ref-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "provenance": { "enum": ["fresh", "reused"] },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin" }] }
+      },
+      "oneOf": [
+        {
+          "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } },
+          "required": ["provenance", "origin"]
+        },
+        {
+          "properties": {
+            "provenance": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin" }
+          },
+          "required": ["provenance", "origin"]
+        }
+      ]
+    },
+    "evidence_package_entry": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "disposition",
+        "verdict",
+        "passed",
+        "complete",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputDigest",
+        "evidenceRef",
+        "evidenceRefDigest",
+        "thresholds",
+        "statusTotals",
+        "targetCensus",
+        "score",
+        "origin"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "disposition": { "enum": ["executed", "reused"] },
+        "verdict": { "enum": ["pass", "fail", "unknown"] },
+        "passed": { "type": "boolean" },
+        "complete": { "type": "boolean" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceRef": { "$ref": "#/$defs/evidence_ref" },
+        "evidenceRefDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "targetCensus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFileCount", "totalMutants"],
+          "properties": {
+            "targetFileCount": { "$ref": "#/$defs/count" },
+            "totalMutants": { "$ref": "#/$defs/count" }
+          }
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin" }] }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "disposition": { "const": "executed" },
+            "origin": { "type": "null" },
+            "evidenceRef": {
+              "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        },
+        {
+          "properties": {
+            "disposition": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin" },
+            "evidenceRef": {
+              "properties": {
+                "provenance": { "const": "reused" },
+                "origin": { "$ref": "#/$defs/reuse_origin" }
+              }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        }
+      ],
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/required_measurement_is_empty" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "passed": { "const": false },
+              "verdict": { "const": "unknown" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "complete": { "const": false } }, "required": ["complete"] },
+          "then": {
+            "properties": { "passed": { "const": false }, "verdict": { "const": "unknown" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": true } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "pass" } } }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": false } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "fail" } } }
+        }
+      ]
+    },
+    "not_required_package_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "disposition",
+        "verdict",
+        "passed",
+        "reasonCode"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "not-required" },
+        "disposition": { "const": "not-required" },
+        "verdict": { "const": "not-applicable" },
+        "passed": { "const": false },
+        "reasonCode": {
+          "enum": [
+            "no-mutatable-production-surface",
+            "package-excluded-by-approved-release-profile"
+          ]
+        }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageCount",
+        "executedPackageCount",
+        "reusedPackageCount",
+        "notRequiredPackageCount",
+        "score",
+        "statusTotals",
+        "verdict",
+        "passed",
+        "evidenceSetDigest"
+      ],
+      "properties": {
+        "packageCount": { "$ref": "#/$defs/count" },
+        "executedPackageCount": { "$ref": "#/$defs/count" },
+        "reusedPackageCount": { "$ref": "#/$defs/count" },
+        "notRequiredPackageCount": { "$ref": "#/$defs/count" },
+        "score": {
+          "oneOf": [{ "type": "number", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+        },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "passed": { "type": "boolean" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "candidate",
+        "complete",
+        "verdict",
+        "passed",
+        "packages",
+        "aggregate"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-composed-report-set-v2" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "complete": { "type": "boolean" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "passed": { "type": "boolean" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/evidence_package_entry" },
+              { "$ref": "#/$defs/not_required_package_entry" }
+            ]
+          }
+        },
+        "aggregate": { "$ref": "#/$defs/aggregate" }
+      },
+      "allOf": [
+        {
+          "if": { "not": { "$ref": "#/$defs/contains_required_package" } },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "not-applicable" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "executedPackageCount": { "const": 0 },
+                      "reusedPackageCount": { "const": 0 },
+                      "score": { "type": "null" },
+                      "statusTotals": { "$ref": "#/$defs/zero_status_totals" },
+                      "verdict": { "const": "not-applicable" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "$ref": "#/$defs/aggregate_scored_is_zero" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "null" } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/aggregate_scored_is_zero" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "number", "minimum": 0, "maximum": 100 } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": { "$ref": "#/$defs/contains_incomplete_required_package" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "verdict": { "const": "unknown" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "unknown" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "not": { "$ref": "#/$defs/contains_not_passed_required_package" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "pass" },
+              "passed": { "const": true },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "pass" },
+                      "passed": { "const": true }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "$ref": "#/$defs/contains_not_passed_required_package" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "fail" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "fail" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "verifier_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "vendor", "byteEquality"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "commit", "tree", "byteSetDigest"],
+          "properties": {
+            "repository": { "const": "devai-verifier" },
+            "commit": { "$ref": "#/$defs/git_object" },
+            "tree": { "$ref": "#/$defs/git_object" },
+            "byteSetDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "vendor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "manifestPath",
+            "manifestDigest",
+            "sourceCommit",
+            "sourceTree",
+            "byteSetDigest"
+          ],
+          "properties": {
+            "root": { "$ref": "#/$defs/portable_path" },
+            "manifestPath": { "$ref": "#/$defs/portable_path" },
+            "manifestDigest": { "$ref": "#/$defs/sha256" },
+            "sourceCommit": { "$ref": "#/$defs/git_object" },
+            "sourceTree": { "$ref": "#/$defs/git_object" },
+            "byteSetDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "byteEquality": { "const": true }
+      }
+    },
+    "semantic_receipt_package": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "packageName",
+            "disposition",
+            "inputDigest",
+            "reportDigest",
+            "resultDigest",
+            "compositionEntryDigest"
+          ],
+          "properties": {
+            "packageName": { "$ref": "#/$defs/package_name" },
+            "disposition": { "enum": ["executed", "reused"] },
+            "inputDigest": { "$ref": "#/$defs/sha256" },
+            "reportDigest": { "$ref": "#/$defs/sha256" },
+            "resultDigest": { "$ref": "#/$defs/sha256" },
+            "compositionEntryDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName", "disposition", "compositionEntryDigest"],
+          "properties": {
+            "packageName": { "$ref": "#/$defs/package_name" },
+            "disposition": { "const": "not-required" },
+            "compositionEntryDigest": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "semantic_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptId",
+        "candidate",
+        "outputContractDigest",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "verifierProvenance",
+        "packages",
+        "packageResultSetDigest",
+        "evidenceSetDigest",
+        "verdict",
+        "semanticVerificationPerformed",
+        "receiptDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.1.0" },
+        "kind": { "const": "mutation-semantic-verification-receipt-v2" },
+        "receiptId": { "type": "string", "pattern": "^MSV2-[0-9a-f]{16}$" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "outputContractDigest": { "$ref": "#/$defs/sha256" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "verifierProvenance": { "$ref": "#/$defs/verifier_provenance" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/semantic_receipt_package" }
+        },
+        "packageResultSetDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "semanticVerificationPerformed": { "const": true },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "execution_binding_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templateId", "templateVersion", "taskNode", "taskPolicyDigest"],
+      "properties": {
+        "templateId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "templateVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "taskNode": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
+        "taskPolicyDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "required_package_contract_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "reportPath",
+        "resultPath",
+        "inputProjection",
+        "inputDigest",
+        "thresholds",
+        "executionBinding"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "inputProjection": { "$ref": "#/$defs/input_projection" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
+        "executionBinding": { "$ref": "#/$defs/execution_binding_v22" }
+      }
+    },
+    "output_contract_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "expectedPackageCount",
+        "summaryPath",
+        "semanticReceiptPath",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "packages",
+        "paths"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.2.0" },
+        "kind": { "const": "mutation-report-set-v2" },
+        "expectedPackageCount": { "type": "integer", "minimum": 1 },
+        "summaryPath": { "$ref": "#/$defs/portable_path" },
+        "semanticReceiptPath": { "$ref": "#/$defs/portable_path" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/required_package_contract_v22" },
+              { "$ref": "#/$defs/not_required_package_contract" }
+            ]
+          }
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/portable_path" }
+        }
+      }
+    },
+    "mpe_artifact_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "sizeBytes"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portable_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "sizeBytes": { "$ref": "#/$defs/count" }
+      }
+    },
+    "mutation_package_execution_receipt_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptId",
+        "repositoryId",
+        "candidate",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "template",
+        "task",
+        "package",
+        "report",
+        "result",
+        "verifierProvenance",
+        "receiptDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "kind": { "const": "mutation-package-execution-receipt-v1" },
+        "receiptId": { "type": "string", "pattern": "^MPE1-[0-9a-f]{16}$" },
+        "repositoryId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "template": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "version": { "type": "string", "minLength": 1, "maxLength": 100 }
+          }
+        },
+        "task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodeId", "policyDigest"],
+          "properties": {
+            "nodeId": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
+            "policyDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "package": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName", "workspace", "inputDigest"],
+          "properties": {
+            "packageName": { "$ref": "#/$defs/package_name" },
+            "workspace": { "$ref": "#/$defs/portable_path" },
+            "inputDigest": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "report": { "$ref": "#/$defs/mpe_artifact_v1" },
+        "result": { "$ref": "#/$defs/mpe_artifact_v1" },
+        "verifierProvenance": { "$ref": "#/$defs/verifier_provenance" },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "mutation_package_execution_origin_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receipt"],
+      "properties": {
+        "kind": { "const": "mutation-package-execution-origin-v1" },
+        "receipt": { "$ref": "#/$defs/mutation_package_execution_receipt_v1" }
+      }
+    },
+    "reuse_origin_v22": {
+      "oneOf": [
+        { "$ref": "#/$defs/reuse_origin" },
+        { "$ref": "#/$defs/mutation_package_execution_origin_v1" }
+      ]
+    },
+    "evidence_ref_v22": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "kind",
+        "packageName",
+        "workspace",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputDigest",
+        "provenance",
+        "origin"
+      ],
+      "properties": {
+        "kind": { "const": "mutation-package-evidence-ref-v2" },
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "provenance": { "enum": ["fresh", "reused"] },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin_v22" }] }
+      },
+      "oneOf": [
+        {
+          "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } },
+          "required": ["provenance", "origin"]
+        },
+        {
+          "properties": {
+            "provenance": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin_v22" }
+          },
+          "required": ["provenance", "origin"]
+        }
+      ]
+    },
+    "evidence_package_entry_v22": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "packageName",
+        "workspace",
+        "requirement",
+        "disposition",
+        "verdict",
+        "passed",
+        "complete",
+        "reportPath",
+        "resultPath",
+        "reportDigest",
+        "resultDigest",
+        "inputDigest",
+        "evidenceRef",
+        "evidenceRefDigest",
+        "thresholds",
+        "statusTotals",
+        "targetCensus",
+        "score",
+        "origin"
+      ],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/package_name" },
+        "workspace": { "$ref": "#/$defs/portable_path" },
+        "requirement": { "const": "required" },
+        "disposition": { "enum": ["executed", "reused"] },
+        "verdict": { "enum": ["pass", "fail", "unknown"] },
+        "passed": { "type": "boolean" },
+        "complete": { "type": "boolean" },
+        "reportPath": { "$ref": "#/$defs/portable_path" },
+        "resultPath": { "$ref": "#/$defs/portable_path" },
+        "reportDigest": { "$ref": "#/$defs/sha256" },
+        "resultDigest": { "$ref": "#/$defs/sha256" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceRef": { "$ref": "#/$defs/evidence_ref_v22" },
+        "evidenceRefDigest": { "$ref": "#/$defs/sha256" },
+        "thresholds": { "$ref": "#/$defs/effective_thresholds" },
+        "statusTotals": { "$ref": "#/$defs/status_totals" },
+        "targetCensus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFileCount", "totalMutants"],
+          "properties": {
+            "targetFileCount": { "$ref": "#/$defs/count" },
+            "totalMutants": { "$ref": "#/$defs/count" }
+          }
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "origin": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reuse_origin_v22" }] }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "disposition": { "const": "executed" },
+            "origin": { "type": "null" },
+            "evidenceRef": {
+              "properties": { "provenance": { "const": "fresh" }, "origin": { "type": "null" } }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        },
+        {
+          "properties": {
+            "disposition": { "const": "reused" },
+            "origin": { "$ref": "#/$defs/reuse_origin_v22" },
+            "evidenceRef": {
+              "properties": {
+                "provenance": { "const": "reused" },
+                "origin": { "$ref": "#/$defs/reuse_origin_v22" }
+              }
+            }
+          },
+          "required": ["disposition", "origin", "evidenceRef"]
+        }
+      ],
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/required_measurement_is_empty" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "passed": { "const": false },
+              "verdict": { "const": "unknown" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "complete": { "const": false } }, "required": ["complete"] },
+          "then": {
+            "properties": { "passed": { "const": false }, "verdict": { "const": "unknown" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": true } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "pass" } } }
+        },
+        {
+          "if": {
+            "properties": { "complete": { "const": true }, "passed": { "const": false } },
+            "required": ["complete", "passed"]
+          },
+          "then": { "properties": { "verdict": { "const": "fail" } } }
+        }
+      ]
+    },
+    "composition_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "candidate",
+        "complete",
+        "verdict",
+        "passed",
+        "packages",
+        "aggregate"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.2.0" },
+        "kind": { "const": "mutation-composed-report-set-v2" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "complete": { "type": "boolean" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "passed": { "type": "boolean" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/evidence_package_entry_v22" },
+              { "$ref": "#/$defs/not_required_package_entry" }
+            ]
+          }
+        },
+        "aggregate": { "$ref": "#/$defs/aggregate" }
+      },
+      "allOf": [
+        {
+          "if": { "not": { "$ref": "#/$defs/contains_required_package" } },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "not-applicable" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "executedPackageCount": { "const": 0 },
+                      "reusedPackageCount": { "const": 0 },
+                      "score": { "type": "null" },
+                      "statusTotals": { "$ref": "#/$defs/zero_status_totals" },
+                      "verdict": { "const": "not-applicable" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "$ref": "#/$defs/aggregate_scored_is_zero" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "null" } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/aggregate_scored_is_zero" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "score": { "type": "number", "minimum": 0, "maximum": 100 } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": { "$ref": "#/$defs/contains_incomplete_required_package" },
+          "then": {
+            "properties": {
+              "complete": { "const": false },
+              "verdict": { "const": "unknown" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  {
+                    "properties": {
+                      "verdict": { "const": "unknown" },
+                      "passed": { "const": false }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "not": { "$ref": "#/$defs/contains_not_passed_required_package" } }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "pass" },
+              "passed": { "const": true },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "verdict": { "const": "pass" }, "passed": { "const": true } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "$ref": "#/$defs/contains_required_package" },
+              { "not": { "$ref": "#/$defs/contains_incomplete_required_package" } },
+              { "$ref": "#/$defs/contains_not_passed_required_package" }
+            ]
+          },
+          "then": {
+            "properties": {
+              "complete": { "const": true },
+              "verdict": { "const": "fail" },
+              "passed": { "const": false },
+              "aggregate": {
+                "allOf": [
+                  { "$ref": "#/$defs/aggregate" },
+                  { "properties": { "verdict": { "const": "fail" }, "passed": { "const": false } } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "semantic_receipt_v22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptId",
+        "candidate",
+        "outputContractDigest",
+        "releasePlanReceiptDigest",
+        "releaseProfileDigest",
+        "policyDigest",
+        "verifierProvenance",
+        "packages",
+        "packageResultSetDigest",
+        "evidenceSetDigest",
+        "verdict",
+        "semanticVerificationPerformed",
+        "receiptDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.2.0" },
+        "kind": { "const": "mutation-semantic-verification-receipt-v2" },
+        "receiptId": { "type": "string", "pattern": "^MSV2-[0-9a-f]{16}$" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "outputContractDigest": { "$ref": "#/$defs/sha256" },
+        "releasePlanReceiptDigest": { "$ref": "#/$defs/sha256" },
+        "releaseProfileDigest": { "$ref": "#/$defs/sha256" },
+        "policyDigest": { "$ref": "#/$defs/sha256" },
+        "verifierProvenance": { "$ref": "#/$defs/verifier_provenance" },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/semantic_receipt_package" }
+        },
+        "packageResultSetDigest": { "$ref": "#/$defs/sha256" },
+        "evidenceSetDigest": { "$ref": "#/$defs/sha256" },
+        "verdict": { "enum": ["pass", "fail", "unknown", "not-applicable"] },
+        "semanticVerificationPerformed": { "const": true },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "2.1.0",
+      "kind": "mutation-report-set-v2",
+      "expectedPackageCount": 2,
+      "summaryPath": "mutation/summary.json",
+      "semanticReceiptPath": "mutation/semantic-receipt.json",
+      "releasePlanReceiptDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "releaseProfileDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "policyDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "packages": [
+        {
+          "packageName": "@devai-nyx/spec",
+          "workspace": "packages/spec",
+          "requirement": "required",
+          "reportPath": "mutation/spec/report.json",
+          "resultPath": "mutation/spec/result.json",
+          "inputProjection": {
+            "schemaVersion": "2.1.0",
+            "kind": "mutation-input-projection-v2",
+            "packageName": "@devai-nyx/spec",
+            "workspace": "packages/spec",
+            "bindings": {
+              "source": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "tests": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "manifests": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "mutationConfiguration": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "runner": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "roster": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 2,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "thresholds": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "sanitizer": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "lockfile": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "environment": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "toolchain": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "semanticRebind": {
+                "canonicalization": "rfc8785-jcs-utf8",
+                "memberCount": 1,
+                "populationDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                "selectionRuleDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              }
+            }
+          },
+          "inputDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "thresholds": {
+            "break": 90,
+            "high": 90,
+            "low": 80,
+            "scoreMin": 60,
+            "survivedMax": 50
+          }
+        },
+        {
+          "packageName": "@devai-nyx/schemas",
+          "workspace": "packages/schemas",
+          "requirement": "not-required",
+          "reasonCode": "no-mutatable-production-surface"
+        }
+      ],
+      "paths": [
+        "mutation/summary.json",
+        "mutation/semantic-receipt.json",
+        "mutation/spec/report.json",
+        "mutation/spec/result.json"
+      ]
+    }
+  ]
+}

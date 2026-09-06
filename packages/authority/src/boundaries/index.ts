@@ -10,6 +10,8 @@ import {
   type AnyRecord,
 } from '../runtime/contracts.js';
 import { selectorMatches } from '../runtime/policy-resolver.js';
+import { captureProtectedReleaseRepositoryIdentity } from './release-repository-identity.js';
+import { captureProtectedReleaseExportBinding } from './release-export-binding.js';
 
 const MUTATORS = new Set([
   'appendFile',
@@ -50,6 +52,13 @@ const READ_PROCESS_OWNERS = new Set([
   'packages/cli/src/version.ts',
   'packages/loop/src/governance-ledger/index.ts',
 ]);
+const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
+  readGitObjectSync: new Set<string>(),
+  readExactGitTreeSync: new Set([
+    'packages/cli/src/services/check-runner/authority-process.ts',
+    'packages/cli/src/services/release-certification-provider.ts',
+  ]),
+};
 const GOVERNANCE_PROJECTION_EXCEPTION = 'writeGovernanceProjectionSync';
 const GOVERNANCE_PROJECTION_OWNER = 'packages/cli/src/commands/docs/governance-render.ts';
 const HOST_EFFECTS_MODULE = '@devai-nyx/authority';
@@ -88,7 +97,104 @@ function relativePath(value: unknown): value is string {
 
 function adapterId(target: AnyRecord): string {
   if (target.kind === 'fs-rename') return 'fs-authority-boundary';
+  const protectedAdapter = protectedReleaseBoundaryAdapterId(target);
+  if (protectedAdapter !== undefined) return protectedAdapter;
   return `${String(target.kind)}-authority-boundary`;
+}
+
+/** Exact internal projection of the frozen protected release adapters, never a generic remote override. */
+export function protectedReleaseBoundaryAdapterId(
+  target: Readonly<Record<string, unknown>>,
+): string | undefined {
+  if (target.kind !== 'remote' || target.endpoint_id !== 'host' || target.publication !== false)
+    return undefined;
+  const provider =
+    target.system_id === 'devai-protected-certification-provider-v3' &&
+    target.operation_id === 'execute';
+  const sink =
+    target.system_id === 'trusted-certification-evidence-sink-v1' &&
+    target.operation_id === 'write';
+  const artifact =
+    target.system_id === 'trusted-artifact-sink-v3' && target.operation_id === 'write';
+  const exportSink =
+    target.system_id === 'trusted-export-artifact-sink-v1' && target.operation_id === 'write';
+  const exportSigner =
+    target.system_id === 'protected-export-signer-v1' && target.operation_id === 'sign';
+  if (!provider && !sink && !artifact && !exportSink && !exportSigner) return undefined;
+  const binding = target.protected_release_binding;
+  if (!isRecord(binding)) return undefined;
+  try {
+    const prototype = Object.getPrototypeOf(binding) as unknown;
+    if (
+      (prototype !== Object.prototype && prototype !== null) ||
+      Reflect.ownKeys(binding).some((key) => {
+        const descriptor = Object.getOwnPropertyDescriptor(binding, key);
+        return typeof key !== 'string' || !descriptor?.enumerable || !('value' in descriptor);
+      })
+    )
+      return undefined;
+    captureProtectedReleaseRepositoryIdentity({
+      authority_repository_id: binding.authority_repository_id,
+      expected_release_repository_id: binding.expected_release_repository_id,
+      origin_url: binding.origin_url,
+      repository: binding.repository,
+    });
+    if (exportSink || exportSigner) {
+      const descriptor = Object.fromEntries(
+        Object.entries(binding).filter(
+          ([key]) =>
+            !['authority_repository_id', 'expected_release_repository_id', 'origin_url'].includes(
+              key,
+            ),
+        ),
+      );
+      captureProtectedReleaseExportBinding(descriptor);
+      if (
+        typeof target.protected_operation_id !== 'string' ||
+        target.protected_operation_id.length === 0
+      )
+        return undefined;
+      return exportSink ? 'trusted-export-artifact-sink-v1' : 'protected-export-signer-v1';
+    }
+  } catch {
+    return undefined;
+  }
+  if (
+    !isRecord(binding.repository) ||
+    Object.keys(binding).sort().join(',') !==
+      (artifact
+        ? 'action_id,authority_repository_id,expected_release_repository_id,origin_url,pack_spec_digest_sha256,plan_receipt_digest_sha256,repository,sink_id'
+        : 'action_id,authority_repository_id,expected_release_repository_id,helper_identity_sha256,origin_url,plan_receipt_digest_sha256,repository,task_policy_digest_sha256') ||
+    !(artifact
+      ? binding.action_id === 'release prepare'
+      : ['release preflight', 'release certify'].includes(binding.action_id)) ||
+    (sink && binding.action_id !== 'release certify') ||
+    typeof binding.repository.id !== 'string' ||
+    binding.repository.id.length === 0 ||
+    ![binding.repository.commit, binding.repository.tree].every(
+      (value) => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+    ) ||
+    !(
+      artifact
+        ? [binding.plan_receipt_digest_sha256, binding.pack_spec_digest_sha256]
+        : [
+            binding.task_policy_digest_sha256,
+            binding.plan_receipt_digest_sha256,
+            binding.helper_identity_sha256,
+          ]
+    ).every((value) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value)) ||
+    (artifact &&
+      (typeof binding.sink_id !== 'string' ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(binding.sink_id))) ||
+    typeof target.protected_operation_id !== 'string' ||
+    target.protected_operation_id.length === 0
+  )
+    return undefined;
+  return artifact
+    ? 'trusted-artifact-sink-v3'
+    : provider
+      ? 'protected-certification-provider-v3'
+      : 'trusted-certification-evidence-sink-v1';
 }
 
 export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
@@ -199,7 +305,19 @@ export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
     ) {
       return failure('refused', 'AUTHORITY_PUBLISH_CONSENT_REQUIRED');
     }
-    return success(deepFreeze({ target: input, adapter_id: 'remote-authority-boundary' }));
+    if (
+      [
+        'devai-protected-certification-provider-v3',
+        'trusted-certification-evidence-sink-v1',
+        'trusted-artifact-sink-v3',
+        'trusted-export-artifact-sink-v1',
+        'protected-export-signer-v1',
+      ].includes(input.system_id) &&
+      protectedReleaseBoundaryAdapterId(input) === undefined
+    ) {
+      return failure('refused', 'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+    }
+    return success(deepFreeze({ target: input, adapter_id: adapterId(input) }));
   }
   return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
 }
@@ -811,6 +929,25 @@ function unauthorizedMutatorCalls(
       const importedSymbol = ts.isIdentifier(expression)
         ? (importedNames.get(expression.text) ?? expression.text)
         : symbol;
+      const gitReadOwners =
+        importedSymbol !== undefined && Object.hasOwn(GIT_READ_OWNERS, importedSymbol)
+          ? GIT_READ_OWNERS[importedSymbol]
+          : undefined;
+      const gitReadModule = ts.isIdentifier(expression)
+        ? imported.get(expression.text)
+        : ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)
+          ? imported.get(expression.expression.text)
+          : undefined;
+      if (
+        importedSymbol !== undefined &&
+        gitReadOwners !== undefined &&
+        (!gitReadOwners.has(fileName) || gitReadModule !== HOST_EFFECTS_MODULE)
+      ) {
+        calls.push({
+          line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+          symbol: importedSymbol,
+        });
+      }
       if (
         importedSymbol === HOST_SCOPE_CONTROLLER &&
         (!HOST_SCOPE_OWNERS.has(fileName) ||

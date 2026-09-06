@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,6 +15,7 @@ aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 
 let dir = '';
 let registryPath = '';
+const REPO_ROOT = process.cwd();
 
 function writeRegistry(body: Record<string, unknown>): void {
   writeFileSync(registryPath, JSON.stringify(body, null, 2));
@@ -185,16 +186,32 @@ describe('scanForbiddenActions', () => {
   }
 
   function writeCiAdr(options?: {
-    readonly status?: 'active' | 'superseded';
+    readonly status?: 'accepted' | 'superseded';
     readonly affectedRule?: string;
     readonly malformed?: boolean;
   }): void {
-    mkdirSync(join(dir, 'law/adr'), { recursive: true });
+    cpSync(join(REPO_ROOT, 'law', 'adr'), join(dir, 'law', 'adr'), { recursive: true });
+    for (const file of [
+      'ADR-GOV-0008-canonical-subject-projections.md',
+      'ADR-GOV-0009-instance-validatable-adr-results.md',
+      'ADR-GOV-0010-complete-adr-validation-result.md',
+      'ADR-GOV-0011-fail-closed-adr-result-state.md',
+    ]) {
+      const path = join(dir, 'law', 'adr', file);
+      writeFileSync(
+        path,
+        readFileSync(path, 'utf8').replaceAll(
+          'scripts/check-workflows.mjs',
+          'scripts/adr-fixture-coverage.mjs',
+        ),
+      );
+    }
+    cpSync(join(REPO_ROOT, 'law', 'policy'), join(dir, 'law', 'policy'), { recursive: true });
     writeFileSync(
-      join(dir, 'law/adr/ADR-014-ci-checker.md'),
+      join(dir, 'law/adr/ADR-GOV-9999-ci-checker.md'),
       options?.malformed === true
         ? '---\nid: ADR-014\nstatus active\n---\n'
-        : `---\nid: ADR-014\ntype: adr\nstatus: ${options?.status ?? 'active'}\naffected_rules:\n  - ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\n---\n`,
+        : `---\nid: ADR-GOV-9999\ntitle: CI checker change review\ntype: adr\nstatus: ${options?.status ?? 'accepted'}\ndate: 2026-09-03\nauthority: Architect\nsupersedes: []\nprovenance:\n  - law/constitution.md Article 6 (substrate authority-by-path)\naffected_rules:\n  - ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\ninspector_acceptance:\n  - IA-001 -- A CI checker change requires an effective accepted ADR that covers its exact governed path.\n${options?.status === 'superseded' ? 'disposition: Superseded fixture record has no active authority.\n' : ''}---\n\n# CI checker change review\n\n## Status\n\nFixture record.\n\n## Context\n\nFixture coverage for a governed CI checker change.\n\n## Decision\n\nThe fixture records the exact governed checker path.\n\n## Consequences\n\nOnly an effective accepted record can authorize coverage.\n\n## Alternatives Considered\n\n**No ADR coverage.** Rejected because the forbidden-action check must fail closed.\n\n## Affected Rules\n\n- ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\n\n## Inspector Adversarial Acceptance\n\n- IA-001 -- A superseded, malformed, or unrelated fixture does not provide coverage.\n`,
     );
   }
 

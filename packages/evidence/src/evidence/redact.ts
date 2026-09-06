@@ -1,4 +1,4 @@
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 import { redact, type RedactionPolicy } from '@devai-nyx/utils';
 import {
   computeManifestHash,
@@ -8,7 +8,7 @@ import {
   type EvidenceRecord,
 } from './chain.js';
 
-const validateEvidence = getValidator('evidence.schema.json');
+const validateEvidence = validators.evidence;
 
 export interface RedactRecordInputs {
   readonly chainPath: string;
