@@ -76,6 +76,7 @@
     "request_digest_sha256": { "$ref": "#/$defs/sha256" },
     "authorization_event_id": { "type": ["string", "null"], "pattern": "^EA-[0-9a-f]{16}$" },
     "provider_handle": {
+      "description": "Observed provider identity. For release export this is a local artifact-sink transaction handle, never a remote publication or an authorization grant.",
       "type": ["string", "null"],
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
     },
@@ -189,13 +190,44 @@
         }
       },
       "else": {
-        "properties": {
-          "authorization_event_id": { "type": "null" },
-          "provider_handle": { "type": "null" },
-          "provider_dispatch": {
-            "properties": {
-              "status": { "const": "not-dispatched" },
-              "handle_observed": { "const": false }
+        "if": {
+          "properties": { "action_id": { "const": "release export" } },
+          "required": ["action_id"]
+        },
+        "then": {
+          "properties": { "authorization_event_id": { "type": "null" } },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "provider_dispatch": {
+                    "properties": {
+                      "status": { "enum": ["not-dispatched", "failed-before-dispatch"] }
+                    }
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "provider_dispatch": {
+                    "properties": {
+                      "handle_observed": { "const": false }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "else": {
+          "properties": {
+            "authorization_event_id": { "type": "null" },
+            "provider_handle": { "type": "null" },
+            "provider_dispatch": {
+              "properties": {
+                "status": { "const": "not-dispatched" },
+                "handle_observed": { "const": false }
+              }
             }
           }
         }

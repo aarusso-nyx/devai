@@ -1091,6 +1091,10 @@ export function reduceStoreRecords(values: readonly unknown[]): StoreReduction {
       errors.add('release-state-store-candidate-mismatch');
 
     const remote = EFFECT_BY_ACTION[record.action_id] === 'remote-write';
+    const observedProvider =
+      remote ||
+      (record.action_id === 'release export' &&
+        record.provider_dispatch.status !== 'not-dispatched');
     if (record.record_kind === 'attempt') {
       if (prior === null) {
         if (record.predecessor_record !== null) errors.add('release-store-opening-attempt-invalid');
@@ -1149,7 +1153,7 @@ export function reduceStoreRecords(values: readonly unknown[]): StoreReduction {
       if (
         record.record_kind === 'completion' &&
         (record.completion?.state !== STATE_BY_ACTION[record.action_id] ||
-          (remote &&
+          (observedProvider &&
             (record.provider_dispatch.status !== 'dispatched' ||
               !record.provider_dispatch.handle_observed ||
               record.provider_handle === null)))
@@ -1158,14 +1162,14 @@ export function reduceStoreRecords(values: readonly unknown[]): StoreReduction {
       }
       if (
         record.record_kind === 'failure' &&
-        remote &&
+        observedProvider &&
         record.provider_dispatch.status !== 'failed-before-dispatch'
       ) {
         errors.add('release-store-terminal-attempt-link-invalid');
       }
       if (
         record.record_kind === 'unknown-provider-result' &&
-        record.provider_dispatch.status !== (remote ? 'unknown' : 'not-dispatched')
+        record.provider_dispatch.status !== (observedProvider ? 'unknown' : 'not-dispatched')
       ) {
         errors.add('release-store-completion-unknown-conflict');
       }
@@ -1930,6 +1934,10 @@ function buildStoreRecord(
   const sequence = prior === null ? 0 : prior.sequence + 1;
   const handle = result?.provider_handle ?? null;
   const remote = EFFECT_BY_ACTION[request.action_id] === 'remote-write';
+  const observedProvider =
+    remote ||
+    (request.action_id === 'release export' &&
+      (handle !== null || result?.dispatch_status !== undefined));
   return finalizeStoreRecord({
     schemaVersion: '1.0.0',
     record_kind: kind,
@@ -1947,9 +1955,9 @@ function buildStoreRecord(
     provider_dispatch:
       kind === 'attempt'
         ? { status: 'not-dispatched', handle_observed: false }
-        : kind === 'unknown-provider-result' && remote
+        : kind === 'unknown-provider-result' && observedProvider
           ? { status: 'unknown', handle_observed: handle !== null }
-          : remote
+          : observedProvider
             ? {
                 status: result?.dispatch_status ?? 'dispatched',
                 handle_observed: handle !== null,

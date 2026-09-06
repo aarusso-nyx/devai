@@ -52,8 +52,10 @@ import {
   resumeReleaseLifecycleExecution,
   resolveReleaseMutationRequirements,
   validateReleaseLifecycleRequest,
+  verifyStoreRecordIdentity,
   verifyReleaseStateIdentity,
   type ReleaseLifecycleRequest,
+  type ReleaseProvider,
   type ReleaseStateMaterial,
   type OpaqueArtifactIdentity,
   type StoreRecord,
@@ -1803,6 +1805,74 @@ describe('release lifecycle execution kernel', () => {
     });
     expect(provider).not.toHaveBeenCalled();
   });
+
+  it.each(['success', 'unknown'] as const)(
+    'retains a local export transaction handle for %s without remote authorization',
+    async (outcome) => {
+      const value = request('release export');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      await advanceToPrepared(store);
+      const base = providerFor('release export');
+      const provider = vi.fn(async (...args: Parameters<ReleaseProvider>) =>
+        outcome === 'unknown'
+          ? {
+              outcome: 'unknown' as const,
+              dispatch_status: 'unknown' as const,
+              provider_handle: 'local-export-transaction',
+              code: 'release-provider-result-unknown',
+            }
+          : {
+              ...(await base(...args)),
+              dispatch_status: 'dispatched' as const,
+              provider_handle: 'local-export-transaction',
+            },
+      );
+      const invoke = () =>
+        withReleaseExportAuthorityFixture(value, () =>
+          executeReleaseLifecycleAction({
+            request: value,
+            action: 'release export',
+            authority: authorityFor('release export'),
+            store,
+            resolveReceipt: () => planReceipt(),
+            resolvePlanInput,
+            provider,
+            artifactReader: artifactReaderFor('release prepare'),
+            recorded_at: '2026-09-03T00:00:00.000Z',
+          }),
+        );
+      const result = await invoke();
+      expect(result.ok).toBe(outcome === 'success');
+      const record = store.readStoreRecords().at(-1);
+      expect(record).toMatchObject({
+        record_kind: outcome === 'success' ? 'completion' : 'unknown-provider-result',
+        authorization_event_id: null,
+        provider_handle: 'local-export-transaction',
+        provider_dispatch: {
+          status: outcome === 'success' ? 'dispatched' : 'unknown',
+          handle_observed: true,
+        },
+      });
+      for (const invalid of [
+        { ...record, authorization_event_id: 'EA-0123456789abcdef' },
+        { ...record, action_id: 'release prepare' },
+        { ...record, action_id: 'release evidence-publish' },
+        { ...record, provider_dispatch: { status: 'not-dispatched', handle_observed: true } },
+      ])
+        expect(() => verifyStoreRecordIdentity(invalid)).toThrow(
+          'release-state-store-record-invalid',
+        );
+      if (outcome === 'unknown') {
+        expect(record?.unknown).toMatchObject({ redispatch_permitted: false });
+        expect(await invoke()).toMatchObject({
+          ok: false,
+          phase: 'reconciliation',
+          code: 'release-provider-result-unknown',
+        });
+        expect(provider).toHaveBeenCalledOnce();
+      }
+    },
+  );
 
   it('treats an export provider exception or post-sign material defect as unknown without cleanup or redispatch', async () => {
     for (const kind of ['throw', 'missing-material', 'invalid-material'] as const) {
