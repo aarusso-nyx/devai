@@ -881,27 +881,20 @@ describe('candidate-independent evidence verification', () => {
   it('binds a v1.2 digest-only namespace census to exactly one task output population', () => {
     const state = namespaceCensusFixture();
     assert.equal(
-      verify(state, { artifactsDir: state.artifactsDir, namespaceCensus: state.namespaceCensus })
-        .ok,
+      verify(state, { artifactsDir: state.artifactsDir, namespaceCensus: state.namespaceCensus }).ok,
       true,
     );
 
     const missing = namespaceCensusFixture();
     missing.namespaceCensus.namespaces[0].entries = [];
     expectCode('SCHEMA_INVALID', () =>
-      verify(missing, {
-        artifactsDir: missing.artifactsDir,
-        namespaceCensus: missing.namespaceCensus,
-      }),
+      verify(missing, { artifactsDir: missing.artifactsDir, namespaceCensus: missing.namespaceCensus }),
     );
 
     const foreign = namespaceCensusFixture();
     foreign.namespaceCensus.namespaces[0].taskNode = 'foreign:task';
     expectCode('NODE_POPULATION_MISMATCH', () =>
-      verify(foreign, {
-        artifactsDir: foreign.artifactsDir,
-        namespaceCensus: foreign.namespaceCensus,
-      }),
+      verify(foreign, { artifactsDir: foreign.artifactsDir, namespaceCensus: foreign.namespaceCensus }),
     );
 
     const undeclared = namespaceCensusFixture();
