@@ -112,6 +112,26 @@ async function completeDag() {
 }
 
 describe('protected mutation prerequisites', () => {
+  it('reads exact defensive policies without executing tasks or granting certification', () => {
+    const value = certificationFixture();
+    const policies = value.adapters.read_task_policies(value.request);
+    expect(policies).toEqual(value.assembly.task_policies);
+    expect(runner.mock.calls.every(([options]) => options.operation === 'plan')).toBe(true);
+    expect(runBound).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(verifyRuntime).not.toHaveBeenCalled();
+    Reflect.set(policies[0]?.document ?? {}, 'caller_mutation', true);
+    expect(value.adapters.read_task_policies(value.request)).toEqual(value.assembly.task_policies);
+    expect(() =>
+      value.adapters.read_task_policies({
+        ...value.request,
+        candidate_locator: { ...value.request.candidate_locator, tree: 'f'.repeat(40) },
+      }),
+    ).toThrow('release-certification-plan-binding-invalid');
+    expect(() =>
+      takeProtectedMutationPrerequisites(value.adapters.certification_provider, value.request),
+    ).toThrow('release-certification-prerequisite-proof-invalid');
+  });
   it('issues a private token only after the bound non-mutation adapter reports a passing DAG, then returns defensive bytes', async () => {
     const value = await completeDag();
     expect(runBound).toHaveBeenCalledTimes(2);
@@ -124,6 +144,9 @@ describe('protected mutation prerequisites', () => {
       ),
     ).toBe(true);
 
+    // Policy inspection must not consume or clear a completed execution's proof.
+    expect(value.adapters.read_task_policies(value.request)).toEqual(value.assembly.task_policies);
+    expect(execute).toHaveBeenCalledTimes(1);
     const [token] = takeProtectedMutationPrerequisites(
       value.adapters.certification_provider,
       value.request,

@@ -46,6 +46,7 @@ import {
   createContainerReleaseCertificationAdapters,
   createContainerReleasePreflightProvider,
   type ContainerReleaseCertificationOptions,
+  type ContainerReleaseCertificationAdapters,
   type ProtectedReleasePlanMaterial,
 } from './release-certification-provider.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
@@ -174,6 +175,10 @@ export interface ProtectedReleaseHostRunner {
   /** Copies, not live provider state. These methods do not persist receipts or advance the lifecycle. */
   readonly readPlan: () => Readonly<Record<string, unknown>>;
   readonly readPolicyClosure: () => ReleasePolicyClosure;
+  /** Independently reconstructed certification policies; never reads an exported carrier. */
+  readonly readCertificationTaskPolicies: (
+    request: ReleaseLifecycleRequest,
+  ) => ReturnType<ContainerReleaseCertificationAdapters['read_task_policies']>;
   readonly readFixturePlan: () => Readonly<Record<string, unknown>>;
   /** Serial diagnostic projection only, not a derived-plan brand or execution grant. */
   readonly readMutationInputPlan: () => Omit<ReleaseMutationInputPlanV21, 'readProof'>;
@@ -828,6 +833,15 @@ export function createProtectedReleaseHostRunner(
   return Object.freeze({
     readPlan: () => copy(receipt),
     readPolicyClosure: () => createReleasePolicyClosure({ plan: receipt, resolution }),
+    readCertificationTaskPolicies: (value: ReleaseLifecycleRequest) => {
+      assertCliInvocationIdle();
+      if (active) fail('release-host-invocation-in-progress');
+      if (process.cwd() !== cwd || realpathSync(root) !== root)
+        fail('release-host-working-directory-changed');
+      const request = validateReleaseLifecycleRequest(copy(value), 'release certify');
+      assertRequest(request);
+      return copy(certification.read_task_policies(request));
+    },
     readFixturePlan: () =>
       fixture === undefined ? fail('release-host-fixture-unavailable') : copy(fixture.receipt),
     readMutationInputPlan: () => {

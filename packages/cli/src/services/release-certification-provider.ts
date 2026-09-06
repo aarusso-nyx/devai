@@ -133,6 +133,10 @@ export interface ContainerReleaseCertificationOptions {
 
 export interface ContainerReleaseCertificationAdapters {
   readonly preflight_provider: ReleaseProvider;
+  /** Reconstructs policy bytes without executing tasks or changing prerequisite proof state. */
+  readonly read_task_policies: (
+    request: ReleaseLifecycleRequest,
+  ) => Parameters<typeof createReleaseCertificationProvider>[0]['task_policies'];
   readonly certification_provider: (
     request: ReleaseLifecycleRequest,
   ) => Parameters<typeof createReleaseCertificationProvider>[0];
@@ -1121,14 +1125,35 @@ function createContainerReleaseAdapters(
     }
   };
 
+  const planCertification = (request: ReleaseLifecycleRequest) => {
+    const descriptor = bindRequest(request);
+    const options = selected.map((_entry, index) =>
+      optionsFor(request, descriptor, index, 'certify'),
+    );
+    const policies = options.map((option, index) => ({
+      release_unit: request.candidate_locator.release_units[index]?.release_unit ?? '',
+      ...runCheckTasks(option).plan,
+    }));
+    const task_policies = policies.map((policy) => ({
+      release_unit: policy.release_unit,
+      task_policy_digest_sha256: policy.taskPolicyDigest,
+      document: policy.taskPolicy,
+    }));
+    return { options, policies, task_policies };
+  };
+
   protectedPreflightProviders.add(preflight_provider);
   const adapters: ContainerReleaseCertificationAdapters = {
     preflight_provider,
+    read_task_policies(request) {
+      if (active) throw new Error('release-certification-provider-in-use');
+      return structuredClone(planCertification(request).task_policies);
+    },
     certification_provider(request) {
       pendingMutationPrerequisites.delete(adapters.certification_provider);
       if (input.evidence_sink === undefined)
         throw new Error('release-certification-evidence-sink-unavailable');
-      const descriptor = bindRequest(request);
+      bindRequest(request);
       // A task's PASS and hashed output paths are never semantic mutation evidence.
       // Required mutation is certifiable only through the protected producer below;
       // without its host controls this still refuses before any task, container or
@@ -1138,21 +1163,11 @@ function createContainerReleaseAdapters(
         selected.some((entry) => object(entry.receipt.determination).mutation !== 'none')
       )
         throw new Error('release-certification-mutation-evidence-unavailable');
-      const options = selected.map((_entry, index) =>
-        optionsFor(request, descriptor, index, 'certify'),
-      );
-      const policies = options.map((option, index) => ({
-        release_unit: request.candidate_locator.release_units[index]?.release_unit ?? '',
-        ...runCheckTasks(option).plan,
-      }));
+      const { options, policies, task_policies } = planCertification(request);
       return {
         content_source: input.content_source,
         evidence_sink: input.evidence_sink,
-        task_policies: policies.map((policy) => ({
-          release_unit: policy.release_unit,
-          task_policy_digest_sha256: policy.taskPolicyDigest,
-          document: policy.taskPolicy,
-        })),
+        task_policies,
         provider: {
           kind: 'protected-certification-provider-v3',
           async certify(call) {

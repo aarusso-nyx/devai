@@ -266,11 +266,21 @@ try {
     assert.deepEqual(before.grants, { execution: false, certification: false, reuse: false });
     assert.deepEqual(Object.keys(runner).sort(), [
       'invoke',
+      'readCertificationTaskPolicies',
       'readFixturePlan',
       'readMutationInputPlan',
       'readPlan',
       'readPolicyClosure',
     ]);
+    assert.throws(
+      () =>
+        runner.readCertificationTaskPolicies({
+          ...diagnostic.request,
+          action_id: 'release certify',
+        }),
+      /release-host-input-mismatch/,
+    );
+    assert.equal(observations.container_executions, 0);
     const fixtureRequest = { ...diagnostic.request };
     const requestFile = document('fixture-request.json', fixtureRequest);
     const result = await runner.invoke({
