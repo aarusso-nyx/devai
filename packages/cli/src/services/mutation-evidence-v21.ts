@@ -229,7 +229,40 @@ interface CanonicalMutationModule {
   ) => JsonObject;
 }
 
+export interface OfflineCandidateEvidenceInput {
+  readonly receipt: unknown;
+  readonly taskPolicy: unknown;
+  readonly namespaceCensus?: unknown;
+  readonly expectedRepository: string;
+  readonly expectedCommit: string;
+  readonly expectedTree: string;
+  readonly expectedPolicyDigest: string;
+  readonly readEvidenceFile: (
+    kind: 'result' | 'artifact',
+    identity: string,
+    label: string,
+  ) => Buffer;
+  readonly mutationExpectations?: Readonly<Record<string, unknown>>;
+}
+
+export interface OfflineDetachedSignatureInput {
+  readonly trustStore: unknown;
+  readonly algorithm: 'ed25519';
+  readonly expectedSignerId: string;
+  readonly expectedTrustRootId: string;
+  readonly expectedTrustStoreDigest: string;
+  readonly expectedKeyId: string;
+  readonly payloadBytes: Buffer;
+  readonly signatureBytes: Buffer;
+}
+
 interface PinnedModules {
+  readonly evidence: {
+    readonly verifyCandidateReceiptEvidence: (input: OfflineCandidateEvidenceInput) => unknown;
+  };
+  readonly trust: {
+    readonly verifyDetachedSignature: (input: OfflineDetachedSignatureInput) => unknown;
+  };
   readonly kernel: CanonicalMutationModule;
   readonly safety: {
     readonly validateArtifactContent: (input: {
@@ -282,6 +315,19 @@ function loadVerifiedSnapshot(
       .filter(({ path }) => path.startsWith('src/') && path.endsWith('.js'))
       .map(({ path, bytes }) => [new URL(path, scope).href, Buffer.from(bytes)]),
   );
+  // Offline entrypoints receive bytes through explicit readers. Even an accidental
+  // legacy path cannot reach the filesystem or launch a process from this graph.
+  const deniedFs = new URL('offline-fs.js', scope).href;
+  const deniedProcess = new URL('offline-process.js', scope).href;
+  const deny = "function refuse() { throw new Error('release-offline-ambient-effect-refused'); }";
+  sources.set(
+    deniedFs,
+    Buffer.from(`${deny}
+    export const constants = Object.freeze({});
+    export const readFileSync = refuse, writeFileSync = refuse, readdirSync = refuse,
+      closeSync = refuse, fstatSync = refuse, lstatSync = refuse, openSync = refuse;`),
+  );
+  sources.set(deniedProcess, Buffer.from(`${deny} export const spawnSync = refuse;`));
   const filenames = new Map([...sources.keys()].map((url) => [fileURLToPath(url), url]));
   // The Node loader receives only bytes already covered by the activation proof.
   // Synthetic locations never fall through to disk; source replacement after
@@ -292,8 +338,10 @@ function loadVerifiedSnapshot(
       const filenameUrl = filenames.get(specifier);
       if (filenameUrl !== undefined) return { url: filenameUrl, shortCircuit: true };
       if (parent?.startsWith(scope)) {
-        if (specifier === 'node:crypto' || specifier === 'node:fs')
+        if (['node:crypto', 'node:path', 'node:util'].includes(specifier))
           return { url: specifier, shortCircuit: true };
+        if (specifier === 'node:fs') return { url: deniedFs, shortCircuit: true };
+        if (specifier === 'node:child_process') return { url: deniedProcess, shortCircuit: true };
         if (!specifier.startsWith('./')) refuse();
         const url = new URL(specifier, parent).href;
         if (!sources.has(url)) refuse();
@@ -321,7 +369,9 @@ function loadVerifiedSnapshot(
     const canonical = load(
       fileURLToPath(`${scope}src/canonical-json.js`),
     ) as PinnedModules['canonical'];
-    const loaded = { kernel, safety, canonical };
+    const evidence = load(fileURLToPath(`${scope}src/verify.js`)) as PinnedModules['evidence'];
+    const trust = load(fileURLToPath(`${scope}src/trust.js`)) as PinnedModules['trust'];
+    const loaded = { kernel, safety, canonical, evidence, trust };
     pinnedModules.set(byteSetDigest, loaded);
     return loaded;
   } finally {
@@ -648,4 +698,22 @@ export async function verifyMutationEvidenceV21(
           }),
     },
   );
+}
+
+/** Offline semantic checking through exactly the activated verifier bytes. No ambient reads. */
+export async function verifyPinnedCandidateReceiptEvidence(
+  input: OfflineCandidateEvidenceInput,
+): Promise<unknown> {
+  if (typeof input.readEvidenceFile !== 'function')
+    throw new Error('release-offline-reader-required');
+  const verifier = await loadPinnedVerifier();
+  return verifier.evidence.verifyCandidateReceiptEvidence(input);
+}
+
+/** Verify a reconstructed export transcript against independently supplied protected trust. */
+export async function verifyPinnedDetachedSignature(
+  input: OfflineDetachedSignatureInput,
+): Promise<unknown> {
+  const verifier = await loadPinnedVerifier();
+  return verifier.trust.verifyDetachedSignature(input);
 }
