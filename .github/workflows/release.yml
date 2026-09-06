@@ -506,7 +506,7 @@ jobs:
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
           state="$(node release-control/scripts/process/publication-state.mjs release "$RELEASE_TAG")"
-          if test "$state" = present; then
+          if test "$state" = present || test "$state" = draft; then
             test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" = "$RELEASE_IS_PRERELEASE"
             existing="$RUNNER_TEMP/existing-release"
             mkdir -p "$existing"
@@ -518,7 +518,10 @@ jobs:
               test "$(sha256sum "$asset" | cut -d' ' -f1)" = \
                 "$(sha256sum "$existing/$name" | cut -d' ' -f1)"
             done
-            echo 'Existing Release exactly matches; recovery is a no-op.'
+            if test "$state" = draft; then
+              gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+            fi
+            echo 'Canonical Release exactly matches; completed publication is a no-op.'
           else
             release_flags=()
             if test "$RELEASE_IS_PRERELEASE" = true; then release_flags+=(--prerelease); fi
@@ -557,7 +560,7 @@ jobs:
           registry_tgz="$(find "$project/registry-pack" -maxdepth 1 -name '*.tgz' -print -quit)"
           test -n "$registry_tgz"
           test "$(sha256sum "$source_tgz" | cut -d' ' -f1)" = "$(sha256sum "$registry_tgz" | cut -d' ' -f1)"
-          current_dist_version="$(npm view "$PACKAGE_NAME" "dist-tags.$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com 2>/dev/null || true)"
+          current_dist_version="$(npm view "$PACKAGE_NAME" "dist-tags.$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com)"
           if test "$current_dist_version" != "$PACKAGE_VERSION"; then
             npm dist-tag add "$PACKAGE_NAME@$PACKAGE_VERSION" "$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com
           fi

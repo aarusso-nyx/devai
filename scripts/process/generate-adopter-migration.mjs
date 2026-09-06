@@ -74,9 +74,11 @@ function main() {
     `
 import pathlib, sys
 sys.path.insert(0, sys.argv[1])
-from evidence_transport import read_archive
+from evidence_transport import read_archive, directory_files
 files = read_archive(pathlib.Path(sys.argv[2]).read_bytes())
 root = pathlib.Path(sys.argv[3])
+expected_dist = {name[len('package/dist/'):]: data for name, data in files.items() if name.startswith('package/dist/')}
+if directory_files(root / 'dist') != expected_dist: raise ValueError('installed population drift')
 for name, data in files.items():
     if not name.startswith('package/'): raise ValueError('package root')
     path = root / name[len('package/'):]
@@ -124,6 +126,16 @@ print(read_archive(pathlib.Path(sys.argv[2]).read_bytes())['package/dist/runtime
   try {
     execute(['git', 'init', '--quiet', temporary], temporary);
     mkdirSync(join(temporary, '.devai'), { recursive: true });
+    const assertConfigTree = (directory) => {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        requireValue(
+          !entry.isSymbolicLink() && (entry.isDirectory() || entry.isFile()),
+          'MIGRATION_CONFIG_LINK_OR_SPECIAL_FILE',
+        );
+        if (entry.isDirectory()) assertConfigTree(join(directory, entry.name));
+      }
+    };
+    assertConfigTree(join(config.adopterRoot, '.devai/config'));
     cpSync(join(config.adopterRoot, '.devai/config'), join(temporary, '.devai/config'), {
       recursive: true,
       dereference: false,

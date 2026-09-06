@@ -288,3 +288,58 @@ process.stdout.write(fs.readFileSync(process.env.FAKE_REMOTE+'/'+file));
     );
   });
 });
+
+describe('publication recovery observations', () => {
+  it.each([
+    { kind: 'release', payload: [[{ tag_name: 'v1.4.5', draft: false }]], expected: 'present' },
+    { kind: 'release', payload: [[{ tag_name: 'v1.4.5', draft: true }]], expected: 'draft' },
+    { kind: 'release', payload: [[]], expected: 'absent' },
+    { kind: 'registry', payload: ['1.4.4', '1.4.5'], expected: 'present' },
+    { kind: 'registry', payload: ['1.4.4'], expected: 'absent' },
+  ])('distinguishes $kind $expected after a successful read', ({ kind, payload, expected }) => {
+    const directory = temporary();
+    writeFileSync(join(directory, 'payload.json'), JSON.stringify(payload));
+    for (const name of ['gh', 'npm']) {
+      writeFileSync(
+        join(directory, name),
+        '#!/usr/bin/env node\nprocess.stdout.write(require("node:fs").readFileSync(process.env.STATE_FIXTURE));\n',
+      );
+      chmodSync(join(directory, name), 0o755);
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(root, 'scripts/process/publication-state.mjs'),
+        kind,
+        kind === 'release' ? 'v1.4.5' : '1.4.5',
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          STATE_FIXTURE: join(directory, 'payload.json'),
+          PATH: `${directory}:${process.env.PATH}`,
+        },
+      },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe(expected);
+  });
+  it('never converts an authentication or network error into absence', () => {
+    const directory = temporary();
+    for (const name of ['gh', 'npm']) {
+      writeFileSync(join(directory, name), '#!/bin/sh\nexit 1\n');
+      chmodSync(join(directory, name), 0o755);
+    }
+    for (const kind of ['release', 'registry']) {
+      const result = spawnSync(
+        process.execPath,
+        [join(root, 'scripts/process/publication-state.mjs'), kind, '1.4.5'],
+        { encoding: 'utf8', env: { ...process.env, PATH: `${directory}:${process.env.PATH}` } },
+      );
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('PUBLICATION_STATE_UNKNOWN');
+    }
+  });
+});

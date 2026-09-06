@@ -22,8 +22,9 @@ const result = spawnSync(args[0], args.slice(1), { encoding: 'utf8' });
 if (result.status !== 0) throw new Error('PUBLICATION_STATE_UNKNOWN');
 const value = JSON.parse(result.stdout);
 if (!Array.isArray(value)) throw new Error('PUBLICATION_STATE_UNKNOWN');
-const found =
-  kind === 'release'
-    ? value.flat().some((release) => release.tag_name === identity)
-    : value.includes(identity);
-process.stdout.write(found ? 'present\n' : 'absent\n');
+if (kind === 'release') {
+  const found = value.flat().find((release) => release.tag_name === identity);
+  process.stdout.write(found ? (found.draft ? 'draft\n' : 'present\n') : 'absent\n');
+} else {
+  process.stdout.write(value.includes(identity) ? 'present\n' : 'absent\n');
+}

@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
+  symlinkSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -132,6 +133,34 @@ const fs=require('node:fs'); const version=process.argv[3].split('@').at(-1);pro
     'name: prior\n',
   );
   expect(existsSync(join(cwd, 'one/REVIEW.md'))).toBe(true);
+  const originalConfig = join(cwd, 'original-project.json');
+  writeFileSync(originalConfig, configBefore);
+  rmSync(join(adopter, '.devai/config/project.json'));
+  symlinkSync(originalConfig, join(adopter, '.devai/config/project.json'));
+  const linkedConfig = join(cwd, 'linked.json');
+  writeFileSync(
+    linkedConfig,
+    JSON.stringify({
+      adopterRoot: adopter,
+      packageRoot: installed,
+      packageTarball,
+      providerTarball,
+      outputDir: join(cwd, 'linked'),
+    }),
+  );
+  const linked = spawnSync(
+    process.execPath,
+    [join(root, 'scripts/process/generate-adopter-migration.mjs'), linkedConfig],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, FAKE_METADATA: cwd, PATH: `${bin}:${process.env.PATH}` },
+    },
+  );
+  expect(linked.status).not.toBe(0);
+  expect(readFileSync(originalConfig, 'utf8')).toBe(configBefore);
+  expect(existsSync(join(cwd, 'linked'))).toBe(false);
+  rmSync(join(adopter, '.devai/config/project.json'));
+  writeFileSync(join(adopter, '.devai/config/project.json'), configBefore);
   // Changed installed executable is rejected before renderer invocation.
   writeFileSync(join(installed, 'dist/runtime/index/bin.js'), 'throw new Error("changed")');
   const configPath = join(cwd, 'bad.json');
