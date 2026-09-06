@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { runCheckTasks } from '../.devai/state/pr-bootstrap/cli/services/check-runner/index.js';
 
 const root = resolve(import.meta.dirname, '..');
 const base = process.argv.slice(2).find((argument) => argument !== '--');
@@ -51,40 +50,46 @@ const targetVersion = JSON.parse(
 ).version;
 const changedPaths = changedPathsBetween(base, candidateCommit);
 
-function executeTask(argv, cwd, timeout, environment) {
-  const result = spawnSync(argv[0], argv.slice(1), {
-    cwd,
-    timeout,
+const cli = join(root, '.devai/state/pr-bootstrap/cli/bin.js');
+function invoke(args) {
+  const result = spawnSync(process.execPath, [cli, ...args, '--format', 'json'], {
+    cwd: root,
     encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-    env: { PATH: process.env.PATH, HOME: process.env.HOME, ...environment },
+    maxBuffer: 64 * 1024 * 1024,
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, DEVAI_FORMAT_BASE: base },
   });
-  return {
-    status: result.status,
-    signal: result.signal,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-    ...(result.error ? { errorCode: result.error.code } : {}),
-  };
+  let output;
+  try {
+    output = JSON.parse(result.stdout);
+  } catch {
+    /* reported below */
+  }
+  if (!output?.result?.value)
+    throw new Error(`PR_GATE_CLI_FAILED:${result.status}:${result.stderr}:${result.stdout}`);
+  return { report: output.result.value, status: result.status };
 }
+// Materialize the existing local authority binding through its approved boundary.
+invoke(['init', 'bind', '--target', root, '--as-role', 'architect', '--write']);
 function run(options) {
-  const report = runCheckTasks({
-    repoRoot: root,
-    baseCommit: base,
-    operation: 'execute',
-    environment: { DEVAI_FORMAT_BASE: base },
-    executeTask,
-    ...options,
-  });
-  // No candidate receipt or protected artifact is exposed by PR orchestration.
+  const args = ['check', '--run', '--as-role', 'inspector', '--write', '--base', base];
+  if (options.target === 'affected') args.push('--affected');
+  else {
+    const intentPath = join(root, '.devai/state/pr-bootstrap/release-intent.json');
+    writeFileSync(intentPath, JSON.stringify(options.releaseIntent));
+    args.push(
+      '--release-intent',
+      intentPath,
+      '--release-profile',
+      join(root, 'law/policy/release-verification.json'),
+      '--release-stage',
+      'preflight',
+    );
+  }
+  const { report, status } = invoke(args);
   process.stdout.write(
-    `${JSON.stringify({
-      nonAttesting: true,
-      tasks: report.execution,
-      exitCode: report.exitCode,
-    })}\n`,
+    `${JSON.stringify({ nonAttesting: true, tasks: report.execution, exitCode: report.exitCode })}\n`,
   );
-  return report.exitCode;
+  return report.exitCode || status;
 }
 if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));
 

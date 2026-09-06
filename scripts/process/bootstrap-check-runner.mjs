@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 // Compile the orchestration runtime outside publishable CLI output. In particular,
 // bootstrapping must not contaminate a cached assembled package with raw TS output.
-import { readFileSync, mkdirSync, existsSync, realpathSync, symlinkSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  realpathSync,
+  symlinkSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const root = resolve(import.meta.dirname, '../..');
@@ -37,3 +44,14 @@ if (existsSync(modules)) {
 } else {
   symlinkSync(workspaceModules, modules, 'dir');
 }
+
+const metadata = JSON.parse(readFileSync(join(root, 'packages/cli/package.json'), 'utf8'));
+writeFileSync(
+  join(output, '../package.json'),
+  JSON.stringify({ ...metadata, imports: { '#runtime-core': './cli/runtime-core.js' } }),
+);
+const law = join(output, 'law');
+if (existsSync(law)) {
+  if (realpathSync(law) !== realpathSync(join(root, 'law')))
+    throw new Error('BOOTSTRAP_LAW_MISMATCH');
+} else symlinkSync(join(root, 'law'), law, 'dir');
