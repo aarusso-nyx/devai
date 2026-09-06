@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
+import { readPinnedNpmCache } from './npm-cache.mjs';
 import {
   decodeContainerDependencyArchive,
   encodeContainerArchive,
@@ -22,6 +23,7 @@ if (process.argv.length !== 3 || !isAbsolute(controlsPath ?? ''))
 const c = JSON.parse(readFileSync(controlsPath, 'utf8'));
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const maximumBytes = 1024 * 1024 * 1024;
+const npmCache = readPinnedNpmCache(c.npm_install_cache, c.repository);
 const inside = (root, path) => {
   const suffix = relative(root, path);
   return suffix === '' || (!suffix.startsWith('..') && !isAbsolute(suffix));
@@ -218,6 +220,16 @@ for (const offline of [false, true]) {
   ].entries()) {
     const raw = docker(['cp', `${name}:/workspace/candidate/${mount_path}/.`, '-']);
     const entries = decodeContainerDependencyArchive(raw, maximumBytes);
+    if (mount_path === 'node_modules' && npmCache !== undefined) {
+      if (
+        entries.some(
+          (entry) =>
+            entry.path === '.devai-npm-cache' || entry.path.startsWith('.devai-npm-cache/'),
+        )
+      )
+        throw new Error('DEVAI_NPM_CACHE_COLLISION');
+      entries.push(...npmCache.entries);
+    }
     const archive = encodeContainerDependencyArchive(entries);
     const dependency = { mount_path, archive, sha256: hash(archive), inputs };
     dependencies.push(dependency);
@@ -251,6 +263,9 @@ writeFileSync(
       inputs,
       identity_sha256: outputs[0],
       offline_rebuild_identical: true,
+      ...(npmCache === undefined
+        ? {}
+        : { npm_install_cache_manifest_sha256: npmCache.manifest_sha256 }),
       artifacts,
       retained_resource_prefix: id,
     },

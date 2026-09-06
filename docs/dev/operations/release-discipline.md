@@ -73,6 +73,21 @@ closure, and creates a normalized public manifest with development workspace dep
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
 that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
 
+For network-isolated package-staging checks, the repository-local dependency provisioner
+accepts an explicit `npm_install_cache` control with external canonical `directory` and
+`manifest` paths plus `manifest_sha256`. The manifest lists every cache file's `path`,
+`size`, and `sha256`. The provisioner rejects links, population differences, changed bytes,
+and candidate-owned inputs, then includes the verified cache in both dependency rebuilds.
+The complete dependency archive identity binds these bytes. Missing package cache entries
+must be diagnosed before certification; installed pnpm dependencies alone do not supply
+npm's cache for the separate normalized package installation.
+
+Staging copies the transported `node_modules/.devai-npm-cache` seed to a temporary writable
+cache and installs offline. The seed remains unchanged. A cache miss fails without network
+fallback. Ordinary staging without a seed uses its existing npm installation path, with
+network retries disabled and a two-minute process limit. This does not remove the mandatory
+package-staging test or grant candidate commands network access in protected execution.
+
 The pull-request gate uses exact-commit binding. GitHub-created main merge commits and the signed
 release tag use explicit `exact-tree` binding, which accepts the PR receipt only when the checked
 tree is byte-identical. Commit mismatch without tree equality remains a hard failure.

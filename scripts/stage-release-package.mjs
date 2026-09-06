@@ -124,10 +124,31 @@ try {
   mkdirSync(sbomRoot, { recursive: true });
   execFileSync('tar', ['-xzf', output, '-C', sbomRoot]);
   const sbomPackageRoot = join(sbomRoot, 'package');
-  execFileSync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
-    cwd: sbomPackageRoot,
-    stdio: 'pipe',
-  });
+  const cacheSeed = join(repositoryRoot, 'node_modules/.devai-npm-cache');
+  const cacheArguments = [];
+  if (existsSync(cacheSeed)) {
+    const writableCache = join(temporaryRoot, 'npm-cache');
+    cpSync(cacheSeed, writableCache, { recursive: true });
+    cacheArguments.push('--offline', '--cache', writableCache);
+  }
+  execFileSync(
+    'npm',
+    [
+      'install',
+      '--omit=dev',
+      '--ignore-scripts',
+      '--no-audit',
+      '--no-fund',
+      '--fetch-retries=0',
+      '--fetch-timeout=15000',
+      ...cacheArguments,
+    ],
+    {
+      cwd: sbomPackageRoot,
+      stdio: 'pipe',
+      timeout: 120_000,
+    },
+  );
   const sbom = join(outputRoot, `devai-${manifest.version}.cdx.json`);
   const npmExecPath = realpathSync(execFileSync('which', ['npm'], { encoding: 'utf8' }).trim());
   execFileSync(
