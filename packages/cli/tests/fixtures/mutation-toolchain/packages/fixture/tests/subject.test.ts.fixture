@@ -1,0 +1,3 @@
+import { describe, it, expect } from 'vitest';
+import { enabled } from '../src/subject.js';
+describe('fixed compatibility', () => { it('true', () => expect(enabled(true)).toBe(1)); it('false', () => expect(enabled(false)).toBe(0)); });

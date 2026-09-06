@@ -14,7 +14,9 @@ export default tseslint.config(
       '.claude/**',
       'scratch/**',
       'examples/**',
-      'packages/cli/vendor/evidence-verification/test/**',
+      // Byte-pinned upstream source: provenance.json is the integrity control here,
+      // and any lint fix would break that pin rather than be applied in this repo.
+      'packages/cli/vendor/evidence-verification/**',
     ],
   },
   js.configs.recommended,

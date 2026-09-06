@@ -93,6 +93,8 @@ export interface MutationRosterEntry {
   readonly test_selectors?: readonly string[];
   readonly manifest_path?: string;
   readonly config_paths?: readonly string[];
+  readonly vitest_config_path?: string;
+  readonly typescript_config_path?: string;
   readonly sanitizer_paths?: readonly string[];
   readonly orchestration_paths?: readonly string[];
   readonly lockfile_path?: string;

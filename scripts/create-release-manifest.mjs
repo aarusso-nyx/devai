@@ -20,6 +20,21 @@ const siteFile = resolve(required('SITE_ARCHIVE'));
 const sbomFile = resolve(required('SBOM_FILE'));
 const outputFile = resolve(required('OUTPUT_FILE'));
 const packageManifest = JSON.parse(readFileSync('packages/cli/package.json', 'utf8'));
+const verifierProvenanceBytes = readFileSync(
+  'packages/cli/vendor/evidence-verification/provenance.json',
+);
+const verifierProvenance = JSON.parse(verifierProvenanceBytes.toString('utf8'));
+const verifierProvenanceSha256 = required('LEDGER_VERIFIER_PROVENANCE_SHA256');
+const verifierPackageVersion = required('LEDGER_VERIFIER_PACKAGE_VERSION');
+if (
+  createHash('sha256').update(verifierProvenanceBytes).digest('hex') !== verifierProvenanceSha256 ||
+  verifierProvenance.schemaVersion !== '1.0.0' ||
+  typeof verifierProvenance.sourceCommit !== 'string' ||
+  !/^[a-f0-9]{40}$/u.test(verifierProvenance.sourceCommit) ||
+  verifierPackageVersion !== packageManifest.version
+) {
+  throw new Error('RELEASE_MANIFEST_VERIFIER_IDENTITY_INVALID');
+}
 const releaseTag = required('RELEASE_TAG');
 const packageName = required('PACKAGE_NAME');
 const channel = releaseChannel(packageManifest.version);
@@ -43,9 +58,9 @@ const manifest = {
   },
   ledger: {
     verifier_package: '@aarusso-nyx/devai',
-    verifier_package_version: required('LEDGER_VERIFIER_PACKAGE_VERSION'),
-    verifier_provenance_sha256: required('LEDGER_VERIFIER_PROVENANCE_SHA256'),
-    verifier_source_commit: '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de',
+    verifier_package_version: verifierPackageVersion,
+    verifier_provenance_sha256: verifierProvenanceSha256,
+    verifier_source_commit: verifierProvenance.sourceCommit,
     policy_digest: required('LEDGER_POLICY_DIGEST'),
     envelope_sha256: required('LEDGER_ENVELOPE_SHA256'),
     results_archive_sha256: required('LEDGER_RESULTS_SHA256'),

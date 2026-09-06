@@ -42,9 +42,16 @@ export interface TaskPolicyNode {
 }
 
 export interface TaskPolicy {
-  readonly schemaVersion: '1.1.0';
+  /** 1.2.0 is required precisely when the release input projection is carried. */
+  readonly schemaVersion: '1.1.0' | '1.2.0';
   readonly repositoryId: string;
   readonly requiredNodes: readonly TaskPolicyNode[];
+  readonly inputProjection?: Readonly<{
+    schemaVersion: '1.0.0';
+    source: 'exact-candidate-tree';
+    excludedPrefixes: readonly string[];
+    digest: string;
+  }>;
 }
 
 export interface PlannedTask extends TaskPolicyNode {
@@ -152,6 +159,8 @@ export interface CheckRunnerOptions {
   readonly baseCommit?: string;
   readonly timeoutMs?: number;
   readonly descriptorPath?: string;
+  readonly descriptorDocument?: TaskDescriptor;
+  readonly releaseCandidate?: Readonly<{ commit: string; tree: string }>;
   readonly cacheRoot?: string;
   readonly toolchain?: Readonly<Record<string, string>>;
   readonly environment?: Readonly<Record<string, string>>;
@@ -169,5 +178,18 @@ export interface CheckRunnerOptions {
     timeoutMs: number,
     environment: Readonly<Record<string, string>>,
   ) => TaskExecutionResult;
+  /** Trusted host-only execution identity; never populated from CLI documents. */
+  readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;
+  readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
+  /** Protected executors return sealed bytes after namespace quiescence, not worktree reads. */
+  readonly readTaskOutput?: (path: string) => Buffer;
+  /** Complete sealed namespace census supplied by the protected executor, not a task path list. */
+  readonly capturedTaskOutputPaths?: (task: PlannedTask) => readonly string[];
+  /**
+   * Trusted host-only declaration that a protected semantic mutation producer will
+   * retain this unit's evidence. Never populated from CLI documents: a JSON profile
+   * cannot carry a function, so an ordinary `devai check` can never claim it.
+   */
+  readonly resolveProtectedMutationProducer?: () => string;
   readonly now?: () => string;
 }

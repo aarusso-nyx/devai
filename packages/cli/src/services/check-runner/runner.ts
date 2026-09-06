@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { getValidator } from '@devai-nyx/schemas';
@@ -15,11 +15,14 @@ import {
 } from '../release-preflight.js';
 import { CheckCache } from './cache.js';
 import { sha256Hex } from './canonical.js';
+import { bindReleaseTaskProcessOptions } from './authority-process.js';
 import {
   buildTaskPlan,
   currentRepositoryState,
+  exactCandidateRepositoryState,
   exactCommitFile,
   exactCommitTree,
+  parseTaskDescriptor,
   readTaskDescriptor,
 } from './policy.js';
 import type {
@@ -35,6 +38,38 @@ import type {
 } from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 15 * 60_000;
+/** Exact declaration a protected host producer must return; nothing else lifts the refusal. */
+export const PROTECTED_MUTATION_PRODUCER = 'protected-mutation-producer-v21';
+const protectedCompletedTaskResults = new WeakMap<CheckRunnerReport, readonly TaskResult[]>();
+
+function snapshotTaskResult(value: TaskResult): TaskResult {
+  return Object.freeze({
+    ...value,
+    dependencyResultDigests: Object.freeze({ ...value.dependencyResultDigests }),
+    outputDigests: Object.freeze({ ...value.outputDigests }),
+  });
+}
+
+/**
+ * A protected certification host may retain the canonical task-result population
+ * while it is still live. This never consults a cache path and is unavailable for
+ * reports that did not produce an attestable candidate receipt.
+ */
+export function readProtectedCompletedTaskResults(
+  report: CheckRunnerReport,
+): readonly TaskResult[] {
+  const results = protectedCompletedTaskResults.get(report);
+  if (results === undefined) throw new Error('release-certification-task-results-unavailable');
+  return results.map(snapshotTaskResult);
+}
+
+function descriptorFor(options: CheckRunnerOptions) {
+  return options.descriptorDocument === undefined
+    ? readTaskDescriptor(
+        resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
+      )
+    : parseTaskDescriptor(options.descriptorDocument);
+}
 
 function commandVersion(command: string, args: readonly string[], cwd: string): string {
   const result = spawnSync(command, [...args], { cwd, encoding: 'utf8', timeout: 10_000 });
@@ -69,6 +104,7 @@ export function resolveRunnerToolchain(
   for (const key of [...new Set(requiredKeys)].sort()) {
     if (key === 'node') resolved[key] = process.version;
     else if (key === 'pnpm') resolved[key] = commandVersion('pnpm', ['--version'], repoRoot);
+    else if (key === 'git') resolved[key] = commandVersion('git', ['--version'], repoRoot);
     else if (key === 'eslint') resolved[key] = packageVersion(repoRoot, 'eslint');
     else if (key === 'vitest') resolved[key] = packageVersion(repoRoot, 'vitest');
     else if (key === 'typescript') resolved[key] = packageVersion(repoRoot, 'typescript');
@@ -86,6 +122,7 @@ function defaultExecute(
   cwd: string,
   timeoutMs: number,
   environment: Readonly<Record<string, string>>,
+  releaseBinding?: Parameters<typeof bindReleaseTaskProcessOptions>[1],
 ): TaskExecutionResult {
   const executionEnvironment: NodeJS.ProcessEnv = {
     ...(process.env.PATH !== undefined && { PATH: process.env.PATH }),
@@ -95,14 +132,21 @@ function defaultExecute(
     NO_COLOR: '1',
     ...environment,
   };
-  const result = spawnSync(argv[0] ?? '', argv.slice(1), {
+  const spawnOptions = {
     cwd,
     encoding: 'utf8',
     timeout: timeoutMs,
     maxBuffer: 64 * 1024 * 1024,
     env: executionEnvironment,
     shell: false,
-  });
+  } as const;
+  const result = spawnSync(
+    argv[0] ?? '',
+    argv.slice(1),
+    releaseBinding === undefined
+      ? spawnOptions
+      : bindReleaseTaskProcessOptions({ ...spawnOptions }, releaseBinding),
+  );
   return {
     status: result.status,
     signal: result.signal,
@@ -129,18 +173,25 @@ function outputDigests(
   repoRoot: string,
   task: PlannedTask,
   execution: TaskExecutionResult,
+  readTaskOutput?: (path: string) => Buffer,
+  capturedTaskOutputPaths?: (task: PlannedTask) => readonly string[],
 ): Readonly<Record<string, string>> {
   const digests: Record<string, string> = {
     stdout: sha256Hex(Buffer.from(execution.stdout, 'utf8')),
     stderr: sha256Hex(Buffer.from(execution.stderr, 'utf8')),
   };
-  const paths = task.outputContract.paths;
+  const paths = task.outputContract.paths ?? [];
   if (paths !== undefined) {
     if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string'))
       throw new Error(`CHECK_RUNNER_OUTPUT_CONTRACT: ${task.nodeId} has malformed paths`);
-    for (const path of paths as string[]) {
+    for (const path of new Set([
+      ...(paths as string[]),
+      ...(capturedTaskOutputPaths?.(task) ?? []),
+    ])) {
       try {
-        digests[path] = sha256Hex(readFileSync(join(repoRoot, path)));
+        digests[path] = sha256Hex(
+          readTaskOutput === undefined ? readFileSync(join(repoRoot, path)) : readTaskOutput(path),
+        );
       } catch {
         throw new Error(`CHECK_RUNNER_OUTPUT_MISSING: ${task.nodeId}: ${path}`);
       }
@@ -155,16 +206,14 @@ function planWithCache(
   toolchain: Readonly<Record<string, string>>,
   environment: Readonly<Record<string, string>>,
 ) {
-  const descriptorPath = resolve(
-    options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json'),
-  );
-  const descriptor = readTaskDescriptor(descriptorPath);
+  const descriptor = descriptorFor(options);
   const reusableDigests = new Map<string, string>();
   return buildTaskPlan({
     repoRoot: options.repoRoot,
     descriptor,
     target: options.target,
     ...(options.baseCommit !== undefined && { baseCommit: options.baseCommit }),
+    ...(options.releaseCandidate !== undefined && { releaseCandidate: options.releaseCandidate }),
     ...(options.releaseRequiredNodes !== undefined && {
       releaseRequiredNodes: options.releaseRequiredNodes,
     }),
@@ -176,6 +225,12 @@ function planWithCache(
     }),
     toolchain,
     environment,
+    ...(options.resolveExecutable === undefined
+      ? {}
+      : { resolveExecutable: options.resolveExecutable }),
+    ...(options.protectedExecutionIdentity === undefined
+      ? {}
+      : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
     cacheState(task) {
       const dependencies: Record<string, string> = {};
       for (const dependency of task.dependencies) {
@@ -204,9 +259,7 @@ function requiredTaskNodes(
   options: CheckRunnerOptions,
   releaseScope: 'selected' | 'complete' = 'complete',
 ): readonly TaskDescriptorNode[] {
-  const descriptor = readTaskDescriptor(
-    resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-  );
+  const descriptor = descriptorFor(options);
   if (options.target === 'affected') {
     const profile = descriptor.profiles.find((entry) => entry.profileId === 'affected');
     const eligible = new Set(profile?.eligibleNodes ?? []);
@@ -307,9 +360,9 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   if (intent.release_unit !== profile.release_unit) {
     throw new Error('CHECK_RELEASE_UNIT_MISMATCH');
   }
-  const candidate = currentRepositoryState(input.repoRoot);
-  if (intent.candidate.commit !== candidate.commit || intent.candidate.tree !== candidate.tree) {
-    throw new Error('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
+  const candidate = exactCandidateRepositoryState(input.repoRoot, intent.candidate);
+  if (!candidate.clean) {
+    throw new Error('CHECK_RELEASE_CANDIDATE_WORKTREE_MISMATCH');
   }
   if (input.baseCommit === undefined || intent.base.commit !== input.baseCommit) {
     throw new Error('CHECK_RELEASE_INTENT_BASE_MISMATCH');
@@ -357,9 +410,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   if (decision.verdict !== 'ready') {
     throw new Error(`CHECK_RELEASE_INTENT_BLOCKED:${decision.blockingReasons.join(',')}`);
   }
-  const descriptor = readTaskDescriptor(
-    resolve(input.descriptorPath ?? join(input.repoRoot, 'test-tasks.json')),
-  );
+  const descriptor = descriptorFor(input);
   const allRoots = resolveReleaseTaskNodes(
     decision,
     profile.capability_tasks,
@@ -400,11 +451,23 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     descriptor.tasks.map((task) => task.nodeId),
   );
   const stage = input.releaseStage ?? 'preflight';
+  // Exit codes and output digests alone cannot satisfy required mutation. Required
+  // mutation may be planned for execution only when a protected semantic producer
+  // declares it will retain the evidence; read-only planning and the unconditional
+  // preflight floor stay usable either way.
+  if (
+    stage === 'certify' &&
+    input.operation === 'run' &&
+    decision.mutation !== 'none' &&
+    input.resolveProtectedMutationProducer?.() !== PROTECTED_MUTATION_PRODUCER
+  )
+    throw new Error('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
   return {
     options: {
       ...input,
       target: 'release',
       releaseStage: stage,
+      releaseCandidate: intent.candidate,
       releaseRequiredNodes: stage === 'preflight' ? preflightRoots : selectedRoots,
       releaseAllNodes: selectedRoots,
       releaseTaskBindings: stage === 'preflight' ? {} : mutationTaskBindings,
@@ -426,10 +489,105 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
   };
 }
 
+type AsyncTaskExecutor = (
+  ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
+) => TaskExecutionResult | Promise<TaskExecutionResult>;
+
+type TaskExecutionEffect = () => TaskExecutionResult | Promise<TaskExecutionResult>;
+
+/** The synchronous API and protected asynchronous host share every planning/result rule. */
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
+  const steps = runCheckTaskSteps(inputOptions);
+  let step = steps.next();
+  while (!step.done) {
+    let result: TaskExecutionResult | Promise<TaskExecutionResult>;
+    try {
+      result = step.value();
+      if (result !== null && typeof result === 'object' && 'then' in result)
+        throw new Error('CHECK_RUNNER_ASYNC_EXECUTOR_REQUIRES_ASYNC_HOST');
+    } catch (error) {
+      steps.throw(error);
+      throw error;
+    }
+    step = steps.next(result);
+  }
+  return step.value;
+}
+
+/**
+ * Internal host orchestration only: await a task's complete execution/retention
+ * before processing its result or advancing to a dependent task. This adds no
+ * release action, receipt authority, or exception to the mutation producer guard.
+ */
+export async function runCheckTasksAsync(
+  inputOptions: Omit<CheckRunnerOptions, 'executeTask'> & {
+    readonly executeTask?: AsyncTaskExecutor;
+  },
+): Promise<CheckRunnerReport> {
+  const {
+    executeTask,
+    resolveExecutable,
+    readTaskOutput,
+    capturedTaskOutputPaths,
+    resolveProtectedMutationProducer,
+    now,
+    ...data
+  } = inputOptions;
+  // Host functions are captured once; caller-owned documents cannot drift while
+  // a task is awaited. None of these callbacks is resolved from candidate data.
+  const captured: CheckRunnerOptions = {
+    ...structuredClone(data),
+    ...(resolveExecutable === undefined ? {} : { resolveExecutable }),
+    ...(readTaskOutput === undefined ? {} : { readTaskOutput }),
+    ...(capturedTaskOutputPaths === undefined ? {} : { capturedTaskOutputPaths }),
+    ...(resolveProtectedMutationProducer === undefined ? {} : { resolveProtectedMutationProducer }),
+    ...(now === undefined ? {} : { now }),
+  };
+  const steps = runCheckTaskSteps(
+    captured,
+    executeTask === undefined
+      ? undefined
+      : (argv, cwd, timeout, environment) =>
+          executeTask([...argv], cwd, timeout, { ...environment }),
+  );
+  let step = steps.next();
+  while (!step.done) {
+    let result: TaskExecutionResult;
+    try {
+      result = await step.value();
+    } catch (error) {
+      steps.throw(error);
+      throw error;
+    }
+    step = steps.next(result);
+  }
+  return step.value;
+}
+
+function* runCheckTaskSteps(
+  inputOptions: CheckRunnerOptions,
+  asyncExecutor?: AsyncTaskExecutor,
+): Generator<TaskExecutionEffect, CheckRunnerReport, TaskExecutionResult> {
   const request = bindReleaseRequest(inputOptions);
   const options = request.options;
+  const protectedOutputCapture =
+    options.protectedExecutionIdentity !== undefined &&
+    options.readTaskOutput !== undefined &&
+    options.capturedTaskOutputPaths !== undefined;
   const requiredEnvironment = requiredEnvironmentKeys(options);
+  // Protected execution binds the complete selected DAG, including dependencies, but does
+  // not require credentials or tools belonging only to unselected task nodes. Refuse before
+  // ambient environment/toolchain resolution; those values are not protected host inputs.
+  if (
+    options.protectedExecutionIdentity !== undefined &&
+    requiredTaskNodes(options, 'selected').some(
+      (task) =>
+        task.allowlistedEnv.some((key) => options.environment?.[key] === undefined) ||
+        task.toolchainKeys.some((key) => options.toolchain?.[key] === undefined),
+    )
+  ) {
+    throw new Error('release-certification-environment-unbound');
+  }
   const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
   if (
     (options.target === 'rc' || options.target === 'release') &&
@@ -454,7 +612,13 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
         'CHECK_AUTHORITY_POLICY_REQUIRED: materialize .devai/config/authority-policy.json before planning release evidence',
       );
     }
-    environment[authorityDigestKey] = sha256Hex(readFileSync(authorityPolicyPath));
+    const authorityDigest = sha256Hex(readFileSync(authorityPolicyPath));
+    if (
+      options.protectedExecutionIdentity !== undefined &&
+      environment[authorityDigestKey] !== authorityDigest
+    )
+      throw new Error('release-certification-environment-unbound');
+    environment[authorityDigestKey] = authorityDigest;
   }
   for (const key of requiredEnvironment) {
     const inheritedValue = process.env[key];
@@ -485,9 +649,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     if (options.preflightReceipt === undefined || releaseBinding === undefined) {
       throw new Error('CHECK_RELEASE_PREFLIGHT_REQUIRED');
     }
-    const knownNodes = readTaskDescriptor(
-      resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-    ).tasks.map((task) => task.nodeId);
+    const knownNodes = descriptorFor(options).tasks.map((task) => task.nodeId);
     const preflightPlan = planWithCache(
       {
         ...options,
@@ -522,18 +684,20 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     return { schemaVersion: '1.0.0', operation: options.operation, plan, exitCode: 0 };
   }
 
-  const execute = options.executeTask ?? defaultExecute;
-  const descriptor = readTaskDescriptor(
-    resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-  );
+  const descriptor = descriptorFor(options);
   const descriptorById = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new Error('CHECK_RUNNER_TIMEOUT: timeout must be a positive integer');
   }
   const now = options.now ?? (() => new Date().toISOString());
-  const initialState = currentRepositoryState(options.repoRoot);
+  const repositoryState = (): Readonly<{ commit: string; tree: string; clean: boolean }> =>
+    options.target === 'release' && options.releaseCandidate !== undefined
+      ? exactCandidateRepositoryState(options.repoRoot, options.releaseCandidate)
+      : currentRepositoryState(options.repoRoot);
+  const initialState = repositoryState();
   const resultDigests = new Map<string, string>();
+  const taskResults = new Map<string, TaskResult>();
   const execution: ExecutedTask[] = [];
 
   for (const task of plan.tasks) {
@@ -559,7 +723,10 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     }
     const cached = cache.inspect(task, dependencyResultDigests);
     if (cached.cacheState === 'reusable' && cached.cachedResultDigest !== undefined) {
+      if (cached.result === undefined)
+        throw new Error('CHECK_RUNNER_INTERNAL: reusable task result missing');
       resultDigests.set(task.nodeId, cached.cachedResultDigest);
+      taskResults.set(task.nodeId, snapshotTaskResult(cached.result));
       execution.push({
         nodeId: task.nodeId,
         taskKey: task.taskKey,
@@ -578,12 +745,33 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     if (descriptorTask === undefined) {
       throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
     }
-    const result = execute(
-      options.executeTask === undefined ? [task.executable.path, ...task.argv.slice(1)] : task.argv,
-      resolve(options.repoRoot, task.cwd),
-      timeoutMs,
-      taskEnvironment(descriptorTask, environment),
-    );
+    const taskCwd = realpathSync(resolve(options.repoRoot, task.cwd));
+    const taskEnv = taskEnvironment(descriptorTask, environment);
+    const result = yield () =>
+      asyncExecutor !== undefined
+        ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv)
+        : options.executeTask === undefined
+          ? defaultExecute(
+              [task.executable.path, ...task.argv.slice(1)],
+              taskCwd,
+              timeoutMs,
+              taskEnv,
+              options.target === 'release'
+                ? {
+                    candidate: {
+                      commit: plan.repository.commit,
+                      tree: plan.repository.tree,
+                    },
+                    descriptor_digest: plan.descriptorDigest,
+                    task_policy_digest: plan.taskPolicyDigest,
+                    node_id: task.nodeId,
+                    executable: task.executable,
+                    argv: task.argv,
+                    cwd: task.cwd,
+                  }
+                : undefined,
+            )
+          : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv);
     const durationMs = Math.max(0, Date.now() - started);
     const finishedAt = now();
     const outcome = executionOutcome(result);
@@ -625,7 +813,13 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
         status: 'PASS',
         inputDigest: task.inputDigest,
         dependencyResultDigests,
-        outputDigests: outputDigests(options.repoRoot, task, result),
+        outputDigests: outputDigests(
+          options.repoRoot,
+          task,
+          result,
+          options.readTaskOutput,
+          options.capturedTaskOutputPaths,
+        ),
         startedAt,
         finishedAt,
       };
@@ -647,12 +841,16 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     const resultDigest = cache.writeResult(taskResult);
     cache.writeAttempt(task.nodeId, task.taskKey, 'PASS', finishedAt, resultDigest);
     resultDigests.set(task.nodeId, resultDigest);
+    taskResults.set(task.nodeId, snapshotTaskResult(taskResult));
     execution.push({
       nodeId: task.nodeId,
       taskKey: task.taskKey,
       disposition: 'executed',
       outcome: 'PASS',
-      reason: cached.reason,
+      reason:
+        task.outputContract.generated_namespaces !== undefined && !protectedOutputCapture
+          ? 'executed;protected-namespace-closure-unproven'
+          : cached.reason,
       durationMs,
       resultDigest,
       exitCode: 0,
@@ -663,8 +861,13 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
   let preflightReceipt: CheckRunnerReport['preflightReceipt'];
   let receiptRefusal: string | undefined;
   const allPass = execution.every((task) => task.outcome === 'PASS');
-  const finalState = currentRepositoryState(options.repoRoot);
-  if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
+  const finalState = repositoryState();
+  if (
+    !protectedOutputCapture &&
+    plan.tasks.some((task) => task.outputContract.generated_namespaces !== undefined)
+  )
+    receiptRefusal = 'protected-namespace-closure-unproven';
+  else if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
   else if (!plan.clean || !initialState.clean) receiptRefusal = 'dirty-start';
   else if (!allPass) receiptRefusal = 'task-population-not-pass';
   else if (
@@ -739,7 +942,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     const written = cache.writeReceipt(candidateReceipt);
     receipt = { ...written, value: candidateReceipt };
   }
-  return {
+  const report: CheckRunnerReport = {
     schemaVersion: '1.0.0',
     operation: options.operation,
     plan,
@@ -747,9 +950,7 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     ...(receipt !== undefined && { receipt }),
     ...(preflightReceipt !== undefined && { preflightReceipt }),
     ...(options.target === 'release' && {
-      releaseVerification: readTaskDescriptor(
-        resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-      ).tasks.map((task) => {
+      releaseVerification: descriptorFor(options).tasks.map((task) => {
         const result = execution.find((entry) => entry.nodeId === task.nodeId);
         if (result === undefined) {
           return {
@@ -787,4 +988,23 @@ export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerRepo
     ...(receiptRefusal !== undefined && { receiptRefusal }),
     exitCode: allPass ? 0 : 1,
   };
+  if (
+    protectedOutputCapture &&
+    receipt !== undefined &&
+    taskResults.size === plan.tasks.length &&
+    plan.tasks.every((task) => taskResults.get(task.nodeId)?.taskKey === task.taskKey)
+  ) {
+    protectedCompletedTaskResults.set(
+      report,
+      Object.freeze(
+        plan.tasks.map((task) => {
+          const result = taskResults.get(task.nodeId);
+          if (result === undefined)
+            throw new Error('CHECK_RUNNER_INTERNAL: retained task result missing');
+          return snapshotTaskResult(result);
+        }),
+      ),
+    );
+  }
+  return report;
 }

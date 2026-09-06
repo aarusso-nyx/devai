@@ -148,6 +148,33 @@ function executablePackageMaterializationFixture(
       },
     })}\n`,
   );
+  // The adopter's approved provider and the candidate vendor are distinct populations.
+  // Build a self-contained mocked provider matching its approved population size.
+  const fixtureManifest = JSON.parse(
+    readFileSync(join(verifierRoot, 'provenance.json'), 'utf8'),
+  ) as {
+    sourceCommit: string;
+    files: Array<{ path: string; sha256: string }>;
+  };
+  const binaries = new Set([
+    'src/build-policy-cli.js',
+    'src/cli.js',
+    'src/bundle-cli.js',
+    'src/export-cli.js',
+    'src/publish-cli.js',
+    'src/verify.js',
+  ]);
+  const selected = [...fixtureManifest.files].sort(
+    (a, b) =>
+      Number(binaries.has(b.path)) - Number(binaries.has(a.path)) || a.path.localeCompare(b.path),
+  );
+  for (const member of selected.slice(VERIFIER_POLICY.verifier.payload_file_count))
+    rmSync(join(verifierRoot, member.path));
+  fixtureManifest.files = selected
+    .slice(0, VERIFIER_POLICY.verifier.payload_file_count)
+    .sort((a, b) => a.path.localeCompare(b.path));
+  fixtureManifest.sourceCommit = VERIFIER_POLICY.verifier.source_commit;
+  writeFileSync(join(verifierRoot, 'provenance.json'), JSON.stringify(fixtureManifest));
   mutate?.(packageRoot, verifierRoot);
   execFileSync('tar', ['-czf', archive, '--format', 'ustar', 'package'], {
     cwd: root,
@@ -471,7 +498,8 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'wrong package-owned verifier provenance',
-      mutate: (source: string) => source.replaceAll(VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
+      mutate: (source: string) =>
+        source.replaceAll('9f849f117fe1e460b5e3c647515f5ccbe783cbfb', 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
@@ -550,7 +578,7 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 48');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 57');
     expect(release).toContain('pnpm run release:closure');
     const buildIndex = release.indexOf('pnpm run build');
     expect(buildIndex).toBeGreaterThanOrEqual(0);
@@ -675,7 +703,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 48', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 57', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {

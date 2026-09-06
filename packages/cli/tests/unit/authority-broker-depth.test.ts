@@ -4,16 +4,29 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
+import {
+  bindReleaseTaskProcessOptions,
+  matchDeclaredReleaseTaskProcess,
+  readTaskDescriptor,
+  sha256Hex,
+} from '../../src/services/check-runner/index.js';
+import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const originalArgv = [...process.argv];
 const originalStdout = process.stdout.write;
 let entries: readonly RegistryEntry[];
+const sourceFixtures: Array<ReturnType<typeof createSelfContainedRepositoryFixture>> = [];
+afterEach(() => {
+  for (const fixture of sourceFixtures.splice(0)) fixture.cleanup();
+});
 
 beforeAll(async () => {
   process.argv = [process.execPath, 'devai', '--help'];
@@ -114,6 +127,154 @@ function effect(
 }
 
 describe('authority broker production boundary depth', () => {
+  it('exposes only the exact consent admitted by the production authority boundary', () => {
+    const allowed = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'init',
+        'bind',
+        '--constitution',
+        '--as-role',
+        'architect',
+        '--write',
+      ],
+      entries,
+    );
+    expect(allowed).toBeUndefined();
+    expect(declaredInvocationAuthority()).toEqual({
+      actor: { kind: 'human', role: 'architect', declaration_source: 'cli-flag' },
+      consent: { write: true, allow_publish: false, experimental: false },
+    });
+
+    const refused = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'init',
+        'bind',
+        '--constitution',
+        '--as-role',
+        'engineer',
+        '--write',
+      ],
+      entries,
+    );
+    expect(refused).toMatchObject({ exit_code: 2 });
+    expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
+  it('admits only exact declared check tasks for stock release preflight execution', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['test-tasks.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const root = fixture.root;
+    const host = brokerAt(root, 'release preflight', 'inspector', [
+      process.execPath,
+      'devai',
+      'release',
+      'preflight',
+      '--request',
+      'request.json',
+      '--as-role',
+      'inspector',
+      '--write',
+    ]);
+    const descriptor = readTaskDescriptor(join(root, 'test-tasks.json'));
+    const task = descriptor.tasks.find(
+      (candidate) =>
+        JSON.stringify(candidate.argv) === JSON.stringify(['pnpm', 'run', 'devai:prepare']),
+    );
+    if (task === undefined) throw new Error('devai:prepare task fixture missing');
+    const identity = resolveTaskExecutable(root, 'pnpm');
+    const candidate = {
+      commit: fixture.commit,
+      tree: fixture.tree,
+    };
+    const options = bindReleaseTaskProcessOptions(
+      { cwd: realpathSync(root), shell: false },
+      {
+        candidate,
+        descriptor_digest: sha256Hex(descriptor),
+        task_policy_digest: 'a'.repeat(64),
+        node_id: task.nodeId,
+        executable: identity,
+        argv: task.argv,
+        cwd: task.cwd,
+      },
+    );
+    try {
+      expect(
+        matchDeclaredReleaseTaskProcess(root, {
+          kind: 'process',
+          symbol: 'spawnSync',
+          arguments: [identity.path, ['run', 'devai:prepare'], options],
+        }),
+      ).toMatchObject({ nodeId: task.nodeId });
+      expect(
+        host.scope.apply_effect(
+          effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare', '--extra'], { cwd: root, shell: false }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare'], { cwd: root, shell: true }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('admits no process execution for pure release preparation', () => {
+    const host = broker('release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    try {
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            [
+              'npm',
+              ['pack', '--ignore-scripts'],
+              { cwd: join(ROOT, 'packages/cli'), shell: false },
+            ],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('bootstraps only the exact installed-Constitution binding in an unbound adopter', () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-init-bind-bootstrap-'));
     const entry = entries.find((candidate) => candidate.name === 'init bind');

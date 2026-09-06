@@ -111,6 +111,10 @@ export class CheckCache {
     task: PlannedTask,
     dependencyResultDigests: Readonly<Record<string, string>>,
   ): CacheInspection {
+    // An ambient file check cannot re-prove a stopped protected namespace census. Such tasks
+    // still execute normally, but their old PASS is never reused as namespace-complete evidence.
+    if (task.outputContract.generated_namespaces !== undefined)
+      return { cacheState: 'execute', reason: 'protected-namespace-recapture-required' };
     const indexPath = join(this.#root, 'nodes', `${safeNodeId(task.nodeId)}.json`);
     if (!existsSync(indexPath)) return { cacheState: 'execute', reason: 'cache-miss' };
     let index: NodeIndex;

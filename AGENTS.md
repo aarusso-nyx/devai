@@ -6,7 +6,7 @@ development: human maintainers choose scope, review changes, and decide releases
 - Work in a dedicated branch or worktree and preserve unrelated user changes.
 - Treat `law/constitution.md`, current `law/policy/`, and current `law/schemas/` as
   product contracts. Do not widen effects, permissions, or write scopes implicitly.
-- Keep the public CLI at its approved RC action set. Recipes are host-invoked contracts,
+- Keep the public CLI at the approved action set in `law/policy/action-registry.json`. Recipes are host-invoked contracts,
   not CLI dispatchers, and deterministic behavior belongs in typed operations.
 - Run the smallest trustworthy checks affected by the change. Reuse fresh evidence for
   untouched areas; reserve full Vitest and coverage for explicit RC gates.

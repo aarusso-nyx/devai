@@ -32,11 +32,14 @@ interface PolicyBuildOptions {
   readonly descriptor: TaskDescriptor;
   readonly target: TaskTarget;
   readonly baseCommit?: string;
+  readonly releaseCandidate?: Readonly<{ commit: string; tree: string }>;
   readonly releaseRequiredNodes?: readonly string[];
   readonly releaseAffectedSelection?: boolean;
   readonly releaseTaskBindings?: Readonly<Record<string, unknown>>;
   readonly toolchain: Readonly<Record<string, string>>;
   readonly environment: Readonly<Record<string, string>>;
+  readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;
+  readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
   readonly cacheState: (
     task: Readonly<
       Pick<
@@ -267,6 +270,17 @@ function validateDescriptor(value: unknown): TaskDescriptor {
   return descriptor;
 }
 
+export function parseTaskDescriptor(value: unknown): TaskDescriptor {
+  try {
+    return validateDescriptor(value);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('CHECK_RUNNER_DESCRIPTOR:')) throw error;
+    throw new Error(
+      `CHECK_RUNNER_DESCRIPTOR: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 export function readTaskDescriptor(path: string): TaskDescriptor {
   if (!existsSync(path)) {
     throw new Error(
@@ -274,7 +288,7 @@ export function readTaskDescriptor(path: string): TaskDescriptor {
     );
   }
   try {
-    return validateDescriptor(JSON.parse(readFileSync(path, 'utf8')));
+    return parseTaskDescriptor(JSON.parse(readFileSync(path, 'utf8')));
   } catch (error) {
     if (
       error instanceof Error &&
@@ -436,6 +450,12 @@ function changedPaths(
 
 const HARNESS_MUTATED_PREFIXES = ['.devai/state/', 'record/', 'scratch/'] as const;
 
+const RELEASE_INPUT_PROJECTION = Object.freeze({
+  schemaVersion: '1.0.0' as const,
+  source: 'exact-candidate-tree' as const,
+  excludedPrefixes: Object.freeze([...HARNESS_MUTATED_PREFIXES].sort()),
+});
+
 function isHarnessMutatedPath(path: string): boolean {
   return HARNESS_MUTATED_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
@@ -565,10 +585,14 @@ function selectedNodeIds(
 
 export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   const { repoRoot, descriptor, target, toolchain, environment } = options;
-  const commit = gitText(repoRoot, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
-  assertCommit(repoRoot, commit, 'HEAD');
-  const tree = gitText(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`]).trim();
-  const clean = cleanStatus(repoRoot);
+  const repositoryState =
+    options.releaseCandidate === undefined
+      ? currentRepositoryState(repoRoot)
+      : exactCandidateRepositoryState(repoRoot, options.releaseCandidate);
+  const { commit, tree, clean } = repositoryState;
+  if (target === 'release' && !clean) {
+    throw new Error('CHECK_RELEASE_CANDIDATE_WORKTREE_MISMATCH');
+  }
   let changes: readonly string[] = [];
   if (target === 'affected' || target === 'release') {
     if (options.baseCommit === undefined) {
@@ -632,7 +656,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     }));
     const executableName = task.argv[0] ?? '';
     const protectedExecutable = taskExecutableFromToolchain(toolchain, executableName);
-    const executable = resolveTaskExecutable(repoRoot, executableName);
+    const executable =
+      options.resolveExecutable?.(executableName) ??
+      resolveTaskExecutable(repoRoot, executableName);
     if (
       protectedExecutable !== undefined &&
       (protectedExecutable.path !== executable.path ||
@@ -654,6 +680,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       environment: selectedEnvironment,
       outputContract: outputContracts.get(task.nodeId),
       ...(releaseBinding === undefined ? {} : { releaseBinding }),
+      ...(options.protectedExecutionIdentity === undefined
+        ? {}
+        : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
       inputs,
       dependencies,
     });
@@ -686,7 +715,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       return { ...planned, ...options.cacheState(planned) };
     });
   const taskPolicy: TaskPolicy = {
-    schemaVersion: '1.1.0',
+    // v1.1 stays byte-compatible for non-release checks. The canonical verifier
+    // accepts inputProjection only in the explicitly forward v1.2 release form.
+    schemaVersion: target === 'release' ? '1.2.0' : '1.1.0',
     repositoryId: descriptor.repositoryId,
     requiredNodes: tasks.map(({ nodeId, taskKey, dependencies, outputContract }) => ({
       nodeId,
@@ -694,6 +725,12 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       dependencies,
       outputContract,
     })),
+    ...(target === 'release' && {
+      inputProjection: {
+        ...RELEASE_INPUT_PROJECTION,
+        digest: sha256Hex(entries),
+      },
+    }),
   };
   return {
     schemaVersion: '1.0.0',
@@ -731,4 +768,23 @@ export function exactCommitFile(repoRoot: string, commit: string, path: string):
   } catch {
     throw new Error('CHECK_RELEASE_VERSION_SOURCE_UNREADABLE');
   }
+}
+
+export function exactCandidateRepositoryState(
+  repoRoot: string,
+  candidate: Readonly<{ commit: string; tree: string }>,
+): Readonly<{ commit: string; tree: string; clean: boolean }> {
+  const tree = exactCommitTree(repoRoot, candidate.commit);
+  if (tree !== candidate.tree) throw new Error('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
+  const candidateEntries = committedSnapshot(repoRoot, candidate.commit).filter(
+    (entry) => !isHarnessMutatedPath(entry.path),
+  );
+  const worktreeEntries = worktreeSnapshot(repoRoot).filter(
+    (entry) => !isHarnessMutatedPath(entry.path),
+  );
+  return {
+    commit: candidate.commit,
+    tree,
+    clean: sha256Hex(candidateEntries) === sha256Hex(worktreeEntries),
+  };
 }

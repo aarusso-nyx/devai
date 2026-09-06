@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: false
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
-  EXPECTED_ACTION_COUNT: 48
+  EXPECTED_ACTION_COUNT: 57
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   CANDIDATE_REF: ${{ github.event_name == 'workflow_dispatch' && (inputs.publish && inputs.release_tag || inputs.candidate_commit) || github.ref }}
 jobs:
@@ -107,7 +107,7 @@ jobs:
           }
           const provenancePath = join(verifierRoot, 'provenance.json');
           const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
-          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de') {
+          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '9f849f117fe1e460b5e3c647515f5ccbe783cbfb') {
             throw new Error('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
           }
           const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));
@@ -238,7 +238,7 @@ jobs:
           const ledger=Object.fromEntries(Object.entries(fields).map(([key,file])=>[key,createHash('sha256').update(readFileSync(root+'/'+file)).digest('hex')]));
           ledger.verifier_package='@aarusso-nyx/devai';
           ledger.verifier_package_version=process.env.VERIFIER_PACKAGE_VERSION;
-          ledger.verifier_source_commit='37e75a5c27569d4cb3fdb4a3dc97a140da4d78de';
+          ledger.verifier_source_commit='9f849f117fe1e460b5e3c647515f5ccbe783cbfb';
           ledger.policy_digest=process.env.POLICY_DIGEST;
           ledger.verifier_provenance_sha256=process.env.VERIFIER_PROVENANCE;
           console.log('ledger_json='+JSON.stringify(ledger));

@@ -70,16 +70,71 @@ interface CliResult {
 const ROLES = new Set<HumanRole>(['owner', 'architect', 'inspector', 'engineer', 'auditor']);
 const SESSION_ID = /^AUTH-SESSION-[A-Za-z0-9]{16,}$/u;
 /**
- * The human role the authority layer resolved for this invocation, from either
- * `--as-role` or a validated session. Handlers cannot read the declaration
- * themselves — it is stripped before dispatch — so anything that must attribute
- * work to a role reads it here rather than re-parsing argv and risking a
- * different answer than the one authority actually allowed.
+ * The human authority the pre-dispatch layer resolved for this invocation,
+ * from either `--as-role` or a validated session, together with the consent it
+ * admitted. Handlers cannot read the declaration themselves — it is stripped
+ * before dispatch — so anything that must attribute work or bind consent reads
+ * it here rather than re-parsing argv and risking a different answer than the
+ * one authority actually allowed.
  */
 let resolvedInvocationRole: HumanRole | undefined;
+let resolvedInvocationDeclarationSource: 'cli-flag' | 'session-state' | undefined;
+let resolvedInvocationConsent:
+  | Readonly<{
+      write: true;
+      allow_publish: boolean;
+      experimental: false;
+    }>
+  | undefined;
 
 export function declaredInvocationRole(): HumanRole | undefined {
   return resolvedInvocationRole;
+}
+
+export function declaredInvocationAuthority():
+  | Readonly<{
+      actor: Readonly<{
+        kind: 'human';
+        role: HumanRole;
+        declaration_source: 'cli-flag' | 'session-state';
+      }>;
+      consent: Readonly<{
+        write: true;
+        allow_publish: boolean;
+        experimental: false;
+      }>;
+    }>
+  | undefined {
+  return resolvedInvocationRole === undefined ||
+    resolvedInvocationDeclarationSource === undefined ||
+    resolvedInvocationConsent === undefined
+    ? undefined
+    : Object.freeze({
+        actor: Object.freeze({
+          kind: 'human',
+          role: resolvedInvocationRole,
+          declaration_source: resolvedInvocationDeclarationSource,
+        }),
+        consent: resolvedInvocationConsent,
+      });
+}
+
+function rememberResolvedInvocationAuthority(
+  role: HumanRole,
+  declarationSource: 'cli-flag' | 'session-state',
+  argv: readonly string[],
+): void {
+  // A stable action cannot acquire experimental consent. Keeping the context
+  // absent fails closed if a caller somehow routes that undeclared flag past
+  // command parsing instead of letting a handler reinterpret it.
+  if (argv.includes('--experimental')) return;
+  resolvedInvocationRole = role;
+  resolvedInvocationDeclarationSource = declarationSource;
+  resolvedInvocationConsent = Object.freeze({
+    write: true,
+    allow_publish: argv.includes('--publish'),
+    experimental: false,
+  });
 }
 
 let pendingHostScope: AuthorityHostEffectScope | undefined;
@@ -88,6 +143,35 @@ let pendingHostDryRun = false;
 let pendingSessionOperation: (() => unknown) | undefined;
 let pendingPolicyMaterialization: (() => unknown) | undefined;
 let pendingExactCommit: (() => void) | undefined;
+let invocationDisposalFailed = false;
+
+function guardedInvocationDisposal(dispose: () => void): () => void {
+  return () => {
+    try {
+      dispose();
+    } catch (error) {
+      invocationDisposalFailed = true;
+      throw error;
+    }
+  };
+}
+
+/** End one CLI invocation, including authorization followed by a parser failure.
+ * Clear every capability reference before disposal, even when disposal throws. */
+export function disposeCliInvocationAuthority(): void {
+  const dispose = pendingHostDispose;
+  pendingHostScope = undefined;
+  pendingHostDispose = undefined;
+  pendingHostDryRun = false;
+  pendingSessionOperation = undefined;
+  pendingPolicyMaterialization = undefined;
+  pendingExactCommit = undefined;
+  resolvedInvocationRole = undefined;
+  resolvedInvocationDeclarationSource = undefined;
+  resolvedInvocationConsent = undefined;
+  dispose?.();
+  if (invocationDisposalFailed) throw new Error('AUTHORITY_INVOCATION_DISPOSAL_FAILED');
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -576,7 +660,7 @@ function stageHostScope(
     bootstrap_policy: bootstrapPolicy,
   });
   pendingHostScope = dryRun ? Object.freeze({ ...broker.scope, effect: 'read' }) : broker.scope;
-  pendingHostDispose = broker.dispose;
+  pendingHostDispose = guardedInvocationDisposal(broker.dispose);
   pendingHostDryRun = dryRun;
   pendingSessionOperation = broker.session_operation;
   pendingPolicyMaterialization = broker.policy_materialization;
@@ -678,6 +762,7 @@ export function attachAuthorityCommandBoundaries(
         scope.action_id !== entry.name ||
         scope.effect !== (dryRun ? 'read' : invocationEntry.effects)
       ) {
+        dispose?.();
         throw new Error('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
       }
       try {
@@ -720,6 +805,9 @@ export function authorizeCliArgv(
   argv: readonly string[],
   entries: readonly RegistryEntry[],
 ): CliResult | undefined {
+  resolvedInvocationRole = undefined;
+  resolvedInvocationDeclarationSource = undefined;
+  resolvedInvocationConsent = undefined;
   if (argv.some((value) => value === '--help' || value === '-h')) {
     return undefined;
   }
@@ -769,7 +857,7 @@ export function authorizeCliArgv(
       }
       const derived = createPostMergeHostScope(targetRoot(entry, argv), verified.mergeSha);
       pendingHostScope = derived.scope;
-      pendingHostDispose = derived.dispose;
+      pendingHostDispose = guardedInvocationDisposal(derived.dispose);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const code =
@@ -814,7 +902,7 @@ export function authorizeCliArgv(
       });
       const derived = createTrackingReconcileScope(repoRoot, round);
       pendingHostScope = derived.scope;
-      pendingHostDispose = derived.dispose;
+      pendingHostDispose = guardedInvocationDisposal(derived.dispose);
       pendingHostDryRun = false;
     } catch (error) {
       const code =
@@ -967,7 +1055,6 @@ export function authorizeCliArgv(
   }
   const role =
     asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
-  resolvedInvocationRole = role as HumanRole | undefined;
   if (!role || !routeRoles(entry, argv).includes(role as HumanRole)) {
     return renderAuthorityResult(
       taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {
@@ -1035,6 +1122,11 @@ export function authorizeCliArgv(
       if (code === undefined) throw error;
       return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
     }
+    rememberResolvedInvocationAuthority(
+      role as HumanRole,
+      sessionId === undefined ? 'cli-flag' : 'session-state',
+      argv,
+    );
     return undefined;
   }
   try {
@@ -1053,6 +1145,11 @@ export function authorizeCliArgv(
       : 'refused';
     return renderAuthorityResult(taggedAuthorityFailure(category, code, entry, argv), format);
   }
+  rememberResolvedInvocationAuthority(
+    role as HumanRole,
+    sessionId === undefined ? 'cli-flag' : 'session-state',
+    argv,
+  );
   return undefined;
 }
 

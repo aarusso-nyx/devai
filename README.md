@@ -4,9 +4,11 @@ DEVAI is a human-supervised control harness for AI-assisted software development
 It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
-The DEVAI 1.4 product is one publishable package,
-`@aarusso-nyx/devai`. Its current machine catalog contains **48 actions**, **59
-sensors**, and **7 host-invoked recipes**. The ordinary public CLI is organized
+DEVAI ships as one package, `@aarusso-nyx/devai`; the published installation
+below remains pinned to **1.4.5**. This source tree's machine catalog contains
+**57 actions** (32 stable, 14 preview, 11 internal), **59 sensors**, and
+**7 host-invoked recipes**. These source contracts do not claim a published 1.5
+release or a fully operational release lifecycle. The ordinary public CLI is organized
 into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
 `evidence`, `release`, and `triage`. `task` and `catalog` are internal plumbing exposed by
 `--all` for maintainers and automation.
@@ -48,3 +50,9 @@ contains only the environment-variable reference and never the credential.
 
 Human maintainers choose scope, review changes, and authorize releases. No command
 or evidence record substitutes for that decision.
+
+DEVAI may verify its own source through human-invoked, explicitly permitted
+self-dogfood checks under [the self-dogfood policy](law/policy/self-dogfood.json).
+That context permits no autonomous or scheduled work, role widening, remote
+effects, or self-granted readiness. A passing check never authorizes merge,
+publication, or deployment.

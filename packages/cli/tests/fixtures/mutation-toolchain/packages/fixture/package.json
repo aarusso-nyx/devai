@@ -1,0 +1,6 @@
+{
+  "name": "@devai-toolchain/fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module"
+}

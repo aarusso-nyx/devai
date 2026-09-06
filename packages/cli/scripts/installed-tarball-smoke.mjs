@@ -3,27 +3,34 @@
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
+const expectedActionCount = JSON.parse(
+  readFileSync(join(packageRoot, 'dist/law/policy/action-registry.json'), 'utf8'),
+).counts.total;
 const smokeRoot = mkdtempSync(join(tmpdir(), 'devai installed çandidate-'));
 const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
 const authorizationRoot = join(smokeRoot, 'authorization-project');
+let smokePassed = false;
 const secondaryBins = [
   'devai-evidence-policy',
   'devai-evidence-verify',
@@ -61,6 +68,12 @@ function filesUnder(root) {
 
 function digest(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function runInstalledModuleCheck(name, source, cwd = projectRoot) {
+  const path = join(projectRoot, `installed-host-${name}.mjs`);
+  writeFileSync(path, `${source}\n`);
+  return run(process.execPath, [path], cwd);
 }
 
 try {
@@ -116,7 +129,7 @@ try {
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
 
   const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
-  if (unboundCatalog?.result?.value?.length !== 48) {
+  if (unboundCatalog?.result?.value?.length !== expectedActionCount) {
     throw new Error('INSTALLED_UNBOUND_CATALOG_INVALID');
   }
   const unboundPlan = JSON.parse(
@@ -238,7 +251,7 @@ try {
 
   const envelope = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
   const actions = envelope?.result?.value;
-  if (!Array.isArray(actions) || actions.length !== 48) {
+  if (!Array.isArray(actions) || actions.length !== expectedActionCount) {
     throw new Error(`INSTALLED_CATALOG_INVALID:${String(actions?.length)}`);
   }
 
@@ -1096,11 +1109,17 @@ try {
   );
   const verifierFiles = filesUnder(verifierRoot)
     .filter((path) => !path.endsWith('/provenance.json'))
+    .map((path) => relative(verifierRoot, path))
     .sort();
+  const declaredVerifierFiles = verifierProvenance.files?.map((entry) => entry.path).sort();
   if (
-    verifierProvenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de' ||
-    verifierProvenance.files?.length !== 21 ||
-    verifierFiles.length !== 21
+    verifierProvenance.sourceCommit !== '9f849f117fe1e460b5e3c647515f5ccbe783cbfb' ||
+    digest(join(verifierRoot, 'provenance.json')) !==
+      'f61cccd8a0c0c5e7020cc6055f254c1a5ab56388fc9fc220ea76b1f9dc9a196c' ||
+    verifierProvenance.files?.length !== 26 ||
+    verifierFiles.length !== 26 ||
+    JSON.stringify(verifierFiles) !== JSON.stringify(declaredVerifierFiles) ||
+    verifierFiles.some((path) => path.startsWith('test/'))
   ) {
     throw new Error('INSTALLED_VERIFIER_POPULATION_INVALID');
   }
@@ -1109,6 +1128,216 @@ try {
       throw new Error(`INSTALLED_VERIFIER_DIGEST_INVALID:${String(entry.path)}`);
     }
   }
+
+  const releaseHostModule = '@aarusso-nyx/devai/release-host';
+  const hostBin = readFileSync(join(installedPackage, 'dist/runtime/index/bin.js'), 'utf8');
+  if (!hostBin.includes("import { startDevaiCli } from './release-host.js'")) {
+    throw new Error('INSTALLED_RELEASE_HOST_THIN_BIN_INVALID');
+  }
+  const inert = JSON.parse(
+    runInstalledModuleCheck(
+      'inert-import',
+      `
+        const before = { argv: [...process.argv], cwd: process.cwd(), exitCode: process.exitCode };
+        await import(${JSON.stringify(releaseHostModule)});
+        const after = { argv: [...process.argv], cwd: process.cwd(), exitCode: process.exitCode };
+        if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('INSTALLED_RELEASE_HOST_IMPORT_EFFECT');
+        process.stdout.write(JSON.stringify({ inert: true }));
+      `,
+    ),
+  );
+  if (inert.inert !== true) throw new Error('INSTALLED_RELEASE_HOST_IMPORT_INVALID');
+
+  const hostLifecycle = JSON.parse(
+    runInstalledModuleCheck(
+      'lifecycle',
+      `
+        import * as host from ${JSON.stringify(releaseHostModule)};
+        const first = host.invokeDevaiCli(['catalog', 'actions']);
+        const concurrent = await host.invokeDevaiCli(['--version']).then(() => null, (error) => error.message);
+        let adapterMutation;
+        try { host.installReleaseLifecycleCommandAdapters({}); } catch (error) { adapterMutation = error.message; }
+        const firstResult = await first;
+        const malformed = await host.invokeDevaiCli(['catalog', 'actions', '--malformed']);
+        const recovered = await host.invokeDevaiCli(['--version']);
+        if (firstResult.exit_code !== 0 || concurrent !== 'release-host-invocation-in-progress' || adapterMutation !== 'release-host-invocation-in-progress' || malformed.exit_code !== 2 || recovered.exit_code !== 0) {
+          throw new Error('INSTALLED_RELEASE_HOST_LIFECYCLE_INVALID');
+        }
+        process.stdout.write(JSON.stringify({ concurrent, adapterMutation, recovered: recovered.exit_code }));
+      `,
+    ),
+  );
+  if (
+    hostLifecycle.concurrent !== 'release-host-invocation-in-progress' ||
+    hostLifecycle.adapterMutation !== 'release-host-invocation-in-progress' ||
+    hostLifecycle.recovered !== 0
+  ) {
+    throw new Error('INSTALLED_RELEASE_HOST_LIFECYCLE_RESULT_INVALID');
+  }
+
+  const cwdDrift = JSON.parse(
+    runInstalledModuleCheck(
+      'cwd-drift',
+      `
+        import * as host from ${JSON.stringify(releaseHostModule)};
+        const first = await host.invokeDevaiCli(['--version']);
+        process.chdir('..');
+        const drift = await host.invokeDevaiCli(['--version']).then(() => null, (error) => error.message);
+        if (first.exit_code !== 0 || drift !== 'release-host-working-directory-changed') throw new Error('INSTALLED_RELEASE_HOST_CWD_DRIFT_INVALID');
+        process.stdout.write(JSON.stringify({ drift }));
+      `,
+    ),
+  );
+  if (cwdDrift.drift !== 'release-host-working-directory-changed') {
+    throw new Error('INSTALLED_RELEASE_HOST_CWD_DRIFT_RESULT_INVALID');
+  }
+
+  const typeConsumer = join(projectRoot, 'installed-release-host-consumer.mts');
+  writeFileSync(
+    typeConsumer,
+    `import { invokeDevaiCli, type MutationVerifierProvenanceV21, type ReleaseLifecycleCommandAdapters } from ${JSON.stringify(releaseHostModule)};
+const invoke: typeof invokeDevaiCli = invokeDevaiCli;
+const provenance: MutationVerifierProvenanceV21 | undefined = undefined;
+const adapters: ReleaseLifecycleCommandAdapters | undefined = undefined;
+void invoke;
+void provenance;
+void adapters;
+`,
+  );
+  run(join(resolve(packageRoot, '../..'), 'node_modules/.bin/tsc'), [
+    '--noEmit',
+    '--module',
+    'NodeNext',
+    '--moduleResolution',
+    'NodeNext',
+    '--target',
+    'ES2022',
+    typeConsumer,
+  ]);
+
+  run(process.execPath, [
+    join(packageRoot, 'tests/fixtures/release-host-bootstrap-installed-probe.mjs'),
+    installedPackage,
+    resolve(packageRoot, tarball),
+  ]);
+
+  const mutationGate = JSON.parse(
+    runInstalledModuleCheck(
+      'mutation-gate',
+      `
+        import { createHash } from 'node:crypto';
+        import { readFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        import * as host from ${JSON.stringify(releaseHostModule)};
+        const canonical = (value) => Array.isArray(value) ? '[' + value.map(canonical).join(',') + ']' : value && typeof value === 'object' ? '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}' : JSON.stringify(value);
+        const policy = JSON.parse(readFileSync(join(${JSON.stringify(installedPackage)}, 'dist/law/policy/mutation-evidence-v2.json'), 'utf8'));
+        const contract = {
+          schemaVersion: '2.1.0', kind: 'mutation-report-set-v2', expectedPackageCount: 1,
+          summaryPath: 'mutation/summary.json', semanticReceiptPath: 'mutation/semantic-receipt.json',
+          releasePlanReceiptDigest: 'c'.repeat(64), releaseProfileDigest: 'd'.repeat(64),
+          policyDigest: createHash('sha256').update(canonical(policy)).digest('hex'),
+          packages: [{ packageName: '@fixture/package', workspace: 'packages/package', requirement: 'not-required', reasonCode: 'no-mutatable-production-surface' }],
+          paths: ['mutation/summary.json', 'mutation/semantic-receipt.json'],
+        };
+        const candidate = { releaseUnit: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) };
+        const composed = await host.composeMutationEvidenceV21({ contract, candidate, packages: [{ disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' }] });
+        const artifacts = new Map(composed.artifacts.map((entry) => [entry.path, entry.bytes]));
+        const verified = await host.verifyMutationEvidenceV21(contract, (path) => artifacts.get(path), { releaseUnit: candidate.releaseUnit, candidateCommit: candidate.commit, candidateTree: candidate.tree, mutationVerificationMode: 'offline' });
+        if (composed.summary.verdict !== 'not-applicable' || composed.summary.passed !== false || verified.verdict !== 'not-applicable' || verified.passed !== false) throw new Error('INSTALLED_MUTATION_NOT_REQUIRED_ESCALATED');
+        process.stdout.write(JSON.stringify({ artifacts: composed.artifacts.length, verdict: verified.verdict, passed: verified.passed }));
+      `,
+    ),
+  );
+  if (
+    mutationGate.artifacts !== 2 ||
+    mutationGate.verdict !== 'not-applicable' ||
+    mutationGate.passed !== false
+  ) {
+    throw new Error('INSTALLED_MUTATION_GATE_INVALID');
+  }
+
+  const probeTemplate = join(smokeRoot, 'installed-host-probe-template');
+  cpSync(installedPackage, probeTemplate, { recursive: true, dereference: true });
+  const probeRoot = join(installedPackage, '.host-probes');
+  const runHostProbe = (name, mutate) => {
+    const probePackage = join(probeRoot, name);
+    mkdirSync(probePackage, { recursive: true });
+    cpSync(probeTemplate, probePackage, { recursive: true, dereference: true });
+    mutate(probePackage);
+    const result = JSON.parse(
+      runInstalledModuleCheck(
+        `probe-${name}`,
+        `
+          import { pathToFileURL } from 'node:url';
+          import { join } from 'node:path';
+          const host = await import(pathToFileURL(join(${JSON.stringify(probePackage)}, 'dist/runtime/index/release-host.js')).href);
+          const outcome = await host.finalizeMutationEvidenceV21({}).then(() => null, (error) => error.code ?? error.message);
+          if (outcome !== 'MUTATION_VENDOR_PROVENANCE_MISMATCH') throw new Error('INSTALLED_MUTATION_PROBE_ACCEPTED:' + outcome);
+          process.stdout.write(JSON.stringify({ outcome }));
+        `,
+      ),
+    );
+    if (result.outcome !== 'MUTATION_VENDOR_PROVENANCE_MISMATCH') {
+      throw new Error(`INSTALLED_MUTATION_PROBE_RESULT_INVALID:${name}`);
+    }
+  };
+  runHostProbe('policy', (probePackage) =>
+    writeFileSync(join(probePackage, 'dist/law/policy/mutation-evidence-v2.json'), '{}\n'),
+  );
+  runHostProbe('manifest', (probePackage) =>
+    writeFileSync(join(probePackage, 'dist/runtime/evidence-verification/provenance.json'), '{}\n'),
+  );
+  runHostProbe('missing', (probePackage) =>
+    rmSync(join(probePackage, 'dist/runtime/evidence-verification/src/mutation-v21.js')),
+  );
+  runHostProbe('extra', (probePackage) =>
+    writeFileSync(
+      join(probePackage, 'dist/runtime/evidence-verification/src/unapproved.js'),
+      'export {};\n',
+    ),
+  );
+  runHostProbe('symlink-file', (probePackage) => {
+    const file = join(probePackage, 'dist/runtime/evidence-verification/src/mutation-v21.js');
+    rmSync(file);
+    symlinkSync('artifact-safety.js', file);
+  });
+  runHostProbe('symlink-ancestor', (probePackage) => {
+    const source = join(probePackage, 'dist/runtime/evidence-verification/src');
+    renameSync(source, `${source}-real`);
+    symlinkSync(`${source}-real`, source);
+  });
+  const racePackage = join(probeRoot, 'load-race');
+  mkdirSync(racePackage, { recursive: true });
+  cpSync(probeTemplate, racePackage, { recursive: true, dereference: true });
+  const race = JSON.parse(
+    runInstalledModuleCheck(
+      'probe-load-race',
+      `
+        import { writeFileSync } from 'node:fs';
+        import { createRequire, syncBuiltinESMExports } from 'node:module';
+        import { join } from 'node:path';
+        import { pathToFileURL } from 'node:url';
+        const require = createRequire(import.meta.url);
+        const module = require('node:module');
+        const originalRegisterHooks = module.registerHooks;
+        module.registerHooks = (hooks) => {
+          const registration = originalRegisterHooks(hooks);
+          writeFileSync(join(${JSON.stringify(racePackage)}, 'dist/runtime/evidence-verification/src/mutation-v21.js'), 'globalThis.__devaiMutationRaceSentinel = true; throw new Error("unverified code executed");\\n');
+          return registration;
+        };
+        syncBuiltinESMExports();
+        const host = await import(pathToFileURL(join(${JSON.stringify(racePackage)}, 'dist/runtime/index/release-host.js')).href);
+        const outcome = await host.finalizeMutationEvidenceV21({}).then(() => null, (error) => error.code ?? error.message);
+        if (outcome !== 'MUTATION_VENDOR_PROVENANCE_MISMATCH' || globalThis.__devaiMutationRaceSentinel === true) throw new Error('INSTALLED_MUTATION_LOAD_RACE_ACCEPTED:' + outcome);
+        process.stdout.write(JSON.stringify({ outcome, executed: globalThis.__devaiMutationRaceSentinel === true }));
+      `,
+    ),
+  );
+  if (race.outcome !== 'MUTATION_VENDOR_PROVENANCE_MISMATCH' || race.executed !== false) {
+    throw new Error('INSTALLED_MUTATION_LOAD_RACE_RESULT_INVALID');
+  }
+  rmSync(probeRoot, { recursive: true, force: true });
+
   const requiredAssets = [
     'dist/law/policy/action-registry.json',
     'dist/law/policy/sensor-registry.json',
@@ -1183,7 +1412,7 @@ try {
     existsSync(join(projectRoot, '.agents/skills/devai-assess')) ||
     existsSync(join(projectRoot, '.devai')) ||
     JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']))?.result?.value?.length !==
-      48
+      expectedActionCount
   ) {
     throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }
@@ -1208,6 +1437,8 @@ try {
       runtime_dependencies: dependencyNames.sort(),
     }) + '\n',
   );
+  smokePassed = true;
 } finally {
-  rmSync(smokeRoot, { recursive: true, force: true });
+  if (smokePassed) rmSync(smokeRoot, { recursive: true, force: true });
+  else process.stderr.write(`Installed smoke fixture preserved: ${smokeRoot}\n`);
 }
