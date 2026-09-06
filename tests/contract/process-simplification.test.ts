@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdtempSync,
   readFileSync,
+  readdirSync,
   writeFileSync,
   rmSync,
   mkdirSync,
@@ -213,11 +214,20 @@ describe('early prerequisites and evidence transport', () => {
     expect(() => prerequisites.assertFresh(previous, { ...previous, ok: false })).toThrow();
   });
   it('exercises archive safety, integrity, private transport and no fallback', () => {
-    const result = spawnSync('python3', ['-m', 'unittest', '-v', 'test_evidence_transport.py'], {
-      cwd: join(root, 'scripts/process'),
-      encoding: 'utf8',
-    });
+    const pythonRoot = temporary();
+    const sourceFiles = ['evidence_transport.py', 'test_evidence_transport.py'];
+    for (const name of sourceFiles)
+      writeFileSync(join(pythonRoot, name), readFileSync(join(root, 'scripts/process', name)));
+    const result = spawnSync(
+      'python3',
+      ['-B', '-m', 'unittest', '-v', 'test_evidence_transport.py'],
+      {
+        cwd: pythonRoot,
+        encoding: 'utf8',
+      },
+    );
     expect(result.status, result.stderr).toBe(0);
+    expect(readdirSync(pythonRoot).sort()).toEqual(sourceFiles);
   });
 });
 
@@ -229,6 +239,7 @@ describe('promotion command with remote fixtures', () => {
     mkdirSync(bin);
     const zip = (source: string, output: string) =>
       execFileSync('python3', [
+        '-B',
         '-c',
         "import pathlib,sys,zipfile; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],'w'); [z.write(p,p.name) for p in sorted(root.iterdir())]; z.close()",
         source,

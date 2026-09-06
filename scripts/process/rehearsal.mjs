@@ -165,6 +165,7 @@ function extractZip(data, directory) {
   const result = spawnSync(
     'python3',
     [
+      '-B',
       '-c',
       `
 import io, os, pathlib, sys, zipfile

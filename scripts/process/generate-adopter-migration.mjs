@@ -70,6 +70,7 @@ function main() {
   // executing its renderer. Extraction, package hooks and source imports are absent.
   execute([
     'python3',
+    '-B',
     '-c',
     `
 import pathlib, sys
@@ -108,6 +109,7 @@ for name, data in files.items():
   // The Inspector still compares provenance against this authenticated provider.
   const provenance = execute([
     'python3',
+    '-B',
     '-c',
     `
 import pathlib, sys

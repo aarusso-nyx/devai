@@ -44,6 +44,7 @@ it('authenticates and renders deterministic local migration files without editin
   writeFileSync(join(provider, 'dist/runtime/evidence-verification/provenance.json'), provenance);
   const makeArchive = (source: string, output: string) =>
     execFileSync('python3', [
+      '-B',
       '-c',
       "import pathlib,sys; sys.path.insert(0,sys.argv[1]); from evidence_transport import archive,directory_files; pathlib.Path(sys.argv[3]).write_bytes(archive({'package/'+k:v for k,v in directory_files(sys.argv[2]).items()}))",
       join(root, 'scripts/process'),
