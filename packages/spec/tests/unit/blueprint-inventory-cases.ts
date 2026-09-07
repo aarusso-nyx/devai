@@ -247,6 +247,52 @@ describe('inventory invariant candidates', () => {
     expect(result.summary.unread_inputs).toHaveLength(3);
   });
 
+  it('keeps every candidate while the original sensor findings remain present', () => {
+    const repo = root();
+    prepareInputs(repo);
+    const options = {
+      repoRoot: repo,
+      coverageBodyPath: join(repo, 'coverage.json'),
+      dataHandlingBodyPath: join(repo, 'handling.json'),
+      depGraphBodyPath: join(repo, 'graph.json'),
+      rbacBodyPath: join(repo, 'rbac.json'),
+      now: NOW,
+      outDir: join(repo, 'candidates'),
+      dryRun: true,
+    };
+    const suggested = suggestInvariants(options);
+    for (const candidate of suggested.candidates)
+      write(repo, `candidates/${candidate.id}.json`, candidate);
+    expect(gcStaleInvariantCandidates(options)).toEqual({
+      scanned: 5,
+      stale: 0,
+      kept: 5,
+      evidence: [],
+      evidence_log_path: null,
+    });
+    write(repo, 'rbac.json', { unmapped: { endpointsWithoutRole: [] } });
+    write(repo, 'handling.json', {
+      tables: [
+        {
+          name: 'users',
+          columns: [
+            { name: 'email', pii_class: 'contact', legal_basis: 'consent', retention: 'P1Y' },
+          ],
+        },
+      ],
+    });
+    write(repo, 'graph.json', {
+      graph: { 'packages/a/src/a.ts': ['packages/a/internal/allowed.ts', 'packages/b/public.ts'] },
+    });
+    const resolved = gcStaleInvariantCandidates(options);
+    expect(resolved).toMatchObject({ scanned: 5, stale: 3, kept: 2, evidence_log_path: null });
+    expect(resolved.evidence.map((item) => item.category).sort()).toEqual([
+      'forbidden_edge',
+      'unbound_endpoint',
+      'unlabeled_pii_column',
+    ]);
+  });
+
   it('classifies stale, live, malformed, and unavailable candidates during GC', () => {
     const repo = root();
     prepareInputs(repo);

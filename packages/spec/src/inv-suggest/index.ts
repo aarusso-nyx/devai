@@ -501,10 +501,22 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
       )
     : null;
   const rbac = existsSync(rbacPath)
-    ? readJson<{ endpointsWithoutRole?: readonly { id?: string }[] }>(rbacPath)
+    ? readJson<{
+        unmapped?: { endpointsWithoutRole?: readonly string[] };
+        endpointsWithoutRole?: readonly { id?: string }[];
+      }>(rbacPath)
     : null;
   const dh = existsSync(dataHandlingPath)
     ? readJson<{
+        tables?: readonly {
+          name: string;
+          columns: readonly {
+            name: string;
+            pii_class?: string;
+            legal_basis?: string;
+            retention?: string;
+          }[];
+        }[];
         pii?: readonly {
           table?: string;
           column?: string;
@@ -514,29 +526,56 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
       }>(dataHandlingPath)
     : null;
   const dg = existsSync(depGraphPath)
-    ? readJson<{ forbiddenEdges?: readonly { from?: string; to?: string }[] }>(depGraphPath)
+    ? readJson<{
+        graph?: Record<string, readonly string[]>;
+        forbiddenEdges?: readonly { from?: string; to?: string }[];
+      }>(depGraphPath)
     : null;
 
   const unmappedRoutes = new Set(cov?.unmapped?.routes ?? []);
   const unmappedEndpoints = new Set(cov?.unmapped?.endpoints ?? []);
   const unboundEndpoints = new Set(
-    (rbac?.endpointsWithoutRole ?? [])
-      .map((e) => e.id)
-      .filter((s): s is string => typeof s === 'string'),
+    rbac?.unmapped?.endpointsWithoutRole ??
+      (rbac?.endpointsWithoutRole ?? [])
+        .map((e) => e.id)
+        .filter((s): s is string => typeof s === 'string'),
   );
   const unlabeledCols = new Set(
-    (dh?.pii ?? [])
-      .filter(
-        (c) =>
-          c.legal_basis === undefined ||
-          c.legal_basis === null ||
-          c.retention === undefined ||
-          c.retention === null,
-      )
-      .map((c) => `${c.table ?? ''}.${c.column ?? ''}`),
+    dh?.tables !== undefined
+      ? dh.tables.flatMap((table) =>
+          table.columns
+            .filter(
+              (column) =>
+                column.pii_class !== undefined &&
+                column.pii_class !== '' &&
+                (!column.legal_basis || !column.retention),
+            )
+            .map((column) => `${table.name}.${column.name}`),
+        )
+      : (dh?.pii ?? [])
+          .filter(
+            (c) =>
+              c.legal_basis === undefined ||
+              c.legal_basis === null ||
+              c.retention === undefined ||
+              c.retention === null,
+          )
+          .map((c) => `${c.table ?? ''}.${c.column ?? ''}`),
   );
   const forbiddenEdges = new Set(
-    (dg?.forbiddenEdges ?? []).map((e) => `${e.from ?? ''} -> ${e.to ?? ''}`),
+    dg?.graph !== undefined
+      ? Object.entries(dg.graph).flatMap(([from, targets]) =>
+          targets
+            .filter(
+              (to) =>
+                isInternalImport(to) &&
+                packageOf(from) !== null &&
+                packageOf(to) !== null &&
+                packageOf(from) !== packageOf(to),
+            )
+            .map((to) => `${from} -> ${to}`),
+        )
+      : (dg?.forbiddenEdges ?? []).map((e) => `${e.from ?? ''} -> ${e.to ?? ''}`),
   );
 
   let entries: string[];
