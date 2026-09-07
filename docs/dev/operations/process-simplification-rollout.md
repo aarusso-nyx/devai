@@ -324,3 +324,32 @@ protected-field updates, task executed/reused counts and durations, rehearsal ru
 artifact/manifest digests and publication `buildInvocations: 0`. Do not equate fixture tests with
 live protected verification. External rollout and publication remain pending until separately
 authorized and actually demonstrated.
+
+### Installed export verification command
+
+Run `node scripts/process/installed-export-command.mjs /absolute/private-controls.json`
+from approved repository process controls. The configuration must be a private regular
+file (mode 0600); it is operator input, never a member of the evidence bundle.
+
+The command accepts `seed`, `provision`, and `verification` control objects. `seed`
+contains an external `root`, the untrusted `candidateRoot`, and independently approved
+SHA-256 `members` pins for exactly `package.json`, `host/provision-package.mjs`, and
+`index/release-host-bootstrap.js`. The package file is exactly `{"type":"module"}`
+followed by a newline. Copy the other two files from the independently reviewed host
+control artifact. Do not compute approval pins from downloaded candidate evidence.
+No other seed members or linked files are accepted.
+
+`provision` is the installed `provisionReleaseHostPackage` control object: approved
+archive path and expected package identity, private external destination parent,
+pinned tar executable, and resource limits. `verification` supplies the existing
+`verifyInstalledExport` request, approved DAG control, private transport/work paths,
+and independently bound expected identities, policy, and trust. The command supplies
+the provisioned host itself. For DEVAI, `mutationInputPlanPath` identifies the plan
+whose digest and exact ten-package inputs the verifier checks against protected
+expectations. Ordinary RC evidence remains a separate required check.
+
+Success prints only the receipt ID, digest, and verdict. Failure prints a generic
+message; preserve private work for diagnosis. This command does not authorize its
+control pins, install protected settings, or establish release readiness by itself.
+Protected workflow activation still requires approved host/DAG identities and the
+mandatory export check to be wired alongside ordinary RC verification.
