@@ -910,7 +910,7 @@ function unauthorizedMutatorCalls(
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
       const symbol = ts.isIdentifier(expression)
-        ? expression.text
+        ? (importedNames.get(expression.text) ?? expression.text)
         : ts.isPropertyAccessExpression(expression)
           ? expression.name.text
           : undefined;
