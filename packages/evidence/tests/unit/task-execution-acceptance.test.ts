@@ -325,3 +325,135 @@ describe('task-execution evidence acceptance', () => {
     }
   });
 });
+
+const agentExecutor = {
+  kind: 'agent',
+  registry_id: 'fixture:model',
+  runtime: 'fixture-runtime',
+  model: 'model',
+  effort: 'high',
+  recipe_name: 'fixture-recipe',
+  recipe_variant: 'run',
+} as const;
+function exactAgentTask(overrides: Record<string, unknown> = {}) {
+  return task('TASK-EXACT', {
+    ...agentExecutor,
+    prompt_composition_id: 'PROMPT-EXACT',
+    selection: { mode: 'exact', registry_id: agentExecutor.registry_id },
+    ...overrides,
+  });
+}
+function agentFacts(overrides: Partial<TaskExecutionEvidenceFacts> = {}) {
+  return facts('TEE-EXACT', agentExecutor, {
+    selection: {
+      mode: 'exact',
+      considered_registry_ids: [agentExecutor.registry_id],
+      selected_registry_id: agentExecutor.registry_id,
+      rejection_codes: [],
+      fallback: false,
+      fallback_reason: null,
+    },
+    prompt: { prompt_composition_id: 'PROMPT-EXACT', prompt_sha256: 'e'.repeat(64) },
+    usage: { input_tokens: 10, output_tokens: 5 },
+    cost: { amount: 0.01, currency: 'USD', source: 'provider-reported' },
+    ...overrides,
+  });
+}
+
+describe('independent exact agent execution bindings', () => {
+  it.each(['runtime', 'model', 'effort'] as const)('refuses substituted %s', (field) => {
+    expect(() =>
+      buildTaskExecutionEvidence(
+        exactAgentTask(),
+        agentFacts({
+          resolved_executor: { ...agentExecutor, [field]: 'substituted' },
+        }),
+        PASS_VALIDATOR,
+      ),
+    ).toThrow(
+      'TASK_EXECUTION_EVIDENCE_EXACT_SUBSTITUTION: exact selection changed requested runtime, model, or effort',
+    );
+  });
+  it.each(['recipe_name', 'recipe_variant'] as const)('refuses substituted %s', (field) => {
+    expect(() =>
+      buildTaskExecutionEvidence(
+        exactAgentTask(),
+        agentFacts({
+          resolved_executor: { ...agentExecutor, [field]: 'substituted' },
+        }),
+        PASS_VALIDATOR,
+      ),
+    ).toThrow(
+      'TASK_EXECUTION_EVIDENCE_RECIPE_MISMATCH: resolved recipe identity differs from the immutable request',
+    );
+  });
+  it.each([undefined, null, [], 'exact'])(
+    'refuses missing or malformed selection %j',
+    (selection) => {
+      expect(() =>
+        buildTaskExecutionEvidence(exactAgentTask({ selection }), agentFacts(), PASS_VALIDATOR),
+      ).toThrow('TASK_EXECUTION_EVIDENCE_SELECTION_MISMATCH: agent task has no selection contract');
+    },
+  );
+  it.each([
+    { mode: 'not-applicable' as const },
+    { selected_registry_id: 'other' },
+    { considered_registry_ids: ['other'] },
+  ])('refuses independently inconsistent selection evidence %j', (changed) => {
+    expect(() =>
+      buildTaskExecutionEvidence(
+        exactAgentTask(),
+        agentFacts({
+          selection: { ...agentFacts().selection, ...changed },
+        }),
+        PASS_VALIDATOR,
+      ),
+    ).toThrow('TASK_EXECUTION_EVIDENCE_SELECTION_MISMATCH');
+  });
+  it.each([
+    { considered_registry_ids: [agentExecutor.registry_id, 'other'] },
+    { fallback: true },
+    { fallback_reason: 'substituted model' },
+  ])('refuses hidden substitution in exact selection %j', (changed) => {
+    expect(() =>
+      buildTaskExecutionEvidence(
+        exactAgentTask(),
+        agentFacts({
+          selection: { ...agentFacts().selection, ...changed },
+        }),
+        PASS_VALIDATOR,
+      ),
+    ).toThrow(
+      'TASK_EXECUTION_EVIDENCE_EXACT_SUBSTITUTION: exact selection must resolve only the exact requested registry identity',
+    );
+  });
+  it.each([NA, { prompt_composition_id: 'OTHER', prompt_sha256: 'e'.repeat(64) }])(
+    'refuses unbound prompt composition %j',
+    (prompt) => {
+      expect(() =>
+        buildTaskExecutionEvidence(exactAgentTask(), agentFacts({ prompt }), PASS_VALIDATOR),
+      ).toThrow(
+        'TASK_EXECUTION_EVIDENCE_PROMPT_MISMATCH: agent evidence must bind the exact requested prompt composition',
+      );
+    },
+  );
+  it('allows exactly equal start and completion timestamps', () => {
+    const evidence = buildTaskExecutionEvidence(
+      exactAgentTask(),
+      agentFacts({ completed_at: agentFacts().started_at }),
+      PASS_VALIDATOR,
+    );
+    expect(evidence.started_at).toBe(evidence.completed_at);
+  });
+  it.each(['started_at', 'completed_at'] as const)('refuses invalid %s independently', (field) => {
+    expect(() =>
+      buildTaskExecutionEvidence(
+        exactAgentTask(),
+        agentFacts({ [field]: 'invalid' }),
+        PASS_VALIDATOR,
+      ),
+    ).toThrow(
+      'TASK_EXECUTION_EVIDENCE_TIMESTAMP_INVALID: completed_at must be at or after started_at',
+    );
+  });
+});
