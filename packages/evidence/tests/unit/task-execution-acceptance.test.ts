@@ -734,3 +734,51 @@ describe('non-agent execution authority bindings', () => {
     ).toBe('TASK_EXECUTION_EVIDENCE_COMPOSITE_MISMATCH');
   });
 });
+
+it('records absent optional recipe bindings as null using the real evidence schema', () => {
+  const { recipe_name: _name, recipe_variant: _variant, ...executor } = exactAgentTask().executor;
+  const boundTask = task('TASK-7902', {
+    ...executor,
+    prompt_composition_id: 'PC-5555555555555555',
+  });
+  const input = {
+    ...agentFacts({
+      resolved_executor: { ...agentExecutor, recipe_name: null, recipe_variant: null },
+    }),
+    id: 'TXE-3333333333333333',
+    prompt: { prompt_composition_id: 'PC-5555555555555555', prompt_sha256: 'e'.repeat(64) },
+  };
+  const evidence = buildTaskExecutionEvidence(boundTask, input);
+  expect(evidence.resolved_executor).toMatchObject({
+    kind: 'agent',
+    recipe_name: null,
+    recipe_variant: null,
+  });
+  expect(checkTaskExecutionEvidence(evidence).ok).toBe(true);
+});
+
+it.each(['recipe_name', 'recipe_variant'] as const)(
+  'refuses an undeclared %s even when the rest of the exact agent binding agrees',
+  (field) => {
+    const { recipe_name: _name, recipe_variant: _variant, ...executor } = exactAgentTask().executor;
+    const boundTask = task('TASK-7903', {
+      ...executor,
+      prompt_composition_id: 'PC-5555555555555555',
+    });
+    const input = {
+      ...agentFacts({
+        resolved_executor: {
+          ...agentExecutor,
+          recipe_name: null,
+          recipe_variant: null,
+          [field]: 'undeclared',
+        },
+      }),
+      id: 'TXE-4444444444444444',
+      prompt: { prompt_composition_id: 'PC-5555555555555555', prompt_sha256: 'e'.repeat(64) },
+    };
+    expect(() => buildTaskExecutionEvidence(boundTask, input)).toThrow(
+      'TASK_EXECUTION_EVIDENCE_RECIPE_MISMATCH',
+    );
+  },
+);
