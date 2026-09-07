@@ -137,7 +137,12 @@ describe('blueprint behavior', () => {
       ],
     });
     write(repo, '.devai/state/sensors/inventory_api/api-map.json', {
-      endpoints: [{ path: '/api/orders' }, { path: '/api/audit-logs/:id' }],
+      endpoints: [
+        { method: 'GET', path: '/api/orders' },
+        { method: 'GET', path: '/api/orders/:id' },
+        { method: 'POST', path: '/api/orders' },
+        { method: 'GET', path: '/api/audit-logs/:id' },
+      ],
     });
     write(repo, '.devai/state/sensors/inventory_rbac/rbac.json', {
       roles: [{ id: 'reader' }],
@@ -486,7 +491,14 @@ it.each([
       },
       api: {
         path: 'inventory_api/api-map.json',
-        value: { endpoints: [{ path: '/api/orders' }, { path: '/api/audit-logs/:id' }] },
+        value: {
+          endpoints: [
+            { method: 'GET', path: '/api/orders' },
+            { method: 'GET', path: '/api/orders/:id' },
+            { method: 'POST', path: '/api/orders' },
+            { method: 'GET', path: '/api/audit-logs/:id' },
+          ],
+        },
       },
       rbac: {
         path: 'inventory_rbac/rbac.json',

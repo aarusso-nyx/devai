@@ -376,15 +376,25 @@ export function diffBlueprintAgainstInventory(opts: BlueprintDiffOptions): Bluep
     }
   }
 
-  // API leg.
-  const inventoryEndpoints = extractEndpointPaths(apiMap ?? {});
+  // Match the operation, not just a coincidentally shared URL. PUT and PATCH
+  // both implement item updates; collection and item reads remain distinct.
+  const operationMethods: Readonly<Record<Operation, readonly string[]>> = {
+    list: ['GET'],
+    get: ['GET'],
+    create: ['POST'],
+    update: ['PUT', 'PATCH'],
+    delete: ['DELETE'],
+  };
+  const inventoryEndpoints = extractEndpoints(apiMap ?? {});
   for (const resource of blueprint.api?.resources ?? []) {
     const basePath = blueprint.api?.basePath ?? '/api';
     const resourcePath = resource.path ?? `/${toKebabSimple(resource.entity)}s`;
     for (const op of resource.operations ?? []) {
       const wantedPath = `${basePath}${resourcePath}`;
-      const present = Array.from(inventoryEndpoints).some(
-        (p) => p === wantedPath || p === `${wantedPath}/:id`,
+      const operationPath =
+        op === 'get' || op === 'update' || op === 'delete' ? `${wantedPath}/:id` : wantedPath;
+      const present = operationMethods[op].some((method) =>
+        inventoryEndpoints.has(`${method} ${operationPath}`),
       );
       if (!present) {
         deltas.push({
@@ -554,11 +564,13 @@ function extractFieldNames(dataModel: unknown, table: string): Set<string> {
   return out;
 }
 
-function extractEndpointPaths(apiMap: unknown): Set<string> {
+function extractEndpoints(apiMap: unknown): Set<string> {
   const out = new Set<string>();
-  const am = apiMap as { endpoints?: ReadonlyArray<{ path?: string }> };
+  const am = apiMap as { endpoints?: ReadonlyArray<{ method?: string; path?: string }> };
   for (const e of am.endpoints ?? []) {
-    if (typeof e.path === 'string') out.add(e.path);
+    if (typeof e.method === 'string' && typeof e.path === 'string') {
+      out.add(`${e.method} ${e.path}`);
+    }
   }
   return out;
 }
