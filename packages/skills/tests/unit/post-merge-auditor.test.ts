@@ -274,6 +274,29 @@ describe('post-merge host receipt verification', () => {
     }
   });
 
+  it.each([0, 300_000, -30_000])(
+    'accepts the signed receipt at clock offset %s ms',
+    async (offset) => {
+      const fx = fixture();
+      const now = new Date(Date.parse(NOW) + offset).toISOString();
+      await withAuthorityHostTestScope(() => {
+        expect(verify(fx, { now })).toEqual({ mergeSha: fx.mergeSha, baselineSha: fx.baselineSha });
+      });
+    },
+  );
+
+  it.each([300_001, -30_001])(
+    'refuses one millisecond beyond the receipt boundary at %s ms',
+    (offset) => {
+      const fx = fixture();
+      const bytes = readFileSync(fx.receiptPath);
+      expect(() => verify(fx, { now: new Date(Date.parse(NOW) + offset).toISOString() })).toThrow(
+        'HOST_RECEIPT_STALE',
+      );
+      expect(readFileSync(fx.receiptPath)).toEqual(bytes);
+    },
+  );
+
   it('rejects invalid, future, and stale receipt clocks', () => {
     for (const [now, issuedAt] of [
       ['invalid', NOW],
