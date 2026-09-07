@@ -235,6 +235,32 @@ describe('scanForbiddenActions', () => {
     return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
   }
 
+  it.each([
+    ['git push +HEAD:topic', 'FORBID-FORCE-PUSH'],
+    ['git push origin main', 'FORBID-PUSH-MAIN'],
+    ['git reset --hard HEAD', 'FORBID-RESET-HARD'],
+    ['git rebase -i HEAD~2', 'FORBID-REBASE-I'],
+    ['git rebase --interactive HEAD~2', 'FORBID-REBASE-I'],
+    ['git branch -D obsolete', 'FORBID-DELETE-BRANCH'],
+    ['git push origin --delete obsolete', 'FORBID-DELETE-BRANCH'],
+    ['rm -rf uncommitted-work', 'FORBID-RM-RF'],
+    ['gh issue comment 12 --body message', 'FORBID-EXTERNAL-MESSAGES'],
+    ['aws kms describe-key --key-id production', 'FORBID-SECRETS-PROD'],
+    ['npm publish', 'FORBID-PUBLISH'],
+    ['pnpm publish', 'FORBID-PUBLISH'],
+    ['yarn publish', 'FORBID-PUBLISH'],
+    ['aws s3 rm s3://production/data', 'FORBID-AWS-DELETE-PROD'],
+    ['aws s3 sync ./data s3://production --delete', 'FORBID-AWS-DELETE-PROD'],
+  ])('reports committed command text %s as %s without executing it', (command, forbidden_id) => {
+    writeContextAwareRegistry();
+    seedRepository();
+    const ref = commitForbiddenFixture(`${command}\n`);
+    const result = scanForbiddenActions({ repoRoot: dir, maxCommits: 1 });
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ forbidden_id, ref, source: 'commit-change' }),
+    );
+  });
+
   it('does not self-match a newly materialized forbidden-action registry', () => {
     writeContextAwareRegistry();
     mkdirSync(join(dir, 'record/proofs'), { recursive: true });
