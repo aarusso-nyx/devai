@@ -12,6 +12,17 @@ Demonstrate the required PR result before changing branch protection. A final cl
 candidate needs one explicit RC gate and a successful non-publishing rehearsal before
 any product publication decision. No version bump is inferred from this work.
 
+For DEVAI 1.5, the ordinary RC gate is necessary but insufficient. All ten packages
+must also satisfy their existing mutation score and survivor limits for the exact
+candidate. The current version-1 evidence transport and ledger binding cover ordinary
+RC evidence; they do not yet carry and independently verify the complete mutation
+export. Do not activate 1.5 promotion until that verification is required in both
+rehearsal and promotion and its candidate, policy, toolchain and approved verifier
+identities are bound to the completion record. Missing mutation evidence blocks release.
+
+A successful installed diagnostic fixture with mutation marked `not-applicable` proves
+only its applicable checks. It cannot discharge DEVAI's required mutation semantics.
+
 1. Review hook, PR and checker changes; verify `devai-release-gate` before settings change.
 2. Prepare a live protection snapshot with `node scripts/process/prepare-settings.mjs <new-output-directory>`.
    The output includes current/proposed JSON and an application checklist. Re-read the
@@ -118,9 +129,20 @@ Any changed bound trust/evidence input requires another rehearsal. The exact ret
 are promoted; no build, pack, SBOM generation, site generation or rehearsal smoke is repeated.
 Registry download/hash comparison and live Pages checks remain external-effect verification.
 
-Recovery first reads the full relevant remote collection successfully. Failed authorization,
-network reads and ambiguous outcomes block writes. Existing matching effects are no-ops;
-confirmed missing effects may proceed under authorization. Mismatches are never overwritten.
+Release and registry recovery first read the full relevant remote collection successfully.
+Failed authorization, network reads and ambiguous outcomes block writes. Matching effects
+are no-ops; confirmed missing effects may proceed under authorization. Mismatches are never
+overwritten. A partial draft Release is inspected completely before uploading only missing
+assets, and every asset is checked again before publication.
+
+Pages currently validates the site population before upload and verifies every public
+member's bytes after deployment. Apart from the empty root `.nojekyll` control file,
+dot-prefixed members are refused because the pinned Pages uploader excludes them.
+Interrupted Pages deployment reconciliation is not yet implemented: a failed workflow
+does not prove that no deployment occurred, and automatic redeployment is not an accepted
+recovery procedure. Before enabling promotion, add retained deployment identifiers,
+authenticated status observation and exact-byte reconciliation so matching effects are
+no-ops, only confirmed missing effects resume, and unknown outcomes block.
 
 ## Adopter migration bundles and limited self-adoption
 
