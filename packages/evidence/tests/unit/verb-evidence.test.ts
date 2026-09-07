@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
@@ -36,9 +36,16 @@ describe('current operation evidence', () => {
     expect(second.ok).toBe(true);
     const chain = JSON.parse(readFileSync(join(root, 'record/proofs/chain.json'), 'utf8')) as {
       head: string;
-      records: Array<{ id: string; previous_run_hash: string | null; manifest_hash: string }>;
+      records: Array<{
+        id: string;
+        previous_run_hash: string | null;
+        manifest_hash: string;
+        notes?: string[];
+      }>;
     };
     expect(chain.records).toHaveLength(2);
+    expect(chain.records[0]?.notes).toEqual(['report_only=true']);
+    expect(chain.records[1]).not.toHaveProperty('notes');
     expect(chain.records[0]?.id).toBe(first.id);
     expect(chain.records[1]?.id).toBe(second.id);
     expect(chain.records[1]?.previous_run_hash).toBe(chain.records[0]?.manifest_hash);
@@ -58,4 +65,35 @@ describe('current operation evidence', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toBeTypeOf('string');
   });
+});
+
+it('does not create a chain for an explicitly non-recording operation', () => {
+  const root = mkdtempSync(join(tmpdir(), 'devai-evidence-'));
+  roots.push(root);
+  expect(
+    appendVerbEvidence({
+      repoRoot: root,
+      action: 'verify.translation',
+      status: 'completed',
+      automatic: true,
+    }),
+  ).toEqual({ ok: true });
+  expect(existsSync(join(root, 'record'))).toBe(false);
+});
+
+it('records explicit automatic=false and preserves an explicitly empty notes population', () => {
+  const root = mkdtempSync(join(tmpdir(), 'devai-evidence-'));
+  roots.push(root);
+  const result = appendVerbEvidence({
+    repoRoot: root,
+    action: 'verify.translation',
+    status: 'completed',
+    automatic: false,
+    notes: [],
+  });
+  expect(result.ok).toBe(true);
+  expect(result.id).toMatch(/^EV-[a-f0-9]{16}$/u);
+  const chain = JSON.parse(readFileSync(join(root, 'record/proofs/chain.json'), 'utf8'));
+  expect(chain.records).toHaveLength(1);
+  expect(chain.records[0].notes).toEqual([]);
 });

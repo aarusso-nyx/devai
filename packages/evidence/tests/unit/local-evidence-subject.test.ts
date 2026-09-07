@@ -95,3 +95,23 @@ describe('exact local evidence subjects', () => {
     );
   });
 });
+
+it.each([
+  ['https://github.com///owner/repository///', 'owner/repository'],
+  ['///owner/repository///', 'owner/repository'],
+  ['owner.git/repository.git', 'owner.git/repository'],
+])('preserves the exact repository identity for %s', (origin, expected) => {
+  expect(deriveExactSubject(fixture(origin)).repository).toBe(expected);
+});
+
+it.each(['', '/', '///'])('refuses an empty repository identity from origin %j', (origin) => {
+  expect(() => deriveExactSubject(fixture(origin))).toThrow(
+    'cannot derive repository identity from origin',
+  );
+});
+
+it('reports a missing origin as a failed Git lookup rather than inventing an identity', () => {
+  const root = fixture();
+  git(root, 'remote', 'remove', 'origin');
+  expect(() => deriveExactSubject(root)).toThrow('git config --get remote.origin.url failed');
+});
