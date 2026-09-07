@@ -610,3 +610,90 @@ it('honors additional jobs required by the claim without subtracting the built-i
     }).disposition,
   ).toBe('promotion-hit');
 });
+
+it.each([
+  ['fullResult', null, 'full result is not an object'],
+  ['fullResult', [], 'full result is not an object'],
+  ['fullResult', 'success', 'full result is not an object'],
+  ['decision', null, 'shadow decision is not an object'],
+  ['decision', [], 'shadow decision is not an object'],
+  ['decision', true, 'shadow decision is not an object'],
+] as const)('rejects non-record %s without losing the refusal reason', (field, value, reason) => {
+  expect(() => validateActionsEvidenceShadowTuple({ ...tuple(), [field]: value })).toThrow(
+    `actions evidence tuple: ${reason}`,
+  );
+});
+
+it.each([
+  ['fallback-no-evidence'],
+  ['fallback-tree-mismatch'],
+  ['fallback-base-moved'],
+  ['fallback-policy-changed'],
+  ['fallback-lockfile-changed'],
+  ['fallback-toolchain-changed'],
+  ['fallback-job-incomplete'],
+] as const)('retains a verified full-CI fallback observation: %s', (disposition) => {
+  const input = tuple();
+  // A fallback runs full CI on the current merge; it does not assert reuse of
+  // the source run's exact parents, but still binds the transported full result.
+  const result = validateActionsEvidenceShadowTuple({
+    ...input,
+    decision: { ...input.decision, disposition },
+    mergeParents: ['8'.repeat(40), '9'.repeat(40)],
+  });
+  expect(result).toEqual({
+    mergeSha: input.decision.mergedCommitSha,
+    disposition,
+    shadowFullEquivalent: true,
+    durable: true,
+  });
+});
+
+it.each([
+  [
+    'UNKNOWN',
+    { disposition: 'UNKNOWN' },
+    'UNKNOWN observation is non-skippable and resets the candidate window',
+  ],
+  [
+    'mechanism defect',
+    { mechanismDefect: true },
+    'promotion mechanism defect resets the candidate window',
+  ],
+  ['undurable', { durable: false }, 'undurable observation resets the candidate window'],
+  [
+    'disagreement',
+    { shadowFullEquivalent: false },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+  [
+    'invalid claim',
+    { disposition: 'invalid-claim' },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+] as const)(
+  'explains the %s reset until a complete new window qualifies',
+  (_name, change, reason) => {
+    const failed: ActionsEvidenceWindowObservation = {
+      mergeSha: 'a'.repeat(40),
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      durable: true,
+      ...change,
+    };
+    expect(
+      evaluateActionsEvidenceWindow([...windowRows(5, 5), failed, ...windowRows(4, 3)]),
+    ).toEqual({
+      qualifies: false,
+      consecutiveMerges: 4,
+      promotionHits: 3,
+      resetAfterMerge: failed.mergeSha,
+      reason,
+    });
+    expect(evaluateActionsEvidenceWindow([failed, ...windowRows(5, 3)])).toMatchObject({
+      qualifies: true,
+      reason:
+        'candidate window satisfies consecutive merge, promotion-hit, and hit-rate thresholds',
+    });
+  },
+);
