@@ -111,6 +111,14 @@ export function parseAdrFrontMatter(text: string): Record<string, unknown> {
     if (match === null) throw new Error(`unparseable frontmatter line ${String(index + 1)}`);
     const key = match[1] ?? '';
     if (Object.hasOwn(result, key)) throw new Error(`duplicate frontmatter key '${key}'`);
+    // Frontmatter keys are data. Create an own property before assignment so
+    // __proto__ cannot alter the prototype or hide a field from schema validation.
+    Object.defineProperty(result, key, {
+      value: undefined,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
     const value = match[2] ?? '';
     if (value === '') {
       const members: string[] = [];
