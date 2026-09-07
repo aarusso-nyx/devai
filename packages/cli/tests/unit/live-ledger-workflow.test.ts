@@ -2,7 +2,6 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
-  cpSync,
   linkSync,
   mkdirSync,
   mkdtempSync,
@@ -25,6 +24,7 @@ import {
   VERIFIER_SOURCE_COMMIT,
 } from '../../src/services/ci-scaffold/index.js';
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
+import { createHistoricalVerifierGitFixture } from '../fixtures/historical-verifier-1.4.4/index.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CHECKER = join(ROOT, 'scripts/check-workflows.mjs');
@@ -125,20 +125,42 @@ function executablePackageMaterializationFixture(
   mkdirSync(verifierRoot, { recursive: true });
   mkdirSync(runnerTemp, { recursive: true });
   mkdirSync(mockBin, { recursive: true });
-  cpSync(
-    join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
-    join(verifierRoot, 'provenance.json'),
+  // This fixture models the published 1.4.4 package, whose frozen control has
+  // 21 runtime files. It must not inherit the current package's v2.1 vendor.
+  const historicalArchive = join(root, 'published-1.4.4-verifier.tar');
+  const historical = createHistoricalVerifierGitFixture();
+  try {
+    writeFileSync(
+      historicalArchive,
+      historical.git([
+        'archive',
+        // The isolated bare fixture has no attributes; avoid indexing unrelated
+        // historical trees. The helper still pins every original archive byte.
+        '--worktree-attributes',
+        '--format=tar',
+        VERIFIER_POLICY.package.release_source.commit,
+        'packages/cli/vendor/evidence-verification',
+      ]),
+    );
+  } finally {
+    historical.cleanup();
+  }
+  execFileSync(
+    'tar',
+    ['-xf', historicalArchive, '--strip-components=4', '--directory', verifierRoot],
+    { cwd: root },
   );
-  cpSync(
-    join(ROOT, 'packages/cli/vendor/evidence-verification/schemas'),
-    join(verifierRoot, 'schemas'),
-    {
-      recursive: true,
-    },
+  rmSync(join(verifierRoot, 'test'), { recursive: true, force: true });
+  const historicalProvenance = readFileSync(join(verifierRoot, 'provenance.json'));
+  expect(createHash('sha256').update(historicalProvenance).digest('hex')).toBe(
+    VERIFIER_POLICY.verifier.provenance_sha256,
   );
-  cpSync(join(ROOT, 'packages/cli/vendor/evidence-verification/src'), join(verifierRoot, 'src'), {
-    recursive: true,
-  });
+  const historicalManifest = JSON.parse(historicalProvenance.toString('utf8')) as {
+    sourceCommit: string;
+    files: unknown[];
+  };
+  expect(historicalManifest.sourceCommit).toBe(VERIFIER_POLICY.verifier.source_commit);
+  expect(historicalManifest.files).toHaveLength(VERIFIER_POLICY.verifier.payload_file_count);
   writeFileSync(
     join(packageRoot, 'package.json'),
     `${JSON.stringify({
@@ -153,33 +175,6 @@ function executablePackageMaterializationFixture(
       },
     })}\n`,
   );
-  // The adopter's approved provider and the candidate vendor are distinct populations.
-  // Build a self-contained mocked provider matching its approved population size.
-  const fixtureManifest = JSON.parse(
-    readFileSync(join(verifierRoot, 'provenance.json'), 'utf8'),
-  ) as {
-    sourceCommit: string;
-    files: Array<{ path: string; sha256: string }>;
-  };
-  const binaries = new Set([
-    'src/build-policy-cli.js',
-    'src/cli.js',
-    'src/bundle-cli.js',
-    'src/export-cli.js',
-    'src/publish-cli.js',
-    'src/verify.js',
-  ]);
-  const selected = [...fixtureManifest.files].sort(
-    (a, b) =>
-      Number(binaries.has(b.path)) - Number(binaries.has(a.path)) || a.path.localeCompare(b.path),
-  );
-  for (const member of selected.slice(VERIFIER_POLICY.verifier.payload_file_count))
-    rmSync(join(verifierRoot, member.path));
-  fixtureManifest.files = selected
-    .slice(0, VERIFIER_POLICY.verifier.payload_file_count)
-    .sort((a, b) => a.path.localeCompare(b.path));
-  fixtureManifest.sourceCommit = VERIFIER_POLICY.verifier.source_commit;
-  writeFileSync(join(verifierRoot, 'provenance.json'), JSON.stringify(fixtureManifest));
   mutate?.(packageRoot, verifierRoot);
   execFileSync('tar', ['-czf', archive, '--format', 'ustar', 'package'], {
     cwd: root,
