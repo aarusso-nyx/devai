@@ -353,6 +353,40 @@ describe('post-merge host receipt verification', () => {
 });
 
 describe('post-merge authority host scope', () => {
+  it.each(['rmSync', 'unlinkSync', 'writeFileSync', 'renameSync'])(
+    'refuses %s on the shared worktrees parent before applying an effect',
+    (symbol) => {
+      const fx = fixture(false);
+      const host = createPostMergeHostScope(fx.root, fx.mergeSha);
+      const shared = join(fx.root, '.devai/worktrees');
+      let applied = false;
+      try {
+        expect(() =>
+          host.scope.apply_effect(
+            {
+              kind: 'filesystem',
+              symbol,
+              arguments:
+                symbol === 'renameSync' ? [shared, join(shared, 'auditor-post-merge')] : [shared],
+            },
+            () => {
+              applied = true;
+            },
+          ),
+        ).toThrow('POST_MERGE_EFFECT_OUT_OF_SCOPE');
+        expect(applied).toBe(false);
+        expect(
+          host.scope.apply_effect(
+            { kind: 'filesystem', symbol: 'mkdirSync', arguments: [shared, { recursive: true }] },
+            () => 'created',
+          ),
+        ).toBe('created');
+      } finally {
+        host.dispose();
+      }
+    },
+  );
+
   it.each(
     [
       ['add'],
