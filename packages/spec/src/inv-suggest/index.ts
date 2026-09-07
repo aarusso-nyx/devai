@@ -598,7 +598,7 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
       kept += 1;
       continue;
     }
-    if (parsed === null) {
+    if (parsed === null || !validators.invCandidate(parsed)) {
       kept += 1;
       continue;
     }

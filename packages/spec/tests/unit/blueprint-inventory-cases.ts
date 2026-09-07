@@ -387,6 +387,29 @@ describe('inventory invariant candidates', () => {
     ]);
   });
 
+  it('preserves schema-invalid candidate records even when their claimed target disappeared', () => {
+    const repo = root();
+    write(repo, 'coverage.json', { unmapped: { routes: [], endpoints: [] } });
+    write(repo, 'candidates/INV-CANDIDATE-corrupt.json', {
+      category: 'unmapped_route',
+      target: { identifier: 'gone-route' },
+    });
+    const result = gcStaleInvariantCandidates({
+      repoRoot: repo,
+      outDir: join(repo, 'candidates'),
+      coverageBodyPath: join(repo, 'coverage.json'),
+      dryRun: true,
+      now: NOW,
+    });
+    expect(result).toEqual({
+      scanned: 1,
+      stale: 0,
+      kept: 1,
+      evidence: [],
+      evidence_log_path: null,
+    });
+  });
+
   it('classifies stale, live, malformed, and unavailable candidates during GC', () => {
     const repo = root();
     prepareInputs(repo);
