@@ -145,23 +145,25 @@ describe('grant references', () => {
     });
   });
 
-  // Resealing the reordered chain invalidates the forward grant reference. This checks
-  // rejection of that population, not isolated coverage of the sequence-order guard.
-  it('refuses a resequenced chain with an unresolved forward grant reference', () => {
-    // A valid chain, re-sequenced so the consumption precedes the grant it references.
-    const { first, second } = chain('consumed');
-    const earlier = seal({ ...second, sequence: 1, previous_event_digest_sha256: null });
-    const later = seal({
-      ...first,
-      sequence: 2,
-      previous_event_digest_sha256: canonicalSha256(earlier),
+  // Mutants 6551, 6552: the referenced grant must precede the terminal event in sequence.
+  // The grant is sealed exactly once at sequence 2 and the consumption at sequence 1 names
+  // its final id, so the reference itself resolves; entry 2's previous digest cannot be
+  // chained to an event that references it and is reported as a mismatch beside the
+  // ordering error. Only the ordering check produces the unresolved-reference error here.
+  it('refuses a terminal event sequenced before its grant', () => {
+    const later = seal({ ...grant(), sequence: 2, previous_event_digest_sha256: '0'.repeat(64) });
+    const earlier = seal({
+      ...terminal(later, 'consumed', 2, canonicalSha256(later)),
+      sequence: 1,
+      previous_event_digest_sha256: null,
     });
-    const bound = seal({ ...earlier, grant_event_id: later.event_id });
-    const relinked = seal({ ...later, previous_event_digest_sha256: canonicalSha256(bound) });
-    const result = verify([bound, relinked]);
+    expect(earlier.grant_event_id).toBe(later.event_id);
+    const result = verify([earlier, later]);
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('unreachable');
-    expect(result.errors).toContain('eal-grant-reference-unresolved');
+    expect(result.errors).toEqual(
+      expect.arrayContaining(['eal-previous-digest-mismatch', 'eal-grant-reference-unresolved']),
+    );
   });
 });
 
