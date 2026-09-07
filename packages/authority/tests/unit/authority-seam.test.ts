@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import { verifyDecisionBinding } from '../../src/decision.js';
 import {
   HUMAN_ROLES,
   MACHINE_ACTORS,
@@ -13,6 +15,7 @@ import {
   type AuthorityPolicyAdapter,
   type AuthorityPolicyProvenance,
   type AuthorityRuntimeAdapter,
+  type Decision,
   type EnforcementMode,
   type MachinePrincipal,
   type MutationBoundaryAdapter,
@@ -183,6 +186,94 @@ function policy(
 }
 
 describe('authority decision seam', () => {
+  it('binds an unmodified decision to the exact subject and authority context', () => {
+    const trustedRuntime = runtime();
+    const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+    const decision = decide({ plan, runtime: trustedRuntime, policy: policy() });
+    expect(verifyDecisionBinding({ plan }, decision, humanContext)).toEqual({
+      verified: true,
+      capability: {
+        decision_id: decision.decision_id,
+        decision_digest_sha256: decision.decision_digest_sha256,
+        subject_digest_sha256: canonicalSha256({ plan }),
+      },
+    });
+  });
+
+  it.each([
+    { change: { disposition: 'refuse' }, reason: 'decision disposition is not proceed' },
+    { change: { evaluation: 'deny' }, reason: 'binding mutation requires an allow evaluation' },
+    { change: { plan_id: 'different-plan' }, reason: 'plan id differs' },
+    { change: { batch_id: 'unexpected-batch' }, reason: 'batch id differs' },
+    { change: { subject_digest_sha256: digest('a') }, reason: 'subject digest differs' },
+    {
+      change: { authority_context_digest_sha256: digest('a') },
+      reason: 'authority context digest differs',
+    },
+    { change: { policy_binding_digest_sha256: digest('a') }, reason: 'policy digest differs' },
+    { change: { decision_id: 'different-decision' }, reason: 'decision id differs' },
+  ] satisfies { change: Partial<Decision>; reason: string }[])(
+    'refuses resealed authorization when $reason',
+    async ({ change, reason }) => {
+      const trustedRuntime = runtime();
+      const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+      const issued = decide({ plan, runtime: trustedRuntime, policy: policy() });
+      const altered = { ...issued, ...change };
+      const unsigned: Record<string, unknown> = { ...altered };
+      delete unsigned['decision_digest_sha256'];
+      const decision: Decision = { ...altered, decision_digest_sha256: canonicalSha256(unsigned) };
+      const verification = verifyDecisionBinding({ plan }, decision, humanContext);
+      expect(verification).toMatchObject({
+        verified: false,
+        reasons: expect.arrayContaining([reason]),
+      });
+      if (verification.verified) throw Error('altered binding accepted');
+      expect(verification.reasons).not.toContain('decision digest differs');
+      let prepares = 0;
+      const adapter: MutationBoundaryAdapter = {
+        adapter_id: 'refusal-observer',
+        adapter_version: '1.0.0',
+        target_kind: 'fs',
+        prepare: async () => {
+          prepares += 1;
+          throw Error('altered authorization reached adapter');
+        },
+        verifyPrepared: () => ({ verified: false, reasons: ['never prepared'] }),
+        apply: async () => {
+          throw Error('not authorized');
+        },
+      };
+      expect(
+        await prepareAuthorizedMutation({
+          adapter,
+          subject: { plan },
+          decision,
+          context: humanContext,
+        }),
+      ).toMatchObject({ prepared: false, reasons: expect.arrayContaining([reason]) });
+      expect(prepares).toBe(0);
+    },
+  );
+
+  it('refuses an unsealed decision change and independently changed authority context', () => {
+    const trustedRuntime = runtime();
+    const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+    const decision = decide({ plan, runtime: trustedRuntime, policy: policy() });
+    expect(
+      verifyDecisionBinding(
+        { plan },
+        { ...decision, decision_digest_sha256: digest('a') },
+        humanContext,
+      ),
+    ).toMatchObject({ verified: false, reasons: ['decision digest differs'] });
+    expect(
+      verifyDecisionBinding({ plan }, decision, { ...humanContext, action_id: 'different action' }),
+    ).toMatchObject({
+      verified: false,
+      reasons: expect.arrayContaining(['authority context digest differs', 'decision id differs']),
+    });
+  });
+
   it.each([
     '',
     '/absolute',
