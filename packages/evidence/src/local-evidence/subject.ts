@@ -11,7 +11,7 @@ export interface LocalEvidenceSubject {
   readonly tree: EvidenceTreeIdentity;
 }
 
-function git(repoRoot: string, args: readonly string[]): string {
+function git(repoRoot: string, args: readonly string[], trim = true): string {
   const result = spawnSync('git', [...args], {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -20,7 +20,7 @@ function git(repoRoot: string, args: readonly string[]): string {
   if (result.status !== 0) {
     throw new Error(result.stderr.trim() || `git ${args.join(' ')} failed`);
   }
-  return result.stdout.trim();
+  return trim ? result.stdout.trim() : result.stdout;
 }
 
 function repositoryFromRemote(remote: string): string {
@@ -59,8 +59,12 @@ export function deriveTrailerParentSubject(
   if (parents.length !== 2) {
     throw new Error('local evidence trailer commit must have exactly one parent');
   }
-  const changed = git(repoRoot, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])
-    .split('\n')
+  const changed = git(
+    repoRoot,
+    ['diff-tree', '--no-commit-id', '--name-only', '-z', '-r', 'HEAD'],
+    false,
+  )
+    .split('\0')
     .filter(Boolean);
   if (changed.length !== 1 || changed[0] !== manifestPath) {
     throw new Error('local evidence trailer commit must change only the declared manifest');
