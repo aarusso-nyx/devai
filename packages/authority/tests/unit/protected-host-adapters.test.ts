@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   createProtectedArtifactSinkAdapter,
   createProtectedReleaseHostAdapter,
@@ -11,6 +11,12 @@ import {
 import { createIssuer, runtimeApi } from './authority-runtime-testkit.js';
 import { createReleaseRepositoryTestFixture } from './release-repository-test-fixture.js';
 
+// Every case reads this immutable repository; capability state stays local to each harness.
+let repository: ReturnType<typeof createReleaseRepositoryTestFixture>;
+beforeAll(() => {
+  repository = createReleaseRepositoryTestFixture();
+});
+afterAll(() => repository?.dispose());
 const disposers: (() => void)[] = [];
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose();
@@ -20,9 +26,10 @@ async function harness(
   kind: 'artifact' | 'certification',
   broker?: (request: AuthorityHostEffectRequest, apply: () => unknown) => unknown,
 ) {
-  const repository = createReleaseRepositoryTestFixture();
-  disposers.push(repository.dispose);
   const issuer = createIssuer(await runtimeApi());
+  disposers.push(() => {
+    issuer.dispose();
+  });
   const owner = createProtectedReleaseSinkOwner(kind, 'expected-sink');
   const action = kind === 'artifact' ? 'release prepare' : 'release certify';
   const artifactBinding = {
