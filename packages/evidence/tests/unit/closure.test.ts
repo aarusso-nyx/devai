@@ -447,3 +447,55 @@ describe('closure records', () => {
     );
   });
 });
+
+it.each([
+  ['D-2', 'D-2', 'must strictly follow'],
+  ['D-3', 'D-2', 'must strictly follow'],
+  ['D-1', 'DII-2', 'different namespaces'],
+  ['D-1', 'D-9007199254740992', 'malformed decision id'],
+] as const)(
+  'refuses closure ordering %s to %s before creating a record',
+  async (declaring_decision, closing_decision, diagnostic) => {
+    const { root, head } = repository();
+    await withAuthorityHostTestScope(() => {
+      expect(() =>
+        closePhase(root, { ...gateDraft(head), declaring_decision, closing_decision }),
+      ).toThrow(diagnostic);
+      expect(readClosures(root)).toEqual([]);
+    });
+  },
+);
+
+it.each(['D', 'DII'])(
+  'orders %s decisions numerically across digit boundaries',
+  async (namespace) => {
+    const { root, head } = repository();
+    await withAuthorityHostTestScope(() => {
+      const result = closePhase(root, {
+        ...gateDraft(head),
+        declaring_decision: `${namespace}-9`,
+        closing_decision: `${namespace}-10`,
+      });
+      expect(result.record).toMatchObject({
+        id: 'PC-0001',
+        declaring_decision: `${namespace}-9`,
+        closing_decision: `${namespace}-10`,
+      });
+      expect(readClosures(root)).toEqual([result.record]);
+    });
+  },
+);
+
+it.each(['merged_as', 'release_disposition'] as const)(
+  'requires explicit %s on new closure writes',
+  async (field) => {
+    const { root, head } = repository();
+    const draft = { ...gateDraft(head) };
+    if (field === 'merged_as') delete draft.merged_as;
+    else delete draft.release_disposition;
+    await withAuthorityHostTestScope(() => {
+      expect(() => closePhase(root, draft)).toThrow(`${field} is required`);
+      expect(readClosures(root)).toEqual([]);
+    });
+  },
+);
