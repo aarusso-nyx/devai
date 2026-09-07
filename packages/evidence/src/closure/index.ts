@@ -236,7 +236,7 @@ export function closePhase(repoRoot: string, draft: PhaseClosureDraft): ClosePha
       `phase close: closing decision ${record.closing_decision} must strictly follow declaring decision ${record.declaring_decision}`,
     );
   }
-  const dup = existing.find((r) => r.round_id === record.round_id);
+  const dup = existing.findLast((r) => r.round_id === record.round_id);
   if (dup !== undefined && record.supersedes !== dup.id) {
     throw new Error(
       `phase close: round_id '${record.round_id}' already closed as ${dup.id}; pass supersedes: '${dup.id}' to correct it`,

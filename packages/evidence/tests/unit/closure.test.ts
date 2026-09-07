@@ -1,10 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
-import { closePhase, computeLedger, readClosures } from '../../src/closure/index.js';
+import {
+  closePhase,
+  computeLedger,
+  readClosures,
+  type PhaseClosureDraft,
+  type PhaseClosureRecord,
+} from '../../src/closure/index.js';
 
 const roots: string[] = [];
 
@@ -38,6 +44,132 @@ afterEach(() => {
 });
 
 describe('closure records', () => {
+  it('derives roles, failed gates, and deletion streak from effective records', () => {
+    const base: PhaseClosureRecord = {
+      schemaVersion: '1.0.0',
+      id: 'PC-0001',
+      round_id: 'first',
+      title: 'First round',
+      closed_at: '2026-08-10T00:00:00.000Z',
+      declaring_decision: 'D-1',
+      closing_decision: 'D-2',
+      batches: [
+        { id: 'B1', roles: ['Engineer', 'Inspector'], headline: 'Implementation' },
+        { id: 'B2', roles: ['Inspector'], headline: 'Review' },
+      ],
+      gates: {
+        build: { status: 'pass' },
+        coverage: { status: 'fail' },
+        optional: { status: 'skipped' },
+      },
+      source_repo_deleted: false,
+      validation_criteria: [{ criterion: 'coverage', verdict: 'fail' }],
+    };
+    const records: PhaseClosureRecord[] = [
+      base,
+      { ...base, id: 'PC-0002', round_id: 'second', source_repo_deleted: true },
+      { ...base, id: 'PC-0003', round_id: 'third' },
+    ];
+    const ledger = computeLedger(records);
+    expect(ledger).toMatchObject({
+      count: 3,
+      no_deletion_streak: 1,
+      streak_basis: 'since records began (PC-0001)',
+    });
+    expect(ledger.rounds[0]).toEqual({
+      id: 'PC-0001',
+      round_id: 'first',
+      title: 'First round',
+      closed_at: base.closed_at,
+      declaring_decision: 'D-1',
+      closing_decision: 'D-2',
+      batch_count: 2,
+      roles: ['Engineer', 'Inspector'],
+      gates_failed: ['coverage'],
+      source_repo_deleted: false,
+    });
+    expect(
+      computeLedger([
+        ...records,
+        {
+          ...base,
+          id: 'PC-0004',
+          round_id: 'second',
+          supersedes: 'PC-0002',
+        },
+      ]),
+    ).toMatchObject({
+      count: 3,
+      no_deletion_streak: 3,
+      rounds: [
+        { id: 'PC-0001' },
+        { id: 'PC-0002', superseded_by: 'PC-0004' },
+        { id: 'PC-0003' },
+        { id: 'PC-0004' },
+      ],
+    });
+    expect(computeLedger(records.slice(0, 2)).no_deletion_streak).toBe(0);
+  });
+
+  it('chains repeated corrections through the latest closure without changing earlier bytes', async () => {
+    const { root, head } = repository();
+    const draft: PhaseClosureDraft = {
+      round_id: 'repeated-correction',
+      declaring_decision: 'D-1',
+      closing_decision: 'D-2',
+      batches: [{ id: 'B1', roles: ['Inspector'], headline: 'Reviewed closure' }],
+      gates: { check: { status: 'pass' } },
+      source_repo_deleted: false,
+      validation_criteria: [{ criterion: 'check', verdict: 'pass' }],
+      merged_as: head,
+      release_disposition: 'none-needed',
+      closed_at: '2026-08-10T00:00:00.000Z',
+    };
+    const first = await withAuthorityHostTestScope(() => closePhase(root, draft));
+    const firstBytes = readFileSync(first.path);
+    const second = await withAuthorityHostTestScope(() =>
+      closePhase(root, {
+        ...draft,
+        supersedes: first.record.id,
+        declaring_decision: 'D-3',
+        closing_decision: 'D-4',
+      }),
+    );
+    const secondBytes = readFileSync(second.path);
+    const third = await withAuthorityHostTestScope(() =>
+      closePhase(root, {
+        ...draft,
+        supersedes: second.record.id,
+        declaring_decision: 'D-5',
+        closing_decision: 'D-6',
+      }),
+    );
+    expect(third.record.id).toBe('PC-0003');
+    expect(readFileSync(first.path)).toEqual(firstBytes);
+    expect(readFileSync(second.path)).toEqual(secondBytes);
+    const records = await withAuthorityHostTestScope(() => readClosures(root));
+    expect(computeLedger(records)).toMatchObject({
+      count: 1,
+      no_deletion_streak: 1,
+      rounds: [
+        { id: 'PC-0001', superseded_by: 'PC-0002' },
+        { id: 'PC-0002', superseded_by: 'PC-0003' },
+        { id: 'PC-0003' },
+      ],
+    });
+    await expect(
+      withAuthorityHostTestScope(() =>
+        closePhase(root, {
+          ...draft,
+          supersedes: first.record.id,
+          declaring_decision: 'D-7',
+          closing_decision: 'D-8',
+        }),
+      ),
+    ).rejects.toThrow("pass supersedes: 'PC-0003'");
+    expect(await withAuthorityHostTestScope(() => readClosures(root))).toHaveLength(3);
+  });
+
   it('appends corrections and computes the effective no-deletion ledger', async () => {
     const { root, head } = repository();
     const first = await withAuthorityHostTestScope(() =>
