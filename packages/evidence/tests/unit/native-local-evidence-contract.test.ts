@@ -734,3 +734,36 @@ describe('verified manifest-only trailer commits', () => {
     );
   });
 });
+
+describe('collection failure preserves existing evidence', () => {
+  it.each([
+    'missing-directory',
+    'file-directory',
+    'missing-metadata',
+    'wrong-job',
+    'missing-mapping',
+  ] as const)('refuses %s without replacing the existing manifest', (damage) => {
+    const { root, now, manifestPath } = fixture();
+    const before = readFileSync(join(root, manifestPath));
+    const artifactDir = join(root, '.artifacts/unit');
+    const jobDirs: Record<string, string> = Object.fromEntries(
+      REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]),
+    );
+    if (damage === 'missing-directory' || damage === 'file-directory')
+      rmSync(artifactDir, { recursive: true });
+    if (damage === 'file-directory') writeFileSync(artifactDir, 'not a directory');
+    if (damage === 'missing-metadata') rmSync(join(artifactDir, 'metadata.txt'));
+    if (damage === 'wrong-job')
+      writeFileSync(join(artifactDir, 'metadata.txt'), 'job=coverage\nplatform=darwin/arm64\n');
+    if (damage === 'missing-mapping') delete jobDirs.unit;
+    const expected = {
+      'missing-directory': `local CI artifact directory does not exist: ${artifactDir}`,
+      'file-directory': `local CI artifact directory does not exist: ${artifactDir}`,
+      'missing-metadata': `missing local CI metadata: ${join(artifactDir, 'metadata.txt')}`,
+      'wrong-job': `expected ${artifactDir} to contain job=unit, got job=coverage`,
+      'missing-mapping': 'missing artifact directory for required job: unit',
+    }[damage];
+    expect(() => collectLocalEvidence({ repoRoot: root, jobDirs, now })).toThrow(expected);
+    expect(readFileSync(join(root, manifestPath))).toEqual(before);
+  });
+});

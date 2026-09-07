@@ -71,7 +71,10 @@ function code(callback: () => unknown): string | undefined {
   } catch (error) {
     if (error instanceof Error && 'code' in error) {
       // A closed refusal code must still explain the problem to its caller.
-      expect(error.message.trim().length).toBeGreaterThan(0);
+      expect(error.name).toBe('TaskExecutionEvidenceError');
+      const prefix = `${String(error.code)}: `;
+      expect(error.message.startsWith(prefix)).toBe(true);
+      expect(error.message.slice(prefix.length).trim().length).toBeGreaterThan(0);
     }
     return error instanceof Error && 'code' in error ? String(error.code) : undefined;
   }
