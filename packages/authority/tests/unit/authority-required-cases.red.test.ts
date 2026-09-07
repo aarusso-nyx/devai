@@ -760,9 +760,12 @@ describe('R19 resolver total-order and selector matrix', () => {
   });
 });
 
-async function requiredAllowFixture(targets: readonly unknown[] = [fsTarget]) {
+async function requiredAllowFixture(
+  targets: readonly unknown[] = [fsTarget],
+  issuerOverrides: Record<string, unknown> = {},
+) {
   const api = await runtimeApi();
-  const issuer = createIssuer(api);
+  const issuer = createIssuer(api, issuerOverrides);
   const declaration = expectSuccess<{ context_receipt: unknown }>(
     api.resolveAuthorityDeclaration(
       {
@@ -1171,6 +1174,68 @@ describe('R19 issuer complete-set, batch, and receipt matrix', () => {
       'refused',
       'AUTHORITY_DECISION_RECEIPT_FOREIGN_ISSUER',
     );
+  });
+
+  it.each([
+    [1, 0, true],
+    [1, 2, false],
+    [30_000, 29_999, true],
+    [30_000, 30_001, false],
+  ] as const)(
+    'enforces receipt TTL %s at elapsed %s milliseconds',
+    async (ttl, elapsed, allowed) => {
+      let clock = NOW;
+      const fixture = await requiredAllowFixture([fsTarget], {
+        now: () => clock,
+        receipt_ttl_ms: ttl,
+      });
+      try {
+        const subject = exactSubject();
+        const issued = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject)) as {
+          receipt: unknown;
+        };
+        expect(issued).toMatchObject({ issued: true, outcome: 'allow' });
+        clock = new Date(Date.parse(NOW) + elapsed).toISOString();
+        const input = {
+          receipt: issued.receipt,
+          subject,
+          invocation_id: 'invocation-1',
+          adapter_id: 'fs-authority-boundary',
+          now: NOW,
+        };
+        const result = fixture.issuer.consume(input);
+        if (allowed) expectSuccess(result);
+        else expectFailure(result, 'refused', 'AUTHORITY_DECISION_RECEIPT_EXPIRED');
+        clock = NOW;
+        expectFailure(
+          fixture.issuer.consume(input),
+          'refused',
+          'AUTHORITY_DECISION_RECEIPT_REPLAYED',
+        );
+      } finally {
+        fixture.issuer.dispose();
+      }
+    },
+  );
+
+  it.each([
+    ['invocation_id', ''],
+    ['invocation_id', '  '],
+    ['invocation_id', null],
+    ['boundary_adapter_id', ''],
+    ['boundary_adapter_id', '  '],
+    ['boundary_adapter_id', null],
+  ] as const)('refuses malformed %s %s before closing its valid context', async (field, value) => {
+    const fixture = await requiredAllowFixture();
+    try {
+      const input = requiredIssueInput(fixture, exactSubject());
+      const result = fixture.issuer.issueAllow({ ...input, [field]: value });
+      expectFailure(result, 'refused', 'AUTHORITY_DECISION_INPUT_INVALID');
+      expect(result).not.toHaveProperty('receipt');
+      expect(fixture.issuer.issueAllow(input)).toMatchObject({ issued: true, outcome: 'allow' });
+    } finally {
+      fixture.issuer.dispose();
+    }
   });
 
   it('expires from the issuer-owned clock rather than caller input', async () => {
