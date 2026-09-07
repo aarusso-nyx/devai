@@ -466,8 +466,16 @@ describe('local evidence claim and actor parsing', () => {
     'prefix Local-CI-Evidence: proof.json',
     'Local-CI-Evidence: proof.json extra',
     'no evidence',
+    'Local-CI-Evidence:\nproof.json',
+    'Local-CI-Evidence: \r\nproof.json',
+    'Local-CI-Evidence:\n\nproof.json',
   ])('does not accept malformed claim %s', (message) => {
     expect(parseTrailerPath(message)).toBe('');
+  });
+  it('accepts horizontal tabs, case-insensitive keys and CRLF on the same trailer line', () => {
+    expect(parseTrailerPath('subject\r\nlocal-ci-evidence:\tproof.json\t\r\nOther: value')).toBe(
+      'proof.json',
+    );
   });
   it('extracts a standalone trailer with surrounding commit text', () => {
     expect(

@@ -58,7 +58,7 @@ export interface VerifyLocalResult {
 }
 
 export function parseTrailerPath(message: string): string {
-  const match = /^Local-CI-Evidence:\s*(\S+)\s*$/imu.exec(message);
+  const match = /^Local-CI-Evidence:[^\S\r\n]*(\S+)[^\S\r\n]*\r?$/imu.exec(message);
   return match?.[1] ?? '';
 }
 
