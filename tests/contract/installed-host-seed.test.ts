@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
 
-const { inspectInstalledHostSeed } = await import(
+const { inspectInstalledHostSeed, runInstalledExportCommand } = await import(
   pathToFileURL(resolve('scripts/process/installed-export-command.mjs')).href
 );
 const roots: string[] = [];
@@ -81,4 +81,41 @@ it('requires complete external pins before reading seed code', () => {
   expect(() =>
     inspectInstalledHostSeed({ root: '/absent', candidateRoot: '/absent', members: {} }),
   ).toThrow('INSTALLED_HOST_SEED_PINS_REQUIRED');
+});
+
+it.each([
+  ['missing path', 'INSTALLED_OFFLINE_PLAN_FILE_INVALID'],
+  ['wrong digest', 'MUTATION_INPUT_PLAN_DIGEST_MISMATCH'],
+  ['wrong candidate', 'MUTATION_INPUT_PLAN_CANDIDATE_MISMATCH'],
+  ['incomplete roster', 'MUTATION_INPUT_PLAN_ROSTER_MISMATCH'],
+])('rejects %s before executing any host bootstrap module', async (kind, error) => {
+  const seed = fixture();
+  const repository = { id: 'aarusso-nyx/devai', commit: 'a'.repeat(40), tree: 'b'.repeat(40) };
+  const plan = {
+    repository: kind === 'wrong candidate' ? { ...repository, commit: 'c'.repeat(40) } : repository,
+    release_unit: '@aarusso-nyx/devai',
+    mutation_policy_digest: 'd'.repeat(64),
+    release_plan_receipt_digest: 'e'.repeat(64),
+    release_profile_digest: 'f'.repeat(64),
+    packages: [],
+  };
+  const path = join(seed.candidateRoot, 'plan.json');
+  const bytes = Buffer.from(JSON.stringify(plan));
+  writeFileSync(path, bytes);
+  await expect(
+    runInstalledExportCommand({
+      seed,
+      mutationInputPlanPath: kind === 'missing path' ? undefined : path,
+      verification: {
+        dagControl: { candidateRoot: seed.candidateRoot },
+        expected: {
+          repository,
+          mutationPlanSha256:
+            kind === 'wrong digest'
+              ? '0'.repeat(64)
+              : createHash('sha256').update(bytes).digest('hex'),
+        },
+      },
+    }),
+  ).rejects.toThrow(error);
 });
