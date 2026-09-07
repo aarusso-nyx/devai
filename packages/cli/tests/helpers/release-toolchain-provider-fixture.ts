@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { canonicalJson, canonicalSha256, parseConstitutionVersion } from '@devai-nyx/utils';
@@ -551,17 +551,32 @@ function providerFixture(production?: {
   });
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-toolchain-provider-')));
   temporaryRoots.push(root);
-  const git = (args: readonly string[], input?: Uint8Array): Buffer => {
-    const result = spawnSync('git', ['-C', root, ...args], { input });
+  const git = (args: readonly string[]): Buffer => {
+    const result = spawnSync('git', ['-C', root, ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 30_000,
+    });
+    if (result.error !== undefined) throw result.error;
     if (result.status !== 0) throw new Error(result.stderr.toString());
     return result.stdout;
   };
   git(['init', '-q']);
   for (const [id, object] of value.candidate.readProof(value.candidate.paths)) {
-    assert.equal(
-      git(['hash-object', '-w', '-t', object.type, '--stdin'], object.bytes).toString().trim(),
-      id,
-    );
+    // A combined-suite run stalled inside Git reading its stdin pipe. Materialize
+    // the same proof bytes as a private file so hashing has a definite EOF; keep
+    // the exact object-id assertion and never place fixture inputs in the tree.
+    const input = join(root, '.git', 'devai-proof-input');
+    writeFileSync(input, object.bytes, { flag: 'wx', mode: 0o600 });
+    try {
+      assert.equal(
+        git(['hash-object', '-w', '-t', object.type, '--no-filters', '--', input])
+          .toString()
+          .trim(),
+        id,
+      );
+    } finally {
+      rmSync(input);
+    }
   }
   git(['checkout', '--detach', value.candidate.repository.commit]);
   assert.equal(git(['rev-parse', 'HEAD']).toString().trim(), value.candidate.repository.commit);
