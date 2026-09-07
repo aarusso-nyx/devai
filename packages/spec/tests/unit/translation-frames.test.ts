@@ -204,6 +204,105 @@ describe('translation validation frames', () => {
   );
 });
 
+describe('translation frames with multiple independent claims', () => {
+  function pair(): { -readonly [K in keyof Input]: Input[K] } {
+    const input = valid();
+    return {
+      ...input,
+      witness: {
+        ...input.witness,
+        touched: ['src/a.ts', 'lib/b.ts'],
+        red_green: [{ test_ref: 'tests/a.test.ts' }, { test_ref: 'tests/b.test.ts' }],
+      },
+      registered_test_refs: ['tests/a.test.ts', 'tests/b.test.ts'],
+      task_scope: ['src/**', 'lib/**'],
+      diff_paths: ['lib/b.ts', 'src/a.ts'],
+      base_executions: [
+        { test_ref: 'tests/a.test.ts', outcome: 'fail', failure_mode: 'assertion' },
+        { test_ref: 'tests/b.test.ts', outcome: 'fail', failure_mode: 'assertion' },
+      ],
+      candidate_executions: [
+        { test_ref: 'tests/a.test.ts', outcome: 'pass', failure_mode: 'none' },
+        { test_ref: 'tests/b.test.ts', outcome: 'pass', failure_mode: 'none' },
+      ],
+      expected_state_changes: [
+        { path: 'proof.json', operation: 'create' },
+        { path: 'run.json', operation: 'append' },
+      ],
+      observed_state_changes: [
+        { path: 'run.json', operation: 'append' },
+        { path: 'proof.json', operation: 'create' },
+      ],
+    };
+  }
+
+  it('accepts independently matching scopes and order-independent complete populations', () => {
+    const result = evaluateTranslationFrames(pair());
+    expect(result.verdict).toBe('PASS');
+    expect(result.executed_test_refs).toEqual(['tests/a.test.ts', 'tests/b.test.ts']);
+    expect(result.frames.every((frame) => frame.status === 'PASS')).toBe(true);
+  });
+
+  it('does not let one registered reference conceal an unregistered claim', () => {
+    const input = pair();
+    input.registered_test_refs = ['tests/a.test.ts'];
+    expect(failed(input)).toEqual(['witness-structure', 'red-proof', 'candidate-proof']);
+    expect(evaluateTranslationFrames(input).executed_test_refs).toEqual([]);
+  });
+
+  it.each(['base', 'candidate'] as const)(
+    'requires evidence for every claimed reference in the %s population',
+    (population) => {
+      const input = pair();
+      if (population === 'base') input.base_executions = input.base_executions.slice(0, 1);
+      else input.candidate_executions = input.candidate_executions.slice(0, 1);
+      expect(failed(input)).toEqual([population === 'base' ? 'red-proof' : 'candidate-proof']);
+    },
+  );
+
+  it.each(['base', 'candidate'] as const)(
+    'does not let a good execution conceal a bad execution in the %s population',
+    (population) => {
+      const input = pair();
+      if (population === 'base') {
+        input.base_executions = [
+          ...input.base_executions.slice(0, 1),
+          {
+            test_ref: 'tests/b.test.ts',
+            outcome: 'fail',
+            failure_mode: 'infrastructure',
+          },
+        ];
+      } else {
+        input.candidate_executions = [
+          ...input.candidate_executions.slice(0, 1),
+          {
+            test_ref: 'tests/b.test.ts',
+            outcome: 'fail',
+            failure_mode: 'assertion',
+          },
+        ];
+      }
+      expect(failed(input)).toEqual([population === 'base' ? 'red-proof' : 'candidate-proof']);
+    },
+  );
+
+  it('requires every state change to match even when cardinality and one member agree', () => {
+    const input = pair();
+    input.observed_state_changes = [
+      { path: 'proof.json', operation: 'create' },
+      { path: 'different.json', operation: 'append' },
+    ];
+    expect(failed(input)).toEqual(['expected-diff']);
+  });
+
+  it('rejects a same-sized touched population with only one shared path', () => {
+    const input = pair();
+    input.witness = { ...input.witness, touched: ['src/a.ts', 'lib/other.ts'] };
+    expect(failed(input)).toEqual(['witness-structure', 'red-proof', 'candidate-proof']);
+  });
+});
+
 describe('invariant strategy population', () => {
   const active = {
     id: 'INV-AUTH-001',
