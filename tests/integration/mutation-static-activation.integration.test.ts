@@ -174,3 +174,20 @@ if (!READY) throw new Error('FIXTURE_STARTUP_REFUSED');
   },
   60000,
 );
+
+it('preserves collected assertion failures instead of hiding them behind a suite error', () => {
+  runFixture(
+    'export const READY = true;\n',
+    {
+      'assertion.test.js':
+        "import {it,expect} from 'vitest'; import {READY} from '../value.js'; it('required readiness assertion',()=>expect(READY,'FIXTURE_ASSERTION_DETAILS').toBe(false));",
+    },
+    ['value.js'],
+    (root, status, log) => {
+      expect(status, `Retained fixture: ${root}`).not.toBe(0);
+      expect(log).toContain('required readiness assertion');
+      expect(log).toContain('FIXTURE_ASSERTION_DETAILS');
+      expect(log).not.toContain('A test suite failed during the unmutated baseline.');
+    },
+  );
+}, 60000);

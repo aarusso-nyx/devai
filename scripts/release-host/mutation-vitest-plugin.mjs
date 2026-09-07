@@ -53,7 +53,7 @@ const { declareFactoryPlugin, PluginKind } = await import(
   pathToFileURL(coreRequire.resolve('@stryker-mutator/api/plugin')).href
 );
 
-const { DryRunStatus, MutantRunStatus } = await import(
+const { DryRunStatus, MutantRunStatus, TestStatus } = await import(
   pathToFileURL(coreRequire.resolve('@stryker-mutator/api/test-runner')).href
 );
 
@@ -91,6 +91,14 @@ function createProtectedVitest(injector) {
   const originalDryRun = runner.dryRun;
   runner.dryRun = async function (options) {
     const result = await originalDryRun.call(this, options);
+    // Preserve upstream errors/timeouts and collected assertion diagnostics.
+    // Only supplement an otherwise successful baseline with uncollected suite
+    // failures; replacing failed tests would discard their names and causes.
+    if (
+      result.status !== DryRunStatus.Complete ||
+      result.tests.some((test) => test.status === TestStatus.Failed)
+    )
+      return result;
     if (this.ctx.state.getFiles().some((file) => file.result?.state === 'fail')) {
       return {
         status: DryRunStatus.Error,
