@@ -89,6 +89,16 @@ run candidate commands. A passing product-fixture receipt with mutation marked
 not applicable remains product acceptance only; release readiness still requires
 independent verification of all ten required mutation packages.
 
+For `aarusso-nyx/devai`, also supply `expected.mutationInputPlanBytes` and the
+independently protected `expected.mutationPlanSha256`. The adapter rejects a missing
+plan before invoking offline verification. After authenticated verification, it requires
+all nine ordered checks to pass, mandatory mutation evidence, the complete 22-member
+closure, and an identical output contract in every exported package. Each contract must
+bind the exact ten-package plan, candidate commit/tree, policy, test inputs and unchanged
+60/50 limits. These additional comparisons do not authenticate an arbitrary supplied
+receipt; they run only on the installed verifier's successful result and snapshotted
+export objects. Wiring this adapter into protected workflows remains a rollout gate.
+
 ## Local prerequisites and certification
 
 Keep the configuration, package, maps, signing material, prerequisite receipt and export
