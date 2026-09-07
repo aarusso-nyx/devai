@@ -218,3 +218,66 @@ describe('verifyChain', () => {
   });
 });
 // Invariants: INV-DEVAI-001
+
+describe('chain ordinals and predecessor aliases', () => {
+  it('verifies genesis and non-genesis aliases without changing stored bytes', () => {
+    initChain(chainPath);
+    const first = appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+    const second = appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+    expect(first).toMatchObject({ sequence: 1, previous_hash: 'GENESIS', previous_run_hash: null });
+    expect(second).toMatchObject({
+      sequence: 2,
+      previous_hash: first.manifest_hash,
+      previous_run_hash: first.manifest_hash,
+    });
+    const before = readFileSync(chainPath);
+    expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+    expect(readFileSync(chainPath)).toEqual(before);
+  });
+  it('reports independent ordinal, predecessor alias and head defects together', () => {
+    initChain(chainPath);
+    appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+    const second = appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+    const chain = loadChain(chainPath);
+    const [first, next] = chain.records;
+    if (!first || !next) throw new Error('expected two records');
+    first.sequence = 0;
+    next.sequence = 3;
+    first.previous_hash = 'incorrect-genesis';
+    next.previous_hash = 'incorrect-predecessor';
+    chain.head = null;
+    writeFileSync(chainPath, JSON.stringify(chain));
+    const before = readFileSync(chainPath);
+    expect(verifyChain(chainPath)).toEqual({
+      valid: false,
+      errors: [
+        'record EV-0000000000000001: sequence mismatch (expected 1, got 0)',
+        'record EV-0000000000000001: previous_hash mismatch (expected GENESIS, got incorrect-genesis)',
+        'record EV-0000000000000002: sequence mismatch (expected 2, got 3)',
+        `record EV-0000000000000002: previous_hash mismatch (expected ${first.manifest_hash}, got incorrect-predecessor)`,
+        `chain head mismatch (expected ${second.manifest_hash}, got null)`,
+      ],
+    });
+    expect(readFileSync(chainPath)).toEqual(before);
+  });
+  it('preserves verification of legacy records without the optional aliases', () => {
+    initChain(chainPath);
+    appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+    appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+    const chain = loadChain(chainPath);
+    for (const record of chain.records) {
+      delete record.sequence;
+      delete record.previous_hash;
+    }
+    writeFileSync(chainPath, JSON.stringify(chain));
+    expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+  });
+  it.each(['null', '42', '{"records":null,"head":null}', '{"records":[],"head":42}'])(
+    'refuses malformed chain shape %s without rewriting it',
+    (bytes) => {
+      writeFileSync(chainPath, bytes);
+      expect(() => loadChain(chainPath)).toThrow(/evidence chain at/);
+      expect(readFileSync(chainPath, 'utf8')).toBe(bytes);
+    },
+  );
+});
