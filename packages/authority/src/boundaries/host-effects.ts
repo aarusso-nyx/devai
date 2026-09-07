@@ -1169,10 +1169,11 @@ export function applyAuthorityHostEffectsAtomically(
 ): readonly unknown[] {
   type Snapshot =
     | Readonly<{ kind: 'absent'; path: string }>
-    | Readonly<{ kind: 'directory'; path: string; mode: number }>
+    | Readonly<{ kind: 'directory'; path: string; mode: number; entries?: readonly Snapshot[] }>
     | Readonly<{ kind: 'file'; path: string; mode: number; bytes: Buffer }>
     | Readonly<{ kind: 'symlink'; path: string; target: string }>;
   const paths: string[] = [];
+  const recursivePaths = new Set<string>();
   for (const effect of effects) {
     if (effect.request.kind !== 'filesystem') {
       throw new Error('AUTHORITY_ATOMIC_UNIT_FILESYSTEM_ONLY');
@@ -1185,38 +1186,62 @@ export function applyAuthorityHostEffectsAtomically(
           ? [args[1]]
           : [args[0]];
     for (const candidate of candidates) {
-      if (typeof candidate === 'string' && !paths.includes(candidate)) paths.push(candidate);
+      if (typeof candidate !== 'string') continue;
+      if (!paths.includes(candidate)) paths.push(candidate);
+      // Only subtree-changing operations need child bytes; metadata-only
+      // operations must not copy unrelated directory contents.
+      if (['rmSync', 'renameSync', 'cpSync'].includes(effect.request.symbol))
+        recursivePaths.add(candidate);
     }
   }
-  const snapshots: Snapshot[] = paths.map((path) => {
+  function capture(path: string, recursive: boolean): Snapshot {
     // A dangling symlink is an existing entry and must survive rollback.
     const stat = lstatSync(path, { throwIfNoEntry: false });
     if (stat === undefined) return { kind: 'absent', path };
     if (stat.isSymbolicLink()) return { kind: 'symlink', path, target: readlinkSync(path) };
-    if (stat.isDirectory()) return { kind: 'directory', path, mode: stat.mode };
+    if (stat.isDirectory())
+      return {
+        kind: 'directory',
+        path,
+        mode: stat.mode,
+        ...(recursive
+          ? {
+              entries: readdirSync(path)
+                .sort()
+                .map((name) => capture(resolve(path, name), true)),
+            }
+          : {}),
+      };
+    if (!stat.isFile()) throw new Error('AUTHORITY_ATOMIC_SNAPSHOT_SPECIAL_FILE');
     return { kind: 'file', path, mode: stat.mode, bytes: readFileSync(path) };
-  });
+  }
+  const snapshots = paths.map((path) => capture(path, recursivePaths.has(path)));
+  function restore(snapshot: Snapshot): void {
+    if (snapshot.kind === 'directory') {
+      if (snapshot.entries !== undefined) {
+        nodeRmSync(snapshot.path, { recursive: true, force: true });
+        nodeMkdirSync(snapshot.path, { recursive: true });
+        for (const entry of snapshot.entries) restore(entry);
+      } else if (!existsSync(snapshot.path)) nodeMkdirSync(snapshot.path, { recursive: true });
+      nodeChmodSync(snapshot.path, snapshot.mode);
+      return;
+    }
+    nodeRmSync(snapshot.path, { recursive: true, force: true });
+    if (snapshot.kind === 'absent') return;
+    nodeMkdirSync(dirname(snapshot.path), { recursive: true });
+    if (snapshot.kind === 'symlink') nodeSymlinkSync(snapshot.target, snapshot.path);
+    else {
+      nodeWriteFileSync(snapshot.path, snapshot.bytes);
+      nodeChmodSync(snapshot.path, snapshot.mode);
+    }
+  }
   const results: unknown[] = [];
   try {
     for (const effect of effects) results.push(effect.apply());
     return results;
   } catch (error) {
     try {
-      for (const snapshot of snapshots.toReversed()) {
-        if (snapshot.kind === 'directory') {
-          if (!existsSync(snapshot.path)) nodeMkdirSync(snapshot.path, { recursive: true });
-          nodeChmodSync(snapshot.path, snapshot.mode);
-          continue;
-        }
-        nodeRmSync(snapshot.path, { recursive: true, force: true });
-        if (snapshot.kind === 'absent') continue;
-        nodeMkdirSync(dirname(snapshot.path), { recursive: true });
-        if (snapshot.kind === 'symlink') nodeSymlinkSync(snapshot.target, snapshot.path);
-        else {
-          nodeWriteFileSync(snapshot.path, snapshot.bytes);
-          nodeChmodSync(snapshot.path, snapshot.mode);
-        }
-      }
+      for (const snapshot of snapshots.toReversed()) restore(snapshot);
     } catch {
       throw new Error('AUTHORITY_ATOMIC_ROLLBACK_FAILED');
     }

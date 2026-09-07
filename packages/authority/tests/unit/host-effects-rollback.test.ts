@@ -1,11 +1,13 @@
 import {
   chmodSync,
   copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   readlinkSync,
   renameSync,
   rmSync,
@@ -219,4 +221,99 @@ describe('authorized projection rollback', () => {
     );
     expect(callback).not.toHaveBeenCalled();
   });
+});
+
+describe('directory effects are recoverable as complete authorized units', () => {
+  it.each(['rmSync', 'renameSync'] as const)(
+    'restores directory contents and modes after %s and a later failure',
+    (symbol) => {
+      const root = fixture(),
+        original = join(root, 'original'),
+        moved = join(root, 'moved');
+      mkdirSync(join(original, 'nested'), { recursive: true });
+      writeFileSync(join(original, 'nested/data'), 'original bytes');
+      chmodSync(join(original, 'nested/data'), 0o640);
+      symlinkSync('missing', join(original, 'dangling'));
+      chmodSync(join(original, 'nested'), 0o750);
+      const args = symbol === 'rmSync' ? [original, { recursive: true }] : [original, moved];
+      expect(() =>
+        applyAuthorityHostEffectsAtomically([
+          effect(symbol, args, () =>
+            symbol === 'rmSync'
+              ? rmSync(original, { recursive: true })
+              : renameSync(original, moved),
+          ),
+          effect('writeFileSync', [join(root, 'new')], fail),
+        ]),
+      ).toThrow(failure);
+      expect(readFileSync(join(original, 'nested/data'), 'utf8')).toBe('original bytes');
+      expect(lstatSync(join(original, 'nested/data')).mode & 0o777).toBe(0o640);
+      expect(lstatSync(join(original, 'nested')).mode & 0o777).toBe(0o750);
+      expect(readlinkSync(join(original, 'dangling'))).toBe('missing');
+      expect(existsSync(moved)).toBe(false);
+    },
+  );
+});
+
+it('restores the complete directory population after a failed recursive copy', () => {
+  const root = fixture(),
+    source = join(root, 'source'),
+    destination = join(root, 'destination');
+  mkdirSync(source);
+  mkdirSync(destination);
+  writeFileSync(join(source, 'replace'), 'new');
+  writeFileSync(join(source, 'added'), 'new file');
+  writeFileSync(join(destination, 'replace'), 'original');
+  writeFileSync(join(destination, 'keep'), 'keep');
+  expect(() =>
+    applyAuthorityHostEffectsAtomically([
+      effect('cpSync', [source, destination, { recursive: true }], () =>
+        cpSync(source, destination, { recursive: true }),
+      ),
+      effect('writeFileSync', [join(destination, 'replace')], fail),
+    ]),
+  ).toThrow(failure);
+  expect(readdirSync(destination).sort()).toEqual(['keep', 'replace']);
+  expect(readFileSync(join(destination, 'replace'), 'utf8')).toBe('original');
+  expect(readFileSync(join(destination, 'keep'), 'utf8')).toBe('keep');
+  expect(readFileSync(join(source, 'replace'), 'utf8')).toBe('new');
+});
+
+it('restores the prior empty rename destination and the populated source', () => {
+  const root = fixture(),
+    source = join(root, 'source'),
+    destination = join(root, 'destination');
+  mkdirSync(source);
+  mkdirSync(destination);
+  chmodSync(destination, 0o750);
+  writeFileSync(join(source, 'keep'), 'source data');
+  expect(() =>
+    applyAuthorityHostEffectsAtomically([
+      effect('renameSync', [source, destination], () => renameSync(source, destination)),
+      effect('writeFileSync', [join(root, 'later')], fail),
+    ]),
+  ).toThrow(failure);
+  expect(readdirSync(destination)).toEqual([]);
+  expect(lstatSync(destination).mode & 0o777).toBe(0o750);
+  expect(readFileSync(join(source, 'keep'), 'utf8')).toBe('source data');
+});
+
+it('restores directory mode without rewriting untouched children for metadata-only effects', () => {
+  const root = fixture(),
+    directory = join(root, 'directory'),
+    file = join(directory, 'untouched');
+  mkdirSync(directory);
+  chmodSync(directory, 0o750);
+  writeFileSync(file, 'keep');
+  const before = lstatSync(file);
+  expect(() =>
+    applyAuthorityHostEffectsAtomically([
+      effect('chmodSync', [directory, 0o700], () => chmodSync(directory, 0o700)),
+      effect('writeFileSync', [join(root, 'later')], fail),
+    ]),
+  ).toThrow(failure);
+  expect(lstatSync(directory).mode & 0o777).toBe(0o750);
+  expect(lstatSync(file).ino).toBe(before.ino);
+  expect(lstatSync(file).mtimeMs).toBe(before.mtimeMs);
+  expect(readFileSync(file, 'utf8')).toBe('keep');
 });
