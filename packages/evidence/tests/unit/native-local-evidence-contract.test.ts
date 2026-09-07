@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
@@ -485,6 +485,57 @@ describe('local evidence claim and actor parsing', () => {
 });
 
 describe('local evidence required tool identities', () => {
+  it('binds nested artifact bytes, relative names and complete file population to a known checksum', () => {
+    const { root, now } = fixture();
+    const artifactDir = join(root, '.artifacts/unit');
+    mkdirSync(join(artifactDir, 'nested'));
+    writeFileSync(join(artifactDir, 'nested/inner.txt'), 'payload é\n');
+    writeFileSync(join(artifactDir, 'extra.bin'), Buffer.from([0, 255]));
+    writeFileSync(
+      join(artifactDir, 'metadata.txt'),
+      'job=unit\nplatform=darwin/arm64\nnode=v24.20.0\n',
+    );
+    const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+    const checksum = () =>
+      collectLocalEvidence({ repoRoot: root, jobDirs, now }).manifest.jobs['unit']
+        ?.artifactChecksum;
+    // Independent Python SHA-256 vector over the four named byte strings.
+    expect(checksum()).toEqual({
+      algorithm: 'sha256',
+      fileCount: 4,
+      value: 'd4b397877a3647967558a12e630ab4edb0b8bfb6bffedf186016be3e937590d4',
+    });
+    const original = checksum();
+    writeFileSync(join(artifactDir, 'nested/inner.txt'), 'changed é\n');
+    const changed = checksum();
+    expect(changed?.fileCount).toBe(4);
+    expect(changed?.value).not.toBe(original?.value);
+    renameSync(join(artifactDir, 'extra.bin'), join(artifactDir, 'renamed.bin'));
+    const renamed = checksum();
+    expect(renamed?.fileCount).toBe(4);
+    expect(renamed?.value).not.toBe(changed?.value);
+    writeFileSync(join(artifactDir, 'empty.txt'), '');
+    const added = checksum();
+    expect(added?.fileCount).toBe(5);
+    expect(added?.value).not.toBe(renamed?.value);
+  });
+
+  it('reads CRLF metadata without treating comments or embedded equals signs as fields', () => {
+    const { root, now } = fixture();
+    writeFileSync(
+      join(root, '.artifacts/unit/metadata.txt'),
+      'job=unit\r\n \t\r\nplatform=darwin/arm64\r\ncomment without separator\r\nnode=v24.20.0\r\ncommand=node --define=a=b\r\n',
+    );
+    const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+    const collected = collectLocalEvidence({ repoRoot: root, jobDirs, now });
+    expect(collected.manifest.jobs['unit']?.metadata).toEqual({
+      job: 'unit',
+      platform: 'darwin/arm64',
+      node: 'v24.20.0',
+      command: 'node --define=a=b',
+    });
+  });
+
   it.each(['absolute', 'mixed'])(
     'accepts %s artifact paths without rebasing absolute directories under the repository',
     (mode) => {
