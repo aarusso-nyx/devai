@@ -1,7 +1,7 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: requested and resolved executor evidence remains
 // immutable, exact-candidate bound, semantically total, and append-only.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -455,5 +455,42 @@ describe('independent exact agent execution bindings', () => {
     ).toThrow(
       'TASK_EXECUTION_EVIDENCE_TIMESTAMP_INVALID: completed_at must be at or after started_at',
     );
+  });
+});
+
+describe('canonical task-evidence persistence identity', () => {
+  it.each([
+    './record/proofs/task-execution/TEE-CANONICAL.json',
+    'record//proofs/task-execution/TEE-CANONICAL.json',
+    'record/proofs/task-execution/unused/../TEE-CANONICAL.json',
+  ])('refuses an alternative spelling before persistence: %s', async (relativePath) => {
+    const executor = {
+      kind: 'routine' as const,
+      action_id: null,
+      argv: ['node', 'fixture.mjs'],
+      cwd: '.',
+      effects: ['read' as const],
+    };
+    const repoRoot = mkdtempSync(join(TARGET, 'canonical-'));
+    const boundTask = task('TASK-CANONICAL', executor);
+    const evidence = buildTaskExecutionEvidence(
+      boundTask,
+      facts('TEE-CANONICAL', executor),
+      PASS_VALIDATOR,
+    );
+    const result = await withAuthorityHostTestScope(() =>
+      code(() =>
+        persistTaskExecutionEvidence({
+          repoRoot,
+          relativePath,
+          task: boundTask,
+          candidate_sha: SHA,
+          evidence,
+          validator: PASS_VALIDATOR,
+        }),
+      ),
+    );
+    expect(result).toBe('TASK_EXECUTION_EVIDENCE_PATH_INVALID');
+    expect(readdirSync(repoRoot)).toEqual([]);
   });
 });
