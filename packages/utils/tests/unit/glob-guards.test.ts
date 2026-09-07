@@ -198,3 +198,37 @@ describe('evaluateGlobGuards', () => {
   });
 });
 // Invariants: INV-DEVAI-014
+
+describe('glob fixed-prefix and discovery boundaries', () => {
+  it('matches top-level wildcard files without requiring a fixed directory', () => {
+    touch('root.json');
+    touch('nested/child.json');
+    expect(evaluateGlobGuard(dir, { id: 'ROOT', pattern: '*.json' }).sample_matches).toEqual([
+      'root.json',
+    ]);
+  });
+
+  it('excludes symlinked children encountered during a wildcard walk', () => {
+    touch('real/data.json');
+    symlinkSync(join(dir, 'real'), join(dir, 'alias'));
+    symlinkSync(join(dir, 'real/data.json'), join(dir, 'link.json'));
+    expect(evaluateGlobGuard(dir, { id: 'LINKS', pattern: '**/*.json' }).sample_matches).toEqual([
+      'real/data.json',
+    ]);
+  });
+
+  it('does not treat a regular-file prefix as a directory to scan', () => {
+    touch('file.json');
+    expect(
+      evaluateGlobGuard(dir, { id: 'FILE_PREFIX', pattern: 'file.json/*.json' }).match_count,
+    ).toBe(0);
+  });
+
+  it('refuses absolute and backslash-containing literal paths even when the file exists', () => {
+    touch('file.json');
+    touch('odd\\name.json');
+    for (const pattern of [join(dir, 'file.json'), 'odd\\name.json']) {
+      expect(evaluateGlobGuard(dir, { id: 'PATH', pattern }).match_count).toBe(0);
+    }
+  });
+});
