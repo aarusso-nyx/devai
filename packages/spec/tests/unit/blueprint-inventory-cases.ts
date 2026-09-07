@@ -444,11 +444,7 @@ describe('inventory invariant candidates', () => {
     };
     const dry = gcStaleInvariantCandidates({ ...options, dryRun: true });
     expect(dry).toMatchObject({ scanned: 7, stale: 4, kept: 3, evidence_log_path: null });
-    expect(gcStaleInvariantCandidates(options)).toMatchObject({
-      scanned: 7,
-      stale: 4,
-      kept: 3,
-    });
+    expect(() => gcStaleInvariantCandidates(options)).toThrow('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
 
     expect(
       gcStaleInvariantCandidates({

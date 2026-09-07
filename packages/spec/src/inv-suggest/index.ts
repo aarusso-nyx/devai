@@ -587,6 +587,7 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
   const candidates = entries.filter((e) => e.startsWith('INV-CANDIDATE-') && e.endsWith('.json'));
 
   const evidence: GcStaleEvidence[] = [];
+  const staleFiles: string[] = [];
   let stale = 0;
   let kept = 0;
   for (const file of candidates) {
@@ -650,24 +651,17 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
       gc_reason: 'target no longer surfaced by inventory body',
       gc_timestamp: now,
     });
-    if (opts.dryRun !== true) {
-      try {
-        unlinkSync(fullPath);
-      } catch {
-        /* skip */
-      }
-    }
+    staleFiles.push(fullPath);
   }
 
   let evidenceLogPath: string | null = null;
   if (evidence.length > 0 && opts.dryRun !== true) {
     evidenceLogPath = join(outDir, 'gc-evidence.jsonl');
     const block = evidence.map((e) => JSON.stringify(e)).join('\n') + '\n';
-    try {
-      appendFileSync(evidenceLogPath, block);
-    } catch {
-      /* skip */
-    }
+    // Preserve the evidence of the staleness decision before any destructive effect.
+    // Propagate failures: callers must reconcile a partial deletion, never report success.
+    appendFileSync(evidenceLogPath, block);
+    for (const file of staleFiles) unlinkSync(file);
   }
 
   return {
