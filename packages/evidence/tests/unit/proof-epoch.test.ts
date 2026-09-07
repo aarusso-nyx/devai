@@ -46,6 +46,84 @@ afterEach(() => {
 });
 
 describe('proof epoch integrity', () => {
+  it('hashes nested object keys canonically while preserving array order and input bytes', () => {
+    const unsigned = {
+      schemaVersion: '1.0.0' as const,
+      line_type: 'record' as const,
+      round_id: 'R-0005',
+      kind: 'hash',
+      sequence: 1,
+      timestamp: '2026-08-10T00:00:00.000Z',
+      payload: { z: 0, a: [{ z: 2, a: 1 }, null] },
+      previous_line_hash: null,
+    };
+    const original = JSON.stringify(unsigned);
+    // Independent SHA-256 vector over recursively sorted, compact JSON.
+    const expected = '147953a022e467c20359c1cd64d25e91f5a500fa1e7afa0e0e002b66ef721f8c';
+    expect(computeProofEpochLineHash(unsigned)).toBe(expected);
+    expect(
+      computeProofEpochLineHash({ ...unsigned, payload: { a: [{ a: 1, z: 2 }, null], z: 0 } }),
+    ).toBe(expected);
+    expect(
+      computeProofEpochLineHash({ ...unsigned, payload: { a: [null, { a: 1, z: 2 }], z: 0 } }),
+    ).not.toBe(expected);
+    expect(JSON.stringify(unsigned)).toBe(original);
+  });
+
+  it('seals an empty epoch with the dedicated empty hash and no phantom records', () => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'empty' };
+    expect(verifyProofEpoch({ ...inputs, requireClosed: false })).toMatchObject({
+      valid: true,
+      closed: false,
+      recordCount: 0,
+      head: null,
+    });
+    expect(verifyProofEpoch(inputs).valid).toBe(false);
+    const terminal = closeProofEpoch(inputs);
+    expect(terminal).toMatchObject({
+      sequence: 1,
+      record_count: 0,
+      payload: {},
+      previous_line_hash: null,
+      terminal_hash: 'd8340ed8a3ecd08c7e13e780a74e251073d1707951dcd8a41f476ac49258aa5f',
+    });
+    expect(verifyProofEpoch(inputs)).toMatchObject({
+      valid: true,
+      closed: true,
+      recordCount: 0,
+      head: terminal.line_hash,
+    });
+  });
+
+  it.each(['R-005', 'R-00055', 'prefixR-0005', 'R-0005suffix', '../R-0005'])(
+    'refuses malformed round identity %s',
+    (roundId) => {
+      expect(() => proofEpochPath(root(), roundId, 'valid')).toThrow(/invalid proof epoch round/u);
+    },
+  );
+  it.each(['', '../escape', '/absolute', 'UPPER', 'valid/child', '_prefix'])(
+    'refuses malformed kind %s',
+    (kind) => {
+      expect(() => proofEpochPath(root(), 'R-0005', kind)).toThrow(/invalid proof epoch kind/u);
+    },
+  );
+
+  it.each([
+    ['missing newline', '{}', /missing final newline/u],
+    ['empty line', '\n', /empty line at 1/u],
+    ['invalid JSON', '{\n', /invalid JSON at line 1/u],
+  ] as const)('rejects %s and preserves the damaged epoch', (_label, bytes, diagnostic) => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'damaged' };
+    appendProofEpochRecord({ ...inputs, payload: {} });
+    const path = proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind);
+    writeFileSync(path, bytes);
+    const result = verifyProofEpoch(inputs);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('; ')).toMatch(diagnostic);
+    expect(() => closeProofEpoch(inputs)).toThrow(diagnostic);
+    expect(readFileSync(path, 'utf8')).toBe(bytes);
+  });
+
   it.each([
     ['round', { round_id: 'R-0006' }, 'line 2 crosses round'],
     ['kind', { kind: 'other' }, 'line 2 crosses kind'],
