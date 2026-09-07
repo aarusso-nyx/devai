@@ -1067,12 +1067,15 @@ function isValidationLease(value: unknown): value is ValidationLease {
   const suffix = typeof lease.id === 'string' ? lease.id.slice(4) : '';
   return (
     lease.schemaVersion === '1.0.0' &&
-    /^TVL-[a-f0-9]{16}$/u.test(lease.id ?? '') &&
-    /^TASK-[0-9]{4,}$/u.test(lease.task_id ?? '') &&
+    typeof lease.id === 'string' &&
+    /^TVL-[a-f0-9]{16}$/u.test(lease.id) &&
+    typeof lease.task_id === 'string' &&
+    /^TASK-[0-9]{4,}$/u.test(lease.task_id) &&
     lease.worktree_id === `WT-TV-${suffix}` &&
     lease.worktree_path === `.devai/worktrees/WT-TV-${suffix}` &&
     lease.database === `devai_task_TV_${suffix}` &&
-    /^[a-f0-9]{40}$/u.test(lease.base_sha ?? '') &&
+    typeof lease.base_sha === 'string' &&
+    /^[a-f0-9]{40}$/u.test(lease.base_sha) &&
     typeof lease.created_at === 'string' &&
     !Number.isNaN(Date.parse(lease.created_at))
   );
