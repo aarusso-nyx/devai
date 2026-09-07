@@ -1,6 +1,6 @@
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildBootstrapPlan,
@@ -121,6 +121,36 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
     expect(result.preserved).toEqual([]);
     expect(result.overwritten).toContain('record/proofs/chain.json');
     expect(result.overwritten).toContain('.devai/state/counters.json');
+  });
+
+  it.each([false, true])('rechecks provenance created after planning with force=%s', (force) => {
+    const plan = buildBootstrapPlan({ targetRoot: dir });
+    const records = [
+      ['record/proofs/chain.json', '{"head":"retained","records":[{"hash":"retained"}]}'],
+      ['.devai/state/counters.json', '{"TASK":42}'],
+    ] as const;
+    for (const [path, content] of records) {
+      const absolute = join(dir, path);
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, content);
+    }
+    const result = executeBootstrapPlan(plan, { force });
+    for (const [path, content] of records) {
+      expect(readFileSync(join(dir, path), 'utf8')).toBe(content);
+      expect(force ? result.preserved : result.skipped).toContain(path);
+      expect(result.created).not.toContain(path);
+      expect(result.overwritten).not.toContain(path);
+    }
+  });
+
+  it('does not overwrite adopter files created after planning without force', () => {
+    const plan = buildBootstrapPlan({ targetRoot: dir });
+    mkdirSync(join(dir, 'product'), { recursive: true });
+    writeFileSync(join(dir, 'product/README.md'), 'new adopter-owned content');
+    const result = executeBootstrapPlan(plan);
+    expect(readFileSync(join(dir, 'product/README.md'), 'utf8')).toBe('new adopter-owned content');
+    expect(result.skipped).toContain('product/README.md');
+    expect(result.created).not.toContain('product/README.md');
   });
 
   it('does NOT preserve unrelated existing files when --force', () => {

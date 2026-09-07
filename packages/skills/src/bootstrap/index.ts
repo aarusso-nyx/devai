@@ -462,7 +462,9 @@ export function executeBootstrapPlan(
   for (const entry of plan.entries) {
     const abs = join(plan.target_root, entry.path);
     const dir = dirname(abs);
-    if (entry.action === 'skip-exists') {
+    // A reviewed plan may outlive an adopter write. Reconcile newly existing
+    // paths through the same force and provenance rules as files seen at planning.
+    if (entry.action === 'skip-exists' || (entry.action === 'create' && existsSync(abs))) {
       if (opts.force === true && entry.content !== null) {
         // Provenance-critical files (Article 32): refuse to overwrite
         // when they already contain real data. This closes the
