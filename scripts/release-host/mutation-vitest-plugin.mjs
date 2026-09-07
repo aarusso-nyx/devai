@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { sandboxWorkspaceAliases } from './mutation-workspace-aliases.mjs';
 import { pathToFileURL } from 'node:url';
 
@@ -55,6 +55,22 @@ const { declareFactoryPlugin, PluginKind } = await import(
 
 function createProtectedVitest(injector) {
   const runner = vitestTestRunnerFactory(injector);
+  // Stryker 9.6.1 uses a global file filter for the explicit testFiles roster,
+  // but labels that filter as runtime activation even for static mutants. The
+  // pinned Vitest runner's per-test IDs are relative "file#test" strings; the
+  // global filter consists of absolute sandbox file paths. Activate before
+  // module evaluation for that full-file selection, retaining the exact filter.
+  const originalMutantRun = runner.mutantRun;
+  runner.mutantRun = function (options) {
+    const fullFileSelection =
+      Array.isArray(options.testFilter) &&
+      options.testFilter.length > 0 &&
+      options.testFilter.every((file) => typeof file === 'string' && isAbsolute(file));
+    return originalMutantRun.call(this, {
+      ...options,
+      mutantActivation: fullFileSelection ? 'static' : options.mutantActivation,
+    });
+  };
   const originalInit = runner.init;
   runner.init = async function () {
     await originalInit.call(this);

@@ -140,6 +140,32 @@ Self-adoption includes early diagnosis, retained artifacts and interrupted-effec
 The existing 1.5 custom packer, protected certification provider and injected artifact sink remain
 deferred. This does not alter their product contracts or declare those implementations ready.
 
+## Mutation activation compatibility
+
+Before an expensive mutation campaign, run the real runner regression:
+
+```sh
+pnpm exec vitest run --config tests/config/local.config.ts tests/integration/mutation-static-activation.integration.test.ts
+```
+
+With pinned Stryker 9.6.1, an explicit `testFiles` population produces an absolute
+file filter even for static mutants. The upstream planner labels that filter for
+runtime activation, which occurs after module initialization in the Vitest runner.
+A module-level mutation can consequently be reported as surviving without ever
+being active when the module loads.
+
+The installed DEVAI wrapper activates full-file filters before module evaluation.
+It retains the exact filter; relative per-test IDs keep their runtime activation.
+The regression executes actual static and runtime mutants with an explicit test
+population and verifies both the results and the complete test-file census.
+It is a runner compatibility check, not candidate certification.
+
+A wrapper change changes the protected mutation program identity. Rebuild and
+rebind the installed control before a new campaign; do not reuse a previous
+package result or aggregate verdict across that identity change. Retain earlier
+reports as diagnostics, including failures. Do not remove static mutants or the
+explicit test population to work around an activation failure.
+
 ## Acceptance record
 
 Record candidate/control SHA, focused/full gate outcomes, operator intervention count,
