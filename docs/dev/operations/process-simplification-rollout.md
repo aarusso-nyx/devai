@@ -70,6 +70,22 @@ controls, followed by complete mutation semantics and rehearsal bindings. Workfl
 activation of this v2 path remains pending that integration and protected approval.
 Never include control packages, signing keys or trust/revocation files in this layout.
 
+`verify-installed-export.mjs` provides the repository-local installed verification adapter.
+Its caller first provisions and independently approves the host package, then supplies that
+host, the approved DAG control, external signer trust, exact metadata hashes and policy
+expectations. Use a fresh process and empty private output directory for each invocation;
+the installed host permits its command adapters to be installed only once. Supply the
+separately provisioned offline authority root as `expected.verificationRoot`. An empty
+output directory cannot substitute for that root, and the adapter never initializes or
+weakens authority policy automatically.
+
+The adapter snapshots digest-addressed objects, invokes the existing installed
+`release offline-verify` action, retains the command result privately, and refuses
+unconsumed extra objects. It installs no signing or publication adapter and does not
+run candidate commands. A passing product-fixture receipt with mutation marked
+not applicable remains product acceptance only; release readiness still requires
+independent verification of all ten required mutation packages.
+
 ## Local prerequisites and certification
 
 Keep the configuration, package, maps, signing material, prerequisite receipt and export
