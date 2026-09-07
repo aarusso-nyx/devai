@@ -538,7 +538,7 @@ function parseUniqueLine(line: string): readonly string[] | null {
 function parseFkLine(line: string): DataModelForeignKey | null {
   // CONSTRAINT name FOREIGN KEY (cols) REFERENCES table(cols) [ON DELETE x] [ON UPDATE y]
   const m = line.match(
-    /FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+(?:([A-Za-z_][\w]*)\.)?([A-Za-z_][\w]*)\s*(?:\(([^)]+)\))?(?:\s+ON\s+DELETE\s+([A-Za-z]+(?:\s+[A-Za-z]+)?))?(?:\s+ON\s+UPDATE\s+([A-Za-z]+(?:\s+[A-Za-z]+)?))?/i,
+    /FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+(?:([A-Za-z_][\w]*)\.)?([A-Za-z_][\w]*)\s*(?:\(([^)]+)\))?(?:\s+ON\s+DELETE\s+([A-Za-z]+(?:\s+(?!ON\b)[A-Za-z]+)?))?(?:\s+ON\s+UPDATE\s+([A-Za-z]+(?:\s+(?!ON\b)[A-Za-z]+)?))?/i,
   );
   if (m === null) return null;
   const cols = m[1];
@@ -727,13 +727,20 @@ export function senseInventoryDataModel(opts: InventoryDataModelOptions): Invent
   }> = [];
 
   const dirs = opts.migrationDirs ?? DEFAULT_MIGRATION_DIRS;
-  const scanned: string[] = [];
+  const discovered = new Set<string>();
   for (const d of dirs) {
     const abs = existingDir(opts.repoRoot, d);
     if (abs === null) continue;
-    scanned.push(...walkFiles(abs, { ignoreDirs, extensions: ['sql'], skipDeclarations: false }));
+    for (const file of walkFiles(abs, {
+      ignoreDirs,
+      extensions: ['sql'],
+      skipDeclarations: false,
+    })) {
+      discovered.add(file);
+    }
   }
 
+  const scanned = [...discovered];
   let tables: DataModelTable[] = [];
   // Phase 22.C: accumulate raw SQL across all migration files so
   // the pii-registry pass can scan inserts that target tables
