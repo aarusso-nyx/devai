@@ -22,6 +22,7 @@ import {
   type MutationRequest,
   type PreparedMutation,
   type ResourceTarget,
+  type ResourceTargetSelector,
   type TrustedExecutionState,
   type VerifiedPreparedMutationCapability,
 } from '../../src/index.js';
@@ -182,6 +183,322 @@ function policy(
 }
 
 describe('authority decision seam', () => {
+  it.each([
+    '',
+    '/absolute',
+    './file',
+    'dir/',
+    'a\\b',
+    'a\0b',
+    'a//b',
+    '../file',
+    'a/../b',
+    'a/./b',
+  ])('refuses the isolated unsafe target or rename path %j before policy', (path) => {
+    const trustedRuntime = runtime({ mode: 'shadow' });
+    const envelope = trustedRuntime.materialize(baseRequest);
+    for (const target of [
+      { ...fsTarget, canonical_relative_path: path },
+      { ...fsTarget, operation: 'rename' as const, rename_from_canonical_relative_path: path },
+    ]) {
+      let calls = 0;
+      const selectedPolicy = {
+        ...policy(),
+        evaluate: () => {
+          calls += 1;
+          return { outcome: 'allow' as const, reasons: [] };
+        },
+      };
+      const decision = decide({
+        plan: exactPlan(envelope, [target]),
+        runtime: trustedRuntime,
+        policy: selectedPolicy,
+      });
+      expect(decision.reason_code).toBe('MALFORMED_PLAN');
+      expect(decision.disposition).toBe('refuse');
+      expect(calls).toBe(0);
+    }
+  });
+
+  it('refuses duplicate IDs and duplicate semantic resources independently', () => {
+    const trustedRuntime = runtime();
+    const envelope = trustedRuntime.materialize(baseRequest);
+    const targets: ResourceTarget[] = [
+      fsTarget,
+      {
+        kind: 'git-ref',
+        id: 'git',
+        repository_id: 'example-repository',
+        ref: 'refs/heads/main',
+        operation: 'update',
+      },
+      {
+        kind: 'db',
+        id: 'db',
+        connection_id: 'local',
+        database_id: 'main',
+        object_id: 'records',
+        operation: 'update',
+      },
+      {
+        kind: 'remote',
+        id: 'remote',
+        system_id: 'service',
+        endpoint_id: 'records',
+        operation_id: 'update',
+        publication: false,
+      },
+    ];
+    for (const target of targets) {
+      const valid = decide({
+        plan: exactPlan(envelope, [target]),
+        runtime: trustedRuntime,
+        policy: policy(),
+      });
+      expect(valid.evaluation).toBe('allow');
+      const duplicateResource = { ...target, id: target.id + '-different' };
+      expect(
+        decide({
+          plan: exactPlan(envelope, [target, duplicateResource]),
+          runtime: trustedRuntime,
+          policy: policy(),
+        }).reason_code,
+      ).toBe('MALFORMED_PLAN');
+    }
+    expect(
+      decide({
+        plan: exactPlan(envelope, [
+          fsTarget,
+          { ...fsTarget, canonical_relative_path: 'another-file' },
+        ]),
+        runtime: trustedRuntime,
+        policy: policy(),
+      }).reason_code,
+    ).toBe('MALFORMED_PLAN');
+  });
+
+  it('rejects each empty semantic identifier and credential-style remote endpoint', () => {
+    const trustedRuntime = runtime();
+    const envelope = trustedRuntime.materialize(baseRequest);
+    const targets: ResourceTarget[] = [
+      { ...fsTarget, id: ' ' },
+      { ...fsTarget, repository_id: ' ' },
+      { kind: 'git-ref', id: 'git', repository_id: '', ref: 'main', operation: 'update' },
+      {
+        kind: 'git-ref',
+        id: 'git',
+        repository_id: 'example-repository',
+        ref: ' ',
+        operation: 'update',
+      },
+      ...['connection_id', 'database_id', 'object_id'].map((key) => ({
+        kind: 'db' as const,
+        id: 'db',
+        connection_id: 'local',
+        database_id: 'main',
+        object_id: 'records',
+        operation: 'update' as const,
+        [key]: '',
+      })),
+      ...['system_id', 'endpoint_id', 'operation_id'].map((key) => ({
+        kind: 'remote' as const,
+        id: 'remote',
+        system_id: 'service',
+        endpoint_id: 'records',
+        operation_id: 'update',
+        publication: false,
+        [key]: ' ',
+      })),
+      {
+        kind: 'remote',
+        id: 'remote',
+        system_id: 'service',
+        endpoint_id: 'https://example.invalid/records',
+        operation_id: 'update',
+        publication: false,
+      },
+    ];
+    for (const target of targets)
+      expect(
+        decide({ plan: exactPlan(envelope, [target]), runtime: trustedRuntime, policy: policy() })
+          .reason_code,
+      ).toBe('MALFORMED_PLAN');
+  });
+
+  it('binds every selector dimension before allowing an exact batch', () => {
+    const trustedRuntime = runtime({
+      executionState: {
+        applied_batch_ids: [],
+        applied_target_count: 0,
+        partial_effect_evidence_refs: [],
+      },
+    });
+    const envelope = trustedRuntime.materialize({
+      ...baseRequest,
+      consent: { ...baseRequest.consent, allow_publish: true },
+    });
+    const cases: {
+      target: ResourceTarget;
+      selector: ResourceTargetSelector;
+      outside: ResourceTarget[];
+    }[] = [
+      {
+        target: { ...fsTarget, canonical_relative_path: 'docs/.hidden' },
+        selector: {
+          kind: 'fs',
+          repository_id: 'example-repository',
+          canonical_relative_path_glob: 'docs/**',
+          operations: ['update'],
+        },
+        outside: [
+          { ...fsTarget, canonical_relative_path: 'outside/file' },
+          { ...fsTarget, canonical_relative_path: 'docs/file', repository_id: 'other' },
+          { ...fsTarget, canonical_relative_path: 'docs/file', operation: 'delete' },
+        ],
+      },
+      {
+        target: {
+          kind: 'git-ref',
+          id: 'git',
+          repository_id: 'example-repository',
+          ref: 'refs/heads/main',
+          operation: 'update',
+        },
+        selector: {
+          kind: 'git-ref',
+          repository_id: 'example-repository',
+          ref_glob: 'refs/heads/*',
+          operations: ['update'],
+        },
+        outside: [
+          {
+            kind: 'git-ref',
+            id: 'git',
+            repository_id: 'other',
+            ref: 'refs/heads/main',
+            operation: 'update',
+          },
+          {
+            kind: 'git-ref',
+            id: 'git',
+            repository_id: 'example-repository',
+            ref: 'refs/tags/v1',
+            operation: 'update',
+          },
+          {
+            kind: 'git-ref',
+            id: 'git',
+            repository_id: 'example-repository',
+            ref: 'refs/heads/main',
+            operation: 'delete',
+          },
+        ],
+      },
+      {
+        target: {
+          kind: 'db',
+          id: 'db',
+          connection_id: 'local',
+          database_id: 'main',
+          object_id: 'records',
+          operation: 'update',
+        },
+        selector: {
+          kind: 'db',
+          connection_id: 'local',
+          database_id_glob: 'main',
+          object_id_glob: 'records',
+          operations: ['update'],
+        },
+        outside: ['connection_id', 'database_id', 'object_id', 'operation'].map((key) => ({
+          kind: 'db' as const,
+          id: 'db',
+          connection_id: 'local',
+          database_id: 'main',
+          object_id: 'records',
+          operation: 'update' as const,
+          [key]: key === 'operation' ? 'delete' : 'other',
+        })),
+      },
+      {
+        target: {
+          kind: 'remote',
+          id: 'remote',
+          system_id: 'service',
+          endpoint_id: 'records',
+          operation_id: 'update',
+          publication: false,
+        },
+        selector: {
+          kind: 'remote',
+          system_id: 'service',
+          endpoint_ids: ['records'],
+          operation_ids: ['update'],
+          publication: false,
+        },
+        outside: [
+          ...['system_id', 'endpoint_id', 'operation_id'].map((key) => ({
+            kind: 'remote' as const,
+            id: 'remote',
+            system_id: 'service',
+            endpoint_id: 'records',
+            operation_id: 'update',
+            publication: false,
+            [key]: 'other',
+          })),
+          {
+            kind: 'remote',
+            id: 'remote',
+            system_id: 'service',
+            endpoint_id: 'records',
+            operation_id: 'update',
+            publication: true,
+          },
+        ],
+      },
+    ];
+    for (const entry of cases) {
+      const plan: MutationPlan = {
+        plan_id: 'bounded-dimensions',
+        envelope,
+        strategy: 'bounded-batches',
+        selectors: [entry.selector],
+        bounds: { max_batches: 1, max_targets_per_batch: 1, max_total_targets: 1 },
+        batch_atomicity: 'each-batch',
+        recovery: 'preserve-and-report',
+      };
+      const batch: MutationBatch = {
+        batch_id: 'first-batch',
+        plan_id: plan.plan_id,
+        ordinal: 1,
+        atomicity: 'whole-batch',
+        targets: [entry.target],
+      };
+      expect(decide({ plan, batch, runtime: trustedRuntime, policy: policy() }).evaluation).toBe(
+        'allow',
+      );
+      for (const target of entry.outside)
+        expect(
+          decide({
+            plan,
+            batch: { ...batch, targets: [target] },
+            runtime: trustedRuntime,
+            policy: policy(),
+          }).reason_code,
+        ).toBe('MALFORMED_PLAN');
+      const unrelated = cases.find((other) => other.target.kind !== entry.target.kind);
+      if (!unrelated) throw Error('missing cross-kind fixture');
+      expect(
+        decide({
+          plan,
+          batch: { ...batch, targets: [unrelated.target] },
+          runtime: trustedRuntime,
+          policy: policy(),
+        }).reason_code,
+      ).toBe('MALFORMED_PLAN');
+    }
+  });
+
   it('declares exactly the five human roles and rejects machine actors', () => {
     for (const role of HUMAN_ROLES) {
       expect(
