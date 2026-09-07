@@ -447,7 +447,12 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
     );
   }
 
-  if (/\b(?:secrets|vars)\./u.test(source)) {
+  // GitHub contexts also support bracket access and whole-context expressions.
+  // Dotted-name matching alone permits e.g. toJSON(secrets) to bypass this guard.
+  const protectedExpression = [...source.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].some((match) =>
+    /\b(?:secrets|vars)\b/u.test(match[1] ?? ''),
+  );
+  if (/\b(?:secrets|vars)\s*(?:\.|\[)/u.test(source) || protectedExpression) {
     findings.push(
       finding('CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN', file, 'preflight must reference no secret'),
     );
@@ -486,7 +491,10 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
   }
   if (
     JSON.stringify(Object.keys(jobs)) !== JSON.stringify(['preflight']) ||
-    jobs.preflight?.name !== 'devai-release-gate'
+    jobs.preflight?.name !== 'devai-release-gate' ||
+    jobs.preflight?.if !== undefined ||
+    (jobs.preflight?.['continue-on-error'] !== undefined &&
+      jobs.preflight['continue-on-error'] !== false)
   )
     findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, 'one required result'));
   const gate = jobs.preflight?.steps?.find(

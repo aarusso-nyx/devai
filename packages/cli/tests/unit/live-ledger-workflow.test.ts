@@ -924,6 +924,30 @@ describe('remote preflight workflow', () => {
         ),
       diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
     },
+    ...[
+      'vars.DEVAI_LEDGER_POLICY_DIGEST',
+      "secrets['PACKAGES_READ_TOKEN']",
+      "vars['DEVAI_LEDGER_POLICY_DIGEST']",
+      'toJSON(secrets)',
+      'toJSON(vars)',
+    ].map((reference) => ({
+      name: `protected input expression ${reference}`,
+      mutate: (source: string) =>
+        source.replace(
+          '          node-version: 24',
+          '          node-version: 24\n          token: ${{ ' + reference + ' }}',
+        ),
+      diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
+    })),
+    ...['if: false', 'continue-on-error: true'].map((setting) => ({
+      name: `optional required job ${setting}`,
+      mutate: (source: string) =>
+        source.replace(
+          '    name: devai-release-gate',
+          '    ' + setting + '\n    name: devai-release-gate',
+        ),
+      diagnostic: 'CI_PREFLIGHT_GATE_INVALID',
+    })),
     {
       name: 'remote execution of the attested RC closure',
       mutate: (source: string) =>
