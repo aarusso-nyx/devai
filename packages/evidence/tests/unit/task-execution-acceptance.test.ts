@@ -494,3 +494,158 @@ describe('canonical task-evidence persistence identity', () => {
     expect(readdirSync(repoRoot)).toEqual([]);
   });
 });
+
+describe('non-agent execution authority bindings', () => {
+  const routine = {
+    kind: 'routine' as const,
+    action_id: null,
+    argv: ['node', 'fixture.mjs'],
+    cwd: '.',
+    effects: ['read' as const, 'local-write' as const],
+  };
+  const bound = task('TASK-NON-AGENT', routine);
+
+  it.each([
+    ['changed argument', { argv: ['node', 'other.mjs'] }],
+    ['reordered arguments', { argv: ['fixture.mjs', 'node'] }],
+    ['missing argument', { argv: ['node'] }],
+    ['extra argument', { argv: ['node', 'fixture.mjs', '--write'] }],
+    ['undeclared action', { action_id: 'check' }],
+    ['changed effects', { effects: ['read', 'remote-write'] }],
+    ['reordered effects', { effects: ['local-write', 'read'] }],
+    ['missing effect', { effects: ['read'] }],
+    ['extra effect', { effects: ['read', 'local-write', 'remote-write'] }],
+  ])('refuses a routine with %s', (_label, changes) => {
+    const resolved = { ...routine, ...changes } as TaskExecutionEvidenceFacts['resolved_executor'];
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(bound, facts('TEE-NON-AGENT', resolved), PASS_VALIDATOR),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_ROUTINE_MISMATCH');
+  });
+
+  it('refuses substitution of a declared action', () => {
+    const requested = { ...routine, action_id: 'check', argv: [] };
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          task('TASK-ACTION', requested),
+          facts('TEE-ACTION', { ...requested, action_id: 'run' }),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_ROUTINE_MISMATCH');
+  });
+
+  it.each([
+    ['model-selection mode', { mode: 'exact' }],
+    ['considered identity', { considered_registry_ids: ['provider:model'] }],
+    ['selected identity', { selected_registry_id: 'provider:model' }],
+    ['provider rejection', { rejection_codes: ['PROVIDER_UNAVAILABLE'] }],
+    ['fallback reason', { fallback_reason: 'try another model' }],
+  ])('refuses non-agent %s', (_label, changes) => {
+    const selection = { ...NO_SELECTION, ...changes } as TaskExecutionEvidenceFacts['selection'];
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          bound,
+          facts('TEE-SELECTION', routine, { selection }),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_SELECTION_NOT_APPLICABLE');
+  });
+
+  it.each([
+    ['usage', { usage: { input_tokens: 1, output_tokens: 2 } }],
+    ['cost', { cost: { amount: 1, currency: 'USD', source: 'provider-reported' } }],
+  ])('refuses provider %s on a routine', (_label, changes) => {
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          bound,
+          facts('TEE-PROVIDER', routine, changes as Partial<TaskExecutionEvidenceFacts>),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_PROVIDER_FACTS_NOT_APPLICABLE');
+  });
+
+  it.each(['fail', 'error', 'cancelled'] as const)('requires failure details for %s', (verdict) => {
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          bound,
+          facts('TEE-FAILURE', routine, { verdict }),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_FAILURE_MISMATCH');
+    const failure = {
+      code: 'EXECUTION_FAILED',
+      message: 'retained for repair',
+      rollback_disposition: 'preserved-for-repair' as const,
+    };
+    expect(
+      buildTaskExecutionEvidence(
+        bound,
+        facts('TEE-FAILURE', routine, { verdict, failure }),
+        PASS_VALIDATOR,
+      ).failure,
+    ).toEqual(failure);
+  });
+
+  it('refuses failure details attached to a passing result', () => {
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          bound,
+          facts('TEE-PASS', routine, {
+            failure: { code: 'FAILED', message: 'failed', rollback_disposition: 'not-required' },
+          }),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_FAILURE_MISMATCH');
+  });
+
+  it.each([
+    ['different role', { role: 'owner' as const, completion_evidence: ['EV-1'] }],
+    [
+      'unbound completion',
+      { role: 'inspector' as const, completion_evidence: ['EV-1', 'EV-UNBOUND'] },
+    ],
+  ])('refuses human evidence with %s', (_label, changes) => {
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          task('TASK-HUMAN', { kind: 'human', role: 'inspector' }),
+          facts('TEE-HUMAN', { kind: 'human', ...changes }),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_HUMAN_MISMATCH');
+  });
+
+  it.each([
+    ['reordered children', ['TASK-B', 'TASK-A'], ['TEE-B', 'TEE-A']],
+    ['substituted child', ['TASK-A', 'TASK-C'], ['TEE-A', 'TEE-C']],
+    ['missing child', ['TASK-A'], ['TEE-A']],
+    ['missing receipt', ['TASK-A', 'TASK-B'], ['TEE-A']],
+    ['extra receipt', ['TASK-A', 'TASK-B'], ['TEE-A', 'TEE-B', 'TEE-C']],
+  ])('refuses a composite with %s', (_label, child_task_ids, child_execution_evidence_ids) => {
+    expect(
+      code(() =>
+        buildTaskExecutionEvidence(
+          task('TASK-COMPOSITE', { kind: 'composite', child_task_ids: ['TASK-A', 'TASK-B'] }),
+          facts('TEE-COMPOSITE', {
+            kind: 'composite',
+            child_task_ids,
+            child_execution_evidence_ids,
+          }),
+          PASS_VALIDATOR,
+        ),
+      ),
+    ).toBe('TASK_EXECUTION_EVIDENCE_COMPOSITE_MISMATCH');
+  });
+});
