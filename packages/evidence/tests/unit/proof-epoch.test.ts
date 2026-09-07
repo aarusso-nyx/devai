@@ -7,6 +7,7 @@ import {
   appendProofEpochErrata,
   appendProofEpochRecord,
   closeProofEpoch,
+  computeProofEpochLineHash,
   proofEpochPath,
   verifyProofEpoch,
   type ProofEpochLine,
@@ -45,6 +46,66 @@ afterEach(() => {
 });
 
 describe('proof epoch integrity', () => {
+  it.each([
+    ['round', { round_id: 'R-0006' }, 'line 2 crosses round'],
+    ['kind', { kind: 'other' }, 'line 2 crosses kind'],
+    ['record count', { record_count: 0 }, 'line 2 has wrong record count'],
+    ['terminal hash', { terminal_hash: '0'.repeat(64) }, 'line 2 has wrong terminal hash'],
+  ] as const)('rejects a rehashed terminal with a wrong %s', (_name, changes, diagnostic) => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'seal' };
+    const first = appendProofEpochRecord({ ...inputs, payload: { result: 'pass' } });
+    const terminal = closeProofEpoch(inputs);
+    const { line_hash: _hash, ...unsigned } = { ...terminal, ...changes };
+    const forged = { ...unsigned, line_hash: computeProofEpochLineHash(unsigned) };
+    write(proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind), [first, forged]);
+    const result = verifyProofEpoch(inputs);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(diagnostic);
+    expect(result.errors).not.toContain('line 2 has a tampered hash');
+  });
+
+  it('rejects a rehashed forward errata reference', () => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'errata' };
+    const first = appendProofEpochRecord({ ...inputs, payload: {} });
+    const errata = appendProofEpochErrata({
+      ...inputs,
+      payload: {},
+      correctsSequence: 1,
+      reason: 'correction',
+    });
+    const { line_hash: _hash, ...unsigned } = { ...errata, corrects_sequence: 2 };
+    write(proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind), [
+      first,
+      { ...unsigned, line_hash: computeProofEpochLineHash(unsigned) },
+    ]);
+    expect(verifyProofEpoch({ ...inputs, requireClosed: false })).toMatchObject({
+      valid: false,
+      errors: ['line 2 has invalid forward or non-record errata'],
+    });
+  });
+
+  it.each([
+    { value: null },
+    { value: false },
+    { value: 42 },
+    { value: 'invalid' },
+    { value: [] },
+    { value: {} },
+  ])('reports malformed line $value without crashing or permitting append', ({ value }) => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'malformed' };
+    appendProofEpochRecord({ ...inputs, payload: { initial: true } });
+    const path = proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind);
+    writeFileSync(path, `${JSON.stringify(value)}\n`);
+    const bytes = readFileSync(path);
+    const result = verifyProofEpoch({ ...inputs, requireClosed: false });
+    expect(result).toMatchObject({ valid: false, closed: false, recordCount: 0 });
+    expect(result.errors).toContain('line 1 fails schema validation');
+    expect(() => appendProofEpochRecord({ ...inputs, payload: { late: true } })).toThrow(
+      /proof epoch is invalid/u,
+    );
+    expect(readFileSync(path)).toEqual(bytes);
+  });
+
   it('appends records and forward-only errata before a terminal seal', () => {
     const repoRoot = root();
     const inputs = { repoRoot, roundId: 'R-0005', kind: 'test-results' } as const;
