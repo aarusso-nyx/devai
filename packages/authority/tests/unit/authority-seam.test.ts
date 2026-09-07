@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { verifyDecisionBinding } from '../../src/decision.js';
 import {
@@ -1167,6 +1167,91 @@ describe('authority decision seam', () => {
       const decision = decide({ plan, batch, runtime: trustedRuntime, policy: policy() });
       expect(decision.reason_code).toBe(testCase.reason);
       expect(decision.disposition).toBe('refuse');
+    }
+  });
+});
+
+describe('policy provenance before authority evaluation', () => {
+  const textFields: [string, (value: string) => AuthorityPolicyProvenance][] = [
+    ['policy ID', (value) => ({ ...provenance, policy_id: value })],
+    ['policy version', (value) => ({ ...provenance, policy_version: value })],
+    ['repository ID', (value) => ({ ...provenance, repository_id: value })],
+    [
+      'constitution version',
+      (value) => ({ ...provenance, constitution: { ...provenance.constitution, version: value } }),
+    ],
+  ];
+  const hashFields: [string, (value: string) => AuthorityPolicyProvenance][] = [
+    [
+      'constitution digest',
+      (value) => ({
+        ...provenance,
+        constitution: { ...provenance.constitution, digest_sha256: value },
+      }),
+    ],
+    [
+      'source policy digest',
+      (value) => ({
+        ...provenance,
+        source_policy: { ...provenance.source_policy, digest_sha256: value },
+      }),
+    ],
+    ['resolved policy digest', (value) => ({ ...provenance, resolved_digest_sha256: value })],
+    [
+      'extension digest',
+      (value) => ({
+        ...provenance,
+        additive_extensions: [
+          { extension_id: 'extension', extension_version: '1.0.0', digest_sha256: value },
+        ],
+      }),
+    ],
+  ];
+  function expectProvenanceRefusal(selected: AuthorityPolicyProvenance) {
+    const trustedRuntime = runtime({ policy: selected });
+    const evaluate = vi.fn(() => ({
+      outcome: 'allow' as const,
+      reasons: ['must never authorize malformed provenance'],
+    }));
+    const decision = decide({
+      plan: exactPlan(trustedRuntime.materialize(baseRequest)),
+      runtime: trustedRuntime,
+      policy: { provenance: selected, evaluate },
+    });
+    expect(decision.reason_code).toBe('POLICY_PROVENANCE_INVALID');
+    expect(decision.evaluation).toBe('deny');
+    expect(decision.disposition).toBe('refuse');
+    expect(evaluate).not.toHaveBeenCalled();
+  }
+  for (const [name, withValue] of textFields) {
+    it.each(['', ' ', '\t\n'])(`refuses empty or whitespace-only ${name}: %j`, (value) => {
+      expectProvenanceRefusal(withValue(value));
+    });
+  }
+  for (const [name, withValue] of hashFields) {
+    it.each([
+      '',
+      'a'.repeat(63),
+      'a'.repeat(65),
+      'G'.repeat(64),
+      'A'.repeat(64),
+      `prefix${'a'.repeat(64)}`,
+      `${'a'.repeat(64)}suffix`,
+    ])(`refuses malformed ${name}: %j`, (value) => {
+      expectProvenanceRefusal(withValue(value));
+    });
+  }
+  it('accepts lowercase SHA-256 endpoints with exact policy identity', () => {
+    for (const value of ['0'.repeat(64), 'f'.repeat(64)]) {
+      const selected = { ...provenance, resolved_digest_sha256: value };
+      const trustedRuntime = runtime({ policy: selected });
+      const decision = decide({
+        plan: exactPlan(trustedRuntime.materialize(baseRequest)),
+        runtime: trustedRuntime,
+        policy: policy(selected),
+      });
+      expect(decision.reason_code).toBe('POLICY_ALLOW');
+      expect(decision.disposition).toBe('proceed');
     }
   });
 });
