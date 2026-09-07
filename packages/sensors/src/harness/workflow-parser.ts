@@ -252,7 +252,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       jobs.push(currentJob);
       continue;
     }
-    // Nested-job recognition for `name:` inside the current job is the same regex; guard via stepCount.
+    // Subsequent jobs are recognized at jobBaseIndent, independent of step count.
 
     // steps: marker.
     if (currentJob !== null && /^steps\s*:/.test(trimmed)) {
@@ -309,8 +309,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       inJobsBlock &&
       currentJob !== null &&
       ind === jobBaseIndent &&
-      /^[A-Za-z0-9_\-.]+\s*:\s*$/.test(trimmed) &&
-      currentJob.stepCount > 0
+      /^[A-Za-z0-9_\-.]+\s*:\s*$/.test(trimmed)
     ) {
       // Switching to a new job at the same indent.
       const name = trimmed.replace(/:\s*$/, '');
