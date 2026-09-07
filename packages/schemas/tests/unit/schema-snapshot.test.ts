@@ -143,3 +143,61 @@ describe('installed schema snapshot binding', () => {
     );
   });
 });
+
+// Invariants: INV-DEVAI-001
+
+describe('lazy schema reference isolation', () => {
+  it.each([
+    'error.schema.json',
+    'glob-guards.schema.json',
+    'github-issues-tracking-policy.schema.json',
+    'triage.schema.json',
+    'release-intent.schema.json',
+    'release-policy-resolution.schema.json',
+    'release-lifecycle-store-head.schema.json',
+    'release-lifecycle-state.schema.json',
+  ])('does not parse unrelated %s while compiling an invariant', async (name) => {
+    const registry = await import('../../src/index.js');
+    const input = snapshot();
+    input.schemas.set(name, Buffer.from('{'));
+    registry.bindSchemaPackageSnapshot(input);
+    const validate = registry.getValidator('invariant.schema.json');
+    expect(validate({})).toBe(false);
+    expect(validate.errors?.length).toBeGreaterThan(0);
+    expect(() => registry.loadSchema(name)).toThrow(SyntaxError);
+  });
+
+  it.each([
+    ['error.schema.json', 'action-result.schema.json'],
+    ['github-issues-tracking-policy.schema.json', 'github-issues-tracking-config.schema.json'],
+    ['triage.schema.json', 'triage-classify-result.schema.json'],
+    ['release-intent.schema.json', 'release-plan-receipt.schema.json'],
+    ['release-policy-resolution.schema.json', 'release-plan-receipt-v2.schema.json'],
+    ['release-lifecycle-store-head.schema.json', 'release-lifecycle-store-record.schema.json'],
+    ['release-lifecycle-state.schema.json', 'release-lifecycle-store-record.schema.json'],
+  ])(
+    'reuses previously compiled %s when subsequently compiling %s',
+    async (dependency, consumer) => {
+      const registry = await import('../../src/index.js');
+      registry.bindSchemaPackageSnapshot(snapshot());
+      const first = registry.getValidator(dependency);
+      const next = registry.getValidator(consumer);
+      expect(next({})).toBe(false);
+      expect(next.errors?.length).toBeGreaterThan(0);
+      expect(registry.getValidator(dependency)).toBe(first);
+      expect(registry.getValidator(consumer)).toBe(next);
+    },
+  );
+
+  it.each(['common-defs.schema.json', 'record-meta.schema.json'])(
+    'returns an already registered shared schema %s without duplicate registration',
+    async (name) => {
+      const registry = await import('../../src/index.js');
+      registry.bindSchemaPackageSnapshot(snapshot());
+      registry.getValidator('invariant.schema.json');
+      const validator = registry.getValidator(name);
+      expect(typeof validator).toBe('function');
+      expect(registry.getValidator(name)).toBe(validator);
+    },
+  );
+});
