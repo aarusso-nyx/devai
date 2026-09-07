@@ -697,3 +697,36 @@ it.each([
     });
   },
 );
+
+it('compares transported Git tree identity independently of JSON property order', () => {
+  const input = tuple();
+  const { algorithm, value } = input.fullResult.testedTree;
+  const transported = JSON.parse(
+    JSON.stringify({ ...input.fullResult, testedTree: { value, algorithm } }),
+  );
+  expect(validateActionsEvidenceShadowTuple({ ...input, fullResult: transported })).toEqual({
+    mergeSha: input.decision.mergedCommitSha,
+    disposition: 'promotion-hit',
+    shadowFullEquivalent: true,
+    durable: true,
+  });
+});
+
+it.each([
+  ['missing', undefined],
+  ['null', null],
+  ['array', []],
+  ['algorithm only', { algorithm: 'sha1' }],
+  ['value only', { value: 'a'.repeat(40) }],
+  ['extra field', { algorithm: 'sha1', value: 'a'.repeat(40), extra: true }],
+  ['wrong algorithm', { algorithm: 'sha256', value: 'a'.repeat(40) }],
+  ['wrong value', { algorithm: 'sha1', value: 'b'.repeat(40) }],
+] as const)('refuses a %s transported Git tree identity', (_name, testedTree) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      fullResult: { ...input.fullResult, testedTree },
+    }),
+  ).toThrow('full result tested tree does not match the manifest');
+});

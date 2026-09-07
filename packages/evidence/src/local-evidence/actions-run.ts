@@ -288,8 +288,14 @@ export function validateActionsEvidenceShadowTuple(
   ] as const) {
     requireTuple(full[field] === expected, `full result ${field} does not match the manifest`);
   }
+  const testedTree = full['testedTree'];
   requireTuple(
-    JSON.stringify(full['testedTree']) === JSON.stringify(claimed.testedTree),
+    isRecord(testedTree) &&
+      Object.keys(testedTree).length === 2 &&
+      Object.hasOwn(testedTree, 'algorithm') &&
+      Object.hasOwn(testedTree, 'value') &&
+      testedTree['algorithm'] === claimed.testedTree.algorithm &&
+      testedTree['value'] === claimed.testedTree.value,
     'full result tested tree does not match the manifest',
   );
   requireTuple(isRecord(full['jobs']), 'full result jobs are missing');
