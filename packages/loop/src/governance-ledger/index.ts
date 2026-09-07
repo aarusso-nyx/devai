@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, relative, resolve } from 'node:path';
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import { readProcessSync } from '@devai-nyx/authority';
 
@@ -576,7 +576,19 @@ export function archiveImmutability(options: {
 }): GovernanceIntegrityReport {
   const archiveDir = resolve(options.repoRoot, options.archiveDir ?? DEFAULT_ARCHIVE_DIR);
   const manifestPath = join(archiveDir, 'MANIFEST.json');
-  if (!existsSync(archiveDir)) return { ok: true, findings: [] };
+  const archiveStat = lstatSync(archiveDir, { throwIfNoEntry: false });
+  if (archiveStat === undefined) return { ok: true, findings: [] };
+  if (!archiveStat.isDirectory())
+    return {
+      ok: false,
+      findings: [
+        {
+          code: 'ARCHIVE_MANIFEST_INVALID',
+          message: 'Archive root must be a directory, not a link.',
+          path: relative(options.repoRoot, archiveDir),
+        },
+      ],
+    };
   if (!existsSync(manifestPath)) {
     return {
       ok: false,
@@ -591,14 +603,22 @@ export function archiveImmutability(options: {
   }
   let manifest: ArchiveManifest;
   try {
+    if (!lstatSync(manifestPath).isFile()) throw new Error('manifest is not a regular file');
     manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ArchiveManifest;
+    if (
+      manifest === null ||
+      typeof manifest !== 'object' ||
+      Array.isArray(manifest) ||
+      !Array.isArray(manifest.files)
+    )
+      throw new Error('manifest files array is required');
   } catch {
     return {
       ok: false,
       findings: [
         {
           code: 'ARCHIVE_MANIFEST_INVALID',
-          message: 'MANIFEST.json is not valid JSON.',
+          message: 'MANIFEST.json must be a regular JSON file containing a files array.',
           path: relative(options.repoRoot, manifestPath),
         },
       ],
@@ -606,22 +626,50 @@ export function archiveImmutability(options: {
   }
   const findings: GovernanceFinding[] = [];
   const declared = new Set<string>();
+  const inventory = new Map<string, string>();
+  const scan = (directory: string): void => {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) scan(path);
+      else if (stat.isFile()) inventory.set(relative(archiveDir, path).split(sep).join('/'), path);
+      else
+        findings.push({
+          code: 'ARCHIVE_FILE_UNSAFE',
+          message: 'Archive members must not be links or special files.',
+          path: relative(options.repoRoot, path),
+        });
+    }
+  };
+  scan(archiveDir);
   for (const entry of manifest.files ?? []) {
-    if (typeof entry.path !== 'string' || typeof entry.sha256 !== 'string') {
+    if (
+      entry === null ||
+      typeof entry !== 'object' ||
+      typeof entry.path !== 'string' ||
+      typeof entry.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(entry.sha256) ||
+      /[\\\p{Cc}]/u.test(entry.path) ||
+      /^[A-Za-z]:/u.test(entry.path) ||
+      !entry.path.split('/').every((part) => part !== '' && part !== '.' && part !== '..') ||
+      entry.path === 'MANIFEST.json' ||
+      declared.has(entry.path)
+    ) {
       findings.push({
         code: 'ARCHIVE_MANIFEST_INVALID',
-        message: 'Every manifest entry requires string path and sha256 fields.',
+        message:
+          'Every manifest entry requires a unique canonical member path and lowercase SHA-256.',
         path: relative(options.repoRoot, manifestPath),
       });
       continue;
     }
     declared.add(entry.path);
-    const path = join(archiveDir, entry.path);
-    if (!existsSync(path)) {
+    const path = inventory.get(entry.path);
+    if (path === undefined) {
       findings.push({
         code: 'ARCHIVE_FILE_MISSING',
         message: `${entry.path} is declared but absent.`,
-        path: relative(options.repoRoot, path),
+        path: relative(options.repoRoot, join(archiveDir, entry.path)),
       });
       continue;
     }
@@ -634,8 +682,7 @@ export function archiveImmutability(options: {
       });
     }
   }
-  for (const path of walkFiles(archiveDir)) {
-    const rel = relative(archiveDir, path);
+  for (const [rel, path] of inventory) {
     if (rel !== 'MANIFEST.json' && !declared.has(rel)) {
       findings.push({
         code: 'ARCHIVE_FILE_UNDECLARED',

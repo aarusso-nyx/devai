@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -519,6 +519,81 @@ describe('citation and archive integrity', () => {
     );
 
     expect(archiveImmutability({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+  });
+
+  it.each([{ value: null }, { value: {} }, { value: { files: {} } }, { value: { files: [null] } }])(
+    'refuses malformed archive manifest shape $value without crashing',
+    ({ value }) => {
+      const root = fixtureRoot();
+      write(join(root, 'law/adr/archive/MANIFEST.json'), JSON.stringify(value));
+      expect(archiveImmutability({ repoRoot: root })).toMatchObject({
+        ok: false,
+        findings: expect.arrayContaining([
+          expect.objectContaining({ code: 'ARCHIVE_MANIFEST_INVALID' }),
+        ]),
+      });
+    },
+  );
+
+  it.each(['../outside.md', './frozen.md', 'nested/../frozen.md', 'nested//frozen.md'])(
+    'refuses a noncanonical or escaping archive member %s',
+    (path) => {
+      const root = fixtureRoot();
+      const archive = join(root, 'law/adr/archive');
+      write(join(archive, path), 'frozen\n');
+      write(
+        join(archive, 'MANIFEST.json'),
+        JSON.stringify({
+          files: [{ path, sha256: createHash('sha256').update('frozen\n').digest('hex') }],
+        }),
+      );
+      expect(archiveImmutability({ repoRoot: root }).ok).toBe(false);
+    },
+  );
+
+  it('accepts nested Unicode members and rejects duplicate declarations', () => {
+    const root = fixtureRoot();
+    const archive = join(root, 'law/adr/archive');
+    const path = 'nested/ação antiga.md';
+    write(join(archive, path), 'frozen\n');
+    const entry = { path, sha256: createHash('sha256').update('frozen\n').digest('hex') };
+    write(join(archive, 'MANIFEST.json'), JSON.stringify({ files: [entry] }));
+    expect(archiveImmutability({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+    write(join(archive, 'MANIFEST.json'), JSON.stringify({ files: [entry, entry] }));
+    expect(archiveImmutability({ repoRoot: root })).toMatchObject({
+      ok: false,
+      findings: expect.arrayContaining([
+        expect.objectContaining({ code: 'ARCHIVE_MANIFEST_INVALID' }),
+      ]),
+    });
+  });
+
+  it('rejects a directory link cycle without traversing it', () => {
+    const root = fixtureRoot();
+    const archive = join(root, 'law/adr/archive');
+    write(join(archive, 'MANIFEST.json'), JSON.stringify({ files: [] }));
+    symlinkSync(archive, join(archive, 'cycle'));
+    expect(archiveImmutability({ repoRoot: root })).toMatchObject({
+      ok: false,
+      findings: [expect.objectContaining({ code: 'ARCHIVE_FILE_UNSAFE' })],
+    });
+  });
+
+  it('refuses a pinned symlink instead of following its target outside the archive', () => {
+    const root = fixtureRoot();
+    const archive = join(root, 'law/adr/archive');
+    mkdirSync(archive, { recursive: true });
+    write(join(root, 'outside.md'), 'frozen\n');
+    symlinkSync(join(root, 'outside.md'), join(archive, 'linked.md'));
+    write(
+      join(archive, 'MANIFEST.json'),
+      JSON.stringify({
+        files: [
+          { path: 'linked.md', sha256: createHash('sha256').update('frozen\n').digest('hex') },
+        ],
+      }),
+    );
+    expect(archiveImmutability({ repoRoot: root }).ok).toBe(false);
   });
 });
 
