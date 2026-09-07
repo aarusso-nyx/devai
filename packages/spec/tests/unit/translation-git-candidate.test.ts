@@ -594,3 +594,64 @@ it.each([
     for (const [path, bytes] of retained) expect(readFileSync(join(f.root, path))).toEqual(bytes);
   },
 );
+
+it.each(['run-id', 'caller-kind', 'caller-name', 'recipe-output', 'witness-output'] as const)(
+  'refuses a schema-valid, correctly hashed agent manifest with a mismatched %s',
+  async (kind) => {
+    const f = await evidenceFixture();
+    const path = f.inputs.state_paths.find((value) =>
+      value.startsWith('record/proofs/work/agent-runs/'),
+    );
+    if (!path) throw new Error('fixture agent path missing');
+    const agent = JSON.parse(readFileSync(join(f.root, path), 'utf8')) as Data;
+    if (kind === 'run-id') agent['run_id'] = 'AR-01990000-0000-7000-8000-000000000001';
+    else if (kind === 'caller-kind') agent['caller'] = { kind: 'cli', name: 'devai-fix' };
+    else if (kind === 'caller-name') agent['caller'] = { kind: 'recipe', name: 'devai-verify' };
+    else {
+      const written = agent['files_written'];
+      if (!Array.isArray(written)) throw new Error('fixture files missing');
+      agent['files_written'] = written.filter(
+        (value) =>
+          typeof value === 'string' &&
+          !(kind === 'recipe-output'
+            ? value.startsWith('record/proofs/work/recipe-runs/')
+            : value.startsWith('record/proofs/compliance/')),
+      );
+    }
+    const { manifest_hash: _oldHash, ...draft } = agent;
+    agent['manifest_hash'] = createHash('sha256').update(canonicalJson(draft)).digest('hex');
+    expect(validators.agentRun(agent)).toBe(true);
+    put(f.root, path, JSON.stringify(agent));
+    const bytes = readFileSync(join(f.root, path));
+    const index = readFileSync(join(f.root, '.git/index'));
+    await expect(
+      runRecorder(f.root, async () => recordMutationEvidenceCommit(f.inputs)),
+    ).rejects.toThrow('MUTATION_EVIDENCE_AGENT_RUN_MISMATCH');
+    expect(readFileSync(join(f.root, path))).toEqual(bytes);
+    expect(readFileSync(join(f.root, '.git/index'))).toEqual(index);
+    expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
+  },
+);
+
+it('accepts absolute agent output paths inside the candidate and retains their original bytes', async () => {
+  const f = await evidenceFixture();
+  const path = f.inputs.state_paths.find((value) =>
+    value.startsWith('record/proofs/work/agent-runs/'),
+  );
+  if (!path) throw new Error('fixture agent path missing');
+  const agent = JSON.parse(readFileSync(join(f.root, path), 'utf8')) as Data;
+  const written = agent['files_written'];
+  if (!Array.isArray(written)) throw new Error('fixture files missing');
+  agent['files_written'] = written.map((value) => {
+    if (typeof value !== 'string') throw new Error('fixture path not a string');
+    return join(f.root, value);
+  });
+  const { manifest_hash: _oldHash, ...draft } = agent;
+  agent['manifest_hash'] = createHash('sha256').update(canonicalJson(draft)).digest('hex');
+  expect(validators.agentRun(agent)).toBe(true);
+  put(f.root, path, JSON.stringify(agent));
+  const bytes = readFileSync(join(f.root, path), 'utf8');
+  const result = await runRecorder(f.root, async () => recordMutationEvidenceCommit(f.inputs));
+  expect(git(f.root, 'show', `${result.evidence_sha}:${path}`)).toBe(bytes);
+  expect(readFileSync(join(f.root, path), 'utf8')).toBe(bytes);
+});
