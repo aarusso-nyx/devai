@@ -312,7 +312,7 @@ export function validateActionsEvidenceShadowTuple(
   );
   requireTuple(
     typeof shadow['mergedCommitSha'] === 'string' &&
-      /^[0-9a-f]{40,64}$/.test(shadow['mergedCommitSha']),
+      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(shadow['mergedCommitSha']),
     'shadow decision merge SHA is invalid',
   );
   requireTuple(shadow['fullCiResult'] === 'success', 'shadow decision full CI is not successful');

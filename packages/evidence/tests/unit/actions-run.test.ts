@@ -5,6 +5,7 @@ import {
   aggregateActionsEvidenceRequiredCheck,
   selectActionsEvidenceJobs,
   verifyActionsRunEvidence,
+  validateActionsEvidenceShadowTuple,
   type VerifyActionsRunEvidenceInputs,
 } from '../../src/local-evidence/actions-run.js';
 
@@ -78,6 +79,150 @@ function fixture() {
     },
   };
 }
+
+function tuple() {
+  const { manifest } = fixture();
+  const run = manifest.actionsRun;
+  return {
+    manifest,
+    fullResult: {
+      schemaVersion: 1,
+      kind: 'actions-run-full-result',
+      result: 'success',
+      fullCiAuthoritative: true,
+      repository: run.repository,
+      workflowRef: run.workflowRef,
+      runId: run.runId,
+      runAttempt: run.runAttempt,
+      testedCommitSha: run.testedCommitSha,
+      testedTree: run.testedTree,
+      jobs: Object.fromEntries(ACTIONS_REUSABLE_JOBS.map((job) => [job, 'success'])),
+    },
+    decision: {
+      schemaVersion: 1,
+      kind: 'actions-evidence-shadow-decision',
+      mainRunId: '456',
+      mainRunAttempt: 1,
+      mergedCommitSha: '7'.repeat(40),
+      fullCiResult: 'success',
+      executeFullCi: true,
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      reason: 'exact tested tree',
+      reusableJobs: [...ACTIONS_REUSABLE_JOBS],
+      freshnessJobs: [...ACTIONS_FRESHNESS_JOBS],
+    },
+    mergeParents: [run.baseSha, run.headSha],
+  };
+}
+
+it.each([40, 64])('accepts an exact shadow tuple with a %i-character Git identity', (length) => {
+  const input = tuple();
+  input.decision.mergedCommitSha = '7'.repeat(length);
+  expect(validateActionsEvidenceShadowTuple(input)).toEqual({
+    mergeSha: '7'.repeat(length),
+    disposition: 'promotion-hit',
+    shadowFullEquivalent: true,
+    durable: true,
+  });
+});
+
+it.each([39, 41, 48, 63, 65])('rejects a %i-character non-Git merge identity', (length) => {
+  const input = tuple();
+  input.decision.mergedCommitSha = '7'.repeat(length);
+  expect(() => validateActionsEvidenceShadowTuple(input)).toThrow(
+    'shadow decision merge SHA is invalid',
+  );
+});
+
+it.each([
+  ['repository', 'wrong/repository'],
+  ['workflowRef', 'wrong/workflow'],
+  ['runId', '999'],
+  ['runAttempt', 1],
+  ['testedCommitSha', '8'.repeat(40)],
+  ['schemaVersion', 2],
+  ['kind', 'other'],
+  ['result', 'failure'],
+  ['fullCiAuthoritative', false],
+  ['testedTree', { algorithm: 'sha1', value: '9'.repeat(40) }],
+] as const)('rejects substituted full-result %s', (field, value) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      fullResult: { ...input.fullResult, [field]: value },
+    }),
+  ).toThrow(/actions evidence tuple: full result/u);
+});
+
+it.each(ACTIONS_REUSABLE_JOBS)(
+  'requires authoritative success for %s in the full result',
+  (job) => {
+    const input = tuple();
+    input.fullResult.jobs = Object.fromEntries(
+      Object.entries(input.fullResult.jobs).filter(([name]) => name !== job),
+    );
+    expect(() => validateActionsEvidenceShadowTuple(input)).toThrow(
+      `full result is missing successful job ${job}`,
+    );
+  },
+);
+
+it.each([
+  ['schemaVersion', 2],
+  ['kind', 'other'],
+  ['mainRunId', ''],
+  ['mainRunAttempt', 0],
+  ['mainRunAttempt', 1.5],
+  ['fullCiResult', 'failure'],
+  ['executeFullCi', false],
+  ['reason', ''],
+  ['disposition', 'invented'],
+  ['shadowFullEquivalent', false],
+  ['reusableJobs', []],
+  ['freshnessJobs', []],
+] as const)('rejects invalid shadow-decision %s=%s', (field, value) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      decision: { ...input.decision, [field]: value },
+    }),
+  ).toThrow(/actions evidence tuple:/u);
+});
+
+it.each(['reversed', 'missing', 'extra'] as const)('rejects %s merge-parent identity', (kind) => {
+  const input = tuple();
+  const mergeParents =
+    kind === 'reversed'
+      ? input.mergeParents.toReversed()
+      : kind === 'missing'
+        ? input.mergeParents.slice(0, 1)
+        : [...input.mergeParents, '8'.repeat(40)];
+  expect(() => validateActionsEvidenceShadowTuple({ ...input, mergeParents })).toThrow(
+    'exact tested base and head merge inputs',
+  );
+});
+
+it.each(['UNKNOWN', 'invalid-claim'])(
+  'retains %s as a non-equivalent observation',
+  (disposition) => {
+    const input = tuple();
+    expect(() =>
+      validateActionsEvidenceShadowTuple({
+        ...input,
+        decision: { ...input.decision, disposition },
+      }),
+    ).toThrow('cannot claim shadow/full equivalence');
+    expect(
+      validateActionsEvidenceShadowTuple({
+        ...input,
+        decision: { ...input.decision, disposition, shadowFullEquivalent: false },
+      }),
+    ).toMatchObject({ disposition, shadowFullEquivalent: false, durable: true });
+  },
+);
 
 it('reuses only the heavy jobs while retaining every freshness job', () => {
   const result = verifyActionsRunEvidence(fixture());
