@@ -656,7 +656,9 @@ export function archiveImmutability(options: {
       !/^[a-f0-9]{64}$/u.test(entry.sha256) ||
       /[\\\p{Cc}]/u.test(entry.path) ||
       /^[A-Za-z]:/u.test(entry.path) ||
-      !entry.path.split('/').every((part) => part !== '' && part !== '.' && part !== '..') ||
+      !entry.path
+        .split('/')
+        .every((part: string) => part !== '' && part !== '.' && part !== '..') ||
       entry.path === 'MANIFEST.json' ||
       declared.has(entry.path)
     ) {
