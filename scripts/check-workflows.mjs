@@ -119,6 +119,45 @@ export function checkWorkflowTree(root = process.cwd()) {
   return { ok: findings.length === 0, files, findings };
 }
 
+function checkInstalledExportWorkflow(file, workflow, findings) {
+  const job = object(object(workflow.jobs)['verify-ledger']);
+  const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+  const materialize = steps.filter((step) =>
+    String(step.run ?? '').includes('scripts/process/installed_control_transport.py'),
+  );
+  const verify = steps.filter((step) => step.id === 'installed-offline');
+  const transport = steps.find((step) =>
+    String(step.run ?? '').includes('scripts/process/evidence_transport.py materialize'),
+  );
+  const invalid =
+    materialize.length !== 1 ||
+    verify.length !== 1 ||
+    object(transport?.env).BUNDLE_SCHEMA_VERSION !== '2.0.0' ||
+    job['continue-on-error'] !== undefined ||
+    [...materialize, ...verify].some(
+      (step) =>
+        step.if !== undefined ||
+        step['continue-on-error'] !== undefined ||
+        !String(step.run ?? '').includes('set -euo pipefail'),
+    ) ||
+    !String(verify[0]?.run ?? '').includes(
+      'node release-control/scripts/process/installed-export-command.mjs',
+    ) ||
+    object(materialize[0]?.env).INSTALLED_CONTROL_SHA256 !==
+      '${{ vars.DEVAI_INSTALLED_CONTROL_SHA256 }}' ||
+    object(materialize[0]?.env).INSTALLED_OFFLINE_CONFIG_B64 !==
+      '${{ secrets.DEVAI_INSTALLED_OFFLINE_CONFIG_B64 }}' ||
+    steps.indexOf(materialize[0]) >= steps.indexOf(verify[0]);
+  if (invalid)
+    findings.push(
+      finding(
+        'CI_INSTALLED_MUTATION_EXPORT_REQUIRED',
+        file,
+        'protected verification requires v2 evidence, approved controls, and unconditional installed export verification',
+      ),
+    );
+}
+
 function checkWorkflow(file, source, findings) {
   for (const marker of OLD_WORKFLOW_MARKERS) {
     if (file.includes(marker) || source.includes(marker)) {
@@ -134,6 +173,8 @@ function checkWorkflow(file, source, findings) {
     return;
   }
   const workflow = object(document.toJS());
+  if ([RELEASE_WORKFLOW_FILE, LEDGER_WORKFLOW_FILE].includes(file))
+    checkInstalledExportWorkflow(file, workflow, findings);
 
   if (file === RELEASE_WORKFLOW_FILE) {
     checkReleaseWorkflow(file, workflow, source, findings);

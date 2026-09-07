@@ -353,3 +353,39 @@ message; preserve private work for diagnosis. This command does not authorize it
 control pins, install protected settings, or establish release readiness by itself.
 Protected workflow activation still requires approved host/DAG identities and the
 mandatory export check to be wired alongside ordinary RC verification.
+
+### Protected installed-control rollout
+
+The v1.5 repository workflows require evidence bundle schema `2.0.0`; selecting
+legacy transport or a bundle without the mutation export fails. Both ordinary RC
+verification and the installed offline verification must succeed.
+
+Provision the separately reviewed immutable control carrier in the private
+`aarusso-nyx/devai-evidence` repository as `controls.tgz` on release
+`control-<archive-sha256>`. This carrier is separate from `evidence.tgz` and contains
+only `seed/`, `dag/`, `verification-root/`, and `host.tgz`. Preserve DAG member modes
+from its approved manifest. The carrier must contain no signing keys or current
+signer trust/revocation configuration. Assemble and verify its complete draft before
+separately authorized publication with immutability enabled; never replace existing
+content. No automatic upload is implemented by the verification workflow.
+
+Set protected variable `DEVAI_INSTALLED_CONTROL_SHA256` to the independently approved
+carrier digest. Set secret `DEVAI_INSTALLED_OFFLINE_CONFIG_B64` to the base64 private
+JSON configuration described above, including approved seed pins, full host identity,
+DAG approval digest, current signer trust, policy expectations, and exact candidate
+repository/commit/tree. This configuration remains outside both carriers. The
+read-only evidence credential downloads the exact digest-selected control release;
+there is no candidate URL or transport fallback.
+
+`installed_control_transport.py` verifies the approved carrier digest before reading
+archive members, checks archive safety, and materializes private files. It replaces
+only the known runtime path fields with the workflow's actual control, candidate,
+evidence, and fresh work directories. It refuses configuration for another candidate.
+It never supplies approval digests from carrier contents. Missing approvals, missing
+assets, authentication failure, and changed trust block the protected job.
+
+The release manifest and rehearsal completion bind `installed_control_sha256` and
+`installed_offline_receipt_sha256`. Promotion compares them with fresh protected
+verification, so changed control or verification identities require another rehearsal.
+These workflow changes must not be activated until the control carrier and exact
+protected configuration have been separately approved and provisioned.

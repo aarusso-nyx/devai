@@ -1094,3 +1094,27 @@ describe('ci-economy concurrency-cancel rule', () => {
     );
   });
 });
+
+describe('mandatory installed mutation export workflow binding', () => {
+  it.each(['devai-ledger-verify.yml', 'release.yml'])(
+    'refuses optional or missing installed verification in %s',
+    (file) => {
+      const source = readFileSync(join(ROOT, '.github/workflows', file), 'utf8');
+      for (const changed of [
+        source.replace('id: installed-offline', 'id: installed-offline\n        if: false'),
+        source.replace(
+          'id: installed-offline',
+          'id: installed-offline\n        continue-on-error: true',
+        ),
+        source.replace('id: installed-offline', 'id: missing-installed-offline'),
+        source.replace("BUNDLE_SCHEMA_VERSION: '2.0.0'", "BUNDLE_SCHEMA_VERSION: '1.0.0'"),
+        source.replace('vars.DEVAI_INSTALLED_CONTROL_SHA256', 'vars.UNAPPROVED_CONTROL'),
+      ]) {
+        const directory = fixture(changed, file);
+        const result = spawnSync(process.execPath, [CHECKER], { cwd: directory, encoding: 'utf8' });
+        expect(result.status).not.toBe(0);
+        expect(result.stdout + result.stderr).toContain('CI_INSTALLED_MUTATION_EXPORT_REQUIRED');
+      }
+    },
+  );
+});
