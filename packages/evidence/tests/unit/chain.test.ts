@@ -281,3 +281,35 @@ describe('chain ordinals and predecessor aliases', () => {
     },
   );
 });
+
+it('matches the legacy chain digest vectors while retaining artifact multiplicity and caller order', () => {
+  // Independent SHA-256 vectors over the published JSON tuple (including GENESIS).
+  expect(computeManifestHash(baseHashInputs())).toBe(
+    'd554c623dbe47accd2ffe7c505f3086811580788678dfe6a4be72029a743609c',
+  );
+  const artifacts = Object.freeze(['b'.repeat(64), null, 'a'.repeat(64), 'b'.repeat(64)]);
+  const input = { ...baseHashInputs(), artifact_sha256s: artifacts };
+  expect(computeManifestHash(input)).toBe(
+    '08e275e2c5990ecc1a0074bc41aec04849dbf0b73333130be8fd1fddb61e1cd1',
+  );
+  expect(artifacts).toEqual(['b'.repeat(64), null, 'a'.repeat(64), 'b'.repeat(64)]);
+  expect(
+    computeManifestHash({ ...input, artifact_sha256s: [null, 'a'.repeat(64), 'b'.repeat(64)] }),
+  ).not.toBe(computeManifestHash(input));
+});
+
+it('retains explicit finding counts and omits an absent summary when appending', () => {
+  initChain(chainPath);
+  const findings = { info: 0, warning: 2, error: 1, critical: 0 };
+  const first = appendRecord(
+    chainPath,
+    genesisDraft('EV-0000000000000091', { findings_summary: findings }),
+  );
+  const second = appendRecord(chainPath, genesisDraft('EV-0000000000000092'));
+  expect(first.findings_summary).toEqual(findings);
+  expect(Object.hasOwn(second, 'findings_summary')).toBe(false);
+  const persisted = loadChain(chainPath);
+  expect(persisted.records[0]?.findings_summary).toEqual(findings);
+  expect(Object.hasOwn(persisted.records[1] ?? {}, 'findings_summary')).toBe(false);
+  expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+});
