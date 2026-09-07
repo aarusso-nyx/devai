@@ -15,7 +15,10 @@ import { afterEach, expect, it } from 'vitest';
 import { createAuthorityDecisionIssuer, runWithAuthorityHostEffects } from '@devai-nyx/authority';
 import { validators } from '@devai-nyx/schemas';
 import { canonicalJson } from '@devai-nyx/utils';
-import { recordMutationCandidate } from '../../src/translation-validation/index.js';
+import {
+  recordMutationCandidate,
+  recordMutationEvidenceCommit,
+} from '../../src/translation-validation/index.js';
 
 type Data = Record<string, unknown>;
 const roots: string[] = [];
@@ -130,7 +133,10 @@ async function runRecorder<T>(root: string, callback: () => Promise<T>): Promise
               '.devai/state/r28-index-MI-0123456789abcdef',
             ]);
           if (argv[0] === 'update-ref')
-            expect(argv[1]).toBe('refs/devai/r28/candidates/MI-0123456789abcdef');
+            expect([
+              'refs/devai/r28/candidates/MI-0123456789abcdef',
+              'refs/devai/r28/evidence/MI-0123456789abcdef',
+            ]).toContain(argv[1]);
           return apply();
         },
       },
@@ -292,5 +298,149 @@ it.each(['new café.ts', 'new"quote.ts', 'trailing.ts '])(
     expect(git(f.root, 'show', `${result.candidate_sha}:${f.sourcePath}`)).toBe(
       'export const value = 2;',
     );
+  },
+);
+
+async function evidenceFixture(sourcePath = 'packages/core/src/example.ts') {
+  const f = fixture(sourcePath);
+  const candidate = await runRecorder(f.root, () =>
+    recordMutationCandidate({
+      repo_root: f.root,
+      intent: f.intent,
+      emitted_at: '2026-09-07T00:00:00.000Z',
+      run: async () => {
+        put(f.root, f.sourcePath, 'export const value = 2;\n');
+      },
+    }),
+  );
+  const witness = candidate.witness;
+  const witnessPath = `record/proofs/compliance/translation-validation/witnesses/${String(witness['id'])}.json`;
+  const recipePath = 'record/proofs/work/recipe-runs/devai-fix/test/run.json';
+  const agent = example('agent-run');
+  agent['started_at'] = '2026-09-07T00:00:00.000Z';
+  agent['ended_at'] = '2026-09-07T00:01:00.000Z';
+  agent['caller'] = { kind: 'recipe', name: 'devai-fix' };
+  agent['files_written'] = [recipePath, witnessPath];
+  const { manifest_hash: _oldHash, ...draft } = agent;
+  agent['manifest_hash'] = createHash('sha256').update(canonicalJson(draft)).digest('hex');
+  expect(validators.agentRun(agent)).toBe(true);
+  const agentPath = `record/proofs/work/agent-runs/${String(agent['run_id'])}.json`;
+  put(f.root, witnessPath, JSON.stringify(witness));
+  put(
+    f.root,
+    recipePath,
+    JSON.stringify({
+      recipe_name: 'devai-fix',
+      recipe_variant: 'test',
+      status: 'pass',
+      evidence: { translation_witness: witness },
+    }),
+  );
+  put(f.root, agentPath, JSON.stringify(agent));
+  const inputs = {
+    repo_root: f.root,
+    intent_id: String(f.intent['id']),
+    candidate_sha: candidate.candidate_sha,
+    timestamp: '2026-09-07T00:01:00.000Z',
+    recipe_name: 'devai-fix',
+    recipe_variant: 'test',
+    witness,
+    state_paths: [
+      witnessPath,
+      recipePath,
+      agentPath,
+      `.devai/state/tasks/${String(f.intent['task_id'])}.json`,
+    ],
+  };
+  return { ...f, candidate, inputs };
+}
+
+it.each(['example.ts', 'café.ts'])(
+  'records evidence on the exact candidate without rebuilding %s',
+  async (name) => {
+    const f = await evidenceFixture(`packages/core/src/${name}`);
+    const index = readFileSync(join(f.root, '.git/index'));
+    const expected = new Map(
+      f.inputs.state_paths.map((path) => [path, readFileSync(join(f.root, path), 'utf8')]),
+    );
+    const result = await runRecorder(f.root, async () => recordMutationEvidenceCommit(f.inputs));
+    expect(git(f.root, 'rev-parse', `${result.evidence_sha}^`)).toBe(f.candidate.candidate_sha);
+    expect(git(f.root, 'rev-parse', result.evidence_ref)).toBe(result.evidence_sha);
+    expect(
+      git(f.root, 'diff', f.candidate.candidate_sha, result.evidence_sha, '--', 'packages'),
+    ).toBe('');
+    for (const [path, bytes] of expected)
+      expect(git(f.root, 'show', `${result.evidence_sha}:${path}`)).toBe(bytes.trim());
+    expect(result.state_paths).toEqual([...f.inputs.state_paths].sort());
+    expect(git(f.root, 'rev-parse', 'HEAD')).toBe(f.intent['base_sha']);
+    expect(readFileSync(join(f.root, '.git/index'))).toEqual(index);
+    expect(existsSync(join(f.root, '.devai/state/r28-index-MI-0123456789abcdef'))).toBe(false);
+  },
+);
+
+it('refuses a different candidate commit even when its source tree and changed paths are identical', async () => {
+  const f = await evidenceFixture();
+  const tree = git(f.root, 'rev-parse', `${f.candidate.candidate_sha}^{tree}`);
+  const other = git(
+    f.root,
+    'commit-tree',
+    tree,
+    '-p',
+    String(f.intent['base_sha']),
+    '-m',
+    'another candidate identity',
+  );
+  expect(other).not.toBe(f.candidate.candidate_sha);
+  await expect(
+    runRecorder(f.root, async () =>
+      recordMutationEvidenceCommit({ ...f.inputs, candidate_sha: other }),
+    ),
+  ).rejects.toThrow('MUTATION_EVIDENCE_CANDIDATE_MISMATCH');
+  expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
+});
+
+it.each([
+  ['devai-verify', 'test'],
+  ['devai-fix', 'other'],
+])(
+  'binds the evidence recorder recipe to the witness: %s/%s',
+  async (recipeName, recipeVariant) => {
+    const f = await evidenceFixture();
+    const oldPath = 'record/proofs/work/recipe-runs/devai-fix/test/run.json';
+    const newPath = `record/proofs/work/recipe-runs/${recipeName}/${recipeVariant}/run.json`;
+    put(
+      f.root,
+      newPath,
+      JSON.stringify({
+        recipe_name: recipeName,
+        recipe_variant: recipeVariant,
+        status: 'pass',
+        evidence: { translation_witness: f.inputs.witness },
+      }),
+    );
+    rmSync(join(f.root, oldPath));
+    const agentPath = f.inputs.state_paths.find((path) =>
+      path.startsWith('record/proofs/work/agent-runs/'),
+    );
+    if (!agentPath) throw new Error('fixture agent run missing');
+    const agent = JSON.parse(readFileSync(join(f.root, agentPath), 'utf8')) as Data;
+    agent['caller'] = { kind: 'recipe', name: recipeName };
+    agent['files_written'] = (agent['files_written'] as string[]).map((path) =>
+      path === oldPath ? newPath : path,
+    );
+    const { manifest_hash: _oldHash, ...draft } = agent;
+    agent['manifest_hash'] = createHash('sha256').update(canonicalJson(draft)).digest('hex');
+    expect(validators.agentRun(agent)).toBe(true);
+    put(f.root, agentPath, JSON.stringify(agent));
+    const input = {
+      ...f.inputs,
+      recipe_name: recipeName,
+      recipe_variant: recipeVariant,
+      state_paths: f.inputs.state_paths.map((path) => (path === oldPath ? newPath : path)),
+    };
+    await expect(
+      runRecorder(f.root, async () => recordMutationEvidenceCommit(input)),
+    ).rejects.toThrow('MUTATION_EVIDENCE_RECIPE_MISMATCH');
+    expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
   },
 );

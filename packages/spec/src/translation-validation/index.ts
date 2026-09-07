@@ -431,6 +431,15 @@ export function recordMutationEvidenceCommit(input: {
   if (!validators.translationWitness(input.witness)) {
     throw new Error('MUTATION_EVIDENCE_WITNESS_INVALID');
   }
+  if (input.witness['candidate_sha'] !== input.candidate_sha) {
+    throw new Error('MUTATION_EVIDENCE_CANDIDATE_MISMATCH');
+  }
+  if (
+    input.witness['recipe_name'] !== recipeName ||
+    input.witness['recipe_variant'] !== recipeVariant
+  ) {
+    throw new Error('MUTATION_EVIDENCE_RECIPE_MISMATCH');
+  }
   const witnessId = requireId(
     String(input.witness['id']),
     /^TW-[a-f0-9]{16}$/u,
