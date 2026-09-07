@@ -66,7 +66,7 @@ function parseYamlSubset(source: string): Record<string, unknown> {
     .filter((line) => line.text.length > 0 && !line.text.startsWith('#'));
 
   function parseObject(start: number, indent: number): [Record<string, unknown>, number] {
-    const result: Record<string, unknown> = {};
+    const result = Object.create(null) as Record<string, unknown>;
     let index = start;
     while (index < lines.length) {
       const line = lines[index];
@@ -111,9 +111,8 @@ function parseYamlSubset(source: string): Record<string, unknown> {
       const item = line.text.slice(2).trim();
       if (item.includes(':')) {
         const colon = item.indexOf(':');
-        const object: Record<string, unknown> = {
-          [item.slice(0, colon).trim()]: scalar(item.slice(colon + 1).trim()),
-        };
+        const object = Object.create(null) as Record<string, unknown>;
+        object[item.slice(0, colon).trim()] = scalar(item.slice(colon + 1).trim());
         index += 1;
         while (index < lines.length) {
           const nested = lines[index];

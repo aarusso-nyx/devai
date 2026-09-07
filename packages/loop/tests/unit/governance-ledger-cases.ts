@@ -85,6 +85,63 @@ function commitAll(root: string, message: string): void {
 }
 
 describe('governance record parsing and integrity', () => {
+  it('keeps prototype-shaped YAML keys as data rather than inherited governance fields', () => {
+    const root = fixtureRoot();
+    const path = writeRecord(
+      root,
+      'prototype.md',
+      [
+        '---',
+        '__proto__:',
+        '  status: accepted',
+        '  id: ADR-HIDDEN',
+        'items:',
+        '  - name: ordinary',
+        '    __proto__:',
+        '      authority: Owner',
+        '---',
+        '# Fixture',
+        '',
+      ].join('\n'),
+    );
+    const parsed = parseGovernanceRecord(path);
+    expect(parsed.frontmatter['status']).toBeUndefined();
+    expect(parsed.frontmatter['id']).toBeUndefined();
+    expect(Object.hasOwn(parsed.frontmatter, '__proto__')).toBe(true);
+    expect(parsed.frontmatter['__proto__']).toEqual({ status: 'accepted', id: 'ADR-HIDDEN' });
+    const items = parsed.frontmatter['items'] as Record<string, unknown>[];
+    expect(items[0]?.['authority']).toBeUndefined();
+    expect(Object.hasOwn(items[0] ?? {}, '__proto__')).toBe(true);
+    expect(items[0]?.['__proto__']).toEqual({ authority: 'Owner' });
+    expect(decisionRecordIntegrity({ repoRoot: root }).findings).toContainEqual(
+      expect.objectContaining({ code: 'DECISION_SCHEMA_INVALID', path: 'law/adr/prototype.md' }),
+    );
+  });
+
+  it.each([
+    { source: '[]', expected: [] },
+    { source: '{}', expected: {} },
+    { source: '[ ]', expected: [] },
+    { source: '[1; false; null]', expected: [1, false, null] },
+    { source: '[one, two]', expected: ['one', 'two'] },
+    { source: 'true', expected: true },
+    { source: 'false', expected: false },
+    { source: 'null', expected: null },
+    { source: '-24', expected: -24 },
+    { source: '"true"', expected: 'true' },
+    { source: "' false '", expected: ' false ' },
+    { source: 'unquoted text', expected: 'unquoted text' },
+  ])('preserves the supported scalar meaning of $source', ({ source, expected }) => {
+    const path = writeRecord(
+      fixtureRoot(),
+      'scalar.md',
+      `---\n# comment\nfield: ${source}\n---\n\nBody\n`,
+    );
+    const parsed = parseGovernanceRecord(path);
+    expect(parsed.frontmatter['field']).toEqual(expected);
+    expect(parsed.body).toBe('Body\n');
+  });
+
   it('parses the supported YAML subset and rejects missing frontmatter', () => {
     const root = fixtureRoot();
     const path = writeRecord(root, 'ADR-001.md');
