@@ -357,12 +357,15 @@ export function introspectRepo(opts: IntrospectOptions): RepoIntrospection {
     const manifestRoots = manifests
       .filter((path) => path !== 'package.json')
       .map((path) => path.replace(/\/package\.json$/u, ''));
-    const matched = manifestRoots.filter((path) =>
-      patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
-    );
-    const outside = manifestRoots.filter(
-      (path) => path !== '' && !patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
-    );
+    const included = patterns.filter((pattern) => !pattern.startsWith('!'));
+    const excluded = patterns
+      .filter((pattern) => pattern.startsWith('!'))
+      .map((pattern) => pattern.slice(1));
+    const inWorkspace = (path: string): boolean =>
+      included.some((pattern) => minimatch(path, pattern, { dot: true, nonegate: true })) &&
+      !excluded.some((pattern) => minimatch(path, pattern, { dot: true, nonegate: true }));
+    const matched = manifestRoots.filter(inWorkspace);
+    const outside = manifestRoots.filter((path) => path !== '' && !inWorkspace(path));
     notes.push(
       `Parsed pnpm-workspace.yaml: ${String(patterns.length)} pattern(s), ${String(matched.length)} matching manifest(s)`,
     );

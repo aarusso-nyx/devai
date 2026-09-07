@@ -180,3 +180,27 @@ describe('repository detection contracts', () => {
     });
   });
 });
+
+it.each([
+  "packages:\n  - 'modules/*'\n  - '!modules/excluded'\n",
+  "packages:\n  - '!modules/excluded'\n  - 'modules/*'\n",
+])('applies workspace exclusions without admitting unrelated packages', (yaml) => {
+  workspace();
+  file('pnpm-workspace.yaml', yaml);
+  file('modules/excluded/package.json', '{}');
+  file('modules/excluded/src/index.ts');
+  file('examples/demo/package.json', '{}');
+  file('examples/demo/src/index.ts');
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(result.notes).toContain(
+    'Parsed pnpm-workspace.yaml: 2 pattern(s), 1 matching manifest(s)',
+  );
+  expect(result.notes).toContain(
+    'Discovered 2 package manifest(s) outside pnpm workspace patterns; retained their source/test roots as repository evidence',
+  );
+  expect(result.source_globs).toEqual([
+    'examples/demo/src/**',
+    'modules/core/src/**',
+    'modules/excluded/src/**',
+  ]);
+});
