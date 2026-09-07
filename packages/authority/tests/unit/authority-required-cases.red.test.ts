@@ -870,6 +870,99 @@ async function requiredDenyFixture() {
 }
 
 describe('R19 issuer complete-set, batch, and receipt matrix', () => {
+  function expectedRecordedDecision(subject: unknown, denied: boolean, batch: boolean) {
+    const bound = subject as {
+      plan: { plan_id: string; envelope: { policy: unknown } };
+      batch?: { batch_id: string };
+    };
+    const unsigned = {
+      decision_id: 'authority-id-1',
+      subject_digest_sha256: canonicalSha256(subject),
+      authority_context_digest_sha256: canonicalSha256({
+        kind: 'human-session',
+        principal: {
+          kind: 'human',
+          role: 'engineer',
+          declaration: { source: 'cli-flag', declared_at: NOW },
+        },
+        action_id: 'test mutate',
+        origin: { kind: 'direct-cli', invocation_id: 'invocation-1' },
+      }),
+      policy_binding_digest_sha256: canonicalSha256(bound.plan.envelope.policy),
+      plan_id: batch ? 'plan-bounded' : 'plan-exact',
+      ...(batch ? { batch_id: 'batch-1' } : {}),
+      enforcement_mode: 'binding',
+      evaluation: denied ? 'deny' : 'allow',
+      disposition: denied ? 'refuse' : 'proceed',
+      reason_code: denied ? 'POLICY_DENY' : 'POLICY_ALLOW',
+      reasons: [`matched ${denied ? 'self-package-source-deny' : engineerRule.rule_id}`],
+      policy: bound.plan.envelope.policy,
+      obligations: [],
+      readiness: { eligible: !denied, reason: 'Independent acceptance remains required.' },
+    };
+    return { ...unsigned, decision_digest_sha256: canonicalSha256(unsigned) };
+  }
+
+  it.each([false, true])(
+    'records the full authenticated allow decision (batch=%s)',
+    async (batch) => {
+      const fixture = await requiredAllowFixture();
+      try {
+        const subject = batch ? boundedSubject() : exactSubject();
+        const expected = expectedRecordedDecision(subject, false, batch);
+        const issued = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject)) as {
+          receipt: unknown;
+        };
+        expect(issued).toEqual({
+          issued: true,
+          outcome: 'allow',
+          decision: expected,
+          receipt: expect.any(Object),
+        });
+        expect(Object.getPrototypeOf(issued.receipt)).toBeNull();
+        expect(Object.isFrozen(issued.receipt)).toBe(true);
+        expect(Object.keys(issued.receipt as object)).toEqual([]);
+        expect(
+          fixture.issuer.consume({
+            receipt: issued.receipt,
+            subject,
+            invocation_id: 'invocation-1',
+            adapter_id: 'fs-authority-boundary',
+          }),
+        ).toEqual({
+          ok: true,
+          value: {
+            decision_id: expected.decision_id,
+            decision_digest_sha256: expected.decision_digest_sha256,
+            subject_digest_sha256: expected.subject_digest_sha256,
+          },
+        });
+      } finally {
+        fixture.issuer.dispose();
+      }
+    },
+  );
+
+  it('records a complete denial without granting a receipt or readiness', async () => {
+    const fixture = await requiredDenyFixture();
+    try {
+      expect(
+        fixture.issuer.issueDenial({
+          subject: fixture.subject,
+          context_receipt: fixture.contextReceipt,
+          invocation_id: 'invocation-1',
+          resolution: fixture.denial,
+        }),
+      ).toEqual({
+        issued: true,
+        outcome: 'deny',
+        decision: expectedRecordedDecision(fixture.subject, true, false),
+      });
+    } finally {
+      fixture.issuer.dispose();
+    }
+  });
+
   it.each([
     ['exact', 'atomicity', 'each-target'],
     ['exact', 'targets', []],
