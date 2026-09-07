@@ -480,3 +480,58 @@ it.each([
   expect(result.executeFullCi).toBe(true);
   expect(result.disposition).not.toBe('promotion-hit');
 });
+
+it.each(['preflight', 'evidenceGate', 'freshness'] as const)(
+  'fails the required result when mandatory %s could not run',
+  (field) => {
+    const input = {
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'success',
+      decision: verifyActionsRunEvidence(fixture()),
+    } as const;
+    expect(aggregateActionsEvidenceRequiredCheck({ ...input, [field]: 'skipped' })).toBe('failure');
+  },
+);
+
+it('cannot mask an invalid evidence claim with successful CI jobs', () => {
+  const input = fixture();
+  input.current.headSha = '0'.repeat(40);
+  const decision = verifyActionsRunEvidence(input);
+  expect(decision.hardFailure).toBe(true);
+  expect(
+    aggregateActionsEvidenceRequiredCheck({
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'success',
+      decision,
+    }),
+  ).toBe('failure');
+  expect(selectActionsEvidenceJobs(decision)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
+
+it('requires and accepts actual full execution after a legitimate evidence miss', () => {
+  const decision = verifyActionsRunEvidence({ ...fixture(), manifest: null });
+  expect(decision).toMatchObject({
+    executeFullCi: true,
+    hardFailure: false,
+    disposition: 'fallback-no-evidence',
+  });
+  const base = {
+    preflight: 'success',
+    evidenceGate: 'success',
+    freshness: 'success',
+    decision,
+  } as const;
+  expect(aggregateActionsEvidenceRequiredCheck({ ...base, reusable: 'success' })).toBe('success');
+  expect(aggregateActionsEvidenceRequiredCheck({ ...base, reusable: 'skipped' })).toBe('failure');
+  expect(selectActionsEvidenceJobs(decision)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
