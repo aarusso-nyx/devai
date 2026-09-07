@@ -1255,3 +1255,55 @@ describe('policy provenance before authority evaluation', () => {
     }
   });
 });
+
+describe('decision binding independent field checks', () => {
+  it.each([
+    ['plan_id', 'other-plan', 'plan id differs'],
+    ['batch_id', 'unexpected-batch', 'batch id differs'],
+    ['subject_digest_sha256', digest('f'), 'subject digest differs'],
+    ['authority_context_digest_sha256', digest('f'), 'authority context digest differs'],
+    ['policy_binding_digest_sha256', digest('f'), 'policy digest differs'],
+    ['decision_id', 'AUTH-0000000000000000', 'decision id differs'],
+    ['disposition', 'refuse', 'decision disposition is not proceed'],
+    ['evaluation', 'deny', 'binding mutation requires an allow evaluation'],
+  ])(
+    'rejects substituted %s even when the decision digest is recomputed',
+    async (field, value, reason) => {
+      const trustedRuntime = runtime();
+      const plan = exactPlan(trustedRuntime.materialize(baseRequest), [fsTarget]);
+      const original = decide({ plan, runtime: trustedRuntime, policy: policy() });
+      expect(verifyDecisionBinding({ plan }, original, humanContext).verified).toBe(true);
+      const { decision_digest_sha256: _digest, ...unsigned } = original;
+      const altered = { ...unsigned, [field]: value };
+      const changed = { ...altered, decision_digest_sha256: canonicalSha256(altered) } as Decision;
+      const verification = verifyDecisionBinding({ plan }, changed, humanContext);
+      expect(verification.verified).toBe(false);
+      if (verification.verified) throw new Error('forged decision accepted');
+      expect(verification.reasons).toContain(reason);
+      expect(verification.reasons).not.toContain('decision digest differs');
+      const prepare = vi.fn(async () => {
+        throw new Error('prepare must not run');
+      });
+      const adapter: MutationBoundaryAdapter = {
+        target_kind: 'fs',
+        adapter_id: 'binding-regression',
+        adapter_version: '1.0.0',
+        prepare,
+        verifyPrepared: () => {
+          throw new Error('verify must not run');
+        },
+        apply: async () => {
+          throw new Error('apply must not run');
+        },
+      };
+      const result = await prepareAuthorizedMutation({
+        adapter,
+        subject: { plan },
+        decision: changed,
+        context: humanContext,
+      });
+      expect(result.prepared).toBe(false);
+      expect(prepare).not.toHaveBeenCalled();
+    },
+  );
+});
