@@ -247,6 +247,100 @@ describe('inventory invariant candidates', () => {
     expect(result.summary.unread_inputs).toHaveLength(3);
   });
 
+  it.each([
+    ['basis', '', 'P1Y', 'legal_basis'],
+    ['retention', 'consent', '', 'retention'],
+    ['both', '', '', 'legal_basis + retention'],
+  ])(
+    'identifies missing PII %s without flagging complete or non-PII columns',
+    (_name, legal_basis, retention, missing) => {
+      const repo = root();
+      prepareInputs(repo);
+      write(repo, 'handling.json', {
+        tables: [
+          {
+            name: 'users',
+            columns: [
+              { name: 'email', pii_class: 'contact', legal_basis, retention },
+              { name: 'id' },
+              { name: 'public', pii_class: '' },
+              { name: 'complete', pii_class: 'contact', legal_basis: 'consent', retention: 'P1Y' },
+            ],
+          },
+        ],
+      });
+      const result = suggestInvariants({
+        repoRoot: repo,
+        dryRun: true,
+        now: NOW,
+        dataHandlingBodyPath: join(repo, 'handling.json'),
+      });
+      expect(result.summary.by_category.unlabeled_pii_column).toBe(1);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toMatchObject({
+        schemaVersion: '1.0.0',
+        generated_at: NOW,
+        category: 'unlabeled_pii_column',
+        source_sensor: 'inventory_data_handling',
+        confidence: 'high',
+        target: { kind: 'column', identifier: 'users.email' },
+        suggested_invariant: {
+          title: `Column users.email (contact) must have ${missing}`,
+          severity_suggestion: 'hard-fail',
+          domain_suggestion: 'INVENTORY',
+          measurable_via_suggestion: ['sense data-handling', 'sense data-model'],
+        },
+        related_invariants: ['INV-INVENTORY-002'],
+        status: 'proposed',
+        tags: ['phase-17-E', 'brownfield', 'pii', 'contact'],
+      });
+      expect(result.candidates[0]?.target).not.toHaveProperty('evidence');
+    },
+  );
+
+  it.each(['internal', '_internal', 'private', 'lib/internal'])(
+    'flags cross-package %s edges while allowing same-package and public access',
+    (segment) => {
+      const repo = root();
+      const from = 'apps/web/src/page.ts';
+      const to = `packages/api/${segment}/secret.ts`;
+      write(repo, 'graph.json', {
+        graph: {
+          [from]: [to, `apps/web/${segment}/own.ts`, 'packages/api/public.ts'],
+          'unknown/file.ts': [to],
+          'src/main.ts': ['src/internal/own.ts'],
+        },
+      });
+      const result = suggestInvariants({
+        repoRoot: repo,
+        dryRun: true,
+        now: NOW,
+        depGraphBodyPath: join(repo, 'graph.json'),
+      });
+      expect(result.summary.by_category.forbidden_edge).toBe(1);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toMatchObject({
+        generated_at: NOW,
+        category: 'forbidden_edge',
+        source_sensor: 'inventory_dep_graph',
+        confidence: 'high',
+        status: 'proposed',
+        target: {
+          kind: 'edge',
+          identifier: `${from} -> ${to}`,
+          evidence: [{ path: from, startLine: 1, endLine: 1 }],
+        },
+        suggested_invariant: {
+          severity_suggestion: 'hard-fail',
+          title: 'Cross-package internal import: apps/web → packages/api/internal',
+          measurable_via_suggestion: ['sense dep-graph'],
+        },
+        related_invariants: ['INV-INVENTORY-004'],
+        tags: ['phase-17-E', 'brownfield', 'layering'],
+      });
+    },
+  );
+
   it('keeps every candidate while the original sensor findings remain present', () => {
     const repo = root();
     prepareInputs(repo);
