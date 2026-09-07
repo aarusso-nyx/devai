@@ -200,7 +200,6 @@ export function createProtectedToolchainFixtureContext(input: {
       !same(candidate.repository, fixture.repository) ||
       candidate.repository.id !== 'devai-diagnostic/mutation-toolchain-diagnostic' ||
       fixture.release_unit !== '@devai-toolchain/diagnostic' ||
-      production.release_unit !== '@aarusso-nyx/devai' ||
       !same(fixture.resolution['installed_package'], input.installed_package.identity) ||
       !same(production.resolution['installed_package'], input.installed_package.identity) ||
       !same(input.environment, {}) ||
@@ -217,6 +216,18 @@ export function createProtectedToolchainFixtureContext(input: {
       input.toolchain['stryker'] !== '9.6.1' ||
       input.dependencies.length === 0 ||
       Object.entries(VERSIONS).some(([key, value]) => input.toolchain[key] !== value)
+    )
+      fail();
+    const profile = object(production.readInput('release-verification-profile'));
+    const template = object(profile['mutation_execution']);
+    // ADR-MUT-0008 makes v1.2 generic. Keep the historical v1.1 restriction,
+    // and bind the adopter unit through its independently verified policy.
+    if (
+      !['1.1.0', '1.2.0'].includes(String(template['schemaVersion'])) ||
+      profile['schemaVersion'] !== template['schemaVersion'] ||
+      template['template_id'] !== 'devai.protected-mutation-stryker.v1' ||
+      profile['release_unit'] !== production.release_unit ||
+      (template['schemaVersion'] === '1.1.0' && production.release_unit !== '@aarusso-nyx/devai')
     )
       fail();
     const definition = loadReleaseToolchainFixtureDefinition(input.installed_package);
@@ -241,15 +252,7 @@ export function createProtectedToolchainFixtureContext(input: {
       input.controls.maximum_archive_bytes,
     );
     verifyProtectedDependencyInputs(transport, source);
-    const profile = object(production.readInput('release-verification-profile'));
-    const template = object(profile['mutation_execution']);
-    if (
-      !['1.1.0', '1.2.0'].includes(String(template['schemaVersion'])) ||
-      profile['schemaVersion'] !== template['schemaVersion'] ||
-      template['template_id'] !== 'devai.protected-mutation-stryker.v1' ||
-      container['node_version'] !== VERSIONS.node
-    )
-      fail();
+    if (container['node_version'] !== VERSIONS.node) fail();
     const identity = copy({
       schemaVersion: '1.0.0',
       definition_sha256: definition.definition_sha256,

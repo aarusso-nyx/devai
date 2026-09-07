@@ -283,7 +283,7 @@ function resolutionFor(
   const archiveSRI = `sha512-${createHash('sha512').update(installed.readArchive()).digest('base64')}`;
   const manifest = Buffer.from(
     JSON.stringify({
-      name: repository === REPOSITORY ? '@devai-toolchain/diagnostic' : PACKAGE,
+      name: releaseUnit,
       version: '1.0.0',
       packageManager: 'pnpm@9.15.0',
       dependencies: { [PACKAGE]: 'file:host/devai.tgz' },
@@ -755,4 +755,4 @@ function providerFixture(production?: {
   return { value, options, request: boundRequest, raw, expected };
 }
 
-export { ROOT, DYNAMIC, PACKAGE, fixture, context, request, providerFixture };
+export { ROOT, DYNAMIC, PACKAGE, fixture, context, request, providerFixture, resolutionFor };

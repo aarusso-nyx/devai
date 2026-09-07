@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ProtectedCertificationContainer } from '../../src/services/release-certification-container.js';
 import { isVerifiedReleaseCandidateSnapshot } from '../../src/services/release-candidate-snapshot.js';
 import {
@@ -30,6 +32,7 @@ import {
 } from '../helpers/release-mutation-inputs-fixture.js';
 import {
   DYNAMIC,
+  ROOT,
   PACKAGE,
   fixture,
   context,
@@ -39,6 +42,7 @@ import {
   containerState,
   fixtureRuntime,
   cleanupFixtures,
+  resolutionFor,
 } from '../helpers/release-toolchain-provider-fixture.js';
 const runner = vi.fn((options: CheckRunnerOptions) => fixtureRuntime.runCheckTasks?.(options));
 const containerCalls: {
@@ -106,6 +110,46 @@ afterEach(() => {
 });
 
 describe('release toolchain fixture compatibility', () => {
+  it('binds a genuine generic v1.2 adopter resolution while retaining the v1.1 release-unit restriction', () => {
+    const base = currentFixture();
+    const policy = JSON.parse(readFileSync(join(ROOT, 'law/policy/devai-adoption.json'), 'utf8'));
+    policy.release_verification.release_unit = '@fixture/installed-consumer';
+    policy.release_verification.version_source = 'package.json';
+    const resolution = resolutionFor(
+      base.installed,
+      'law/policy/consumer-adoption.json',
+      Buffer.from(JSON.stringify(policy)),
+      '@fixture/installed-consumer',
+      'fixture/installed-consumer',
+    );
+    const value = fixture({ installed: base.installed, productionResolution: resolution });
+    expect(() => context(value)).not.toThrow();
+    expect(() =>
+      context(
+        fixture({
+          installed: base.installed,
+          productionResolution: {
+            ...resolution,
+            release_unit: '@fixture/spoofed',
+          },
+        }),
+      ),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+
+    policy.release_verification.schemaVersion = '1.1.0';
+    policy.release_verification.mutation_execution.schemaVersion = '1.1.0';
+    const historical = resolutionFor(
+      base.installed,
+      'law/policy/consumer-adoption.json',
+      Buffer.from(JSON.stringify(policy)),
+      '@fixture/installed-consumer',
+      'fixture/installed-consumer',
+    );
+    expect(() =>
+      context(fixture({ installed: base.installed, productionResolution: historical })),
+    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+  });
+
   it('runs the private preflight-only factory without an evidence store or any certification surface', async () => {
     const value = providerFixture();
     const { evidence_sink: unusedSink, ...options } = value.options;
