@@ -1149,3 +1149,47 @@ describe('scanForbiddenActions', () => {
   });
 });
 // Invariants: INV-DEVAI-001
+
+describe('reasoned canonical coverage waivers', () => {
+  it.each([undefined, '', 'short', 123, null, '😀😀😀😀'])(
+    'does not waive a missing protection using invalid reason %j',
+    (reason) => {
+      writeRegistry({
+        actions: CANONICAL_FORBIDDEN_ACTIONS.filter((entry) => entry.id !== 'FORBID-RM-RF'),
+        waivers: [{ id: 'FORBID-RM-RF', reason }],
+      });
+      expect(checkForbiddenRegistryCoverage(registryPath)).toMatchObject({
+        ok: false,
+        waived: [],
+        unwaived_missing: ['FORBID-RM-RF'],
+      });
+    },
+  );
+
+  it('accepts the schema minimum reason length and retains the exact reason', () => {
+    writeRegistry({
+      actions: CANONICAL_FORBIDDEN_ACTIONS.filter((entry) => entry.id !== 'FORBID-RM-RF'),
+      waivers: [{ id: 'FORBID-RM-RF', reason: 'No shell' }],
+    });
+    expect(checkForbiddenRegistryCoverage(registryPath)).toMatchObject({
+      ok: true,
+      waived: [{ id: 'FORBID-RM-RF', reason: 'No shell' }],
+      unwaived_missing: [],
+    });
+  });
+});
+
+it.each([null, [], { id: 'FORBID-RM-RF', reason: 'No shell', extra: true }])(
+  'ignores malformed waiver entry %j without satisfying coverage',
+  (value) => {
+    writeRegistry({
+      actions: CANONICAL_FORBIDDEN_ACTIONS.filter((entry) => entry.id !== 'FORBID-RM-RF'),
+      waivers: [value],
+    });
+    expect(checkForbiddenRegistryCoverage(registryPath)).toMatchObject({
+      ok: false,
+      waived: [],
+      unwaived_missing: ['FORBID-RM-RF'],
+    });
+  },
+);

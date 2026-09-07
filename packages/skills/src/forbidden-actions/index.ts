@@ -325,8 +325,19 @@ export function loadForbiddenRegistry(path: string): ForbiddenActionEntry[] {
 export function loadForbiddenWaivers(path: string): ForbiddenActionWaiver[] {
   if (!existsSync(path)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { waivers?: ForbiddenActionWaiver[] };
-    return parsed.waivers ?? [];
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { waivers?: unknown };
+    if (!Array.isArray(parsed.waivers)) return [];
+    return parsed.waivers.filter((value): value is ForbiddenActionWaiver => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+      const waiver = value as Record<string, unknown>;
+      return (
+        typeof waiver['id'] === 'string' &&
+        /^FORBID-[A-Z][A-Z0-9_-]*$/.test(waiver['id']) &&
+        typeof waiver['reason'] === 'string' &&
+        [...waiver['reason']].length >= 8 &&
+        Object.keys(waiver).every((key) => key === 'id' || key === 'reason')
+      );
+    });
   } catch {
     return [];
   }
