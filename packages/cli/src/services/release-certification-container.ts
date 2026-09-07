@@ -1088,12 +1088,28 @@ export class ProtectedCertificationContainer {
     } finally {
       // Unproved namespace shutdown preserves resources for diagnosis, never accepts bytes.
       if (created && !stopped) {
+        const inspectStopped = () => {
+          const inspection = object(
+            (JSON.parse(this.#checked(['inspect', id]).toString('utf8')) as unknown[])[0],
+          );
+          const state = object(inspection.State);
+          return state.Running === false && state.Pid === 0 && state.Restarting === false;
+        };
         try {
-          this.#checked(['kill', '--signal', 'KILL', id]);
-          this.#checked(['wait', id]);
-          stopped = true;
+          // A failed upload may leave a never-started container. Killing that
+          // container fails; waiting can hang and hide the original transport error.
+          stopped = inspectStopped();
         } catch {
-          /* preserved */
+          /* An unavailable observation is not proof of shutdown. */
+        }
+        if (!stopped) {
+          try {
+            this.#checked(['kill', '--signal', 'KILL', id]);
+            this.#checked(['wait', id]);
+            stopped = inspectStopped();
+          } catch {
+            /* preserved */
+          }
         }
       }
       if (!created || stopped) {

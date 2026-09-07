@@ -224,6 +224,73 @@ afterEach(() => {
 });
 
 describe('protected mutation-program container transport', () => {
+  it('preserves a copy failure when the created container is independently confirmed stopped', () => {
+    const value = fixture();
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        const command = args.slice(4);
+        if (command[0] === 'cp' && command[3] === `${state.id}:/workspace`)
+          return { ...result, status: 1 };
+        if (command[0] === 'kill' || command[0] === 'wait')
+          throw new Error('created container has never started');
+        return result;
+      },
+    };
+    try {
+      expect(() => invoke(value)).toThrow('release-certification-container-operation-failed:cp');
+      expect(state.calls.some((args) => args[4] === 'inspect')).toBe(true);
+      expect(state.calls.some((args) => ['kill', 'wait', 'start'].includes(args[4] ?? ''))).toBe(
+        false,
+      );
+      expectCleanup();
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each([
+    { Running: true },
+    { Pid: 12 },
+    { Restarting: true },
+    { Running: null },
+    { Pid: null },
+    { Restarting: null },
+  ])(
+    'preserves resources when shutdown remains unproved despite successful kill and wait: %j',
+    (changed) => {
+      const value = fixture();
+      activeFixture = {
+        ...value,
+        docker(args, input) {
+          const result = value.docker(args, input);
+          const command = args.slice(4);
+          if (command[0] === 'cp' && command[3] === `${state.id}:/workspace`)
+            return { ...result, status: 1 };
+          if (command[0] === 'inspect') {
+            const inspection = JSON.parse(result.stdout.toString());
+            Object.assign(inspection[0].State, changed);
+            return { ...result, stdout: Buffer.from(JSON.stringify(inspection)) };
+          }
+          return result;
+        },
+      };
+      try {
+        expect(() => invoke(value)).toThrow('release-certification-container-quiescence-unproven');
+        expect(state.calls.some((args) => args[4] === 'kill')).toBe(true);
+        expect(state.calls.some((args) => args[4] === 'wait')).toBe(true);
+        expect(
+          state.calls.some(
+            (args) => args[4] === 'rm' || (args[4] === 'volume' && args[5] === 'rm'),
+          ),
+        ).toBe(false);
+      } finally {
+        value.dispose();
+      }
+    },
+  );
+
   it('keeps the ordinary task route unchanged when no mutation program is supplied', () => {
     const value = fixture();
     try {
