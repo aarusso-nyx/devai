@@ -353,6 +353,89 @@ describe('post-merge host receipt verification', () => {
 });
 
 describe('post-merge authority host scope', () => {
+  it.each(
+    [
+      ['add'],
+      ['add', '-A', `work/audit/post-merge/${'a'.repeat(40)}`],
+      ['add', '--', `work/audit/post-merge/${'a'.repeat(40)}`, '--all'],
+      ['add', '--', `prefix/work/audit/post-merge/${'a'.repeat(40)}`],
+      ['add', '--', `work/audit/post-merge/${'a'.repeat(40)}/extra`],
+      ['add', '--', 42],
+      ['commit', '--amend', `audit(post-merge): observe ${'a'.repeat(40)}`],
+      ['commit', '-m', `audit(post-merge): observe ${'a'.repeat(40)}`, '--amend'],
+      ['commit', '-m', `prefix audit(post-merge): observe ${'a'.repeat(40)}`],
+      ['commit', '-m', `audit(post-merge): observe ${'a'.repeat(40)} extra`],
+      ['commit', '-m', 42],
+      ['update-ref', 'refs/heads/main', 'HEAD'],
+      ['update-ref', `refs/devai/post-merge/${'a'.repeat(40)}`, 'HEAD~1'],
+      ['update-ref', `refs/devai/post-merge/${'a'.repeat(40)}`, 'HEAD', '--no-deref'],
+      ['update-ref', `refs/devai/post-merge/${'a'.repeat(40)}/extra`, 'HEAD'],
+      ['update-ref', 42, 'HEAD'],
+      [
+        'show',
+        `refs/devai/post-merge/${'a'.repeat(40)}:work/audit/post-merge/${'b'.repeat(40)}/status.json`,
+      ],
+      [
+        'show',
+        `refs/devai/post-merge/${'a'.repeat(40)}:work/audit/post-merge/${'a'.repeat(40)}/private.json`,
+      ],
+      [
+        'show',
+        `refs/devai/post-merge/${'a'.repeat(40)}:work/audit/post-merge/${'a'.repeat(40)}/status.json`,
+        '--output=outside',
+      ],
+      ['show', 42],
+    ].map((args) => [JSON.stringify(args), args] as const),
+  )('refuses broadened audit command %s before applying an effect', (_label, args) => {
+    const fx = fixture(false);
+    const host = createPostMergeHostScope(fx.root, fx.mergeSha);
+    let applied = false;
+    try {
+      expect(() =>
+        host.scope.apply_effect(
+          { kind: 'process', symbol: 'spawnSync', arguments: ['git', args] },
+          () => {
+            applied = true;
+          },
+        ),
+      ).toThrow('POST_MERGE_PROCESS_FORBIDDEN');
+      expect(applied).toBe(false);
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('admits the exact audit ref update and all five matching artifact reads', () => {
+    const fx = fixture(false);
+    const host = createPostMergeHostScope(fx.root, fx.mergeSha);
+    const ref = `refs/devai/post-merge/${fx.mergeSha}`;
+    try {
+      expect(
+        host.scope.apply_effect(
+          { kind: 'process', symbol: 'spawnSync', arguments: ['git', ['update-ref', ref, 'HEAD']] },
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      for (const name of ['inventory', 'scorecard', 'backlog', 'assessment', 'status']) {
+        expect(
+          host.scope.apply_effect(
+            {
+              kind: 'process',
+              symbol: 'spawnSync',
+              arguments: [
+                'git',
+                ['show', `${ref}:work/audit/post-merge/${fx.mergeSha}/${name}.json`],
+              ],
+            },
+            () => 'applied',
+          ),
+        ).toBe('applied');
+      }
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('allows only bounded filesystem effects and the git command allowlist', () => {
     const fx = fixture();
     const host = createPostMergeHostScope(fx.root, fx.mergeSha);
