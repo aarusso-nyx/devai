@@ -163,9 +163,10 @@ describe('blueprint behavior', () => {
     );
 
     write(repo, '.devai/state/sensors/inventory_data_model/data-model.json', '{bad');
-    expect(diffBlueprintAgainstInventory({ blueprint, inventoryRoot: repo }).status).toBe(
-      'aligned',
-    );
+    expect(diffBlueprintAgainstInventory({ blueprint, inventoryRoot: repo })).toMatchObject({
+      status: 'has_deltas',
+      summary: { missing_entities: 2 },
+    });
   });
 });
 
@@ -460,4 +461,59 @@ describe('inventory invariant candidates', () => {
       evidence_log_path: null,
     });
   });
+});
+
+it.each([
+  ['data', 'missing', 'missing_entities', 2],
+  ['data', 'malformed', 'missing_entities', 2],
+  ['api', 'missing', 'missing_routes', 4],
+  ['api', 'malformed', 'missing_routes', 4],
+  ['rbac', 'missing', 'missing_permissions', 2],
+  ['rbac', 'malformed', 'missing_permissions', 2],
+] as const)(
+  'does not call a blueprint aligned when its %s inventory is %s',
+  (leg, state, counter, count) => {
+    const repo = root();
+    const bodies = {
+      data: {
+        path: 'inventory_data_model/data-model.json',
+        value: {
+          tables: [
+            { name: 'orders', columns: [{ name: 'id' }, { name: 'email' }] },
+            { name: 'sales__order_flow_audit_log', columns: [{ name: 'id' }] },
+          ],
+        },
+      },
+      api: {
+        path: 'inventory_api/api-map.json',
+        value: { endpoints: [{ path: '/api/orders' }, { path: '/api/audit-logs/:id' }] },
+      },
+      rbac: {
+        path: 'inventory_rbac/rbac.json',
+        value: { roles: [{ id: 'reader' }, { id: 'writer' }] },
+      },
+    };
+    for (const [name, body] of Object.entries(bodies)) {
+      if (name !== leg) write(repo, `.devai/state/sensors/${body.path}`, body.value);
+      else if (state === 'malformed') write(repo, `.devai/state/sensors/${body.path}`, '{bad');
+    }
+    const result = diffBlueprintAgainstInventory({ blueprint, inventoryRoot: repo });
+    expect(result.status).toBe('has_deltas');
+    expect(result.summary[counter]).toBe(count);
+    expect(result.deltas).toHaveLength(count);
+  },
+);
+
+it('includes declared role gaps when no inventory exists at all', () => {
+  const result = diffBlueprintAgainstInventory({ blueprint, inventoryRoot: root() });
+  expect(result.status).toBe('no_inventory');
+  expect(result.summary).toEqual({
+    missing_entities: 2,
+    missing_fields: 0,
+    missing_routes: 4,
+    missing_permissions: 2,
+  });
+  expect(result.deltas.filter((d) => d.kind === 'missing_permission').map((d) => d.target)).toEqual(
+    ['reader', 'writer'],
+  );
 });
