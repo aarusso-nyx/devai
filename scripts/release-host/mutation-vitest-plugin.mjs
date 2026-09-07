@@ -59,6 +59,33 @@ const { DryRunStatus, MutantRunStatus, TestStatus } = await import(
 
 function createProtectedVitest(injector) {
   const runner = vitestTestRunnerFactory(injector);
+  let phaseSequence = 0;
+  async function tracePhase(phase, operation) {
+    const sequence = ++phaseSequence;
+    const started = performance.now();
+    // Fixed vocabulary and numeric process/timing fields only: never print
+    // candidate paths, test data, environment values or exception messages.
+    const emit = (status) =>
+      process.stderr.write(
+        `DEVAI_MUTATION_RUNNER_PHASE ${JSON.stringify({
+          version: 1,
+          pid: process.pid,
+          sequence,
+          phase,
+          status,
+          elapsed_ms: Math.max(0, Math.round(performance.now() - started)),
+        })}\n`,
+      );
+    emit('begin');
+    try {
+      const result = await operation();
+      emit('complete');
+      return result;
+    } catch (error) {
+      emit('failed');
+      throw error;
+    }
+  }
   // Stryker 9.6.1 uses a global file filter for the explicit testFiles roster,
   // but labels that filter as runtime activation even for static mutants. The
   // pinned Vitest runner's per-test IDs are relative "file#test" strings; the
@@ -108,15 +135,24 @@ function createProtectedVitest(injector) {
     return result;
   };
   const originalInit = runner.init;
-  runner.init = async function () {
-    await originalInit.call(this);
-    if (!this.ctx || !Array.isArray(this.ctx.projects) || this.ctx.projects.length === 0)
-      throw new Error('release-mutation-test-population-invalid');
-    for (const config of [this.ctx.config, ...this.ctx.projects.map((project) => project.config)]) {
-      config.exclude = [];
-      config.passWithNoTests = false;
-      config.allowOnly = false;
-    }
+  runner.init = function () {
+    return tracePhase('init', async () => {
+      await originalInit.call(this);
+      if (!this.ctx || !Array.isArray(this.ctx.projects) || this.ctx.projects.length === 0)
+        throw new Error('release-mutation-test-population-invalid');
+      for (const config of [
+        this.ctx.config,
+        ...this.ctx.projects.map((project) => project.config),
+      ]) {
+        config.exclude = [];
+        config.passWithNoTests = false;
+        config.allowOnly = false;
+      }
+    });
+  };
+  const originalDispose = runner.dispose;
+  runner.dispose = function () {
+    return tracePhase('dispose', () => originalDispose.call(this));
   };
   return runner;
 }
