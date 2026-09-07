@@ -124,3 +124,86 @@ describe('candidate-bound harness alignment evidence', () => {
     },
   );
 });
+
+describe('alignment command and measurement population', () => {
+  it.each([
+    'pnpm exec devai',
+    'pnpm devai',
+    'npx --no-install devai',
+    'npm exec -- devai',
+    'env CHECK_MODE=strict devai',
+    'CHECK_MODE=strict command -- devai',
+    'node packages/cli/dist/bin.js',
+    'nodejs packages/cli/src/bin.ts',
+    '"/opt/devai tools/devai"',
+  ])('recognizes a directly invoked supported launcher: %s', (launcher) => {
+    workflow(`${launcher} ${action}`);
+    evidence({ command: `${launcher} ${action}` });
+    expect(sense().status).toBe('pass');
+  });
+
+  it.each([
+    'node other.js devai',
+    'python script.py devai',
+    'pnpm exec unrelated devai',
+    'npx unrelated devai',
+    'npm run devai',
+    'grep devai',
+  ])('does not promote action text passed to another executable: %s', (launcher) => {
+    workflow(`${launcher} ${action}`);
+    expect(sense().status).toBe('review');
+  });
+
+  it('requires all declared measurements in all mode but one suffices in any mode', () => {
+    const path = join(root, 'law/invariants/INV-TEST-001.json');
+    const second = 'check --only integrity';
+    const invariant = { id: 'INV-TEST-001', severity: 'gate', measurable_via: [action, second] };
+    writeFileSync(path, JSON.stringify({ ...invariant, measurable_via_mode: 'any' }));
+    expect(sense().status).toBe('pass');
+    writeFileSync(path, JSON.stringify({ ...invariant, measurable_via_mode: 'all' }));
+    expect(sense().status).toBe('review');
+    workflow(`devai ${action} && devai ${second}`);
+    expect(sense().status).toBe('review');
+    writeFileSync(
+      join(root, 'evidence/second.json'),
+      JSON.stringify({
+        command: `devai ${second}`,
+        status: 'pass',
+        candidate_sha: candidate,
+        completed_at: now,
+      }),
+    );
+    expect(sense().status).toBe('pass');
+  });
+
+  it('aggregates missing measurements and escalates three misaligned gates to failure', () => {
+    for (const id of ['INV-TEST-001', 'INV-TEST-002', 'INV-TEST-003']) {
+      writeFileSync(
+        join(root, `law/invariants/${id}.json`),
+        JSON.stringify({ id, severity: 'gate' }),
+      );
+    }
+    const result = sense();
+    expect(result.status).toBe('fail');
+    expect(result.metrics).toMatchObject({ gate_invariants: 3, misaligned: 3 });
+    expect(result.findings?.map((finding) => finding.code)).toEqual(
+      Array(3).fill('HARNESS_INVARIANT_ALIGNMENT_NO_MEASURABLE_VIA'),
+    );
+  });
+
+  it('reports a genuinely empty selected population as review with the dedicated finding', () => {
+    const result = sense({ gateSeverityValue: 'constitutional' });
+    expect(result.status).toBe('review');
+    expect(result.metrics).toEqual({ gate_invariants: 0, misaligned: 0 });
+    expect(result.findings?.map((finding) => finding.code)).toEqual([
+      'HARNESS_INVARIANT_ALIGNMENT_NO_GATES',
+    ]);
+  });
+
+  it('cannot promote a gate from missing or malformed evidence', () => {
+    writeFileSync(join(root, 'evidence/result.json'), '{broken');
+    expect(sense().status).toBe('review');
+    rmSync(join(root, 'evidence'), { recursive: true });
+    expect(sense().status).toBe('review');
+  });
+});
