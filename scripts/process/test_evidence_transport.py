@@ -92,6 +92,30 @@ class TransportTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     e.read_archive(malicious(name, kind))
 
+    def test_decompressed_archive_limit_precedes_tar_parsing(self):
+        data = e.archive({'small': b'x'})
+        with patch.object(e, 'LIMIT', 1024), patch.object(e.tarfile, 'open') as parser:
+            with self.assertRaisesRegex(ValueError, 'ARCHIVE_TOO_LARGE'):
+                e.read_archive(data)
+            parser.assert_not_called()
+
+    def test_directory_entries_count_toward_population_limit(self):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode='w:gz') as tar:
+            for name in ['a', 'b', 'c']:
+                member = tarfile.TarInfo(name)
+                member.type = tarfile.DIRTYPE
+                tar.addfile(member)
+        with patch.object(e, 'MAX_MEMBERS', 2, create=True):
+            with self.assertRaisesRegex(ValueError, 'ARCHIVE_TOO_LARGE'):
+                e.read_archive(output.getvalue())
+
+    def test_exact_decompressed_limit_is_accepted(self):
+        import gzip
+        data = e.archive({'small': b'x'})
+        with patch.object(e, 'LIMIT', len(gzip.decompress(data))):
+            self.assertEqual(e.read_archive(data), {'small': b'x'})
+
     def test_nested_archive_validated_before_materialization(self):
         data = bundle(lambda files: files.update({'artifacts.tgz': malicious('../escape')}))
         with self.assertRaises(ValueError):

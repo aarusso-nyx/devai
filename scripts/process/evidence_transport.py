@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import tarfile
+import tempfile
 
 REPOSITORY = 'aarusso-nyx/devai-evidence'
 MEMBERS = ('artifacts.tgz', 'envelope.json', 'environment.json', 'results.tgz',
@@ -18,6 +19,7 @@ MEMBERS = ('artifacts.tgz', 'envelope.json', 'environment.json', 'results.tgz',
 MUTATION_MEMBERS = ('mutation-export.tgz', 'mutation-input-plan.json')
 VERSIONS = ('1.0.0', '2.0.0')
 LIMIT = 1024 * 1024 * 1024
+MAX_MEMBERS = 100000
 
 
 def require(condition, code):
@@ -50,23 +52,39 @@ def read_archive(data):
     files = {}
     seen = set()
     total = 0
-    with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tar:
-        for member in tar:
-            name = member.name
-            parts = PurePosixPath(name).parts
-            require(not name.startswith('/') and '\\' not in name and
-                    '..' not in parts and not re.match(r'^[A-Za-z]:', name), 'ARCHIVE_PATH_INVALID')
-            normalized = str(PurePosixPath(name))
-            require(normalized not in seen, 'ARCHIVE_DUPLICATE')
-            seen.add(normalized)
-            require(member.isfile() or member.isdir(), 'ARCHIVE_TYPE_INVALID')
-            require(not member.pax_headers, 'ARCHIVE_EXTENSIONS_INVALID')
-            if member.isdir():
-                continue
-            require(normalized != '.', 'ARCHIVE_PATH_INVALID')
-            total += member.size
-            require(total <= LIMIT and len(files) < 100000, 'ARCHIVE_TOO_LARGE')
-            files[normalized] = tar.extractfile(member).read()
+    # Bound the entire expanded tar, including metadata and padding, before
+    # tarfile may interpret extension headers. Spill privately to disk instead
+    # of retaining another archive-sized buffer in memory.
+    with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as unpacked:
+        expanded = 0
+        with gzip.GzipFile(fileobj=io.BytesIO(data), mode='rb') as compressed:
+            while True:
+                chunk = compressed.read(min(1024 * 1024, LIMIT - expanded + 1))
+                if not chunk:
+                    break
+                expanded += len(chunk)
+                require(expanded <= LIMIT, 'ARCHIVE_TOO_LARGE')
+                unpacked.write(chunk)
+        unpacked.seek(0)
+        with tarfile.open(fileobj=unpacked, mode='r:') as tar:
+            for member in tar:
+                name = member.name
+                parts = PurePosixPath(name).parts
+                require(not name.startswith('/') and '\\' not in name and
+                        '..' not in parts and not re.match(r'^[A-Za-z]:', name), 'ARCHIVE_PATH_INVALID')
+                normalized = str(PurePosixPath(name))
+                require(normalized not in seen, 'ARCHIVE_DUPLICATE')
+                seen.add(normalized)
+                require(len(seen) <= MAX_MEMBERS, 'ARCHIVE_TOO_LARGE')
+                require(member.isfile() or member.isdir(), 'ARCHIVE_TYPE_INVALID')
+                require(not member.pax_headers, 'ARCHIVE_EXTENSIONS_INVALID')
+                if member.isdir():
+                    continue
+                require(normalized != '.', 'ARCHIVE_PATH_INVALID')
+                total += member.size
+                require(total <= LIMIT, 'ARCHIVE_TOO_LARGE')
+                files[normalized] = tar.extractfile(member).read()
+                require(len(files[normalized]) == member.size, 'ARCHIVE_SIZE_MISMATCH')
     for name in files:
         require(not any(str(parent) in files for parent in PurePosixPath(name).parents), 'ARCHIVE_PARENT_COLLISION')
     return files

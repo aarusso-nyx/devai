@@ -63,7 +63,10 @@ must match its filename digest. Pass this directory as `--mutation-export` and t
 pre-RC input plan as `--mutation-input-plan` when packing.
 
 The transport validates the approved outer digest, complete member manifest, safe
-archives and nested object hashes before writing files. It does not authenticate
+archives and nested object hashes before writing files. Each archive is limited to
+1 GiB both compressed and fully expanded, including tar metadata and padding, and
+100,000 members including directories. Expansion is bounded before tar parsing;
+private temporary storage is used above an 8 MiB memory buffer. It does not authenticate
 export signatures or establish mutation acceptance. The installed offline verifier
 must check the exported state and policy closure with external trust and approved
 controls, followed by complete mutation semantics and rehearsal bindings. Workflow
