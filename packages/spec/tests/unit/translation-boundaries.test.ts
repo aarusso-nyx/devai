@@ -150,3 +150,24 @@ describe('trusted expected-diff manifest', () => {
     );
   });
 });
+
+describe('auditor observation authorization', () => {
+  it.each(['work/audit', 'work/audit/report.json', 'work/audit/post-merge/abc/report.json'])(
+    'does not authorize legacy observation path %s for an auditor',
+    (path) => {
+      expect(classifyTranslationPath('auditor', path)).toEqual({
+        allowed: false,
+        effect: 'fs:auditor-observation',
+      });
+    },
+  );
+  it.each([
+    '.devai/local/rounds/R-0001/audit/report.json',
+    '.devai/local/rounds/R-0002/audit/report.json',
+  ])(
+    'does not substitute a path-only classification for active-round authorization: %s',
+    (path) => {
+      expect(classifyTranslationPath('auditor', path).allowed).toBe(false);
+    },
+  );
+});

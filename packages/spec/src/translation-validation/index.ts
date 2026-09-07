@@ -749,7 +749,9 @@ export function classifyTranslationPath(
     return { allowed: false, effect: 'fs:architect-spec' };
   }
   if (auditorObservation) {
-    return { allowed: role === 'auditor', effect: 'fs:auditor-observation' };
+    // Article 7 permits observation only through the active round's authorized
+    // runtime action. A legacy work/audit path supplies no such binding.
+    return { allowed: false, effect: 'fs:auditor-observation' };
   }
   if (testPath) return { allowed: role === 'inspector', effect: 'fs:tests' };
   if (ownerPath) return { allowed: role === 'owner', effect: 'fs:owner-spec' };
