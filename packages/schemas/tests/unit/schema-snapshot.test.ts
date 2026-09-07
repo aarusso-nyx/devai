@@ -95,6 +95,37 @@ describe('installed schema snapshot binding', () => {
     expect(() => registry.bindSchemaPackageSnapshot(snapshot())).not.toThrow();
   });
 
+  it('cannot retroactively bind after a refused ambient validator lookup', async () => {
+    const registry = await import('../../src/index.js');
+    expect(() => registry.getValidator('unknown.schema.json')).toThrow(
+      'unregistered schema: unknown.schema.json',
+    );
+    expect(() => registry.bindSchemaPackageSnapshot(snapshot())).toThrow(
+      'rpl-package-identity-mismatch',
+    );
+  });
+
+  it('exposes current validation errors when consumers copy the lazy validator diagnostics', async () => {
+    const registry = await import('../../src/index.js');
+    registry.bindSchemaPackageSnapshot(snapshot());
+    const validator = registry.validators.error;
+    expect(validator({})).toBe(false);
+    const failed = { ...validator };
+    expect(failed.errors).toEqual(registry.getValidator('error.schema.json').errors);
+    expect(failed.errors?.length).toBeGreaterThan(0);
+    expect(
+      validator({
+        schemaVersion: '1.0.0',
+        code: 'INVALID_INPUT',
+        class: 'invalid-input',
+        exit: 4,
+        message: 'Provide a value.',
+      }),
+    ).toBe(true);
+    expect({ ...validator }).toHaveProperty('errors', null);
+    expect(failed.errors?.length).toBeGreaterThan(0);
+  });
+
   it.each([
     '../error.schema.json',
     'error.schema.json/extra',
