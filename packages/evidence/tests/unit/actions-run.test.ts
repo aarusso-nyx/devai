@@ -735,3 +735,47 @@ it.each([
     }),
   ).toThrow('full result tested tree does not match the manifest');
 });
+
+it.each([0, 1])('rejects a promotion when only merge parent %i differs', (index) => {
+  const input = tuple();
+  const mergeParents = [...input.mergeParents];
+  mergeParents[index] = '8'.repeat(40);
+  expect(() => validateActionsEvidenceShadowTuple({ ...input, mergeParents })).toThrow(
+    'exact tested base and head merge inputs',
+  );
+});
+
+it('records an exact shadow hit without graduation authorization and still executes every CI job', () => {
+  const input = fixture();
+  const result = verifyActionsRunEvidence({
+    mode: 'shadow',
+    manifest: input.manifest,
+    current: input.current,
+  });
+  expect(result).toMatchObject({
+    disposition: 'promotion-hit',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+  expect(selectActionsEvidenceJobs(result)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
+
+it('does not let an inconsistent fallback decision justify skipped required tests', () => {
+  const decision = {
+    ...verifyActionsRunEvidence(fixture()),
+    disposition: 'fallback-no-evidence' as const,
+    executeFullCi: false,
+  };
+  expect(
+    aggregateActionsEvidenceRequiredCheck({
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'skipped',
+      decision,
+    }),
+  ).toBe('failure');
+});
