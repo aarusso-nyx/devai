@@ -5,6 +5,7 @@ import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   buildBootstrapPlan,
   executeBootstrapPlan,
+  resolveCanonicalPolicyContent,
   validateCanonicalPolicyContent,
 } from '../../src/bootstrap/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
@@ -279,3 +280,81 @@ describe('executeBootstrapPlan: writes the adopter constitution binding', () => 
   });
 });
 // Invariants: INV-DEVAI-009
+
+describe('canonical bootstrap policy validation before adopter writes', () => {
+  const domainFixture = {
+    schemaVersion: '1.0.0',
+    core: ['CORE'],
+    framework: ['DEVAI'],
+    client: [],
+  };
+
+  const invalidDomains: ReadonlyArray<readonly [string, unknown]> = [
+    ['null document', null],
+    ['array document', []],
+    ['wrong version', { ...domainFixture, schemaVersion: '2.0.0' }],
+    ...(['core', 'framework', 'client'] as const).flatMap((key) =>
+      [null, 'CORE', [''], [1], ['CORE', 'CORE']].map(
+        (value) =>
+          [
+            `${key} invalid roster ${JSON.stringify(value)}`,
+            { ...domainFixture, [key]: value },
+          ] as const,
+      ),
+    ),
+    ['empty core', { ...domainFixture, core: [] }],
+    ['empty framework', { ...domainFixture, framework: [] }],
+  ];
+  it.each(invalidDomains)('refuses domains with %s', (_name, value) => {
+    expect(() => validateCanonicalPolicyContent('domains.json', JSON.stringify(value))).toThrow(
+      'canonical policy domains.json failed schema validation',
+    );
+  });
+
+  it('accepts an empty client roster and preserves original canonical bytes', () => {
+    const bytes = `${JSON.stringify(domainFixture, null, 4)}\n`;
+    expect(validateCanonicalPolicyContent('domains.json', bytes)).toBe(bytes);
+  });
+
+  const fields = [
+    ['coverage', 'lines', 0, 100],
+    ['coverage', 'branches', 0, 100],
+    ['coverage', 'functions', 0, 100],
+    ['coverage', 'statements', 0, 100],
+    ['mutation', 'score_min', 0, 100],
+    ['mutation', 'survived_max', 0, Number.MAX_SAFE_INTEGER],
+    ['lint', 'max_errors', 0, Number.MAX_SAFE_INTEGER],
+    ['lint', 'max_warnings', 0, Number.MAX_SAFE_INTEGER],
+    ['typecheck', 'max_errors', 0, Number.MAX_SAFE_INTEGER],
+    ['freshness', 'default_max_age_hours', 1, 8760],
+    ['freshness', 'scorecard_failure_max_age_hours', 1, 8760],
+  ] as const;
+
+  function thresholdsWith(section: string, field: string, value: unknown): string {
+    const original = JSON.parse(resolveCanonicalPolicyContent('thresholds.json')) as Record<
+      string,
+      unknown
+    >;
+    return JSON.stringify({
+      ...original,
+      [section]: { ...(original[section] as Record<string, unknown>), [field]: value },
+    });
+  }
+
+  it.each(
+    fields.flatMap(([section, field, min, max]) =>
+      [null, true, String(min), min - 1, max + 1].map((value) => [section, field, value] as const),
+    ),
+  )('refuses malformed threshold %s.%s = %s', (section, field, value) => {
+    expect(() =>
+      validateCanonicalPolicyContent('thresholds.json', thresholdsWith(section, field, value)),
+    ).toThrow('canonical policy thresholds.json failed schema validation');
+  });
+
+  it.each(fields)('accepts both inclusive boundaries for %s.%s', (section, field, min, max) => {
+    for (const value of [min, max]) {
+      const bytes = thresholdsWith(section, field, value);
+      expect(validateCanonicalPolicyContent('thresholds.json', bytes)).toBe(bytes);
+    }
+  });
+});
