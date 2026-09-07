@@ -759,6 +759,7 @@ export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSin
     ![selected.plan_receipt_digest_sha256, selected.pack_spec_digest_sha256].every((value) =>
       /^[0-9a-f]{64}$/u.test(value),
     ) ||
+    typeof selected.sink_id !== 'string' ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(selected.sink_id)
   )
     throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
@@ -915,6 +916,7 @@ export function createProtectedReleaseHostAdapter(binding: ProtectedReleaseHostB
   });
   if (
     !['release certify', 'release preflight'].includes(selected.action_id) ||
+    typeof selected.repository.id !== 'string' ||
     selected.repository.id.length === 0 ||
     ![selected.repository.commit, selected.repository.tree].every((value) =>
       /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
