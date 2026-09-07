@@ -150,6 +150,31 @@ describe('renderTemplate', () => {
     expect(r.output).toBe('');
   });
 
+  it.each([
+    '<!-- ENDIF:orphan -->',
+    'prefix<!-- ENDIF:orphan --><!-- IF:a -->A<!-- ENDIF:a -->',
+    '<!-- IF:a -->A<!-- ENDIF:a --><!-- ENDIF:orphan -->',
+    '<!-- IF:a -->A<!-- ENDIF:b --><!-- ENDIF:a -->',
+  ])('rejects an unmatched closing conditional: %s', (body) => {
+    expect(() =>
+      renderTemplate({ body, tokens: fixedTokens(), flags: { a: true, b: true } }),
+    ).toThrow(/unmatched/);
+  });
+
+  it('handles nested distinct flags and whitespace around exact closing markers', () => {
+    const body =
+      'before<!-- IF:outer -->A<!-- IF:inner -->B<!--   ENDIF:inner   -->C<!-- ENDIF:outer -->after';
+    expect(
+      renderTemplate({ body, tokens: fixedTokens(), flags: { outer: true, inner: true } }).output,
+    ).toBe('beforeABCafter');
+    expect(
+      renderTemplate({ body, tokens: fixedTokens(), flags: { outer: true, inner: false } }).output,
+    ).toBe('beforeACafter');
+    expect(
+      renderTemplate({ body, tokens: fixedTokens(), flags: { outer: false, inner: true } }).output,
+    ).toBe('beforeafter');
+  });
+
   it('throws on unmatched IF', () => {
     const t = fixedTokens();
     const body = '<!-- IF:foo -->no close';
