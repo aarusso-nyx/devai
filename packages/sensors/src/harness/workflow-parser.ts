@@ -99,13 +99,13 @@ function trimComment(line: string): string {
   return before.trimEnd();
 }
 
-const USES_RE = /^\s*-?\s*uses:\s*([^\s@'"]+)(?:@([^\s'"]+))?/;
+const USES_RE = /^\s*-?\s*uses:\s*(['"]?)([^\s@'"]+)(?:@([^\s'"]+))?\1\s*$/;
 
 function parseUses(line: string, lineNo: number): ActionUse | null {
   const m = line.match(USES_RE);
   if (m === null) return null;
-  const target = m[1] ?? '';
-  const ref = m[2] ?? '';
+  const target = m[2] ?? '';
+  const ref = m[3] ?? '';
   if (target.startsWith('./')) {
     // Local action / reusable workflow — owner '' indicates local.
     return { owner: '', repo: target, ref, line: lineNo };
