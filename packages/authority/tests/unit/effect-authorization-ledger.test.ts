@@ -461,3 +461,53 @@ describe('one-time effect authorization runtime', () => {
     });
   });
 });
+
+describe('exact effect-ledger append and live-window boundaries', () => {
+  it.each([
+    { ledger_id: 'EAL-ffffffffffffffff' },
+    { sequence: 3 },
+    { previous_event_digest_sha256: 'f'.repeat(64) },
+  ])('refuses one independently substituted append binding: %j', (changed) => {
+    const f = terminate('consumed');
+    const initial = fixture().ledger;
+    const before = structuredClone(initial);
+    expect(() =>
+      appendEffectAuthorizationEvent(initial, seal({ ...f.terminal, ...changed })),
+    ).toThrow('effect authorization event does not extend the exact ledger head');
+    expect(initial).toEqual(before);
+  });
+
+  it('accepts consumption exactly at the grant start', () => {
+    const f = terminate('consumed');
+    const event = seal({ ...f.terminal, recorded_at: '2026-09-03T00:00:00.000Z' });
+    expect(verifyEvents([f.grant, event])).toMatchObject({ ok: true });
+  });
+
+  it('cannot resolve a terminal event as a fresh grant', () => {
+    const f = terminate('revoked');
+    expect(
+      resolveEffectAuthorization(f.ledger, f.resolveEvent, {
+        ...f.request,
+        authorization_event_id: f.terminal.event_id,
+      }),
+    ).toMatchObject({ ok: false, code: 'absent-effect-authorization' });
+  });
+
+  it.each([null, [], 'event', 42])(
+    'rejects non-object payload input with a stable diagnostic: %j',
+    (value) => {
+      expect(() => computeEffectAuthorizationPayloadDigest(value)).toThrow(
+        'effect authorization event must be an object',
+      );
+    },
+  );
+
+  it.each(['', 'a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'g'.repeat(64)])(
+    'rejects malformed digest identity with a stable diagnostic: %s',
+    (value) => {
+      expect(() => deriveEffectAuthorizationEventId(value)).toThrow(
+        'effect authorization payload digest must be lowercase SHA-256',
+      );
+    },
+  );
+});
