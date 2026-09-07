@@ -1,5 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -122,6 +132,54 @@ describe('protected release repository context', () => {
       writeFileSync(join(head.root, 'README.md'), 'drifted HEAD\n');
       git(head.root, ['add', 'README.md']);
       git(head.root, ['commit', '-qm', 'drift']);
+      expect(() => readProtectedReleaseRepositoryIdentity()).toThrow(
+        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+      );
+    });
+  });
+
+  it('refuses raw-origin changes even when config inode and repository identity stay fixed', async () => {
+    const value = fixture();
+    const context = createProtectedReleaseRepositoryContext(value.controls);
+    const config = join(value.root, '.git/config');
+    const before = statSync(config);
+    await withProtectedReleaseRepositoryContext(context, async () => {
+      const original = readFileSync(config, 'utf8');
+      expect(original).toContain(ORIGIN);
+      writeFileSync(config, original.replace(ORIGIN, 'ssh://git@github.com/aarusso-nyx/devai.git'));
+      expect(statSync(config).ino).toBe(before.ino);
+      expect(git(value.root, ['rev-parse', 'HEAD'])).toBe(value.controls.repository.commit);
+      expect(() => readProtectedReleaseRepositoryIdentity()).toThrow(
+        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+      );
+    });
+  });
+
+  it('refuses a new commit even when the complete candidate tree is unchanged', async () => {
+    const value = fixture();
+    const context = createProtectedReleaseRepositoryContext(value.controls);
+    await withProtectedReleaseRepositoryContext(context, async () => {
+      git(value.root, ['commit', '--allow-empty', '-qm', 'same tree new candidate']);
+      expect(git(value.root, ['rev-parse', 'HEAD^{tree}'])).toBe(value.controls.repository.tree);
+      expect(git(value.root, ['rev-parse', 'HEAD'])).not.toBe(value.controls.repository.commit);
+      expect(() => readProtectedReleaseRepositoryIdentity()).toThrow(
+        'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+      );
+    });
+  });
+
+  it('refuses replacement of the pinned config inode even with identical bytes', async () => {
+    const value = fixture();
+    const context = createProtectedReleaseRepositoryContext(value.controls);
+    const config = join(value.root, '.git/config');
+    const bytes = readFileSync(config);
+    const before = statSync(config);
+    await withProtectedReleaseRepositoryContext(context, async () => {
+      writeFileSync(config + '.replacement', bytes);
+      renameSync(config + '.replacement', config);
+      expect(readFileSync(config)).toEqual(bytes);
+      expect(statSync(config).ino).not.toBe(before.ino);
+      expect(git(value.root, ['rev-parse', 'HEAD'])).toBe(value.controls.repository.commit);
       expect(() => readProtectedReleaseRepositoryIdentity()).toThrow(
         'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
       );
