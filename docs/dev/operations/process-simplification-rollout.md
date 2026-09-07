@@ -98,6 +98,11 @@ Rehearsal dispatch: `publish=false`, exact `candidate_commit` on main, and inten
 builds once, double-packs for determinism, creates SBOM/site/manifest and exercises installed
 adoption on Linux. Only a successful complete graph emits `devai-rehearsal-<attempt>`.
 
+Installed smoke acceptance consumes the canonical staged tarball and its SHA-256; it does
+not pack a second smoke candidate. To verify an existing artifact locally, run
+`node packages/cli/scripts/installed-tarball-smoke.mjs --tarball <absolute-path> --sha256 <digest>`.
+The digest is checked before installation and again before reporting success.
+
 The completion binds source commit/tree, intended tag, run/attempt, workflow and process
 control commits, source artifact ID/digest, manifest/files and ledger verification identities.
 Assets are named `devai-release-assets-<attempt>` and both artifacts last 30 days.

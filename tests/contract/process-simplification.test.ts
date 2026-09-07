@@ -354,3 +354,51 @@ describe('publication recovery observations', () => {
     }
   });
 });
+
+describe('exact staged package smoke acceptance', () => {
+  it('rejects an incorrect supplied archive digest before invoking packaging or installation', () => {
+    const directory = temporary();
+    const archive = join(directory, 'candidate.tgz');
+    writeFileSync(archive, 'wrong archive');
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(root, 'packages/cli/scripts/installed-tarball-smoke.mjs'),
+        '--tarball',
+        archive,
+        '--sha256',
+        '0'.repeat(64),
+      ],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: directory } },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('SMOKE_TARBALL_DIGEST_MISMATCH');
+    expect(result.stderr).not.toContain('ENOENT');
+  });
+
+  it('requires an explicit digest when an archive is supplied', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(root, 'packages/cli/scripts/installed-tarball-smoke.mjs'),
+        '--tarball',
+        'candidate.tgz',
+      ],
+      { cwd: root, encoding: 'utf8' },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('SMOKE_USAGE');
+  });
+
+  it('rehearses the staged archive and digest without a separate smoke pack', () => {
+    const workflow = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8');
+    const invocation =
+      'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball" --sha256 "$package_sha256"';
+    expect(workflow.split(invocation)).toHaveLength(2);
+    expect(workflow.indexOf('node scripts/stage-release-package.mjs')).toBeLessThan(
+      workflow.indexOf(invocation),
+    );
+    expect(workflow).toContain('process.stdout.write(p.sha256)');
+    expect(workflow).not.toContain('run pack:smoke');
+  });
+});

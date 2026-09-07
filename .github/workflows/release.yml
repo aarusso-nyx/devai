@@ -294,7 +294,6 @@ jobs:
           pnpm run typecheck
           pnpm run release:static-integrity
           pnpm run release:closure
-          pnpm --filter "$PACKAGE_NAME" run pack:smoke
           npm --prefix docs/site ci
           npm --prefix docs/site run security:check
           npm --prefix docs/site run typecheck
@@ -323,6 +322,8 @@ jobs:
           stage_json="$(node scripts/stage-release-package.mjs --output "$release_dir")"
           tarball="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.tarball)' "$stage_json")"
           sbom="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sbom)' "$stage_json")"
+          package_sha256="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sha256)' "$stage_json")"
+          node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball" --sha256 "$package_sha256"
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(String(p.reproductions))' "$stage_json")" = 2
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sbom_subject_sha256)' "$stage_json")" = \
             "$(sha256sum "$tarball" | cut -d' ' -f1)"

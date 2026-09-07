@@ -25,6 +25,20 @@ const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json')
 const expectedActionCount = JSON.parse(
   readFileSync(join(packageRoot, 'dist/law/policy/action-registry.json'), 'utf8'),
 ).counts.total;
+const arguments_ = process.argv.slice(2);
+const suppliedTarball = arguments_.length === 0 ? undefined : resolve(arguments_[1] ?? '');
+const suppliedDigest = arguments_[3];
+if (
+  arguments_.length !== 0 &&
+  (arguments_.length !== 4 ||
+    arguments_[0] !== '--tarball' ||
+    arguments_[2] !== '--sha256' ||
+    !/^[a-f0-9]{64}$/u.test(suppliedDigest ?? ''))
+)
+  throw new Error('SMOKE_USAGE: --tarball <path> --sha256 <digest>');
+if (suppliedTarball !== undefined && digest(suppliedTarball) !== suppliedDigest)
+  throw new Error('SMOKE_TARBALL_DIGEST_MISMATCH');
+
 const smokeRoot = mkdtempSync(join(tmpdir(), 'devai installed çandidate-'));
 const packRoot = join(smokeRoot, 'pack');
 const projectRoot = join(smokeRoot, 'project');
@@ -79,9 +93,24 @@ function runInstalledModuleCheck(name, source, cwd = projectRoot) {
 try {
   mkdirSync(packRoot, { recursive: true });
   mkdirSync(projectRoot, { recursive: true });
-  const packed = JSON.parse(
-    run('pnpm', ['pack', '--json', '--pack-destination', packRoot], packageRoot),
-  );
+  const packed =
+    suppliedTarball === undefined
+      ? JSON.parse(run('pnpm', ['pack', '--json', '--pack-destination', packRoot], packageRoot))
+      : {
+          filename: suppliedTarball,
+          files: run('tar', ['-tzf', suppliedTarball], packageRoot)
+            .split('\n')
+            .filter(Boolean)
+            .filter((name) => !name.endsWith('/'))
+            .map((name) => {
+              if (
+                !name.startsWith('package/') ||
+                name.split('/').some((part) => part === '..' || part === '.')
+              )
+                throw new Error('SMOKE_TARBALL_MEMBER_INVALID');
+              return { path: name.slice('package/'.length) };
+            }),
+        };
   const tarball = packed?.filename;
   if (typeof tarball !== 'string') throw new Error('PACK_TARBALL_MISSING');
   const unexpectedPackedFiles = (packed.files ?? [])
@@ -1417,6 +1446,8 @@ void adapters;
     throw new Error('INSTALLED_REMOVAL_PROCEDURE_INVALID');
   }
   const tarballPath = resolve(packageRoot, tarball);
+  if (suppliedDigest !== undefined && digest(tarballPath) !== suppliedDigest)
+    throw new Error('SMOKE_TARBALL_DIGEST_MISMATCH');
   const installedFiles = filesUnder(installedPackage);
 
   process.stdout.write(
