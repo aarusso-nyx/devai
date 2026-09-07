@@ -327,6 +327,7 @@ jobs:
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(String(p.reproductions))' "$stage_json")" = 2
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sbom_subject_sha256)' "$stage_json")" = \
             "$(sha256sum "$tarball" | cut -d' ' -f1)"
+          node scripts/process/verify-pages-bytes.mjs local docs/site/build
           site="$release_dir/devai-site-$PACKAGE_VERSION.tar.gz"
           tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
             -czf "$site" -C docs/site/build .
@@ -588,6 +589,24 @@ jobs:
       pages: write
       id-token: write
     steps:
+      - name: Check out approved Pages verification controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+          path: release-control
+          persist-credentials: false
+      - name: Bind approved Pages verification controls
+        shell: bash
+        env:
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+        run: |
+          set -euo pipefail
+          [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
+      - name: Set up Node for Pages verification
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
       - name: Download canonical release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -601,6 +620,7 @@ jobs:
           site="$(node -e "const m=require('./release-assets/release-manifest.json'); process.stdout.write(m.artifacts.site.file)")"
           mkdir -p pages-site
           tar -xzf "release-assets/$site" -C pages-site
+          node release-control/scripts/process/verify-pages-bytes.mjs local pages-site
       - name: Upload exact Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
         with:
@@ -630,6 +650,7 @@ jobs:
           done
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/adopters/install" >/dev/null
           curl --fail --location --retry 8 --retry-delay 5 "${root}docs/reference/cli" >/dev/null
+          node release-control/scripts/process/verify-pages-bytes.mjs live pages-site
   rehearsal-summary:
     name: Verify non-publishing rehearsal assets
     needs:
