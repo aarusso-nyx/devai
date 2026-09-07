@@ -203,24 +203,28 @@ it.each([39, 41, 48, 63, 65])('rejects a %i-character non-Git merge identity', (
 });
 
 it.each([
-  ['repository', 'wrong/repository'],
-  ['workflowRef', 'wrong/workflow'],
-  ['runId', '999'],
-  ['runAttempt', 1],
-  ['testedCommitSha', '8'.repeat(40)],
-  ['schemaVersion', 2],
-  ['kind', 'other'],
-  ['result', 'failure'],
-  ['fullCiAuthoritative', false],
-  ['testedTree', { algorithm: 'sha1', value: '9'.repeat(40) }],
-] as const)('rejects substituted full-result %s', (field, value) => {
+  ['repository', 'wrong/repository', 'full result repository does not match the manifest'],
+  ['workflowRef', 'wrong/workflow', 'full result workflowRef does not match the manifest'],
+  ['runId', '999', 'full result runId does not match the manifest'],
+  ['runAttempt', 1, 'full result runAttempt does not match the manifest'],
+  ['testedCommitSha', '8'.repeat(40), 'full result testedCommitSha does not match the manifest'],
+  ['schemaVersion', 2, 'full result schemaVersion is invalid'],
+  ['kind', 'other', 'full result kind is invalid'],
+  ['result', 'failure', 'full result is not successful'],
+  ['fullCiAuthoritative', false, 'full result is not authoritative'],
+  [
+    'testedTree',
+    { algorithm: 'sha1', value: '9'.repeat(40) },
+    'full result tested tree does not match the manifest',
+  ],
+] as const)('rejects substituted full-result %s', (field, value, reason) => {
   const input = tuple();
   expect(() =>
     validateActionsEvidenceShadowTuple({
       ...input,
       fullResult: { ...input.fullResult, [field]: value },
     }),
-  ).toThrow(/actions evidence tuple: full result/u);
+  ).toThrow(`actions evidence tuple: ${reason}`);
 });
 
 it.each(ACTIONS_REUSABLE_JOBS)(
@@ -237,26 +241,26 @@ it.each(ACTIONS_REUSABLE_JOBS)(
 );
 
 it.each([
-  ['schemaVersion', 2],
-  ['kind', 'other'],
-  ['mainRunId', ''],
-  ['mainRunAttempt', 0],
-  ['mainRunAttempt', 1.5],
-  ['fullCiResult', 'failure'],
-  ['executeFullCi', false],
-  ['reason', ''],
-  ['disposition', 'invented'],
-  ['shadowFullEquivalent', false],
-  ['reusableJobs', []],
-  ['freshnessJobs', []],
-] as const)('rejects invalid shadow-decision %s=%s', (field, value) => {
+  ['schemaVersion', 2, 'shadow decision schemaVersion is invalid'],
+  ['kind', 'other', 'shadow decision kind is invalid'],
+  ['mainRunId', '', 'shadow decision main run id is invalid'],
+  ['mainRunAttempt', 0, 'shadow decision main run attempt is invalid'],
+  ['mainRunAttempt', 1.5, 'shadow decision main run attempt is invalid'],
+  ['fullCiResult', 'failure', 'shadow decision full CI is not successful'],
+  ['executeFullCi', false, 'shadow decision did not execute full CI'],
+  ['reason', '', 'shadow reason is missing'],
+  ['disposition', 'invented', 'shadow disposition is invalid'],
+  ['shadowFullEquivalent', false, 'promotion-hit must record shadow/full equivalence'],
+  ['reusableJobs', [], 'shadow reusable-job set does not match the current contract'],
+  ['freshnessJobs', [], 'shadow freshness-job set does not match the current contract'],
+] as const)('rejects invalid shadow-decision %s=%s', (field, value, reason) => {
   const input = tuple();
   expect(() =>
     validateActionsEvidenceShadowTuple({
       ...input,
       decision: { ...input.decision, [field]: value },
     }),
-  ).toThrow(/actions evidence tuple:/u);
+  ).toThrow(`actions evidence tuple: ${reason}`);
 });
 
 it.each(['reversed', 'missing', 'extra'] as const)('rejects %s merge-parent identity', (kind) => {
@@ -338,14 +342,14 @@ it.each(['revoked', 'unavailable'] as const)(
 );
 
 it.each([
-  ['repository', 'other/repository'],
-  ['workflowRef', 'other/workflow'],
-  ['runId', '124'],
-  ['runAttempt', 3],
-  ['headSha', '1'.repeat(40)],
-  ['mergeBaseSha', '2'.repeat(40)],
-  ['headIsMergeInput', false],
-] as const)('rejects substituted %s', (field, value) => {
+  ['repository', 'other/repository', 'repository identity does not match the claim'],
+  ['workflowRef', 'other/workflow', 'workflow identity does not match the claim'],
+  ['runId', '124', 'run id does not match the selected evidence run'],
+  ['runAttempt', 3, 'run attempt does not match the selected evidence run'],
+  ['headSha', '1'.repeat(40), 'PR head is not the claimed merge input'],
+  ['mergeBaseSha', '2'.repeat(40), 'merge-base identity does not match the claim'],
+  ['headIsMergeInput', false, 'PR head is not an input to the configured merge method'],
+] as const)('rejects substituted %s', (field, value, reason) => {
   const input = fixture();
   const result = verifyActionsRunEvidence({
     ...input,
@@ -353,6 +357,7 @@ it.each([
   });
   expect(result).toMatchObject({
     disposition: 'invalid-claim',
+    reason,
     executeFullCi: true,
     hardFailure: true,
   });
