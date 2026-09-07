@@ -420,3 +420,63 @@ it('refuses an authorization from a caller-selected source', () => {
     verifyActionsRunEvidence(altered as unknown as VerifyActionsRunEvidenceInputs),
   ).toMatchObject({ disposition: 'fallback-no-evidence', executeFullCi: true });
 });
+
+it.each([
+  {
+    name: 'expiry interval',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.expiresAt = '2026-09-08T00:00:00.001Z';
+    },
+  },
+  {
+    name: 'policy age binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.policy.maxAgeHours = 23;
+    },
+  },
+  {
+    name: 'repository binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.subject = { ...m.subject, repository: 'example/different' };
+    },
+  },
+  {
+    name: 'commit binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.subject = { ...m.subject, commitSha: '0'.repeat(40) };
+    },
+  },
+  {
+    name: 'tree binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.subject = { ...m.subject, tree: { ...m.subject.tree, value: '0'.repeat(40) } };
+    },
+  },
+])(
+  'rejects internally inconsistent manifest $name before granting reuse or durable shadow evidence',
+  ({ change }) => {
+    const input = fixture();
+    change(input.manifest);
+    expect(verifyActionsRunEvidence(input)).toMatchObject({
+      disposition: 'invalid-claim',
+      executeFullCi: true,
+      hardFailure: true,
+    });
+    const observation = tuple();
+    observation.manifest = input.manifest;
+    expect(() => validateActionsEvidenceShadowTuple(observation)).toThrow(
+      'manifest is not a valid actions-run claim',
+    );
+  },
+);
+
+it.each([
+  { value: '0'.repeat(64), fileCount: 12 },
+  { value: 'b'.repeat(64), fileCount: 13 },
+])('refuses reuse when independently recomputed source hash differs: %j', (source) => {
+  const input = fixture();
+  input.current.recomputedSourceHash = { algorithm: 'sha256', ...source };
+  const result = verifyActionsRunEvidence(input);
+  expect(result.executeFullCi).toBe(true);
+  expect(result.disposition).not.toBe('promotion-hit');
+});
