@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import { parsers } from '@devai-nyx/schemas';
 import {
   appendEffectAuthorizationEvent,
   buildEffectAuthorizationTerminalEvent,
@@ -62,7 +64,222 @@ function terminate(kind: EffectAuthorizationTerminalKind) {
   return { ...f, terminal, ledger: appendEffectAuthorizationEvent(f.ledger, terminal) };
 }
 
+// Independently reseal tampered fixtures so schema-valid attacks reach the semantic verifier.
+function seal(event: EffectAuthorizationEvent): EffectAuthorizationEvent {
+  const payload: Record<string, unknown> = { ...event };
+  delete payload['event_id'];
+  delete payload['payload_digest_sha256'];
+  const digest = canonicalSha256(payload);
+  return { ...event, event_id: `EA-${digest.slice(0, 16)}`, payload_digest_sha256: digest };
+}
+
+function ledgerFor(events: EffectAuthorizationEvent[]): EffectAuthorizationLedger {
+  const entries = events.map((event) => ({
+    sequence: event.sequence,
+    event_id: event.event_id,
+    event_digest_sha256: canonicalSha256(event),
+    previous_event_digest_sha256: event.previous_event_digest_sha256,
+    kind: event.kind,
+    references_event_id: event.grant_event_id,
+  }));
+  const last = entries.at(-1);
+  if (!last) throw Error('fixture needs an event');
+  return {
+    ...fixture().ledger,
+    entries,
+    head: {
+      sequence: last.sequence,
+      event_id: last.event_id,
+      event_digest_sha256: last.event_digest_sha256,
+    },
+  };
+}
+
+function verifyEvents(events: EffectAuthorizationEvent[]) {
+  const ledger = ledgerFor(events);
+  expect(parsers.effectAuthorizationLedger.safeParse(ledger).ok).toBe(true);
+  for (const event of events)
+    expect(parsers.effectAuthorizationEvent.safeParse(event).ok).toBe(true);
+  return verifyEffectAuthorizationLedger(ledger, (entry) =>
+    events.find((event) => event.event_id === entry.event_id),
+  );
+}
+
 describe('one-time effect authorization runtime', () => {
+  it('rejects resealed events belonging to a different ledger', () => {
+    const event = seal({ ...fixture().grant, ledger_id: 'EAL-other-release' });
+    expect(verifyEvents([event])).toMatchObject({
+      ok: false,
+      errors: ['eal-event-ledger-id-mismatch'],
+    });
+  });
+
+  it.each(['2026-09-03T00:00:00.000Z', '2026-09-02T23:59:59.999Z'])(
+    'rejects a grant ending at or before its start: %s',
+    (expires_at) => {
+      const event = seal({ ...fixture().grant, expires_at });
+      expect(verifyEvents([event])).toMatchObject({
+        ok: false,
+        errors: ['eal-grant-live-window-invalid'],
+      });
+    },
+  );
+
+  it.each(['2026-09-02T23:59:59.999Z', '2026-09-03T01:00:00.000Z'])(
+    'rejects a resealed consumption outside the live window: %s',
+    (recorded_at) => {
+      const f = terminate('consumed');
+      const event = seal({ ...f.terminal, recorded_at });
+      expect(verifyEvents([f.grant, event])).toMatchObject({
+        ok: false,
+        errors: ['eal-consume-outside-live-window'],
+      });
+    },
+  );
+
+  it('rejects a terminal record referring to an absent grant', () => {
+    const f = terminate('revoked');
+    const terminal = seal({ ...f.terminal, grant_event_id: 'EA-0000000000000000' });
+    expect(verifyEvents([f.grant, terminal])).toMatchObject({
+      ok: false,
+      errors: ['eal-grant-reference-unresolved'],
+    });
+  });
+
+  it('rejects a second consumption even when every event hash and chain link is valid', () => {
+    const f = terminate('consumed');
+    const replay = seal({
+      ...f.terminal,
+      sequence: 3,
+      previous_event_digest_sha256: canonicalSha256(f.terminal),
+      consumed_by_state_id: 'RLS-1111111111111111',
+    });
+    expect(verifyEvents([f.grant, f.terminal, replay])).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'eal-grant-has-multiple-terminal-events',
+        'eal-terminal-after-terminal',
+        'eal-grant-consumed-more-than-once',
+      ]),
+    });
+  });
+
+  it('rejects revocation after consumption without misreporting another consumption', () => {
+    const f = terminate('consumed');
+    const revoked = terminate('revoked').terminal;
+    const event = seal({
+      ...revoked,
+      sequence: 3,
+      previous_event_digest_sha256: canonicalSha256(f.terminal),
+    });
+    const result = verifyEvents([f.grant, f.terminal, event]);
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'eal-terminal-after-terminal',
+        'eal-grant-has-multiple-terminal-events',
+      ]),
+    });
+    if (result.ok) throw Error('terminal replay accepted');
+    expect(result.errors).not.toContain('eal-grant-consumed-more-than-once');
+  });
+
+  it('rejects terminal authority transferred to a different exact artifact', () => {
+    const f = terminate('consumed');
+    const event = seal({
+      ...f.terminal,
+      resource: { ...f.terminal.resource, exact_identifier: '@aarusso-nyx/devai@9.9.9' },
+    });
+    expect(verifyEvents([f.grant, event])).toMatchObject({
+      ok: false,
+      errors: ['eal-grant-identity-mismatch'],
+    });
+  });
+
+  it('rejects reordered chains, duplicate sequences, and an incorrect final head', () => {
+    const f = terminate('consumed');
+    const later = seal({
+      ...terminate('revoked').terminal,
+      sequence: 3,
+      previous_event_digest_sha256: canonicalSha256(f.terminal),
+    });
+    const reordered = verifyEvents([f.grant, later, f.terminal]);
+    expect(reordered).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'eal-sequence-not-contiguous-from-one',
+        'eal-previous-digest-mismatch',
+      ]),
+    });
+    const duplicated = seal({ ...later, sequence: 2 });
+    expect(verifyEvents([f.grant, f.terminal, duplicated])).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'eal-duplicate-sequence',
+        'eal-sequence-not-contiguous-from-one',
+      ]),
+    });
+    for (const head of [
+      { ...f.ledger.head, sequence: 1 },
+      { ...f.ledger.head, event_id: f.grant.event_id },
+      { ...f.ledger.head, event_digest_sha256: 'a'.repeat(64) },
+    ])
+      expect(verifyEffectAuthorizationLedger({ ...f.ledger, head }, f.resolveEvent)).toMatchObject({
+        ok: false,
+        errors: ['eal-head-not-final-entry'],
+      });
+  });
+
+  it('checks event bytes against the entry and independently sealed payload', () => {
+    const f = terminate('consumed');
+    for (const [change, error] of [
+      [{ payload_digest_sha256: 'a'.repeat(64) }, 'eal-event-payload-digest-mismatch'],
+      [{ event_id: 'EA-0000000000000000' }, 'eal-event-id-mismatch'],
+      [{ sequence: 3 }, 'eal-entry-event-sequence-mismatch'],
+      [
+        { previous_event_digest_sha256: 'a'.repeat(64) },
+        'eal-entry-event-previous-digest-mismatch',
+      ],
+    ] as const) {
+      const event = { ...f.terminal, ...change };
+      expect(parsers.effectAuthorizationEvent.safeParse(event).ok).toBe(true);
+      expect(
+        verifyEffectAuthorizationLedger(f.ledger, (entry) =>
+          entry.event_id === f.grant.event_id ? f.grant : event,
+        ),
+      ).toMatchObject({
+        ok: false,
+        errors: expect.arrayContaining([error, 'eal-event-digest-mismatch']),
+      });
+    }
+  });
+
+  it('refuses append against a stale head without modifying the ledger', () => {
+    const f = terminate('consumed');
+    const before = structuredClone(f.ledger);
+    expect(() => appendEffectAuthorizationEvent(f.ledger, f.terminal)).toThrow(
+      'does not extend the exact ledger head',
+    );
+    expect(f.ledger).toEqual(before);
+  });
+
+  it('does not persist or execute when authorization is absent', async () => {
+    const f = fixture();
+    const adapter = vi.fn();
+    const appendConsumption = vi.fn();
+    expect(
+      await executeAuthorizedEffect({
+        ...f,
+        request: { ...f.request, authorization_event_id: 'EA-0000000000000000' },
+        consumed_by_state_id: 'RLS-0123456789abcdef',
+        appendConsumption,
+        adapter,
+      }),
+    ).toEqual({ ok: false, phase: 'authorization', code: 'absent-effect-authorization' });
+    expect(adapter).not.toHaveBeenCalled();
+    expect(appendConsumption).not.toHaveBeenCalled();
+  });
+
   it('verifies the independently sealed contract example and resolves its exact grant', () => {
     const f = fixture();
     expect(computeEffectAuthorizationPayloadDigest(f.grant)).toBe(f.grant.payload_digest_sha256);
