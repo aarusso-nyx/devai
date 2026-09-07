@@ -277,11 +277,18 @@ describe('policy query and decision identity', () => {
   ])('rejects malformed query field $field=$value', async ({ field, value }) => {
     const h = await fixture();
     h.query[field] = value;
-    expect(h.resolve()).toMatchObject({
+    expect(h.resolve()).toEqual({
       outcome: 'deny',
+      category: 'refused',
       code: 'AUTHORITY_QUERY_INVALID',
       reasons: ['AUTHORITY_QUERY_INVALID'],
+      policy_binding_digest_sha256: canonicalSha256(h.policy.provenance),
+      resource_target_id: field === 'resource' ? '' : fsTarget.id,
+      resource_kind: 'fs',
+      operation: 'update',
+      matched_rule_ids: [],
       obligations: [],
+      query_digest_sha256: canonicalSha256(h.query),
     });
   });
   it('preserves complete denial details for a classified operation mismatch', async () => {
