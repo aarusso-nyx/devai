@@ -192,6 +192,7 @@ describe('early prerequisites and evidence transport', () => {
       'control-location',
       'package',
       'mutation-control',
+      'mutation-inputs',
       'maps',
       'signer',
       'destination',

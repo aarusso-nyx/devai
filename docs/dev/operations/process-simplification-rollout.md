@@ -62,20 +62,25 @@ pins the archive, complete unpacked member population, source commit/tree, and d
 Identity inspection executes no verifier modules and does not constitute control approval or
 mutation acceptance. Certification rechecks these bindings against the prerequisite result;
 a missing control fails, and unavailable dependent checks are reported as blocked.
+The mutation input plan is bound before execution, without requiring generated receipts or
+result hashes. It must select the exact candidate and all ten packages with score minimum
+60 and survivor maximum 50. Post-run contracts must preserve these input bindings; the
+approved verifier must still check the complete artifact population and semantics.
 
 Configuration fields:
 
-| Field                                                    | Meaning                                                                                  |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `repo`                                                   | Exact clean candidate checkout                                                           |
-| `packageRoot`, `packageVersion`, `packageTreeSha256`     | Approved installed package identity                                                      |
-| `verifierProvenanceSha256`                               | Approved verifier provenance-file digest                                                 |
-| `mutationVerifierRoot`, `mutationVerifierApprovalSha256` | External immutable mutation control installation and separately approved manifest digest |
-| `policyDigest`                                           | Expected reconstructed RC task-policy digest                                             |
-| `toolchain`, `environment`                               | Protected map filenames; absent declared environment values are null                     |
-| `privateKey`, `publicKey`, `signerId`, `trustStore`      | External Ed25519 signer and current trust/revocation configuration                       |
-| `outputDir`                                              | New export directory whose existing parent is accessible and external                    |
-| `receipt`                                                | Exact unsigned receipt filename, only for the separate evidence phase                    |
+| Field                                                    | Meaning                                                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `repo`                                                   | Exact clean candidate checkout                                                              |
+| `packageRoot`, `packageVersion`, `packageTreeSha256`     | Approved installed package identity                                                         |
+| `verifierProvenanceSha256`                               | Approved verifier provenance-file digest                                                    |
+| `mutationVerifierRoot`, `mutationVerifierApprovalSha256` | External immutable mutation control installation and separately approved manifest digest    |
+| `mutationInputPlan`, `mutationInputPlanSha256`           | External installed-host mutation input plan and independently established exact byte digest |
+| `policyDigest`                                           | Expected reconstructed RC task-policy digest                                                |
+| `toolchain`, `environment`                               | Protected map filenames; absent declared environment values are null                        |
+| `privateKey`, `publicKey`, `signerId`, `trustStore`      | External Ed25519 signer and current trust/revocation configuration                          |
+| `outputDir`                                              | New export directory whose existing parent is accessible and external                       |
+| `receipt`                                                | Exact unsigned receipt filename, only for the separate evidence phase                       |
 
 ```text
 node scripts/process/release-prerequisites.mjs prerequisites <config.json> <new-prerequisites.json>

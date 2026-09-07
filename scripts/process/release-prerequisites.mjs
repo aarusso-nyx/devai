@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inspectApprovedMutationVerifier } from './approved-mutation-verifier.mjs';
+import { inspectMutationInputPlan } from './mutation-evidence-bindings.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const canonical = (value) => JSON.stringify(value, Object.keys(value).sort());
@@ -170,6 +171,15 @@ export function inspectPrerequisites(config, configPath) {
     bindings.mutationVerifierArchive = control.archiveSha256;
     bindings.mutationVerifierCommit = control.sourceCommit;
     bindings.mutationVerifierTree = control.sourceTree;
+  });
+  attempt('mutation-inputs', ['candidate', 'control-location'], () => {
+    const path = external(repo, config.mutationInputPlan);
+    inspectMutationInputPlan(regular(path), {
+      sha256: config.mutationInputPlanSha256,
+      commit: bindings.commit,
+      tree: bindings.tree,
+    });
+    bindings.mutationInputPlan = config.mutationInputPlanSha256;
   });
   attempt('maps', ['control-location'], () => {
     external(repo, config.toolchain);
