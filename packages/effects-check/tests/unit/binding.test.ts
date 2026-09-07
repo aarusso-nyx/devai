@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { enforceEffectReport } from '../../src/index.js';
+import {
+  enforceEffectReport,
+  parseActionEffectsSource,
+  validateDeclaredCapabilityConsistency,
+} from '../../src/index.js';
 
 // Invariants: INV-DEVAI-020
 
@@ -30,6 +34,66 @@ describe('binding effect report', () => {
       }),
     ).not.toThrow();
   });
+});
+
+it('does not interpret an unrelated object as the action-effect declaration', () => {
+  expect(
+    parseActionEffectsSource(`
+    const OTHER = { unrelated: 'remote-write' };
+    const ACTION_EFFECTS = { doctor: 'read' } as const;
+    const AFTER = { later: 'local-write' };
+  `),
+  ).toEqual({ doctor: 'read' });
+});
+
+it.each([
+  "({ doctor: 'read' })",
+  "({ doctor: 'read' } as const)",
+  "({ doctor: 'read' } satisfies Record<string, string>)",
+  "(<Record<string, string>>{ doctor: 'read' })",
+])('extracts a wrapped action declaration: %s', (expression) => {
+  expect(parseActionEffectsSource(`const ACTION_EFFECTS = ${expression};`)).toEqual({
+    doctor: 'read',
+  });
+});
+
+it('ignores computed, shorthand, method and non-literal effect declarations', () => {
+  expect(
+    parseActionEffectsSource(`
+    const action = 'computed', shorthand = 'read';
+    const ACTION_EFFECTS = {
+      [action]: 'remote-write', shorthand, method() { return 'read'; },
+      dynamic: selectEffect(), 'docs publish': ('remote-write' as const),
+    };
+  `),
+  ).toEqual({ 'docs publish': 'remote-write' });
+});
+
+it('rejects an extra contract even when every catalog action is present', () => {
+  expect(() =>
+    validateDeclaredCapabilityConsistency({
+      catalog: ['doctor'],
+      contracts: [
+        { action_id: 'doctor', effect: 'read', capabilities: [] },
+        { action_id: 'unexpected', effect: 'remote-write', capabilities: ['net:publish'] },
+      ],
+    }),
+  ).toThrow(new Error('EFFECT_CONTRACT_CATALOG_MISMATCH'));
+});
+
+it('rejects a missing contract with the exact affected action', () => {
+  expect(() =>
+    validateDeclaredCapabilityConsistency({ catalog: ['doctor'], contracts: [] }),
+  ).toThrow(new Error('doctor: EFFECT_CONTRACT_MISSING'));
+});
+
+it('accepts a complete read-only catalog with explicitly empty capabilities', () => {
+  expect(() =>
+    validateDeclaredCapabilityConsistency({
+      catalog: ['doctor'],
+      contracts: [{ action_id: 'doctor', effect: 'read', capabilities: [] }],
+    }),
+  ).not.toThrow();
 });
 
 it.each([
