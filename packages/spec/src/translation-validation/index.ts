@@ -489,7 +489,7 @@ export function recordMutationEvidenceCommit(input: {
   const standaloneWitness = JSON.parse(
     readFileSync(resolve(repoRoot, witnessPath), 'utf8'),
   ) as unknown;
-  if (JSON.stringify(standaloneWitness) !== JSON.stringify(input.witness)) {
+  if (canonicalSha256(standaloneWitness) !== canonicalSha256(input.witness)) {
     throw new Error('MUTATION_EVIDENCE_WITNESS_MISMATCH');
   }
   const recipeStatePaths = statePaths.filter((path) => path.startsWith(recipePrefix));
@@ -520,7 +520,7 @@ export function recordMutationEvidenceCommit(input: {
     throw new Error('MUTATION_EVIDENCE_RECIPE_RECORD_NOT_ELIGIBLE');
   }
   if (
-    JSON.stringify(recipeRecord.evidence?.translation_witness) !== JSON.stringify(input.witness)
+    canonicalSha256(recipeRecord.evidence?.translation_witness) !== canonicalSha256(input.witness)
   ) {
     throw new Error('MUTATION_EVIDENCE_WITNESS_MISMATCH');
   }

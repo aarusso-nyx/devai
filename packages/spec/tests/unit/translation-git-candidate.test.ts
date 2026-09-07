@@ -460,3 +460,72 @@ it('rejects a corrupt agent-run hash even when its schema and claimed output pat
   ).rejects.toThrow('MUTATION_EVIDENCE_AGENT_RUN_INVALID');
   expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
 });
+
+it.each(['standalone', 'embedded'] as const)(
+  'accepts reordered keys in the %s witness without rewriting its bytes',
+  async (location) => {
+    const f = await evidenceFixture();
+    const reordered = Object.fromEntries(Object.entries(f.inputs.witness).reverse());
+    expect(validators.translationWitness(reordered)).toBe(true);
+    expect(canonicalJson(reordered)).toBe(canonicalJson(f.inputs.witness));
+    const path = f.inputs.state_paths.find((value) =>
+      location === 'standalone'
+        ? value.startsWith('record/proofs/compliance/translation-validation/witnesses/')
+        : value.startsWith('record/proofs/work/recipe-runs/'),
+    );
+    if (!path) throw new Error('fixture witness path missing');
+    const content =
+      location === 'standalone'
+        ? reordered
+        : {
+            recipe_name: 'devai-fix',
+            recipe_variant: 'test',
+            status: 'pass',
+            evidence: { translation_witness: reordered },
+          };
+    put(f.root, path, JSON.stringify(content));
+    const bytes = readFileSync(join(f.root, path), 'utf8');
+    const index = readFileSync(join(f.root, '.git/index'));
+    const result = await runRecorder(f.root, async () => recordMutationEvidenceCommit(f.inputs));
+    expect(git(f.root, 'show', `${result.evidence_sha}:${path}`)).toBe(bytes);
+    expect(readFileSync(join(f.root, path), 'utf8')).toBe(bytes);
+    expect(readFileSync(join(f.root, '.git/index'))).toEqual(index);
+  },
+);
+
+it.each(['standalone', 'embedded'] as const)(
+  'refuses changed semantic content in the %s witness',
+  async (location) => {
+    const f = await evidenceFixture();
+    const changed = { ...f.inputs.witness, notes: ['Different untrusted witness claim.'] };
+    expect(validators.translationWitness(changed)).toBe(true);
+    const path = f.inputs.state_paths.find((value) =>
+      location === 'standalone'
+        ? value.startsWith('record/proofs/compliance/translation-validation/witnesses/')
+        : value.startsWith('record/proofs/work/recipe-runs/'),
+    );
+    if (!path) throw new Error('fixture witness path missing');
+    put(
+      f.root,
+      path,
+      JSON.stringify(
+        location === 'standalone'
+          ? changed
+          : {
+              recipe_name: 'devai-fix',
+              recipe_variant: 'test',
+              status: 'pass',
+              evidence: { translation_witness: changed },
+            },
+      ),
+    );
+    const bytes = readFileSync(join(f.root, path));
+    const index = readFileSync(join(f.root, '.git/index'));
+    await expect(
+      runRecorder(f.root, async () => recordMutationEvidenceCommit(f.inputs)),
+    ).rejects.toThrow('MUTATION_EVIDENCE_WITNESS_MISMATCH');
+    expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
+    expect(readFileSync(join(f.root, path))).toEqual(bytes);
+    expect(readFileSync(join(f.root, '.git/index'))).toEqual(index);
+  },
+);
