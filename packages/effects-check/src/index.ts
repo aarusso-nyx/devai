@@ -492,7 +492,7 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
     const capabilities = new Set<EffectCapability>();
     const dispositions = new Map<string, EffectDisposition>();
     const visited = new Set<string>();
-    const queue: ts.Node[] = [...handlers];
+    const queue: ts.Node[] = handlers.map(unwrapExpression);
 
     const enqueueSymbol = (node: ts.Node): boolean => {
       const symbol = symbolAt(checker, node);
@@ -512,6 +512,10 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
       const key = `${node.getSourceFile().fileName}:${String(node.pos)}:${String(node.end)}`;
       if (visited.has(key)) continue;
       visited.add(key);
+      // Command registrations may name a handler rather than embed its body.
+      // Visiting an identifier alone finds no calls; follow its declaration with
+      // the same symbol resolution used for calls and callback arguments.
+      if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) enqueueSymbol(node);
       const walk = (child: ts.Node): void => {
         if (child !== node && ts.isFunctionLike(child)) return;
         if (ts.isReturnStatement(child) && child.expression !== undefined) {
