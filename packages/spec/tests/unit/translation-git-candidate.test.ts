@@ -444,3 +444,19 @@ it.each([
     expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
   },
 );
+
+it('rejects a corrupt agent-run hash even when its schema and claimed output paths are valid', async () => {
+  const f = await evidenceFixture();
+  const path = f.inputs.state_paths.find((value) =>
+    value.startsWith('record/proofs/work/agent-runs/'),
+  );
+  if (!path) throw new Error('fixture agent run missing');
+  const agent = JSON.parse(readFileSync(join(f.root, path), 'utf8')) as Data;
+  agent['manifest_hash'] = '0'.repeat(64);
+  expect(validators.agentRun(agent)).toBe(true);
+  put(f.root, path, JSON.stringify(agent));
+  await expect(
+    runRecorder(f.root, async () => recordMutationEvidenceCommit(f.inputs)),
+  ).rejects.toThrow('MUTATION_EVIDENCE_AGENT_RUN_INVALID');
+  expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
+});

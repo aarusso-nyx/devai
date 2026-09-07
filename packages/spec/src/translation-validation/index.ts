@@ -4,6 +4,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { minimatch } from 'minimatch';
 import { validators } from '@devai-nyx/schemas';
+import { canonicalSha256 } from '@devai-nyx/utils';
 
 export type TranslationStrategy =
   'regression' | 'feature-overlay' | 'behavioral-equivalence' | 'structural' | 'semantic-review';
@@ -530,6 +531,10 @@ export function recordMutationEvidenceCommit(input: {
   const agentRunPath = agentRunPaths[0] as string;
   const agentRun = JSON.parse(readFileSync(resolve(repoRoot, agentRunPath), 'utf8')) as unknown;
   if (!validators.agentRun(agentRun)) throw new Error('MUTATION_EVIDENCE_AGENT_RUN_INVALID');
+  const { manifest_hash: manifestHash, ...agentManifest } = agentRun as Record<string, unknown>;
+  if (canonicalSha256(agentManifest) !== manifestHash) {
+    throw new Error('MUTATION_EVIDENCE_AGENT_RUN_INVALID');
+  }
   const typedAgentRun = agentRun as {
     readonly run_id: string;
     readonly caller: { readonly kind: string; readonly name: string };
