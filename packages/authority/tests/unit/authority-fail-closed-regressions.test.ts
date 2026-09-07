@@ -55,7 +55,7 @@ async function registryRuntime(overrides: Record<string, unknown> = {}) {
 }
 
 describe('malformed protected markers fail closed', () => {
-  it.each(['true', 'false', 1, 0, {}, null, []])(
+  it.each([['true'], ['false'], [1], [0], [{}], [null], [[]]])(
     'refuses classification of a git-ref carrying the non-boolean marker %s',
     (marker) => {
       expectBoundaryFailure(
@@ -109,7 +109,7 @@ describe('malformed protected markers fail closed', () => {
 describe('unverifiable containment fails closed', () => {
   const escaping = () => '/private/outside/index.ts';
 
-  it.each([undefined, 42, null, ['/workspace/devai']])(
+  it.each([[undefined], [42], [null], [['/workspace/devai']]])(
     'refuses classification when a realpath is supplied but the repository root is %s',
     (repository_root) => {
       expectBoundaryFailure(
@@ -120,7 +120,7 @@ describe('unverifiable containment fails closed', () => {
     },
   );
 
-  it.each([undefined, 42, null, ['/workspace/devai/x']])(
+  it.each([[undefined], [42], [null], [['/workspace/devai/x']]])(
     'refuses classification when realpath yields the non-string result %s',
     (resolved) => {
       expectBoundaryFailure(

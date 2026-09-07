@@ -124,7 +124,7 @@ describe('git-ref operation and protection contracts', () => {
   );
 
   // Mutant 2412: a non-string ref is refused, never dereferenced.
-  it.each([undefined, null, 42, ['refs/heads/main'], { ref: 'refs/heads/main' }])(
+  it.each([[undefined], [null], [42], [['refs/heads/main']], [{ ref: 'refs/heads/main' }]])(
     'refuses a non-string ref %s before inspecting it',
     (ref) => {
       expectBoundaryFailure(
@@ -284,7 +284,7 @@ describe('filesystem containment dependency contracts', () => {
   // A runtime that supplies a realpath must supply a string repository root; otherwise
   // containment cannot be established and the target is refused, never admitted unchecked
   // (see authority-fail-closed-regressions.test.ts for the contract references).
-  it.each([undefined, 42, null, ['/workspace/devai']])(
+  it.each([[undefined], [42], [null], [['/workspace/devai']]])(
     'refuses containment resolution when a realpath is supplied but the root is %s',
     (repository_root) => {
       expectBoundaryFailure(
@@ -345,11 +345,14 @@ describe('protected release binding identity contracts', () => {
   });
 
   // Mutants 2224, 2227: the bound repository needs a non-empty string id.
-  it.each(['', 42, undefined, null, ['owner/repository']])('refuses repository id %s', (id) => {
-    const base = exactBinding(providerLane);
-    const binding = { ...base, repository: { ...(base.repository as object), id } };
-    expect(protectedReleaseBoundaryAdapterId(boundTarget(providerLane, binding))).toBeUndefined();
-  });
+  it.each([[''], [42], [undefined], [null], [['owner/repository']]])(
+    'refuses repository id %s',
+    (id) => {
+      const base = exactBinding(providerLane);
+      const binding = { ...base, repository: { ...(base.repository as object), id } };
+      expect(protectedReleaseBoundaryAdapterId(boundTarget(providerLane, binding))).toBeUndefined();
+    },
+  );
 
   // Mutants 2230, 2231, 2233, 2235, 2236, 2239, 2240, 2243, 2244: commit and tree are each an
   // exact 40- or 64-hex object id, checked as strings, anchored at both ends, for every entry.
