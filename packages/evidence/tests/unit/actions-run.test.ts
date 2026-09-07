@@ -6,8 +6,75 @@ import {
   selectActionsEvidenceJobs,
   verifyActionsRunEvidence,
   validateActionsEvidenceShadowTuple,
+  evaluateActionsEvidenceWindow,
+  type ActionsEvidenceWindowObservation,
   type VerifyActionsRunEvidenceInputs,
 } from '../../src/local-evidence/actions-run.js';
+
+function windowRows(count: number, hits: number): ActionsEvidenceWindowObservation[] {
+  return Array.from({ length: count }, (_, index) => ({
+    mergeSha: (index + 1).toString(16).padStart(40, '0'),
+    disposition: index < hits ? 'promotion-hit' : 'fallback-no-evidence',
+    shadowFullEquivalent: true,
+    durable: true,
+  }));
+}
+
+it.each([
+  [0, 0, false],
+  [4, 4, false],
+  [5, 2, false],
+  [5, 3, true],
+  [6, 3, true],
+  [7, 3, false],
+  [8, 4, true],
+] as const)(
+  'requires every graduation threshold with %i merges and %i hits',
+  (count, hits, qualifies) => {
+    expect(evaluateActionsEvidenceWindow(windowRows(count, hits))).toMatchObject({
+      qualifies,
+      consecutiveMerges: count,
+      promotionHits: hits,
+    });
+  },
+);
+
+it.each([
+  ['UNKNOWN', { disposition: 'UNKNOWN' }],
+  ['invalid claim', { disposition: 'invalid-claim' }],
+  ['disagreement', { shadowFullEquivalent: false }],
+  ['undurable', { durable: false }],
+  ['mechanism defect', { mechanismDefect: true }],
+] as const)(
+  'resets both counters after %s and counts only the new complete window',
+  (_name, change) => {
+    const before = windowRows(5, 5);
+    const failed: ActionsEvidenceWindowObservation = {
+      mergeSha: 'a'.repeat(40),
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      durable: true,
+      ...change,
+    };
+    const result = evaluateActionsEvidenceWindow([...before, failed]);
+    expect(result).toMatchObject({
+      qualifies: false,
+      consecutiveMerges: 0,
+      promotionHits: 0,
+      resetAfterMerge: failed.mergeSha,
+    });
+    const after = windowRows(5, 3).map((row, index) => ({
+      ...row,
+      mergeSha: (index + 20).toString(16).padStart(40, '0'),
+    }));
+    expect(evaluateActionsEvidenceWindow([...before, failed, ...after])).toMatchObject({
+      qualifies: true,
+      consecutiveMerges: 5,
+      promotionHits: 3,
+      resetAfterMerge: failed.mergeSha,
+    });
+  },
+);
 
 // Invariants: INV-DEVAI-020. Reuse must preserve current authorization and exact evidence inputs.
 function fixture() {
