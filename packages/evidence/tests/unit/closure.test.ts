@@ -179,7 +179,66 @@ describe('closure failure acknowledgement', () => {
   );
 });
 
+const schemaDefects = [
+  ['boolean posture', { source_repo_deleted: 'false' }, '/source_repo_deleted must be boolean'],
+  [
+    'batch role',
+    { batches: [{ id: 'B1', roles: ['Administrator'], headline: 'Invalid role' }] },
+    '/batches/0/roles/0 must be equal to one of the allowed values',
+  ],
+] as const;
+
 describe('closure records', () => {
+  it('ignores backup and unrelated filenames while reading canonical closure identities', async () => {
+    const { root, head } = repository();
+    const first = await withAuthorityHostTestScope(() => closePhase(root, gateDraft(head)));
+    const dir = join(root, 'record/proofs/compliance/closures');
+    for (const name of ['backup-PC-0001.json', 'PC-0001.json.bak', 'PC-00001.json', 'notes.json']) {
+      writeFileSync(join(dir, name), 'deliberately not a closure JSON record');
+    }
+    expect(await withAuthorityHostTestScope(() => readClosures(root))).toEqual([first.record]);
+  });
+
+  it.each(schemaDefects)(
+    'reports invalid %s in a stored closure without changing its bytes',
+    async (_name, defect, detail) => {
+      const { root, head } = repository();
+      const first = await withAuthorityHostTestScope(() => closePhase(root, gateDraft(head)));
+      const broken = JSON.stringify({
+        ...first.record,
+        ...defect,
+      });
+      writeFileSync(first.path, broken);
+      const error = await withAuthorityHostTestScope(() => readClosures(root)).catch(
+        (failure: unknown) => failure,
+      );
+      expect(error).toBeInstanceOf(Error);
+      const message = (error as Error).message;
+      expect(message).toContain('phase closure PC-0001.json does not validate');
+      expect(message).toContain(detail);
+      expect(readFileSync(first.path, 'utf8')).toBe(broken);
+    },
+  );
+
+  it.each(schemaDefects)(
+    'reports invalid %s in a draft before creating a closure',
+    async (_name, defect, detail) => {
+      const { root, head } = repository();
+      const draft = {
+        ...gateDraft(head),
+        ...defect,
+      } as unknown as PhaseClosureDraft;
+      const error = await withAuthorityHostTestScope(() => closePhase(root, draft)).catch(
+        (failure: unknown) => failure,
+      );
+      expect(error).toBeInstanceOf(Error);
+      const message = (error as Error).message;
+      expect(message).toContain('phase close: draft does not validate');
+      expect(message).toContain(detail);
+      expect(await withAuthorityHostTestScope(() => readClosures(root))).toEqual([]);
+    },
+  );
+
   it('derives roles, failed gates, and deletion streak from effective records', () => {
     const base: PhaseClosureRecord = {
       schemaVersion: '1.0.0',

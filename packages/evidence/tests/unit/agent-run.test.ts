@@ -83,7 +83,17 @@ describe('agent-run proof records', () => {
         );
       const before = snapshot();
       expect(readLastAgentRunHash(repo)).toBeNull();
-      await expect(withAuthorityHostTestScope(() => emitAgentRun(options))).rejects.toThrow();
+      const expectedFailure = {
+        tampered: 'agent-run history contains an invalid record',
+        'missing-parent': 'agent-run history has a missing predecessor',
+        fork: 'agent-run history has branching successors',
+        'second-genesis': 'agent-run history has multiple genesis records',
+        'wrong-filename': 'agent-run history contains an invalid record',
+        'invalid-json': SyntaxError,
+      }[damage];
+      await expect(withAuthorityHostTestScope(() => emitAgentRun(options))).rejects.toThrow(
+        expectedFailure,
+      );
       expect(snapshot()).toEqual(before);
     },
   );
