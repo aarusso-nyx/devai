@@ -424,7 +424,7 @@ function mergeGitignore(current: string, canonical: string): string {
   return `${current}${separator}${missing.join('\n')}\n`;
 }
 
-function isPopulated(absPath: string): boolean {
+function isPopulated(absPath: string, relativePath: string): boolean {
   if (!existsSync(absPath)) return false;
   let parsed: unknown;
   try {
@@ -434,15 +434,20 @@ function isPopulated(absPath: string): boolean {
     // something we don't understand.
     return true;
   }
-  if (parsed === null || typeof parsed !== 'object') return false;
-  const obj = parsed as Record<string, unknown>;
-  // Evidence chain: any records means populated.
-  if (Array.isArray(obj.records) && obj.records.length > 0) return true;
-  // Counters: any value > 0 means populated.
-  for (const value of Object.values(obj)) {
-    if (typeof value === 'number' && value > 0) return true;
+  // Only recognized empty bootstrap state may be replaced. Parseable damaged or
+  // extended records still contain recovery data and are not evidence of emptiness.
+  if (!isPlainRecord(parsed)) return true;
+  if (relativePath === 'record/proofs/chain.json') {
+    return !(
+      Object.keys(parsed).length === 2 &&
+      parsed.head === null &&
+      Array.isArray(parsed.records) &&
+      parsed.records.length === 0
+    );
   }
-  return false;
+  return Object.entries(parsed).some(
+    ([key, value]) => !['TASK', 'RGR', 'CTG', 'ESC'].includes(key) || value !== 0,
+  );
 }
 
 export function executeBootstrapPlan(
@@ -463,7 +468,7 @@ export function executeBootstrapPlan(
         // when they already contain real data. This closes the
         // `init --execute --force` foot-gun that would otherwise
         // silently delete the evidence chain.
-        if (PRESERVE_WHEN_POPULATED.has(entry.path) && isPopulated(abs)) {
+        if (PRESERVE_WHEN_POPULATED.has(entry.path) && isPopulated(abs, entry.path)) {
           preserved.push(entry.path);
           continue;
         }

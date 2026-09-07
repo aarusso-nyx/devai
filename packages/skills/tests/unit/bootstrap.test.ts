@@ -29,6 +29,7 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
     const result = executeBootstrapPlan(replan, { force: true });
     expect(result.preserved).toEqual([]);
     expect(result.overwritten).toContain('record/proofs/chain.json');
+    expect(result.overwritten).toContain('.devai/state/counters.json');
   });
 
   it('preserves a populated evidence chain even with --force', () => {
@@ -79,6 +80,47 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
     expect(result.preserved).toContain('.devai/state/counters.json');
     const after = JSON.parse(readFileSync(countersPath, 'utf8')) as { TASK: number };
     expect(after.TASK).toBe(42);
+  });
+
+  it.each([
+    ['null chain', 'record/proofs/chain.json', 'null'],
+    ['scalar chain', 'record/proofs/chain.json', '"recover this chain"'],
+    ['array chain', 'record/proofs/chain.json', '[{"hash":"retained"}]'],
+    ['orphaned head', 'record/proofs/chain.json', '{"head":"retained","records":[]}'],
+    [
+      'unknown chain fields',
+      'record/proofs/chain.json',
+      '{"head":null,"records":[],"recovery":"retained"}',
+    ],
+    ['malformed chain', 'record/proofs/chain.json', '{"head":'],
+    ['null counters', '.devai/state/counters.json', 'null'],
+    ['unknown zero counter', '.devai/state/counters.json', '{"REL":0}'],
+    ['boolean counter', '.devai/state/counters.json', '{"TASK":false}'],
+    ['scalar counters', '.devai/state/counters.json', '"recover counters"'],
+    ['array counters', '.devai/state/counters.json', '[0]'],
+    ['string counter', '.devai/state/counters.json', '{"TASK":"42"}'],
+    ['negative counter', '.devai/state/counters.json', '{"TASK":-1}'],
+    ['unknown counter metadata', '.devai/state/counters.json', '{"TASK":0,"recovery":"retained"}'],
+    ['malformed counters', '.devai/state/counters.json', '{"TASK":'],
+  ])('preserves %s for recovery under force', (_name, path, content) => {
+    executeBootstrapPlan(buildBootstrapPlan({ targetRoot: dir }));
+    const absolute = join(dir, path);
+    writeFileSync(absolute, content);
+    const before = readFileSync(absolute);
+    const result = executeBootstrapPlan(buildBootstrapPlan({ targetRoot: dir }), { force: true });
+    expect(result.preserved).toContain(path);
+    expect(result.overwritten).not.toContain(path);
+    expect(readFileSync(absolute)).toEqual(before);
+  });
+
+  it('recognizes reordered empty chain fields and existing zero counters', () => {
+    executeBootstrapPlan(buildBootstrapPlan({ targetRoot: dir }));
+    writeFileSync(join(dir, 'record/proofs/chain.json'), '{"records":[],"head":null}');
+    writeFileSync(join(dir, '.devai/state/counters.json'), '{"ESC":0,"CTG":0,"RGR":0,"TASK":0}');
+    const result = executeBootstrapPlan(buildBootstrapPlan({ targetRoot: dir }), { force: true });
+    expect(result.preserved).toEqual([]);
+    expect(result.overwritten).toContain('record/proofs/chain.json');
+    expect(result.overwritten).toContain('.devai/state/counters.json');
   });
 
   it('does NOT preserve unrelated existing files when --force', () => {
