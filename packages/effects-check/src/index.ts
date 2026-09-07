@@ -543,16 +543,21 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
           const nodeProc = declarationFiles.some((file) =>
             file.includes('@types/node/child_process'),
           );
+          // Imports can rename a host operation. Classify its resolved symbol,
+          // while retaining the local spelling for diagnostics and other calls.
+          const hostCallName =
+            seam || nodeFs || nodeProc ? (symbol?.getName() ?? callName) : callName;
           const pg = declarationFiles.some(
             (file) => file.includes('/pg/') || file.includes('@types/pg'),
           );
-          if ((seam || nodeFs) && FS_MUTATORS.has(callName)) capabilities.add('fs:unknown-write');
+          if ((seam || nodeFs) && FS_MUTATORS.has(hostCallName))
+            capabilities.add('fs:unknown-write');
           if (pg && ['connect', 'end', 'query', 'Pool', 'Client'].includes(callName)) {
             capabilities.add('db:unclassified');
           }
           if (
-            PROCESS_CALLS.has(callName) &&
-            (nodeProc || seam || UNAMBIGUOUS_PROCESS_CALLS.has(callName))
+            PROCESS_CALLS.has(hostCallName) &&
+            (nodeProc || seam || UNAMBIGUOUS_PROCESS_CALLS.has(hostCallName))
           ) {
             const executable = literalText(argumentsList[0]);
             const shape = argvShape(argumentsList[1]);
