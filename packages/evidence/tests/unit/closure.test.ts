@@ -43,6 +43,142 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+function gateDraft(head: string): PhaseClosureDraft {
+  return {
+    round_id: 'gate-acknowledgement',
+    declaring_decision: 'D-1',
+    closing_decision: 'D-2',
+    batches: [{ id: 'B1', roles: ['Machine'], commit: head, headline: 'Measured candidate' }],
+    gates: { coverage: { status: 'fail' } },
+    source_repo_deleted: false,
+    validation_criteria: [{ criterion: 'coverage', verdict: 'fail' }],
+    merged_as: head,
+    release_disposition: 'missing',
+    closed_at: '2026-08-10T00:00:00.000Z',
+  };
+}
+
+describe('closure failure acknowledgement', () => {
+  it.each(['precoverage', 'coverage-extra', 'coverage_extra', 'coverage2', 'unrelated'])(
+    'refuses partial or absent gate identity %s',
+    async (criterion) => {
+      const { root, head } = repository();
+      await expect(
+        withAuthorityHostTestScope(() =>
+          closePhase(root, {
+            ...gateDraft(head),
+            validation_criteria: [{ criterion, verdict: 'fail' }],
+          }),
+        ),
+      ).rejects.toThrow('naming each gate: coverage');
+      expect(await withAuthorityHostTestScope(() => readClosures(root))).toEqual([]);
+    },
+  );
+
+  it.each(['pass', 'n/a'] as const)(
+    'does not accept %s as acknowledgement of failure',
+    async (verdict) => {
+      const { root, head } = repository();
+      await expect(
+        withAuthorityHostTestScope(() =>
+          closePhase(root, {
+            ...gateDraft(head),
+            validation_criteria: [{ criterion: 'coverage', verdict }],
+          }),
+        ),
+      ).rejects.toThrow('naming each gate: coverage');
+    },
+  );
+
+  it('requires each failed gate while ignoring passed and skipped gates', async () => {
+    const { root, head } = repository();
+    const draft: PhaseClosureDraft = {
+      ...gateDraft(head),
+      gates: {
+        coverage: { status: 'fail' },
+        mutation: { status: 'fail' },
+        build: { status: 'pass' },
+        optional: { status: 'skipped' },
+      },
+    };
+    await expect(withAuthorityHostTestScope(() => closePhase(root, draft))).rejects.toThrow(
+      'naming each gate: mutation',
+    );
+    const result = await withAuthorityHostTestScope(() =>
+      closePhase(root, {
+        ...draft,
+        validation_criteria: [
+          { criterion: 'unrelated review', verdict: 'pass' },
+          { criterion: 'coverage', verdict: 'fail' },
+          { criterion: 'retained report', evidence: 'mutation: below threshold', verdict: 'fail' },
+        ],
+      }),
+    );
+    expect(result.record.release_disposition).toBe('missing');
+    expect(computeLedger([result.record]).rounds[0]?.gates_failed).toEqual([
+      'coverage',
+      'mutation',
+    ]);
+  });
+
+  it.each(['test.unit', 'test[unit]', 'test+unit', 'test(unit)'])(
+    'matches gate metacharacters literally: %s',
+    async (gate) => {
+      const { root, head } = repository();
+      const result = await withAuthorityHostTestScope(() =>
+        closePhase(root, {
+          ...gateDraft(head),
+          gates: { [gate]: { status: 'fail' } },
+          validation_criteria: [
+            {
+              criterion: 'retained failed evidence',
+              evidence: `Result: ${gate}; failed`,
+              verdict: 'fail',
+            },
+          ],
+        }),
+      );
+      expect(computeLedger([result.record]).rounds[0]?.gates_failed).toEqual([gate]);
+    },
+  );
+
+  it('does not treat a regex-like gate as a wildcard', async () => {
+    const { root, head } = repository();
+    await expect(
+      withAuthorityHostTestScope(() =>
+        closePhase(root, {
+          ...gateDraft(head),
+          gates: { 'test.unit': { status: 'fail' } },
+          validation_criteria: [{ criterion: 'testXunit', verdict: 'fail' }],
+        }),
+      ),
+    ).rejects.toThrow('naming each gate: test.unit');
+  });
+
+  it.each([undefined, 'HEAD', 'a'.repeat(41), 'a'.repeat(63)])(
+    'refuses Machine delivery without exact full commit %s',
+    async (commit) => {
+      const { root, head } = repository();
+      await expect(
+        withAuthorityHostTestScope(() =>
+          closePhase(root, {
+            ...gateDraft(head),
+            batches: [
+              {
+                id: 'B1',
+                roles: ['Machine'],
+                headline: 'Measured candidate',
+                ...(commit === undefined ? {} : { commit }),
+              },
+            ],
+          }),
+        ),
+      ).rejects.toThrow('does not validate against phase-closure.schema.json');
+      expect(await withAuthorityHostTestScope(() => readClosures(root))).toEqual([]);
+    },
+  );
+});
+
 describe('closure records', () => {
   it('derives roles, failed gates, and deletion streak from effective records', () => {
     const base: PhaseClosureRecord = {
