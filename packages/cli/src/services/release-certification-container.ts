@@ -441,6 +441,30 @@ export class ProtectedCertificationContainer {
       result.status !== 0 ||
       !Buffer.isBuffer(result.stdout)
     ) {
+      const errorCode = (result.error as NodeJS.ErrnoException | undefined)?.code;
+      // Host transport metadata is useful even when task output is confidential.
+      // Never log argv, environment, input bytes, or raw Docker output here.
+      const diagnostic = {
+        kind: 'release-container-operation-failure',
+        operation: argv[0],
+        status: Number.isSafeInteger(result.status) ? result.status : null,
+        signal:
+          typeof result.signal === 'string' && /^SIG[A-Z0-9]{1,16}$/u.test(result.signal)
+            ? result.signal
+            : null,
+        error_code:
+          typeof errorCode === 'string' && /^[A-Z][A-Z0-9_]{0,31}$/u.test(errorCode)
+            ? errorCode
+            : result.error === undefined
+              ? null
+              : 'UNAVAILABLE',
+        input_bytes: input?.length ?? 0,
+      };
+      try {
+        process.stderr.write(`${JSON.stringify(diagnostic)}\n`);
+      } catch {
+        // A diagnostic sink failure must not replace the original refusal.
+      }
       throw new Error(`release-certification-container-operation-failed:${argv[0] ?? 'unknown'}`);
     }
     return result.stdout;

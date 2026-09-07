@@ -224,6 +224,50 @@ afterEach(() => {
 });
 
 describe('protected mutation-program container transport', () => {
+  it.each(['ETIMEDOUT', 'EPIPE', '/private/protected-value'])(
+    'reports bounded transport metadata without disclosing command output: %s',
+    (code) => {
+      const value = fixture();
+      const messages: string[] = [];
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+        messages.push(String(chunk));
+        return true;
+      });
+      activeFixture = {
+        ...value,
+        docker(args, input) {
+          const result = value.docker(args, input);
+          const command = args.slice(4);
+          if (command[0] === 'cp' && command[3] === `${state.id}:/workspace`)
+            return {
+              ...result,
+              status: null,
+              signal: 'SIGTERM',
+              error: Object.assign(new Error('private error text'), { code }),
+              stderr: Buffer.from('private stderr text'),
+            };
+          return result;
+        },
+      };
+      try {
+        expect(() => invoke(value)).toThrow('release-certification-container-operation-failed:cp');
+        expect(messages).toHaveLength(1);
+        expect(JSON.parse(messages[0] ?? '')).toMatchObject({
+          kind: 'release-container-operation-failure',
+          operation: 'cp',
+          status: null,
+          signal: 'SIGTERM',
+          error_code: code.startsWith('/') ? 'UNAVAILABLE' : code,
+        });
+        expect(messages.join('')).not.toContain('private');
+        expect(messages.join('')).not.toContain('export const input');
+      } finally {
+        stderr.mockRestore();
+        value.dispose();
+      }
+    },
+  );
+
   it('preserves a copy failure when the created container is independently confirmed stopped', () => {
     const value = fixture();
     activeFixture = {
