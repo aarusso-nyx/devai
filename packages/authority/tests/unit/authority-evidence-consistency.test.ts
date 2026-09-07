@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  actionDocument,
+  actionRegistry,
   canonicalSha256,
   evidenceBindings,
   evidenceDocument,
@@ -14,10 +16,10 @@ function view(overrides: Record<string, unknown> = {}) {
 function field(name: string) {
   return view()[name] as Record<string, unknown>;
 }
-async function validate(overrides: Record<string, unknown>) {
+async function validate(overrides: Record<string, unknown>, action = actionDocument()) {
   const document = evidenceDocument(overrides) as { view: unknown };
   return (await runtimeApi()).validateAuthorityEvidence(document.view, {
-    current: evidenceBindings(),
+    current: evidenceBindings({ actionContracts: actionRegistry([action]) }),
     canonicalSha256,
     // Exercise semantic validation after the separately tested schema boundary.
     validateSchema: () => ({ ok: true, value: document }),
@@ -126,5 +128,110 @@ describe('authority evidence independent consistency checks', () => {
       }),
     );
     expect(result.audit_only).toBe(true);
+  });
+});
+
+const machine = { kind: 'derived-machine', actor: 'binding', transition: 'bind' };
+const initiator = { kind: 'human', role: 'architect', declaration_source: 'cli-flag' };
+const machineAction = actionDocument('local-write', {
+  ...machine,
+  initiator: { allowed_roles: ['architect'], preserve_in_context: true },
+});
+const ineligible = { ...field('readiness'), authority_eligible: false };
+const bootstrapRead = {
+  action_id: 'test read',
+  action_effect: 'read',
+  principal: { kind: 'derived-machine', actor: 'bootstrap' },
+  readiness: ineligible,
+  decision: { ...field('decision'), evaluation: 'not-applicable', disposition: 'proceed' },
+};
+const readAction = actionDocument('read', { kind: 'none' });
+
+describe('machine and bootstrap evidence provenance', () => {
+  it('accepts a bound machine action with the declared human initiator', async () => {
+    expectSuccess(
+      await validate({ principal: { ...machine, initiated_by: initiator } }, machineAction),
+    );
+  });
+
+  it.each([
+    ['kind', { kind: 'human' }],
+    ['actor', { actor: 'other' }],
+    ['transition', { transition: 'other' }],
+  ])('rejects an independent machine %s mismatch', async (_name, changed) => {
+    expectFailure(
+      await validate(
+        { principal: { ...machine, initiated_by: initiator, ...changed } },
+        machineAction,
+      ),
+      'refused',
+      'AUTHORITY_EVIDENCE_PROVENANCE_INVALID',
+    );
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['none', 'none'],
+    ['wrong role', { ...initiator, role: 'engineer' }],
+  ])('rejects %s human initiation for a machine action', async (_name, initiated_by) => {
+    expectFailure(
+      await validate({ principal: { ...machine, initiated_by } }, machineAction),
+      'refused',
+      'AUTHORITY_EVIDENCE_INITIATOR_INVALID',
+    );
+  });
+
+  it('distinguishes explicit no-initiator actions from human initiated actions', async () => {
+    const action = actionDocument('local-write', { ...machine, initiator: 'none' });
+    expectSuccess(await validate({ principal: { ...machine, initiated_by: 'none' } }, action));
+    expectFailure(
+      await validate({ principal: { ...machine, initiated_by: initiator } }, action),
+      'refused',
+      'AUTHORITY_EVIDENCE_INITIATOR_INVALID',
+    );
+  });
+
+  it('accepts bootstrap reads only as ineligible audit evidence', async () => {
+    const result = expectSuccess<{ audit_only: boolean }>(
+      await validate(bootstrapRead, readAction),
+    );
+    expect(result.audit_only).toBe(true);
+  });
+
+  it.each(['allow', 'deny'])('rejects coherent %s bootstrap reads', async (evaluation) => {
+    expectFailure(
+      await validate(
+        {
+          ...bootstrapRead,
+          decision: {
+            ...field('decision'),
+            evaluation,
+            disposition: evaluation === 'allow' ? 'proceed' : 'refuse',
+          },
+        },
+        readAction,
+      ),
+      'refused',
+      'AUTHORITY_EVIDENCE_BOOTSTRAP_INVALID',
+    );
+  });
+
+  it('rejects bootstrap authority eligibility before general readiness checks', async () => {
+    expectFailure(
+      await validate({ ...bootstrapRead, readiness: field('readiness') }, readAction),
+      'refused',
+      'AUTHORITY_EVIDENCE_BOOTSTRAP_INVALID',
+    );
+  });
+
+  it.each([
+    { kind: 'human', role: 'engineer' },
+    { kind: 'derived-machine', actor: 'binding' },
+  ])('rejects a non-bootstrap principal on a subject-free read', async (principal) => {
+    expectFailure(
+      await validate({ ...bootstrapRead, principal }, readAction),
+      'refused',
+      'AUTHORITY_EVIDENCE_PROVENANCE_INVALID',
+    );
   });
 });
