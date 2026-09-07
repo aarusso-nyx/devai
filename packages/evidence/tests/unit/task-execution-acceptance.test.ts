@@ -1,7 +1,7 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: requested and resolved executor evidence remains
 // immutable, exact-candidate bound, semantically total, and append-only.
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -69,6 +69,10 @@ function code(callback: () => unknown): string | undefined {
     callback();
     return undefined;
   } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      // A closed refusal code must still explain the problem to its caller.
+      expect(error.message.trim().length).toBeGreaterThan(0);
+    }
     return error instanceof Error && 'code' in error ? String(error.code) : undefined;
   }
 }
@@ -223,6 +227,10 @@ describe('task-execution evidence acceptance', () => {
         (value) => Object.assign(value, { task_id: 'TASK-X' }),
       ],
       [
+        'TASK_EXECUTION_EVIDENCE_TASK_BINDING_MISMATCH',
+        (value) => Object.assign(value, { round_id: 'R-OTHER' }),
+      ],
+      [
         'TASK_EXECUTION_EVIDENCE_CANDIDATE_MISMATCH',
         (value) => Object.assign(value, { candidate_sha: 'b'.repeat(40) }),
       ],
@@ -309,6 +317,9 @@ describe('task-execution evidence acceptance', () => {
       }),
     );
     expect(persisted.relativePath).toBe('record/proofs/task-execution/TEE-7401.json');
+    const originalBytes = readFileSync(persisted.path);
+    expect(JSON.parse(originalBytes.toString('utf8'))).toEqual(evidence);
+    expect(persisted.evidence).toEqual(evidence);
     expect(
       code(() =>
         persistTaskExecutionEvidence({
@@ -317,6 +328,7 @@ describe('task-execution evidence acceptance', () => {
         }),
       ),
     ).toBe('TASK_EXECUTION_EVIDENCE_ALREADY_EXISTS');
+    expect(readFileSync(persisted.path)).toEqual(originalBytes);
     for (const relativePath of ['', '/tmp/TEE-7401.json', '../TEE-7401.json', 'wrong.json']) {
       expect(
         code(() => persistTaskExecutionEvidence({ ...base, relativePath })),
