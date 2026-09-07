@@ -1307,3 +1307,122 @@ describe('decision binding independent field checks', () => {
     },
   );
 });
+
+describe('bounded selector validation with independently valid limits', () => {
+  const selectors: readonly ResourceTargetSelector[] = [
+    {
+      kind: 'fs',
+      repository_id: 'example-repository',
+      canonical_relative_path_glob: 'docs/**',
+      operations: ['update'],
+    },
+    {
+      kind: 'git-ref',
+      repository_id: 'example-repository',
+      ref_glob: 'refs/heads/*',
+      operations: ['update'],
+    },
+    {
+      kind: 'db',
+      connection_id: 'primary',
+      database_id_glob: 'app*',
+      object_id_glob: 'table*',
+      operations: ['update'],
+    },
+    {
+      kind: 'remote',
+      system_id: 'registry',
+      endpoint_ids: ['package'],
+      operation_ids: ['inspect'],
+      publication: false,
+    },
+  ];
+  const cases: [string, ResourceTargetSelector][] = [];
+  for (const selector of selectors) {
+    if (selector.kind === 'fs') {
+      for (const path of [
+        '',
+        '/absolute',
+        './relative',
+        'docs/',
+        'a\\b',
+        'a\0b',
+        'a//b',
+        'a/./b',
+        'a/../b',
+      ]) {
+        cases.push([
+          `fs path ${JSON.stringify(path)}`,
+          { ...selector, canonical_relative_path_glob: path },
+        ]);
+      }
+    }
+    const fields =
+      selector.kind === 'git-ref'
+        ? ['repository_id', 'ref_glob']
+        : selector.kind === 'db'
+          ? ['connection_id', 'database_id_glob', 'object_id_glob']
+          : selector.kind === 'remote'
+            ? ['system_id']
+            : [];
+    for (const field of fields) {
+      for (const value of ['', ' ', '\t\n'])
+        cases.push([
+          `${selector.kind} ${field} ${JSON.stringify(value)}`,
+          { ...selector, [field]: value },
+        ]);
+    }
+    if (selector.kind === 'remote') {
+      cases.push(['remote empty endpoints', { ...selector, endpoint_ids: [] }]);
+      cases.push(['remote empty operations', { ...selector, operation_ids: [] }]);
+      for (const value of ['', ' ', '\t\n', 'https://registry.example/package']) {
+        cases.push([
+          `remote invalid endpoint ${JSON.stringify(value)}`,
+          { ...selector, endpoint_ids: ['valid', value] },
+        ]);
+      }
+    } else cases.push([`${selector.kind} empty operations`, { ...selector, operations: [] }]);
+  }
+  function evaluate(selector: ResourceTargetSelector, mode: EnforcementMode) {
+    const trustedRuntime = runtime({ mode });
+    const selectedPolicy = policy();
+    const evaluatePolicy = vi.fn(selectedPolicy.evaluate);
+    const plan: MutationPlan = {
+      plan_id: 'selector-validation',
+      envelope: trustedRuntime.materialize(baseRequest),
+      strategy: 'bounded-batches',
+      selectors: [selector],
+      bounds: { max_batches: 1, max_targets_per_batch: 1, max_total_targets: 1 },
+      batch_atomicity: 'each-batch',
+      recovery: 'preserve-and-report',
+    };
+    return {
+      decision: decide({
+        plan,
+        runtime: trustedRuntime,
+        policy: { ...selectedPolicy, evaluate: evaluatePolicy },
+      }),
+      evaluatePolicy,
+    };
+  }
+  it.each(selectors)(
+    'accepts the valid $kind selector with minimal positive limits',
+    (selector) => {
+      const { decision, evaluatePolicy } = evaluate(selector, 'binding');
+      expect(decision.reason_code).toBe('POLICY_ALLOW');
+      expect(decision.evaluation).toBe('allow');
+      expect(decision.readiness.eligible).toBe(false);
+      expect(evaluatePolicy).toHaveBeenCalledOnce();
+    },
+  );
+  it.each(cases)('refuses %s before policy evaluation in binding and shadow', (_name, selector) => {
+    for (const mode of ['binding', 'shadow'] as const) {
+      const { decision, evaluatePolicy } = evaluate(selector, mode);
+      expect(decision.reason_code).toBe('MALFORMED_PLAN');
+      expect(decision.disposition).toBe('refuse');
+      expect(decision.evaluation).toBe('deny');
+      expect(decision.reasons).toHaveLength(1);
+      expect(evaluatePolicy).not.toHaveBeenCalled();
+    }
+  });
+});
