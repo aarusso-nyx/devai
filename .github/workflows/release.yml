@@ -505,20 +505,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          assets=()
+          while IFS= read -r asset; do assets+=("$asset"); done < <(find release-assets -maxdepth 1 -type f -print | sort)
           state="$(node release-control/scripts/process/publication-state.mjs release "$RELEASE_TAG")"
           if test "$state" = present || test "$state" = draft; then
             test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" = "$RELEASE_IS_PRERELEASE"
             existing="$RUNNER_TEMP/existing-release"
             mkdir -p "$existing"
-            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$existing"
-            test "$(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)" = \
-              "$(find "$existing" -maxdepth 1 -type f -printf '%f\n' | sort)"
-            for asset in "${assets[@]}"; do
-              name="$(basename "$asset")"
-              test "$(sha256sum "$asset" | cut -d' ' -f1)" = \
-                "$(sha256sum "$existing/$name" | cut -d' ' -f1)"
-            done
+            asset_count="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')"
+            [[ "$asset_count" =~ ^[0-9]+$ ]]
+            if test "$asset_count" -gt 0; then
+              gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$existing"
+            fi
+            missing="$(node release-control/scripts/process/release-recovery.mjs release-assets "$existing" "$state")"
+            if test -n "$missing"; then
+              while IFS= read -r name; do
+                gh release upload "$RELEASE_TAG" "release-assets/$name" --repo "$GITHUB_REPOSITORY"
+              done <<< "$missing"
+              verified="$RUNNER_TEMP/reconciled-release"
+              mkdir -p "$verified"
+              gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$verified"
+              node release-control/scripts/process/release-recovery.mjs release-assets "$verified" present
+            fi
             if test "$state" = draft; then
               gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
             fi
