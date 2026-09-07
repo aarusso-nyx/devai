@@ -244,6 +244,79 @@ async function withinCapacity<T>(
 }
 
 describe('protected release export boundary', () => {
+  function changed(path: string, value: unknown): unknown {
+    const result = structuredClone(binding());
+    const parts = path.split('.');
+    let parent: object = result;
+    for (const part of parts.slice(0, -1)) parent = Reflect.get(parent, part) as object;
+    Reflect.set(parent, present(parts.at(-1), 'expected fixture path'), value);
+    return result;
+  }
+
+  for (const path of [
+    'plan_receipt_digest_sha256',
+    'parent_artifact_sink.committed_manifest_sha256',
+    'trust.trust_store_digest_sha256',
+    'closure_inputs.0.sha256',
+    'closure_inputs.0.policy_resolution_digest_sha256',
+    'closure_inputs.0.expected_installed_package.archive_sha256',
+    'closure_inputs.0.expected_installed_package.content_manifest_sha256',
+  ]) {
+    it.each(['', 'a'.repeat(63), 'a'.repeat(65), 'G'.repeat(64), null, 1])(
+      `rejects malformed ${path} %j`,
+      (value) => {
+        expect(() => captureProtectedReleaseExportBinding(changed(path, value))).toThrow(
+          'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+        );
+      },
+    );
+  }
+  for (const path of [
+    'parent_artifact_sink.committed_manifest_size_bytes',
+    'closure_inputs.0.size_bytes',
+  ]) {
+    it.each([0, -1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1, '1', null])(
+      `rejects invalid ${path} %j`,
+      (value) => {
+        expect(() => captureProtectedReleaseExportBinding(changed(path, value))).toThrow(
+          'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+        );
+      },
+    );
+    it.each([1, Number.MAX_SAFE_INTEGER])(`preserves exact ${path} endpoint %s`, (value) => {
+      const input = changed(path, value);
+      expect(captureProtectedReleaseExportBinding(input)).toEqual(input);
+    });
+  }
+  it('requires strictly ordered unique package closures and freezes every captured closure', () => {
+    const source = present(binding().closure_inputs[0], 'expected fixture closure');
+    const closures = ['@fixture/a', '@fixture/b', 'plain'].map((package_id) => ({
+      ...structuredClone(source),
+      package_id,
+    }));
+    const input = changed('closure_inputs', closures);
+    const captured = captureProtectedReleaseExportBinding(input);
+    expect(captured.closure_inputs).toEqual(closures);
+    expect(captured.closure_inputs).not.toBe(closures);
+    for (const closure of captured.closure_inputs) {
+      expect(Object.isFrozen(closure)).toBe(true);
+      expect(Object.isFrozen(closure.expected_installed_package)).toBe(true);
+    }
+    for (const invalid of [[...closures].reverse(), [closures[0], closures[0]], []]) {
+      expect(() =>
+        captureProtectedReleaseExportBinding(changed('closure_inputs', invalid)),
+      ).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+    }
+  });
+  it.each(['@scope', '@scope/', '/package', 'Uppercase', 'white space', 'x'.repeat(201)])(
+    'rejects malformed closure package identity %j',
+    (value) => {
+      expect(() =>
+        captureProtectedReleaseExportBinding(changed('closure_inputs.0.package_id', value)),
+      ).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+    },
+  );
+
   it('keeps export sink and signer operations distinct and captures an immutable binding', async () => {
     const frozen = binding();
     const source = { ...frozen, parent_artifact_sink: { ...frozen.parent_artifact_sink } };
