@@ -149,7 +149,11 @@ function parseBlockAt(
   const expires = fields.expires ?? '';
   const approver = fields.approver ?? '';
   const adr = fields.adr;
-  if (!EXPIRES_RE.test(expires)) {
+  if (
+    !EXPIRES_RE.test(expires) ||
+    (!expires.includes('-Q') &&
+      new Date(`${expires}T00:00:00.000Z`).toISOString().slice(0, 10) !== expires)
+  ) {
     return {
       record: null,
       finding: {
@@ -157,7 +161,7 @@ function parseBlockAt(
         file: fileRel,
         line: startIdx + 1,
         invariant_id: invariantId,
-        message: `inv-override expires '${expires}' must match YYYY-Q[1-4] or YYYY-MM-DD`,
+        message: `inv-override expires '${expires}' must be a valid YYYY-Q[1-4] or calendar YYYY-MM-DD`,
       },
     };
   }
@@ -246,6 +250,7 @@ export function scanInvOverrides(opts: ScanOptions): InvOverrideScanResult {
   const exts = new Set(opts.extensions ?? DEFAULT_EXTENSIONS);
   const roots = opts.roots ?? DEFAULT_ROOTS;
   const now = opts.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new Error('INV_OVERRIDE_CLOCK_INVALID');
 
   const allFiles: string[] = [];
   for (const r of roots) {
