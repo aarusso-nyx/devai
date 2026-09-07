@@ -24,10 +24,12 @@ export function siteMembers(directory) {
       const file = join(root, name);
       const path = prefix + name;
       const stat = lstatSync(file);
+      // The pinned upload-pages-artifact action excludes every dot-prefixed member.
+      // Refuse a population it would silently truncate before creating any effect.
+      if (path === '.nojekyll' && stat.isFile() && stat.size === 0) continue;
+      if (name.startsWith('.')) throw new Error('PAGES_UPLOAD_EXCLUDED_MEMBER');
       if (stat.isDirectory()) visit(file, `${path}/`);
       else if (stat.isFile()) {
-        // This empty GitHub control file is not a public HTTP resource.
-        if (path === '.nojekyll' && stat.size === 0) continue;
         total += stat.size;
         if (total > MAX_BYTES || stat.size > 64 * 1024 * 1024 || members.length >= 20000)
           throw new Error('PAGES_POPULATION_LIMIT');

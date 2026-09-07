@@ -111,3 +111,20 @@ it('rejects symbolic links before issuing any remote read', async () => {
   ).rejects.toThrow('PAGES_UNSAFE_MEMBER');
   expect(reads).toBe(0);
 });
+
+it.each(['.hidden', '.well-known/identity.json', 'assets/.metadata', '.nojekyll'])(
+  'refuses content the pinned Pages uploader excludes before any remote effect: %s',
+  async (path) => {
+    const root = fixture();
+    mkdirSync(resolve(root, path, '..'), { recursive: true });
+    writeFileSync(join(root, path), 'must not be silently dropped');
+    let reads = 0;
+    await expect(
+      verifyPagesBytes(root, async () => {
+        reads++;
+        return Buffer.alloc(0);
+      }),
+    ).rejects.toThrow('PAGES_UPLOAD_EXCLUDED_MEMBER');
+    expect(reads).toBe(0);
+  },
+);
