@@ -268,6 +268,57 @@ describe('protected mutation-program container transport', () => {
     },
   );
 
+  it.each(['ETIMEDOUT', 'EPIPE', '/private/protected-value'])(
+    'retains sanitized attach failure metadata before a shutdown refusal: %s',
+    (code) => {
+      const value = fixture();
+      const messages: string[] = [];
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+        messages.push(String(chunk));
+        return true;
+      });
+      let inspections = 0;
+      activeFixture = {
+        ...value,
+        docker(args, input) {
+          const result = value.docker(args, input);
+          const command = args.slice(4);
+          if (command[0] === 'start')
+            return {
+              ...result,
+              status: null,
+              signal: 'SIGTERM',
+              error: Object.assign(new Error('private error text'), { code }),
+              stderr: Buffer.from('private stderr text'),
+            };
+          if (command[0] === 'inspect' && inspections++ === 0) {
+            const inspection = JSON.parse(result.stdout.toString());
+            Object.assign(inspection[0].State, { Running: true, Pid: 12 });
+            return { ...result, stdout: Buffer.from(JSON.stringify(inspection)) };
+          }
+          return result;
+        },
+      };
+      try {
+        expect(() => invoke(value)).toThrow('release-certification-container-quiescence-unproven');
+        expect(messages).toHaveLength(1);
+        expect(JSON.parse(messages[0] ?? '')).toMatchObject({
+          kind: 'release-container-attach-failure',
+          status: null,
+          signal: 'SIGTERM',
+          error_code: code.startsWith('/') ? 'UNAVAILABLE' : code,
+          timeout_ms: 11_000,
+        });
+        expect(messages.join('')).not.toContain('private');
+        expect(messages.join('')).not.toContain('export const input');
+        expectCleanup();
+      } finally {
+        stderr.mockRestore();
+        value.dispose();
+      }
+    },
+  );
+
   it('preserves a copy failure when the created container is independently confirmed stopped', () => {
     const value = fixture();
     activeFixture = {

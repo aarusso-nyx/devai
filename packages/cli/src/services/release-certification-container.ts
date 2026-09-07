@@ -899,6 +899,33 @@ export class ProtectedCertificationContainer {
               mutation.maximum_raw_report_bytes,
             ),
       );
+      // An attach timeout can leave the container running. Preserve only bounded host
+      // metadata before shutdown verification refuses; task streams remain confidential.
+      if (execution.error !== undefined || execution.signal !== null || execution.status !== 0) {
+        const errorCode = (execution.error as NodeJS.ErrnoException | undefined)?.code;
+        try {
+          process.stderr.write(
+            `${JSON.stringify({
+              kind: 'release-container-attach-failure',
+              status: Number.isSafeInteger(execution.status) ? execution.status : null,
+              signal:
+                typeof execution.signal === 'string' &&
+                /^SIG[A-Z0-9]{1,16}$/u.test(execution.signal)
+                  ? execution.signal
+                  : null,
+              error_code:
+                typeof errorCode === 'string' && /^[A-Z][A-Z0-9_]{0,31}$/u.test(errorCode)
+                  ? errorCode
+                  : execution.error === undefined
+                    ? null
+                    : 'UNAVAILABLE',
+              timeout_ms: input.timeout_ms + 10_000,
+            })}\n`,
+          );
+        } catch {
+          // Diagnostic delivery cannot replace the authoritative execution refusal.
+        }
+      }
       const inspected = object(
         (JSON.parse(this.#checked(['inspect', id]).toString('utf8')) as unknown[])[0],
       );
