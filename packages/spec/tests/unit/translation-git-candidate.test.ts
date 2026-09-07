@@ -6,6 +6,8 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
+  symlinkSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -527,5 +529,68 @@ it.each(['standalone', 'embedded'] as const)(
     expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
     expect(readFileSync(join(f.root, path))).toEqual(bytes);
     expect(readFileSync(join(f.root, '.git/index'))).toEqual(index);
+  },
+);
+
+it.each([
+  ['duplicate', 'MUTATION_EVIDENCE_STATE_DUPLICATE'],
+  ['missing-file', 'MUTATION_EVIDENCE_STATE_MISSING'],
+  ['directory', 'MUTATION_EVIDENCE_STATE_PATH_INVALID'],
+  ['symlink', 'MUTATION_EVIDENCE_STATE_PATH_INVALID'],
+  ['outside-prefix', 'MUTATION_EVIDENCE_STATE_PATH_INVALID'],
+  ['parent-segment', 'MUTATION_EVIDENCE_STATE_PATH_INVALID'],
+  ['unrelated-proof', 'MUTATION_EVIDENCE_STATE_PATH_INVALID'],
+  ['agent-suffix', 'MUTATION_EVIDENCE_STATE_PATH_INVALID'],
+  ['omitted-witness', 'MUTATION_EVIDENCE_WITNESS_MISSING'],
+  ['omitted-task', 'MUTATION_EVIDENCE_TASK_MISSING'],
+] as const)(
+  'refuses %s evidence population without altering the index or existing proof bytes',
+  async (kind, code) => {
+    const f = await evidenceFixture();
+    const recipe = 'record/proofs/work/recipe-runs/devai-fix/test/run.json';
+    let paths = [...f.inputs.state_paths];
+    if (kind === 'duplicate') paths.push(recipe);
+    else if (kind === 'missing-file')
+      paths.push('record/proofs/work/recipe-runs/devai-fix/test/missing.json');
+    else if (kind === 'directory') {
+      const directory = 'record/proofs/work/recipe-runs/devai-fix/test/directory.json';
+      mkdirSync(join(f.root, directory));
+      paths.push(directory);
+    } else if (kind === 'symlink') {
+      const backing = 'record/proofs/work/recipe-runs/devai-fix/test/backing.json';
+      renameSync(join(f.root, recipe), join(f.root, backing));
+      symlinkSync('backing.json', join(f.root, recipe));
+    } else if (kind === 'outside-prefix') {
+      put(f.root, 'unrelated.json', '{}');
+      paths.push('unrelated.json');
+    } else if (kind === 'parent-segment') {
+      paths.push('record/proofs/work/recipe-runs/devai-fix/test/../test/run.json');
+    } else if (kind === 'unrelated-proof') {
+      put(f.root, 'record/proofs/unrelated.json', '{}');
+      paths.push('record/proofs/unrelated.json');
+    } else if (kind === 'agent-suffix') {
+      const path = 'record/proofs/work/agent-runs/AR-extra.json.backup';
+      put(f.root, path, '{}');
+      paths.push(path);
+    } else if (kind === 'omitted-witness') {
+      paths = paths.filter(
+        (path) => !path.startsWith('record/proofs/compliance/translation-validation/witnesses/'),
+      );
+    } else if (kind === 'omitted-task') {
+      paths = paths.filter((path) => !path.startsWith('.devai/state/tasks/'));
+    }
+    const retained = new Map(
+      f.inputs.state_paths.map((path) => [path, readFileSync(join(f.root, path))]),
+    );
+    const index = readFileSync(join(f.root, '.git/index'));
+    await expect(
+      runRecorder(f.root, async () =>
+        recordMutationEvidenceCommit({ ...f.inputs, state_paths: paths }),
+      ),
+    ).rejects.toThrow(code);
+    expect(readFileSync(join(f.root, '.git/index'))).toEqual(index);
+    expect(git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/devai/r28/evidence')).toBe('');
+    expect(git(f.root, 'rev-parse', 'HEAD')).toBe(f.intent['base_sha']);
+    for (const [path, bytes] of retained) expect(readFileSync(join(f.root, path))).toEqual(bytes);
   },
 );
