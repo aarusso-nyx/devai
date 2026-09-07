@@ -616,6 +616,20 @@ describe('live ledger-verification workflow', () => {
     );
   });
 
+  it.each([
+    'pnpm --filter @aarusso-nyx/devai run pack:smoke',
+    'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball"',
+  ])('rejects smoke acceptance without the exact staged archive binding: %s', (replacement) => {
+    const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const command =
+      'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball" --sha256 "$package_sha256"';
+    expect(current).toContain(command);
+    const result = check(fixture(current.replace(command, replacement), 'release.yml'));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('RELEASE_CONTROL_MISSING');
+    expect(result.stderr).toContain(command);
+  });
+
   it('accepts explicit dispatch publication and forbids builds on tag pushes', () => {
     const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const intended = current

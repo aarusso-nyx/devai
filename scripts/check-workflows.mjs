@@ -827,7 +827,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'pnpm install --frozen-lockfile',
     'pnpm run build',
     'pnpm run release:closure',
-    'run pack:smoke',
+    'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball" --sha256 "$package_sha256"',
     'stage-release-package.mjs',
     'release-channel.mjs',
     'RELEASE_IS_PRERELEASE',
