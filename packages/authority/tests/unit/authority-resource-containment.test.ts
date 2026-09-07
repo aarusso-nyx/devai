@@ -124,6 +124,59 @@ describe('resource identity and containment before effect authorization', () => 
     expect(Object.isFrozen(target.destination)).toBe(true);
   });
 
+  it.each(['', '/private', 'user@host', 'scheme://host', 'a\\b', 'a\0b', undefined, 42])(
+    'refuses an invalid rename repository identity %s even with valid endpoints',
+    (repository_id) => {
+      expectBoundaryFailure(
+        classifyAuthorityResource({ ...rename(), repository_id }),
+        'usage-error',
+        'AUTHORITY_FS_TARGET_INVALID',
+      );
+    },
+  );
+
+  it.each(['create', 'update', 'delete', 'copy', '', undefined])(
+    'refuses to reinterpret a two-endpoint rename as operation %s',
+    (operation) => {
+      expectBoundaryFailure(
+        classifyAuthorityResource({ ...rename(), operation }),
+        'usage-error',
+        'AUTHORITY_FS_TARGET_INVALID',
+      );
+    },
+  );
+
+  it.each(['create', 'update', 'delete', 'rename'])(
+    'preserves filesystem operation %s in the exact immutable target',
+    (operation) => {
+      const target = { ...fsTarget, operation };
+      expect(classifyAuthorityResource(target)).toEqual({
+        ok: true,
+        value: { target, atomicity: 'whole-plan', adapter_id: 'fs-authority-boundary' },
+      });
+      expect(Object.isFrozen(target)).toBe(true);
+    },
+  );
+
+  it.each(['read', 'copy', 'execute', '', undefined, 42])(
+    'rejects unsupported filesystem operation %s before path resolution',
+    (operation) => {
+      const realpath = vi.fn(() => '/workspace/devai/packages/core/file');
+      expectBoundaryFailure(
+        classifyAuthorityResource(
+          { ...fsTarget, operation },
+          {
+            realpath,
+            repository_root: '/workspace/devai',
+          },
+        ),
+        'usage-error',
+        'AUTHORITY_FS_TARGET_INVALID',
+      );
+      expect(realpath).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['source', 'destination'] as const)(
     'validates %s independently before admitting an atomic rename',
     (side) => {
