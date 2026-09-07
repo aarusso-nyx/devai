@@ -260,6 +260,102 @@ describe('native local evidence policy', () => {
   });
 });
 
+describe('local evidence mode contracts', () => {
+  it('validates strict evidence without granting CI skipping or requiring actor/change discovery', () => {
+    const { root, now, manifestPath } = fixture();
+    expect(
+      verifyLocalEvidence({
+        repoRoot: root,
+        mode: 'strict',
+        now: now.getTime(),
+        manifestPath,
+        context: {
+          eventName: 'workflow_dispatch',
+          ref: '',
+          actor: '',
+          headMessage: '',
+          changedFiles: null,
+        },
+      }),
+    ).toEqual({
+      evidenceMode: false,
+      outcome: 'strict-valid',
+      message: 'local CI evidence is valid',
+      manifestPath,
+    });
+  });
+
+  it.each(['strict', 'gate'] as const)(
+    'refuses a %s claim when the repository declares no policy',
+    (mode) => {
+      const { root, now, manifestPath } = fixture();
+      put(root, '.devai/config/project.json', {
+        schemaVersion: '1.0.0',
+        project_type: 'runtime-host',
+      });
+      expect(() =>
+        verifyLocalEvidence({
+          repoRoot: root,
+          mode,
+          now: now.getTime(),
+          context: {
+            eventName: 'push',
+            ref: 'refs/heads/main',
+            actor: 'aarusso',
+            headMessage: `Local-CI-Evidence: ${manifestPath}`,
+            changedFiles: [],
+          },
+        }),
+      ).toThrow(
+        mode === 'strict' ? /no local-evidence policy declared/u : /repo declares no.*policy/u,
+      );
+    },
+  );
+
+  it('refuses a trailer pointing outside the declared manifest selection', () => {
+    const { root, now } = fixture();
+    expect(() => gate(root, 'another/manifest.json', now)).toThrow(
+      /Local-CI-Evidence trailer must point to .* got another\/manifest.json/u,
+    );
+  });
+
+  it('marks a missing claimed manifest as an evidence failure', () => {
+    const { root, now, manifestPath } = fixture();
+    rmSync(join(root, manifestPath));
+    let error: unknown;
+    try {
+      gate(root, manifestPath, now);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toMatchObject({
+      evidenceFailure: true,
+      message: `missing evidence manifest: ${join(root, manifestPath)}`,
+    });
+  });
+
+  it.each([
+    ['gate', 'no trusted local CI evidence claimed; normal CI is required'],
+    ['auto', 'normal CI is required'],
+  ] as const)('keeps normal CI without a claim in %s mode', (mode, message) => {
+    const { root, now, manifestPath } = fixture();
+    expect(
+      verifyLocalEvidence({
+        repoRoot: root,
+        mode,
+        now: now.getTime(),
+        context: {
+          eventName: 'push',
+          ref: 'refs/heads/main',
+          actor: '',
+          headMessage: '',
+          changedFiles: null,
+        },
+      }),
+    ).toEqual({ evidenceMode: false, outcome: 'no-claim', message, manifestPath });
+  });
+});
+
 describe('local evidence independent trust and freshness checks', () => {
   const changes: Array<[string, (manifest: MutableManifest) => void, RegExp]> = [
     [
