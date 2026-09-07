@@ -253,6 +253,32 @@ package result or aggregate verdict across that identity change. Retain earlier
 reports as diagnostics, including failures. Do not remove static mutants or the
 explicit test population to work around an activation failure.
 
+## Pages interrupted-publication controller
+
+`scripts/process/pages-publication.mjs` provides repository-local orchestration for
+an authenticated, durable publication journal. Its identity binds the repository,
+tag, candidate commit/tree, rehearsal run/attempt, manifest and site archive hashes,
+and approved control commit. Each intent additionally records the uploaded artifact
+ID; a successful submission records its exact Pages deployment ID.
+
+The controller persists and reads back intent before submitting. A lost submission
+response leaves an unresolved intent and refuses automatic resubmission. A retry
+with a recorded deployment ID only observes that deployment, then verifies live
+bytes before recording completion. Matching live bytes are a no-op. Previously
+verified effects that disappear are not silently replaced. Authentication failures,
+incomplete histories, conflicting identities and unaudited migration histories fail
+closed. No build, repack, site-generation or automatic cancellation capability is
+part of this interface.
+
+This module is not yet activated in the release workflow. Activation requires an
+approved GitHub journal adapter, a recorded audit covering earlier Pages writers,
+and concurrency serialization across all Pages publication paths. The adapter must
+read the complete authenticated history and durably persist each transition. Its
+`confirmed-missing` result must come from external-state reconciliation; HTTP 404,
+a failed workflow or an unavailable live site is insufficient. The focused controller
+tests exercise interrupted writes and retries; they do not establish live GitHub
+publication acceptance. Exact-artifact promotion still requires Owner authorization.
+
 ## Acceptance record
 
 Record candidate/control SHA, focused/full gate outcomes, operator intervention count,
