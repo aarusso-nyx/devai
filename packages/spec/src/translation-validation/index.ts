@@ -98,6 +98,7 @@ function gitMutation(
   options: {
     readonly env?: Readonly<Record<string, string>>;
     readonly input?: string;
+    readonly trimOutput?: boolean;
     readonly error: string;
   },
 ): string {
@@ -111,19 +112,26 @@ function gitMutation(
   if (result.status !== 0) {
     throw new Error(`${options.error}: ${(result.stderr ?? '').trim()}`);
   }
-  return (result.stdout ?? '').trim();
+  const stdout = result.stdout ?? '';
+  return options.trimOutput === false ? stdout : stdout.trim();
 }
 
 function mutationPaths(repoRoot: string): readonly string[] {
-  const tracked = gitMutation(repoRoot, ['diff', '--name-only', 'HEAD', '--'], {
+  const tracked = gitMutation(repoRoot, ['diff', '--name-only', '-z', 'HEAD', '--'], {
+    trimOutput: false,
     error: 'MUTATION_DIFF_FAILED',
   })
-    .split('\n')
+    .split('\0')
     .filter(Boolean);
-  const untracked = gitMutation(repoRoot, ['ls-files', '--others', '--exclude-standard', '--'], {
-    error: 'MUTATION_UNTRACKED_SCAN_FAILED',
-  })
-    .split('\n')
+  const untracked = gitMutation(
+    repoRoot,
+    ['ls-files', '--others', '--exclude-standard', '-z', '--'],
+    {
+      trimOutput: false,
+      error: 'MUTATION_UNTRACKED_SCAN_FAILED',
+    },
+  )
+    .split('\0')
     .filter(Boolean);
   return [...new Set([...tracked, ...untracked])].sort();
 }
@@ -356,10 +364,10 @@ export async function recordMutationCandidate(input: {
   });
   const actualDiff = gitMutation(
     repoRoot,
-    ['diff-tree', '--no-commit-id', '--name-only', '-r', candidateSha],
-    { error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
+    ['diff-tree', '--no-commit-id', '--name-only', '-z', '-r', candidateSha],
+    { trimOutput: false, error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
   )
-    .split('\n')
+    .split('\0')
     .filter(Boolean)
     .sort();
   if (JSON.stringify(actualDiff) !== JSON.stringify(taskPaths)) {
@@ -533,10 +541,10 @@ export function recordMutationEvidenceCommit(input: {
   const nonState = changed.filter((path) => !statePaths.includes(path));
   const candidatePaths = gitMutation(
     repoRoot,
-    ['diff-tree', '--no-commit-id', '--name-only', '-r', input.candidate_sha],
-    { error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
+    ['diff-tree', '--no-commit-id', '--name-only', '-z', '-r', input.candidate_sha],
+    { trimOutput: false, error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
   )
-    .split('\n')
+    .split('\0')
     .filter(Boolean)
     .sort();
   if (JSON.stringify(nonState) !== JSON.stringify(candidatePaths)) {
@@ -558,10 +566,10 @@ export function recordMutationEvidenceCommit(input: {
   });
   const evidenceDiff = gitMutation(
     repoRoot,
-    ['diff', '--name-only', input.candidate_sha, evidenceSha, '--'],
-    { error: 'MUTATION_EVIDENCE_DIFF_FAILED' },
+    ['diff', '--name-only', '-z', input.candidate_sha, evidenceSha, '--'],
+    { trimOutput: false, error: 'MUTATION_EVIDENCE_DIFF_FAILED' },
   )
-    .split('\n')
+    .split('\0')
     .filter(Boolean);
   if (
     evidenceDiff.some(

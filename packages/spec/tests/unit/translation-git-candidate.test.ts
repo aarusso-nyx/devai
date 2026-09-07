@@ -39,7 +39,7 @@ function git(root: string, ...args: string[]): string {
   if (result.status !== 0) throw new Error(String(result.stderr));
   return result.stdout.trim();
 }
-function fixture() {
+function fixture(sourcePath = 'packages/core/src/example.ts', initiallyPresent = true) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai candidate ç ')));
   roots.push(root);
   const task = example('task');
@@ -50,6 +50,7 @@ function fixture() {
   if (!implementation[0]) throw new Error('missing implementation fixture');
   implementation[0]['invariant_id'] = invariant['id'];
   Object.assign(intent, {
+    declared_touched: [sourcePath],
     task_id: task['id'],
     strategy: 'regression',
     implements: implementation,
@@ -61,7 +62,7 @@ function fixture() {
   put(root, `.devai/state/tasks/${String(task['id'])}.json`, JSON.stringify(task));
   put(root, `law/invariants/${String(invariant['id'])}.json`, JSON.stringify(invariant));
   put(root, '.gitignore', '.devai/state/r28-index-*\n');
-  put(root, 'packages/core/src/example.ts', 'export const value = 1;\n');
+  if (initiallyPresent) put(root, sourcePath, 'export const value = 1;\n');
   git(root, 'init', '-b', 'fixture');
   git(root, 'config', 'user.name', 'Fixture');
   git(root, 'config', 'user.email', 'fixture@example.invalid');
@@ -71,7 +72,7 @@ function fixture() {
   git(root, 'commit', '-m', 'fixture base');
   intent['base_sha'] = git(root, 'rev-parse', 'HEAD');
   expect(validators.mutationIntent(intent)).toBe(true);
-  return { root, intent };
+  return { root, intent, sourcePath };
 }
 
 // A trusted unit-fixture adapter executes real Git only inside this disposable
@@ -249,3 +250,47 @@ it('refuses a dirty initial checkout before calling the recipe', async () => {
     'user-owned dirty bytes',
   );
 });
+
+it.each(['with space.ts', 'café.ts', 'quoted"name.ts'])(
+  'records the literal Git path %s without interpreting display quoting',
+  async (name) => {
+    const f = fixture(`packages/core/src/${name}`);
+    const result = await runRecorder(f.root, () =>
+      recordMutationCandidate({
+        repo_root: f.root,
+        intent: f.intent,
+        emitted_at: '2026-09-07T00:00:00.000Z',
+        run: async () => {
+          put(f.root, f.sourcePath, 'export const value = 2;\n');
+        },
+      }),
+    );
+    expect(result.touched).toEqual([f.sourcePath]);
+    expect(git(f.root, 'show', `${result.candidate_sha}:${f.sourcePath}`)).toBe(
+      'export const value = 2;',
+    );
+    expect(git(f.root, 'rev-parse', 'HEAD')).toBe(f.intent['base_sha']);
+    expect(validators.translationWitness(result.witness)).toBe(true);
+  },
+);
+
+it.each(['new café.ts', 'new"quote.ts', 'trailing.ts '])(
+  'records the exact untracked filename %j',
+  async (name) => {
+    const f = fixture(`packages/core/src/${name}`, false);
+    const result = await runRecorder(f.root, () =>
+      recordMutationCandidate({
+        repo_root: f.root,
+        intent: f.intent,
+        emitted_at: '2026-09-07T00:00:00.000Z',
+        run: async () => {
+          put(f.root, f.sourcePath, 'export const value = 2;\n');
+        },
+      }),
+    );
+    expect(result.touched).toEqual([f.sourcePath]);
+    expect(git(f.root, 'show', `${result.candidate_sha}:${f.sourcePath}`)).toBe(
+      'export const value = 2;',
+    );
+  },
+);
