@@ -16,7 +16,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   createProtectedReleaseHostAdapter,
   createProtectedReleaseSinkFilesystem,
@@ -27,6 +27,12 @@ import {
 import { createIssuer, runtimeApi } from './authority-runtime-testkit.js';
 import { createReleaseRepositoryTestFixture } from './release-repository-test-fixture.js';
 
+// Only the read-only Git identity is shared; every case owns its mutable store and handles.
+let repository: ReturnType<typeof createReleaseRepositoryTestFixture>;
+beforeAll(() => {
+  repository = createReleaseRepositoryTestFixture();
+});
+afterAll(() => repository?.dispose());
 const roots: string[] = [];
 const READ = constants.O_RDONLY | constants.O_NOFOLLOW;
 const WRITE = constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW;
@@ -49,9 +55,8 @@ async function inSink<T>(
   callback: () => T,
   owner = f.owner,
 ): Promise<T> {
-  const repository = createReleaseRepositoryTestFixture();
+  const issuer = createIssuer(await runtimeApi());
   try {
-    const issuer = createIssuer(await runtimeApi());
     const adapter = createProtectedReleaseHostAdapter({
       action_id: 'release certify',
       repository: repository.repository,
@@ -75,7 +80,7 @@ async function inSink<T>(
       ),
     );
   } finally {
-    repository.dispose();
+    issuer.dispose();
   }
 }
 
