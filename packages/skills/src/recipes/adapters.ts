@@ -93,11 +93,11 @@ function assertSafeInstallPath(repoRoot: string, relativePath: string): string {
   let cursor = root;
   for (const segment of relativePath.split('/').slice(0, -1)) {
     cursor = join(cursor, segment);
-    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+    if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink()) {
       throw new Error(`RECIPE_INSTALL_SYMLINK_REFUSED: ${relativePath}`);
     }
   }
-  if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+  if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) {
     throw new Error(`RECIPE_INSTALL_SYMLINK_REFUSED: ${relativePath}`);
   }
   return target;
