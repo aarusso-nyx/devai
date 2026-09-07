@@ -699,3 +699,38 @@ describe('local evidence required tool identities', () => {
     expect(() => gate(root, manifestPath, now)).toThrow(/must record docker version evidence/u);
   });
 });
+
+describe('verified manifest-only trailer commits', () => {
+  it('accepts the exact parent candidate after committing only its evidence manifest', () => {
+    const { root, now, manifestPath } = fixture();
+    const before = gate(root, manifestPath, now);
+    execFileSync('git', ['add', '--', manifestPath], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'retain exact candidate evidence'], { cwd: root });
+    expect(gate(root, manifestPath, now)).toEqual(before);
+  });
+
+  it('refuses a later source commit instead of reusing its ancestor evidence', () => {
+    const { root, now, manifestPath } = fixture();
+    execFileSync('git', ['add', '--', manifestPath], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'evidence trailer'], { cwd: root });
+    put(root, 'changed-source.txt', 'different candidate');
+    execFileSync('git', ['add', '--', 'changed-source.txt'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'source change'], { cwd: root });
+    expect(() => gate(root, manifestPath, now)).toThrow(/manifest commit subject mismatch/u);
+  });
+
+  it('refuses a changed tree value even when the repository and commit match', () => {
+    const { root, now, manifestPath } = fixture();
+    const manifest = JSON.parse(readFileSync(join(root, manifestPath), 'utf8')) as MutableManifest;
+    manifest.subject.tree.value = '0'.repeat(40);
+    put(root, manifestPath, manifest);
+    expect(() => gate(root, manifestPath, now)).toThrow('manifest tree subject mismatch');
+  });
+
+  it('requires an actor even when a valid trusted actor list is installed', () => {
+    const { root, now, manifestPath } = fixture();
+    expect(() => gate(root, manifestPath, now, '')).toThrow(
+      'evidence mode requires a GitHub actor',
+    );
+  });
+});

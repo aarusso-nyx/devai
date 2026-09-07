@@ -173,6 +173,15 @@ describe('agent-run proof records', () => {
         /^AR-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
       );
       expect(first.prev_hash).toBe('GENESIS');
+      expect(first.outcome).toEqual({ status: 'pass', notes: ['verified'] });
+      expect(first.subagent_invocations).toEqual([
+        {
+          agent_type: 'inspector',
+          prompt_pc_id: 'PC-fixture',
+          returned_summary: 'green',
+          parent_verification: 'pass',
+        },
+      ]);
       expect(verifyAgentRunHash(first)).toBe(true);
 
       const second = emitAgentRun({
@@ -185,6 +194,8 @@ describe('agent-run proof records', () => {
       expect(second.files_read).toEqual([]);
       expect(second.files_written).toEqual([]);
       expect(second.commands_run).toEqual([]);
+      expect(second).not.toHaveProperty('outcome');
+      expect(second).not.toHaveProperty('subagent_invocations');
       expect(readLastAgentRunHash(repo)).toBe(second.manifest_hash);
 
       const persisted = JSON.parse(
@@ -199,4 +210,21 @@ describe('agent-run proof records', () => {
       ).toBe(false);
     });
   });
+});
+
+it('ignores non-JSON operator notes while extending a verified history', async () => {
+  const repo = root();
+  const input = {
+    repoRoot: repo,
+    caller: { kind: 'cli' as const, name: 'fixture' },
+    started_at: '2026-07-24T10:00:00.000Z',
+    compliance: { invariant_ids: [] },
+  };
+  const first = await withAuthorityHostTestScope(() => emitAgentRun(input));
+  const notes = join(getAgentRunDir(repo), 'operator-notes.txt');
+  writeFileSync(notes, 'not a JSON record');
+  expect(readLastAgentRunHash(repo)).toBe(first.manifest_hash);
+  const second = await withAuthorityHostTestScope(() => emitAgentRun(input));
+  expect(second.prev_hash).toBe(first.manifest_hash);
+  expect(readFileSync(notes, 'utf8')).toBe('not a JSON record');
 });
