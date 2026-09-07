@@ -19,7 +19,7 @@ import { afterEach, expect, it } from 'vitest';
 const { verifyMutationSemantics } = await import(
   pathToFileURL(resolve('scripts/process/verify-mutation-semantics.mjs')).href
 );
-const { mutationSemanticFixture } = await import(
+const { mutationSemanticFixture, mutationSemanticFixtureV22 } = await import(
   pathToFileURL(resolve('tests/fixtures/mutation-semantic-fixture.mjs')).href
 );
 const { canonicalBytes } = await import(
@@ -153,4 +153,56 @@ it('rejects changed report contents even when the replacement JSON is canonical'
   report.framework.name = 'different runner';
   writeFileSync(path, canonicalBytes(report));
   await expect(verifyMutationSemantics(f.args)).rejects.toThrow();
+});
+
+async function v22Fixture() {
+  const f = fixture();
+  const data = await mutationSemanticFixtureV22();
+  for (const [path, bytes] of Object.entries(data.files))
+    writeFileSync(join(f.args.artifactRoot, path), bytes as Uint8Array);
+  return {
+    ...f.args,
+    contractBytes: canonicalBytes(data.contract),
+    expected: {
+      schemaVersion: '2.2.0',
+      semanticReceiptProvenance: data.provenance,
+      v22: data.v22,
+    },
+  };
+}
+it('verifies a complete v2.2 closure with independently supplied execution bindings', async () => {
+  const result = await verifyMutationSemantics(await v22Fixture());
+  expect(result.verification).toMatchObject({
+    schemaVersion: '2.2.0',
+    packageCount: 10,
+    memberCount: 22,
+    complete: true,
+    passed: true,
+  });
+});
+it.each([
+  'missing-controls',
+  'contract-hash',
+  'member-hash',
+  'member-size',
+  'extra-member',
+  'task-binding',
+  'candidate',
+])('rejects changed v2.2 protected closure: %s', async (change) => {
+  const args = await v22Fixture();
+  const controls = args.expected.v22;
+  if (change === 'missing-controls') args.expected.v22 = {};
+  if (change === 'contract-hash') controls.expectedOutputContract.sha256 = 'f'.repeat(64);
+  if (change === 'member-hash') controls.finalUnitReferent.members[0].sha256 = 'f'.repeat(64);
+  if (change === 'member-size') controls.finalUnitReferent.members[0].sizeBytes += 1;
+  if (change === 'extra-member')
+    controls.finalUnitReferent.members.push({
+      path: 'extra.json',
+      sha256: 'f'.repeat(64),
+      sizeBytes: 2,
+    });
+  if (change === 'task-binding')
+    controls.expectedExecutionBindings[0].taskPolicyDigest = 'f'.repeat(64);
+  if (change === 'candidate') controls.finalUnitReferent.candidate.commit = 'f'.repeat(40);
+  await expect(verifyMutationSemantics(args)).rejects.toThrow();
 });

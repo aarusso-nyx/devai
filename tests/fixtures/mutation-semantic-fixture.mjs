@@ -368,3 +368,73 @@ export function mutationSemanticFixture(statuses = ['Killed']) {
   };
   return { contract, files, plan, provenance: state.semanticReceipt.verifierProvenance };
 }
+
+export async function mutationSemanticFixtureV22(statuses = ['Killed']) {
+  const { finalizeMutationReportSetV22, buildMutationSemanticReceiptV22 } =
+    await import('../../packages/cli/vendor/evidence-verification/src/mutation-v22.js');
+  const state = mutationSemanticFixture(statuses);
+  const contract = {
+    ...state.contract,
+    schemaVersion: '2.2.0',
+    packages: state.contract.packages.map((entry, index) => ({
+      ...entry,
+      executionBinding: {
+        templateId: 'mutation-template',
+        templateVersion: '1.3.0',
+        taskNode: `test:mutation-${index}`,
+        taskPolicyDigest: sha256Hex(Buffer.from(`task-policy:${index}`)),
+      },
+    })),
+  };
+  const candidate = {
+    releaseUnit: state.plan.release_unit,
+    commit: state.plan.repository.commit,
+    tree: state.plan.repository.tree,
+  };
+  const summary = finalizeMutationReportSetV22({
+    contract,
+    candidate,
+    packages: contract.packages.map((entry) => ({
+      disposition: 'executed',
+      origin: null,
+      report: JSON.parse(state.files[entry.reportPath]),
+      result: JSON.parse(state.files[entry.resultPath]),
+    })),
+  });
+  const receipt = buildMutationSemanticReceiptV22({
+    contract,
+    summary,
+    receiptId: 'MSV2-1111111111111111',
+    verifierProvenance: state.provenance,
+  });
+  state.files[contract.summaryPath] = canonicalBytes(summary);
+  state.files[contract.semanticReceiptPath] = canonicalBytes(receipt);
+  return {
+    ...state,
+    contract,
+    v22: {
+      expectedExecutionBindings: contract.packages.map((entry) => ({
+        packageName: entry.packageName,
+        ...entry.executionBinding,
+      })),
+      expectedOutputContract: {
+        path: 'mutation/output-contract.json',
+        sha256: sha256Hex(canonicalBytes(contract)),
+        sizeBytes: canonicalBytes(contract).length,
+      },
+      finalUnitReferent: {
+        repositoryId: state.plan.repository.id,
+        candidate,
+        releasePlanReceiptDigest: contract.releasePlanReceiptDigest,
+        releaseProfileDigest: contract.releaseProfileDigest,
+        policyDigest: contract.policyDigest,
+        taskPolicyDigests: contract.packages
+          .map((entry) => entry.executionBinding.taskPolicyDigest)
+          .sort(),
+        members: Object.entries(state.files)
+          .map(([path, bytes]) => ({ path, sha256: sha256Hex(bytes), sizeBytes: bytes.length }))
+          .sort((a, b) => a.path.localeCompare(b.path)),
+      },
+    },
+  };
+}
