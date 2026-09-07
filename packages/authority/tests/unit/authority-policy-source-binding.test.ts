@@ -196,3 +196,79 @@ describe('authority policy source custody', () => {
     expect(loaded.resolved_rule_bytes).toEqual(canonicalBytes(document(plant).rules));
   });
 });
+
+describe('policy semantic and digest boundaries', () => {
+  it.each([undefined, 'invalid', '2026-07-15T12:00:00.000Z', '2026-07-15T11:59:59.000Z'])(
+    'refuses a shadow expiry not strictly after materialization: %s',
+    async (expires_at) => {
+      const plant = makePolicyPlant({ enforcement: { mode: 'shadow', shadow: { expires_at } } });
+      expectFailure(
+        (await runtimeApi()).loadAuthorityPolicy({ document: plant.document }, plant.deps),
+        'refused',
+        'AUTHORITY_POLICY_SEMANTIC_INVALID',
+      );
+    },
+  );
+
+  it('revalidates semantics of the document returned by schema validation', async () => {
+    const plant = makePolicyPlant();
+    plant.deps.validatePolicySchema = () => ({
+      ok: true,
+      value: { view: { ...document(plant), policy_version: 'invalid' } },
+    });
+    expectFailure(
+      (await runtimeApi()).loadAuthorityPolicy({ document: plant.document }, plant.deps),
+      'refused',
+      'AUTHORITY_POLICY_SEMANTIC_INVALID',
+    );
+  });
+
+  it.each([undefined, {}, { view: null }])(
+    'retains exact policy bytes when a schema result supplies no document: %j',
+    async (value) => {
+      const plant = makePolicyPlant();
+      plant.deps.validatePolicySchema = () => ({ ok: true, value });
+      const loaded = expectSuccess<{
+        document: { raw: unknown; view: unknown; canonical_bytes: Uint8Array };
+      }>((await runtimeApi()).loadAuthorityPolicy({ document: plant.document }, plant.deps));
+      expect(loaded.document.raw).toBe(plant.document);
+      expect(loaded.document.view).toBe(plant.document);
+      expect(loaded.document.canonical_bytes).toEqual(canonicalBytes(plant.document));
+    },
+  );
+
+  it.each(['resolved', 'extension', 'missing extension'])(
+    'rejects an independent %s digest mismatch',
+    async (kind) => {
+      const plant = makePolicyPlant();
+      if (kind === 'resolved') document(plant).resolved_digest_sha256 = 'f'.repeat(64);
+      else if (kind === 'missing extension') document(plant).additive_extensions = [];
+      else {
+        const items = structuredClone(document(plant).additive_extensions) as Record<
+          string,
+          unknown
+        >[];
+        first(items).digest_sha256 = 'f'.repeat(64);
+        document(plant).additive_extensions = items;
+      }
+      expectFailure(
+        (await runtimeApi()).loadAuthorityPolicy({ document: plant.document }, plant.deps),
+        'refused',
+        'AUTHORITY_POLICY_DIGEST_MISMATCH',
+      );
+    },
+  );
+
+  it('rejects a source identity substitution with unchanged version and bytes', async () => {
+    const plant = makePolicyPlant();
+    document(plant).source_policy = {
+      ...(document(plant).source_policy as object),
+      policy_id: 'another-core',
+    };
+    expectFailure(
+      (await runtimeApi()).loadAuthorityPolicy({ document: plant.document }, plant.deps),
+      'refused',
+      'AUTHORITY_POLICY_BINDING_MISMATCH',
+    );
+  });
+});
