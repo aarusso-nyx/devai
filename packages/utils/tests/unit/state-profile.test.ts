@@ -152,3 +152,38 @@ describe('disposable state boundaries', () => {
     });
   });
 });
+
+describe('pruning application receipt', () => {
+  it('accepts the minimum one-day retention and reports exact applied effects', () => {
+    const repo = root();
+    const path = put(repo, 'coverage/old.json', '{}');
+    const old = new Date(NOW.getTime() - 2 * 86400000);
+    utimesSync(path, old, old);
+    const calls: unknown[] = [];
+    const result = pruneState({
+      repoRoot: repo,
+      olderThanDays: 1,
+      now: NOW,
+      apply: true,
+      effects: {
+        rmSync: (target, options) => {
+          calls.push([target, options]);
+          rmSync(target, options);
+        },
+      },
+    });
+    expect(result).toEqual({
+      applied: true,
+      older_than_days: 1,
+      candidates: ['coverage/old.json'],
+      deleted: ['coverage/old.json'],
+      preserved_roots: [
+        '.devai/state/counters.json',
+        '.devai/state/leases',
+        '.devai/state/pointers',
+      ],
+    });
+    expect(calls).toEqual([[path, { force: true }]]);
+    expect(pruneState({ repoRoot: repo, now: NOW }).candidates).toEqual([]);
+  });
+});

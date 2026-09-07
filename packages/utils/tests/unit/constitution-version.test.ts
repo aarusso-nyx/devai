@@ -27,3 +27,7 @@ describe('constitution version headers', () => {
     expect(parseConstitutionVersion(text)).toBeNull();
   });
 });
+
+it.each(['', '   '])('accepts a version header with %j separating whitespace', (space) => {
+  expect(parseConstitutionVersion(`**Version:**${space}1.2.3`)).toBe('1.2.3');
+});
