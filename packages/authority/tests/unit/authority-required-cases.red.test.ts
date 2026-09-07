@@ -1147,6 +1147,17 @@ describe('R19 issuer complete-set, batch, and receipt matrix', () => {
       'refused',
       'AUTHORITY_DECISION_RECEIPT_EXPIRED',
     );
+    clock = NOW;
+    expectFailure(
+      issuer.consume({
+        receipt: issued.receipt,
+        subject,
+        invocation_id: 'invocation-1',
+        adapter_id: 'fs-authority-boundary',
+      }),
+      'refused',
+      'AUTHORITY_DECISION_RECEIPT_REPLAYED',
+    );
   });
 
   it('burns a valid receipt atomically on first consumption', async () => {
@@ -1225,6 +1236,18 @@ describe('R19 issuer complete-set, batch, and receipt matrix', () => {
       }),
       'refused',
       'AUTHORITY_DECISION_RECEIPT_BINDING_MISMATCH',
+    );
+    const legitimate = {
+      receipt: fixture.receipt,
+      subject: fixture.subject,
+      invocation_id: 'invocation-1',
+      adapter_id: 'fs-authority-boundary',
+    };
+    expectSuccess(fixture.issuer.consume(legitimate));
+    expectFailure(
+      fixture.issuer.consume(legitimate),
+      'refused',
+      'AUTHORITY_DECISION_RECEIPT_REPLAYED',
     );
   });
 });
