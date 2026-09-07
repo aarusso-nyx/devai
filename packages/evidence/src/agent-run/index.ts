@@ -8,6 +8,7 @@ import {
 } from '@devai-nyx/authority';
 import { join } from 'node:path';
 import { canonicalSha256 } from '@devai-nyx/utils';
+import { validators } from '@devai-nyx/schemas';
 
 /**
  * Agent-run evidence emitter. Records what an automated agent action read,
@@ -96,28 +97,59 @@ function stateDir(repoRoot: string): string {
   return join(repoRoot, STATE_DIR_REL);
 }
 
-/**
- * Read the last agent-run record (by lexicographic order on filename,
- * which matches chronological order under UUID v7). Returns null when
- * no records exist yet. Used to seed prev_hash for the next emit.
- */
-export function readLastAgentRunHash(repoRoot: string): string | null {
+/** Resolve the unique verified chain; UUID order is not execution order. */
+function readAgentRunTip(repoRoot: string): string | null {
   const dir = stateDir(repoRoot);
   if (!existsSync(dir)) return null;
-  let files: string[];
-  try {
-    files = readdirSync(dir)
-      .filter((n) => n.endsWith('.json'))
-      .sort();
-  } catch {
-    return null;
-  }
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
   if (files.length === 0) return null;
-  const last = files[files.length - 1];
-  if (last === undefined) return null;
+  const records = new Map<string, AgentRunRecord>();
+  for (const name of files) {
+    const record = JSON.parse(readFileSync(join(dir, name), 'utf8')) as AgentRunRecord;
+    if (
+      !validators.agentRun(record) ||
+      name !== `${record.run_id}.json` ||
+      !verifyAgentRunHash(record)
+    ) {
+      throw new Error('agent-run history contains an invalid record');
+    }
+    if (records.has(record.manifest_hash))
+      throw new Error('agent-run history contains duplicate records');
+    records.set(record.manifest_hash, record);
+  }
+  const successors = new Map<string, string>();
+  let genesis: string | undefined;
+  for (const record of records.values()) {
+    if (record.prev_hash === null || record.prev_hash === 'GENESIS') {
+      if (genesis !== undefined) throw new Error('agent-run history has multiple genesis records');
+      genesis = record.manifest_hash;
+    } else {
+      if (!records.has(record.prev_hash))
+        throw new Error('agent-run history has a missing predecessor');
+      if (successors.has(record.prev_hash))
+        throw new Error('agent-run history has branching successors');
+      successors.set(record.prev_hash, record.manifest_hash);
+    }
+  }
+  if (genesis === undefined) throw new Error('agent-run history has no genesis record');
+  let tip = genesis;
+  const visited = new Set<string>();
+  while (!visited.has(tip)) {
+    visited.add(tip);
+    const next = successors.get(tip);
+    if (next === undefined) break;
+    tip = next;
+  }
+  if (visited.size !== records.size || successors.has(tip)) {
+    throw new Error('agent-run history is cyclic or disconnected');
+  }
+  return tip;
+}
+
+/** Return the verified chain tip, or null when absent or unverifiable. */
+export function readLastAgentRunHash(repoRoot: string): string | null {
   try {
-    const parsed = JSON.parse(readFileSync(join(dir, last), 'utf8')) as { manifest_hash?: string };
-    return parsed.manifest_hash ?? null;
+    return readAgentRunTip(repoRoot);
   } catch {
     return null;
   }
@@ -155,7 +187,7 @@ export interface EmitAgentRunOptions {
  * and proceed if non-critical).
  */
 export function emitAgentRun(opts: EmitAgentRunOptions): AgentRunRecord {
-  const prev_hash = readLastAgentRunHash(opts.repoRoot) ?? 'GENESIS';
+  const prev_hash = readAgentRunTip(opts.repoRoot) ?? 'GENESIS';
   const draft: Omit<AgentRunRecord, 'manifest_hash'> = {
     schemaVersion: '1.0.0',
     run_id: mintRunId(),
@@ -174,10 +206,11 @@ export function emitAgentRun(opts: EmitAgentRunOptions): AgentRunRecord {
   };
   const manifest_hash = computeManifestHash(draft);
   const record: AgentRunRecord = { ...draft, manifest_hash };
+  if (!validators.agentRun(record)) throw new Error('agent-run record does not validate');
   const dir = stateDir(opts.repoRoot);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, `${record.run_id}.json`);
-  writeFileSync(path, JSON.stringify(record, null, 2) + '\n');
+  writeFileSync(path, JSON.stringify(record, null, 2) + '\n', { flag: 'wx' });
   return record;
 }
 

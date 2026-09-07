@@ -1,8 +1,9 @@
 // Invariants: INV-DEVAI-018
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import {
   emitAgentRun,
   getAgentRunDir,
@@ -25,7 +26,105 @@ afterEach(() => {
 });
 
 describe('agent-run proof records', () => {
-  it('reads empty, malformed, and lexically latest proof states fail-closed', async () => {
+  it.each([
+    'tampered',
+    'missing-parent',
+    'fork',
+    'second-genesis',
+    'wrong-filename',
+    'invalid-json',
+  ] as const)(
+    'refuses to append to %s history and preserves every existing byte',
+    async (damage) => {
+      const repo = root();
+      const options = {
+        repoRoot: repo,
+        caller: { kind: 'cli' as const, name: 'fixture' },
+        started_at: '2026-07-24T10:00:00.000Z',
+        compliance: { invariant_ids: [] },
+      };
+      const first = await withAuthorityHostTestScope(() => emitAgentRun(options));
+      const second = await withAuthorityHostTestScope(() => emitAgentRun(options));
+      const dir = getAgentRunDir(repo);
+      const rehash = (record: AgentRunRecord, changes: Partial<AgentRunRecord>): AgentRunRecord => {
+        const { manifest_hash: _hash, ...draft } = { ...record, ...changes };
+        return { ...draft, manifest_hash: canonicalSha256(draft) };
+      };
+      if (damage === 'tampered')
+        writeFileSync(
+          join(dir, `${second.run_id}.json`),
+          JSON.stringify({ ...second, files_written: ['hidden.txt'] }),
+        );
+      if (damage === 'missing-parent')
+        writeFileSync(
+          join(dir, `${second.run_id}.json`),
+          JSON.stringify(rehash(second, { prev_hash: '0'.repeat(64) })),
+        );
+      if (damage === 'second-genesis')
+        writeFileSync(
+          join(dir, `${second.run_id}.json`),
+          JSON.stringify(rehash(second, { prev_hash: 'GENESIS' })),
+        );
+      if (damage === 'fork') {
+        const fork = rehash(second, {
+          run_id: 'AR-019e384d-257c-7000-8000-000000000001',
+          prev_hash: first.manifest_hash,
+        });
+        writeFileSync(join(dir, `${fork.run_id}.json`), JSON.stringify(fork));
+      }
+      if (damage === 'wrong-filename')
+        writeFileSync(join(dir, 'wrong.json'), JSON.stringify(first));
+      if (damage === 'invalid-json') writeFileSync(join(dir, 'broken.json'), '{');
+      const snapshot = () =>
+        Object.fromEntries(
+          readdirSync(dir)
+            .sort()
+            .map((name) => [name, readFileSync(join(dir, name)).toString('hex')]),
+        );
+      const before = snapshot();
+      expect(readLastAgentRunHash(repo)).toBeNull();
+      await expect(withAuthorityHostTestScope(() => emitAgentRun(options))).rejects.toThrow();
+      expect(snapshot()).toEqual(before);
+    },
+  );
+
+  it('extends the hash-chain tip when same-millisecond UUIDs sort in reverse order', async () => {
+    const repo = root();
+    const dir = getAgentRunDir(repo);
+    mkdirSync(dir, { recursive: true });
+    const stored = (run_id: string, prev_hash: string): AgentRunRecord => {
+      const draft = {
+        schemaVersion: '1.0.0' as const,
+        run_id,
+        prev_hash,
+        started_at: '2026-07-24T10:00:00.000Z',
+        ended_at: '2026-07-24T10:00:00.000Z',
+        caller: { kind: 'cli' as const, name: 'fixture' },
+        files_read: [],
+        files_written: [],
+        commands_run: [],
+        compliance: { invariant_ids: [] },
+      };
+      return { ...draft, manifest_hash: canonicalSha256(draft) };
+    };
+    const first = stored('AR-019e384d-257c-7fff-bfff-ffffffffffff', 'GENESIS');
+    const second = stored('AR-019e384d-257c-7000-8000-000000000000', first.manifest_hash);
+    for (const record of [first, second])
+      writeFileSync(join(dir, `${record.run_id}.json`), JSON.stringify(record));
+    expect(readLastAgentRunHash(repo)).toBe(second.manifest_hash);
+    const third = await withAuthorityHostTestScope(() =>
+      emitAgentRun({
+        repoRoot: repo,
+        caller: { kind: 'cli', name: 'third' },
+        started_at: '2026-07-24T10:00:01.000Z',
+        compliance: { invariant_ids: [] },
+      }),
+    );
+    expect(third.prev_hash).toBe(second.manifest_hash);
+    expect(readLastAgentRunHash(repo)).toBe(third.manifest_hash);
+  });
+
+  it('does not trust empty or malformed proof states or an unauthenticated hash', async () => {
     const repo = root();
     expect(readLastAgentRunHash(repo)).toBeNull();
     const dir = getAgentRunDir(repo);
@@ -35,7 +134,7 @@ describe('agent-run proof records', () => {
     expect(readLastAgentRunHash(repo)).toBeNull();
     writeFileSync(join(dir, 'AR-b.json'), JSON.stringify({ manifest_hash: 'latest-hash' }));
     writeFileSync(join(dir, 'ignored.txt'), 'ignored');
-    expect(readLastAgentRunHash(repo)).toBe('latest-hash');
+    expect(readLastAgentRunHash(repo)).toBeNull();
   });
 
   it('emits chained versioned records and detects nested tampering', async () => {
