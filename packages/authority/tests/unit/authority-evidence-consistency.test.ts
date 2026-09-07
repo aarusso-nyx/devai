@@ -235,3 +235,107 @@ describe('machine and bootstrap evidence provenance', () => {
     );
   });
 });
+
+describe('evidence validator boundary and readiness population', () => {
+  it.each([undefined, null, {}, { current: {} }, { current: {}, validateSchema: true }])(
+    'refuses unavailable validation controls: %j',
+    async (deps) => {
+      expectFailure(
+        (await runtimeApi()).validateAuthorityEvidence(view(), deps),
+        'refused',
+        'AUTHORITY_EVIDENCE_SCHEMA_INVALID',
+      );
+    },
+  );
+
+  it.each([undefined, {}, { view: null }])(
+    'constructs exact audit bytes when schema validation supplies no document: %j',
+    async (value) => {
+      const input = view();
+      const result = expectSuccess<{
+        evidence: { raw: unknown; view: unknown; canonical_bytes: Uint8Array };
+        audit_only: boolean;
+      }>(
+        (await runtimeApi()).validateAuthorityEvidence(input, {
+          current: evidenceBindings(),
+          canonicalSha256,
+          validateSchema: () => ({ ok: true, value }),
+        }),
+      );
+      expect(result.evidence.raw).toBe(input);
+      expect(result.evidence.view).toBe(input);
+      expect(result.evidence.canonical_bytes).toEqual(
+        new TextEncoder().encode(JSON.stringify(input)),
+      );
+      expect(result.audit_only).toBe(true);
+    },
+  );
+
+  it.each([
+    { targets: null },
+    { targets: { ...field('targets'), summary: null } },
+    { decision: null },
+    { issuer_audit: null },
+    { readiness: null },
+  ])('independently refuses malformed semantic structure: %j', async (changed) => {
+    expectFailure(await validate(changed), 'refused', 'AUTHORITY_EVIDENCE_SCHEMA_INVALID');
+  });
+
+  it.each([
+    ['not-applicable', 'refuse'],
+    ['unknown', 'proceed'],
+    ['allow', 'refuse'],
+    ['deny', 'proceed'],
+  ])(
+    'rejects incoherent read decision %s/%s before provenance',
+    async (evaluation, disposition) => {
+      expectFailure(
+        await validate(
+          {
+            ...bootstrapRead,
+            decision: { ...field('decision'), evaluation, disposition },
+          },
+          readAction,
+        ),
+        'refused',
+        'AUTHORITY_EVIDENCE_SEMANTIC_INVALID',
+      );
+    },
+  );
+
+  it('does not accept a machine as a human merely because its role matches', async () => {
+    expectFailure(
+      await validate({
+        principal: { kind: 'derived-machine', role: 'engineer', actor: 'binding' },
+      }),
+      'refused',
+      'AUTHORITY_EVIDENCE_PROVENANCE_INVALID',
+    );
+  });
+
+  it('does not treat a human with an incidental bootstrap actor field as bootstrap', async () => {
+    expectSuccess(await validate({ principal: { ...field('principal'), actor: 'bootstrap' } }));
+  });
+
+  it('rejects authority eligibility for an otherwise coherent denied write', async () => {
+    expectFailure(
+      await validate({
+        decision: { ...field('decision'), evaluation: 'deny', disposition: 'refuse' },
+      }),
+      'refused',
+      'AUTHORITY_EVIDENCE_READINESS_INVALID',
+    );
+  });
+
+  it.each([undefined, { requires_binding: false }])(
+    'rejects eligibility without an action binding requirement: %j',
+    async (readiness) => {
+      const action = actionDocument() as { view: Record<string, unknown> };
+      expectFailure(
+        await validate({}, { ...action, view: { ...action.view, readiness } }),
+        'refused',
+        'AUTHORITY_EVIDENCE_READINESS_INVALID',
+      );
+    },
+  );
+});
