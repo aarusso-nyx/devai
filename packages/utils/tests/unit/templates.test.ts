@@ -33,6 +33,11 @@ describe('toKebab / toSnake', () => {
     expect(toSnake('NsOrders')).toBe('ns_orders');
   });
 
+  it('collapses repeated separators and whitespace rather than multiplying separators', () => {
+    expect(toKebab('Order__  Item2Value')).toBe('order-item2-value');
+    expect(toSnake('Order--  Item2Value')).toBe('order_item2_value');
+  });
+
   it('round-trip stability: kebab→snake→kebab is idempotent', () => {
     const original = 'order-line-item';
     const snake = toSnake(original);
@@ -63,6 +68,46 @@ describe('buildTokens', () => {
     expect(t.__SPEC_VERSION__).toBe('0.1.0');
     expect(t.__SPEC_SHA__).toBe('bbbbbbbb');
   });
+
+  it('trims every blueprint field before deriving token names and identities', () => {
+    const tokens = buildTokens({
+      namespace: ' demo ',
+      module: ' OrderItem ',
+      entity: ' LineItem ',
+      specVersion: ' 1.2.3 ',
+      specSha256: ' abcdef012345 ',
+    });
+    expect(tokens).toEqual({
+      __NAMESPACE__: 'demo',
+      __MODULE__: 'OrderItem',
+      __kebabModule__: 'order-item',
+      __snake_module__: 'order_item',
+      __moduleSlug__: 'demo-order-item',
+      __ENTITY__: 'LineItem',
+      __classEntity__: 'LineItem',
+      __kebabEntity__: 'line-item',
+      __snake_entity__: 'line_item',
+      __snake_table__: 'demo__order_item_line_item',
+      __SPEC_VERSION__: '1.2.3',
+      __SPEC_SHA__: 'abcdef01',
+    });
+  });
+
+  it.each(['prefix__TOKEN__', '__TOKEN__suffix', '__1TOKEN__', '__BAD-TOKEN__'])(
+    'rejects an extra token that only partially matches the naming contract: %s',
+    (key) => {
+      expect(() =>
+        buildTokens({
+          namespace: 'demo',
+          module: 'M',
+          entity: 'E',
+          specVersion: '1',
+          specSha256: 'abc',
+          extra: { [key]: 'value' },
+        }),
+      ).toThrow(/canonical __NAME__ pattern/);
+    },
+  );
 
   it('handles multi-word modules', () => {
     const t = buildTokens({
@@ -179,6 +224,31 @@ describe('renderTemplate', () => {
     const t = fixedTokens();
     const body = '<!-- IF:foo -->no close';
     expect(() => renderTemplate({ body, tokens: t })).toThrow(/unmatched/);
+  });
+
+  it.each([
+    { body: '<!--IF:a-->A<!--ENDIF:a-->' },
+    { body: '<!--  IF:a  -->A<!--  ENDIF:a  -->' },
+    { body: '<!--\tIF:a\t-->A<!--\tENDIF:a\t-->' },
+  ])('consumes the actual whitespace-bearing marker lengths: $body', ({ body }) => {
+    expect(
+      renderTemplate({ body: body + 'tail', tokens: fixedTokens(), flags: { a: true } }).output,
+    ).toBe('Atail');
+    expect(
+      renderTemplate({ body: body + 'tail', tokens: fixedTokens(), flags: { a: false } }).output,
+    ).toBe('tail');
+  });
+
+  it('ignores malformed direct token keys and leaves unrelated text intact', () => {
+    const tokens = { ...fixedTokens(), Greeter: 'corruption' };
+    expect(renderTemplate({ body: '__MODULE__ Greeter', tokens }).output).toBe('Greeter Greeter');
+  });
+
+  it.each([
+    { body: '', sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
+    { body: 'abc', sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad' },
+  ])('matches the standard SHA256 vector for $body', ({ body, sha256 }) => {
+    expect(renderTemplate({ body, tokens: fixedTokens() })).toEqual({ output: body, sha256 });
   });
 
   it('emits deterministic sha256 for identical input', () => {
