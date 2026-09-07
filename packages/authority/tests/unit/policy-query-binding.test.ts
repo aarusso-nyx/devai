@@ -15,12 +15,18 @@ import {
 
 const disposers: (() => void)[] = [];
 afterEach(() => disposers.splice(0).forEach((dispose) => dispose()));
-async function fixture() {
+async function fixture(subjects?: readonly unknown[]) {
   const api = await runtimeApi(),
     issuer = createIssuer(api);
   disposers.push(() => {
     issuer.dispose();
   });
+  const plant = makePolicyPlant(
+    subjects === undefined ? {} : { additiveRules: [{ ...engineerRule, subjects }] },
+  );
+  const policy = expectSuccess<{ provenance: unknown }>(
+    api.loadAuthorityPolicy({ document: plant.document }, plant.deps),
+  );
   const declaration = expectSuccess<{ context_receipt: unknown }>(
     api.resolveAuthorityDeclaration(
       {
@@ -30,12 +36,8 @@ async function fixture() {
         declaration: { as_role: 'engineer' },
         consent: CONSENT,
       },
-      declarationDependencies(issuer),
+      declarationDependencies(issuer, undefined, undefined, policy.provenance),
     ),
-  );
-  const plant = makePolicyPlant();
-  const policy = expectSuccess<{ provenance: unknown }>(
-    api.loadAuthorityPolicy({ document: plant.document }, plant.deps),
   );
   const query: Record<string, unknown> = {
     action_id: 'test mutate',
@@ -53,18 +55,69 @@ async function fixture() {
 }
 
 describe('policy query and decision identity', () => {
-  it.each(['architect', 'engineer'])(
-    'matches derived machines through their preserved %s initiator rule',
-    async (allowedRole) => {
+  it.each(
+    [
+      { name: 'architect initiator', allowedRole: 'architect', allowed: true, subject: undefined },
+      { name: 'engineer initiator', allowedRole: 'engineer', allowed: false, subject: undefined },
+      {
+        name: 'human architect rule',
+        allowedRole: 'architect',
+        allowed: false,
+        subject: { kind: 'human', roles: ['architect'] },
+      },
+      {
+        name: 'human engineer rule',
+        allowedRole: 'architect',
+        allowed: false,
+        subject: { kind: 'human', roles: ['engineer'] },
+      },
+      {
+        name: 'different release machine',
+        allowedRole: 'architect',
+        allowed: false,
+        subject: {
+          kind: 'derived-machine',
+          actor: 'release',
+          transition: 'release',
+          initiator: { allowed_roles: ['architect'], preserve_in_context: true },
+        },
+      },
+      {
+        name: 'harness without initiator',
+        allowedRole: 'architect',
+        allowed: false,
+        subject: {
+          kind: 'derived-machine',
+          actor: 'harness',
+          transition: 'harness-write',
+          initiator: 'none',
+        },
+      },
+      {
+        name: 'matching harness with no policy initiator restriction',
+        allowedRole: 'architect',
+        allowed: true,
+        harness: true,
+        subject: {
+          kind: 'derived-machine',
+          actor: 'harness',
+          transition: 'harness-write',
+          initiator: 'none',
+        },
+      },
+    ].map((entry) => ({ harness: false, ...entry })),
+  )(
+    'matches a derived context against $name',
+    async ({ allowedRole, allowed, subject, harness }) => {
       const api = await runtimeApi(),
         issuer = createIssuer(api);
       disposers.push(() => {
         issuer.dispose();
       });
-      const action = actionDocument('local-write', {
+      const action = actionDocument(harness ? 'harness-write' : 'local-write', {
         kind: 'derived-machine',
-        actor: 'binding',
-        transition: 'bind',
+        actor: harness ? 'harness' : 'binding',
+        transition: harness ? 'harness-write' : 'bind',
         initiator: { allowed_roles: ['architect'], preserve_in_context: true },
       });
       const plant = makePolicyPlant({
@@ -72,7 +125,7 @@ describe('policy query and decision identity', () => {
           {
             ...engineerRule,
             subjects: [
-              {
+              subject ?? {
                 kind: 'derived-machine',
                 actor: 'binding',
                 transition: 'bind',
@@ -110,7 +163,7 @@ describe('policy query and decision identity', () => {
             actionContracts: deps.actionContracts,
             receiptStore: issuer,
             verifiedOrigin: { kind: 'direct-cli', invocation_id: 'invocation-1' },
-            trusted_adapter_id: 'binding-authority',
+            trusted_adapter_id: harness ? 'harness-authority' : 'binding-authority',
             canonicalSha256,
           },
         ),
@@ -127,13 +180,25 @@ describe('policy query and decision identity', () => {
         { receiptStore: issuer, canonicalSha256 },
       );
       expect(result).toMatchObject({
-        outcome: allowedRole === 'architect' ? 'allow' : 'deny',
-        code: allowedRole === 'architect' ? 'POLICY_ALLOW' : 'AUTHORITY_SUBJECT_DENIED',
+        outcome: allowed ? 'allow' : 'deny',
+        code: allowed ? 'POLICY_ALLOW' : 'AUTHORITY_SUBJECT_DENIED',
         matched_rule_ids: [engineerRule.rule_id],
         obligations: [],
       });
     },
   );
+
+  it('refuses a human receipt for a machine-only rule even without an initiator requirement', async () => {
+    const h = await fixture([
+      { kind: 'derived-machine', actor: 'harness', transition: 'harness-write', initiator: 'none' },
+    ]);
+    expect(h.resolve()).toMatchObject({
+      outcome: 'deny',
+      code: 'AUTHORITY_SUBJECT_DENIED',
+      matched_rule_ids: [engineerRule.rule_id],
+      obligations: [],
+    });
+  });
 
   it('binds a complete allowed outcome to the actual human, resource, policy and consent', async () => {
     const h = await fixture(),
