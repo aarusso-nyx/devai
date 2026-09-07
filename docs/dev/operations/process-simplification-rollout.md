@@ -270,14 +270,39 @@ incomplete histories, conflicting identities and unaudited migration histories f
 closed. No build, repack, site-generation or automatic cancellation capability is
 part of this interface.
 
-This module is not yet activated in the release workflow. Activation requires an
-approved GitHub journal adapter, a recorded audit covering earlier Pages writers,
-and concurrency serialization across all Pages publication paths. The adapter must
-read the complete authenticated history and durably persist each transition. Its
-`confirmed-missing` result must come from external-state reconciliation; HTTP 404,
-a failed workflow or an unavailable live site is insufficient. The focused controller
-tests exercise interrupted writes and retries; they do not establish live GitHub
-publication acceptance. Exact-artifact promotion still requires Owner authorization.
+The release workflow invokes the approved `publish-pages.mjs` control after exact
+rehearsal promotion and release verification. `github-pages-journal.mjs` records
+intent in GitHub deployment metadata using task `devai:pages-publication` and
+environment `devai-pages-publication`. It disables automatic merges and automatic
+inactivation. The Pages job alone has `deployments: write`, alongside its existing
+Pages/OIDC permissions. The fixed job concurrency group serializes all versions;
+other Pages writers must be disabled or use that same group. An unresolved journal
+entry from another version blocks a new publication.
+
+Before activation, the Owner reviews the earlier publication history and installs
+`DEVAI_PAGES_MIGRATION_AUDIT_JSON` and its exact SHA-256 in
+`DEVAI_PAGES_MIGRATION_AUDIT_SHA256`, in the protected `github-pages` environment.
+The audit has schema version `1.0.0`, repository `aarusso-nyx/devai`, the exact `tag`
+and approved `controlCommit`, `legacyEffects: "confirmed-absent-for-tag"`,
+`singleWriterGroup: "devai-pages-publication"`, and an ISO timestamp `reviewedAt`.
+This is a reviewed external-state assertion, not a value the candidate may generate
+or approve. Reconcile unknown earlier effects before making that assertion. A new
+tag or control identity needs a matching reviewed audit. No automatic fallback to
+legacy publication is available.
+
+Authenticated complete journal reads, together with that audit and single-writer
+boundary, establish whether a new intent is absent. A failed workflow, HTTP 404 or
+unavailable live site alone cannot establish absence. Submission IDs are retained
+locally before subsequent API operations; journal transitions are read back. Both
+the Pages upload and the always-retained reconciliation records expire after 30
+days. Deployment journal entries have no automatic deletion policy. Keep their IDs
+for operator reconciliation; do not delete unresolved entries to enable a retry.
+
+Focused tests run the actual publication CLI with all subprocess/build commands
+forbidden, exercising successful publication, matching-byte no-ops and lost POST
+responses across separate invocations. The external API is a fixture in those tests;
+live GitHub publication acceptance and protected-field installation remain pending.
+Exact-artifact promotion still requires Owner authorization.
 
 ## Acceptance record
 

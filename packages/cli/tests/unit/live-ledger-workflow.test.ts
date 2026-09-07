@@ -617,6 +617,30 @@ describe('live ledger-verification workflow', () => {
   });
 
   it.each([
+    ['group: devai-pages-publication', 'group: pages-${{ github.run_id }}'],
+    [
+      'PAGES_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}',
+      'PAGES_ARTIFACT_ID: latest',
+    ],
+    [
+      'PAGES_MIGRATION_AUDIT_SHA256: ${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_SHA256 }}',
+      'PAGES_MIGRATION_AUDIT_SHA256: candidate',
+    ],
+    [
+      'node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record',
+      'node candidate/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record',
+    ],
+    ['path: pages-publication-record/*', 'path: discarded-record/*'],
+    ['name: github-pages-${{ github.run_attempt }}', 'name: github-pages'],
+  ])('refuses weakening Pages recovery binding %s', (before, after) => {
+    const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    expect(current).toContain(before);
+    const result = check(fixture(current.replace(before, after), 'release.yml'));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('RELEASE_PAGES_RECOVERY_UNBOUND');
+  });
+
+  it.each([
     'pnpm --filter @aarusso-nyx/devai run pack:smoke',
     'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball"',
   ])('rejects smoke acceptance without the exact staged archive binding: %s', (replacement) => {

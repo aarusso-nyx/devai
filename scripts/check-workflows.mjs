@@ -762,7 +762,13 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     if (/pnpm (?:run )?build|stage-release-package|double-pack|npm (?:run )?build/u.test(body))
       findings.push(finding('RELEASE_PROMOTION_REBUILD_FORBIDDEN', file, name));
   }
-  for (const name of ['verify-ledger', 'rehearsal-summary', 'promote-assets', 'finalize-release']) {
+  for (const name of [
+    'verify-ledger',
+    'rehearsal-summary',
+    'promote-assets',
+    'finalize-release',
+    'deploy-pages',
+  ]) {
     const jobSteps = jobs[name]?.steps ?? [];
     const checkout = jobSteps.find((step) => step.with?.path === 'release-control');
     if (
@@ -772,6 +778,48 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     )
       findings.push(finding('RELEASE_PROCESS_CONTROL_UNBOUND', file, name));
   }
+  const pagesSteps = Array.isArray(pages.steps) ? pages.steps : [];
+  const pagesController = pagesSteps.filter((step) => step.id === 'deployment');
+  const pagesArtifact = pagesSteps.find((step) => step.id === 'pages-artifact');
+  const pagesRecord = pagesSteps.find(
+    (step) => step.name === 'Retain Pages reconciliation identifiers',
+  );
+  const expectedPagesEnvironment = {
+    GH_TOKEN: '${{ github.token }}',
+    PAGES_ARTIFACT_ID: '${{ steps.pages-artifact.outputs.artifact_id }}',
+    REHEARSAL_RUN: '${{ inputs.rehearsal_run_id }}',
+    REHEARSAL_ATTEMPT: '${{ inputs.rehearsal_attempt }}',
+    CONTROL_COMMIT: '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}',
+    PAGES_MIGRATION_AUDIT_JSON: '${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_JSON }}',
+    PAGES_MIGRATION_AUDIT_SHA256: '${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_SHA256 }}',
+  };
+  if (
+    pages.concurrency?.group !== 'devai-pages-publication' ||
+    pages.concurrency?.['cancel-in-progress'] !== false ||
+    pages.permissions?.deployments !== 'write' ||
+    pagesController.length !== 1 ||
+    pagesController[0].run !==
+      'node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record' ||
+    pagesController[0].if !== undefined ||
+    !Object.entries(expectedPagesEnvironment).every(
+      ([key, value]) => pagesController[0].env?.[key] === value,
+    ) ||
+    pagesArtifact?.with?.['retention-days'] !== 30 ||
+    pagesArtifact?.with?.name !== 'github-pages-${{ github.run_attempt }}' ||
+    pagesRecord?.if !== '${{ always() }}' ||
+    pagesRecord?.with?.['retention-days'] !== 30 ||
+    pagesRecord?.with?.path !== 'pages-publication-record/*' ||
+    pagesSteps.some(
+      (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/deploy-pages@'),
+    )
+  )
+    findings.push(
+      finding(
+        'RELEASE_PAGES_RECOVERY_UNBOUND',
+        file,
+        'Pages requires serialized durable intent, exact artifact controls and retained recovery records',
+      ),
+    );
   const immutablePins = new Map([
     ['actions/checkout', CHECKOUT_COMMIT],
     ['actions/setup-node', SETUP_NODE_COMMIT],
@@ -843,7 +891,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'gh release create',
     'git -C candidate verify-tag',
     '--binding exact-tree',
-    'actions/deploy-pages@',
+    'node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record',
     'https://aarusso-nyx.github.io/devai/',
     'All required rehearsal checks passed. No publication occurred.',
     'rehearsal.mjs promote',

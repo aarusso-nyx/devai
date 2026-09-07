@@ -583,10 +583,14 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    timeout-minutes: 10
+    timeout-minutes: 15
+    concurrency:
+      group: devai-pages-publication
+      cancel-in-progress: false
     permissions:
       contents: read
       pages: write
+      deployments: write
       id-token: write
     steps:
       - name: Check out approved Pages verification controls
@@ -622,14 +626,31 @@ jobs:
           tar -xzf "release-assets/$site" -C pages-site
           node release-control/scripts/process/verify-pages-bytes.mjs local pages-site
       - name: Upload exact Pages artifact
+        id: pages-artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
         with:
           path: pages-site
-      - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
-      - name: Deploy Pages artifact
+          name: github-pages-${{ github.run_attempt }}
+          retention-days: 30
+      - name: Reconcile and deploy exact Pages artifact
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}
+          REHEARSAL_RUN: ${{ inputs.rehearsal_run_id }}
+          REHEARSAL_ATTEMPT: ${{ inputs.rehearsal_attempt }}
+          CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
+          PAGES_MIGRATION_AUDIT_JSON: ${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_JSON }}
+          PAGES_MIGRATION_AUDIT_SHA256: ${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_SHA256 }}
+        run: node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record
+      - name: Retain Pages reconciliation identifiers
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-pages-publication-${{ github.run_attempt }}
+          path: pages-publication-record/*
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify live documentation
         shell: bash
         run: |
