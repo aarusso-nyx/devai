@@ -53,6 +53,10 @@ const { declareFactoryPlugin, PluginKind } = await import(
   pathToFileURL(coreRequire.resolve('@stryker-mutator/api/plugin')).href
 );
 
+const { DryRunStatus, MutantRunStatus } = await import(
+  pathToFileURL(coreRequire.resolve('@stryker-mutator/api/test-runner')).href
+);
+
 function createProtectedVitest(injector) {
   const runner = vitestTestRunnerFactory(injector);
   // Stryker 9.6.1 uses a global file filter for the explicit testFiles roster,
@@ -61,15 +65,39 @@ function createProtectedVitest(injector) {
   // global filter consists of absolute sandbox file paths. Activate before
   // module evaluation for that full-file selection, retaining the exact filter.
   const originalMutantRun = runner.mutantRun;
-  runner.mutantRun = function (options) {
+  runner.mutantRun = async function (options) {
     const fullFileSelection =
       Array.isArray(options.testFilter) &&
       options.testFilter.length > 0 &&
       options.testFilter.every((file) => typeof file === 'string' && isAbsolute(file));
-    return originalMutantRun.call(this, {
+    const result = await originalMutantRun.call(this, {
       ...options,
       mutantActivation: fullFileSelection ? 'static' : options.mutantActivation,
     });
+    // A module import can fail before Vitest collects any test cases. The
+    // upstream runner only converts collected cases and can call that survival.
+    if (
+      result.status === MutantRunStatus.Survived &&
+      this.ctx.state.getFiles().some((file) => file.result?.state === 'fail')
+    ) {
+      return {
+        status: MutantRunStatus.Killed,
+        failureMessage: 'A test suite failed during mutation execution.',
+        nrOfTests: result.nrOfTests,
+      };
+    }
+    return result;
+  };
+  const originalDryRun = runner.dryRun;
+  runner.dryRun = async function (options) {
+    const result = await originalDryRun.call(this, options);
+    if (this.ctx.state.getFiles().some((file) => file.result?.state === 'fail')) {
+      return {
+        status: DryRunStatus.Error,
+        errorMessage: 'A test suite failed during the unmutated baseline.',
+      };
+    }
+    return result;
   };
   const originalInit = runner.init;
   runner.init = async function () {

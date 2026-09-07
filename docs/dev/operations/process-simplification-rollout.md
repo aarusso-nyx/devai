@@ -160,6 +160,12 @@ The regression executes actual static and runtime mutants with an explicit test
 population and verifies both the results and the complete test-file census.
 It is a runner compatibility check, not candidate certification.
 
+The wrapper also checks Vitest's recorded suite failures. A baseline with a failed
+suite is refused even if another file passes. During mutation, a recorded suite
+failure counts as a killed mutant when the upstream runner would otherwise report
+survival; this includes import failures before any individual test is collected.
+An empty test count alone is not treated as proof that a mutant was killed.
+
 A wrapper change changes the protected mutation program identity. Rebuild and
 rebind the installed control before a new campaign; do not reuse a previous
 package result or aggregate verdict across that identity change. Retain earlier
