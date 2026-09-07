@@ -65,7 +65,7 @@ export function resolveLocalEvidencePolicy(repoRoot: string): LocalEvidencePolic
   } catch {
     return null;
   }
-  if (raw === undefined) return null;
+  if (raw === undefined || raw === null) return null;
   if (!Array.isArray(raw.required_jobs) || raw.required_jobs.length === 0) return null;
 
   const manifestPath = raw.manifest_path ?? DEFAULT_MANIFEST_PATH;
