@@ -62,3 +62,38 @@ describe('loadDomains', () => {
   });
 });
 // Invariants: INV-BLUEPRINT-002, INV-BLUEPRINT-003, INV-DEVAI-001
+
+describe('domain taxonomy input boundaries', () => {
+  it.each(['[]', '["AUTH"]', 'null', '42', 'true', '"AUTH"'])(
+    'rejects non-object JSON %s',
+    (json) => {
+      const path = join(tempDir, 'shape.json');
+      writeFileSync(path, json);
+      expect(() => loadDomains(path)).toThrow(`domains: ${path} is not a JSON object`);
+    },
+  );
+  it.each(['core', 'framework', 'client'])('rejects non-string members in %s', (category) => {
+    const path = write('member.json', { [category]: ['AUTH', 123] });
+    expect(() => loadDomains(path)).toThrow(`domains: '${category}' contains a non-string entry`);
+  });
+  it.each(['A', 'A1234567890123456', '1AUTH', 'AU-TH', 'AUTH\n'])(
+    'rejects out-of-contract domain %j',
+    (code) => {
+      const path = write('code.json', { client: [code] });
+      expect(() => loadDomains(path)).toThrow(/does not match pattern/);
+    },
+  );
+  it('preserves category membership while deduplicating the union and accepting both length boundaries', () => {
+    const core = ['AB', 'A123456789012345'];
+    const framework = ['AB', 'FW'];
+    const client = ['FW', 'CL'];
+    const tax = loadDomains(write('boundaries.json', { core, framework, client }));
+    expect(tax).toEqual({
+      core,
+      framework,
+      client,
+      all: new Set(['AB', 'A123456789012345', 'FW', 'CL']),
+    });
+    expect(isDomainAllowed(tax, 'ab')).toBe(false);
+  });
+});
