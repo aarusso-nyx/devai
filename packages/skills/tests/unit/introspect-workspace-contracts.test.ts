@@ -204,3 +204,93 @@ it.each([
     'modules/excluded/src/**',
   ]);
 });
+
+it('counts every declared source-language extension with an exact population', () => {
+  for (const extension of [
+    'ts',
+    'tsx',
+    'cts',
+    'mts',
+    'js',
+    'jsx',
+    'mjs',
+    'cjs',
+    'py',
+    'go',
+    'rs',
+    'java',
+    'kt',
+    'kts',
+    'cs',
+    'rb',
+  ])
+    file(`src/source.${extension}`);
+  file('src/README.md');
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(
+    Object.fromEntries(result.languages.map((language) => [language.name, language.file_count])),
+  ).toEqual({
+    typescript: 4,
+    javascript: 4,
+    python: 1,
+    go: 1,
+    rust: 1,
+    java: 1,
+    kotlin: 2,
+    csharp: 1,
+    ruby: 1,
+  });
+  expect(result.languages.map((language) => language.file_count)).toEqual([
+    4, 4, 2, 1, 1, 1, 1, 1, 1,
+  ]);
+});
+
+it.each([
+  ['@nestjs/core', 'nestjs'],
+  ['@nestjs/common', 'nestjs'],
+  ['@angular/core', 'angular'],
+  ['react', 'react'],
+  ['vue', 'vue'],
+  ['express', 'express'],
+  ['fastify', 'fastify'],
+  ['next', 'next'],
+  ['vite', 'vite'],
+])('identifies %s in a peer dependency with its exact evidence', (dependency, framework) => {
+  file('package.json', JSON.stringify({ peerDependencies: { [dependency]: '1.0.0' } }));
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(result.frameworks).toEqual([
+    { name: framework, evidence: `package.json dep: ${dependency}` },
+  ]);
+  expect(result.proposed_project_type).toBe(
+    ['nestjs', 'express', 'fastify'].includes(framework) ? 'runtime-host' : undefined,
+  );
+  expect(result.notes).toBeUndefined();
+});
+
+it.each([
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.cache',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'target',
+  '.idea',
+  '.vscode',
+])('does not infer product inputs from ignored directory %s', (directory) => {
+  file(`${directory}/src/source.ts`);
+  file(`${directory}/tests/source.test.ts`);
+  file(`${directory}/package.json`, '{"dependencies":{"react":"1"}}');
+  file(`${directory}/.env`);
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(result.languages).toEqual([]);
+  expect(result.frameworks).toEqual([]);
+  expect(result.protected_surfaces).toEqual([]);
+  expect(result.source_globs).toEqual(['src/**']);
+  expect(result.test_globs).toEqual(['**/*.test.*']);
+});
