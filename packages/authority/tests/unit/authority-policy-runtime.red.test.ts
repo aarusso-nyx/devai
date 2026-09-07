@@ -299,6 +299,169 @@ describe('R19 policy materialization authorization and purity', () => {
     expectFailure(result, 'refused', 'AUTHORITY_DECLARATION_RECEIPT_BINDING_MISMATCH');
   });
 
+  async function authorizedMaterialization() {
+    const api = await runtimeApi();
+    const fixture = materializationFixture(api);
+    const authorization = expectSuccess(
+      api.authorizePolicyMaterialization(
+        {
+          action_id: 'init bind',
+          invocation_id: 'invocation-materialize',
+          target_operation: 'create',
+          declaration: { as_role: 'architect' },
+          consent: CONSENT,
+        },
+        fixture.deps,
+      ),
+    );
+    const plant = makePolicyPlant();
+    return {
+      api,
+      input: {
+        repository_id: REPOSITORY_ID,
+        enforcement: { mode: 'binding' },
+        host_enforcement: { mode: 'cli-only' },
+        authorization,
+        target_operation: 'create',
+      },
+      deps: {
+        materialized_at: NOW,
+        package_binding: plant.deps.expected_package,
+        constitution_binding: plant.deps.expected_constitution,
+        immutableCore: plant.immutableCore,
+        additiveExtensions: plant.additiveExtensions,
+        receiptStore: fixture.issuer,
+        validatePolicySchema: (value: unknown) => ({
+          ok: true,
+          value: { raw: value, canonical_bytes: canonicalBytes(value), view: value },
+        }),
+        canonicalSha256,
+        canonicalBytes,
+        sha256Bytes,
+      },
+    };
+  }
+
+  const approvedShadow = {
+    reason: 'Temporary observation',
+    expires_at: '2026-07-16T12:00:00.000Z',
+    approved_by: { role: 'architect' },
+  };
+  it.each([
+    null,
+    { mode: 'unknown' },
+    { mode: 'binding', extra: true },
+    { mode: 'shadow' },
+    ...[
+      { reason: '' },
+      { reason: 42 },
+      { expires_at: 'invalid' },
+      { expires_at: NOW },
+      { expires_at: '2026-07-15T11:59:59.000Z' },
+      { approved_by: null },
+      { approved_by: { role: 'engineer' } },
+    ].map((changed) => ({ mode: 'shadow', shadow: { ...approvedShadow, ...changed } })),
+  ])('refuses invalid enforcement and consumes the authorization: %j', async (enforcement) => {
+    const { api, input, deps } = await authorizedMaterialization();
+    expectFailure(
+      api.materializeAuthorityPolicy({ ...input, enforcement }, deps),
+      'refused',
+      'AUTHORITY_POLICY_SHADOW_INVALID',
+    );
+    expectFailure(
+      api.materializeAuthorityPolicy(input, deps),
+      'refused',
+      'AUTHORITY_MATERIALIZATION_AUTHORIZATION_REPLAYED',
+    );
+  });
+
+  it('retains an architect-approved shadow expiry and reason in the pure artifact', async () => {
+    const { api, input, deps } = await authorizedMaterialization();
+    const enforcement = { mode: 'shadow', shadow: approvedShadow };
+    const result = expectSuccess<{ artifact: { bytes: Uint8Array } }>(
+      api.materializeAuthorityPolicy({ ...input, enforcement }, deps),
+    );
+    expect(JSON.parse(new TextDecoder().decode(result.artifact.bytes)).enforcement).toEqual(
+      enforcement,
+    );
+  });
+
+  it.each(['package', 'constitution', 'operation'])(
+    'refuses an independent %s substitution',
+    async (kind) => {
+      const { api, input, deps } = await authorizedMaterialization();
+      const changedDeps = {
+        ...deps,
+        ...(kind === 'package'
+          ? { package_binding: { ...(deps.package_binding as object), version: '99.0.0' } }
+          : {}),
+        ...(kind === 'constitution'
+          ? {
+              constitution_binding: {
+                ...(deps.constitution_binding as object),
+                digest_sha256: 'f'.repeat(64),
+              },
+            }
+          : {}),
+      };
+      expectFailure(
+        api.materializeAuthorityPolicy(
+          kind === 'operation' ? { ...input, target_operation: 'update' } : input,
+          changedDeps,
+        ),
+        'refused',
+        kind === 'operation'
+          ? 'AUTHORITY_MATERIALIZATION_BINDING_MISMATCH'
+          : 'AUTHORITY_MATERIALIZATION_AUTHORIZATION_BINDING_MISMATCH',
+      );
+    },
+  );
+
+  it.each([
+    'missing core',
+    'core rules',
+    'core source',
+    'core bytes',
+    'core byte mismatch',
+    'core rule mismatch',
+    'missing extensions',
+    'null extension',
+    'extension rules',
+    'extension source',
+    'extension bytes',
+    'extension byte mismatch',
+    'extension rule mismatch',
+  ])('refuses independently invalid source custody: %s', async (kind) => {
+    const { api, input, deps } = await authorizedMaterialization();
+    const changed: Record<string, unknown> = { ...deps };
+    const core: Record<string, unknown> = { ...(deps.immutableCore as object) };
+    const original = deps.additiveExtensions[0];
+    if (!original) throw new Error('missing fixture extension');
+    const extension: Record<string, unknown> = { ...(original as object) };
+    changed.immutableCore = core;
+    changed.additiveExtensions = [extension];
+    if (kind === 'missing core') changed.immutableCore = null;
+    if (kind === 'core rules') core.rules = null;
+    if (kind === 'core source') core.source_document = null;
+    if (kind === 'core bytes') core.canonical_source_bytes = [];
+    if (kind === 'core byte mismatch') core.canonical_source_bytes = new Uint8Array([1]);
+    if (kind === 'core rule mismatch') core.rules = [];
+    if (kind === 'missing extensions') changed.additiveExtensions = null;
+    if (kind === 'null extension') changed.additiveExtensions = [null];
+    if (kind === 'extension rules') extension.rules = null;
+    if (kind === 'extension source') extension.source_document = null;
+    if (kind === 'extension bytes') extension.canonical_source_bytes = [];
+    if (kind === 'extension byte mismatch') extension.canonical_source_bytes = new Uint8Array([1]);
+    if (kind === 'extension rule mismatch') extension.rules = [];
+    expectFailure(
+      api.materializeAuthorityPolicy(input, changed),
+      'refused',
+      kind.includes('extension')
+        ? 'AUTHORITY_POLICY_EXTENSION_INVALID'
+        : 'AUTHORITY_POLICY_SOURCE_INVALID',
+    );
+  });
+
   it('returns a pure exact policy artifact and consumes authorization once', async () => {
     const api = await runtimeApi();
     const fixture = materializationFixture(api);
