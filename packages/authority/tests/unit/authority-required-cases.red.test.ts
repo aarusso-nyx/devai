@@ -868,6 +868,81 @@ async function requiredDenyFixture() {
 
 describe('R19 issuer complete-set, batch, and receipt matrix', () => {
   it.each([
+    ['exact', 'atomicity', 'each-target'],
+    ['exact', 'targets', []],
+    ['exact', 'targets', [fsTarget, fsTarget]],
+    ['exact', 'targets', [fsTarget, { ...secondFsTarget, kind: 'unknown' }]],
+    ['bounded', 'batch_id', ''],
+    ['bounded', 'batch_id', '  '],
+    ['bounded', 'ordinal', -1],
+    ['bounded', 'ordinal', 0.5],
+    ['bounded', 'ordinal', Number.MAX_SAFE_INTEGER + 1],
+    ['bounded', 'atomicity', 'each-target'],
+    ['bounded', 'targets', []],
+    ['bounded', 'targets', [fsTarget, { ...secondFsTarget, kind: 'unknown' }]],
+    [
+      'bounded',
+      'targets',
+      [fsTarget, { ...secondFsTarget, canonical_relative_path: 'docs/file.ts' }],
+    ],
+  ] as const)(
+    'refuses invalid %s %s without consuming its context',
+    async (strategy, field, value) => {
+      const fixture = await requiredAllowFixture();
+      try {
+        const subject = (strategy === 'exact' ? exactSubject() : boundedSubject()) as {
+          plan: Record<string, unknown>;
+          batch: Record<string, unknown>;
+        };
+        const target = strategy === 'exact' ? subject.plan : subject.batch;
+        target[field] = value;
+        const refused = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject));
+        expectFailure(refused, 'refused', 'AUTHORITY_DECISION_SUBJECT_NOT_EXACT');
+        expect(refused).not.toHaveProperty('receipt');
+        expect(
+          fixture.issuer.issueAllow(requiredIssueInput(fixture, exactSubject())),
+        ).toMatchObject({
+          issued: true,
+          outcome: 'allow',
+        });
+      } finally {
+        fixture.issuer.dispose();
+      }
+    },
+  );
+
+  it('accepts ordinal zero and an exactly full batch selected by one of several selectors', async () => {
+    const fixture = await requiredAllowFixture([fsTarget, secondFsTarget]);
+    try {
+      const subject = boundedSubject([fsTarget, secondFsTarget]) as {
+        plan: { selectors: unknown[] };
+        batch: { ordinal: number };
+      };
+      subject.batch.ordinal = 0;
+      subject.plan.selectors.unshift({
+        kind: 'fs',
+        repository_id: 'other-repository',
+        canonical_relative_path_glob: 'elsewhere/**',
+        operations: ['update'],
+      });
+      const issued = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject)) as {
+        receipt: unknown;
+      };
+      expect(issued).toMatchObject({ issued: true, outcome: 'allow' });
+      expectSuccess(
+        fixture.issuer.consume({
+          receipt: issued.receipt,
+          subject,
+          invocation_id: 'invocation-1',
+          adapter_id: 'fs-authority-boundary',
+        }),
+      );
+    } finally {
+      fixture.issuer.dispose();
+    }
+  });
+
+  it.each([
     [
       'exact plan with batch',
       () => ({
