@@ -57,18 +57,25 @@ pairs for `package.json` and every regular file under `dist`. Paths use `/` sepa
 symlinks and special files are rejected. This digest is established from authenticated
 package bytes, not accepted from the candidate.
 
+The mutation control identity is required before certification. Its external approval manifest
+pins the archive, complete unpacked member population, source commit/tree, and dependencies.
+Identity inspection executes no verifier modules and does not constitute control approval or
+mutation acceptance. Certification rechecks these bindings against the prerequisite result;
+a missing control fails, and unavailable dependent checks are reported as blocked.
+
 Configuration fields:
 
-| Field                                                | Meaning                                                               |
-| ---------------------------------------------------- | --------------------------------------------------------------------- |
-| `repo`                                               | Exact clean candidate checkout                                        |
-| `packageRoot`, `packageVersion`, `packageTreeSha256` | Approved installed package identity                                   |
-| `verifierProvenanceSha256`                           | Approved verifier provenance-file digest                              |
-| `policyDigest`                                       | Expected reconstructed RC task-policy digest                          |
-| `toolchain`, `environment`                           | Protected map filenames; absent declared environment values are null  |
-| `privateKey`, `publicKey`, `signerId`, `trustStore`  | External Ed25519 signer and current trust/revocation configuration    |
-| `outputDir`                                          | New export directory whose existing parent is accessible and external |
-| `receipt`                                            | Exact unsigned receipt filename, only for the separate evidence phase |
+| Field                                                    | Meaning                                                                                  |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `repo`                                                   | Exact clean candidate checkout                                                           |
+| `packageRoot`, `packageVersion`, `packageTreeSha256`     | Approved installed package identity                                                      |
+| `verifierProvenanceSha256`                               | Approved verifier provenance-file digest                                                 |
+| `mutationVerifierRoot`, `mutationVerifierApprovalSha256` | External immutable mutation control installation and separately approved manifest digest |
+| `policyDigest`                                           | Expected reconstructed RC task-policy digest                                             |
+| `toolchain`, `environment`                               | Protected map filenames; absent declared environment values are null                     |
+| `privateKey`, `publicKey`, `signerId`, `trustStore`      | External Ed25519 signer and current trust/revocation configuration                       |
+| `outputDir`                                              | New export directory whose existing parent is accessible and external                    |
+| `receipt`                                                | Exact unsigned receipt filename, only for the separate evidence phase                    |
 
 ```text
 node scripts/process/release-prerequisites.mjs prerequisites <config.json> <new-prerequisites.json>

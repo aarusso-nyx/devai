@@ -16,6 +16,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { inspectApprovedMutationVerifier } from './approved-mutation-verifier.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const canonical = (value) => JSON.stringify(value, Object.keys(value).sort());
@@ -158,6 +159,17 @@ export function inspectPrerequisites(config, configPath) {
     bindings.packageTree = packageTree;
     bindings.packageVersion = packageManifest.version;
     bindings.verifier = config.verifierProvenanceSha256;
+  });
+  attempt('mutation-control', ['candidate', 'control-location'], () => {
+    const control = inspectApprovedMutationVerifier({
+      root: config.mutationVerifierRoot,
+      candidateRoot: repo,
+      approvalSha256: config.mutationVerifierApprovalSha256,
+    });
+    bindings.mutationVerifierApproval = control.approvalSha256;
+    bindings.mutationVerifierArchive = control.archiveSha256;
+    bindings.mutationVerifierCommit = control.sourceCommit;
+    bindings.mutationVerifierTree = control.sourceTree;
   });
   attempt('maps', ['control-location'], () => {
     external(repo, config.toolchain);
