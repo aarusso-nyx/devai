@@ -934,7 +934,7 @@ function unauthorizedMutatorCalls(
         importedSymbol !== undefined && Object.hasOwn(GIT_READ_OWNERS, importedSymbol)
           ? GIT_READ_OWNERS[importedSymbol]
           : undefined;
-      const gitReadModule = ts.isIdentifier(expression)
+      const importedModule = ts.isIdentifier(expression)
         ? imported.get(expression.text)
         : ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)
           ? imported.get(expression.expression.text)
@@ -942,7 +942,7 @@ function unauthorizedMutatorCalls(
       if (
         importedSymbol !== undefined &&
         gitReadOwners !== undefined &&
-        (!gitReadOwners.has(fileName) || gitReadModule !== HOST_EFFECTS_MODULE)
+        (!gitReadOwners.has(fileName) || importedModule !== HOST_EFFECTS_MODULE)
       ) {
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
@@ -951,8 +951,7 @@ function unauthorizedMutatorCalls(
       }
       if (
         importedSymbol === HOST_SCOPE_CONTROLLER &&
-        (!HOST_SCOPE_OWNERS.has(fileName) ||
-          (ts.isIdentifier(expression) && imported.get(expression.text) !== HOST_EFFECTS_MODULE))
+        (!HOST_SCOPE_OWNERS.has(fileName) || importedModule !== HOST_EFFECTS_MODULE)
       ) {
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
@@ -961,8 +960,7 @@ function unauthorizedMutatorCalls(
       }
       if (
         importedSymbol === ATOMIC_HOST_EFFECTS_CONTROLLER &&
-        (fileName !== ATOMIC_HOST_EFFECTS_OWNER ||
-          (ts.isIdentifier(expression) && imported.get(expression.text) !== HOST_EFFECTS_MODULE))
+        (fileName !== ATOMIC_HOST_EFFECTS_OWNER || importedModule !== HOST_EFFECTS_MODULE)
       ) {
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
@@ -971,8 +969,7 @@ function unauthorizedMutatorCalls(
       }
       if (
         importedSymbol === READ_PROCESS_EXCEPTION &&
-        (!READ_PROCESS_OWNERS.has(fileName) ||
-          (ts.isIdentifier(expression) && imported.get(expression.text) !== HOST_EFFECTS_MODULE))
+        (!READ_PROCESS_OWNERS.has(fileName) || importedModule !== HOST_EFFECTS_MODULE)
       ) {
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
@@ -981,8 +978,7 @@ function unauthorizedMutatorCalls(
       }
       if (
         importedSymbol === GOVERNANCE_PROJECTION_EXCEPTION &&
-        (fileName !== GOVERNANCE_PROJECTION_OWNER ||
-          (ts.isIdentifier(expression) && imported.get(expression.text) !== HOST_EFFECTS_MODULE))
+        (fileName !== GOVERNANCE_PROJECTION_OWNER || importedModule !== HOST_EFFECTS_MODULE)
       ) {
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
