@@ -201,3 +201,69 @@ describe('lazy schema reference isolation', () => {
     },
   );
 });
+
+it.each(['', 42, null])(
+  'rejects an invalid sensor kind %j even when another kind is valid',
+  async (kind) => {
+    const registry = await import('../../src/index.js');
+    registry.bindSchemaPackageSnapshot({
+      ...snapshot(),
+      sensor_registry: Buffer.from(JSON.stringify({ entries: [{ kind: 'valid-kind' }, { kind }] })),
+    });
+    expect(() => registry.loadSchema('sensor-reading.schema.json')).toThrow(
+      'sensor registry has no unique live kind roster',
+    );
+  },
+);
+
+it('reports exactly the meta-schema failures from the bound population without dropping compliant members', async () => {
+  const registry = await import('../../src/index.js');
+  const input = snapshot();
+  // Give each declared member an independently known valid meta-schema envelope.
+  for (const name of registry.ROSTER) {
+    if (name === 'meta.schema.json') continue;
+    const original = JSON.parse(input.schemas.get(name)?.toString() ?? 'null') as Record<
+      string,
+      unknown
+    >;
+    input.schemas.set(
+      name,
+      Buffer.from(
+        JSON.stringify({
+          ...original,
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          $id: `https://devai.nyxk.com.br/schemas/${name}`,
+          title: 'Valid schema',
+          description: 'A complete schema description.',
+          schema_version: '1.0.0',
+          examples: [{}],
+        }),
+      ),
+    );
+  }
+  input.schemas.set(
+    'error.schema.json',
+    Buffer.from(
+      JSON.stringify({
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        $id: 'https://devai.nyxk.com.br/schemas/error.schema.json',
+        title: 'x',
+        description: 'A complete schema description.',
+        schema_version: '1.0.0',
+        examples: [{}],
+      }),
+    ),
+  );
+  registry.bindSchemaPackageSnapshot(input);
+  const report = registry.metaGate();
+  expect(report.noncompliant).toEqual([
+    { name: 'error.schema.json', errors: ['/title must NOT have fewer than 3 characters'] },
+  ]);
+  expect(report.compliant).toEqual(registry.ROSTER.filter((name) => name !== 'error.schema.json'));
+  expect(report.compliant).not.toContain('error.schema.json');
+  expect(report.compliant).toContain('action-result.schema.json');
+  expect(new Set([...report.compliant, ...report.noncompliant.map((row) => row.name)])).toEqual(
+    new Set(registry.ROSTER),
+  );
+  expect(report.compliant.length + report.noncompliant.length).toBe(registry.ROSTER.length);
+});
