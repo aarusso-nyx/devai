@@ -200,6 +200,66 @@ describe('early prerequisites and evidence transport', () => {
     ]);
     expect(JSON.stringify(result)).not.toContain('receipt missing');
   });
+  it.each([
+    ['https://github.com/aarusso-nyx/devai.git', 'pass'],
+    ['https://github.com/aarusso-nyx/devai', 'pass'],
+    ['git@github.com:aarusso-nyx/devai.git', 'pass'],
+    ['ssh://git@github.com/aarusso-nyx/devai.git', 'pass'],
+    ['https://untrusted.example/aarusso-nyx/devai.git', 'fail'],
+    ['/tmp/aarusso-nyx/devai', 'fail'],
+    ['https://github.com/unrelated-aarusso-nyx/devai.git', 'fail'],
+    ['https://github.com/aarusso-nyx/devai.git\n', 'fail'],
+    [' https://github.com/aarusso-nyx/devai.git', 'fail'],
+  ])('checks exact candidate repository origin %j', (origin, status) => {
+    const repo = temporary();
+    execFileSync('git', ['init', '--quiet', repo]);
+    const git = (args: string[]) => execFileSync('git', ['-C', repo, ...args]);
+    writeFileSync(join(repo, 'test-tasks.json'), JSON.stringify({ tasks: [] }));
+    git(['add', 'test-tasks.json']);
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '--quiet',
+      '-m',
+      'fixture',
+    ]);
+    git(['remote', 'add', 'origin', origin]);
+    const result = prerequisites.inspectPrerequisites(
+      { repo, packageRoot: '/missing-package', outputDir: '/missing-parent/export' },
+      '/missing-config',
+    );
+    expect(result.checks.find((check: { id: string }) => check.id === 'candidate').status).toBe(
+      status,
+    );
+    if (status === 'pass') expect(result.bindings.repositoryOrigin).toBe(origin);
+    if (origin === 'https://github.com/aarusso-nyx/devai.git') {
+      const candidateStatus = () =>
+        prerequisites
+          .inspectPrerequisites(
+            { repo, packageRoot: '/missing-package', outputDir: '/missing-parent/export' },
+            '/missing-config',
+          )
+          .checks.find((check: { id: string }) => check.id === 'candidate').status;
+      git([
+        'config',
+        '--add',
+        'remote.origin.url',
+        'https://untrusted.example/aarusso-nyx/devai.git',
+      ]);
+      expect(candidateStatus()).toBe('fail');
+      git(['config', '--unset-all', 'remote.origin.url']);
+      git(['config', 'remote.origin.url', origin]);
+      git(['config', 'url.https://untrusted.example/.insteadOf', 'https://github.com/']);
+      expect(candidateStatus()).toBe('fail');
+    }
+  });
   it('rejects failed or stale prerequisite bindings', () => {
     const previous = {
       schemaVersion: '1.0.0',

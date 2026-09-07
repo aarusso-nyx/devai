@@ -32,7 +32,7 @@ const minimalEnvironment = () =>
       .filter((key) => process.env[key] !== undefined)
       .map((key) => [key, process.env[key]]),
   );
-function command(argv, cwd, env = minimalEnvironment()) {
+function command(argv, cwd, env = minimalEnvironment(), trimOutput = true) {
   const result = spawnSync(argv[0], argv.slice(1), {
     cwd,
     env,
@@ -40,7 +40,7 @@ function command(argv, cwd, env = minimalEnvironment()) {
     maxBuffer: 64 * 1024 * 1024,
   });
   requireValue(result.status === 0, 'CONTROL_COMMAND_FAILED');
-  return result.stdout.trim();
+  return trimOutput ? result.stdout.trim() : result.stdout;
 }
 function external(repo, path) {
   const actual = realpathSync(path);
@@ -96,12 +96,30 @@ export function inspectPrerequisites(config, configPath) {
       command(['git', 'status', '--porcelain', '--untracked-files=all'], repo) === '',
       'CANDIDATE_DIRTY',
     );
+    // NUL-delimited config preserves embedded/trailing whitespace and exposes
+    // multiple origin entries. Do not accept arbitrary hosts with the same suffix.
+    const configured = command(
+      ['git', 'config', '--null', '--get-all', 'remote.origin.url'],
+      repo,
+      minimalEnvironment(),
+      false,
+    );
+    requireValue(configured.endsWith('\0'), 'REPOSITORY_INVALID');
+    const origin = configured.slice(0, -1);
+    const approvedOrigins = new Set([
+      'https://github.com/aarusso-nyx/devai',
+      'https://github.com/aarusso-nyx/devai.git',
+      'git@github.com:aarusso-nyx/devai',
+      'git@github.com:aarusso-nyx/devai.git',
+      'ssh://git@github.com/aarusso-nyx/devai',
+      'ssh://git@github.com/aarusso-nyx/devai.git',
+    ]);
     requireValue(
-      command(['git', 'remote', 'get-url', 'origin'], repo)
-        .replace(/\.git$/u, '')
-        .endsWith('aarusso-nyx/devai'),
+      approvedOrigins.has(origin) &&
+        command(['git', 'remote', 'get-url', 'origin'], repo) === origin,
       'REPOSITORY_INVALID',
     );
+    bindings.repositoryOrigin = origin;
     descriptor = read(join(repo, 'test-tasks.json'));
     bindings.descriptor = sha(regular(join(repo, 'test-tasks.json')));
   });
