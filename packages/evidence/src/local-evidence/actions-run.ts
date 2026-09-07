@@ -374,7 +374,12 @@ export function validateActionsEvidenceShadowTuple(
 export function verifyActionsRunEvidence(
   inputs: VerifyActionsRunEvidenceInputs,
 ): ActionsEvidenceDecision {
-  if (inputs.mode === 'gate' && inputs.gateAuthorization?.authorized !== true) {
+  if (
+    inputs.mode === 'gate' &&
+    (inputs.gateAuthorization?.authorized !== true ||
+      inputs.gateAuthorization.status !== 'active' ||
+      inputs.gateAuthorization.source !== 'base-parent')
+  ) {
     return decision(
       inputs.mode,
       'fallback-no-evidence',
@@ -471,7 +476,10 @@ export function verifyActionsRunEvidence(
   }
 
   const successful = new Set(current.successfulJobs);
-  const missingJob = manifest.policy.requiredJobs.find((job) => !successful.has(job));
+  // A claim may add requirements, but cannot subtract jobs that promotion skips.
+  const missingJob = [...ACTIONS_REUSABLE_JOBS, ...manifest.policy.requiredJobs].find(
+    (job) => !successful.has(job),
+  );
   if (missingJob !== undefined) {
     return decision(
       inputs.mode,
