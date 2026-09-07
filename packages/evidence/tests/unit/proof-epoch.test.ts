@@ -1,5 +1,5 @@
 // Invariants: INV-DEVAI-016, INV-DEVAI-018
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
@@ -46,6 +46,83 @@ afterEach(() => {
 });
 
 describe('proof epoch integrity', () => {
+  it('separates proof files by their exact round and kind', () => {
+    const repoRoot = root();
+    expect(proofEpochPath(repoRoot, 'R-0005', 'test-results')).toBe(
+      join(repoRoot, 'record/proofs/work/test-results/R-0005.jsonl'),
+    );
+    expect(proofEpochPath(repoRoot, 'R-0006', 'test-results')).not.toBe(
+      proofEpochPath(repoRoot, 'R-0005', 'test-results'),
+    );
+    expect(proofEpochPath(repoRoot, 'R-0005', 'lint')).not.toBe(
+      proofEpochPath(repoRoot, 'R-0005', 'test-results'),
+    );
+  });
+
+  it.each([null, [], false, 42, 'invalid'])(
+    'refuses an invalid runtime payload %j before creating or appending proof bytes',
+    (payload) => {
+      const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'payload' };
+      const path = proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind);
+      const invalid = payload as unknown as Readonly<Record<string, unknown>>;
+      expect(() => appendProofEpochRecord({ ...inputs, payload: invalid })).toThrow(
+        /proof epoch line does not validate:/u,
+      );
+      expect(existsSync(path)).toBe(false);
+      appendProofEpochRecord({ ...inputs, payload: { valid: true } });
+      const before = readFileSync(path);
+      expect(() => appendProofEpochRecord({ ...inputs, payload: invalid })).toThrow(
+        /proof epoch line does not validate:/u,
+      );
+      expect(readFileSync(path)).toEqual(before);
+    },
+  );
+
+  it.each(['earlier errata', 'later record'] as const)(
+    'rejects a rehashed correction targeting an %s independently of hash integrity',
+    (target) => {
+      const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'references' };
+      const first = appendProofEpochRecord({ ...inputs, payload: {} });
+      const second = appendProofEpochErrata({
+        ...inputs,
+        payload: {},
+        correctsSequence: 1,
+        reason: 'first correction',
+      });
+      const third = appendProofEpochRecord({ ...inputs, payload: {} });
+      const unsignedSecond = {
+        ...second,
+        corrects_sequence: target === 'later record' ? 3 : 1,
+      };
+      const { line_hash: _secondHash, ...secondBody } = unsignedSecond;
+      const rewrittenSecond = { ...secondBody, line_hash: computeProofEpochLineHash(secondBody) };
+      const thirdBody = {
+        schemaVersion: third.schemaVersion,
+        line_type: target === 'earlier errata' ? ('errata' as const) : ('record' as const),
+        round_id: third.round_id,
+        kind: third.kind,
+        sequence: third.sequence,
+        timestamp: third.timestamp,
+        payload: third.payload,
+        previous_line_hash: rewrittenSecond.line_hash,
+        ...(target === 'earlier errata'
+          ? { corrects_sequence: 2, reason: 'second correction' }
+          : {}),
+      };
+      const rewrittenThird = { ...thirdBody, line_hash: computeProofEpochLineHash(thirdBody) };
+      const path = proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind);
+      write(path, [first, rewrittenSecond, rewrittenThird]);
+      const before = readFileSync(path);
+      const result = verifyProofEpoch({ ...inputs, requireClosed: false });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toEqual([
+        `line ${target === 'earlier errata' ? '3' : '2'} has invalid forward or non-record errata`,
+      ]);
+      expect(() => closeProofEpoch(inputs)).toThrow(/proof epoch is invalid/u);
+      expect(readFileSync(path)).toEqual(before);
+    },
+  );
+
   it('hashes nested object keys canonically while preserving array order and input bytes', () => {
     const unsigned = {
       schemaVersion: '1.0.0' as const,
