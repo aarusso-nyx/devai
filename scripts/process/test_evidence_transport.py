@@ -20,6 +20,28 @@ def bundle(change=None):
     return e.archive(files)
 
 
+
+def mutation_export(change=None):
+    data = b'fixture artifact bytes'
+    files = {'exported-state.json': b'{}', 'policy-closure.json': b'{}',
+             'task-policies.json': b'[]', 'objects/' + e.digest(data): data}
+    if change:
+        change(files)
+    return e.archive(files)
+
+
+def mutation_bundle(change=None):
+    files = e.read_archive(bundle())
+    del files['manifest.json']
+    files['mutation-export.tgz'] = mutation_export()
+    files['mutation-input-plan.json'] = b'{}'
+    if change:
+        change(files)
+    files['manifest.json'] = e.canonical({'schemaVersion': '2.0.0', 'members': {
+        name: {'sha256': e.digest(data), 'size': len(data)} for name, data in files.items()}})
+    return e.archive(files)
+
+
 def malicious(name, type=tarfile.REGTYPE):
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode='w:gz') as tar:
@@ -105,6 +127,74 @@ class TransportTests(unittest.TestCase):
             with patch.dict(os.environ, {'LEDGER_TRANSPORT': 'bundle', 'BUNDLE_SHA256': '1' * 64}, clear=True):
                 with self.assertRaisesRegex(ValueError, 'EVIDENCE_CREDENTIAL_REQUIRED'):
                     e.materialize(target)
+            self.assertFalse(target.exists())
+
+
+class MutationTransportTests(unittest.TestCase):
+    def test_explicit_version_and_deterministic_population(self):
+        data = mutation_bundle()
+        self.assertEqual(data, mutation_bundle())
+        self.assertEqual(set(e.verify_bundle(data, e.digest(data), '2.0.0')),
+                         set(e.MEMBERS + e.MUTATION_MEMBERS))
+        with self.assertRaises(ValueError):
+            e.verify_bundle(data, e.digest(data), '1.0.0')
+        old = bundle()
+        with self.assertRaises(ValueError):
+            e.verify_bundle(old, e.digest(old), '2.0.0')
+
+    def test_digest_precedes_mutation_parser(self):
+        with patch.object(e, 'verify_mutation_export') as parser:
+            with self.assertRaisesRegex(ValueError, 'BUNDLE_DIGEST_MISMATCH'):
+                e.verify_bundle(mutation_bundle(), '0' * 64, '2.0.0')
+            parser.assert_not_called()
+
+    def test_missing_mutation_member_and_trust_injection(self):
+        changes = [lambda files: files.pop('mutation-export.tgz'),
+                   lambda files: files.pop('mutation-input-plan.json'),
+                   lambda files: files.update({'trust-store.json': b'{}'})]
+        for change in changes:
+            data = mutation_bundle(change)
+            with self.assertRaisesRegex(ValueError, 'BUNDLE_POPULATION_INVALID'):
+                e.verify_bundle(data, e.digest(data), '2.0.0')
+
+    def test_nested_export_population_and_digest(self):
+        def replace_object(files):
+            name = next(name for name in files if name.startswith('objects/'))
+            files[name] = b'changed object'
+        for change in [replace_object, lambda files: files.update({'private-key.pem': b'private'}),
+                       lambda files: files.pop('exported-state.json'),
+                       lambda files: files.update({'objects/invalid': b'bytes'})]:
+            data = mutation_bundle(lambda files: files.update({'mutation-export.tgz': mutation_export(change)}))
+            with self.assertRaises(ValueError):
+                e.verify_bundle(data, e.digest(data), '2.0.0')
+
+    def test_unsafe_nested_export(self):
+        data = mutation_bundle(lambda files: files.update({'mutation-export.tgz': malicious('../outside')}))
+        with self.assertRaises(ValueError):
+            e.verify_bundle(data, e.digest(data), '2.0.0')
+
+    def test_no_legacy_fallback_for_current_evidence(self):
+        with patch.dict(os.environ, {'LEDGER_TRANSPORT': 'legacy', 'BUNDLE_SCHEMA_VERSION': '2.0.0'}, clear=True):
+            with self.assertRaisesRegex(ValueError, 'MUTATION_BUNDLE_REQUIRED'):
+                e.materialize('unused')
+
+    def test_materializes_current_export_only_after_validation(self):
+        import base64
+        data = mutation_bundle()
+        env = {'LEDGER_TRANSPORT': 'bundle', 'BUNDLE_SCHEMA_VERSION': '2.0.0',
+               'BUNDLE_SHA256': e.digest(data), 'TRUST_STORE_B64': base64.b64encode(b'{}').decode(),
+               'EVIDENCE_READ_TOKEN': 'fixture'}
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, env, clear=True), patch.object(e, 'gh', return_value=data):
+            target = Path(root) / 'verified'
+            e.materialize(target)
+            self.assertEqual((target / 'mutation-export/task-policies.json').read_bytes(), b'[]')
+            self.assertEqual((target / 'mutation-export/exported-state.json').stat().st_mode & 0o777, 0o600)
+        bad = mutation_bundle(lambda files: files.update({'mutation-export.tgz': malicious('../escape')}))
+        env['BUNDLE_SHA256'] = e.digest(bad)
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, env, clear=True), patch.object(e, 'gh', return_value=bad):
+            target = Path(root) / 'rejected'
+            with self.assertRaises(ValueError):
+                e.materialize(target)
             self.assertFalse(target.exists())
 
 

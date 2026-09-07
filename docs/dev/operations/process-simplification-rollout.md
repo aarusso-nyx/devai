@@ -47,6 +47,29 @@ only its applicable checks. It cannot discharge DEVAI's required mutation semant
 Absent resources or credentials are deployment prerequisites, never reasons to switch
 transport automatically or execute candidate helpers with protected inputs.
 
+## Private mutation transport
+
+DEVAI 1.5 requires bundle schema `2.0.0`, selected explicitly with
+`--schema-version 2.0.0` for pack, verify and operator upload, and
+`BUNDLE_SCHEMA_VERSION=2.0.0` for protected materialization. A selected v2 bundle
+cannot fall back to the six-member v1 payload or legacy payload secrets.
+
+In addition to ordinary RC evidence, v2 contains `mutation-input-plan.json` and
+`mutation-export.tgz`. The latter carries the existing installed export bytes in
+this closed layout: `exported-state.json`, `policy-closure.json`, `task-policies.json`,
+and `objects/<sha256>` for the exported artifact objects. Build the transport input
+by copying those exact retained files; do not regenerate or resign them. Each object
+must match its filename digest. Pass this directory as `--mutation-export` and the
+pre-RC input plan as `--mutation-input-plan` when packing.
+
+The transport validates the approved outer digest, complete member manifest, safe
+archives and nested object hashes before writing files. It does not authenticate
+export signatures or establish mutation acceptance. The installed offline verifier
+must check the exported state and policy closure with external trust and approved
+controls, followed by complete mutation semantics and rehearsal bindings. Workflow
+activation of this v2 path remains pending that integration and protected approval.
+Never include control packages, signing keys or trust/revocation files in this layout.
+
 ## Local prerequisites and certification
 
 Keep the configuration, package, maps, signing material, prerequisite receipt and export
