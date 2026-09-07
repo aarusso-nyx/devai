@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { lstatSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const DISPOSABLE_ROOTS = [
@@ -45,7 +45,22 @@ export function pruneState(opts: PruneStateOptions): PruneStateResult {
   const candidates: string[] = [];
   for (const relativeRoot of DISPOSABLE_ROOTS) {
     const root = join(opts.repoRoot, relativeRoot);
-    if (!existsSync(root)) continue;
+    let prefix = opts.repoRoot;
+    let regularDirectories = true;
+    for (const segment of relativeRoot.split('/')) {
+      prefix = join(prefix, segment);
+      try {
+        if (!lstatSync(prefix).isDirectory()) {
+          regularDirectories = false;
+          break;
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        regularDirectories = false;
+        break;
+      }
+    }
+    if (!regularDirectories) continue;
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const path = join(dir, entry.name);

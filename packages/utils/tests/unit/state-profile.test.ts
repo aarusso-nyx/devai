@@ -104,3 +104,51 @@ describe('adoption profiles', () => {
     expect(profileAtLeast('tier1', 'tier2')).toBe(false);
   });
 });
+
+describe('disposable state boundaries', () => {
+  it('never follows a symlink used as a disposable root', () => {
+    const repo = root();
+    const external = root();
+    const path = put(external, 'old.json', 'preserve');
+    const old = new Date('2026-06-01T00:00:00.000Z');
+    utimesSync(path, old, old);
+    mkdirSync(join(repo, '.devai'), { recursive: true });
+    symlinkSync(external, join(repo, '.devai/cache'));
+    expect(pruneState({ repoRoot: repo, now: NOW }).candidates).toEqual([]);
+  });
+
+  it('never follows a symlink ancestor of a disposable root', () => {
+    const repo = root();
+    const external = root();
+    const path = put(external, 'cache/old.json', 'preserve');
+    const old = new Date('2026-06-01T00:00:00.000Z');
+    utimesSync(path, old, old);
+    symlinkSync(external, join(repo, '.devai'));
+    expect(pruneState({ repoRoot: repo, now: NOW }).candidates).toEqual([]);
+  });
+
+  it('uses the default 30-day cutoff strictly and preserves records at the cutoff', () => {
+    const repo = root();
+    const cutoff = NOW.getTime() - 30 * 86400000;
+    for (const [name, offset] of [
+      ['before', -1000],
+      ['at', 0],
+      ['after', 1000],
+    ] as const) {
+      const path = put(repo, `coverage/${name}.json`, '{}');
+      const stamp = new Date(cutoff + offset);
+      utimesSync(path, stamp, stamp);
+    }
+    expect(pruneState({ repoRoot: repo, now: NOW })).toEqual({
+      applied: false,
+      older_than_days: 30,
+      candidates: ['coverage/before.json'],
+      deleted: [],
+      preserved_roots: [
+        '.devai/state/counters.json',
+        '.devai/state/leases',
+        '.devai/state/pointers',
+      ],
+    });
+  });
+});
