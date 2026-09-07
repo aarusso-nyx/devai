@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createProtectedArtifactSinkAdapter,
   createProtectedReleaseHostAdapter,
@@ -78,6 +78,27 @@ for (const kind of ['artifact', 'certification'] as const) {
         }
       }
     });
+    it.each(['commit', 'tree'] as const)(
+      'rejects coercible %s objects without executing conversion hooks',
+      (key) => {
+        const binding = fixture();
+        const toString = vi.fn(() => 'a'.repeat(40));
+        Reflect.set(binding.repository, key, { length: 40, toString });
+        expect(() => create(binding)).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+        expect(toString).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects coercible digest objects without executing conversion hooks', () => {
+      for (const key of Object.keys(fixture()).filter((key) => key.endsWith('_sha256'))) {
+        const binding = fixture();
+        const toString = vi.fn(() => 'a'.repeat(64));
+        Reflect.set(binding, key, { toString });
+        expect(() => create(binding), key).toThrow('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+        expect(toString).not.toHaveBeenCalled();
+      }
+    });
+
     it('does not accept an action from another release phase', () => {
       expect(() => create({ ...fixture(), action_id: 'release export' })).toThrow(
         'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',

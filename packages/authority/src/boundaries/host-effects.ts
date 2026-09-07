@@ -752,12 +752,12 @@ export function createProtectedArtifactSinkAdapter(binding: ProtectedArtifactSin
     selected.action_id !== 'release prepare' ||
     typeof selected.repository.id !== 'string' ||
     selected.repository.id.length === 0 ||
-    ![selected.repository.commit, selected.repository.tree].every((value) =>
-      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+    ![selected.repository.commit, selected.repository.tree].every(
+      (value) => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
     ) ||
     selected.repository.commit.length !== selected.repository.tree.length ||
-    ![selected.plan_receipt_digest_sha256, selected.pack_spec_digest_sha256].every((value) =>
-      /^[0-9a-f]{64}$/u.test(value),
+    ![selected.plan_receipt_digest_sha256, selected.pack_spec_digest_sha256].every(
+      (value) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value),
     ) ||
     typeof selected.sink_id !== 'string' ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/u.test(selected.sink_id)
@@ -918,15 +918,15 @@ export function createProtectedReleaseHostAdapter(binding: ProtectedReleaseHostB
     !['release certify', 'release preflight'].includes(selected.action_id) ||
     typeof selected.repository.id !== 'string' ||
     selected.repository.id.length === 0 ||
-    ![selected.repository.commit, selected.repository.tree].every((value) =>
-      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
+    ![selected.repository.commit, selected.repository.tree].every(
+      (value) => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value),
     ) ||
     selected.repository.commit.length !== selected.repository.tree.length ||
     ![
       selected.task_policy_digest_sha256,
       selected.plan_receipt_digest_sha256,
       selected.helper_identity_sha256,
-    ].every((value) => /^[0-9a-f]{64}$/u.test(value))
+    ].every((value) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value))
   ) {
     throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
   }
