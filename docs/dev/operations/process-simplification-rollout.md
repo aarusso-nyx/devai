@@ -67,6 +67,14 @@ result hashes. It must select the exact candidate and all ten packages with scor
 60 and survivor maximum 50. Post-run contracts must preserve these input bindings; the
 approved verifier must still check the complete artifact population and semantics.
 
+The repository-local `verify-mutation-semantics.mjs` adapter checks a complete 22-member
+mutation artifact directory through the explicitly selected approved v2.1 or v2.2 kernel.
+It compares the output contract with the protected input plan and checks canonical bytes,
+content safety, receipt provenance, exact population, score and survivor limits. v2.2 also
+requires its independent final-unit, output-contract and execution-binding controls; it
+never falls back to v2.1. This semantic result does not authenticate custody or authorize
+publication. Signed export/transport and rehearsal integration remain required separately.
+
 Configuration fields:
 
 | Field                                                    | Meaning                                                                                     |
