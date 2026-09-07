@@ -115,6 +115,7 @@ function validatePolicyAlignment(
 }
 
 function validateAge(manifest: LocalEvidenceManifest, now: number): void {
+  if (!Number.isFinite(now)) fail('verification clock is not a finite timestamp');
   const generatedAt = Date.parse(manifest.generatedAt);
   if (!Number.isFinite(generatedAt)) fail('manifest generatedAt is not a valid timestamp');
   if (generatedAt > now + 5 * 60 * 1000) fail('manifest generatedAt is in the future');

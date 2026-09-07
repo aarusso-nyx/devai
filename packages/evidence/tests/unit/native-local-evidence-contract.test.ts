@@ -113,6 +113,14 @@ function gate(root: string, manifestPath: string, now: Date, actor = 'aarusso') 
 }
 
 describe('native local evidence policy', () => {
+  it('refuses an invalid verification clock instead of bypassing receipt age checks', () => {
+    const { root, manifestPath, now } = fixture();
+    expect(() => gate(root, manifestPath, now)).not.toThrow();
+    expect(() => gate(root, manifestPath, new Date(Number.NaN))).toThrow(
+      /verification clock is not a finite timestamp/u,
+    );
+  });
+
   it('binds the TEAT job floor, 24-hour age, darwin/arm64, and immutable forbidden paths', () => {
     const { root } = fixture();
     expect(resolveLocalEvidencePolicy(root)).toMatchObject({
