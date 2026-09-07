@@ -92,17 +92,23 @@ export function validateAuthorityEvidence(input: unknown, deps: unknown) {
   const principal = view.principal;
   const bootstrap =
     isRecord(principal) && principal.kind === 'derived-machine' && principal.actor === 'bootstrap';
+  // Provenance is established only against one of the three declared subject kinds. A
+  // contract with no subject record, or with a kind outside that set, proves nothing about
+  // the principal and refuses here rather than validating by omission.
+  const subject = isRecord(action.subject) ? action.subject : undefined;
   let provenanceValid = action.effect === view.action_effect && isRecord(principal);
-  if (action.subject?.kind === 'human')
+  if (subject?.kind === 'human')
     provenanceValid &&=
-      principal.kind === 'human' && action.subject.allowed_roles.includes(principal.role);
-  else if (action.subject?.kind === 'derived-machine')
+      principal.kind === 'human' &&
+      Array.isArray(subject.allowed_roles) &&
+      subject.allowed_roles.includes(principal.role);
+  else if (subject?.kind === 'derived-machine')
     provenanceValid &&=
       principal.kind === 'derived-machine' &&
-      principal.actor === action.subject.actor &&
-      principal.transition === action.subject.transition;
-  else if (action.subject?.kind === 'none')
-    provenanceValid &&= bootstrap && view.action_effect === 'read';
+      principal.actor === subject.actor &&
+      principal.transition === subject.transition;
+  else if (subject?.kind === 'none') provenanceValid &&= bootstrap && view.action_effect === 'read';
+  else provenanceValid = false;
   if (!provenanceValid) return failure('refused', 'AUTHORITY_EVIDENCE_PROVENANCE_INVALID');
   if (bootstrap) {
     const validBootstrap =
@@ -115,13 +121,15 @@ export function validateAuthorityEvidence(input: unknown, deps: unknown) {
     if (!validBootstrap || view.readiness.authority_eligible === true)
       return failure('refused', 'AUTHORITY_EVIDENCE_BOOTSTRAP_INVALID');
   }
-  if (action.subject?.kind === 'derived-machine' && !bootstrap) {
+  if (subject?.kind === 'derived-machine' && !bootstrap) {
     const initiator = principal.initiated_by;
-    if (action.subject.initiator === 'none') {
+    if (subject.initiator === 'none') {
       if (initiator !== 'none') return failure('refused', 'AUTHORITY_EVIDENCE_INITIATOR_INVALID');
     } else if (
       !isRecord(initiator) ||
-      !action.subject.initiator.allowed_roles.includes(initiator.role)
+      !isRecord(subject.initiator) ||
+      !Array.isArray(subject.initiator.allowed_roles) ||
+      !subject.initiator.allowed_roles.includes(initiator.role)
     ) {
       return failure('refused', 'AUTHORITY_EVIDENCE_INITIATOR_INVALID');
     }
