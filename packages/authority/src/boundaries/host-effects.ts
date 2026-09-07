@@ -1189,8 +1189,9 @@ export function applyAuthorityHostEffectsAtomically(
     }
   }
   const snapshots: Snapshot[] = paths.map((path) => {
-    if (!existsSync(path)) return { kind: 'absent', path };
-    const stat = lstatSync(path);
+    // A dangling symlink is an existing entry and must survive rollback.
+    const stat = lstatSync(path, { throwIfNoEntry: false });
+    if (stat === undefined) return { kind: 'absent', path };
     if (stat.isSymbolicLink()) return { kind: 'symlink', path, target: readlinkSync(path) };
     if (stat.isDirectory()) return { kind: 'directory', path, mode: stat.mode };
     return { kind: 'file', path, mode: stat.mode, bytes: readFileSync(path) };
@@ -1242,8 +1243,8 @@ export function runAuthorityHostEffectsWithRollback<T>(
   const snapshots: Snapshot[] = [];
   const captured = new Set<string>();
   for (const path of paths) {
-    if (existsSync(path)) {
-      const stat = lstatSync(path);
+    const stat = lstatSync(path, { throwIfNoEntry: false });
+    if (stat !== undefined) {
       if (stat.isDirectory()) throw new Error(`AUTHORITY_ROLLBACK_FILE_TARGET_REQUIRED:${path}`);
       snapshots.push(
         stat.isSymbolicLink()
@@ -1256,7 +1257,7 @@ export function runAuthorityHostEffectsWithRollback<T>(
     snapshots.push({ kind: 'absent', path });
     captured.add(path);
     let parent = dirname(path);
-    while (!existsSync(parent) && !captured.has(parent)) {
+    while (lstatSync(parent, { throwIfNoEntry: false }) === undefined && !captured.has(parent)) {
       snapshots.push({ kind: 'absent', path: parent });
       captured.add(parent);
       const next = dirname(parent);
