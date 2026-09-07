@@ -31,3 +31,22 @@ describe('binding effect report', () => {
     ).not.toThrow();
   });
 });
+
+it.each([
+  'EFFECT_UNDER_DECLARED',
+  'SPAWN_EFFECT_UNDECLARED',
+  'EFFECT_EDGE_UNRESOLVED',
+  'EFFECT_EXTRACTOR_CATALOG_MISMATCH',
+  'EFFECT_CAPABILITIES_MISSING',
+  'EFFECT_CONTRACT_MISSING',
+])('blocks %s with exact action attribution and aggregated diagnostics', (code) => {
+  expect(() =>
+    enforceEffectReport({
+      findings: [
+        { code, action_id: 'fixture action', message: 'first' },
+        { code: 'EFFECT_OVER_DECLARED', message: 'advisory' },
+        { code, message: 'second' },
+      ],
+    }),
+  ).toThrow(new Error(`${code}:fixture action\n${code}`));
+});
