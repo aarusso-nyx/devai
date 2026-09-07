@@ -354,7 +354,9 @@ export function introspectRepo(opts: IntrospectOptions): RepoIntrospection {
     );
   }
   if (patterns.length > 0) {
-    const manifestRoots = manifests.map((path) => path.replace(/\/package\.json$/u, ''));
+    const manifestRoots = manifests
+      .filter((path) => path !== 'package.json')
+      .map((path) => path.replace(/\/package\.json$/u, ''));
     const matched = manifestRoots.filter((path) =>
       patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
     );
