@@ -1426,3 +1426,69 @@ describe('bounded selector validation with independently valid limits', () => {
     }
   });
 });
+
+describe('policy decision evidence retention', () => {
+  const recovery: TrustedExecutionState = {
+    applied_batch_ids: ['already-applied'],
+    applied_target_count: 1,
+    partial_effect_evidence_refs: ['evidence:prior-effect'],
+    recovery_checkpoint_ref: 'checkpoint:prior-effect',
+  };
+  it.each(['allow', 'deny'] as const)(
+    'retains ordered reasons and obligations for %s',
+    (outcome) => {
+      const trustedRuntime = runtime({ executionState: recovery });
+      const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+      const reasons = ['first policy finding', 'second policy finding'];
+      const obligations = ['retain evidence', 'obtain independent review'];
+      const decision = decide({
+        plan,
+        runtime: trustedRuntime,
+        policy: { provenance, evaluate: () => ({ outcome, reasons, obligations }) },
+      });
+      expect(decision.evaluation).toBe(outcome);
+      expect(decision.reason_code).toBe(outcome === 'allow' ? 'POLICY_ALLOW' : 'POLICY_DENY');
+      expect(decision.reasons).toEqual(reasons);
+      expect(decision.obligations).toEqual(obligations);
+      expect(decision.recovery).toEqual(recovery);
+      expect(decision.authority_context_digest_sha256).toBe(canonicalSha256(humanContext));
+      expect(decision.policy_binding_digest_sha256).toBe(canonicalSha256(provenance));
+      const { decision_digest_sha256, ...unsigned } = decision;
+      expect(decision_digest_sha256).toBe(canonicalSha256(unsigned));
+      expect(canonicalSha256({ ...unsigned, obligations: [...obligations].reverse() })).not.toBe(
+        decision_digest_sha256,
+      );
+      expect(canonicalSha256({ ...unsigned, recovery: undefined })).not.toBe(
+        decision_digest_sha256,
+      );
+    },
+  );
+  it.each([
+    [new Error('policy unavailable'), 'policy unavailable'],
+    ['policy unavailable', 'policy unavailable'],
+    [null, 'null'],
+    [undefined, 'undefined'],
+  ])('retains failure diagnostics and recovery for thrown %j', (failure, message) => {
+    const trustedRuntime = runtime({ executionState: recovery });
+    const decision = decide({
+      plan: exactPlan(trustedRuntime.materialize(baseRequest)),
+      runtime: trustedRuntime,
+      policy: {
+        provenance,
+        evaluate: () => {
+          throw failure;
+        },
+      },
+    });
+    expect(decision).toMatchObject({
+      evaluation: 'deny',
+      disposition: 'refuse',
+      reason_code: 'POLICY_ADAPTER_ERROR',
+      reasons: [`authority policy adapter failed: ${message}`],
+      obligations: [],
+      recovery,
+      authority_context_digest_sha256: canonicalSha256(humanContext),
+      readiness: { eligible: false },
+    });
+  });
+});
