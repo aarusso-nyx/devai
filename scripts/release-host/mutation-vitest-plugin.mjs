@@ -65,8 +65,10 @@ function createProtectedVitest(injector) {
     const started = performance.now();
     // Fixed vocabulary and numeric process/timing fields only: never print
     // candidate paths, test data, environment values or exception messages.
+    // Worker stderr is buffered by Stryker. Its logger crosses the logging
+    // channel; error level retains these phase markers at production verbosity.
     const emit = (status) =>
-      process.stderr.write(
+      runner.log.error(
         `DEVAI_MUTATION_RUNNER_PHASE ${JSON.stringify({
           version: 1,
           pid: process.pid,

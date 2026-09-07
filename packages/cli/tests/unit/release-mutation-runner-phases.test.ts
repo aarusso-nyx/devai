@@ -40,6 +40,7 @@ writeFileSync(
   'export const DryRunStatus = {Complete:"complete", Error:"error"}; export const MutantRunStatus = {Survived:"survived", Killed:"killed"}; export const TestStatus = {Failed:"failed"};',
 );
 interface Runner {
+  log: { error(message: string): void };
   init(): Promise<void>;
   dispose(): Promise<void>;
   ctx: { config: Record<string, unknown>; projects: { config: Record<string, unknown> }[] };
@@ -55,15 +56,19 @@ const create = factory;
 let lines: string[] = [];
 beforeEach(() => {
   lines = [];
-  vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
-    lines.push(String(chunk));
-    return true;
+  vi.spyOn(process.stderr, 'write').mockImplementation(() => {
+    throw new Error('worker stderr is buffered; use the logger');
   });
 });
 afterEach(() => vi.restoreAllMocks());
 afterAll(() => rmSync(control.root, { recursive: true, force: true }));
 function inner(): Runner {
   return {
+    log: {
+      error: (message) => {
+        lines.push(message);
+      },
+    },
     async init() {},
     async dispose() {},
     ctx: {
