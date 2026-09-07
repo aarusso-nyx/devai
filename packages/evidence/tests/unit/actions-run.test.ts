@@ -535,3 +535,78 @@ it('requires and accepts actual full execution after a legitimate evidence miss'
     skippedJobs: [],
   });
 });
+
+it.each([
+  ['lockfileSha256', 'fallback-lockfile-changed', 'lockfile digest changed'],
+  ['toolchainContractSha256', 'fallback-toolchain-changed', 'toolchain contract digest changed'],
+  ['workflowPolicySha256', 'fallback-policy-changed', 'workflow policy digest changed'],
+  ['testContractSha256', 'fallback-policy-changed', 'test contract digest changed'],
+  ['serviceContractSha256', 'fallback-policy-changed', 'service contract digest changed'],
+] as const)(
+  'requires full execution after independently changed %s',
+  (field, disposition, reason) => {
+    const input = fixture();
+    input.current.digests = { ...input.current.digests, [field]: '0'.repeat(64) };
+    expect(verifyActionsRunEvidence(input)).toEqual({
+      disposition,
+      reason,
+      executeFullCi: true,
+      hardFailure: false,
+      reusableJobs: ACTIONS_REUSABLE_JOBS,
+      freshnessJobs: ACTIONS_FRESHNESS_JOBS,
+    });
+  },
+);
+
+it.each([{ baseSha: '0'.repeat(40) }, { basePolicySatisfied: false }])(
+  'requires full execution after changed base condition %j',
+  (change) => {
+    const input = fixture();
+    expect(
+      verifyActionsRunEvidence({ ...input, current: { ...input.current, ...change } }),
+    ).toMatchObject({
+      disposition: 'fallback-base-moved',
+      executeFullCi: true,
+      hardFailure: false,
+    });
+  },
+);
+
+it('refuses to reuse a different actual merged tree while preserving fallback rather than invalid-claim classification', () => {
+  const input = fixture();
+  input.current.mergedTree = { ...input.current.mergedTree, value: '0'.repeat(40) };
+  expect(verifyActionsRunEvidence(input)).toMatchObject({
+    disposition: 'fallback-tree-mismatch',
+    reason: 'actual merged tree differs from tested tree',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+});
+
+it('honors additional jobs required by the claim without subtracting the built-in floor', () => {
+  const base = fixture();
+  const input = {
+    ...base,
+    manifest: {
+      ...base.manifest,
+      policy: {
+        ...base.manifest.policy,
+        requiredJobs: [...base.manifest.policy.requiredJobs, 'extra-verification'],
+      },
+    },
+  };
+  expect(verifyActionsRunEvidence(input)).toMatchObject({
+    disposition: 'fallback-job-incomplete',
+    reason: 'required heavy job is incomplete: extra-verification',
+    executeFullCi: true,
+  });
+  expect(
+    verifyActionsRunEvidence({
+      ...input,
+      current: {
+        ...input.current,
+        successfulJobs: [...input.current.successfulJobs, 'extra-verification'],
+      },
+    }).disposition,
+  ).toBe('promotion-hit');
+});
