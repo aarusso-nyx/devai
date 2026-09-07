@@ -23,8 +23,31 @@ if (result.status !== 0) throw new Error('PUBLICATION_STATE_UNKNOWN');
 const value = JSON.parse(result.stdout);
 if (!Array.isArray(value)) throw new Error('PUBLICATION_STATE_UNKNOWN');
 if (kind === 'release') {
-  const found = value.flat().find((release) => release.tag_name === identity);
+  if (
+    value.some(
+      (page) =>
+        !Array.isArray(page) ||
+        page.some(
+          (release) =>
+            release === null ||
+            typeof release !== 'object' ||
+            typeof release.tag_name !== 'string' ||
+            release.tag_name.length === 0 ||
+            typeof release.draft !== 'boolean',
+        ),
+    )
+  )
+    throw new Error('PUBLICATION_STATE_UNKNOWN');
+  const releases = value.flat();
+  if (new Set(releases.map((release) => release.tag_name)).size !== releases.length)
+    throw new Error('PUBLICATION_STATE_UNKNOWN');
+  const found = releases.find((release) => release.tag_name === identity);
   process.stdout.write(found ? (found.draft ? 'draft\n' : 'present\n') : 'absent\n');
 } else {
+  if (
+    value.some((version) => typeof version !== 'string' || !/^\S+$/u.test(version)) ||
+    new Set(value).size !== value.length
+  )
+    throw new Error('PUBLICATION_STATE_UNKNOWN');
   process.stdout.write(value.includes(identity) ? 'present\n' : 'absent\n');
 }

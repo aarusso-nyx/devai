@@ -302,6 +302,49 @@ process.stdout.write(fs.readFileSync(process.env.FAKE_REMOTE+'/'+file));
 
 describe('publication recovery observations', () => {
   it.each([
+    ['release', [null]],
+    ['release', [[null]]],
+    ['release', [[{ tag_name: 'v1.5.0' }]]],
+    ['release', [[{ tag_name: 'v1.5.0', draft: 'false' }]]],
+    [
+      'release',
+      [
+        [
+          { tag_name: 'v1.5.0', draft: false },
+          { tag_name: 'v1.5.0', draft: true },
+        ],
+      ],
+    ],
+    ['registry', [null]],
+    ['registry', ['']],
+    ['registry', ['1.5.0', '1.5.0']],
+  ])('refuses malformed %s observations without reporting absence', (kind, payload) => {
+    const directory = temporary();
+    writeFileSync(join(directory, 'payload.json'), JSON.stringify(payload));
+    for (const name of ['gh', 'npm']) {
+      writeFileSync(
+        join(directory, name),
+        '#!/usr/bin/env node\nprocess.stdout.write(require("node:fs").readFileSync(process.env.STATE_FIXTURE));\n',
+      );
+      chmodSync(join(directory, name), 0o755);
+    }
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'scripts/process/publication-state.mjs'), String(kind), '1.5.0'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          STATE_FIXTURE: join(directory, 'payload.json'),
+          PATH: `${directory}:${process.env.PATH}`,
+        },
+      },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('PUBLICATION_STATE_UNKNOWN');
+  });
+  it.each([
     { kind: 'release', payload: [[{ tag_name: 'v1.4.5', draft: false }]], expected: 'present' },
     { kind: 'release', payload: [[{ tag_name: 'v1.4.5', draft: true }]], expected: 'draft' },
     { kind: 'release', payload: [[]], expected: 'absent' },
