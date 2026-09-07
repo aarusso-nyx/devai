@@ -419,8 +419,8 @@ export function metaGate(): MetaGateReport {
 
 // --- check-schemas canon linter (improvement 6, recursive half — first slice) ---
 const VERDICT_SETS = [
-  JSON.stringify(['pass', 'review', 'fail']),
-  JSON.stringify(['PASS', 'REVIEW', 'FAIL']),
+  JSON.stringify(['pass', 'review', 'fail'].sort()),
+  JSON.stringify(['PASS', 'REVIEW', 'FAIL'].sort()),
 ];
 export interface CanonFinding {
   schema: string;
