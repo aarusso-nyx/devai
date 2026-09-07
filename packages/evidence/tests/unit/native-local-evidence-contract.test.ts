@@ -485,6 +485,31 @@ describe('local evidence claim and actor parsing', () => {
 });
 
 describe('local evidence required tool identities', () => {
+  it.each(['absolute', 'mixed'])(
+    'accepts %s artifact paths without rebasing absolute directories under the repository',
+    (mode) => {
+      const { root, now } = fixture();
+      const jobDirs = Object.fromEntries(
+        REQUIRED_JOBS.map((job, index) => {
+          const relativePath = `.artifacts/${job}`;
+          return [
+            job,
+            mode === 'absolute' || index % 2 === 0 ? join(root, relativePath) : relativePath,
+          ];
+        }),
+      );
+      const collected = collectLocalEvidence({ repoRoot: root, jobDirs, now });
+      for (const job of REQUIRED_JOBS) {
+        expect(collected.manifest.jobs[job]).toMatchObject({
+          artifactDir: join(root, '.artifacts', job),
+          metadata: { job, platform: 'darwin/arm64' },
+          artifactChecksum: { algorithm: 'sha256', fileCount: 2 },
+        });
+      }
+      expect(gate(root, collected.outputPath, now).outcome).toBe('evidence-valid');
+    },
+  );
+
   it.each([{ observed: [] }, { observed: ['9.14.0'] }, { observed: ['9.15.0', '9.14.0'] }])(
     'rejects package-manager observations $observed',
     ({ observed }) => {

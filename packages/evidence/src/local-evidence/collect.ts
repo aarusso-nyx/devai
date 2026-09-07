@@ -7,7 +7,7 @@ import {
   statSync,
   writeFileSync,
 } from '@devai-nyx/authority';
-import { dirname, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import { computeSourceHash, type SourceHash } from './source-hash.js';
 import { resolveLocalEvidencePolicy, type LocalEvidencePolicy } from './config.js';
@@ -179,7 +179,7 @@ export function collectLocalEvidence(inputs: CollectInputs): CollectResult {
 
   const jobs: Record<string, ManifestJobEntry> = {};
   for (const [job, dir] of Object.entries(inputs.jobDirs)) {
-    jobs[job] = jobEntry(job, join(inputs.repoRoot, dir));
+    jobs[job] = jobEntry(job, isAbsolute(dir) ? dir : join(inputs.repoRoot, dir));
   }
 
   const pm = declaredPackageManager(inputs.repoRoot);
