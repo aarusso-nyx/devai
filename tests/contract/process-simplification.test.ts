@@ -170,6 +170,21 @@ describe('rehearsal promotion', () => {
       ),
     ).toThrow('PROMOTION_TRUST_OR_EVIDENCE_CHANGED');
   });
+  it.each([{}, [], null, { unexpected: 'c'.repeat(64) }].map((ledger) => ({ ledger })))(
+    'rejects incomplete current verification bindings %j',
+    ({ ledger }) => {
+      const f = assets();
+      expect(() =>
+        rehearsal.validatePromotion(
+          f.record,
+          f.run,
+          f.artifact,
+          { ...f.expected, ledger },
+          rehearsal.inspectAssets(f.directory),
+        ),
+      ).toThrow('PROMOTION_TRUST_OR_EVIDENCE_CHANGED');
+    },
+  );
   it('rejects changed bytes and extra release files', () => {
     const f = assets();
     writeFileSync(join(f.directory, 'devai.tgz'), 'changed');

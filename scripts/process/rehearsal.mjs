@@ -147,6 +147,18 @@ export function validatePromotion(record, run, artifact, expected, assets) {
   );
   // Current verification is performed by the protected ledger job. Any changed
   // evidence or trust input requires a new rehearsal; no obsolete claim is reused.
+  requireValue(
+    expected.ledger !== null &&
+      typeof expected.ledger === 'object' &&
+      !Array.isArray(expected.ledger) &&
+      record.ledger !== null &&
+      typeof record.ledger === 'object' &&
+      !Array.isArray(record.ledger) &&
+      Object.keys(expected.ledger).length > 0 &&
+      JSON.stringify(Object.keys(expected.ledger).sort()) ===
+        JSON.stringify(Object.keys(record.ledger).sort()),
+    'PROMOTION_TRUST_OR_EVIDENCE_CHANGED',
+  );
   for (const [key, value] of Object.entries(expected.ledger))
     requireValue(record.ledger[key] === value, 'PROMOTION_TRUST_OR_EVIDENCE_CHANGED');
   return true;
