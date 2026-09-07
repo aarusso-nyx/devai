@@ -232,17 +232,29 @@ export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
     ) {
       return failure('usage-error', 'AUTHORITY_FS_TARGET_INVALID');
     }
-    if (
-      typeof dependencies.realpath === 'function' &&
-      typeof dependencies.repository_root === 'string'
-    ) {
+    // Containment dependencies come only from the trusted host runtime, never from the
+    // caller. A caller with no realpath at all is classifying only. Once a realpath is
+    // supplied, containment must be established or the target is refused: the repository
+    // root must be an absolute path, the realpath result must be a non-empty path, and that
+    // result, absolute or relative to the root, resolves inside the root. Nothing here is
+    // left unchecked for any shape of result.
+    if (typeof dependencies.realpath === 'function') {
+      const configuredRoot = dependencies.repository_root;
+      if (
+        typeof configuredRoot !== 'string' ||
+        !configuredRoot.startsWith('/') ||
+        configuredRoot.includes('\0')
+      ) {
+        return failure('refused', 'AUTHORITY_FS_SYMLINK_ESCAPE');
+      }
       const resolved = dependencies.realpath(input.canonical_relative_path);
-      if (typeof resolved === 'string' && resolved.startsWith('/')) {
-        const root = resolvePath(dependencies.repository_root);
-        const candidate = resolvePath(resolved);
-        if (candidate !== root && !candidate.startsWith(`${root}${sep}`)) {
-          return failure('refused', 'AUTHORITY_FS_SYMLINK_ESCAPE');
-        }
+      if (typeof resolved !== 'string' || resolved.length === 0 || resolved.includes('\0')) {
+        return failure('refused', 'AUTHORITY_FS_SYMLINK_ESCAPE');
+      }
+      const root = resolvePath(configuredRoot);
+      const candidate = resolvePath(root, resolved);
+      if (candidate !== root && !candidate.startsWith(`${root}${sep}`)) {
+        return failure('refused', 'AUTHORITY_FS_SYMLINK_ESCAPE');
       }
     }
     return success(
@@ -250,6 +262,11 @@ export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
     );
   }
   if (input.kind === 'git-ref') {
+    // The protected marker is a caller-declared classification hint that only ever takes a
+    // boolean. Any other shape is malformed input and is refused, never read as unprotected.
+    if (Object.hasOwn(input, 'protected') && typeof input.protected !== 'boolean') {
+      return failure('refused', 'AUTHORITY_GIT_REF_INVALID');
+    }
     if (input.protected === true && ['delete', 'force-push'].includes(input.operation)) {
       return failure('refused', 'AUTHORITY_GIT_PROTECTED_REF_DENIED');
     }
