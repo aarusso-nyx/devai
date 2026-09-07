@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { minimatch } from 'minimatch';
 
 /**
@@ -61,6 +61,23 @@ function globBaseDir(pattern: string): string {
   return base.length > 0 ? base.join('/') : '.';
 }
 
+/** Apply traversal exclusions to the fixed prefix as well as discovered children. */
+function allowedPrefix(root: string, path: string): boolean {
+  if (isAbsolute(path) || path.includes('\\')) return false;
+  let current = root;
+  try {
+    for (const segment of path.split('/')) {
+      if (segment === '' || segment === '.') continue;
+      if (segment === '..' || HARD_EXCLUDE.has(segment)) return false;
+      current = join(current, segment);
+      if (lstatSync(current).isSymbolicLink()) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function walkAll(dir: string, root: string, out: string[]): void {
   let entries;
   try {
@@ -91,11 +108,19 @@ export function evaluateGlobGuard(repoRoot: string, guard: GlobGuard): GlobGuard
   const minMatches = guard.min_matches ?? 1;
   let matches: string[];
   if (!GLOB_META.test(guard.pattern)) {
-    matches = existsSync(join(repoRoot, guard.pattern)) ? [guard.pattern] : [];
+    matches = [];
+    if (allowedPrefix(repoRoot, guard.pattern)) {
+      try {
+        if (lstatSync(join(repoRoot, guard.pattern)).isFile()) matches = [guard.pattern];
+      } catch {
+        // A missing or concurrently removed literal is not a file match.
+      }
+    }
   } else {
-    const baseDir = join(repoRoot, globBaseDir(guard.pattern));
+    const prefix = globBaseDir(guard.pattern);
+    const baseDir = join(repoRoot, prefix);
     const files: string[] = [];
-    if (existsSync(baseDir)) {
+    if (allowedPrefix(repoRoot, prefix)) {
       walkAll(baseDir, repoRoot, files);
     }
     matches = files.filter((f) => minimatch(f, guard.pattern, { dot: true }));
