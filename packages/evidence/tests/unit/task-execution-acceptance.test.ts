@@ -373,6 +373,21 @@ function agentFacts(overrides: Partial<TaskExecutionEvidenceFacts> = {}) {
 }
 
 describe('independent exact agent execution bindings', () => {
+  it.each([undefined, null, 42, 'other:model'])(
+    'refuses an exact request with a missing, malformed or substituted registry identity %j',
+    (registry_id) => {
+      expect(() =>
+        buildTaskExecutionEvidence(
+          exactAgentTask({ selection: { mode: 'exact', registry_id } }),
+          agentFacts(),
+          PASS_VALIDATOR,
+        ),
+      ).toThrow(
+        'TASK_EXECUTION_EVIDENCE_EXACT_SUBSTITUTION: exact selection must resolve only the exact requested registry identity',
+      );
+    },
+  );
+
   it.each(['runtime', 'model', 'effort'] as const)('refuses substituted %s', (field) => {
     expect(() =>
       buildTaskExecutionEvidence(
@@ -466,6 +481,61 @@ describe('independent exact agent execution bindings', () => {
       ),
     ).toThrow(
       'TASK_EXECUTION_EVIDENCE_TIMESTAMP_INVALID: completed_at must be at or after started_at',
+    );
+  });
+});
+
+describe('task evidence snapshots and schema diagnostics', () => {
+  it('builds a real-schema-valid independent snapshot and freezes nested evidence', () => {
+    const executor = {
+      kind: 'routine' as const,
+      action_id: null,
+      argv: ['node', 'fixture.mjs'],
+      cwd: '.',
+      effects: ['read' as const],
+    };
+    const boundTask = task('TASK-7801', executor);
+    const input = facts('TXE-1111111111111111', executor);
+    const evidence = buildTaskExecutionEvidence(boundTask, input);
+    const before = JSON.stringify(evidence);
+    expect(checkTaskExecutionEvidence(evidence).ok).toBe(true);
+    expect(Object.isFrozen(executor)).toBe(false);
+    expect(Object.isFrozen(evidence)).toBe(true);
+    expect(Object.isFrozen(evidence.tool_versions)).toBe(true);
+    expect(Object.isFrozen(evidence.tool_versions[0])).toBe(true);
+    expect(Object.isFrozen(evidence.selection.considered_registry_ids)).toBe(true);
+    expect(Object.isFrozen(evidence.resolved_executor)).toBe(true);
+    if (evidence.resolved_executor.kind !== 'routine') throw new Error('expected routine');
+    expect(Object.isFrozen(evidence.resolved_executor.argv)).toBe(true);
+    executor.argv[0] = 'substituted';
+    Object.assign(input.tool_versions[0] ?? {}, { version: 'changed' });
+    expect(JSON.stringify(evidence)).toBe(before);
+    expect(() => Object.assign(evidence.tool_versions[0] ?? {}, { version: 'changed' })).toThrow(
+      TypeError,
+    );
+  });
+
+  it.each([
+    [undefined, ['schema validation failed without diagnostics']],
+    [null, ['schema validation failed without diagnostics']],
+    [{ message: 'not an array' }, ['schema validation failed without diagnostics']],
+    [[{ instancePath: '', message: 'must be object' }], ['/ must be object']],
+    [[{ instancePath: 1, message: 'must be object' }], ['/ must be object']],
+    [[{ instancePath: '/id', message: 42 }], ['/id invalid value']],
+    [[{}], ['/ invalid value']],
+    [
+      ['invalid member', 42, false],
+      ['invalid member', '42', 'false'],
+    ],
+  ])('preserves actionable schema diagnostics for %j', (errors, issues) => {
+    const validator = Object.assign((_value: unknown) => false, { errors });
+    expect(checkTaskExecutionEvidence({}, validator)).toEqual({
+      ok: false,
+      code: 'TASK_EXECUTION_EVIDENCE_SCHEMA_INVALID',
+      issues,
+    });
+    expect(() => validateTaskExecutionEvidence({}, validator)).toThrow(
+      `TASK_EXECUTION_EVIDENCE_SCHEMA_INVALID: ${(issues as string[]).join('; ')}`,
     );
   });
 });
