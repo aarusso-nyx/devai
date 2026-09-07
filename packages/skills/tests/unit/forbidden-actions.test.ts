@@ -237,6 +237,8 @@ describe('scanForbiddenActions', () => {
 
   it.each([
     ['git push +HEAD:topic', 'FORBID-FORCE-PUSH'],
+    ['git commit --no-verify', 'FORBID-NO-VERIFY'],
+    ['git commit --no-gpg-sign', 'FORBID-NO-GPG-SIGN'],
     ['git push origin main', 'FORBID-PUSH-MAIN'],
     ['git reset --hard HEAD', 'FORBID-RESET-HARD'],
     ['git rebase -i HEAD~2', 'FORBID-REBASE-I'],
@@ -1219,3 +1221,39 @@ it.each([null, [], { id: 'FORBID-RM-RF', reason: 'No shell', extra: true }])(
     });
   },
 );
+
+describe('hook and signature bypass flag boundaries', () => {
+  it.each(['no-verify', 'no-gpg-sign'])(
+    'keeps declared and bootstrap --%s detection aligned',
+    (flag) => {
+      const id = flag === 'no-verify' ? 'FORBID-NO-VERIFY' : 'FORBID-NO-GPG-SIGN';
+      const registries = [
+        CANONICAL_FORBIDDEN_ACTIONS,
+        ...['law/policy/forbidden-actions.json', '.devai/config/forbidden-actions.json'].map(
+          (path) => JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8')).actions,
+        ),
+      ];
+      for (const registry of registries) {
+        const entry = registry.find((value: { id: string }) => value.id === id);
+        if (!entry) throw new Error('missing declared prohibition');
+        const matches = (text: string) =>
+          entry.detect_patterns.some((pattern: string) => new RegExp(pattern, 'i').test(text));
+        for (const text of [
+          `--${flag}`,
+          `git commit --${flag}`,
+          `git commit\t--${flag};`,
+          `git commit "--${flag}"`,
+          `git commit '--${flag}'`,
+        ])
+          expect(matches(text), text).toBe(true);
+        for (const text of [
+          `git commit --${flag}-extra`,
+          `git commit --${flag}x`,
+          `prefix--${flag}`,
+          'git commit --signoff',
+        ])
+          expect(matches(text), text).toBe(false);
+      }
+    },
+  );
+});

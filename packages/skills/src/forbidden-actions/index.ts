@@ -94,7 +94,7 @@ export const CANONICAL_FORBIDDEN_ACTIONS: readonly ForbiddenActionEntry[] = [
     action: 'Any `--no-verify` flag',
     rationale: 'Bypasses hooks',
     severity: 'high',
-    detect_patterns: ['\\b--no-verify\\b'],
+    detect_patterns: ['(?:^|[\\s"\'`])--no-verify(?![\\w-])'],
     safer_alternative: 'Fix the underlying hook failure',
   },
   {
@@ -102,7 +102,7 @@ export const CANONICAL_FORBIDDEN_ACTIONS: readonly ForbiddenActionEntry[] = [
     action: 'Any `--no-gpg-sign` flag',
     rationale: 'Bypasses signing',
     severity: 'high',
-    detect_patterns: ['\\b--no-gpg-sign\\b', 'commit\\.gpgsign=false'],
+    detect_patterns: ['(?:^|[\\s"\'`])--no-gpg-sign(?![\\w-])', 'commit\\.gpgsign=false'],
     safer_alternative: 'Configure signing in the environment',
   },
   {
