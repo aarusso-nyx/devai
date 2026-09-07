@@ -213,6 +213,49 @@ describe('governance record parsing and integrity', () => {
     );
   });
 
+  it.each([
+    { name: 'body', update: { status: 'active', body: '# Changed doctrine' } },
+    { name: 'title', update: { status: 'active', title: 'Changed title' } },
+    { name: 'lifecycle rollback', update: { status: 'draft' } },
+    { name: 'replacement while active', update: { status: 'active', supersededBy: 'ADR-002' } },
+  ])('rejects an uncommitted sealed $name mutation', ({ update }) => {
+    const root = fixtureRoot();
+    const path = writeRecord(root, 'ADR-001.md', recordSource({ status: 'active' }));
+    initGit(root);
+    commitAll(root, 'seal');
+    writeFileSync(path, recordSource(update));
+    expect(decisionRecordIntegrity({ repoRoot: root }).findings).toContainEqual(
+      expect.objectContaining({ code: 'DECISION_LOCKED_BODY_MUTATED' }),
+    );
+  });
+
+  it('accepts an uncommitted restoration and subsequent canonical supersession', () => {
+    const root = fixtureRoot();
+    const original = recordSource({ status: 'active' });
+    const path = writeRecord(root, 'ADR-001.md', original);
+    initGit(root);
+    commitAll(root, 'seal');
+    writeFileSync(path, recordSource({ status: 'active', body: '# Invalid edit' }));
+    commitAll(root, 'invalid edit');
+    writeFileSync(path, original);
+    expect(decisionRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+    writeFileSync(path, recordSource({ status: 'superseded', supersededBy: 'ADR-002' }));
+    writeRecord(root, 'ADR-002.md', recordSource({ id: 'ADR-002', supersedes: '[ADR-001]' }));
+    commitAll(root, 'restore and supersede');
+    expect(decisionRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+  });
+
+  it('accepts a valid supersession before commit when the successor already has history', () => {
+    const root = fixtureRoot();
+    const path = writeRecord(root, 'ADR-001.md', recordSource({ status: 'active' }));
+    const successor = writeRecord(root, 'ADR-002.md', recordSource({ id: 'ADR-002' }));
+    initGit(root);
+    commitAll(root, 'seal and successor draft');
+    writeFileSync(path, recordSource({ status: 'superseded', supersededBy: 'ADR-002' }));
+    writeFileSync(successor, recordSource({ id: 'ADR-002', supersedes: '[ADR-001]' }));
+    expect(decisionRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+  });
+
   it('fails sealed-history verification closed in a shallow clone', () => {
     const source = fixtureRoot();
     writeRecord(source, 'ADR-001.md', recordSource({ status: 'active' }));

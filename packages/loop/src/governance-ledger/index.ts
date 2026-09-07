@@ -179,17 +179,17 @@ function markdownFiles(dir: string): readonly string[] {
     );
 }
 
-function git(repoRoot: string, args: readonly string[]): string | null {
+function git(repoRoot: string, args: readonly string[], trim = true): string | null {
   const result = readProcessSync('git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   });
-  return result.status === 0 ? result.stdout.trim() : null;
+  return result.status === 0 ? (trim ? result.stdout.trim() : result.stdout) : null;
 }
 
 function gitFile(repoRoot: string, commit: string, path: string): string | null {
-  return git(repoRoot, ['show', `${commit}:${path}`]);
+  return git(repoRoot, ['show', `${commit}:${path}`], false);
 }
 
 interface HistoricalPath {
@@ -309,9 +309,14 @@ function sealedHistoryFindings(
   const originalSeal = sealed;
   let lockedMutationObserved = false;
   const priorTerminalStates: string[] = [];
-  const laterHistory = history.slice(sealIndex + 1);
+  // Validate the exact inspected bytes as the final revision, even before commit.
+  const laterHistory: { commit: string | null; path: string }[] = [
+    ...history.slice(sealIndex + 1),
+    { commit: null, path: record.path },
+  ];
   for (const [laterIndex, entry] of laterHistory.entries()) {
-    const laterSource = gitFile(repoRoot, entry.commit, entry.path);
+    const laterSource =
+      entry.commit === null ? record.source : gitFile(repoRoot, entry.commit, entry.path);
     if (laterSource === null) {
       return [
         {
