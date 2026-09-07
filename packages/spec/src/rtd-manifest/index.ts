@@ -157,7 +157,7 @@ function summarizeTrace(
   tracePath: string,
   invariantIds: ReadonlySet<string>,
 ): RtdManifestComponentEntry | null {
-  if (!existsSync(tracePath)) return null;
+  if (!existsSync(tracePath) && invariantIds.size === 0) return null;
   const rec = readJson<{ invariants?: unknown[] }>(tracePath);
   const errors: string[] = [];
   let validatorOk = true;
@@ -267,8 +267,11 @@ function summarizeAdrs(adrDir: string): RtdManifestComponentEntry | null {
 
 function summarizeForbiddenActions(repoRoot: string): RtdManifestComponentEntry | null {
   const path = join(repoRoot, 'law/policy/forbidden-actions.json');
+  if (!existsSync(path)) return null;
   const rec = readJson<{ actions?: unknown[] }>(path);
-  if (rec === null) return null;
+  if (rec === null) {
+    return { count: 0, hash: hashCanonical(null), ok: false, errors: [`unreadable: ${path}`] };
+  }
   const errors: string[] = [];
   const ok = validators.forbiddenActions(rec);
   if (!ok) {
