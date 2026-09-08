@@ -834,6 +834,13 @@ export function renderDecisionRecords(options: {
   ].join('\n');
 }
 
+function markdownTableText(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r\n|\r|\n/g, '<br>');
+}
+
 export function renderDecisionIndex(options: {
   readonly repoRoot: string;
   readonly recordsDir?: string;
@@ -847,6 +854,9 @@ export function renderDecisionIndex(options: {
       String(record.frontmatter['status'] ?? ''),
       String(record.frontmatter['round'] ?? ''),
       String(record.frontmatter['date'] ?? ''),
+      encodeURIComponent(basename(path)).replace(/[()]/g, (character) =>
+        character === '(' ? '%28' : '%29',
+      ),
     ];
   });
   return [
@@ -857,8 +867,8 @@ export function renderDecisionIndex(options: {
     '| ID | Title | Status | Round | Date |',
     '|---|---|---|---|---|',
     ...rows.map(
-      ([id, title, status, round, date]) =>
-        `| [${id}](./${id}.md) | ${title} | ${status} | ${round} | ${date} |`,
+      ([id = '', title = '', status = '', round = '', date = '', filename]) =>
+        `| [${markdownTableText(id)}](./${filename}) | ${[title, status, round, date].map(markdownTableText).join(' | ')} |`,
     ),
     '',
   ].join('\n');
