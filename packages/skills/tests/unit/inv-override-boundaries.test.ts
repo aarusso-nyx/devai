@@ -159,3 +159,56 @@ describe('override expiration calendar boundaries', () => {
     ]);
   });
 });
+
+describe('independent override blocks', () => {
+  it('binds each adjacent override to its own authorization metadata', () => {
+    const first = block({ reason: 'first migration', ticket: 'ENG-1', approver: '@first' });
+    const second = block({
+      reason: 'second migration',
+      ticket: 'ENG-2',
+      approver: '@second',
+    }).replace('INV-TEST-001', 'INV-TEST-002');
+    write('packages/entry.ts', `${first}\n${second}`);
+    const result = scan();
+    expect(result.findings).toEqual([]);
+    expect(
+      result.overrides.map(({ invariant_id, reason, ticket, approver, line }) => ({
+        invariant_id,
+        reason,
+        ticket,
+        approver,
+        line,
+      })),
+    ).toEqual([
+      {
+        invariant_id: 'INV-TEST-001',
+        reason: 'first migration',
+        ticket: 'ENG-1',
+        approver: '@first',
+        line: 1,
+      },
+      {
+        invariant_id: 'INV-TEST-002',
+        reason: 'second migration',
+        ticket: 'ENG-2',
+        approver: '@second',
+        line: 6,
+      },
+    ]);
+  });
+
+  it('does not borrow missing approval fields from the next override block', () => {
+    write('packages/entry.ts', `// inv-override: INV-INCOMPLETE\n${block()}`);
+    const result = scan();
+    expect(result.overrides.map(({ invariant_id }) => invariant_id)).toEqual(['INV-TEST-001']);
+    expect(result.findings).toEqual([
+      {
+        code: 'malformed',
+        file: 'packages/entry.ts',
+        line: 1,
+        invariant_id: 'INV-INCOMPLETE',
+        message: 'inv-override missing required field(s): reason, ticket, expires, approver',
+      },
+    ]);
+  });
+});

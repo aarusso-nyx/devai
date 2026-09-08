@@ -122,6 +122,8 @@ function parseBlockAt(
   let i = startIdx + 1;
   while (i < lines.length) {
     const line = lines[i] ?? '';
+    // Adjacent annotations have separate approval and expiration bindings.
+    if (HEADER_RE.test(line)) break;
     const m = FIELD_RE.exec(line);
     if (m === null) break;
     fields[m[1] ?? ''] = m[2] ?? '';
