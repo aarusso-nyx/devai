@@ -76,6 +76,35 @@ describe('redactRecord', () => {
     expect(expected).toBe(result.target.manifest_hash);
   });
 
+  it('redacts repository and artifact paths without changing structural evidence', () => {
+    initChain(chainPath);
+    const first = appendRecord(
+      chainPath,
+      draft('EV-0000000000000001', {
+        artifacts: [{ path: '/secret/report.json', sha256: 'a'.repeat(64), kind: 'report' }],
+        context: {
+          ...baseContext,
+          git: { head_sha: 'b'.repeat(40), dirty_files: ['tracked.txt'] },
+        },
+      }),
+    );
+
+    const result = redactRecord({
+      chainPath,
+      targetId: first.id,
+      policy: { patterns: [], fields: ['repo_root', 'path'] },
+    });
+
+    expect(result.target).toEqual({
+      ...first,
+      artifacts: [{ ...first.artifacts[0], path: '[REDACTED]' }],
+      context: { ...first.context, repo_root: '[REDACTED]' },
+    });
+    expect(loadChain(chainPath).records).toEqual([result.target]);
+    expect(readFileSync(chainPath, 'utf8')).not.toContain('/secret/');
+    expect(verifyChain(chainPath).valid).toBe(true);
+  });
+
   it('re-links downstream when a hashed field changes and chain stays valid', () => {
     initChain(chainPath);
     appendRecord(chainPath, draft('EV-0000000000000001'));
