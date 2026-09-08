@@ -689,11 +689,13 @@ describe('local evidence required tool identities', () => {
   it.each(['pnpm', '@9.15.0'])(
     'does not invent a tool identity for malformed packageManager %s',
     (packageManager) => {
-      const { root, manifestPath } = fixture({ packageFields: { packageManager } });
+      const { root, manifestPath, now } = fixture({ packageFields: { packageManager } });
       const manifest = JSON.parse(
         readFileSync(join(root, manifestPath), 'utf8'),
       ) as MutableManifest;
       expect(manifest.tools).toEqual({ node: { expected: '>=24', observed: [process.version] } });
+      expect(() => gate(root, manifestPath, now)).not.toThrow();
+      expect(gate(root, manifestPath, now).outcome).toBe('evidence-valid');
     },
   );
 
@@ -932,4 +934,42 @@ describe('local evidence policy-sensitive path boundaries', () => {
     expect(result.evidenceMode).toBe(true);
     expect(result.outcome).toBe('evidence-valid');
   });
+});
+
+describe('local evidence tool verification boundaries', () => {
+  it.each([{}, { node: '' }])('does not invent a Node major when engines is %j', (engines) => {
+    const { root, manifestPath, now } = fixture({ packageFields: { engines } });
+    expect(() => gate(root, manifestPath, now)).not.toThrow();
+    expect(gate(root, manifestPath, now).outcome).toBe('evidence-valid');
+  });
+  it('refuses an entirely absent declared package-manager observation with the version diagnostic', () => {
+    const { root, manifestPath, now } = fixture({
+      packageFields: { packageManager: 'pnpm@9.15.0' },
+      metadata: 'pnpm=9.15.0\n',
+    });
+    const manifest = JSON.parse(readFileSync(join(root, manifestPath), 'utf8')) as MutableManifest;
+    delete manifest.tools.pnpm;
+    put(root, manifestPath, manifest);
+    expect(() => gate(root, manifestPath, now)).toThrow(
+      'manifest pnpm versions must all equal 9.15.0',
+    );
+  });
+  it.each(['missing', 'malformed'] as const)(
+    'refuses tool verification for an exact candidate with %s package metadata',
+    (state) => {
+      const { root, now } = fixture();
+      if (state === 'missing') rmSync(join(root, 'package.json'));
+      else put(root, 'package.json', '{broken');
+      execFileSync('git', ['add', '--', 'package.json'], { cwd: root });
+      execFileSync('git', ['commit', '-qm', 'fixture: invalid package metadata'], { cwd: root });
+      const collected = collectLocalEvidence({
+        repoRoot: root,
+        now,
+        jobDirs: Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`])),
+      });
+      expect(() => gate(root, collected.outputPath, now)).toThrow(
+        'cannot read package.json for tool-version validation',
+      );
+    },
+  );
 });
