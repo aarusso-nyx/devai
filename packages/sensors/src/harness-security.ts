@@ -43,7 +43,7 @@ export interface HarnessSecurityOptions {
 
 const SHA_RE = /^[a-f0-9]{40}$/;
 // `uses: owner/repo@ref` (block list), permissive of leading whitespace.
-const USES_RE = /^\s*-?\s*uses:\s*([^\s@'"]+)@([^\s'"]+)/;
+const USES_RE = /^\s*-?\s*uses:\s*['"]?([^\s@'"]+)@([^\s'"]+)/;
 
 import type { Stats } from 'node:fs';
 
@@ -89,7 +89,7 @@ function scanWorkflow(content: string): Omit<WorkflowFindings, 'file'> {
       }
       if (owner === 'actions/checkout') hasCheckout = true;
     }
-    if (/^\s*permissions:/.test(ln)) hasPermissionsBlock = true;
+    if (/^permissions:/.test(ln)) hasPermissionsBlock = true;
     if (/^\s*pull_request_target\s*:/.test(ln) || /^\s*-\s*pull_request_target\s*$/.test(ln)) {
       hasPullRequestTarget = true;
     }
