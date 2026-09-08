@@ -60,5 +60,29 @@
         "tree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
       }
     }
-  }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "release_unit": "@aarusso-nyx/devai",
+      "current_version": "1.4.5",
+      "target_version": "1.5.0",
+      "support": "current",
+      "support_promotion": false,
+      "change_kind": "behavioral",
+      "changed_paths": ["law/policy/release-lifecycle.json"],
+      "changed_packages": ["@aarusso-nyx/devai"],
+      "risks": ["release-integrity"],
+      "owner_escalations": [],
+      "candidate": {
+        "commit": "5461ba500000000000000000000000000000aaaa",
+        "tree": "2cad519aba8117a1850eee85d41eae452d51a141"
+      },
+      "base": {
+        "commit": "37e75a5c27569d4cb3fdb4a3dc97a140da4d78de",
+        "tree": "1111111111111111111111111111111111111111"
+      }
+    }
+  ]
 }

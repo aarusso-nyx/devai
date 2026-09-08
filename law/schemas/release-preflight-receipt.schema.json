@@ -95,5 +95,77 @@
         "tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
       }
     }
-  }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "repository": {
+        "id": "example/repo",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "base": {
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "tree": "dddddddddddddddddddddddddddddddddddddddd"
+      },
+      "releaseIntentDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "releaseProfileDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "taskPolicyDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "toolchainDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "checks": [
+        {
+          "capability": "formatting-hygiene",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "capability": "lint",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        {
+          "capability": "type-integrity",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "capability": "schema-consistency",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "capability": "secret-scan",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "5555555555555555555555555555555555555555555555555555555555555555"
+        },
+        {
+          "capability": "path-portability",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "6666666666666666666666666666666666666666666666666666666666666666"
+        },
+        {
+          "capability": "package-integrity",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        {
+          "capability": "exact-candidate",
+          "status": "executed",
+          "reasonCode": "required-floor",
+          "resultDigest": "8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ],
+      "verdict": "pass",
+      "blockingReasons": [],
+      "createdAt": "2026-08-29T00:00:00.000Z"
+    }
+  ]
 }
