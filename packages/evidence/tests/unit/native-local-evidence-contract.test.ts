@@ -995,3 +995,64 @@ it.each(['unit', 'api'])(
     expect(readFileSync(join(root, manifestPath))).toEqual(before);
   },
 );
+
+it('collector preserves schema identity, observed platform population and serialized bytes', () => {
+  const { root, now } = fixture({
+    packageFields: { engines: undefined },
+    localPolicy: { allowed_platforms: ['darwin/arm64', 'linux/amd64'] },
+  });
+  put(
+    root,
+    '.artifacts/api/metadata.txt',
+    `job=api\nplatform=linux/amd64\nnode=${process.version}\n`,
+  );
+  const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+  const { manifest, outputPath } = collectLocalEvidence({ repoRoot: root, now, jobDirs });
+  expect(manifest.$schema).toBe('https://devai.dev/schemas/local-evidence-manifest.schema.json');
+  expect(manifest.platforms).toEqual(['darwin/arm64', 'linux/amd64']);
+  expect(manifest.tools['node']).toEqual({ expected: '', observed: [process.version] });
+  expect(readFileSync(join(root, outputPath), 'utf8')).toBe(
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+});
+
+it('collector diagnoses a missing metadata job without substituting an identity', () => {
+  const { root, now } = fixture();
+  put(root, '.artifacts/unit/metadata.txt', `platform=darwin/arm64\nnode=${process.version}\n`);
+  const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+  let failure: unknown;
+  try {
+    collectLocalEvidence({ repoRoot: root, now, jobDirs });
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toBe(
+    `expected ${join(root, '.artifacts/unit')} to contain job=unit, got job=`,
+  );
+});
+
+it('collector reports the configuration needed when no local policy is declared', () => {
+  const { root, now } = fixture();
+  put(root, '.devai/config/project.json', { schemaVersion: '1.0.0', project_type: 'runtime-host' });
+  expect(() => collectLocalEvidence({ repoRoot: root, now, jobDirs: {} })).toThrow(
+    'no local-evidence policy declared: set ci_economy.local_evidence.required_jobs in .devai/config/project.json',
+  );
+});
+
+it('collector excludes its actual output directory from the source digest', () => {
+  const { root, now } = fixture();
+  const outputPath = 'custom-receipts/current.json';
+  put(root, outputPath, { previous: 'first' });
+  execFileSync('git', ['add', '--', outputPath], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'retain previous custom receipt'], { cwd: root });
+  const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+  const before = collectLocalEvidence({ repoRoot: root, now, jobDirs, outputPath });
+  put(root, outputPath, { previous: 'different receipt bytes' });
+  execFileSync('git', ['add', '--', outputPath], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'retain changed custom receipt'], { cwd: root });
+  const after = collectLocalEvidence({ repoRoot: root, now, jobDirs, outputPath });
+  expect(after.manifest.subject.commitSha).not.toBe(before.manifest.subject.commitSha);
+  expect(after.manifest.sourceHash).toEqual(before.manifest.sourceHash);
+  expect(after.outputPath).toBe(outputPath);
+});
