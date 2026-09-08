@@ -6,7 +6,7 @@ import type { AnySchema } from 'ajv';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildRecipeAdapterPlan } from '../../src/recipes/adapters.js';
 import { loadRecipes } from '../../src/recipes/loader.js';
-import { validateRecipeManifest } from '../../src/recipes/validate.js';
+import { assertRecipeManifest, validateRecipeManifest } from '../../src/recipes/validate.js';
 
 const canonical = (() => {
   const recipe = loadRecipes().find((item) => item.manifest.name === 'devai-fix');
@@ -212,5 +212,60 @@ describe('recipe manifest structural and effect boundaries', () => {
         }),
       ).toContain('variants.lint.operations[0] is invalid');
     },
+  );
+});
+
+it.each([null, 42, 'manifest', [], true].map((value) => ({ value })))(
+  'returns the exact root-shape diagnostic for $value',
+  ({ value }) => {
+    expect(validateRecipeManifest(value)).toEqual(['recipe manifest must be an object']);
+  },
+);
+
+it('accepts a bounded directory scope with its trailing separator intact', () => {
+  const value = alteredVariant('write_policy', { mode: 'bounded-patterns', scopes: ['docs/'] });
+  expect(schema(value)).toBe(true);
+  expect(validateRecipeManifest(value)).toEqual([]);
+});
+
+it('reports both the unsupported field and forbidden scopes for a read-only policy', () => {
+  const value = alteredVariant('write_policy', { mode: 'none', scopes: ['docs/**'] });
+  value.variants.lint.effect = 'read';
+  expect(validateRecipeManifest(value)).toEqual([
+    'variants.lint.write_policy has unsupported field: scopes',
+    'variants.lint.write_policy.scopes is forbidden when mode=none',
+  ]);
+});
+
+it.each([null, 42, {}, ['.devai/state/round/**']].map((scope) => ({ scope })))(
+  'returns diagnostics instead of crashing on a malformed runtime scope $scope',
+  ({ scope }) => {
+    const value = alteredVariant('write_policy', { mode: 'bounded-patterns', scopes: [scope] });
+    value.variants.lint.effect = 'runtime-write';
+    let errors: string[] | undefined;
+    expect(() => {
+      errors = validateRecipeManifest(value);
+    }).not.toThrow();
+    expect(errors).toEqual(['variants.lint.write_policy.scopes[0] must be a non-empty string']);
+  },
+);
+
+it('preserves each independent validation diagnostic in the thrown error', () => {
+  let failure: unknown;
+  try {
+    assertRecipeManifest({});
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toBe(
+    [
+      'INVALID_RECIPE_MANIFEST:',
+      'schemaVersion must equal "1"',
+      'name is not one of the seven RC recipes',
+      'status must be stable or preview',
+      'description must be a non-empty string',
+      'variants must be a non-empty object',
+    ].join('\n'),
   );
 });
