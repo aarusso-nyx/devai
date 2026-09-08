@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
 import { minimatch } from 'minimatch';
 import { parse as parseYaml } from 'yaml';
 
@@ -180,7 +180,7 @@ function walk(
       continue;
     }
     if (stat.isDirectory()) {
-      const rel = relative(root, full).replace(/\\/g, '/');
+      const rel = relative(root, full).split(sep).join('/');
       if (['src', 'lib', 'bin'].includes(name) && depth <= 4) state.sourceRoots.add(rel);
       if (
         ['test', 'tests', 'testing', '__tests__'].includes(name) &&
@@ -199,7 +199,7 @@ function walk(
       walk(root, state, full, depth + 1);
     } else if (stat.isFile()) {
       if (name === 'package.json') {
-        state.manifestPaths.push(relative(root, full).replace(/\\/g, '/'));
+        state.manifestPaths.push(relative(root, full).split(sep).join('/'));
       }
       const ext = extname(name);
       const lang = LANG_EXT[ext];
@@ -210,7 +210,7 @@ function walk(
       if (/\.test\.(ts|js|tsx|jsx|mts|mjs|cjs)$/.test(name)) state.hasTestFiles = true;
       for (const re of PROTECTED_FILENAME_PATTERNS) {
         if (re.test(name)) {
-          state.protectedSurfaces.push(relative(root, full).replace(/\\/g, '/'));
+          state.protectedSurfaces.push(relative(root, full).split(sep).join('/'));
           break;
         }
       }
