@@ -72,10 +72,6 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(re);
 }
 
-function isLiteralPath(glob: string): boolean {
-  return !glob.includes('*');
-}
-
 function safeStat(p: string): Stats | null {
   try {
     return statSync(p);
@@ -110,6 +106,17 @@ function listFilesRecursive(absRoot: string, repoRoot: string, sink: string[]): 
   }
 }
 
+/** Expand from the literal prefix, then apply the same pattern used for claims. */
+function matchingFiles(repoRoot: string, glob: string): string[] {
+  const wildcard = glob.indexOf('*');
+  const prefix = wildcard < 0 ? glob : glob.slice(0, glob.lastIndexOf('/', wildcard) + 1);
+  const files: string[] = [];
+  listFilesRecursive(absDir(repoRoot, prefix), repoRoot, files);
+  if (wildcard < 0) return files;
+  const pattern = globToRegExp(glob);
+  return files.filter((file) => pattern.test(file));
+}
+
 interface InvariantRecord {
   readonly id?: string;
   readonly scope?: { code_areas?: readonly string[] };
@@ -128,7 +135,12 @@ export function senseSpecAlignment(rawOpts: SpecAlignmentOptions): SensorReading
 
   // Load invariants and compute the union of all code-area globs.
   const allGlobs: string[] = [];
-  const perInvariantGlobs: Array<{ id: string; file: string; globs: readonly string[] }> = [];
+  const perInvariantGlobs: Array<{
+    id: string;
+    file: string;
+    globs: readonly string[];
+    invalid: boolean;
+  }> = [];
   for (const file of listJsonFiles(invariantsDir)) {
     let parsed: InvariantRecord | null = null;
     try {
@@ -136,70 +148,44 @@ export function senseSpecAlignment(rawOpts: SpecAlignmentOptions): SensorReading
     } catch {
       continue;
     }
-    const id = parsed.id ?? file.split('/').slice(-1).join('');
-    const globs = parsed.scope?.code_areas ?? [];
-    perInvariantGlobs.push({ id, file, globs });
+    const id = parsed?.id ?? file.split('/').slice(-1).join('');
+    const declared = parsed?.scope?.code_areas;
+    const invalid =
+      declared !== undefined &&
+      (!Array.isArray(declared) || declared.some((g) => typeof g !== 'string'));
+    const globs: readonly string[] = invalid ? [] : (declared ?? []);
+    perInvariantGlobs.push({ id, file, globs, invalid });
     for (const g of globs) allGlobs.push(g);
   }
 
   // Forward scan.
   const findings: SensorFinding[] = [];
   let invariantsBrokenForward = 0;
-  for (const { id, file, globs } of perInvariantGlobs) {
-    let matched = 0;
-    for (const g of globs) {
-      if (isLiteralPath(g)) {
-        if (safeStat(absDir(opts.repoRoot, g)) !== null) matched += 1;
-        continue;
-      }
-      // Globbed; expand by walking the stripped-prefix directory.
-      const prefix = g.replace(/\/\*\*$/, '').replace(/\/\*$/, '');
-      const abs = absDir(opts.repoRoot, prefix);
-      const sink: string[] = [];
-      listFilesRecursive(abs, opts.repoRoot, sink);
-      const re = globToRegExp(g);
-      if (sink.some((s) => re.test(s))) matched += 1;
-    }
-    if (globs.length > 0 && matched === 0) {
+  for (const { id, file, globs, invalid } of perInvariantGlobs) {
+    const matched = globs.some((glob) =>
+      glob.includes('*')
+        ? matchingFiles(opts.repoRoot, glob).length > 0
+        : safeStat(absDir(opts.repoRoot, glob))?.isFile() === true,
+    );
+    if (invalid || (globs.length > 0 && !matched)) {
       invariantsBrokenForward += 1;
       findings.push({
         severity: 'error',
-        code: 'SPEC_ALIGNMENT_INVARIANT_HAS_NO_MATCHING_FILES',
-        message: `Invariant ${id} has zero matching files for any of its scope.code_areas[].`,
+        code: invalid
+          ? 'SPEC_ALIGNMENT_INVALID_CODE_AREAS'
+          : 'SPEC_ALIGNMENT_INVARIANT_HAS_NO_MATCHING_FILES',
+        message: invalid
+          ? `Invariant ${id} scope.code_areas must be an array of strings.`
+          : `Invariant ${id} has zero matching files for any of its scope.code_areas[].`,
         file,
       });
     }
   }
 
   // Reverse scan.
-  const sourceFiles: string[] = [];
-  for (const g of sourceGlobs) {
-    const prefix = g.replace(/\/\*\*$/, '').replace(/\/\*$/, '');
-    if (prefix.includes('*')) {
-      // Wildcard in prefix (e.g. packages/*/src) — expand one level.
-      const parts = prefix.split('/');
-      const wildIdx = parts.findIndex((p) => p.includes('*'));
-      if (wildIdx < 0) continue;
-      const before = parts.slice(0, wildIdx).join('/');
-      const after = parts.slice(wildIdx + 1).join('/');
-      const wildAbs = absDir(opts.repoRoot, before);
-      const wildPattern = parts[wildIdx] ?? '*';
-      const wildRe = globToRegExp(wildPattern);
-      let entries: string[];
-      try {
-        entries = readdirSync(wildAbs);
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        if (!wildRe.test(entry)) continue;
-        const sub = absDir(opts.repoRoot, [before, entry, after].filter((s) => s !== '').join('/'));
-        listFilesRecursive(sub, opts.repoRoot, sourceFiles);
-      }
-    } else {
-      listFilesRecursive(absDir(opts.repoRoot, prefix), opts.repoRoot, sourceFiles);
-    }
-  }
+  const sourceFiles = [
+    ...new Set(sourceGlobs.flatMap((glob) => matchingFiles(opts.repoRoot, glob))),
+  ].filter((file) => /\.(ts|tsx|js)$/.test(file));
 
   const allRes = allGlobs.map((g) => globToRegExp(g));
   let claimed = 0;
