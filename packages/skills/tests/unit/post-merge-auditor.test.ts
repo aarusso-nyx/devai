@@ -170,6 +170,27 @@ function rewrite(
   writeFileSync(fx.receiptPath, `${JSON.stringify(receipt)}\n`);
 }
 
+/**
+ * Mirrors the production canonicalisation so a test can re-seal a forged
+ * observation exactly the way the auditor seals a genuine one. Without this the
+ * forgeries below would only ever fail the seal comparison and could never
+ * reach the individual field checks they are written to exercise.
+ */
+function canonicalSha256(value: unknown): string {
+  const canonical = (input: unknown): string => {
+    if (Array.isArray(input)) return `[${input.map(canonical).join(',')}]`;
+    if (input !== null && typeof input === 'object') {
+      const record = input as Record<string, unknown>;
+      return `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`)
+        .join(',')}}`;
+    }
+    return JSON.stringify(input);
+  };
+  return sha256(canonical(value));
+}
+
 function verify(fx: HostFixture, overrides: Record<string, unknown> = {}) {
   return verifyPostMergeHostReceipt({
     repoRoot: fx.root,
@@ -661,5 +682,228 @@ describe('post-merge authority host scope', () => {
     expect(git(linked.root, ['rev-parse', `refs/devai/post-merge/${linked.mergeSha}`])).not.toBe(
       linked.mergeSha,
     );
+  });
+});
+
+async function runAuditor(fx: HostFixture, injectFailure = false) {
+  const host = createPostMergeHostScope(fx.root, fx.mergeSha);
+  try {
+    return await runWithAuthorityHostEffects(host.scope, () =>
+      runPostMergeAuditor({
+        repoRoot: fx.root,
+        hostReceiptPath: fx.receiptPath,
+        now: NOW,
+        devaiVersion: VERSION,
+        injectFailure,
+      }),
+    );
+  } finally {
+    host.dispose();
+  }
+}
+
+function stateBundle(fx: HostFixture): string {
+  return join(fx.root, '.git/devai/post-merge-observations', fx.mergeSha);
+}
+
+interface ObservationForgery {
+  readonly status?: (value: Record<string, unknown>) => Record<string, unknown>;
+  readonly reseal?: boolean;
+  readonly backlog?: (value: Record<string, unknown>) => Record<string, unknown>;
+}
+
+/**
+ * Rewrites a stored completed observation in *both* stores the auditor reads —
+ * the runtime state bundle and the committed audit ref — so the forgery is
+ * internally consistent. A forgery in only one store is rejected by the
+ * cross-store digest comparison, which would hide whether the observation's own
+ * integrity checks did any work.
+ */
+function forgeObservation(fx: HostFixture, edit: ObservationForgery): void {
+  const bundle = stateBundle(fx);
+  const forged: Record<string, string> = {};
+  if (edit.backlog) {
+    const backlog = JSON.parse(readFileSync(join(bundle, 'backlog.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    forged['backlog'] = `${JSON.stringify(edit.backlog(backlog), null, 2)}\n`;
+  }
+  if (edit.status) {
+    const current = JSON.parse(readFileSync(join(bundle, 'status.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const { observation_digest_sha256: sealed, ...unsigned } = current;
+    const body = edit.status(unsigned);
+    forged['status'] = `${JSON.stringify(
+      {
+        ...body,
+        observation_digest_sha256: edit.reseal === true ? canonicalSha256(body) : sealed,
+      },
+      null,
+      2,
+    )}\n`;
+  }
+  const worktree = join(fx.root, '.devai/worktrees/auditor-post-merge');
+  const auditPath = `work/audit/post-merge/${fx.mergeSha}`;
+  for (const [name, contents] of Object.entries(forged)) {
+    writeFileSync(join(bundle, `${name}.json`), contents);
+    writeFileSync(join(worktree, auditPath, `${name}.json`), contents);
+  }
+  git(worktree, ['add', '--', auditPath]);
+  git(worktree, ['commit', '-qm', `forge ${Object.keys(forged).join('+')}`]);
+  git(worktree, ['update-ref', `refs/devai/post-merge/${fx.mergeSha}`, 'HEAD']);
+}
+
+describe('post-merge completed observation integrity', () => {
+  it('refuses to replay forged or unsealed observations and re-observes the merge', async () => {
+    const fx = fixture();
+    expect(await runAuditor(fx)).toMatchObject({ status: 'completed', processed: [fx.mergeSha] });
+    const genuineStatus = readFileSync(join(stateBundle(fx), 'status.json'), 'utf8');
+    const genuineBacklog = readFileSync(join(stateBundle(fx), 'backlog.json'), 'utf8');
+
+    const forgeries: readonly (readonly [string, ObservationForgery])[] = [
+      [
+        'resealed under a foreign schema version',
+        { status: (v) => ({ ...v, schemaVersion: '2.0.0' }), reseal: true },
+      ],
+      [
+        'resealed against a foreign merge sha',
+        { status: (v) => ({ ...v, merge_sha: 'b'.repeat(40) }), reseal: true },
+      ],
+      [
+        'resealed as an error observation',
+        { status: (v) => ({ ...v, status: 'error' }), reseal: true },
+      ],
+      [
+        'resealed as readiness promoting',
+        { status: (v) => ({ ...v, readiness_promoting: true }), reseal: true },
+      ],
+      [
+        'edited without re-sealing the observation digest',
+        { status: (v) => ({ ...v, previous_observation_digest_sha256: 'a'.repeat(64) }) },
+      ],
+      ['carrying a tampered backlog artifact', { backlog: (v) => ({ ...v, forged: true }) }],
+    ];
+
+    for (const [label, edit] of forgeries) {
+      forgeObservation(fx, edit);
+      expect(await runAuditor(fx), label).toMatchObject({
+        status: 'completed',
+        processed: [fx.mergeSha],
+      });
+      expect(readFileSync(join(stateBundle(fx), 'status.json'), 'utf8'), label).toBe(genuineStatus);
+      expect(readFileSync(join(stateBundle(fx), 'backlog.json'), 'utf8'), label).toBe(
+        genuineBacklog,
+      );
+    }
+  }, 120_000);
+
+  it('preserves interrupted attempts whose status bytes are identical', async () => {
+    const fx = fixture();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      let failure: unknown;
+      try {
+        await runAuditor(fx, true);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toBe('POST_MERGE_OBSERVATION_INJECTED_FAILURE');
+    }
+    const stateRoot = join(fx.root, '.git/devai/post-merge-observations');
+    const interrupted = readFileSync(join(stateRoot, fx.mergeSha, 'status.json'));
+    const digest = sha256(interrupted);
+    const historyRoot = join(stateRoot, 'attempt-history', fx.mergeSha);
+    expect(readdirSync(historyRoot).sort()).toEqual([digest, `${digest}-2`]);
+    for (const archived of readdirSync(historyRoot)) {
+      expect(readFileSync(join(historyRoot, archived, 'status.json'))).toEqual(interrupted);
+    }
+  }, 60_000);
+});
+
+describe('post-merge receipt and scope boundary shapes', () => {
+  it('rejects merge and baseline SHAs padded outside the exact forty-hex shape', async () => {
+    const cases: Array<{
+      readonly attestation?: (value: Record<string, unknown>) => Record<string, unknown>;
+      readonly receipt?: (value: Record<string, unknown>) => Record<string, unknown>;
+    }> = [
+      { receipt: (v) => ({ ...v, merge_sha: `z${'a'.repeat(40)}` }) },
+      { receipt: (v) => ({ ...v, merge_sha: `${'a'.repeat(40)}z` }) },
+      { attestation: (v) => ({ ...v, installed_at_head: `z${'a'.repeat(40)}` }) },
+      { attestation: (v) => ({ ...v, installed_at_head: `${'a'.repeat(40)}z` }) },
+    ];
+    for (const testCase of cases) {
+      const fx = fixture();
+      rewrite(fx, testCase.attestation, testCase.receipt);
+      await withAuthorityHostTestScope(() => {
+        expect(() => verify(fx)).toThrow('HOST_RECEIPT_INVALID');
+      });
+    }
+  }, 30_000);
+
+  it('rejects signature envelopes padded around the exact sixty-four-hex digest', async () => {
+    for (const pad of [(value: string) => `ab${value}`, (value: string) => `${value}a`]) {
+      const fx = fixture();
+      writeFileSync(
+        fx.receiptPath,
+        `${JSON.stringify({
+          ...fx.receipt,
+          signature_hmac_sha256: pad(String(fx.receipt['signature_hmac_sha256'])),
+        })}\n`,
+      );
+      await withAuthorityHostTestScope(() => {
+        expect(() => verify(fx)).toThrow('HOST_RECEIPT_UNVERIFIED');
+      });
+    }
+  });
+
+  it('rejects a receipt bound to a different attestation digest', async () => {
+    const fx = fixture();
+    rewrite(fx, undefined, (v) => ({ ...v, attestation_digest_sha256: 'f'.repeat(64) }));
+    await withAuthorityHostTestScope(() => {
+      expect(() => verify(fx)).toThrow('HOST_RECEIPT_STALE');
+    });
+  });
+
+  it('rejects a versionless package binding when no devai version is supplied', async () => {
+    const fx = fixture();
+    rewrite(fx, (v) => ({ ...v, package_binding: { name: '@aarusso-nyx/devai' } }));
+    await withAuthorityHostTestScope(() => {
+      expect(() =>
+        verifyPostMergeHostReceipt({
+          repoRoot: fx.root,
+          hostReceiptPath: fx.receiptPath,
+          now: NOW,
+        }),
+      ).toThrow('HOST_RECEIPT_STALE');
+    });
+  });
+
+  it('refuses an audit ref update smuggled behind another ref namespace', () => {
+    const fx = fixture(false);
+    const host = createPostMergeHostScope(fx.root, fx.mergeSha);
+    let applied = false;
+    try {
+      expect(() =>
+        host.scope.apply_effect(
+          {
+            kind: 'process',
+            symbol: 'spawnSync',
+            arguments: [
+              'git',
+              ['update-ref', `refs/heads/x/refs/devai/post-merge/${'a'.repeat(40)}`, 'HEAD'],
+            ],
+          },
+          () => {
+            applied = true;
+          },
+        ),
+      ).toThrow('POST_MERGE_PROCESS_FORBIDDEN');
+      expect(applied).toBe(false);
+    } finally {
+      host.dispose();
+    }
   });
 });
