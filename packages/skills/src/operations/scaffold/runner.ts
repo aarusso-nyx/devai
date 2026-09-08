@@ -343,7 +343,8 @@ export function runScaffolder(opts: RunScaffolderOptions): ScaffoldOperationResu
     // Fresh write.
     try {
       mkdirSync(dirname(absPath), { recursive: true });
-      writeFileSync(absPath, fullOutput);
+      // A concurrent creator must not turn a fresh scaffold write into an overwrite.
+      writeFileSync(absPath, fullOutput, { flag: 'wx' });
       filesCreated.push(task.target_path);
       templatesUsed.push({
         template_id: task.template_id,
