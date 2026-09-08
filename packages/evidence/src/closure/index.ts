@@ -264,7 +264,7 @@ export function closePhase(repoRoot: string, draft: PhaseClosureDraft): ClosePha
   if (existsSync(path)) {
     throw new Error(`phase close: ${path} already exists (closures are append-only)`);
   }
-  writeFileSync(path, JSON.stringify(record, null, 2) + '\n');
+  writeFileSync(path, JSON.stringify(record, null, 2) + '\n', { flag: 'wx' });
   return { record, path };
 }
 

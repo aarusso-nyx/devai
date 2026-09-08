@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   closePhase,
@@ -11,6 +11,24 @@ import {
   type PhaseClosureDraft,
   type PhaseClosureRecord,
 } from '../../src/closure/index.js';
+
+const concurrentWriter = vi.hoisted(() => ({
+  beforeWrite: undefined as ((path: string) => void) | undefined,
+}));
+vi.mock('@devai-nyx/authority', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@devai-nyx/authority')>();
+  return {
+    ...original,
+    writeFileSync: (...args: Parameters<typeof original.writeFileSync>) => {
+      if (typeof args[0] === 'string' && concurrentWriter.beforeWrite !== undefined) {
+        const callback = concurrentWriter.beforeWrite;
+        concurrentWriter.beforeWrite = undefined;
+        callback(args[0]);
+      }
+      return original.writeFileSync(...args);
+    },
+  };
+});
 
 const roots: string[] = [];
 
@@ -40,6 +58,7 @@ function repository(): { root: string; head: string } {
 }
 
 afterEach(() => {
+  concurrentWriter.beforeWrite = undefined;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -583,3 +602,28 @@ it.each(['merged_as', 'release_disposition'] as const)(
     });
   },
 );
+
+describe('closure append-only write race', () => {
+  it.each(['regular file', 'symlink'] as const)(
+    'preserves a concurrent %s created after the absence check',
+    async (kind) => {
+      const { root, head } = repository();
+      const retained = Buffer.from('concurrent record must remain byte-identical\n');
+      const target = join(root, 'concurrent-target.json');
+      writeFileSync(target, retained);
+      let occupiedPath: string | undefined;
+      concurrentWriter.beforeWrite = (path) => {
+        occupiedPath = path;
+        if (kind === 'symlink') symlinkSync(target, path);
+        else writeFileSync(path, retained);
+      };
+      await expect(
+        withAuthorityHostTestScope(() => closePhase(root, gateDraft(head))),
+      ).rejects.toThrow();
+      expect(occupiedPath).toBe(join(root, 'record/proofs/compliance/closures/PC-0001.json'));
+      if (occupiedPath === undefined) throw new Error('concurrent writer was not reached');
+      expect(readFileSync(occupiedPath)).toEqual(retained);
+      expect(readFileSync(target)).toEqual(retained);
+    },
+  );
+});
