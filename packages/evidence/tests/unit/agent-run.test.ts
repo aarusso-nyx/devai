@@ -26,6 +26,32 @@ afterEach(() => {
 });
 
 describe('agent-run proof records', () => {
+  it('starts an empty proof directory without relocating or rewriting unrelated files', async () => {
+    const repo = root();
+    const dir = join(repo, 'record/proofs/work/agent-runs');
+    mkdirSync(dir, { recursive: true });
+    const unrelated = Buffer.from([0, 255, 10, 13, 42]);
+    writeFileSync(join(dir, 'operator-note.bin'), unrelated);
+    expect(getAgentRunDir(repo)).toBe(dir);
+    const emission = withAuthorityHostTestScope(() =>
+      emitAgentRun({
+        repoRoot: repo,
+        caller: { kind: 'cli', name: 'empty-history' },
+        started_at: '2026-07-24T10:00:00.000Z',
+        compliance: { invariant_ids: [] },
+      }),
+    );
+    await expect(emission).resolves.toBeDefined();
+    const record = await emission;
+    expect(record.prev_hash).toBe('GENESIS');
+    expect(readFileSync(join(dir, `${record.run_id}.json`), 'utf8')).toBe(
+      `${JSON.stringify(record, null, 2)}\n`,
+    );
+    expect(readFileSync(join(dir, 'operator-note.bin'))).toEqual(unrelated);
+    expect(readdirSync(dir).sort()).toEqual([`${record.run_id}.json`, 'operator-note.bin'].sort());
+    expect(readLastAgentRunHash(repo)).toBe(record.manifest_hash);
+  });
+
   it.each([
     'tampered',
     'missing-parent',
