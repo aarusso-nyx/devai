@@ -589,6 +589,69 @@ describe('local evidence claim and actor parsing', () => {
 });
 
 describe('local evidence required tool identities', () => {
+  it('canonicalizes mixed-case artifact names before hashing filesystem enumeration', () => {
+    const { root, now } = fixture();
+    const artifactDir = join(root, '.artifacts/unit');
+    writeFileSync(join(artifactDir, 'Z.txt'), 'upper\n');
+    writeFileSync(join(artifactDir, 'a.txt'), 'lower\n');
+    writeFileSync(
+      join(artifactDir, 'metadata.txt'),
+      'job=unit\nplatform=darwin/arm64\nnode=v24.20.0\n',
+    );
+    const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+    // Independent Python vector in the collector's relative-name collation order:
+    // a.txt, metadata.txt, result.txt, Z.txt.
+    expect(
+      collectLocalEvidence({ repoRoot: root, jobDirs, now }).manifest.jobs.unit?.artifactChecksum,
+    ).toEqual({
+      algorithm: 'sha256',
+      fileCount: 4,
+      value: 'ee0919fad89155303cf2cec1d2f6c995df686e0953f078583a4dcfcae575649c',
+    });
+  });
+
+  it('records exact declared package-manager versions and observed Compose identities', () => {
+    const { root, manifestPath } = fixture({
+      packageFields: { packageManager: 'pnpm@9.15.0' },
+      metadata: 'pnpm=9.15.0\ndocker_compose=2.39.1\n',
+    });
+    const manifest = JSON.parse(readFileSync(join(root, manifestPath), 'utf8')) as MutableManifest;
+    expect(manifest.tools).toEqual({
+      node: { expected: '>=24', observed: [process.version] },
+      pnpm: { expected: '9.15.0', observed: ['9.15.0'] },
+      dockerCompose: { observed: ['2.39.1'] },
+    });
+  });
+  it.each([
+    { required: false, observed: false, expected: undefined },
+    { required: false, observed: true, expected: { observed: ['29.5.2'] } },
+    { required: true, observed: false, expected: { observed: [] } },
+  ])(
+    'records Docker presence for required=$required observed=$observed',
+    ({ required, observed, expected }) => {
+      const { root, manifestPath } = fixture({
+        localPolicy: { require_docker: required },
+        metadata: observed ? 'docker=29.5.2\n' : '',
+      });
+      const manifest = JSON.parse(
+        readFileSync(join(root, manifestPath), 'utf8'),
+      ) as MutableManifest;
+      expect(manifest.tools.docker).toEqual(expected);
+      expect(Object.hasOwn(manifest.tools, 'docker')).toBe(expected !== undefined);
+      expect(Object.hasOwn(manifest.tools, 'dockerCompose')).toBe(false);
+    },
+  );
+  it.each(['pnpm', '@9.15.0'])(
+    'does not invent a tool identity for malformed packageManager %s',
+    (packageManager) => {
+      const { root, manifestPath } = fixture({ packageFields: { packageManager } });
+      const manifest = JSON.parse(
+        readFileSync(join(root, manifestPath), 'utf8'),
+      ) as MutableManifest;
+      expect(manifest.tools).toEqual({ node: { expected: '>=24', observed: [process.version] } });
+    },
+  );
+
   it('binds nested artifact bytes, relative names and complete file population to a known checksum', () => {
     const { root, now } = fixture();
     const artifactDir = join(root, '.artifacts/unit');
