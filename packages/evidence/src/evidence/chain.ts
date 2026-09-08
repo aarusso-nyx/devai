@@ -126,7 +126,7 @@ export function extractManifestInputs(record: EvidenceRecord): ManifestHashInput
 
 function atomicWriteFileSync(path: string, contents: string): void {
   const tmp = `${path}.tmp.${process.pid.toString()}.${Date.now().toString()}`;
-  writeFileSync(tmp, contents);
+  writeFileSync(tmp, contents, { flag: 'wx' });
   renameSync(tmp, path);
 }
 

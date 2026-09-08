@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, aroundEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendRecord,
   computeManifestHash,
@@ -15,6 +15,31 @@ import {
 } from '../../src/evidence/chain.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 
+const concurrentWriter = vi.hoisted(() => ({
+  prefix: undefined as string | undefined,
+  beforeWrite: undefined as ((path: string) => void) | undefined,
+}));
+// Place a competing file at the final native write boundary, after authority checks.
+vi.mock('node:fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...original,
+    writeFileSync: (...args: Parameters<typeof original.writeFileSync>) => {
+      if (
+        typeof args[0] === 'string' &&
+        concurrentWriter.prefix !== undefined &&
+        args[0].startsWith(concurrentWriter.prefix) &&
+        concurrentWriter.beforeWrite !== undefined
+      ) {
+        const callback = concurrentWriter.beforeWrite;
+        concurrentWriter.beforeWrite = undefined;
+        callback(args[0]);
+      }
+      return original.writeFileSync(...args);
+    },
+  };
+});
+
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 
 let tempDir = '';
@@ -26,6 +51,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  concurrentWriter.prefix = undefined;
+  concurrentWriter.beforeWrite = undefined;
   rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -312,4 +339,30 @@ it('retains explicit finding counts and omits an absent summary when appending',
   expect(persisted.records[0]?.findings_summary).toEqual(findings);
   expect(Object.hasOwn(persisted.records[1] ?? {}, 'findings_summary')).toBe(false);
   expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+});
+
+describe('atomic chain temporary-file collision', () => {
+  it.each(['regular file', 'symlink'] as const)(
+    'preserves the old chain and a concurrent %s at the temporary write path',
+    (kind) => {
+      initChain(chainPath);
+      const originalChain = readFileSync(chainPath);
+      const retained = Buffer.from('concurrent bytes must not be overwritten\n');
+      const target = join(tempDir, 'concurrent-target.json');
+      writeFileSync(target, retained);
+      let occupiedPath: string | undefined;
+      concurrentWriter.prefix = `${chainPath}.tmp.`;
+      concurrentWriter.beforeWrite = (path) => {
+        occupiedPath = path;
+        if (kind === 'symlink') symlinkSync(target, path);
+        else writeFileSync(path, retained);
+      };
+      expect(() => appendRecord(chainPath, genesisDraft('EV-0000000000000001'))).toThrow();
+      if (occupiedPath === undefined) throw new Error('temporary write was not reached');
+      expect(readFileSync(occupiedPath)).toEqual(retained);
+      expect(readFileSync(target)).toEqual(retained);
+      expect(readFileSync(chainPath)).toEqual(originalChain);
+      expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+    },
+  );
 });
