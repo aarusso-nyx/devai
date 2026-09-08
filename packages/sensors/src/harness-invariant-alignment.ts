@@ -213,6 +213,29 @@ function hasNonBindingControlFlow(script: string): boolean {
   );
 }
 
+/**
+ * `set +e` drops errexit for everything the shell runs afterwards, so it makes
+ * the rest of the body non-binding however it is reached — its own line, after
+ * `;`, or after `&&`. Matching on segments rather than on line starts keeps the
+ * one-liner forms from slipping past the gate-masking guard.
+ */
+function disablesErrexit(segment: string): boolean {
+  const words = shellWords(stripYamlComment(segment).trim());
+  if (words?.[0] !== 'set') return false;
+  for (let index = 1; index < words.length; index += 1) {
+    const option = words[index] ?? '';
+    if (option === '--' || !/^[+-]/.test(option)) break;
+    if (option === '+o' || option === '-o') {
+      const name = words[index + 1];
+      if (option === '+o' && name === 'errexit') return true;
+      if (name !== undefined && !/^[+-]/.test(name)) index += 1;
+    } else if (/^\+[a-zA-Z]*e[a-zA-Z]*$/.test(option)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function shellWords(command: string): string[] | null {
   const words: string[] = [];
   let word = '';
@@ -234,7 +257,11 @@ function shellWords(command: string): string[] | null {
       } else if (char === '\\') {
         const next = command[index + 1];
         if (next === undefined) return null;
-        word += next;
+        // Inside double quotes, the shell only removes a backslash before
+        // dollar, backtick, double quote, backslash, or a continued newline.
+        if (next !== '\n') {
+          word += ['$', '`', '"', '\\'].includes(next) ? next : `\\${next}`;
+        }
         index += 1;
       } else {
         word += char;
@@ -349,7 +376,7 @@ function isFailClosedExecutableSegment(segment: string, candidate: string): bool
   // occurs in a `run:` body.
   if (/\|\|/.test(command)) return false;
   if (/(?:^|\s)(?:>|>>|1>|1>>|2>|2>>)\s*\/dev\/null(?:\s|$)/.test(command)) return false;
-  if (/^set\s+\+e(?:\s|$)/.test(command)) return false;
+  if (disablesErrexit(command)) return false;
 
   const firstToken = shellWords(command)?.[0];
   if (firstToken === undefined) return false;
@@ -385,7 +412,7 @@ function hasExecutableMeasurement(steps: readonly WorkflowRunStep[], candidate: 
     (step) =>
       !step.continueOnError &&
       !step.disabled &&
-      !/(?:^|\n)\s*set\s+\+e(?:\s|$)/.test(step.script) &&
+      !shellSegments(step.script).some(disablesErrexit) &&
       !hasNonBindingControlFlow(step.script) &&
       shellSegments(step.script).some((segment) =>
         isFailClosedExecutableSegment(segment, candidate),
@@ -590,6 +617,7 @@ function hasFreshCandidateEvidence(
     }
     const command = evidenceCommand(record.command);
     if (hasNonBindingControlFlow(command)) return false;
+    if (shellSegments(command).some(disablesErrexit)) return false;
     return shellSegments(command).some((segment) =>
       isFailClosedExecutableSegment(segment, candidate),
     );

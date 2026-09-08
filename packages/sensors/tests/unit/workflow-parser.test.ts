@@ -200,6 +200,7 @@ describe('workflow job and matrix accounting', () => {
     paths:
       - "src/**"
       - 'docs/#examples/**'
+      - "gen/#out/**" # generated sources
   push:
     paths:
       - 'src/**'
@@ -216,7 +217,7 @@ jobs:
 `,
       '/repo',
     );
-    expect(ast.onPaths).toEqual(['src/**', 'docs/#examples/**']);
+    expect(ast.onPaths).toEqual(['src/**', 'docs/#examples/**', 'gen/#out/**']);
     expect(ast.onPathsIgnore).toEqual(['scratch/**']);
     expect(ast.hasPermissionsBlock).toBe(true);
     expect(ast.hasConcurrencyBlock).toBe(true);
@@ -277,24 +278,64 @@ describe('run script capture', () => {
     expect(ast.jobs.map((job) => job.stepCount)).toEqual([6]);
   });
 
-  it('ends a block-scalar body at a blank line so sibling step keys stay out of the script', () => {
+  it('keeps a blank line inside a literal block from truncating the commands after it', () => {
     const ast = parseWorkflow(
       '/repo/.github/workflows/check.yml',
       `jobs:
   build:
     steps:
       - run: |
+          set -euo pipefail
           echo one
 
-        env:
-          MODE: strict
+          devai check --only dependencies
       - run: echo after
 `,
       '/repo',
     );
-    // The dash column is the recorded run indent, so the best-effort dedent
-    // leaves the two columns the `- ` marker occupies.
-    expect(ast.runScripts).toEqual(['  echo one', 'echo after']);
+    expect(ast.runScripts).toEqual([
+      '  set -euo pipefail\n  echo one\n\n  devai check --only dependencies',
+      'echo after',
+    ]);
     expect(ast.runStepCount).toBe(2);
+  });
+
+  it('does not let a commented-out block-scalar body swallow the next step', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/check.yml',
+      `jobs:
+  build:
+    steps:
+      - run: |
+          # devai check --only dependencies
+      - run: echo after
+`,
+      '/repo',
+    );
+    expect(ast.runScripts).toEqual(['echo after']);
+    expect(ast.runStepCount).toBe(1);
+    expect(ast.jobs.map((job) => job.stepCount)).toEqual([2]);
+  });
+
+  it('ends a block-scalar body at a dedented sibling step key, blank line or not', () => {
+    const separators = ['\n\n', '\n'];
+    for (const separator of separators) {
+      const ast = parseWorkflow(
+        '/repo/.github/workflows/check.yml',
+        `jobs:
+  build:
+    steps:
+      - run: |
+          echo one${separator}        env:
+          MODE: strict
+      - run: echo after
+`,
+        '/repo',
+      );
+      // The dash column is the recorded run indent, so the best-effort dedent
+      // leaves the two columns the `- ` marker occupies.
+      expect(ast.runScripts).toEqual(['  echo one', 'echo after']);
+      expect(ast.runStepCount).toBe(2);
+    }
   });
 });

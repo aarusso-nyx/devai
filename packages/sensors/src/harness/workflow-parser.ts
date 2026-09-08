@@ -88,15 +88,19 @@ function isListItem(line: string): boolean {
 }
 
 function trimComment(line: string): string {
-  // Naive: drop everything after a `#` not inside quotes. Good enough for our extractor.
-  const i = line.indexOf('#');
-  if (i === -1) return line;
-  // Don't strip when inside a quoted string (best-effort): look for unbalanced quotes before #.
-  const before = line.slice(0, i);
-  const dq = (before.match(/"/g) ?? []).length;
-  const sq = (before.match(/'/g) ?? []).length;
-  if (dq % 2 === 1 || sq % 2 === 1) return line;
-  return before.trimEnd();
+  // Drop everything after a `#` that is not inside a quoted scalar. Counting
+  // quotes before the first `#` kept `"gen/#out/**" # note` whole, comment and
+  // all; scanning the line (as harness-invariant-alignment.ts does for the same
+  // construct) closes the quote and strips only the real comment.
+  let single = false;
+  let double = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === "'" && !double) single = !single;
+    else if (char === '"' && !single && line[i - 1] !== '\\') double = !double;
+    else if (char === '#' && !single && !double) return line.slice(0, i).trimEnd();
+  }
+  return line;
 }
 
 const USES_RE = /^\s*-?\s*uses:\s*(['"]?)([^\s@'"]+)(?:@([^\s'"]+))?\1\s*$/;
@@ -156,6 +160,8 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
   // State for run: capture (multi-line scalar).
   let inRun = false;
   let runIndent = -1;
+  /** Indent of the first non-empty body line; -1 until the body starts. */
+  let runContentIndent = -1;
   let runBuffer: string[] = [];
 
   function flushMatrixKey(): void {
@@ -167,11 +173,13 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
   }
 
   function flushRun(): void {
-    if (runBuffer.length > 0) {
-      runScripts.push(runBuffer.join('\n'));
+    const script = runBuffer.join('\n').replace(/\n+$/, '');
+    if (script !== '') {
+      runScripts.push(script);
       runStepCount += 1;
     }
     inRun = false;
+    runContentIndent = -1;
     runBuffer = [];
   }
 
@@ -180,7 +188,10 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
     const ind = indentOf(line);
     const trimmed = line.trim();
     if (trimmed === '' || trimmed.startsWith('#')) {
-      if (inRun && ind <= runIndent) flushRun();
+      // A blank line inside a block scalar is body text, not the end of it: a
+      // literal/folded block ends at the first non-empty line indented less
+      // than its body. Flushing here dropped every command after the blank.
+      if (inRun) runBuffer.push('');
       continue;
     }
 
@@ -209,7 +220,8 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
 
     // Run-script capture (multi-line scalar via | or > or single-line).
     if (inRun) {
-      if (ind > runIndent) {
+      if (runContentIndent === -1 && ind > runIndent) runContentIndent = ind;
+      if (runContentIndent !== -1 && ind >= runContentIndent) {
         runBuffer.push(line.slice(runIndent + 2)); // best-effort dedent
         continue;
       } else {
