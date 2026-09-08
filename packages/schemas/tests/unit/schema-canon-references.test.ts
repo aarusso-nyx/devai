@@ -211,3 +211,161 @@ it.each(['allOf', 'oneOf', 'anyOf'])(
     });
   },
 );
+
+const reference = { $ref: '#/$defs/match' };
+const selected = { kind: 'selected' };
+const other = { kind: 'other' };
+it.each([
+  {
+    keyword: 'properties',
+    wrapper: { properties: { item: reference } },
+    valid: { item: selected },
+    invalid: { item: other },
+  },
+  {
+    keyword: 'patternProperties',
+    wrapper: { patternProperties: { '^item$': reference } },
+    valid: { item: selected },
+    invalid: { item: other },
+  },
+  {
+    keyword: 'dependentSchemas',
+    wrapper: { dependentSchemas: { trigger: reference } },
+    valid: { trigger: true, ...selected },
+    invalid: { trigger: true, ...other },
+  },
+  ...['allOf', 'anyOf', 'oneOf'].map((keyword) => ({
+    keyword,
+    wrapper: { [keyword]: [reference] },
+    valid: selected,
+    invalid: other,
+  })),
+  {
+    keyword: 'prefixItems',
+    wrapper: { prefixItems: [reference] },
+    valid: [selected],
+    invalid: [other],
+  },
+  { keyword: 'items', wrapper: { items: reference }, valid: [selected], invalid: [other] },
+  {
+    keyword: 'additionalProperties',
+    wrapper: { additionalProperties: reference },
+    valid: { item: selected },
+    invalid: { item: other },
+  },
+  {
+    keyword: 'unevaluatedProperties',
+    wrapper: { unevaluatedProperties: reference },
+    valid: { item: selected },
+    invalid: { item: other },
+  },
+  {
+    keyword: 'unevaluatedItems',
+    wrapper: { unevaluatedItems: reference },
+    valid: [selected],
+    invalid: [other],
+  },
+])(
+  'retains complete-shape obligations for mixed use through $keyword',
+  ({ wrapper, valid, invalid }) => {
+    const base = predicateDocument();
+    const schema = { ...base, properties: { ...base.properties, extra: wrapper } };
+    const validate = new Ajv2020({ strict: false }).compile(schema);
+    expect(validate({ kind: 'other', extra: valid })).toBe(true);
+    expect(validate({ kind: 'other', extra: invalid })).toBe(false);
+    expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+      schema: 'fixture.schema.json',
+      rule: 'open-world-object',
+      path: '$root/$defs/match',
+    });
+  },
+);
+
+it.each(['allOf', 'anyOf', 'oneOf'])(
+  'propagates conditional predicate use through a nested %s',
+  (keyword) => {
+    const schema = { ...predicateDocument(), if: { [keyword]: [reference] } };
+    const validate = new Ajv2020({ strict: false }).compile(schema);
+    expect(validate({ kind: 'selected', label: 'present' })).toBe(true);
+    expect(validate({ kind: 'selected' })).toBe(false);
+    expect(validate({ kind: 'other' })).toBe(true);
+    expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+  },
+);
+
+it.each([
+  { keyword: 'then', predicate: { if: true, then: reference }, valid: selected, invalid: other },
+  { keyword: 'else', predicate: { if: false, else: reference }, valid: selected, invalid: other },
+  {
+    keyword: 'contains',
+    predicate: { type: 'array', contains: reference },
+    valid: [selected],
+    invalid: [other],
+  },
+  { keyword: 'not', predicate: { not: reference }, valid: other, invalid: selected },
+])(
+  'recognizes a definition used only by $keyword with real validation controls',
+  ({ predicate, valid, invalid }) => {
+    const schema = { ...predicate, $defs: predicateDocument().$defs };
+    const validate = new Ajv2020({ strict: false }).compile(schema);
+    expect(validate(valid)).toBe(true);
+    expect(validate(invalid)).toBe(false);
+    expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+  },
+);
+
+it('resolves the empty fragment to the resource root with finite recursive validation', () => {
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['kind'],
+    properties: {
+      kind: { const: 'accepted' },
+      child: { $ref: '#', properties: { kind: { const: 'accepted' } } },
+    },
+  };
+  const validate = new Ajv2020({ strict: false }).compile(schema);
+  expect(validate({ kind: 'accepted', child: { kind: 'accepted' } })).toBe(true);
+  expect(validate({ kind: 'accepted', child: { kind: 'accepted', extra: true } })).toBe(false);
+  expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+});
+it('resolves a valid empty property name in a local pointer', () => {
+  const schema = { ...document(closed, '#/$defs/'), $defs: { '': closed } };
+  const validate = new Ajv2020({ strict: false }).compile(schema);
+  expect(validate({ item: { kind: 'accepted' } })).toBe(true);
+  expect(validate({ item: { kind: 'accepted', extra: true } })).toBe(false);
+  expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+});
+it.each(['bad~2key', 'bad~'])(
+  'rejects invalid pointer escapes even when a literal key %s exists',
+  (key) => {
+    const schema = { ...document(closed, `#/$defs/${key}`), $defs: { [key]: closed } };
+    expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+      schema: 'fixture.schema.json',
+      rule: 'open-world-object',
+      path: '$root/properties/item',
+    });
+  },
+);
+it('retains embedded resource scope for a nested local reference', () => {
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      item: {
+        $id: 'https://example.invalid/embedded',
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          child: { $ref: '#/$defs/base', properties: { kind: { const: 'accepted' } } },
+        },
+        $defs: { base: closed },
+      },
+    },
+    $defs: { base: false },
+  };
+  const validate = new Ajv2020({ strict: false }).compile(schema);
+  expect(validate({ item: { child: { kind: 'accepted' } } })).toBe(true);
+  expect(validate({ item: { child: { kind: 'accepted', extra: true } } })).toBe(false);
+  expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+});
