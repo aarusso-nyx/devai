@@ -554,11 +554,13 @@ function parseFkLine(line: string): DataModelForeignKey | null {
   const onDel = m[5];
   const onUpd = m[6];
   if (onDel !== undefined)
-    (fk as { on_delete: DataModelForeignKey['on_delete'] }).on_delete =
-      onDel.toLowerCase() as DataModelForeignKey['on_delete'];
+    (fk as { on_delete: DataModelForeignKey['on_delete'] }).on_delete = onDel
+      .toLowerCase()
+      .replace(/\s+/g, ' ') as DataModelForeignKey['on_delete'];
   if (onUpd !== undefined)
-    (fk as { on_update: DataModelForeignKey['on_update'] }).on_update =
-      onUpd.toLowerCase() as DataModelForeignKey['on_update'];
+    (fk as { on_update: DataModelForeignKey['on_update'] }).on_update = onUpd
+      .toLowerCase()
+      .replace(/\s+/g, ' ') as DataModelForeignKey['on_update'];
   return fk;
 }
 
