@@ -156,3 +156,63 @@ it('refuses multiple effective heads even when neither is a direct successor of 
   f.add(e, [X], [D]);
   noAuthority(f.validate(), 'adr-multiple-effective-accepted-heads');
 });
+
+it.each([
+  ['one code point', 'x'],
+  ['200 BMP code points', 'é'.repeat(200)],
+  ['200 astral code points', '😀'.repeat(200)],
+  ['embedded drive-like segment', 'docs/a:/rule'],
+  ['non-drive prefix', '1:/rule'],
+])(
+  'retains canonical subject boundaries without requiring a filesystem path: %s',
+  (_label, subject) => {
+    const f = fixture();
+    f.add(A, [subject]);
+    const result = f.validate();
+    expect(result.ok).toBe(true);
+    expect(result.subject_authorities.find((entry) => entry.subject === subject)).toEqual({
+      subject,
+      lineage_members: [A],
+      effective_head: A,
+    });
+    expect(result.adrs.find((record) => record.adr_id === A)?.effective_affected_rules).toEqual([
+      subject,
+    ]);
+  },
+);
+
+it('refuses decomposed Unicode subjects without silently normalizing authority', () => {
+  const f = fixture();
+  const subject = 'fixture/cafe\u0301';
+  expect(subject.normalize('NFC')).not.toBe(subject);
+  f.add(A, [subject]);
+  const result = f.validate();
+  expect(result.ok).toBe(false);
+  expect(result.semantic_resolution_performed).toBe(true);
+  expect(result.effective_authorities).toEqual([]);
+  expect(result.subject_authorities).toEqual([]);
+  expect(result.errors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ code: 'adr-affected-rule-subject-invalid' }),
+    ]),
+  );
+});
+
+it('does not interpret frontmatter preceded by arbitrary document text', () => {
+  const f = fixture();
+  f.add(A, [X]);
+  const path = join(f.adrsDir, `${A}-fixture.md`);
+  const before = `# Introductory text\n${readFileSync(path, 'utf8')}`;
+  writeFileSync(path, before);
+  const result = f.validate();
+  expect(result.ok).toBe(false);
+  // The resolver runs on the other parsed records, but grants no authority.
+  expect(result.semantic_resolution_performed).toBe(true);
+  expect(result.effective_authorities).toEqual([]);
+  expect(result.errors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ file: path, code: 'adr-semantic-resolution-not-performed' }),
+    ]),
+  );
+  expect(readFileSync(path, 'utf8')).toBe(before);
+});
