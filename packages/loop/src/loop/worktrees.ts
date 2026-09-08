@@ -25,7 +25,7 @@ export interface CreateWorktreeOptions {
   readonly id: string;
   /** Branch to create or check out. */
   readonly branch: string;
-  /** Base ref (default: HEAD). */
+  /** Base ref when creating a new branch (default: HEAD). */
   readonly baseRef?: string;
   readonly taskId?: string;
   readonly humanAdopted?: boolean;
@@ -101,7 +101,20 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
   mkdirSync(wtRoot, { recursive: true });
   const wtPath = join(wtRoot, opts.id);
 
-  execFileSync('git', ['worktree', 'add', '-b', opts.branch, wtPath, opts.baseRef ?? 'HEAD'], {
+  let branchExists = false;
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${opts.branch}`], {
+      cwd: opts.repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    branchExists = true;
+  } catch {
+    // Git still validates the new branch name and base before creating a worktree.
+  }
+  const args = branchExists
+    ? ['worktree', 'add', '--', wtPath, opts.branch]
+    : ['worktree', 'add', '-b', opts.branch, '--', wtPath, opts.baseRef ?? 'HEAD'];
+  execFileSync('git', args, {
     cwd: opts.repoRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
