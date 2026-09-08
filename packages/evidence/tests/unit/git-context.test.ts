@@ -36,6 +36,8 @@ describe('gatherGitContext', () => {
       'quote"name.txt',
       'line\nbreak.txt',
       'literal -> arrow.txt',
+      'Report.txt',
+      'Copy.txt',
     ];
     for (const path of paths) writeFileSync(join(tempDir, path), 'new\n');
     expect(gatherGitContext(tempDir).dirty_files.sort()).toEqual([...paths].sort());
