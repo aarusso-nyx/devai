@@ -620,7 +620,7 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       } else {
         const nameStatus = execFileSync(
           'git',
-          ['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', '-M', '-m', sha],
+          ['diff-tree', '--root', '--no-commit-id', '--name-status', '-z', '-r', '-M', '-m', sha],
           {
             cwd: opts.repoRoot,
             encoding: 'utf8',
@@ -628,27 +628,35 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             stdio: ['ignore', 'pipe', 'pipe'],
           },
         );
-        changedPaths = nameStatus
-          .split('\n')
-          .filter(Boolean)
-          .flatMap((line) => line.split('\t').slice(1));
+        // NUL framing preserves tabs, newlines, and non-ASCII Git paths verbatim.
+        // Line-oriented output quotes those paths and can conceal protected prefixes.
+        const fields = nameStatus.split('\0');
+        if (fields.pop() !== '') throw new Error('Malformed Git name-status output');
+        const changes: { status: string; paths: string[] }[] = [];
+        for (let index = 0; index < fields.length;) {
+          const status = fields[index++];
+          if (status === undefined || !/^(?:[ADMTUXB]|[RC][0-9]+)$/.test(status)) {
+            throw new Error('Malformed Git change status');
+          }
+          const pathCount = status.startsWith('R') || status.startsWith('C') ? 2 : 1;
+          const paths = fields.slice(index, index + pathCount);
+          if (paths.length !== pathCount || paths.some((path) => path.length === 0)) {
+            throw new Error('Malformed Git change paths');
+          }
+          index += pathCount;
+          changes.push({ status, paths });
+        }
+        changedPaths = changes.flatMap(({ paths }) => paths);
         addedPaths = new Set(
-          nameStatus
-            .split('\n')
-            .filter(Boolean)
-            .filter((line) => line.split('\t')[0] === 'A')
-            .map((line) => line.split('\t').at(-1) ?? ''),
+          changes.filter(({ status }) => status === 'A').flatMap(({ paths }) => paths),
         );
-        operations = nameStatus
-          .split('\n')
-          .filter(Boolean)
-          .map((line) => {
-            const [status = '', ...paths] = line.split('\t');
-            if ((status.startsWith('R') || status.startsWith('C')) && paths.length >= 2) {
-              return `git rm ${paths[0] ?? ''}\ngit add ${paths[1] ?? ''}\n${line}`;
+        operations = changes
+          .map(({ status, paths }) => {
+            const line = [status, ...paths].join('\t');
+            if (status.startsWith('R') || status.startsWith('C')) {
+              return `git rm ${paths[0]}\ngit add ${paths[1]}\n${line}`;
             }
-            const path = paths.at(-1) ?? '';
-            return `${status.startsWith('D') ? 'git rm' : 'git add'} ${path}\n${line}`;
+            return `${status.startsWith('D') ? 'git rm' : 'git add'} ${paths[0]}\n${line}`;
           })
           .join('\n');
         semanticPatch = execFileSync(
