@@ -59,6 +59,28 @@ describe('workspace introspection evidence', () => {
     );
     expect(result.notes?.filter((note) => note.includes('outside pnpm workspace'))).toEqual([]);
   });
+
+  it('skips non-string workspace entries instead of failing the whole introspection', () => {
+    workspace();
+    file('pnpm-workspace.yaml', "packages:\n  - 'modules/*'\n  - name: hand-edited\n");
+    expect(() => introspectRepo({ targetRoot: root, now })).not.toThrow();
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.notes).toContain(
+      'Parsed pnpm-workspace.yaml: 1 pattern(s), 1 matching manifest(s)',
+    );
+    expect(result.notes?.filter((note) => note.includes('outside pnpm workspace'))).toEqual([]);
+  });
+
+  it('counts a dot-prefixed workspace directory as a member of its glob', () => {
+    workspace();
+    file('modules/.internal/package.json', '{}');
+    file('modules/.internal/src/index.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.notes).toContain(
+      'Parsed pnpm-workspace.yaml: 1 pattern(s), 2 matching manifest(s)',
+    );
+    expect(result.notes?.filter((note) => note.includes('outside pnpm workspace'))).toEqual([]);
+  });
 });
 
 describe('repository detection contracts', () => {
@@ -265,6 +287,90 @@ it.each([
     ['nestjs', 'express', 'fastify'].includes(framework) ? 'runtime-host' : undefined,
   );
   expect(result.notes).toBeUndefined();
+});
+
+describe('traversal boundaries', () => {
+  it('samples files at the deepest scanned level and stops past the recursion bound', () => {
+    file('n1/n2/n3/n4/n5/n6/in-bound.ts');
+    file('n1/n2/n3/n4/n5/n6/n7/past-bound.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.languages).toEqual([{ name: 'typescript', file_count: 1 }]);
+  });
+
+  it('keeps source roots within the nesting bound and ignores deeper look-alikes', () => {
+    file('d1/d2/d3/d4/src/index.ts');
+    file('e1/e2/e3/e4/e5/src/index.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.source_globs).toEqual(['d1/d2/d3/d4/src/**']);
+  });
+
+  it('does not treat a top-level testing directory as a test root', () => {
+    file('testing/harness.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.test_globs).toEqual(['**/*.test.*']);
+  });
+});
+
+describe('package manager and proposed project type', () => {
+  it('presumes npm from a bare manifest and proposes no project type for it', () => {
+    file('package.json', '{}');
+    file('src/index.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.package_manager).toBe('npm');
+    expect(result.proposed_project_type).toBeUndefined();
+  });
+
+  it('does not call a pnpm application with a framework a platform-package', () => {
+    file('pnpm-lock.yaml');
+    file('package.json', JSON.stringify({ dependencies: { react: '18' } }));
+    file('src/index.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.frameworks).toEqual([{ name: 'react', evidence: 'package.json dep: react' }]);
+    expect(result.proposed_project_type).toBeUndefined();
+  });
+
+  it('requires a root or top-level package source root before proposing platform-package', () => {
+    file('pnpm-lock.yaml');
+    file('package.json', '{"private":true}');
+    file('vendor/packages/vendored/src/index.ts');
+    file('packages/tooling/src-gen/index.ts');
+    const result = introspectRepo({ targetRoot: root, now });
+    expect(result.proposed_project_type).toBeUndefined();
+  });
+});
+
+it.each([
+  ['packages/core/src/index.ts', 'vendor/apps/demo/src/index.ts'],
+  ['apps/web/src/index.ts', 'vendor/packages/toolkit/src/index.ts'],
+])('reports no monorepo-with-apps note for %s beside a nested look-alike', (real, lookalike) => {
+  file(real);
+  file(lookalike);
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(result.notes).toBeUndefined();
+});
+
+it.each([
+  ['tests/example.spec.ts', 'docs/migration.test.ts.md', ['tests/**', '**/*.spec.*']],
+  ['tests/example.test.ts', 'docs/plan.spec.js.txt', ['tests/**', '**/*.test.*']],
+])('populates test globs from %s and not from the look-alike %s', (test, lookalike, expected) => {
+  file('package.json', '{}');
+  file(test);
+  file(lookalike);
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(result.test_globs).toEqual(expected);
+});
+
+it('does not flag files that merely resemble a protected name', () => {
+  for (const path of [
+    '.envrc',
+    'prod.env',
+    'config/credentials.json.bak',
+    'keys/backup_id_rsa',
+    'docs/hotkeys.keymap.json',
+  ])
+    file(path);
+  const result = introspectRepo({ targetRoot: root, now });
+  expect(result.protected_surfaces).toEqual([]);
 });
 
 it.each([
