@@ -336,6 +336,7 @@ it.each(['revoked', 'unavailable'] as const)(
       }),
     ).toMatchObject({
       disposition: 'fallback-no-evidence',
+      reason: 'active graduation authorization from the base parent is unavailable',
       executeFullCi: true,
       hardFailure: false,
     });
@@ -484,7 +485,11 @@ it.each([
   input.current.recomputedSourceHash = { algorithm: 'sha256', ...source };
   const result = verifyActionsRunEvidence(input);
   expect(result.executeFullCi).toBe(true);
-  expect(result.disposition).not.toBe('promotion-hit');
+  expect(result).toMatchObject({
+    disposition: 'fallback-tree-mismatch',
+    reason: 'merged-checkout sourceHash or source file count differs from the claim',
+    hardFailure: false,
+  });
 });
 
 it.each(['preflight', 'evidenceGate', 'freshness'] as const)(
@@ -527,6 +532,7 @@ it('requires and accepts actual full execution after a legitimate evidence miss'
     executeFullCi: true,
     hardFailure: false,
     disposition: 'fallback-no-evidence',
+    reason: 'no Actions-run evidence claim exists',
   });
   const base = {
     preflight: 'success',
@@ -572,6 +578,7 @@ it.each([{ baseSha: '0'.repeat(40) }, { basePolicySatisfied: false }])(
       verifyActionsRunEvidence({ ...input, current: { ...input.current, ...change } }),
     ).toMatchObject({
       disposition: 'fallback-base-moved',
+      reason: 'protected base moved or required up-to-date/merge-queue policy was not satisfied',
       executeFullCi: true,
       hardFailure: false,
     });
@@ -915,5 +922,59 @@ it('reports an incomplete initial window without inventing a reset observation',
       promotionHits: rows.length,
       reason: 'candidate window has not reached every graduation threshold',
     });
+  }
+});
+
+it.each([
+  { label: 'missing', jobs: undefined },
+  { label: 'null', jobs: null },
+  { label: 'array', jobs: [] },
+  { label: 'string', jobs: 'success' },
+])('refuses $label full-result jobs before inspecting individual job results', ({ jobs }) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      fullResult: { ...input.fullResult, jobs },
+    }),
+  ).toThrow('actions evidence tuple: full result jobs are missing');
+});
+
+it.each([
+  { label: 'missing', equivalent: undefined },
+  { label: 'null', equivalent: null },
+  { label: 'truthy string', equivalent: 'true' },
+  { label: 'numeric zero', equivalent: 0 },
+])('refuses $label shadow equivalence before evaluating its disposition', ({ equivalent }) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      decision: { ...input.decision, shadowFullEquivalent: equivalent },
+    }),
+  ).toThrow('actions evidence tuple: shadow/full equivalence is invalid');
+});
+
+it('does not reuse equal tree values under a different Git hash algorithm', () => {
+  const input = fixture();
+  expect(
+    verifyActionsRunEvidence({
+      ...input,
+      current: {
+        ...input.current,
+        mergedTree: { algorithm: 'sha256', value: input.current.mergedTree.value },
+      },
+    }),
+  ).toMatchObject({
+    disposition: 'fallback-tree-mismatch',
+    reason: 'actual merged tree differs from tested tree',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+});
+
+it('omits a reset identity entirely when the observation window has never reset', () => {
+  for (const rows of [[], windowRows(4, 3), windowRows(5, 3)]) {
+    expect(Object.hasOwn(evaluateActionsEvidenceWindow(rows), 'resetAfterMerge')).toBe(false);
   }
 });
