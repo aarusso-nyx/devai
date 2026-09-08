@@ -767,3 +767,61 @@ describe('collection failure preserves existing evidence', () => {
     expect(readFileSync(join(root, manifestPath))).toEqual(before);
   });
 });
+
+describe('local evidence policy-sensitive path boundaries', () => {
+  it.each([
+    '.github/workflows',
+    '.github/workflows/',
+    '.devai/config',
+    'law/policy',
+    'custom/protected',
+    'custom/protected/',
+    'custom/protected/nested/file.json',
+  ])('refuses protected path %s while preserving the claimed manifest', (changed) => {
+    const { root, now, manifestPath } = fixture({
+      localPolicy: { forbidden_paths: ['custom/protected/'] },
+    });
+    const bytes = readFileSync(join(root, manifestPath));
+    expect(() =>
+      verifyLocalEvidence({
+        repoRoot: root,
+        mode: 'gate',
+        now: now.getTime(),
+        trustedActors: ['aarusso'],
+        context: {
+          eventName: 'push',
+          ref: 'refs/heads/main',
+          actor: 'aarusso',
+          headMessage: `Local-CI-Evidence: ${manifestPath}`,
+          changedFiles: ['src/ordinary.ts', changed],
+        },
+      }),
+    ).toThrow(`policy-sensitive file changes: ${changed}`);
+    expect(readFileSync(join(root, manifestPath))).toEqual(bytes);
+  });
+
+  it('accepts unrelated changes beside protected directory prefixes', () => {
+    const { root, now, manifestPath } = fixture({
+      localPolicy: { forbidden_paths: ['custom/protected/'] },
+    });
+    const result = verifyLocalEvidence({
+      repoRoot: root,
+      mode: 'gate',
+      now: now.getTime(),
+      trustedActors: ['aarusso'],
+      context: {
+        eventName: 'push',
+        ref: 'refs/heads/main',
+        actor: 'aarusso',
+        headMessage: `Local-CI-Evidence: ${manifestPath}`,
+        changedFiles: [
+          'src/ordinary.ts',
+          '.github/workflows-backup/notes',
+          'custom/protected-other/file',
+        ],
+      },
+    });
+    expect(result.evidenceMode).toBe(true);
+    expect(result.outcome).toBe('evidence-valid');
+  });
+});
