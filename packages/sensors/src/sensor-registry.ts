@@ -167,22 +167,24 @@ export const DIAGNOSTIC_SENSOR_KINDS: readonly SensorKind[] = Object.freeze(
 );
 
 export const SENSOR_DESCRIPTORS: readonly SensorDescriptor[] = Object.freeze(
-  SENSOR_REGISTRY.entries.map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    kind: entry.kind,
-    command: `sense run ${entry.kind}`,
-    primaryReadingKind: entry.kind,
-    readingKinds: Object.freeze([entry.kind]),
-    lifecycle: 'supported' as const,
-    emitterModule: entry.emitter_module,
-    effect: entry.effect,
-    capabilities: Object.freeze([...(entry.effect_basis?.capabilities ?? [])]),
-    cells: Object.freeze([...(entry.cells ?? [])]),
-    diagnostic: entry.diagnostic === true,
-    tiers: Object.freeze([...entry.tiers]),
-    designNote: entry.design_note,
-  })),
+  SENSOR_REGISTRY.entries.map((entry) =>
+    Object.freeze({
+      id: entry.id,
+      title: entry.title,
+      kind: entry.kind,
+      command: `sense run ${entry.kind}`,
+      primaryReadingKind: entry.kind,
+      readingKinds: Object.freeze([entry.kind]),
+      lifecycle: 'supported' as const,
+      emitterModule: entry.emitter_module,
+      effect: entry.effect,
+      capabilities: Object.freeze([...(entry.effect_basis?.capabilities ?? [])]),
+      cells: Object.freeze([...(entry.cells ?? [])]),
+      diagnostic: entry.diagnostic === true,
+      tiers: Object.freeze([...entry.tiers]),
+      designNote: entry.design_note,
+    }),
+  ),
 );
 
 export function sensorCellMap(): Readonly<Record<SensorKind, readonly SensorCell[]>> {
