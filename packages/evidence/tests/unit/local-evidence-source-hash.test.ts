@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, aroundEach, describe, expect, it } from 'vitest';
+import { afterEach, aroundEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { computeSourceHash } from '../../src/local-evidence/source-hash.js';
 
@@ -112,5 +112,36 @@ it('hashes Unicode paths in canonical UTF-16 order even when Git lists a differe
     algorithm: 'sha256',
     fileCount: 2,
     value: '772d36e0ff33cd29fd2050e94e35dd9b7f78c9530447754d7273390e51a2685a',
+  });
+});
+
+describe('source hashing refuses failed Git enumeration', () => {
+  it.each([
+    { stderr: '  index cannot be read\n', expected: 'index cannot be read' },
+    { stderr: '', expected: 'git ls-files -z failed' },
+    { stderr: '  \n\t', expected: 'git ls-files -z failed' },
+  ])('preserves the diagnostic or names the failed command: $stderr', ({ stderr, expected }) => {
+    const root = fixture();
+    const bin = join(root, 'controlled-bin');
+    mkdirSync(bin);
+    // Exercise the real subprocess boundary with a deterministic failing Git
+    // executable. Source enumeration and hashing remain the production code.
+    writeFileSync(join(bin, 'git'), `#!/bin/sh\nprintf '%s' '${stderr}' >&2\nexit 1\n`, {
+      mode: 0o700,
+    });
+    const originalPath = process.env.PATH;
+    vi.stubEnv('PATH', `${bin}:${originalPath ?? ''}`);
+    try {
+      let failure: unknown;
+      try {
+        computeSourceHash(root, []);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toBe(expected);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
