@@ -52,6 +52,14 @@ describe('exact local evidence subjects', () => {
   ])('derives the repository path from the supported remote form %s', (origin) => {
     expect(deriveExactSubject(fixture(origin)).repository).toBe('owner/repository');
   });
+  it.each(['./directory/user@:folder@host:repository', './directory/user@host:folder\ncontinued'])(
+    'preserves the complete path-shaped local remote %j',
+    (origin) => {
+      const root = fixture(origin);
+      expect(deriveExactSubject(root).repository).toBe(origin);
+      expect(git(root, 'config', '--get', 'remote.origin.url')).toBe(origin);
+    },
+  );
   it.each([false, true])('refuses tracked edits with staged=%s', (staged) => {
     const root = fixture();
     put(root, 'source.txt', 'changed\n');
