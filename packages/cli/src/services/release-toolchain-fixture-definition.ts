@@ -32,6 +32,7 @@ const INVALID = 'release-toolchain-fixture-definition-invalid';
 const PREFIX = 'dist/runtime/fixtures/mutation-toolchain/';
 const SOURCE = 'packages/cli/tests/fixtures/mutation-toolchain';
 const DRIVER = 'scripts/release-host/mutation-diagnostic.mjs';
+const CHECKER_ADAPTER = 'scripts/release-host/mutation-typescript-plugin.mjs';
 const MAXIMUM_FILE_BYTES = 64 * 1024;
 // This is the source-owned population, not a caller-supplied manifest. Dynamic
 // registered init bindings, the lockfile and host/devai.tgz are deliberately not
@@ -51,7 +52,11 @@ const FIXTURE = [
   ['root-pnpm-workspace.yaml', 'pnpm-workspace.yaml'],
   ['test-tasks.json', 'test-tasks.json'],
 ] as const;
-const paths = [...FIXTURE.map(([, path]) => path), 'host/run-diagnostic.mjs'].sort();
+const paths = [
+  ...FIXTURE.map(([, path]) => path),
+  'host/run-diagnostic.mjs',
+  'host/mutation-typescript-plugin.mjs',
+].sort();
 const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 function refuse(): never {
@@ -163,6 +168,7 @@ export function loadSourceReleaseToolchainFixtureDefinition(): ReleaseToolchainF
     const entries = [
       ...FIXTURE.map(([source, path]) => [`${SOURCE}/${source}`, path]),
       [DRIVER, 'host/run-diagnostic.mjs'],
+      [CHECKER_ADAPTER, 'host/mutation-typescript-plugin.mjs'],
     ] as const;
     // Build the exact allowed ancestor census before touching any source bytes.
     const fixtureDirectories = new Map<string, Set<string>>();

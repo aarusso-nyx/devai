@@ -368,6 +368,7 @@ const __dirname = __devaiDirname(__filename);`,
   );
   for (const name of [
     'mutation-production.mjs',
+    'mutation-typescript-plugin.mjs',
     'mutation-vitest-plugin.mjs',
     'mutation-workspace-aliases.mjs',
   ]) {

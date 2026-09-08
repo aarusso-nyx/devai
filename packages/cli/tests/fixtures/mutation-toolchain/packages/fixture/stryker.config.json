@@ -5,7 +5,7 @@
   ],
   "plugins": [
     "@stryker-mutator/vitest-runner",
-    "@stryker-mutator/typescript-checker"
+    "/workspace/candidate/host/mutation-typescript-plugin.mjs"
   ],
   "testRunner": "vitest",
   "checkers": [

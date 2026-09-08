@@ -20,7 +20,7 @@ const FIXTURE_FILES = {
   'packages/fixture/tests/subject.test.ts.fixture':
     '7e1d555e7743b00f82d2372377a2c8b89be02dedf38d0259dd3bf2fa7d0ce5a2',
   'packages/fixture/stryker.config.json':
-    '4df182cff11e200a996eccb518775dc3d0c1ccc37b4e016613891a3083cdc713',
+    '5ba2162384a81a36c81251c71e9e4e364272d954aa46608b2ca71fb2574e3e64',
   'packages/fixture/tsconfig.json':
     '95034c38b351b89dae9c2212a7f71beed2cce9ccb2a3d992209a887b6cfee318',
   'packages/fixture/vitest.config.cjs':
@@ -125,7 +125,10 @@ describe('mutation toolchain fixture', () => {
     });
     expect(stryker).toMatchObject({
       mutate: ['src/subject.ts', 'src/zero.ts'],
-      plugins: ['@stryker-mutator/vitest-runner', '@stryker-mutator/typescript-checker'],
+      plugins: [
+        '@stryker-mutator/vitest-runner',
+        '/workspace/candidate/host/mutation-typescript-plugin.mjs',
+      ],
       thresholds: { break: 60, high: 60, low: 60 },
       jsonReporter: { fileName: 'reports/mutation/raw.json' },
       incremental: false,

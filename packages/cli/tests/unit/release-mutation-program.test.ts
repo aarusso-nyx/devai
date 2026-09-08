@@ -47,6 +47,7 @@ const { FileMatcher } = (await import(
 };
 const ASSETS = [
   'mutation-production.mjs',
+  'mutation-typescript-plugin.mjs',
   'mutation-vitest-plugin.mjs',
   'mutation-workspace-aliases.mjs',
 ] as const;
@@ -318,6 +319,7 @@ describe('protected mutation program factory with explicit upstream-authority is
     expect(capture.files.map((entry) => entry.path)).toEqual([
       'invocation.json',
       'mutation-production.mjs',
+      'mutation-typescript-plugin.mjs',
       'mutation-vitest-plugin.mjs',
       'mutation-workspace-aliases.mjs',
       'run.mjs',
@@ -331,7 +333,10 @@ describe('protected mutation program factory with explicit upstream-authority is
     expect(json(capture, 'stryker.config.json')).toEqual({
       mutate: ['packages/utils/src/main.ts'],
       testFiles: ['packages/utils/tests/main.test.ts'],
-      plugins: ['@stryker-mutator/typescript-checker', '/devai-host/mutation-vitest-plugin.mjs'],
+      plugins: [
+        '/devai-host/mutation-typescript-plugin.mjs',
+        '/devai-host/mutation-vitest-plugin.mjs',
+      ],
       appendPlugins: [],
       testRunner: 'devai-vitest',
       checkers: ['typescript'],

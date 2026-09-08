@@ -15,6 +15,7 @@ const INVALID = 'release-mutation-program-invalid';
 const PREFIX = 'dist/runtime/host/';
 const SOURCES = [
   'mutation-production.mjs',
+  'mutation-typescript-plugin.mjs',
   'mutation-vitest-plugin.mjs',
   'mutation-workspace-aliases.mjs',
 ] as const;
@@ -169,7 +170,10 @@ export function createProtectedMutationProgram(input: {
   const options = {
     mutate: pkg.mutation_targets.map((entry) => pattern(`${pkg.expected.workspace}/${entry.path}`)),
     testFiles: pkg.selected_tests.map((entry) => pattern(entry.path)),
-    plugins: ['@stryker-mutator/typescript-checker', '/devai-host/mutation-vitest-plugin.mjs'],
+    plugins: [
+      '/devai-host/mutation-typescript-plugin.mjs',
+      '/devai-host/mutation-vitest-plugin.mjs',
+    ],
     appendPlugins: [],
     testRunner: 'devai-vitest',
     checkers: ['typescript'],
