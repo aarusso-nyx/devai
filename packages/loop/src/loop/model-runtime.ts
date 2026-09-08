@@ -1,4 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { getValidator } from '@devai-nyx/schemas';
 
 export const MODEL_RUNTIME_REGISTRY_PATH = 'law/policy/model-runtime-registry.json';
 
@@ -194,6 +195,12 @@ export function validateModelRuntimeRegistry(candidate: unknown): ModelRuntimeRe
     nonemptyString(entry['availability_basis'], `runtime ${id} availability basis is required`);
   }
 
+  if (!getValidator('model-runtime-registry.schema.json')(root)) {
+    throw new ModelRuntimeRegistryError(
+      'TASK_MODEL_REGISTRY_INVALID',
+      'registry does not conform to model-runtime-registry.schema.json',
+    );
+  }
   return root as unknown as ModelRuntimeRegistry;
 }
 
