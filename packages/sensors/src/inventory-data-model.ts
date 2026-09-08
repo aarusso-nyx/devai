@@ -200,7 +200,7 @@ function extractColumnAnnotations(
       const rawName = colMatch[1];
       if (rawName !== undefined) {
         const name = rawName.startsWith('"') ? rawName.slice(1, -1).replace(/""/g, '"') : rawName;
-        if (!reservedFirst.has(name.toUpperCase())) {
+        if (rawName.startsWith('"') || !reservedFirst.has(name.toUpperCase())) {
           currentColumn = name;
           if (!out.has(currentColumn)) out.set(currentColumn, {});
         } else {
@@ -489,7 +489,7 @@ function parseColumnLine(line: string): DataModelColumn | null {
   const rest = m[2];
   if (rawName === undefined || rest === undefined) return null;
   const name = rawName.startsWith('"') ? rawName.slice(1, -1).replace(/""/g, '"') : rawName;
-  if (RESERVED_FIRST_TOKENS.has(name.toUpperCase())) return null;
+  if (!rawName.startsWith('"') && RESERVED_FIRST_TOKENS.has(name.toUpperCase())) return null;
   // Type: one identifier or one of the explicit SQL multi-word type forms,
   // optionally followed by parens (e.g. VARCHAR(255)) or an array suffix.
   // An unconstrained second identifier would consume constraint keywords such
