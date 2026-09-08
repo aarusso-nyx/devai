@@ -1,10 +1,17 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: requested and resolved executor evidence remains
 // immutable, exact-candidate bound, semantically total, and append-only.
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   assertTaskExecutionEvidenceBinding,
@@ -17,6 +24,29 @@ import {
   type TaskExecutionEvidenceValidator,
   type TaskRecordBinding,
 } from '../../src/task-execution/index.js';
+
+const concurrentWriter = vi.hoisted(() => ({
+  beforeWrite: undefined as ((path: string) => void) | undefined,
+}));
+// Inject the competing write at the native filesystem call, after authority checks.
+vi.mock('node:fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...original,
+    writeFileSync: (...args: Parameters<typeof original.writeFileSync>) => {
+      if (typeof args[0] === 'string' && concurrentWriter.beforeWrite !== undefined) {
+        const callback = concurrentWriter.beforeWrite;
+        concurrentWriter.beforeWrite = undefined;
+        callback(args[0]);
+      }
+      return original.writeFileSync(...args);
+    },
+  };
+});
+
+afterEach(() => {
+  concurrentWriter.beforeWrite = undefined;
+});
 
 const TARGET = mkdtempSync(join(tmpdir(), 'devai-r0007-task-evidence-'));
 const SHA = 'a'.repeat(40);
@@ -782,3 +812,48 @@ it.each(['recipe_name', 'recipe_variant'] as const)(
     );
   },
 );
+
+describe('task evidence append-only write race', () => {
+  it.each(['regular file', 'symlink'] as const)(
+    'preserves a concurrent %s created after the absence check',
+    async (kind) => {
+      const root = mkdtempSync(join(TARGET, 'race-'));
+      const executor = {
+        kind: 'routine' as const,
+        action_id: null,
+        argv: ['node', 'fixture.mjs'],
+        cwd: '.',
+        effects: ['read' as const],
+      };
+      const bound = task('TASK-7402', executor);
+      const evidence = buildTaskExecutionEvidence(bound, facts('TXE-0000000000007402', executor));
+      const target = join(root, 'concurrent-target.json');
+      const retained = Buffer.from('concurrent evidence must remain byte-identical\n');
+      writeFileSync(target, retained);
+      let occupiedPath: string | undefined;
+      concurrentWriter.beforeWrite = (path) => {
+        occupiedPath = path;
+        if (kind === 'symlink') symlinkSync(target, path);
+        else writeFileSync(path, retained);
+      };
+
+      await expect(
+        withAuthorityHostTestScope(() =>
+          persistTaskExecutionEvidence({
+            repoRoot: root,
+            relativePath: 'record/proofs/task-execution/TXE-0000000000007402.json',
+            task: bound,
+            candidate_sha: SHA,
+            evidence,
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(occupiedPath).toBe(
+        join(root, 'record/proofs/task-execution/TXE-0000000000007402.json'),
+      );
+      if (occupiedPath === undefined) throw new Error('concurrent writer was not reached');
+      expect(readFileSync(occupiedPath)).toEqual(retained);
+      expect(readFileSync(target)).toEqual(retained);
+    },
+  );
+});
