@@ -104,7 +104,7 @@ const PROTECTED_FILENAME_PATTERNS = [
   /\.pem$/,
   /\.key$/,
   /credentials.*\.json$/i,
-  /secrets?\..*$/i,
+  /secrets?\..*$/is,
   /^id_rsa(\.pub)?$/,
 ];
 
