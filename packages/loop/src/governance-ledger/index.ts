@@ -555,10 +555,10 @@ export function decisionCitationResolution(options: {
   for (const path of roots.flatMap((root) => walkFiles(resolve(options.repoRoot, root)))) {
     const rel = relative(options.repoRoot, path);
     if (
-      path.includes(`${join('node_modules', '')}`) ||
-      path.includes(`${join('dist', '')}`) ||
+      rel.split(sep).some((component) => component === 'node_modules' || component === 'dist') ||
       (!strictRoots &&
-        (path.startsWith(recordsDir) ||
+        (path === recordsDir ||
+          path.startsWith(recordsDir + sep) ||
           rel.startsWith('law/register/') ||
           rel.startsWith('law/adr/archive/') ||
           rel.startsWith('docs/site/versioned_docs/') ||
