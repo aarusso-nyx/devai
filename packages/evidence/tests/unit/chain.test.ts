@@ -299,14 +299,18 @@ describe('chain ordinals and predecessor aliases', () => {
     writeFileSync(chainPath, JSON.stringify(chain));
     expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
   });
-  it.each(['null', '42', '{"records":null,"head":null}', '{"records":[],"head":42}'])(
-    'refuses malformed chain shape %s without rewriting it',
-    (bytes) => {
-      writeFileSync(chainPath, bytes);
-      expect(() => loadChain(chainPath)).toThrow(/evidence chain at/);
-      expect(readFileSync(chainPath, 'utf8')).toBe(bytes);
-    },
-  );
+  it.each([
+    ['null', 'is not a JSON object'],
+    ['42', 'is not a JSON object'],
+    ['"unavailable"', 'is not a JSON object'],
+    ['false', 'is not a JSON object'],
+    ['{"records":null,"head":null}', "has an invalid 'records' field"],
+    ['{"records":[],"head":42}', "has an invalid 'head' field"],
+  ])('refuses malformed chain shape %s without rewriting it', (bytes, diagnostic) => {
+    writeFileSync(chainPath, bytes);
+    expect(() => loadChain(chainPath)).toThrow(`evidence chain at ${chainPath} ${diagnostic}`);
+    expect(readFileSync(chainPath, 'utf8')).toBe(bytes);
+  });
 });
 
 it('matches the legacy chain digest vectors while retaining artifact multiplicity and caller order', () => {
