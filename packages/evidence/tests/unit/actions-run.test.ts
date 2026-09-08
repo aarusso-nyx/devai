@@ -1,3 +1,4 @@
+import { validators } from '@devai-nyx/schemas';
 import { expect, it } from 'vitest';
 import {
   ACTIONS_FRESHNESS_JOBS,
@@ -835,4 +836,84 @@ it.each([
     actionsEvidenceFailure: true,
     message: 'actions evidence tuple: manifest is not a valid actions-run claim',
   });
+});
+
+it('rejects a schema-valid local claim at the Actions trust boundary', () => {
+  const input = fixture();
+  const local: Record<string, unknown> = { ...input.manifest, origin: 'local' };
+  delete local['actionsRun'];
+  expect(validators.localEvidenceManifest(local)).toBe(true);
+  expect(() => verifyActionsRunEvidence({ ...input, manifest: local })).not.toThrow();
+  expect(verifyActionsRunEvidence({ ...input, manifest: local })).toMatchObject({
+    disposition: 'invalid-claim',
+    reason: 'Actions-run evidence manifest or schema claim is invalid',
+    executeFullCi: true,
+    hardFailure: true,
+  });
+  const observation = tuple();
+  expect(() => validateActionsEvidenceShadowTuple({ ...observation, manifest: local })).toThrow(
+    'manifest is not a valid actions-run claim',
+  );
+});
+
+it.each([
+  [
+    'UNKNOWN',
+    { disposition: 'UNKNOWN' },
+    'UNKNOWN observation is non-skippable and resets the candidate window',
+  ],
+  [
+    'invalid claim',
+    { disposition: 'invalid-claim' },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+  [
+    'disagreement',
+    { shadowFullEquivalent: false },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+  ['undurable', { durable: false }, 'undurable observation resets the candidate window'],
+  [
+    'mechanism defect',
+    { mechanismDefect: true },
+    'promotion mechanism defect resets the candidate window',
+  ],
+] as const)(
+  'preserves the %s reset cause until a fresh complete window qualifies',
+  (_name, change, reason) => {
+    const failed: ActionsEvidenceWindowObservation = {
+      mergeSha: 'a'.repeat(40),
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      durable: true,
+      ...change,
+    };
+    const history = [...windowRows(5, 5), failed, ...windowRows(2, 2)];
+    expect(evaluateActionsEvidenceWindow(history)).toEqual({
+      qualifies: false,
+      consecutiveMerges: 2,
+      promotionHits: 2,
+      resetAfterMerge: failed.mergeSha,
+      reason,
+    });
+    expect(evaluateActionsEvidenceWindow([...history, ...windowRows(3, 1)])).toEqual({
+      qualifies: true,
+      consecutiveMerges: 5,
+      promotionHits: 3,
+      resetAfterMerge: failed.mergeSha,
+      reason:
+        'candidate window satisfies consecutive merge, promotion-hit, and hit-rate thresholds',
+    });
+  },
+);
+
+it('reports an incomplete initial window without inventing a reset observation', () => {
+  for (const rows of [[], windowRows(4, 4)]) {
+    expect(evaluateActionsEvidenceWindow(rows)).toEqual({
+      qualifies: false,
+      consecutiveMerges: rows.length,
+      promotionHits: rows.length,
+      reason: 'candidate window has not reached every graduation threshold',
+    });
+  }
 });
