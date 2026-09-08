@@ -94,3 +94,23 @@ describe('local evidence source hashing', () => {
     expect(() => computeSourceHash(root, [])).toThrow();
   });
 });
+
+it('hashes Unicode paths in canonical UTF-16 order even when Git lists a different byte order', () => {
+  const root = fixture();
+  const supplementary = 'unicode/\u{10000}.txt';
+  const bmp = 'unicode/\ue000.txt';
+  put(root, supplementary, 'supplementary\n');
+  put(root, bmp, 'bmp\n');
+  git(root, 'add', '.');
+  const gitOrder = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean);
+  expect(gitOrder).toEqual([bmp, supplementary]);
+  // Independent Python hashlib vector over UTF-16-sorted names and documented
+  // UTF-8 path / NUL / decimal byte length / NUL / content SHA256 / NUL framing.
+  expect(computeSourceHash(root, [])).toEqual({
+    algorithm: 'sha256',
+    fileCount: 2,
+    value: '772d36e0ff33cd29fd2050e94e35dd9b7f78c9530447754d7273390e51a2685a',
+  });
+});
