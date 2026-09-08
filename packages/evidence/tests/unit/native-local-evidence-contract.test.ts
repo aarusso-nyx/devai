@@ -973,3 +973,25 @@ describe('local evidence tool verification boundaries', () => {
     },
   );
 });
+
+it.each(['unit', 'api'])(
+  'reports generated-manifest schema defects in %s without replacing previous valid evidence',
+  (job) => {
+    const { root, now, manifestPath } = fixture();
+    const before = readFileSync(join(root, manifestPath));
+    put(root, `.artifacts/${job}/metadata.txt`, `job=${job}\nnode=${process.version}\n`);
+    const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+    let failure: unknown;
+    try {
+      collectLocalEvidence({ repoRoot: root, jobDirs, now });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(Error);
+    const message = (failure as Error).message;
+    expect(message).toContain('collected manifest fails schema validation:');
+    expect(message).toContain(`/jobs/${job}/metadata`);
+    expect(message).toContain("must have required property 'platform'");
+    expect(readFileSync(join(root, manifestPath))).toEqual(before);
+  },
+);
