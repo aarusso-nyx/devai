@@ -14,11 +14,12 @@ any product publication decision. No version bump is inferred from this work.
 
 For DEVAI 1.5, the ordinary RC gate is necessary but insufficient. All ten packages
 must also satisfy their existing mutation score and survivor limits for the exact
-candidate. The current version-1 evidence transport and ledger binding cover ordinary
-RC evidence; they do not yet carry and independently verify the complete mutation
-export. Do not activate 1.5 promotion until that verification is required in both
-rehearsal and promotion and its candidate, policy, toolchain and approved verifier
-identities are bound to the completion record. Missing mutation evidence blocks release.
+candidate. The current workflows require version-2 evidence transport, ordinary RC
+verification and independent installed verification of the complete mutation export.
+Rehearsal and promotion bind the candidate, policy, toolchain and approved control
+identities. These source changes do not establish live protected acceptance: approve
+and provision the immutable controls and protected configuration before activation,
+then demonstrate the complete path. Missing mutation evidence blocks release.
 
 A successful installed diagnostic fixture with mutation marked `not-applicable` proves
 only its applicable checks. It cannot discharge DEVAI's required mutation semantics.
@@ -30,8 +31,10 @@ only its applicable checks. It cannot discharge DEVAI's required mutation semant
 3. Approve one exact `DEVAI_PROCESS_CONTROL_COMMIT` as a repository variable. All protected
    jobs check out and verify that revision before running process helpers. It is a control
    rollout, not a per-product-candidate setting. Missing or malformed pins fail closed.
-4. Set `DEVAI_LEDGER_TRANSPORT=legacy` explicitly in the ledger environment initially.
-   Keep existing ledger secrets, expected policy digest, verifier provenance and tag signer trust.
+4. Prepare explicit `DEVAI_LEDGER_TRANSPORT=bundle` selection and schema `2.0.0` for
+   the v1.5 protected workflows. Legacy transport is not accepted by those workflows.
+   Retain existing payload secrets until the bundle path succeeds; keep expected policy
+   digest, approved verifier provenance and tag signer trust outside the bundle.
 5. Separately authorize creation of private `aarusso-nyx/devai-evidence`, with release
    immutability enabled. Evidence releases have tag/name `evidence-<sha256>` and exactly
    one asset `evidence.tgz`; retain them indefinitely. Do not enable automatic cleanup.
@@ -70,8 +73,9 @@ private temporary storage is used above an 8 MiB memory buffer. It does not auth
 export signatures or establish mutation acceptance. The installed offline verifier
 must check the exported state and policy closure with external trust and approved
 controls, followed by complete mutation semantics and rehearsal bindings. Workflow
-activation of this v2 path remains pending that integration and protected approval.
-Never include control packages, signing keys or trust/revocation files in this layout.
+activation of this v2 path requires the protected approvals and live acceptance
+specified below. The current workflows invoke both verification paths. Never include
+control packages, signing keys or trust/revocation files in this layout.
 
 `verify-installed-export.mjs` provides the repository-local installed verification adapter.
 Its caller first provisions and independently approves the host package, then supplies that
@@ -210,11 +214,13 @@ assets, and every asset is checked again before publication.
 Pages currently validates the site population before upload and verifies every public
 member's bytes after deployment. Apart from the empty root `.nojekyll` control file,
 dot-prefixed members are refused because the pinned Pages uploader excludes them.
-Interrupted Pages deployment reconciliation is not yet implemented: a failed workflow
-does not prove that no deployment occurred, and automatic redeployment is not an accepted
-recovery procedure. Before enabling promotion, add retained deployment identifiers,
-authenticated status observation and exact-byte reconciliation so matching effects are
-no-ops, only confirmed missing effects resume, and unknown outcomes block.
+The workflow invokes `publish-pages.mjs` for interrupted-effect reconciliation and
+retains deployment identifiers even when publication fails. Its authenticated journal,
+reviewed migration audit and exact-byte checks distinguish matching, confirmed missing
+and unknown effects. Matching effects are no-ops; only confirmed missing effects may
+resume. A failed workflow alone never authorizes redeployment. Live GitHub acceptance,
+the single-writer boundary and protected migration-audit approval remain rollout gates;
+the Pages recovery section below specifies those requirements.
 
 ## Adopter migration bundles and limited self-adoption
 
@@ -351,8 +357,9 @@ expectations. Ordinary RC evidence remains a separate required check.
 Success prints only the receipt ID, digest, and verdict. Failure prints a generic
 message; preserve private work for diagnosis. This command does not authorize its
 control pins, install protected settings, or establish release readiness by itself.
-Protected workflow activation still requires approved host/DAG identities and the
-mandatory export check to be wired alongside ordinary RC verification.
+The current protected workflows wire this mandatory export check alongside ordinary
+RC verification. Activation still requires approved host/DAG identities, protected
+configuration and successful live acceptance.
 
 ### Protected installed-control rollout
 
