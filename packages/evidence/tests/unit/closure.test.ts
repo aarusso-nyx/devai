@@ -32,10 +32,14 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
 
 const roots: string[] = [];
 
-function repository(): { root: string; head: string } {
+function repository(objectFormat?: 'sha256'): { root: string; head: string } {
   const root = mkdtempSync(join(tmpdir(), 'devai-closure-'));
   roots.push(root);
-  execFileSync('git', ['init', '-b', 'main'], { cwd: root });
+  execFileSync(
+    'git',
+    ['init', '-b', 'main', ...(objectFormat ? [`--object-format=${objectFormat}`] : [])],
+    { cwd: root },
+  );
   writeFileSync(join(root, 'README.md'), 'fixture\n');
   execFileSync('git', ['add', 'README.md'], { cwd: root });
   execFileSync(
@@ -626,4 +630,22 @@ describe('closure append-only write race', () => {
       expect(readFileSync(target)).toEqual(retained);
     },
   );
+});
+
+it('closes and reloads a real SHA-256 Git candidate with its complete 64-character identities', async () => {
+  const { root, head } = repository('sha256');
+  expect(head).toMatch(/^[0-9a-f]{64}$/u);
+  expect(
+    execFileSync('git', ['rev-parse', '--show-object-format'], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim(),
+  ).toBe('sha256');
+  await withAuthorityHostTestScope(() => {
+    const result = closePhase(root, gateDraft(head));
+    expect(result.record.batches[0]?.commit).toBe(head);
+    expect(result.record.merged_as).toBe(head);
+    expect(readClosures(root)).toEqual([result.record]);
+    expect(JSON.parse(readFileSync(result.path, 'utf8'))).toEqual(result.record);
+  });
 });
