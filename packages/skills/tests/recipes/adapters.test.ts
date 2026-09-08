@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -9,6 +17,7 @@ import {
   preflightRecipeAdapterInstall,
   type RecipeHost,
 } from '../../src/recipes/adapters.js';
+import { loadRecipes } from '../../src/recipes/loader.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
 
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
@@ -188,4 +197,43 @@ describe('recipe adapter selection and installation boundaries', () => {
     for (const file of files)
       expect(readFileSync(join(repo, file.path), 'utf8')).toBe(`original ${file.path}`);
   });
+});
+
+it.each([
+  String.raw`Inspect C:\workspace\repo and "quoted" policy`,
+  'Verificar ação: "próxima etapa"',
+])('preserves description bytes through generated YAML: %s', (description) => {
+  const canonical = loadRecipes()[0];
+  if (canonical === undefined) throw new Error('canonical recipe population missing');
+  const root = mkdtempSync(join(tmpdir(), 'devai adapter metadata ç '));
+  try {
+    cpSync(dirname(canonical.resource_dir), root, { recursive: true });
+    const manifestPath = join(root, canonical.manifest.name, 'devai.recipe.json');
+    const markdownPath = join(root, canonical.manifest.name, 'SKILL.md');
+    const manifest = { ...canonical.manifest, description };
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    writeFileSync(
+      markdownPath,
+      canonical.skill_markdown.replace(
+        `description: ${canonical.manifest.description}`,
+        `description: ${description}`,
+      ),
+    );
+    const manifestBytes = readFileSync(manifestPath);
+    const markdownBytes = readFileSync(markdownPath);
+    const plan = buildRecipeAdapterPlan(root, ['codex']);
+    const metadata = plan.files.find(
+      (file) => file.path === `.agents/skills/${canonical.manifest.name}/agents/openai.yaml`,
+    );
+    expect(metadata).toBeDefined();
+    expect(() => parseYaml(metadata?.content ?? '')).not.toThrow();
+    expect(parseYaml(metadata?.content ?? '')).toEqual({
+      interface: { display_name: canonical.manifest.name, short_description: description },
+      policy: { allow_implicit_invocation: canonical.manifest.status === 'stable' },
+    });
+    expect(readFileSync(manifestPath)).toEqual(manifestBytes);
+    expect(readFileSync(markdownPath)).toEqual(markdownBytes);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
