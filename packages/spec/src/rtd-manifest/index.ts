@@ -251,17 +251,28 @@ function summarizeAdrs(adrDir: string): RtdManifestComponentEntry | null {
       .filter((n) => /^ADR-\d{3,}.*\.md$/.test(n))
       .sort();
   } catch {
-    return null;
+    return {
+      hash: hashCanonical(null),
+      ok: false,
+      errors: [`unreadable: ${adrDir}`],
+    };
   }
   // ADRs are markdown — hash the directory listing + per-file content hash.
+  const errors: string[] = [];
   const fingerprint = files.map((f) => {
-    const content = readFileSync(join(adrDir, f), 'utf8');
-    return { name: f, sha: createHash('sha256').update(content).digest('hex') };
+    try {
+      const content = readFileSync(join(adrDir, f), 'utf8');
+      return { name: f, sha: createHash('sha256').update(content).digest('hex') };
+    } catch {
+      errors.push(`unreadable: ${join(adrDir, f)}`);
+      return { name: f, sha: null };
+    }
   });
   return {
     count: files.length,
     hash: hashCanonical(fingerprint),
-    ok: true,
+    ok: errors.length === 0,
+    ...(errors.length > 0 && { errors }),
   };
 }
 
@@ -363,7 +374,11 @@ export function buildRtdManifest(opts: BuildRtdManifestOptions): RtdManifest {
   const adrs = summarizeAdrs(adrDir);
   if (adrs !== null) {
     components.adrs = adrs;
-    subVerdicts.push({ component: 'adrs', ok: adrs.ok });
+    subVerdicts.push({
+      component: 'adrs',
+      ok: adrs.ok,
+      ...(adrs.errors !== undefined && { error_count: adrs.errors.length }),
+    });
   }
 
   const fa = summarizeForbiddenActions(repoRoot);

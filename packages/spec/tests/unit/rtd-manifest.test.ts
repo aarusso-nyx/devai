@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -134,6 +135,7 @@ describe('RTD aggregate refusal propagation', () => {
     expect(manifest.readiness.ok).toBe(true);
     expect(manifest.components.trace).toBeUndefined();
     expect(manifest.components.forbidden_actions).toBeUndefined();
+    expect(manifest.components.adrs).toBeUndefined();
   });
 });
 
@@ -151,4 +153,76 @@ it('retains both independently discoverable failures in the same readiness recor
   });
   expect(manifest.components.trace?.errors).toHaveLength(1);
   expect(manifest.components.forbidden_actions?.errors).toHaveLength(1);
+});
+
+describe('RTD ADR input availability', () => {
+  it('preserves the established sorted content fingerprint for readable ADRs', async () => {
+    const root = readinessFixture();
+    completeTrace(root);
+    const adrDir = join(root, 'law/adr');
+    mkdirSync(adrDir);
+    const second = { name: 'ADR-002-second.md', content: '# Second\n' };
+    const first = { name: 'ADR-001-first.md', content: '# First\n' };
+    for (const record of [second, first]) writeFileSync(join(adrDir, record.name), record.content);
+    writeFileSync(join(adrDir, 'README.md'), 'Not an ADR');
+    const sha = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
+    const manifest = await fixtureManifest(root);
+    expect(manifest.components.adrs).toEqual({
+      count: 2,
+      hash: sha(
+        JSON.stringify([first, second].map(({ name, content }) => ({ name, sha: sha(content) }))),
+      ),
+      ok: true,
+    });
+    expect(manifest.readiness.ok).toBe(true);
+    expect(manifest.readiness.sub_verdicts).toContainEqual({ component: 'adrs', ok: true });
+  });
+
+  it('retains an unreadable ADR directory as a failed component', async () => {
+    const root = readinessFixture();
+    completeTrace(root);
+    const adrDir = join(root, 'law/adr');
+    writeFileSync(adrDir, 'owner-managed invalid directory placeholder');
+    const manifest = await fixtureManifest(root);
+    expect(manifest.readiness.ok).toBe(false);
+    expect(manifest.components.adrs).toMatchObject({
+      ok: false,
+      errors: [`unreadable: ${adrDir}`],
+    });
+    expect(manifest.readiness.sub_verdicts).toContainEqual({
+      component: 'adrs',
+      ok: false,
+      error_count: 1,
+    });
+    expect(readFileSync(adrDir, 'utf8')).toBe('owner-managed invalid directory placeholder');
+  });
+
+  it('aggregates unreadable ADR members and later policy failures without discarding readable ADRs', async () => {
+    const root = readinessFixture();
+    completeTrace(root);
+    const adrDir = join(root, 'law/adr');
+    mkdirSync(adrDir);
+    const unreadable = join(adrDir, 'ADR-001-unreadable.md');
+    mkdirSync(unreadable);
+    const readable = join(adrDir, 'ADR-002-readable.md');
+    writeFileSync(readable, '# Accepted decision\n');
+    writeFileSync(join(root, 'law/policy/forbidden-actions.json'), '{');
+    const first = await fixtureManifest(root);
+    expect(first.readiness.ok).toBe(false);
+    expect(first.components.adrs).toMatchObject({
+      count: 2,
+      ok: false,
+      errors: [`unreadable: ${unreadable}`],
+    });
+    expect(first.readiness.sub_verdicts).toEqual([
+      { component: 'invariants', ok: true },
+      { component: 'trace', ok: true },
+      { component: 'adrs', ok: false, error_count: 1 },
+      { component: 'forbidden_actions', ok: false, error_count: 1 },
+    ]);
+    writeFileSync(readable, '# Revised accepted decision\n');
+    const second = await fixtureManifest(root);
+    expect(second.components.adrs?.hash).not.toBe(first.components.adrs?.hash);
+    expect(second.components.adrs?.errors).toEqual(first.components.adrs?.errors);
+  });
 });
