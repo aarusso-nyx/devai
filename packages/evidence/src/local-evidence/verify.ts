@@ -231,7 +231,9 @@ function validateTools(
 function validateJobs(manifest: LocalEvidenceManifest, policy: LocalEvidencePolicy): void {
   for (const jobName of policy.requiredJobs) {
     const job = manifest.jobs[jobName];
-    if (job === undefined) fail(`manifest missing required job: ${jobName}`);
+    if (!Object.hasOwn(manifest.jobs, jobName) || job === undefined) {
+      fail(`manifest missing required job: ${jobName}`);
+    }
     if (job.result !== 'success') fail(`manifest job ${jobName} did not succeed`);
     if (job.metadata['job'] !== jobName) fail(`manifest job ${jobName} metadata does not match`);
     const platform = job.metadata['platform'] ?? '';
