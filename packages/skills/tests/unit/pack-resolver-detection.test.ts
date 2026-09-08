@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { getValidator } from '@devai-nyx/schemas';
 import {
   evaluateDetectSignals,
   findStackAdapterPacks,
@@ -26,17 +27,15 @@ function pack(
 ): StackAdapterPack {
   return {
     schemaVersion: '1.0.0',
-    id,
+    id: `redox-pack-${id}`,
     name: id,
     version: '1.0.0',
     stack: { backend: 'test', frontend: 'test', db: 'test' },
     detect: { signals, ...(priority !== undefined && { priority }) },
   };
 }
-function save(
-  value: StackAdapterPack,
-  directory = join(root, 'examples', `redox-pack-${value.id}`),
-): string {
+function save(value: StackAdapterPack, directory = join(root, 'examples', value.id)): string {
+  expect(getValidator('stack-adapter.schema.json')(value)).toBe(true);
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, 'stack-adapter.json'), JSON.stringify(value));
   return directory;
@@ -78,9 +77,9 @@ describe('pack discovery and explicit selection', () => {
     const result = resolveStackAdapterPack({
       repoRoot: root,
       adopterRoot: adopter,
-      explicitId: 'forced',
+      explicitId: 'redox-pack-forced',
     });
-    expect(result.matched?.id).toBe('forced');
+    expect(result.matched?.id).toBe('redox-pack-forced');
     expect(
       result.candidates.map(({ matched_signals, priority }) => ({ matched_signals, priority })),
     ).toEqual([{ matched_signals: [], priority: 0 }]);
@@ -93,7 +92,10 @@ describe('pack discovery and explicit selection', () => {
 
   it('uses additional directories when resolving a sensor without implicitly discovering adopter packs', () => {
     const extra = save(
-      { ...pack('extra', []), extractor_params: { inventory_api: { source: 'src/api' } } },
+      {
+        ...pack('extra', [{ kind: 'file_present', path: 'never-present.txt' }]),
+        extractor_params: { inventory_api: { source: 'src/api' } },
+      },
       join(root, 'explicit'),
     );
     expect(
@@ -101,7 +103,7 @@ describe('pack discovery and explicit selection', () => {
         adopterRoot: adopter,
         sensorKind: 'inventory_api',
         additionalDirs: [extra],
-        explicitId: 'extra',
+        explicitId: 'redox-pack-extra',
       }),
     ).toBeNull();
     expect(
@@ -110,7 +112,7 @@ describe('pack discovery and explicit selection', () => {
         adopterRoot: adopter,
         sensorKind: 'inventory_api',
         additionalDirs: [extra],
-        explicitId: 'extra',
+        explicitId: 'redox-pack-extra',
       })?.params,
     ).toEqual({ source: 'src/api' });
     expect(
@@ -119,7 +121,7 @@ describe('pack discovery and explicit selection', () => {
         adopterRoot: adopter,
         sensorKind: 'inventory_api',
         additionalDirs: [extra],
-        explicitId: 'absent',
+        explicitId: 'redox-pack-absent',
       }),
     ).toBeNull();
   });
@@ -215,7 +217,7 @@ describe('pack ranking and ambiguity', () => {
     save(pack('b-default', [marker]));
     save(pack('c-high', [marker], 99));
     save(pack('d-low', [marker], 0));
-    save(pack('no-match', [{ kind: 'file_present', path: 'absent' }], 1000));
+    save(pack('no-match', [{ kind: 'file_present', path: 'absent' }], 100));
     const result = resolveStackAdapterPack({ repoRoot: root, adopterRoot: adopter });
     expect(
       result.candidates.map((candidate) => [
@@ -224,13 +226,13 @@ describe('pack ranking and ambiguity', () => {
         candidate.matched_signals.length,
       ]),
     ).toEqual([
-      ['a-specific', 5, 2],
-      ['z-specific', 5, 2],
-      ['c-high', 99, 1],
-      ['b-default', 50, 1],
-      ['d-low', 0, 1],
+      ['redox-pack-a-specific', 5, 2],
+      ['redox-pack-z-specific', 5, 2],
+      ['redox-pack-c-high', 99, 1],
+      ['redox-pack-b-default', 50, 1],
+      ['redox-pack-d-low', 0, 1],
     ]);
-    expect(result.matched?.id).toBe('a-specific');
+    expect(result.matched?.id).toBe('redox-pack-a-specific');
     expect(result.ambiguous).toBe(true);
   });
 
@@ -238,7 +240,7 @@ describe('pack ranking and ambiguity', () => {
     save(pack('lower', [marker], 10));
     save(pack('higher', [marker], 20));
     const result = resolveStackAdapterPack({ repoRoot: root, adopterRoot: adopter });
-    expect(result.matched?.id).toBe('higher');
+    expect(result.matched?.id).toBe('redox-pack-higher');
     expect(result.ambiguous).toBe(false);
   });
 
@@ -246,7 +248,7 @@ describe('pack ranking and ambiguity', () => {
     save(pack('generic', [marker], 50));
     save(pack('specific', [marker, second], 50));
     const result = resolveStackAdapterPack({ repoRoot: root, adopterRoot: adopter });
-    expect(result.matched?.id).toBe('specific');
+    expect(result.matched?.id).toBe('redox-pack-specific');
     expect(result.ambiguous).toBe(false);
   });
 });

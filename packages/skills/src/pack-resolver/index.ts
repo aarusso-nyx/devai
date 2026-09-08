@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { getValidator } from '@devai-nyx/schemas';
 
 /**
  * Stack-adapter pack resolver.
@@ -72,7 +73,7 @@ export interface FindPacksOptions {
 
 /**
  * Walks examples/redox-pack-X under repoRoot and any additional dirs;
- * returns each parseable stack-adapter.json body with its
+ * returns each schema-valid stack-adapter.json body with its
  * directory path set in _packDir.
  */
 export function findStackAdapterPacks(opts: FindPacksOptions): StackAdapterPack[] {
@@ -112,8 +113,9 @@ export function findStackAdapterPacks(opts: FindPacksOptions): StackAdapterPack[
 
 function tryParse(path: string, dir: string): StackAdapterPack | null {
   try {
-    const body = JSON.parse(readFileSync(path, 'utf8')) as StackAdapterPack;
-    return { ...body, _packDir: dir };
+    const body: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    if (!getValidator('stack-adapter.schema.json')(body)) return null;
+    return { ...(body as StackAdapterPack), _packDir: dir };
   } catch {
     return null;
   }
