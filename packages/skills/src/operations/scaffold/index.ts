@@ -82,6 +82,20 @@ function fieldTokens(entity: Blueprint['database']['entities'][number]): Record<
   };
 }
 
+function apiModuleTokens(blueprint: Blueprint): Record<string, string> {
+  const entities = blueprint.database.entities.map((entity) => entity.name.trim());
+  return {
+    __API_ENTITY_IMPORTS__: entities
+      .flatMap((name) => [
+        `import { ${name}Service } from './services/${kebab(name)}.service';`,
+        `import { ${name}Controller } from './controllers/${kebab(name)}.controller';`,
+      ])
+      .join('\n'),
+    __API_CONTROLLERS__: entities.map((name) => `${name}Controller`).join(', '),
+    __API_SERVICES__: entities.map((name) => `${name}Service`).join(', '),
+  };
+}
+
 function entityTasks(
   blueprint: Blueprint,
   moduleSlug: string,
@@ -120,6 +134,7 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
       {
         template_id: 'api.module',
         target_path: `domain/${slug}/api/src/${slug}/${slug}.module.ts`,
+        extra_tokens: apiModuleTokens(blueprint),
       },
       {
         template_id: 'api.guard.policy',

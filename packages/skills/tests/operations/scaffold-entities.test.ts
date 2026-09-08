@@ -107,6 +107,23 @@ describe('scaffold entity bindings', () => {
     const bytes = new Map(value.paths.map((p) => [p, readFileSync(join(root, p))]));
     expect(readFileSync(join(root, value.selected), 'utf8')).toContain(value.expected);
     if (value.variant === 'api') {
+      const module = readFileSync(join(root, `${api}/demo-bookmark.module.ts`), 'utf8');
+      for (const [entityName, fileName] of [
+        ['Bookmark', 'bookmark'],
+        ['AuditEvent', 'audit-event'],
+      ]) {
+        expect(module).toContain(
+          `import { ${entityName}Controller } from './controllers/${fileName}.controller';`,
+        );
+        expect(module).toContain(
+          `import { ${entityName}Service } from './services/${fileName}.service';`,
+        );
+      }
+      expect(module).toContain('controllers: [BookmarkController, AuditEventController]');
+      expect(module).toContain(
+        'providers: [BookmarkService, AuditEventService, BookmarkPolicyGuard]',
+      );
+      expect(module).toContain('exports: [BookmarkService, AuditEventService]');
       const entity = readFileSync(join(root, `${api}/entities/audit-event.entity.ts`), 'utf8');
       expect(entity).toContain('export class AuditEvent');
       for (const field of [
