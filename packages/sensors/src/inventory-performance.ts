@@ -97,8 +97,14 @@ export function senseInventoryPerformance(opts: InventoryPerformanceOptions): Se
       if (!e.endsWith('.json')) continue;
       try {
         const parsed = JSON.parse(readFileSync(join(dir, e), 'utf8')) as PersistedSR;
-        if (typeof parsed.duration_ms !== 'number') continue;
+        if (
+          typeof parsed.duration_ms !== 'number' ||
+          !Number.isFinite(parsed.duration_ms) ||
+          parsed.duration_ms < 0
+        )
+          continue;
         const kind = parsed.sensor?.kind ?? sub;
+        if (typeof kind !== 'string' || !kind.startsWith('inventory_')) continue;
         const list = perKind.get(kind) ?? [];
         list.push(parsed.duration_ms);
         perKind.set(kind, list);
@@ -161,6 +167,9 @@ export function senseInventoryPerformance(opts: InventoryPerformanceOptions): Se
     const list = [...(perKind.get(kind) ?? [])].sort((a, b) => a - b);
     perKindMetrics[`${kind}_count`] = list.length;
     perKindMetrics[`${kind}_p95_ms`] = percentile(list, 0.95);
+    perKindMetrics[`${kind}_mean_ms`] = Math.round(
+      list.reduce((sum, duration) => sum + duration, 0) / list.length,
+    );
   }
 
   return buildSensorReading({
