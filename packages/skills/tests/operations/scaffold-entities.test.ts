@@ -190,6 +190,11 @@ describe('scaffold entity bindings', () => {
     if (value.variant === 'ui') {
       const module = readFileSync(join(root, `${ui}/demo-bookmark.module.ts`), 'utf8');
       expect(module).toContain('export class DemoBookmarkFeatureModule {}');
+      for (const name of names)
+        for (const kind of ['list', 'detail'])
+          expect(readFileSync(join(root, ui, `${name}-${kind}.component.ts`), 'utf8')).toContain(
+            'standalone: false',
+          );
       for (const [name, file] of [
         ['Bookmark', 'bookmark'],
         ['AuditEvent', 'audit-event'],
