@@ -1,7 +1,7 @@
 /* Generated for __NAMESPACE__/__MODULE__ — spec: __SPEC_VERSION__ sha: __SPEC_SHA__ */
 import { Test } from '@nestjs/testing';
-import { __classEntity__Controller } from './controllers/__kebabEntity__.controller';
-import { __classEntity__Service } from './services/__kebabEntity__.service';
+import { __classEntity__Controller } from '../src/__moduleSlug__/controllers/__kebabEntity__.controller';
+import { __classEntity__Service } from '../src/__moduleSlug__/services/__kebabEntity__.service';
 
 describe('__classEntity__Controller', () => {
   it('compiles', async () => {

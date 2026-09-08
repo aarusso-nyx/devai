@@ -1,6 +1,6 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOperationHost, runOperation } from '../../src/operations/index.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
@@ -140,6 +140,43 @@ describe('scaffold entity bindings', () => {
       expect(update).toContain('class UpdateAuditEventDto');
       expect(update).toContain('extends PartialType(CreateAuditEventDto)');
       expect(update).toContain("from './create-audit-event.dto'");
+    }
+    if (value.variant === 'tests') {
+      const apiResult = await withAuthorityHostTestScope(() =>
+        runOperation(
+          {
+            ...request,
+            variant: 'api',
+            operation: 'scaffold.api',
+            write_paths: [...cases[0].paths],
+          },
+          createOperationHost({ run: command }),
+        ),
+      );
+      expect(apiResult.status, JSON.stringify(apiResult)).toBe('pass');
+      for (const path of value.paths) {
+        const text = readFileSync(join(root, path), 'utf8');
+        const imports = [...text.matchAll(/from '(\.[^']+)'/gu)].map((match) => match[1]);
+        expect(imports.length).toBe(path.endsWith('.controller.spec.ts') ? 2 : 1);
+        for (const imported of imports)
+          expect(existsSync(resolve(root, dirname(path), `${imported}.ts`))).toBe(true);
+      }
+      for (const name of names) {
+        const controller = readFileSync(
+          join(root, `${prefix}/api/test/${name}.controller.spec.ts`),
+          'utf8',
+        );
+        const service = readFileSync(
+          join(root, `${prefix}/api/test/${name}.service.spec.ts`),
+          'utf8',
+        );
+        expect(controller).toContain(`from '../src/demo-bookmark/controllers/${name}.controller'`);
+        expect(controller).toContain(`from '../src/demo-bookmark/services/${name}.service'`);
+        expect(service).toContain(`from '../src/demo-bookmark/services/${name}.service'`);
+        expect(service).toContain("from '@nestjs/testing'");
+        expect(service).toContain('Test.createTestingModule(');
+        expect(service).not.toContain('@angular/');
+      }
     }
     expect((await execute()).evidence).toMatchObject({
       files_created: [],
