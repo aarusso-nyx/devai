@@ -436,7 +436,14 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
     const parsed = JSON.parse(readFileSync(registryPath, 'utf8')) as {
       actions?: ForbiddenActionEntry[];
     };
-    if (!Array.isArray(parsed.actions)) throw new Error('actions must be an array');
+    if (
+      !Array.isArray(parsed.actions) ||
+      parsed.actions.some(
+        (entry) => entry === null || typeof entry !== 'object' || Array.isArray(entry),
+      )
+    ) {
+      throw new Error('actions must be an array of objects');
+    }
     registry = parsed.actions;
   } catch {
     return {
