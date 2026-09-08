@@ -20,7 +20,11 @@ function put(path: string, data: string): void {
 function policy(job: string): void {
   put(
     '.devai/config/project.json',
-    JSON.stringify({ ci_economy: { local_evidence: { required_jobs: [job] } } }),
+    JSON.stringify({
+      schemaVersion: '1.0.0',
+      project_type: 'runtime-host',
+      ci_economy: { local_evidence: { required_jobs: [job] } },
+    }),
   );
 }
 function initialized(job: string): void {
