@@ -228,3 +228,31 @@ it('ignores non-JSON operator notes while extending a verified history', async (
   expect(second.prev_hash).toBe(first.manifest_hash);
   expect(readFileSync(notes, 'utf8')).toBe('not a JSON record');
 });
+
+it.each([
+  ['empty caller identity', { caller: { kind: 'cli' as const, name: '' } }],
+  ['empty command argv', { commands_run: [{ argv: [], exit_code: 0, duration_ms: 1 }] }],
+  [
+    'negative command duration',
+    { commands_run: [{ argv: ['node'], exit_code: 0, duration_ms: -1 }] },
+  ],
+  ['fractional exit code', { commands_run: [{ argv: ['node'], exit_code: 0.5, duration_ms: 1 }] }],
+] as const)('refuses %s before modifying a verified proof history', async (_label, invalid) => {
+  const repo = root();
+  const input = {
+    repoRoot: repo,
+    caller: { kind: 'cli' as const, name: 'fixture' },
+    started_at: '2026-07-24T10:00:00.000Z',
+    compliance: { invariant_ids: [] },
+  };
+  const first = await withAuthorityHostTestScope(() => emitAgentRun(input));
+  const dir = getAgentRunDir(repo);
+  const path = join(dir, `${first.run_id}.json`);
+  const before = readFileSync(path);
+  await expect(
+    withAuthorityHostTestScope(() => emitAgentRun({ ...input, ...invalid })),
+  ).rejects.toThrow('agent-run record does not validate');
+  expect(readdirSync(dir)).toEqual([`${first.run_id}.json`]);
+  expect(readFileSync(path)).toEqual(before);
+  expect(readLastAgentRunHash(repo)).toBe(first.manifest_hash);
+});
