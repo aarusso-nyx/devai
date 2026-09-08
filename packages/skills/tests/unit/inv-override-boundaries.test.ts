@@ -212,3 +212,57 @@ describe('independent override blocks', () => {
     ]);
   });
 });
+
+describe('override metadata isolation and record identity', () => {
+  it.each(['reason', 'ticket', 'expires', 'approver'])(
+    'reports missing %s at the annotation header',
+    (field) => {
+      const body = block()
+        .split('\n')
+        .filter((line) => !line.startsWith(`// ${field}:`))
+        .join('\n');
+      write('packages/entry.ts', `\n${body}`);
+      expect(scan()).toEqual({
+        overrides: [],
+        findings: [
+          {
+            code: 'malformed',
+            file: 'packages/entry.ts',
+            line: 2,
+            invariant_id: 'INV-TEST-001',
+            message: `inv-override missing required field(s): ${field}`,
+          },
+        ],
+      });
+    },
+  );
+
+  it.each(['const value = 1; ', '\n', '/* boundary */\n'])(
+    'does not attach metadata beyond code or a block boundary %j',
+    (boundary) => {
+      const lines = block().split('\n');
+      write('packages/entry.ts', `${lines[0]}\n${boundary}${lines.slice(1).join('\n')}`);
+      expect(scan()).toEqual({
+        overrides: [],
+        findings: [
+          {
+            code: 'malformed',
+            file: 'packages/entry.ts',
+            line: 1,
+            invariant_id: 'INV-TEST-001',
+            message: 'inv-override missing required field(s): reason, ticket, expires, approver',
+          },
+        ],
+      });
+    },
+  );
+
+  it('binds stable record IDs to exact source location and reason using independent hash vectors', () => {
+    // Python hashlib.sha256 over invariant|file|line|reason, first 16 hex digits.
+    write('packages/entry.ts', `\n${block()}`);
+    expect(scan().overrides.map(({ id }) => id)).toEqual(['OVR-610eccc80f6e64b4']);
+    expect(scan().overrides.map(({ id }) => id)).toEqual(['OVR-610eccc80f6e64b4']);
+    write('packages/entry.ts', `\n${block({ reason: 'different reason' })}`);
+    expect(scan().overrides.map(({ id }) => id)).toEqual(['OVR-768f940ce73a4807']);
+  });
+});
