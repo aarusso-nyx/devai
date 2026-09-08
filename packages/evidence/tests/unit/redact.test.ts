@@ -146,6 +146,27 @@ describe('redactRecord', () => {
     expect(verifyChain(chainPath).valid).toBe(true);
   });
 
+  it('re-links records without introducing an absent legacy hash alias', () => {
+    initChain(chainPath);
+    appendRecord(chainPath, draft('EV-0000000000000001'));
+    appendRecord(chainPath, draft('EV-0000000000000002'));
+    const original = loadChain(chainPath);
+    original.records = original.records.map(({ previous_hash: _legacy, ...record }) => record);
+    writeFileSync(chainPath, JSON.stringify(original));
+    expect(verifyChain(chainPath).valid).toBe(true);
+    const result = redactRecord({
+      chainPath,
+      targetId: 'EV-0000000000000001',
+      policy: { patterns: [], fields: ['actor'] },
+    });
+    expect(result.relinkedCount).toBe(1);
+    const persisted = loadChain(chainPath);
+    expect(persisted.records).toHaveLength(2);
+    expect(persisted.records.every((record) => !Object.hasOwn(record, 'previous_hash'))).toBe(true);
+    expect(persisted.records[1]?.previous_run_hash).toBe(result.target.manifest_hash);
+    expect(verifyChain(chainPath).valid).toBe(true);
+  });
+
   it('chain stays valid after redacting notes only (no hash change, no downstream effect)', () => {
     initChain(chainPath);
     appendRecord(chainPath, draft('EV-0000000000000001'));
@@ -196,7 +217,8 @@ describe('redactRecord', () => {
         targetId: 'EV-0000000000000001',
         policy: { patterns: [/sk-[a-z0-9]+/g], fields: [] },
       });
-    }).toThrow(/does not validate/);
+    }).toThrow('redactRecord: redacted target EV-0000000000000001 does not validate');
+    expect(readFileSync(chainPath, 'utf8')).toBe(JSON.stringify(chain, null, 2));
   });
 
   it('throws if a re-linked downstream record would violate the schema', () => {
@@ -226,7 +248,8 @@ describe('redactRecord', () => {
         targetId: 'EV-0000000000000001',
         policy: { patterns: [], fields: ['actor'] },
       });
-    }).toThrow(/does not validate/);
+    }).toThrow('redactRecord: re-linked downstream EV-0000000000000002 does not validate');
+    expect(readFileSync(chainPath, 'utf8')).toBe(JSON.stringify(chain, null, 2));
   });
 
   it('multiple redactions leave the chain valid', () => {
