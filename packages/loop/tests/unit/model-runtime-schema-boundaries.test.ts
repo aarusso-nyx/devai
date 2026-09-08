@@ -101,11 +101,14 @@ describe('model runtime actionable refusal diagnostics', () => {
     );
   });
 
-  it.each([null, [], 'runtime', 17])('identifies a malformed runtime entry %j', (value) => {
-    expect(() =>
-      validateModelRuntimeRegistry({ ...structuredClone(original), runtimes: [value] }),
-    ).toThrow('TASK_MODEL_REGISTRY_INVALID: runtime entry must be an object');
-  });
+  it.each([null, [], 'runtime', 17].map((value) => ({ value })))(
+    'identifies a malformed runtime entry $value',
+    ({ value }) => {
+      expect(() =>
+        validateModelRuntimeRegistry({ ...structuredClone(original), runtimes: [value] }),
+      ).toThrow('TASK_MODEL_REGISTRY_INVALID: runtime entry must be an object');
+    },
+  );
 
   it.each(['id', 'status', 'authority', 'schemaVersion', '$schema'])(
     'preserves the identity refusal for an invalid %s',
