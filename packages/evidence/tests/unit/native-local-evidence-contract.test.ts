@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
@@ -589,6 +597,26 @@ describe('local evidence claim and actor parsing', () => {
 });
 
 describe('local evidence required tool identities', () => {
+  it.each(['file', 'directory'] as const)(
+    'refuses a %s symlink in artifact population without replacing the existing manifest',
+    (kind) => {
+      const { root, now, manifestPath } = fixture();
+      const before = readFileSync(join(root, manifestPath));
+      put(root, 'link-target/payload.txt', 'must remain unchanged');
+      const target = join(root, kind === 'file' ? 'link-target/payload.txt' : 'link-target');
+      const link = join(root, '.artifacts/unit/linked');
+      symlinkSync(target, link, kind === 'file' ? 'file' : 'dir');
+      const jobDirs = Object.fromEntries(REQUIRED_JOBS.map((job) => [job, `.artifacts/${job}`]));
+      expect(() => collectLocalEvidence({ repoRoot: root, jobDirs, now })).toThrow(
+        `unsupported local CI artifact member: ${link}`,
+      );
+      expect(readFileSync(join(root, manifestPath))).toEqual(before);
+      expect(readFileSync(join(root, 'link-target/payload.txt'), 'utf8')).toBe(
+        'must remain unchanged',
+      );
+    },
+  );
+
   it('canonicalizes mixed-case artifact names before hashing filesystem enumeration', () => {
     const { root, now } = fixture();
     const artifactDir = join(root, '.artifacts/unit');

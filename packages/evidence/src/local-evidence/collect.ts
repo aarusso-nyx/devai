@@ -84,7 +84,8 @@ function collectFiles(root: string, current: string, files: string[]): string[] 
       collectFiles(root, fullPath, files);
       continue;
     }
-    if (entry.isFile()) files.push(fullPath);
+    if (!entry.isFile()) throw new Error(`unsupported local CI artifact member: ${fullPath}`);
+    files.push(fullPath);
   }
   return files;
 }
