@@ -154,11 +154,10 @@ export function computeScorecard(opts: ComputeScorecardOptions): Scorecard {
       if (cell === undefined || cell.verdict === 'N/A') continue;
       const staleFail = isStaleFailure(reading, generatedAtMs, staleFailAfterMs);
       const incoming = staleFail ? 'REVIEW' : sensorStatusToVerdict(reading.status);
-      // UNKNOWN means "no reading has landed yet" — replace, not
-      // collapse. After at least one reading lands, accumulate
-      // worst-wins so a failing reading sticks even when later
-      // readings pass.
-      cell.verdict = cell.verdict === 'UNKNOWN' ? incoming : worseVerdict(cell.verdict, incoming);
+      // Only an unobserved cell is replaced outright. An explicit UNKNOWN
+      // reading is evidence of a gap and participates in worst-wins merging.
+      cell.verdict =
+        cell.sensor_readings === undefined ? incoming : worseVerdict(cell.verdict, incoming);
       cell.deterministic = cell.deterministic && reading.deterministic;
       const refs = cell.sensor_readings ?? [];
       refs.push(reading.id);
