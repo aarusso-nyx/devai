@@ -73,3 +73,20 @@ it.each(['constructor', '__proto__', 'toString'])(
     expect(persisted.jobs[job]?.metadata['__proto__']).toBe('literal metadata');
   },
 );
+
+it.each(['missing', 'malformed'] as const)(
+  'records no declared tool expectations when package.json is %s',
+  (state) => {
+    initialized('unit');
+    if (state === 'missing') rmSync(join(root, 'package.json'));
+    else put('package.json', '{"name":');
+    execFileSync('git', ['add', '-u', '--', 'package.json'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'Bind package metadata state'], { cwd: root });
+    const { manifest } = collectLocalEvidence({
+      repoRoot: root,
+      jobDirs: { unit: '.artifacts/job' },
+    });
+    expect(manifest.tools).toEqual({ node: { expected: '', observed: [process.version] } });
+    expect(manifest.jobs['unit']?.result).toBe('success');
+  },
+);
