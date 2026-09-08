@@ -80,3 +80,14 @@ it.each(['TOKEN', 'SECRET', 'PASSWORD', 'KEY', 'CREDENTIAL', 'CREDENTIALS'])(
     }
   },
 );
+
+it('keeps adjacent words separate when removing markup and link directives', () => {
+  expect(render('alpha<b></b>beta')).toBe('alpha beta');
+  expect(render('before![title](target)after')).toBe('before title target)after');
+  expect(render('before][reference]after')).toBe('before reference]after');
+});
+
+it('neutralizes repeated fences without manufacturing runs of quote characters', () => {
+  expect(render('```command``` and ``value``')).toBe("'command' and 'value'");
+  expect(render('Bearer   Aa12Bb34Cc56Dd78')).toBe('[REDACTED]');
+});
