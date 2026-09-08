@@ -144,6 +144,37 @@ describe('scaffold entity bindings', () => {
     if (value.variant === 'ui') {
       const module = readFileSync(join(root, `${ui}/demo-bookmark.module.ts`), 'utf8');
       expect(module).toContain('export class DemoBookmarkFeatureModule {}');
+      for (const [name, file] of [
+        ['Bookmark', 'bookmark'],
+        ['AuditEvent', 'audit-event'],
+      ]) {
+        expect(module).toContain(
+          `import { ${name}ListComponent } from './${file}-list.component';`,
+        );
+        expect(module).toContain(
+          `import { ${name}DetailComponent } from './${file}-detail.component';`,
+        );
+        expect(module).toContain(`import { ${name}Service } from './${file}.service';`);
+      }
+      expect(module).toContain(
+        'declarations: [BookmarkListComponent, BookmarkDetailComponent, AuditEventListComponent, AuditEventDetailComponent]',
+      );
+      expect(module).toContain('providers: [BookmarkService, AuditEventService, CognitoGuard]');
+      const expectedRoutes = [
+        ['audit-event', 'AuditEventListComponent', 'audit-event'],
+        ['audit-event/:id', 'AuditEventDetailComponent', 'audit-event'],
+        ['', 'BookmarkListComponent', 'bookmark'],
+        [':id', 'BookmarkDetailComponent', 'bookmark'],
+      ];
+      let previous = -1;
+      for (const [path, component, resource] of expectedRoutes) {
+        const route = `{ path: '${path}', component: ${component}, canActivate: [BookmarkPolicyGuard], data: { resource: '${resource}', action: 'read' } }`;
+        expect(module).toContain(route);
+        const offset = module.indexOf(route);
+        expect(offset).toBeGreaterThan(previous);
+        previous = offset;
+      }
+
       expect(module).not.toContain('__NsModulePascal__');
       expect(module).toContain('canActivate: [CognitoGuard]');
       expect(module).toContain('canActivate: [BookmarkPolicyGuard]');

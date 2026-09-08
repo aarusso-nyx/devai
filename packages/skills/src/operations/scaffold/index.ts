@@ -96,6 +96,34 @@ function apiModuleTokens(blueprint: Blueprint): Record<string, string> {
   };
 }
 
+function uiModuleTokens(blueprint: Blueprint): Record<string, string> {
+  const entities = blueprint.database.entities.map((entity) => entity.name.trim());
+  const components = entities.flatMap((name) => [`${name}ListComponent`, `${name}DetailComponent`]);
+  const routes = entities.map((name, index) => {
+    const resource = kebab(name);
+    const base = index === 0 ? '' : resource;
+    const guard = `${blueprint.module.name}PolicyGuard`;
+    return [
+      `      { path: '${base}', component: ${name}ListComponent, canActivate: [${guard}], data: { resource: '${resource}', action: 'read' } },`,
+      `      { path: '${base ? `${base}/` : ''}:id', component: ${name}DetailComponent, canActivate: [${guard}], data: { resource: '${resource}', action: 'read' } },`,
+    ];
+  });
+  // Named entity routes must precede the first entity's legacy :id route.
+  const orderedRoutes = [...routes.slice(1), ...routes.slice(0, 1)];
+  return {
+    __UI_ENTITY_IMPORTS__: entities
+      .flatMap((name) => [
+        `import { ${name}ListComponent } from './${kebab(name)}-list.component';`,
+        `import { ${name}DetailComponent } from './${kebab(name)}-detail.component';`,
+        `import { ${name}Service } from './${kebab(name)}.service';`,
+      ])
+      .join('\n'),
+    __UI_COMPONENTS__: components.join(', '),
+    __UI_SERVICES__: entities.map((name) => `${name}Service`).join(', '),
+    __UI_ENTITY_ROUTES__: orderedRoutes.flat().join('\n'),
+  };
+}
+
 function entityTasks(
   blueprint: Blueprint,
   moduleSlug: string,
@@ -182,6 +210,7 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
         template_id: 'ui.module',
         target_path: `domain/${slug}/web/src/app/${slug}/${slug}.module.ts`,
         extra_tokens: {
+          ...uiModuleTokens(blueprint),
           __NsModulePascal__:
             blueprint.module.namespace
               .split(/[-_\s]+/u)
