@@ -126,6 +126,38 @@ describe('closed policy Git grammar refuses look-alike commands', () => {
   });
 });
 
+describe('closed policy Git grammar bounds the batch read input', () => {
+  // Mutants 1822, 1823: the batch input bound is `> 64 MiB`, so an input of exactly that
+  // width is still read and only the first byte past it is refused. Both inputs are complete
+  // newline-delimited exact object names, so nothing but the size test can decide them, and
+  // the admitted one is aimed at a root that does not exist so that it surfaces as an
+  // execution failure instead of as an input refusal. Widths are asserted, not assumed.
+  const LIMIT = 64 * 1024 * 1024;
+  const wide = 'b'.repeat(64) + '\n';
+  const narrow = 'a'.repeat(40) + '\n';
+
+  it('admits an input of exactly 64 MiB to the read', () => {
+    // 65 × 1032410 + 41 × 54 === 64 MiB.
+    const exact = Buffer.concat([
+      Buffer.alloc(wide.length * 1032410, wide),
+      Buffer.alloc(narrow.length * 54, narrow),
+    ]);
+    expect(exact.length).toBe(LIMIT);
+    expect(() => readCheckPolicyGitSync(NOWHERE, ['cat-file', '--batch'], exact)).toThrow(
+      'GIT_POLICY_READ_FAILED',
+    );
+  });
+
+  it('refuses the input one byte past 64 MiB', () => {
+    // 41 × 1636800 + 65 === 64 MiB + 1.
+    const over = Buffer.concat([Buffer.alloc(narrow.length * 1636800, narrow), Buffer.from(wide)]);
+    expect(over.length).toBe(LIMIT + 1);
+    expect(() => readCheckPolicyGitSync(NOWHERE, ['cat-file', '--batch'], over)).toThrow(
+      'GIT_POLICY_READ_INPUT_INVALID',
+    );
+  });
+});
+
 describe('exact Git tree entries', () => {
   // Mutant 1914: an entry whose path continues past a control character is refused as a
   // whole, never truncated into a shorter path.
