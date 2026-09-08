@@ -104,8 +104,8 @@ export function walkTsxJsx(dir: string, ignoreDirs?: ReadonlySet<string>): strin
  * Parse a TS/TSX source file via the typescript compiler. Returns
  * null on read or parse failure (callers skip such files).
  *
- * Script kind defaults to TSX so JSX in `.tsx` and `.jsx` files
- * parses. Pure `.ts` content still parses fine under TSX.
+ * Preserve TypeScript parsing for `.ts`; React projects may carry JSX
+ * in either `.jsx` or plain `.js` files, both discovered by the route walker.
  */
 export function parseSource(file: string): ts.SourceFile | null {
   let text: string;
@@ -114,8 +114,11 @@ export function parseSource(file: string): ts.SourceFile | null {
   } catch {
     return null;
   }
-  const kind =
-    file.endsWith('.tsx') || file.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const kind = file.endsWith('.tsx')
+    ? ts.ScriptKind.TSX
+    : file.endsWith('.jsx') || file.endsWith('.js')
+      ? ts.ScriptKind.JSX
+      : ts.ScriptKind.TS;
   try {
     return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, /*setParents*/ false, kind);
   } catch {
