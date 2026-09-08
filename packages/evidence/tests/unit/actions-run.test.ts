@@ -779,3 +779,60 @@ it('does not let an inconsistent fallback decision justify skipped required test
     }),
   ).toBe('failure');
 });
+
+it.each([
+  [
+    'negative source population',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      m.sourceHash = { ...m.sourceHash, fileCount: -1 };
+    },
+  ],
+  [
+    'invalid source digest',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      m.sourceHash = { ...m.sourceHash, value: 'not-a-digest' };
+    },
+  ],
+  [
+    'invalid artifact digest',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      const job = Object.values(m.jobs)[0];
+      if (job === undefined) throw new Error('fixture job missing');
+      job.artifactChecksum.value = 'not-a-digest';
+    },
+  ],
+  [
+    'negative artifact population',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      const job = Object.values(m.jobs)[0];
+      if (job === undefined) throw new Error('fixture job missing');
+      job.artifactChecksum.fileCount = -1;
+    },
+  ],
+] as const)('rejects %s at the manifest schema boundary', (_name, change) => {
+  for (const mode of ['gate', 'shadow'] as const) {
+    const input = fixture();
+    expect(verifyActionsRunEvidence({ ...input, mode }).disposition).toBe('promotion-hit');
+    change(input.manifest);
+    const result = verifyActionsRunEvidence({ ...input, mode });
+    expect(result).toMatchObject({
+      disposition: 'invalid-claim',
+      hardFailure: true,
+      executeFullCi: true,
+      reason: 'Actions-run evidence manifest or schema claim is invalid',
+    });
+    expect(selectActionsEvidenceJobs(result).skippedJobs).toEqual([]);
+  }
+  const input = tuple();
+  change(input.manifest);
+  let caught: unknown;
+  try {
+    validateActionsEvidenceShadowTuple(input);
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toMatchObject({
+    actionsEvidenceFailure: true,
+    message: 'actions evidence tuple: manifest is not a valid actions-run claim',
+  });
+});
