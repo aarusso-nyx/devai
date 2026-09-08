@@ -360,3 +360,15 @@ describe('hashes and escaped quote boundaries', () => {
     expect(sense().status).toBe('review');
   });
 });
+
+describe('folded workflow commands', () => {
+  it.each(['>', '>-'])('does not credit a folded failure-masking command (%s)', (style) => {
+    workflow(`${style}\n          devai ${ACTION}\n          || true`);
+    expect(sense().status).toBe('review');
+  });
+
+  it('joins folded action arguments into one binding invocation', () => {
+    workflow(`>\n          devai check\n          --only dependencies`);
+    expect(sense().status).toBe('pass');
+  });
+});

@@ -1,3 +1,4 @@
+import { foldWorkflowLines } from './folded-lines.js';
 import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
@@ -165,6 +166,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
   let matrixKeyIndent = -1;
   // State for run: capture (multi-line scalar).
   let inRun = false;
+  let foldedRun = false;
   let runIndent = -1;
   /** Indent of the first non-empty body line; -1 until the body starts. */
   let runContentIndent = -1;
@@ -179,7 +181,10 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
   }
 
   function flushRun(): void {
-    const script = runBuffer.join('\n').replace(/\n+$/, '');
+    const script = (foldedRun ? foldWorkflowLines(runBuffer) : runBuffer.join('\n')).replace(
+      /\n+$/,
+      '',
+    );
     if (script !== '') {
       runScripts.push(script);
       runStepCount += 1;
@@ -369,6 +374,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       const inline = trimmed.replace(/^-?\s*run\s*:\s*/, '');
       if (inline === '|' || inline === '>' || inline === '|-' || inline === '>-' || inline === '') {
         inRun = true;
+        foldedRun = inline.startsWith('>');
         runIndent = ind;
         runBuffer = [];
       } else {

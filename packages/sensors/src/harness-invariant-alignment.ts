@@ -7,6 +7,7 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
+import { foldWorkflowLines } from './harness/folded-lines.js';
 import { loadWorkflows } from './harness/workflow-parser.js';
 
 /**
@@ -180,7 +181,11 @@ function extractRunSteps(content: string): WorkflowRunStep[] {
           if (bodyLine.trim() !== '' && indentation <= runIndent) break;
           body.push(bodyLine.slice(Math.min(bodyLine.length, runIndent + 2)));
         }
-        steps.push({ script: body.join('\n'), continueOnError, disabled });
+        steps.push({
+          script: raw.startsWith('>') ? foldWorkflowLines(body) : body.join('\n'),
+          continueOnError,
+          disabled,
+        });
       } else {
         steps.push({ script: unquoteYamlScalar(raw), continueOnError, disabled });
       }

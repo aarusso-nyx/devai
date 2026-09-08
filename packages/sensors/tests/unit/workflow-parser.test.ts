@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { parseWorkflow } from '../../src/harness/workflow-parser.js';
 
@@ -377,5 +378,22 @@ jobs:
       '/repo',
     );
     expect(ast.runScripts).toEqual([command]);
+  });
+});
+
+describe('folded scalar line boundaries', () => {
+  it.each([
+    ['devai check --only dependencies', '|| true'],
+    ['devai check', '--only dependencies'],
+    ['echo one', '', 'echo two'],
+    ['echo one', '', '', 'echo two'],
+    ['echo one', '  indented text', 'echo two'],
+    ['echo one', '', '  indented text', '', 'echo two'],
+    ['', 'echo one', 'echo two'],
+  ])('agrees with YAML folding for %j', (...body) => {
+    const content = `jobs:\n  check:\n    steps:\n      - run: >-\n${body.map((line) => `          ${line}`).join('\n')}\n`;
+    const reference = parseYaml(content) as { jobs: { check: { steps: { run: string }[] } } };
+    const ast = parseWorkflow('/repo/.github/workflows/ci.yml', content, '/repo');
+    expect(ast.runScripts).toEqual([reference.jobs.check.steps[0]?.run]);
   });
 });
