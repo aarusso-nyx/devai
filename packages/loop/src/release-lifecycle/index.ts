@@ -143,7 +143,7 @@ export interface ReleaseDerivedReceipt {
 }
 
 export interface ReleaseLifecycleObservation extends Readonly<Record<string, unknown>> {
-  readonly schemaVersion: '1.0.0';
+  readonly schemaVersion: '1.0.0' | '1.1.0';
   readonly observation_kind: 'release-lifecycle-observation';
   readonly observation_id: string;
   readonly repository: ReleaseIdentity;
@@ -387,8 +387,36 @@ function observationDraft(input: {
   readonly derived: readonly ReleaseDerivedReceipt[];
   readonly published: Readonly<Record<string, unknown>>;
 }): Omit<ReleaseLifecycleObservation, 'observation_id' | 'observation_digest_sha256'> {
+  // Mirror the policy's pure resume mapping; describing a next action never executes it.
+  const observed =
+    input.published['observed'] === true
+      ? 'published'
+      : input.head?.state === 'exported' &&
+          input.derived.some((receipt) => receipt.state === 'offline_verified')
+        ? 'offline_verified'
+        : (input.head?.state ??
+          (input.derived.some((receipt) => receipt.state === 'planned') ? 'planned' : 'none'));
+  const nextActions = {
+    none: 'release plan',
+    planned: 'release preflight',
+    preflight_passed: 'release certify',
+    certified: 'release prepare',
+    prepared: 'release export',
+    exported: 'release offline-verify',
+    offline_verified: 'release evidence-publish',
+    evidence_published: 'release publish',
+    publication_dispatched: 'release resume',
+    published: null,
+  } as const;
   return {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
+    next_action: nextActions[observed],
+    next_outcome:
+      observed === 'published'
+        ? 'complete'
+        : observed === 'publication_dispatched'
+          ? 'awaiting-external-receipt'
+          : 'ready',
     observation_kind: 'release-lifecycle-observation',
     repository: input.repository,
     candidate: input.candidate,
