@@ -89,6 +89,55 @@ function fixture() {
 }
 
 describe('round identity boundaries', () => {
+  it.each([
+    { title: 'Owner says "verify"' },
+    { goal: 'First requirement\nSecond requirement\twith a tab' },
+    { goal: 'Preserve C:\\fixtures\\candidate paths' },
+    { gates: ['unit,a', 'unit;b'] },
+    { orchestrator_prompt: 'prompts/quoted"name.md' },
+  ])(
+    'round-trips accepted declaration strings without changing their meaning: %j',
+    async (change) => {
+      await withAuthorityHostTestScope(() => {
+        const root = fixture();
+        const input = { ...record(), ...change };
+        expect(validators.recordMeta(input)).toBe(true);
+        const declared = declareGovernedRound({
+          repoRoot: root,
+          round: 5,
+          recordPath: write(root, 'special-record.json', input),
+        });
+        const bytes = readFileSync(join(root, declared.path));
+        expect(governedRoundStatus({ repoRoot: root, round: 5 }).record).toEqual(input);
+        expect(readFileSync(join(root, declared.path))).toEqual(bytes);
+      });
+    },
+  );
+
+  it('round-trips quoted separators in wave scopes and titles', async () => {
+    await withAuthorityHostTestScope(() => {
+      const root = fixture();
+      const input = record();
+      input.waves = [
+        {
+          id: 'W1',
+          title: 'Verify "exact" scope',
+          roles: ['Inspector'],
+          type: 'serial',
+          lock_scopes: ['packages/a,b/**', 'packages/c;d/**'],
+          gates: ['unit'],
+        },
+      ];
+      expect(validators.recordMeta(input)).toBe(true);
+      declareGovernedRound({
+        repoRoot: root,
+        round: 5,
+        recordPath: write(root, 'special-record.json', input),
+      });
+      expect(governedRoundStatus({ repoRoot: root, round: 5 }).record).toEqual(input);
+    });
+  });
+
   it('refuses status when the valid record belongs to another round', async () => {
     await withAuthorityHostTestScope(() => {
       const root = fixture();

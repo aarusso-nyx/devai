@@ -39,6 +39,12 @@ function scalar(value: string): unknown {
   if (trimmed === '[]') return [];
   if (trimmed === '{}') return {};
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      // Generated inline arrays use JSON quoting, including embedded separators.
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      // Retain the existing bare-word and semicolon-separated YAML subset.
+    }
     const inner = trimmed.slice(1, -1).trim();
     return inner.length === 0 ? [] : inner.split(/[;,]/u).map((item) => scalar(item));
   }
@@ -46,6 +52,13 @@ function scalar(value: string): unknown {
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
+    if (trimmed.startsWith('"')) {
+      try {
+        return JSON.parse(trimmed) as unknown;
+      } catch {
+        // Non-JSON quoted forms retain the existing subset interpretation.
+      }
+    }
     return trimmed.slice(1, -1);
   }
   if (trimmed === 'true') return true;
