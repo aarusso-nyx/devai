@@ -306,6 +306,31 @@ describe('closure records', () => {
     expect(computeLedger(records.slice(0, 2)).no_deletion_streak).toBe(0);
   });
 
+  it('corrects the matching round across interleaved closures without changing other rounds', async () => {
+    const { root, head } = repository();
+    const first = await withAuthorityHostTestScope(() => closePhase(root, gateDraft(head)));
+    const unrelated = await withAuthorityHostTestScope(() =>
+      closePhase(root, { ...gateDraft(head), round_id: 'independent-round' }),
+    );
+    const originalBytes = [first, unrelated].map(({ path }) => readFileSync(path));
+    const correction = await withAuthorityHostTestScope(() =>
+      closePhase(root, { ...gateDraft(head), supersedes: first.record.id }),
+    );
+    expect(correction.record.id).toBe('PC-0003');
+    expect(correction.record.supersedes).toBe('PC-0001');
+    const records = await withAuthorityHostTestScope(() => readClosures(root));
+    expect(computeLedger(records)).toMatchObject({
+      count: 2,
+      rounds: [
+        { id: 'PC-0001', superseded_by: 'PC-0003' },
+        { id: 'PC-0002', round_id: 'independent-round' },
+        { id: 'PC-0003', round_id: 'gate-acknowledgement' },
+      ],
+    });
+    expect(computeLedger(records).rounds[1]).not.toHaveProperty('superseded_by');
+    expect([first, unrelated].map(({ path }) => readFileSync(path))).toEqual(originalBytes);
+  });
+
   it('chains repeated corrections through the latest closure without changing earlier bytes', async () => {
     const { root, head } = repository();
     const draft: PhaseClosureDraft = {
