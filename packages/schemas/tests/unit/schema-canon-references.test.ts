@@ -369,3 +369,43 @@ it('retains embedded resource scope for a nested local reference', () => {
   expect(validate({ item: { child: { kind: 'accepted', extra: true } } })).toBe(false);
   expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
 });
+
+it.each(['x/$defs/base', '#x$defs/base'])(
+  'does not mistake external or non-pointer reference %s for a local pointer',
+  (reference) => {
+    expect(checkSchema('fixture.schema.json', document(closed, reference))).toContainEqual({
+      schema: 'fixture.schema.json',
+      rule: 'open-world-object',
+      path: '$root/properties/item',
+    });
+  },
+);
+it.each([null, false, 42, 'not a schema'])(
+  'reports unresolved closure without throwing when a pointer crosses %j',
+  (base) => {
+    const schema = { ...document(closed, '#/$defs/base/child'), $defs: { base } };
+    // Invalid schema documents are rejected by the separate compilation gate;
+    // the independent canon check must still return its findings, not abort.
+    expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+      schema: 'fixture.schema.json',
+      rule: 'open-world-object',
+      path: '$root/properties/item',
+    });
+  },
+);
+
+it('resolves conditional predicates inside their embedded resource instead of the outer definitions', () => {
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      item: { ...predicateDocument(), $id: 'https://example.invalid/conditional-resource' },
+    },
+    $defs: { match: false },
+  };
+  const validate = new Ajv2020({ strict: false }).compile(schema);
+  expect(validate({ item: { kind: 'selected', label: 'present' } })).toBe(true);
+  expect(validate({ item: { kind: 'selected' } })).toBe(false);
+  expect(validate({ item: { kind: 'other' } })).toBe(true);
+  expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+});
