@@ -81,12 +81,12 @@ function task(): TaskRecord {
 }
 
 describe('task transition tracking observations', () => {
-  it('records an intended start without sealing a checkpoint', () => {
+  it('records an intended start without sealing a checkpoint', async () => {
     const root = repository();
     activate(root);
     const declared = { ...task(), id: 'TASK-8702', status: 'ready' as const };
 
-    withAuthorityHostTestScope(() => {
+    await withAuthorityHostTestScope(() => {
       saveTask(root, declared);
       expect(
         startRoundTask({ repoRoot: root, round: ROUND, taskId: declared.id }).task,
@@ -113,11 +113,11 @@ describe('task transition tracking observations', () => {
     expect(listGovernanceSegments({ repoRoot: root, round: ROUND })).toEqual([]);
   });
 
-  it('persists the completed transition status, checkpoint, payload, and summary', () => {
+  it('persists the completed transition status, checkpoint, payload, and summary', async () => {
     const root = repository();
     activate(root);
 
-    withAuthorityHostTestScope(() => {
+    await withAuthorityHostTestScope(() => {
       saveTask(root, task());
       expect(finishRoundTask({ repoRoot: root, round: ROUND, taskId: 'TASK-8701' })).toMatchObject({
         id: 'TASK-8701',

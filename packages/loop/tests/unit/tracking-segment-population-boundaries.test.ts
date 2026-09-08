@@ -46,10 +46,10 @@ function segmentDirectory(root: string): string {
 }
 
 describe('tracking segment population boundaries', () => {
-  it('ignores files whose names only resemble canonical segment names', () => {
+  it('ignores files whose names only resemble canonical segment names', async () => {
     const root = repository();
 
-    withAuthorityHostTestScope(() => {
+    await withAuthorityHostTestScope(() => {
       record(root, SESSION_A, 'canonical segment');
       expect(
         sealGovernanceSegments({
@@ -83,10 +83,10 @@ describe('tracking segment population boundaries', () => {
     );
   });
 
-  it('orders valid segments by sealed_at rather than filename', () => {
+  it('orders valid segments by sealed_at rather than filename', async () => {
     const root = repository();
 
-    withAuthorityHostTestScope(() => {
+    await withAuthorityHostTestScope(() => {
       for (let index = 0; index < 16; index += 1) {
         record(
           root,
