@@ -123,6 +123,44 @@ describe('proof epoch integrity', () => {
     },
   );
 
+  it('treats an existing zero-byte epoch as empty before the first append', () => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'empty-file' };
+    appendProofEpochRecord({ ...inputs, payload: {} });
+    const path = proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind);
+    writeFileSync(path, '');
+    expect(verifyProofEpoch({ ...inputs, requireClosed: false })).toEqual({
+      valid: true,
+      closed: false,
+      head: null,
+      recordCount: 0,
+      lines: [],
+      errors: [],
+    });
+    expect(readFileSync(path)).toHaveLength(0);
+    const first = appendProofEpochRecord({ ...inputs, payload: { fresh: true } });
+    expect(first.sequence).toBe(1);
+    expect(first.previous_line_hash).toBeNull();
+    expect(parse(path)).toEqual([first]);
+  });
+
+  it('reports independent epoch identity defects together without appending', () => {
+    const inputs = { repoRoot: root(), roundId: 'R-0005', kind: 'identity' };
+    const first = appendProofEpochRecord({ ...inputs, payload: {} });
+    const { line_hash: _hash, ...original } = first;
+    const wrongIdentity = { ...original, round_id: 'R-0006', kind: 'foreign' };
+    const path = proofEpochPath(inputs.repoRoot, inputs.roundId, inputs.kind);
+    write(path, [{ ...wrongIdentity, line_hash: computeProofEpochLineHash(wrongIdentity) }]);
+    const before = readFileSync(path);
+    expect(verifyProofEpoch({ ...inputs, requireClosed: false }).errors).toEqual([
+      'line 1 crosses round',
+      'line 1 crosses kind',
+    ]);
+    expect(() => appendProofEpochRecord({ ...inputs, payload: {} })).toThrow(
+      'proof epoch is invalid: line 1 crosses round; line 1 crosses kind',
+    );
+    expect(readFileSync(path)).toEqual(before);
+  });
+
   it('hashes nested object keys canonically while preserving array order and input bytes', () => {
     const unsigned = {
       schemaVersion: '1.0.0' as const,
