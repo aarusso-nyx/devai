@@ -1218,7 +1218,11 @@ function sameFileIdentity(
     left.mode === right.mode &&
     left.uid === right.uid &&
     left.gid === right.gid &&
-    left.nlink === right.nlink
+    // Directory link counts change when unrelated child directories are created.
+    // Keep unlinked directories unsafe and retain exact hard-link checks for files.
+    (left.isDirectory() && right.isDirectory()
+      ? left.nlink > 0 && right.nlink > 0
+      : left.nlink === right.nlink)
   );
 }
 
