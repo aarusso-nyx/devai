@@ -119,7 +119,11 @@ describe('glossary identity and reference validation', () => {
     expect(result.files_scanned).toBe(3);
     expect(result.entries).toEqual([{ id: 'GE-001', term: 'Owner', file: first }]);
     expect(result.errors).toEqual([
-      { file: invalid, pointer: '/term', message: expect.stringContaining('(minLength)') },
+      {
+        file: invalid,
+        pointer: '/term',
+        message: 'must NOT have fewer than 1 characters (minLength)',
+      },
       { file: malformed, message: expect.stringMatching(/^JSON parse error: /) },
       {
         file: first,

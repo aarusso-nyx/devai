@@ -32,6 +32,9 @@ describe('journey validation against the real schema and invariant catalog', () 
     expect(
       validateJourneys({ journeysDir: join(root, 'absent'), invariantIds: new Set() }),
     ).toEqual(empty);
+    const regularFile = write('not-a-directory', 'Keep these unrelated bytes');
+    expect(validateJourneys({ journeysDir: regularFile, invariantIds: new Set() })).toEqual(empty);
+    expect(readFileSync(regularFile, 'utf8')).toBe('Keep these unrelated bytes');
   });
 
   it('loads sorted journey files while ignoring other prefixes, extensions and nested records', () => {
@@ -152,9 +155,13 @@ describe('journey validation against the real schema and invariant catalog', () 
         {
           file: invalid,
           pointer: undefined,
-          message: expect.stringContaining('(additionalProperties)'),
+          message: 'must NOT have additional properties (additionalProperties)',
         },
-        { file: invalidTitle, pointer: '/title', message: expect.stringContaining('(minLength)') },
+        {
+          file: invalidTitle,
+          pointer: '/title',
+          message: 'must NOT have fewer than 1 characters (minLength)',
+        },
       ]),
     );
     expect(result.errors).toHaveLength(3);
