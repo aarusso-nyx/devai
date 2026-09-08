@@ -7,6 +7,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOperationHost, runOperation } from '../../src/operations/index.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
 
+function generatedProperties(code: string, className: string) {
+  const compiled = ts.transpileModule(code, {
+    reportDiagnostics: true,
+    compilerOptions: { target: ts.ScriptTarget.ES2022, experimentalDecorators: true },
+  });
+  expect(compiled.diagnostics ?? [], className).toEqual([]);
+  const source = ts.createSourceFile('generated.ts', code, ts.ScriptTarget.Latest, true);
+  const declaration = source.statements.find(
+    (node): node is ts.ClassDeclaration =>
+      ts.isClassDeclaration(node) && node.name?.text === className,
+  );
+  expect(declaration, className).toBeDefined();
+  if (!declaration) throw new Error('expected generated class');
+  return declaration.members.filter(ts.isPropertyDeclaration).map((member) => ({
+    name: member.name.getText(source),
+    type: member.type?.getText(source),
+    optional: member.questionToken !== undefined,
+    definite: member.exclamationToken !== undefined,
+    decorators: (ts.getDecorators(member) ?? []).map((decorator) =>
+      decorator.expression.getText(source),
+    ),
+  }));
+}
+
 type Guard = { canActivate(route?: unknown): Promise<boolean> };
 function loadGuardLogic(root: string) {
   const modules = new Map<string, Record<string, new (adapter: unknown) => Guard>>();
@@ -102,6 +126,27 @@ const cases = [
     selected: `${prefix}/api/test/audit-event.controller.spec.ts`,
     expected: "describe('AuditEventController'",
   },
+  {
+    variant: 'db',
+    operation: 'scaffold.db',
+    paths: [`${prefix}/db/migration.sql`, `${prefix}/db/seed.sql`],
+    selected: `${prefix}/db/migration.sql`,
+    expected: 'create schema if not exists demo;',
+  },
+  {
+    variant: 'docs',
+    operation: 'scaffold.docs',
+    paths: [`${prefix}/docs/README.md`, `${prefix}/docs/ADR-0001.md`],
+    selected: `${prefix}/docs/README.md`,
+    expected: 'Domain module under namespace `demo`.',
+  },
+  {
+    variant: 'ci',
+    operation: 'scaffold.ci',
+    paths: ['.github/workflows/module-demo-bookmark.yml'],
+    selected: '.github/workflows/module-demo-bookmark.yml',
+    expected: 'name: module-demo-bookmark',
+  },
 ] as const;
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'devai entity scaffold ç '));
@@ -181,6 +226,39 @@ describe('scaffold entity bindings', () => {
         expect(entity).toContain(field);
       const create = readFileSync(join(root, `${api}/dto/create-audit-event.dto.ts`), 'utf8');
       const update = readFileSync(join(root, `${api}/dto/update-audit-event.dto.ts`), 'utf8');
+      expect(generatedProperties(entity, 'AuditEvent')).toEqual([
+        { name: 'id', type: 'string', optional: false, definite: true, decorators: [] },
+        { name: 'count', type: 'number', optional: false, definite: true, decorators: [] },
+        { name: 'active', type: 'boolean', optional: false, definite: true, decorators: [] },
+        {
+          name: 'payload',
+          type: 'Record<string, unknown>',
+          optional: false,
+          definite: true,
+          decorators: [],
+        },
+        { name: 'label', type: 'string | null', optional: true, definite: false, decorators: [] },
+        { name: 'created_at', type: 'string', optional: true, definite: false, decorators: [] },
+        { name: 'updated_at', type: 'string', optional: true, definite: false, decorators: [] },
+      ]);
+      expect(generatedProperties(create, 'CreateAuditEventDto')).toEqual([
+        { name: 'count', type: 'number', optional: false, definite: true, decorators: [] },
+        { name: 'active', type: 'boolean', optional: false, definite: true, decorators: [] },
+        {
+          name: 'payload',
+          type: 'Record<string, unknown>',
+          optional: false,
+          definite: true,
+          decorators: [],
+        },
+        {
+          name: 'label',
+          type: 'string | null',
+          optional: true,
+          definite: false,
+          decorators: ['IsOptional()'],
+        },
+      ]);
       expect(create).toContain('class CreateAuditEventDto');
       expect(create).toContain('count!: number;');
       expect(update).toContain('class UpdateAuditEventDto');
