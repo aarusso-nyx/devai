@@ -17,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmPackOutput } from './npm-pack-output.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packageRoot = join(repositoryRoot, 'packages/cli');
@@ -90,16 +91,14 @@ function packOnce(ordinal, manifest) {
       encoding: 'utf8',
     }),
   );
-  const filename = result[0]?.filename;
-  if (typeof filename !== 'string' || filename.length === 0) {
-    throw new Error('RELEASE_PACK_OUTPUT_MISSING');
-  }
+  const entry = npmPackOutput(result, manifest);
+  const filename = entry.filename;
   const tarball = join(packed, basename(filename));
   if (!existsSync(tarball)) throw new Error('RELEASE_PACK_TARBALL_MISSING');
   return {
     tarball,
     sha256: digest(tarball),
-    files: (result[0]?.files ?? []).map((file) => file.path).sort(),
+    files: entry.files.map((file) => file.path).sort(),
   };
 }
 
