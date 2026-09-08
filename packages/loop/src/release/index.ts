@@ -183,7 +183,9 @@ export function runReleaseGate(opts: GateOptions): ReleaseRecord {
       });
       reasons.push('invariants directory missing');
     } else {
-      const names = readdirSync(opts.invariantsDir).filter((n) => /^INV-.*\.json$/.test(n));
+      const names = readdirSync(opts.invariantsDir, { withFileTypes: true }).filter(
+        (entry) => entry.isFile() && /^INV-.*\.json$/.test(entry.name),
+      );
       if (names.length === 0) {
         checks.push({
           name: 'invariants.present',
