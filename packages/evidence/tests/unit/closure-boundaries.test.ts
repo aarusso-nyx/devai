@@ -97,6 +97,44 @@ async function refusalMessage(action: () => unknown): Promise<string> {
 }
 
 describe('closure refusals name the exact rejected identity', () => {
+  it.each(['\ud83d', '\ude80'])(
+    'does not acknowledge a gate by matching only one UTF-16 half of an emoji: %j',
+    async (gate) => {
+      const { root, head } = repository();
+      // Gate property names currently allow any nonblank JSON string. Matching
+      // a fragment of an astral character must not acknowledge a different ID.
+      const message = await refusalMessage(() =>
+        closePhase(root, {
+          ...shippedDraft(head),
+          gates: { [gate]: { status: 'fail' } },
+          validation_criteria: [{ criterion: 'failed 🚀 gate', verdict: 'fail' }],
+        }),
+      );
+      expect(message).toBe(
+        `phase close: failed gates require explicit failing validation criteria naming each gate: ${gate}`,
+      );
+      expect(await withAuthorityHostTestScope(() => readClosures(root))).toEqual([]);
+    },
+  );
+
+  it.each(['🚀', '\ud83d', '\ude80'])(
+    'accepts an explicitly acknowledged Unicode gate identity %j',
+    async (gate) => {
+      const { root, head } = repository();
+      const result = await withAuthorityHostTestScope(() =>
+        closePhase(root, {
+          ...shippedDraft(head),
+          gates: { [gate]: { status: 'fail' } },
+          validation_criteria: [{ criterion: `failed ${gate} gate`, verdict: 'fail' }],
+        }),
+      );
+      expect(result.record.gates).toEqual({ [gate]: { status: 'fail' } });
+      expect(result.record.validation_criteria).toEqual([
+        { criterion: `failed ${gate} gate`, verdict: 'fail' },
+      ]);
+    },
+  );
+
   it('names the batch and the commit identity that does not resolve', async () => {
     const { root, head } = repository();
     const message = await refusalMessage(() =>
