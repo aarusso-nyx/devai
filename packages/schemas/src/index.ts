@@ -433,15 +433,30 @@ export function checkSchema(name: string, schema: unknown): CanonFinding[] {
   const findings: CanonFinding[] = [];
   // A $ref applies its referenced constraints alongside sibling keywords. Follow
   // local pointers only; unresolved references never establish an object policy.
-  const declaresObjectPolicy = (value: unknown, resource: unknown): boolean => {
-    const seen = new Set<object>();
+  const declaresObjectPolicy = (
+    value: unknown,
+    resource: unknown,
+    seen = new Set<object>(),
+  ): boolean => {
     let current = value;
     let scope = resource;
     while (current !== null && typeof current === 'object' && !Array.isArray(current)) {
       if (seen.has(current)) return false;
       seen.add(current);
       const object = current as Record<string, unknown>;
-      if (object['additionalProperties'] !== undefined) return true;
+      if (typeof object['$id'] === 'string') scope = current;
+      if (
+        object['additionalProperties'] !== undefined ||
+        object['unevaluatedProperties'] !== undefined
+      )
+        return true;
+      // Every allOf branch applies, so one declared object policy constrains
+      // the composition. Merely having allOf (or an open branch) proves nothing.
+      if (
+        Array.isArray(object['allOf']) &&
+        object['allOf'].some((branch) => declaresObjectPolicy(branch, scope, new Set(seen)))
+      )
+        return true;
       const ref = object['$ref'];
       if (typeof ref !== 'string' || !ref.startsWith('#')) return false;
       let pointer: string;

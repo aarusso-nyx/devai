@@ -99,3 +99,54 @@ it('does not infer closure from an invalid URI fragment', () => {
     path: '$root/properties/item',
   });
 });
+
+it('recognizes closure supplied by an allOf branch without weakening sibling constraints', () => {
+  const schema = document(closed);
+  const item = { allOf: [{ $ref: '#/$defs/base' }], properties: { kind: { const: 'accepted' } } };
+  const composed = { ...schema, properties: { item } };
+  const validate = new Ajv2020({ strict: false }).compile(composed);
+  expect(validate({ item: { kind: 'accepted' } })).toBe(true);
+  expect(validate({ item: { kind: 'accepted', extra: 1 } })).toBe(false);
+  expect(validate({ item: { kind: 'other' } })).toBe(false);
+  expect(checkSchema('fixture.schema.json', composed)).toEqual([]);
+});
+it('recognizes unevaluatedProperties as an explicit object policy', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      item: {
+        type: 'object',
+        unevaluatedProperties: false,
+        properties: { kind: { type: 'string' } },
+      },
+    },
+  };
+  const validate = new Ajv2020({ strict: false }).compile(schema);
+  expect(validate({ item: { kind: 'accepted' } })).toBe(true);
+  expect(validate({ item: { kind: 'accepted', extra: 1 } })).toBe(false);
+  expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+});
+it.each([
+  { allOf: [] },
+  { allOf: [{}] },
+  { allOf: [{ properties: { kind: { type: 'string' } } }] },
+])('does not infer closure merely from allOf %j', ({ allOf }) => {
+  const schema = { properties: { item: { allOf, properties: { kind: { type: 'string' } } } } };
+  if (allOf.length > 0)
+    expect(
+      new Ajv2020({ strict: false }).compile(schema)({ item: { kind: 'accepted', extra: true } }),
+    ).toBe(true);
+  expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+    schema: 'fixture.schema.json',
+    rule: 'open-world-object',
+    path: '$root/properties/item',
+  });
+});
+it('terminates an allOf reference cycle without inferring closure', () => {
+  const schema = document({ allOf: [{ $ref: '#/$defs/base' }] });
+  expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+    schema: 'fixture.schema.json',
+    rule: 'open-world-object',
+    path: '$root/properties/item',
+  });
+});
