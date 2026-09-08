@@ -241,5 +241,34 @@
       "maxLength": 500,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*[*?])[^\\u0000]+$"
     }
-  }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "request_kind": "release-lifecycle-request",
+      "action_id": "release plan",
+      "repository_locator": {
+        "id": "aarusso-nyx/devai",
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "candidate_locator": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989",
+        "release_units": [
+          {
+            "release_unit": "@aarusso-nyx/devai",
+            "version": "1.5.0",
+            "package_roster": [
+              {
+                "package_id": "@aarusso-nyx/devai",
+                "manifest_path": "package.json",
+                "manifest_digest_sha256": "ce3d1244021c9ff7ac6bcdac38cb75de474734d038cf328f419be5d592c22efa"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

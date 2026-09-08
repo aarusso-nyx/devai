@@ -344,5 +344,71 @@
         }
       }
     }
+  ],
+  "examples": [
+    {
+      "adopter_package": {
+        "path": "package.json",
+        "sha256": "4613b714d3be211acb518d2aaf6cd1b2e1408f48a535e83b04c78012f52106be"
+      },
+      "adopter_policy": {
+        "path": "law/policy/adopter-policy.json",
+        "sha256": "16da05eee774169e92be4538eb9e28c610eff0ba41644a77f6048050dc350319"
+      },
+      "binding_receipt": {
+        "path": ".devai/config/adopter-policy-binding.json",
+        "sha256": "f00dbb39888f06a089778b2845cdc1047b2396cf0d4e95cd7071c95f3e7d5c58"
+      },
+      "constitution": {
+        "path": ".devai/pin/constitution.md",
+        "sha256": "3f0e2ddc45d0f4102eda34776700d8da7a1e56aab30c6ab43cc6ee6dbe972542"
+      },
+      "installation_origin": "candidate-adopter-dependency",
+      "installed_package": {
+        "archive_sha256": "3b6795e8f26b2c89a45417d73ef2c2ffb9b3e57783ea6bc7ec5f5945a59d5ffe",
+        "content_manifest_sha256": "9883ba2a1273ed298257cad072a54fb83fbbdc2fbf1efc8fe00c072f28bfd8ad",
+        "name": "@aarusso-nyx/devai",
+        "version": "1.4.5"
+      },
+      "lockfiles": [
+        {
+          "path": "package-lock.json",
+          "sha256": "33e5240a9f4994371c6ab3af7a4043468c44becb8e4979b6239716042fa07270"
+        }
+      ],
+      "materialized": [
+        {
+          "path": ".devai/config/domains.json",
+          "sha256": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd"
+        },
+        {
+          "path": ".devai/config/glob-guards.json",
+          "sha256": "759bf9dd020fff02a75cdc184780c04e4883bde6a82e16290ce7f0b8ab70d4bd"
+        },
+        {
+          "path": ".devai/config/project.json",
+          "sha256": "6c2ada7c75a3951318abf5d453ca49552f7cdb0a7560b2839d4392b20f02dce5"
+        },
+        {
+          "path": ".devai/config/release-verification.json",
+          "sha256": "3fe9accdf8a6f088fb9d56ce923543517976c5f68df5f161826ecd4015c7a84e"
+        },
+        {
+          "path": ".devai/config/scorecard-na.json",
+          "sha256": "811858d9a230f84ef027b3281fd97d6dbeb2e819f0c4169585ce13080dc94460"
+        },
+        {
+          "path": ".devai/config/thresholds.json",
+          "sha256": "19bff20b5d9531d15a30227fb958ea34be660d88655ef46e45888f1fc1559751"
+        }
+      ],
+      "package_manager": "npm",
+      "project": {
+        "path": ".devai/config/project.json",
+        "sha256": "6c2ada7c75a3951318abf5d453ca49552f7cdb0a7560b2839d4392b20f02dce5"
+      },
+      "resolver_id": "devai.release-policy-resolution.v1",
+      "schemaVersion": "1.0.0"
+    }
   ]
 }

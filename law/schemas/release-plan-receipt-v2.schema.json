@@ -901,5 +901,288 @@
         }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "candidate": {
+        "commit": "487656d59d99c0fa6097b5f804cfa2665dca5200",
+        "release_unit": "@fixture/unit-one",
+        "tree": "fc500106dcf9b83adb2d947a79d0eae166cfc549",
+        "version": "1.4.6"
+      },
+      "canonicalization": {
+        "calculation_order": [
+          "compute-receipt_digest_sha256-over-the-receipt-projection",
+          "derive-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-receipt_digest_sha256"
+        ],
+        "digest_algorithm": "sha256",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "kernel_id": "devai.kernel.release-plan-receipt-canonicalization.v1",
+        "receipt_projection_excludes": ["receipt_id", "receipt_digest_sha256"]
+      },
+      "determination": {
+        "blocking_reasons": [],
+        "capabilities": [
+          "affected-checks",
+          "build-integrity",
+          "dependent-checks",
+          "exact-candidate",
+          "formatting-hygiene",
+          "lint",
+          "package-integrity",
+          "path-portability",
+          "schema-consistency",
+          "secret-scan",
+          "type-integrity"
+        ],
+        "impact": "behavioral",
+        "mutation": "none",
+        "mutation_disposition": {
+          "reason": "mutation-roster-empty",
+          "status": "not-required"
+        },
+        "profile_verdict": "ready",
+        "risk_classes": [],
+        "support": "current",
+        "transition": "patch"
+      },
+      "determinism": {
+        "contains_wall_clock_time": false,
+        "derived_from_bound_inputs_only": true,
+        "deterministic": true
+      },
+      "emitted_by": {
+        "action_id": "release plan",
+        "appends_state_record": false,
+        "effect": "read",
+        "output_channel": "stdout",
+        "persists_repository_state": false,
+        "writes_receipt_file": false
+      },
+      "grants": {
+        "authority": false,
+        "lifecycle_transition": false,
+        "publication_authority": false,
+        "satisfies_state": false
+      },
+      "inputs": [
+        {
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "inline_document": {
+            "base": {
+              "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "candidate": {
+              "commit": "487656d59d99c0fa6097b5f804cfa2665dca5200",
+              "tree": "fc500106dcf9b83adb2d947a79d0eae166cfc549"
+            },
+            "change_kind": "behavioral",
+            "changed_packages": ["@aarusso-nyx/devai"],
+            "changed_paths": ["packages/cli/src/services/release-policy-resolution.ts"],
+            "current_version": "1.4.5",
+            "release_unit": "@fixture/unit-one",
+            "schemaVersion": "1.0.0",
+            "support": "current",
+            "target_version": "1.4.6"
+          },
+          "kind": "release-intent",
+          "origin": "invocation",
+          "schema": "law/schemas/release-intent.schema.json",
+          "sha256": "e78e8b233e88545e2fa1cae4dd248b029ff25f12548038460d5409f0ac7a8b78",
+          "source": "invocation-provided-release-intent-document"
+        },
+        {
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "kind": "release-verification-profile",
+          "origin": "generated-adopter",
+          "path": ".devai/config/release-verification.json",
+          "schema": "law/schemas/release-verification-profile.schema.json",
+          "sha256": "53c92b9c125fba4200a3e5c8d2eb906df0e18d609b0ca5343d48a3d4c1cdf96b",
+          "source": ".devai/config/release-verification.json"
+        },
+        {
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "kind": "release-lifecycle-policy",
+          "origin": "installed-package",
+          "path": "dist/law/policy/release-lifecycle.json",
+          "schema": "law/schemas/release-lifecycle-policy.schema.json",
+          "sha256": "73373e6d4995ecce53a2fc2777b0ce03be18d10e117bfa581f211ccd8d51e7f9",
+          "source": "dist/law/policy/release-lifecycle.json"
+        },
+        {
+          "canonical_bytes": "utf-8-rfc8785-jcs",
+          "kind": "action-registry-policy",
+          "origin": "installed-package",
+          "path": "dist/law/policy/action-registry.json",
+          "schema": "law/schemas/action-registry.schema.json",
+          "sha256": "f6e8f504db3473acdefb335ab46c31dc0bd21ad8c7c2ef472b05471b999668aa",
+          "source": "dist/law/policy/action-registry.json"
+        }
+      ],
+      "plan": [
+        {
+          "action_id": "release plan",
+          "derives_state": "planned",
+          "order": 1,
+          "produces_state": null
+        },
+        {
+          "action_id": "release preflight",
+          "derives_state": null,
+          "order": 2,
+          "produces_state": "preflight_passed"
+        },
+        {
+          "action_id": "release certify",
+          "derives_state": null,
+          "order": 3,
+          "produces_state": "certified"
+        },
+        {
+          "action_id": "release prepare",
+          "derives_state": null,
+          "order": 4,
+          "produces_state": "prepared"
+        },
+        {
+          "action_id": "release export",
+          "derives_state": null,
+          "order": 5,
+          "produces_state": "exported"
+        },
+        {
+          "action_id": "release offline-verify",
+          "derives_state": "offline_verified",
+          "order": 6,
+          "produces_state": null
+        },
+        {
+          "action_id": "release evidence-publish",
+          "derives_state": null,
+          "order": 7,
+          "produces_state": "evidence_published"
+        },
+        {
+          "action_id": "release publish",
+          "derives_state": null,
+          "order": 8,
+          "produces_state": "publication_dispatched"
+        },
+        {
+          "action_id": "release resume",
+          "derives_state": "published",
+          "order": 9,
+          "produces_state": null
+        }
+      ],
+      "policy_resolution": {
+        "adopter_package": {
+          "path": "package.json",
+          "sha256": "4613b714d3be211acb518d2aaf6cd1b2e1408f48a535e83b04c78012f52106be"
+        },
+        "adopter_policy": {
+          "path": "law/policy/adopter-policy.json",
+          "sha256": "16da05eee774169e92be4538eb9e28c610eff0ba41644a77f6048050dc350319"
+        },
+        "binding_receipt": {
+          "path": ".devai/config/adopter-policy-binding.json",
+          "sha256": "f00dbb39888f06a089778b2845cdc1047b2396cf0d4e95cd7071c95f3e7d5c58"
+        },
+        "constitution": {
+          "path": ".devai/pin/constitution.md",
+          "sha256": "3f0e2ddc45d0f4102eda34776700d8da7a1e56aab30c6ab43cc6ee6dbe972542"
+        },
+        "installation_origin": "candidate-adopter-dependency",
+        "installed_package": {
+          "archive_sha256": "3b6795e8f26b2c89a45417d73ef2c2ffb9b3e57783ea6bc7ec5f5945a59d5ffe",
+          "content_manifest_sha256": "9883ba2a1273ed298257cad072a54fb83fbbdc2fbf1efc8fe00c072f28bfd8ad",
+          "name": "@aarusso-nyx/devai",
+          "version": "1.4.5"
+        },
+        "lockfiles": [
+          {
+            "path": "package-lock.json",
+            "sha256": "33e5240a9f4994371c6ab3af7a4043468c44becb8e4979b6239716042fa07270"
+          }
+        ],
+        "materialized": [
+          {
+            "path": ".devai/config/domains.json",
+            "sha256": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd"
+          },
+          {
+            "path": ".devai/config/glob-guards.json",
+            "sha256": "759bf9dd020fff02a75cdc184780c04e4883bde6a82e16290ce7f0b8ab70d4bd"
+          },
+          {
+            "path": ".devai/config/project.json",
+            "sha256": "6c2ada7c75a3951318abf5d453ca49552f7cdb0a7560b2839d4392b20f02dce5"
+          },
+          {
+            "path": ".devai/config/release-verification.json",
+            "sha256": "3fe9accdf8a6f088fb9d56ce923543517976c5f68df5f161826ecd4015c7a84e"
+          },
+          {
+            "path": ".devai/config/scorecard-na.json",
+            "sha256": "811858d9a230f84ef027b3281fd97d6dbeb2e819f0c4169585ce13080dc94460"
+          },
+          {
+            "path": ".devai/config/thresholds.json",
+            "sha256": "19bff20b5d9531d15a30227fb958ea34be660d88655ef46e45888f1fc1559751"
+          }
+        ],
+        "package_manager": "npm",
+        "project": {
+          "path": ".devai/config/project.json",
+          "sha256": "6c2ada7c75a3951318abf5d453ca49552f7cdb0a7560b2839d4392b20f02dce5"
+        },
+        "resolver_id": "devai.release-policy-resolution.v1",
+        "schemaVersion": "1.0.0"
+      },
+      "receipt_digest_sha256": "2b96ed41248a3365404662e53a73ab19bd1f6ca40371025370cd39d3950793f3",
+      "receipt_id": "RPL-2b96ed41248a3365",
+      "receipt_kind": "release-plan-receipt",
+      "repository": {
+        "commit": "487656d59d99c0fa6097b5f804cfa2665dca5200",
+        "id": "fixture/multi-unit",
+        "tree": "fc500106dcf9b83adb2d947a79d0eae166cfc549"
+      },
+      "schemaVersion": "2.0.0",
+      "state_observed": "planned",
+      "verdict": "pass",
+      "verification_kernel": {
+        "algorithm": [
+          "verify-policy-resolution-against-external-expected-package-candidate-and-complete-binding-evidence-before-resolving-inputs",
+          "resolve-every-declared-input-and-recompute-its-sha256",
+          "require-the-exact-four-ordered-input-kinds-origins-sources-schemas-paths-and-utf-8-rfc8785-jcs-sha256-digests-declared-by-plan_determination",
+          "recompute-verdict-profile_verdict-transition-support-impact-risk_classes-capabilities-mutation-mutation_disposition-and-blocking_reasons-under-plan_determination-and-compare-to-the-reported-values",
+          "recompute-the-nine-ordered-plan-steps-for-pass-or-the-empty-plan-for-block-from-the-lifecycle-policy-and-compare-to-plan",
+          "recompute-receipt_digest_sha256-under-devai.kernel.release-plan-receipt-canonicalization.v1",
+          "recompute-receipt_id-as-RPL-hyphen-plus-the-first-16-lowercase-hex-characters-of-the-recomputed-receipt-digest",
+          "reject-pass-when-any-recomputed-value-differs-from-the-reported-value"
+        ],
+        "determination_contract": "dist/law/policy/release-lifecycle.json#/plan_determination",
+        "errors": [
+          "rpl-input-unresolved",
+          "rpl-input-digest-mismatch",
+          "rpl-input-set-mismatch",
+          "rpl-determination-mismatch",
+          "rpl-plan-mismatch",
+          "rpl-receipt-digest-mismatch",
+          "rpl-receipt-id-mismatch",
+          "rpl-semantic-verification-not-performed",
+          "rpl-policy-source-unresolved",
+          "rpl-package-identity-mismatch",
+          "rpl-adopter-binding-mismatch",
+          "rpl-policy-resolution-mismatch",
+          "rpl-legacy-plan-non-authoritative"
+        ],
+        "kernel_id": "devai.kernel.release-plan-receipt.v3",
+        "mandatory": true,
+        "schema_assertion_establishes_pass": false
+      }
+    }
+  ]
 }

@@ -450,5 +450,111 @@
         }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "action_id": "release preflight",
+      "attempt_id": "RLA-54717f66fc042dc0",
+      "authorization_event_id": null,
+      "candidate": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "release_units": [
+          {
+            "packages": [
+              {
+                "package_id": "@aarusso-nyx/devai"
+              }
+            ],
+            "release_unit": "@aarusso-nyx/devai",
+            "version": "1.5.0"
+          }
+        ],
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "canonicalization": {
+        "digest_algorithm": "sha256",
+        "encoding": "utf-8",
+        "id_derivation": "RLE-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256",
+        "json_form": "rfc8785-jcs",
+        "projection_excludes": ["record_id", "record_digest_sha256"]
+      },
+      "completion": null,
+      "failure": null,
+      "observed_head_before": null,
+      "predecessor_record": null,
+      "provider_dispatch": {
+        "handle_observed": false,
+        "status": "not-dispatched"
+      },
+      "provider_handle": null,
+      "record_digest_sha256": "271f21acd6b59a2960e4df8c8b93e079454e166a7933da013dcbf3479ae17fe6",
+      "record_id": "RLE-271f21acd6b59a29",
+      "record_kind": "attempt",
+      "repository": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "id": "aarusso-nyx/devai",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "request_digest_sha256": "e0cf77e6deeceecfbed63240c0b13d349f484cefe97ce6a37a75043af52397d0",
+      "schemaVersion": "1.0.0",
+      "sequence": 0,
+      "unknown": null
+    },
+    {
+      "action_id": "release preflight",
+      "attempt_id": "RLA-54717f66fc042dc0",
+      "authorization_event_id": null,
+      "candidate": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "release_units": [
+          {
+            "packages": [
+              {
+                "package_id": "@aarusso-nyx/devai"
+              }
+            ],
+            "release_unit": "@aarusso-nyx/devai",
+            "version": "1.5.0"
+          }
+        ],
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "canonicalization": {
+        "digest_algorithm": "sha256",
+        "encoding": "utf-8",
+        "id_derivation": "RLE-hyphen-plus-first-16-lowercase-hex-of-record_digest_sha256",
+        "json_form": "rfc8785-jcs",
+        "projection_excludes": ["record_id", "record_digest_sha256"]
+      },
+      "completion": {
+        "state": "preflight_passed",
+        "state_digest_sha256": "3cfa3789bfbf925abb937213c0e8dfc44fb991e464da60ab1bdcbb71494b34f2",
+        "state_id": "RLS-3cfa3789bfbf925a"
+      },
+      "failure": null,
+      "observed_head_before": null,
+      "predecessor_record": {
+        "record_digest_sha256": "271f21acd6b59a2960e4df8c8b93e079454e166a7933da013dcbf3479ae17fe6",
+        "record_id": "RLE-271f21acd6b59a29",
+        "sequence": 0
+      },
+      "provider_dispatch": {
+        "handle_observed": false,
+        "status": "not-dispatched"
+      },
+      "provider_handle": null,
+      "record_digest_sha256": "df240c830309ffaba383f5955ec21cd74a66c58f78ab4aafdd430b52dce75caa",
+      "record_id": "RLE-df240c830309ffab",
+      "record_kind": "completion",
+      "repository": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "id": "aarusso-nyx/devai",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "request_digest_sha256": "e0cf77e6deeceecfbed63240c0b13d349f484cefe97ce6a37a75043af52397d0",
+      "schemaVersion": "1.0.0",
+      "sequence": 1,
+      "unknown": null
+    }
+  ]
 }

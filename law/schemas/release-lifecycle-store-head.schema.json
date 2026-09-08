@@ -71,5 +71,36 @@
         "tree": { "$ref": "#/$defs/git_object" }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "candidate": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "canonicalization": {
+        "digest_algorithm": "sha256",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "kernel_id": "devai.kernel.release-lifecycle-store-head.v2",
+        "projection_excludes": ["head_digest_sha256"]
+      },
+      "completion_record": {
+        "attempt_id": "RLA-54717f66fc042dc0",
+        "record_digest_sha256": "df240c830309ffaba383f5955ec21cd74a66c58f78ab4aafdd430b52dce75caa",
+        "record_id": "RLE-df240c830309ffab",
+        "sequence": 1
+      },
+      "generation": 0,
+      "head_digest_sha256": "e5b994b086b16c61bf5f09adac9507bc32261c63033ab4db9304fcb0e0463aae",
+      "repository": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "id": "aarusso-nyx/devai",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "schemaVersion": "2.0.0",
+      "state_digest_sha256": "3cfa3789bfbf925abb937213c0e8dfc44fb991e464da60ab1bdcbb71494b34f2",
+      "state_id": "RLS-3cfa3789bfbf925a"
+    }
+  ]
 }
