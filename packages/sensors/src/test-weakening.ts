@@ -48,14 +48,14 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
       // line that leaks through to the parent in some Node versions.
       const out = execFileSync(
         'git',
-        ['diff', '--name-only', baseRef, '--', '*.test.ts', '*.spec.ts'],
+        ['diff', '--name-only', '-z', baseRef, '--', '*.test.ts', '*.spec.ts'],
         {
           cwd: opts.cwd,
           encoding: 'utf8',
           stdio: ['pipe', 'pipe', 'ignore'],
         },
       );
-      changedFiles = out.split('\n').filter((f) => f.length > 0);
+      changedFiles = out.split('\0').filter((f) => f.length > 0);
     } catch (err) {
       return buildSensorReading({
         sensorName: 'test-weakening',

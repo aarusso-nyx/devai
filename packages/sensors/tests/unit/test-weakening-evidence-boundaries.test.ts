@@ -30,7 +30,7 @@ beforeEach(() => {
       const operation = args[0];
       if (operation === undefined) throw new Error('Missing Git operation');
       if (faults.has(operation)) throw faults.get(operation);
-      if (args[0] === 'diff') return [...base.keys()].join('\n') + '\n';
+      if (args[0] === 'diff') return [...base.keys()].join('\0') + '\0';
       if (args[0] === 'show') {
         const object = args[1];
         if (object === undefined) throw new Error('Missing Git object');
@@ -73,7 +73,7 @@ describe('test weakening compares actual evidence through the guarded host seam'
     expect(reading.findings?.map((f) => f.code)).toEqual(code ? [code] : []);
     expect(host.execFileSync).toHaveBeenCalledWith(
       'git',
-      ['diff', '--name-only', 'HEAD~1', '--', '*.test.ts', '*.spec.ts'],
+      ['diff', '--name-only', '-z', 'HEAD~1', '--', '*.test.ts', '*.spec.ts'],
       { cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] },
     );
   });
