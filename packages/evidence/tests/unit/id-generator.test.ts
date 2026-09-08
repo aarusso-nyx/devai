@@ -35,6 +35,36 @@ describe('deriveEvidenceId', () => {
     expect(deriveEvidenceId({ ...base, previous_run_hash: 'a'.repeat(64) })).not.toBe(baseId);
   });
 
+  // Independently calculated with Python hashlib over the documented JSON array.
+  it.each([
+    [[], 'EV-1182f12c66e92605'],
+    [['a'.repeat(64)], 'EV-59f71388c68f147d'],
+    [['b'.repeat(64), 'a'.repeat(64), null], 'EV-63bae63635c58d5f'],
+    [['a'.repeat(64), 'a'.repeat(64)], 'EV-a7acbc93d6ab5a5b'],
+  ] as const)(
+    'binds the complete artifact population %j to a stable identifier',
+    (artifacts, id) => {
+      const input = [...artifacts];
+      const before = [...input];
+      expect(deriveEvidenceId({ ...baseInputs(), artifact_sha256s: input })).toBe(id);
+      expect(input).toEqual(before);
+      expect(deriveEvidenceId({ ...baseInputs(), artifact_sha256s: [...input].reverse() })).toBe(
+        id,
+      );
+    },
+  );
+
+  it('retains the canonical identifier for a large mixed-order artifact population', () => {
+    const artifacts = Array.from({ length: 80 }, (_, i) =>
+      ((i * 37) % 80).toString(16).padStart(64, '0'),
+    );
+    const input = [...artifacts];
+    expect(deriveEvidenceId({ ...baseInputs(), artifact_sha256s: input })).toBe(
+      'EV-6f9ed13ae6880532',
+    );
+    expect(input).toEqual(artifacts);
+  });
+
   it('is insensitive to artifact-sha256 ordering (sorts before hashing)', () => {
     const a = deriveEvidenceId({
       ...baseInputs(),
