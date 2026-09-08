@@ -197,6 +197,7 @@ export function governedRoundStatus(options: {
   if (!existsSync(path)) fail('ROUND_RECORD_NOT_FOUND');
   const parsed = parseGovernanceRecord(path);
   if (!validators.recordMeta(parsed.frontmatter)) fail('ROUND_RECORD_SCHEMA_INVALID');
+  if (parsed.frontmatter['id'] !== id) fail('ROUND_RECORD_ID_MISMATCH');
   const location = parsed.frontmatter['status'] === 'closed' ? 'closed' : 'active';
   return {
     ok: true,
@@ -245,6 +246,7 @@ function assertClosePreconditions(repoRoot: string, id: string, source: string):
   const closure = readJson(closurePath, 'ROUND_ARCHIVE_PHASE_CLOSURE_INVALID');
   if (!validators.phaseClosure(closure)) fail('ROUND_ARCHIVE_PHASE_CLOSURE_INVALID');
   if (
+    closure['id'] !== closureId ||
     closure['round_id'] !== id ||
     closure['declaring_decision'] !== declaredBy ||
     closure['closing_decision'] !== closedBy ||
