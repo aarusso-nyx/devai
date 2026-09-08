@@ -69,6 +69,12 @@ function expandWildcardOneLevel(repoRoot: string, glob: string, sink: string[]):
   }
   const before = parts.slice(0, wildIdx).join('/');
   const after = parts.slice(wildIdx + 1).join('/');
+  const segmentPattern = new RegExp(
+    `^${(parts[wildIdx] ?? '')
+      .split('*')
+      .map((literal) => literal.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*')}$`,
+  );
   let entries: string[];
   try {
     entries = readdirSync(abs(repoRoot, before));
@@ -76,6 +82,7 @@ function expandWildcardOneLevel(repoRoot: string, glob: string, sink: string[]):
     return;
   }
   for (const entry of entries) {
+    if (!segmentPattern.test(entry)) continue;
     const next = [before, entry, after].filter((s) => s !== '').join('/');
     walkSources(abs(repoRoot, next), sink);
   }
@@ -98,7 +105,7 @@ export function sensePlantDepth(opts: PlantDepthOptions): SensorReading {
 
   const lineCounts: number[] = [];
   let linesTotal = 0;
-  for (const f of files) {
+  for (const f of new Set(files)) {
     try {
       const content = readFileSync(f, 'utf8');
       const lines = content.split('\n').length;
