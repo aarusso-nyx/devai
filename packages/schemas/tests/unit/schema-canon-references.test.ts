@@ -150,3 +150,64 @@ it('terminates an allOf reference cycle without inferring closure', () => {
     path: '$root/properties/item',
   });
 });
+
+function predicateDocument() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: { kind: { type: 'string' }, label: { type: 'string' } },
+    if: { $ref: '#/$defs/match' },
+    then: { required: ['label'] },
+    $defs: { match: { properties: { kind: { const: 'selected' } }, required: ['kind'] } },
+  };
+}
+it('recognizes a definition used only as a conditional predicate', () => {
+  const schema = predicateDocument();
+  const validate = new Ajv2020({ strict: false }).compile(schema);
+  expect(validate({ kind: 'selected', label: 'present' })).toBe(true);
+  expect(validate({ kind: 'selected' })).toBe(false);
+  expect(validate({ kind: 'other' })).toBe(true);
+  expect(checkSchema('fixture.schema.json', schema)).toEqual([]);
+});
+it('does not exempt the same definition when also used as a complete property shape', () => {
+  const schema = predicateDocument();
+  const mixed = {
+    ...schema,
+    properties: { ...schema.properties, extra: { $ref: '#/$defs/match' } },
+  };
+  expect(checkSchema('fixture.schema.json', mixed)).toContainEqual({
+    schema: 'fixture.schema.json',
+    rule: 'open-world-object',
+    path: '$root/$defs/match',
+  });
+});
+it('does not infer predicate-only use from annotation data', () => {
+  const schema = {
+    type: 'object',
+    $defs: { match: { properties: { kind: { const: 'selected' } } } },
+    examples: [{ if: { $ref: '#/$defs/match' } }],
+  };
+  expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+    schema: 'fixture.schema.json',
+    rule: 'open-world-object',
+    path: '$root/$defs/match',
+  });
+});
+
+it.each(['allOf', 'oneOf', 'anyOf'])(
+  'does not exempt an open definition used as a complete %s branch',
+  (keyword) => {
+    const schema = {
+      [keyword]: [{ $ref: '#/$defs/open' }],
+      $defs: { open: { type: 'object', properties: { kind: { type: 'string' } } } },
+    };
+    expect(new Ajv2020({ strict: false }).compile(schema)({ kind: 'accepted', extra: true })).toBe(
+      true,
+    );
+    expect(checkSchema('fixture.schema.json', schema)).toContainEqual({
+      schema: 'fixture.schema.json',
+      rule: 'open-world-object',
+      path: '$root/$defs/open',
+    });
+  },
+);
