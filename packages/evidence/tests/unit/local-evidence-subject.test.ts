@@ -137,3 +137,38 @@ it.each(['https://github.com', 'ssh://git@github.com:22/'])(
     );
   },
 );
+
+it('refuses a trailer whose sole changed file is not the declared manifest', () => {
+  const root = fixture();
+  put(root, 'other-manifest.json');
+  git(root, 'add', '.');
+  git(root, 'commit', '-qm', 'different manifest');
+  expect(() => deriveTrailerParentSubject(root, 'manifest.json')).toThrow(
+    'local evidence trailer commit must change only the declared manifest',
+  );
+});
+
+it('preserves the actual Git refusal for an explicitly selected missing candidate', () => {
+  const root = fixture();
+  const ref = 'refs/heads/no-such-candidate';
+  let expected = '';
+  try {
+    execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    expect.fail('The missing ref must be refused by Git');
+  } catch (error) {
+    expected = String((error as { stderr?: string }).stderr ?? '').trim();
+  }
+  expect(expected.length).toBeGreaterThan(0);
+  let failure: unknown;
+  try {
+    deriveExactSubject(root, ref);
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toBe(expected);
+});
