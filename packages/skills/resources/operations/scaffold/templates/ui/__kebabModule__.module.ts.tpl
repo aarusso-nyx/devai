@@ -20,6 +20,6 @@ __UI_ENTITY_ROUTES__
 @NgModule({
   declarations: [__UI_COMPONENTS__],
   imports: [CommonModule, HttpClientModule, RouterModule.forChild(routes)],
-  providers: [__UI_SERVICES__, CognitoGuard],
+  providers: [__UI_SERVICES__, CognitoGuard, __MODULE__PolicyGuard],
 })
 export class __NsModulePascal__FeatureModule {}

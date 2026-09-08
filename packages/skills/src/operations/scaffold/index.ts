@@ -22,6 +22,8 @@ const TEMPLATE_PATHS = {
   'api.guard.policy': 'templates/api/guards/policy.guard.ts.tpl',
   'api.decorator.policy': 'templates/api/decorators/policy.decorator.ts.tpl',
   'ui.module': 'templates/ui/__kebabModule__.module.ts.tpl',
+  'ui.guard.authentication': 'templates/ui/guards/cognito.guard.ts.tpl',
+  'ui.guard.policy': 'templates/ui/policy.guard.ts.tpl',
   'ui.list-component': 'templates/ui/__kebabEntity__-list.component.ts.tpl',
   'ui.detail-component': 'templates/ui/__kebabEntity__-detail.component.ts.tpl',
   'ui.service': 'templates/ui/__kebabEntity__.service.ts.tpl',
@@ -204,7 +206,14 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
   },
   'scaffold.ui': {
     operationId: 'scaffold.ui',
-    templateIds: ['ui.module', 'ui.list-component', 'ui.detail-component', 'ui.service'],
+    templateIds: [
+      'ui.module',
+      'ui.guard.authentication',
+      'ui.guard.policy',
+      'ui.list-component',
+      'ui.detail-component',
+      'ui.service',
+    ],
     deriveTasks: (blueprint, _pack, slug) => [
       {
         template_id: 'ui.module',
@@ -217,6 +226,14 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
               .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
               .join('') + blueprint.module.name,
         },
+      },
+      {
+        template_id: 'ui.guard.authentication',
+        target_path: `domain/${slug}/web/src/app/${slug}/guards/cognito.guard.ts`,
+      },
+      {
+        template_id: 'ui.guard.policy',
+        target_path: `domain/${slug}/web/src/app/${slug}/policy.guard.ts`,
       },
       ...entityTasks(blueprint, slug, (_entity, name) => [
         {

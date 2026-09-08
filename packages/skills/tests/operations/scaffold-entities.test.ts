@@ -1,9 +1,53 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
+import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOperationHost, runOperation } from '../../src/operations/index.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
+
+type Guard = { canActivate(route?: unknown): Promise<boolean> };
+function loadGuardLogic(root: string) {
+  const modules = new Map<string, Record<string, new (adapter: unknown) => Guard>>();
+  const load = (file: string): Record<string, new (adapter: unknown) => Guard> => {
+    const existing = modules.get(file);
+    if (existing) return existing;
+    const output = ts.transpileModule(readFileSync(file, 'utf8'), {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+        experimentalDecorators: true,
+      },
+    }).outputText;
+    const module = { exports: {} };
+    // Decorators are inert only in this logic test; actual Angular compilation and
+    // injector acceptance are separate checks. No authentication adapter is stubbed.
+    const decorator = () => () => undefined;
+    runInNewContext(
+      output,
+      {
+        exports: module.exports,
+        module,
+        require: (name: string) => {
+          if (name === '@angular/core')
+            return { Injectable: decorator, Inject: decorator, Optional: decorator };
+          if (name === './guards/cognito.guard')
+            return load(join(root, ui, 'guards/cognito.guard.ts'));
+          throw new Error(`Unexpected generated guard import: ${name}`);
+        },
+      },
+      { timeout: 2000 },
+    );
+    modules.set(file, module.exports);
+    return module.exports;
+  };
+  const Authentication = load(join(root, ui, 'guards/cognito.guard.ts')).CognitoGuard;
+  const Policy = load(join(root, ui, 'policy.guard.ts')).BookmarkPolicyGuard;
+  if (Authentication === undefined || Policy === undefined)
+    throw new Error('Generated guards missing');
+  return { Authentication, Policy };
+}
 
 const roots: string[] = [];
 afterEach(() => {
@@ -37,6 +81,8 @@ const cases = [
     operation: 'scaffold.ui',
     paths: [
       `${ui}/demo-bookmark.module.ts`,
+      `${ui}/guards/cognito.guard.ts`,
+      `${ui}/policy.guard.ts`,
       ...names.flatMap((n) => [
         `${ui}/${n}-list.component.ts`,
         `${ui}/${n}-detail.component.ts`,
@@ -159,7 +205,9 @@ describe('scaffold entity bindings', () => {
       expect(module).toContain(
         'declarations: [BookmarkListComponent, BookmarkDetailComponent, AuditEventListComponent, AuditEventDetailComponent]',
       );
-      expect(module).toContain('providers: [BookmarkService, AuditEventService, CognitoGuard]');
+      expect(module).toContain(
+        'providers: [BookmarkService, AuditEventService, CognitoGuard, BookmarkPolicyGuard]',
+      );
       const expectedRoutes = [
         ['audit-event', 'AuditEventListComponent', 'audit-event'],
         ['audit-event/:id', 'AuditEventDetailComponent', 'audit-event'],
@@ -178,6 +226,41 @@ describe('scaffold entity bindings', () => {
       expect(module).not.toContain('__NsModulePascal__');
       expect(module).toContain('canActivate: [CognitoGuard]');
       expect(module).toContain('canActivate: [BookmarkPolicyGuard]');
+      const { Authentication, Policy } = loadGuardLogic(root);
+      const route = { data: { resource: 'audit-event', action: 'read' } };
+      for (const adapter of [
+        null,
+        { authenticated: () => false },
+        {
+          authenticated: () => {
+            throw new Error('session unavailable');
+          },
+        },
+        { authenticated: () => Promise.reject(new Error('session unavailable')) },
+      ]) {
+        expect(await new Authentication(adapter).canActivate()).toBe(false);
+        expect(await new Policy(adapter).canActivate(route)).toBe(false);
+      }
+      const permits = vi.fn(async () => true);
+      const adapter = { authenticated: async () => true, permits };
+      expect(await new Authentication(adapter).canActivate()).toBe(true);
+      expect(await new Policy(adapter).canActivate(route)).toBe(true);
+      expect(permits).toHaveBeenCalledExactlyOnceWith('audit-event', 'read');
+      for (const data of [
+        {},
+        { resource: '', action: 'read' },
+        { resource: 'audit-event', action: 0 },
+      ])
+        expect(await new Policy(adapter).canActivate({ data })).toBe(false);
+      expect(permits).toHaveBeenCalledTimes(1);
+      for (const permits of [
+        () => false,
+        () => 'true',
+        () => Promise.reject(new Error('policy unavailable')),
+      ])
+        expect(await new Policy({ authenticated: () => true, permits }).canActivate(route)).toBe(
+          false,
+        );
     }
     if (value.variant === 'tests') {
       const apiResult = await withAuthorityHostTestScope(() =>
