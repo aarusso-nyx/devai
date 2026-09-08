@@ -582,11 +582,11 @@ export async function executeReleaseTransition<T>(input: {
   try {
     state = finalizeReleaseLifecycleState(input.draft);
     const reduction = reduceReleaseLifecycle([...input.records, state]);
-    if (!reduction.ok) {
+    if (!reduction.ok || state.effect === 'remote-write') {
       return {
         ok: false,
         phase: 'validation',
-        code: reduction.errors.join(','),
+        code: reduction.ok ? 'release-state-effect-mismatch' : reduction.errors.join(','),
       };
     }
   } catch (cause) {
@@ -607,6 +607,35 @@ export async function executeReleaseTransition<T>(input: {
     return { ok: false, phase: 'append', code: 'release-state-append-failed', cause };
   }
   return { ok: true, state, adapter_result: adapterResult };
+}
+
+function authorizationMatchesReleaseState(
+  state: ReleaseLifecycleStateRecord,
+  request: EffectAuthorizationGrantRequest,
+): boolean {
+  const actor = state['actor'];
+  if (
+    actor === null ||
+    typeof actor !== 'object' ||
+    !('role' in actor) ||
+    state.authorization_event_id !== request.authorization_event_id ||
+    state.action_id !== request.action_id ||
+    state.effect !== request.effect ||
+    !same(state.repository, request.repository) ||
+    !same(state.candidate, request.candidate) ||
+    !same(state['consent'], request.consent) ||
+    actor.role !== request.subject_role
+  )
+    return false;
+  const expectation = state.publication_expectation;
+  return (
+    expectation === null ||
+    (expectation.authorization_event_id === request.authorization_event_id &&
+      request.resource.kind === 'remote' &&
+      request.resource.system_id === expectation.destination.system_id &&
+      request.resource.exact_identifier === expectation.destination.exact_identifier &&
+      same(request.resource.operations, [expectation.destination.operation]))
+  );
 }
 
 /**
@@ -641,6 +670,9 @@ export async function executeAuthorizedReleaseTransition<T>(input: {
     }
   } catch (cause) {
     return { ok: false, phase: 'validation', code: 'release-state-schema-invalid', cause };
+  }
+  if (!authorizationMatchesReleaseState(state, input.authorizationRequest)) {
+    return { ok: false, phase: 'validation', code: 'release-state-authorization-mismatch' };
   }
   if (input.adapter === undefined) {
     return { ok: false, phase: 'adapter', code: 'release-action-provider-unavailable' };
