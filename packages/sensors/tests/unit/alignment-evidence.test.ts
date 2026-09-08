@@ -27,6 +27,9 @@ function workflow(script: string, metadata = '') {
     `jobs:\n  check:\n    steps:\n      - run: ${script}\n${metadata}`,
   );
 }
+function workflowFile(body: string) {
+  writeFileSync(join(root, '.github/workflows/ci.yml'), body);
+}
 function sense(options: Partial<Parameters<typeof senseHarnessInvariantAlignment>[0]> = {}) {
   return senseHarnessInvariantAlignment({
     repoRoot: root,
@@ -116,6 +119,24 @@ describe('candidate-bound harness alignment evidence', () => {
     expect(sense().status).toBe('review');
   });
 
+  it('reads a multi-line block-scalar gate step but not one guarded by shell control flow', () => {
+    workflowFile(
+      `jobs:\n  check:\n    steps:\n      - name: gate\n        run: |\n          set -euo pipefail\n          devai ${action}\n`,
+    );
+    expect(sense().status).toBe('pass');
+    workflowFile(
+      `jobs:\n  check:\n    steps:\n      - name: gate\n        run: |\n          if [ -n "$CI" ]; then\n            devai ${action}\n          fi\n`,
+    );
+    expect(sense().status).toBe('review');
+  });
+
+  it('joins an argv-array evidence command on whitespace before matching it', () => {
+    evidence({ command: ['devai', 'check', '--only', 'dependencies'] });
+    expect(sense().status).toBe('pass');
+    evidence({ command: ['devai', 'check', '--only', 'unrelated'] });
+    expect(sense().status).toBe('review');
+  });
+
   it.each(['        continue-on-error: true\n', '        if: false\n'])(
     'does not count a disabled or nonblocking step %s',
     (metadata) => {
@@ -189,6 +210,23 @@ describe('alignment command and measurement population', () => {
     expect(result.findings?.map((finding) => finding.code)).toEqual(
       Array(3).fill('HARNESS_INVARIANT_ALIGNMENT_NO_MEASURABLE_VIA'),
     );
+  });
+
+  it('holds two misaligned gates at review and escalates the third to failure', () => {
+    const gate = (id: string) =>
+      writeFileSync(
+        join(root, `law/invariants/${id}.json`),
+        JSON.stringify({ id, severity: 'gate' }),
+      );
+    gate('INV-TEST-002');
+    gate('INV-TEST-003');
+    const two = sense();
+    expect(two.status).toBe('review');
+    expect(two.metrics).toMatchObject({ gate_invariants: 3, misaligned: 2 });
+    gate('INV-TEST-004');
+    const three = sense();
+    expect(three.status).toBe('fail');
+    expect(three.metrics).toMatchObject({ gate_invariants: 4, misaligned: 3 });
   });
 
   it('reports a genuinely empty selected population as review with the dedicated finding', () => {

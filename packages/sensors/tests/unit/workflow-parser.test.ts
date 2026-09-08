@@ -64,6 +64,25 @@ describe('workflow action reference extraction', () => {
     },
   );
 
+  it('ignores a uses: scalar that names no owner/repository pair', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/check.yml',
+      `jobs:
+  check:
+    steps:
+      - uses: docker
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/local
+`,
+      '/repo',
+    );
+    expect(ast.actionUses).toEqual([
+      { owner: 'actions', repo: 'checkout', ref: 'v4', line: 5 },
+      { owner: '', repo: './.github/actions/local', ref: '', line: 6 },
+    ]);
+    expect(ast.compositeActionUses).toEqual(['./.github/actions/local']);
+  });
+
   it('does not mistake a run script line for a declared action', () => {
     const ast = parseWorkflow(
       '/repo/.github/workflows/check.yml',
@@ -151,6 +170,28 @@ describe('workflow job and matrix accounting', () => {
     expect(ast.runStepCount).toBe(2);
   });
 
+  it('counts an inline matrix list only for the values it actually declares', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/check.yml',
+      `jobs:
+  build:
+    strategy:
+      matrix:
+        empty: []
+        os: [linux, macos, ]
+        node:
+          - 22
+          - 24
+    steps:
+      - run: echo build
+`,
+      '/repo',
+    );
+    expect(ast.jobs).toEqual([
+      { name: 'build', stepCount: 1, matrixDimensions: 2, matrixCombinations: 4 },
+    ]);
+  });
+
   it('keeps top-level flags and trigger path filters separate from nested job properties', () => {
     const ast = parseWorkflow(
       '/repo/.github/workflows/check.yml',
@@ -194,5 +235,66 @@ jobs:
     expect(nested.hasPermissionsBlock).toBe(false);
     expect(nested.hasConcurrencyBlock).toBe(false);
     expect(nested.relativeFile).toBe('external.yml');
+  });
+});
+
+describe('run script capture', () => {
+  it('captures every block-scalar indicator and dedents the body against the run: key', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/check.yml',
+      `jobs:
+  build:
+    steps:
+      - name: literal
+        run: |
+          echo literal
+            indented
+      - name: strip
+        run: |-
+          echo strip
+      - name: folded
+        run: >
+          echo folded
+      - name: folded-strip
+        run: >-
+          echo folded-strip
+      - name: bare
+        run:
+          echo bare
+      - run: echo inline
+`,
+      '/repo',
+    );
+    expect(ast.runScripts).toEqual([
+      'echo literal\n  indented',
+      'echo strip',
+      'echo folded',
+      'echo folded-strip',
+      'echo bare',
+      'echo inline',
+    ]);
+    expect(ast.runStepCount).toBe(6);
+    expect(ast.jobs.map((job) => job.stepCount)).toEqual([6]);
+  });
+
+  it('ends a block-scalar body at a blank line so sibling step keys stay out of the script', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/check.yml',
+      `jobs:
+  build:
+    steps:
+      - run: |
+          echo one
+
+        env:
+          MODE: strict
+      - run: echo after
+`,
+      '/repo',
+    );
+    // The dash column is the recorded run indent, so the best-effort dedent
+    // leaves the two columns the `- ` marker occupies.
+    expect(ast.runScripts).toEqual(['  echo one', 'echo after']);
+    expect(ast.runStepCount).toBe(2);
   });
 });
