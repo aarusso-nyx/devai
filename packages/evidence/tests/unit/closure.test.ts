@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -648,4 +656,34 @@ it('closes and reloads a real SHA-256 Git candidate with its complete 64-charact
     expect(readClosures(root)).toEqual([result.record]);
     expect(JSON.parse(readFileSync(result.path, 'utf8'))).toEqual(result.record);
   });
+});
+
+it('refuses exhausted closure identities after validating the generated record and preserves every existing byte', async () => {
+  const { root, head } = repository();
+  const first = await withAuthorityHostTestScope(() => closePhase(root, gateDraft(head)));
+  const directory = join(root, 'record/proofs/compliance/closures');
+  writeFileSync(
+    join(directory, 'PC-9998.json'),
+    JSON.stringify({ ...first.record, id: 'PC-9998', round_id: 'historical-last-available' }),
+  );
+  const last = await withAuthorityHostTestScope(() =>
+    closePhase(root, { ...gateDraft(head), round_id: 'last-valid-identity' }),
+  );
+  expect(last.record.id).toBe('PC-9999');
+  const names = readdirSync(directory).sort();
+  const bytes = names.map((name) => readFileSync(join(directory, name)));
+  const failure = await withAuthorityHostTestScope(() =>
+    closePhase(root, { ...gateDraft(head), round_id: 'exhausted' }),
+  ).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toContain(
+    'phase close: draft does not validate against phase-closure.schema.json:',
+  );
+  expect((failure as Error).message).toContain('/id');
+  expect((failure as Error).message).toContain('must match pattern');
+  expect(readdirSync(directory).sort()).toEqual(names);
+  expect(names.map((name) => readFileSync(join(directory, name)))).toEqual(bytes);
+  expect(
+    (await withAuthorityHostTestScope(() => readClosures(root))).map((record) => record.id),
+  ).toEqual(['PC-0001', 'PC-9998', 'PC-9999']);
 });
