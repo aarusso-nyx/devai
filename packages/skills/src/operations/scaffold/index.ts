@@ -181,6 +181,13 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
       {
         template_id: 'ui.module',
         target_path: `domain/${slug}/web/src/app/${slug}/${slug}.module.ts`,
+        extra_tokens: {
+          __NsModulePascal__:
+            blueprint.module.namespace
+              .split(/[-_\s]+/u)
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join('') + blueprint.module.name,
+        },
       },
       ...entityTasks(blueprint, slug, (_entity, name) => [
         {

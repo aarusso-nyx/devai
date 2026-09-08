@@ -141,6 +141,13 @@ describe('scaffold entity bindings', () => {
       expect(update).toContain('extends PartialType(CreateAuditEventDto)');
       expect(update).toContain("from './create-audit-event.dto'");
     }
+    if (value.variant === 'ui') {
+      const module = readFileSync(join(root, `${ui}/demo-bookmark.module.ts`), 'utf8');
+      expect(module).toContain('export class DemoBookmarkFeatureModule {}');
+      expect(module).not.toContain('__NsModulePascal__');
+      expect(module).toContain('canActivate: [CognitoGuard]');
+      expect(module).toContain('canActivate: [BookmarkPolicyGuard]');
+    }
     if (value.variant === 'tests') {
       const apiResult = await withAuthorityHostTestScope(() =>
         runOperation(
