@@ -115,3 +115,25 @@ it('reports a missing origin as a failed Git lookup rather than inventing an ide
   git(root, 'remote', 'remove', 'origin');
   expect(() => deriveExactSubject(root)).toThrow('git config --get remote.origin.url failed');
 });
+
+it.each([
+  ['ssh://git@github.com:22/owner/repository.git', 'owner/repository'],
+  ['https://git@github.com:443/owner/repository.git', 'owner/repository'],
+  ['ssh://git@github.com:2222/owner/repository.git', 'owner/repository'],
+])('keeps transport ports out of repository identity: %s', (origin, expected) => {
+  const root = fixture(origin);
+  expect(deriveExactSubject(root)).toEqual({
+    repository: expected,
+    commitSha: git(root, 'rev-parse', 'HEAD'),
+    tree: { algorithm: 'sha1', value: git(root, 'rev-parse', 'HEAD^{tree}') },
+  });
+});
+
+it.each(['https://github.com', 'ssh://git@github.com:22/'])(
+  'refuses a URL without a repository path: %s',
+  (origin) => {
+    expect(() => deriveExactSubject(fixture(origin))).toThrow(
+      'cannot derive repository identity from origin',
+    );
+  },
+);

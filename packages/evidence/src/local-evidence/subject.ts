@@ -25,16 +25,19 @@ function git(repoRoot: string, args: readonly string[], trim = true): string {
 
 function repositoryFromRemote(remote: string): string {
   const withoutSuffix = remote.replace(/\.git$/u, '');
-  const scp = /^[^@]+@[^:]+:(.+)$/u.exec(withoutSuffix)?.[1];
+  // An explicit URL may contain both a username and a port. Its port colon
+  // is not the separator used by Git's scp-style remote syntax.
+  const scp = withoutSuffix.includes('://')
+    ? undefined
+    : /^[^@]+@[^:]+:(.+)$/u.exec(withoutSuffix)?.[1];
   if (scp !== undefined) return scp;
+  let url: URL | undefined;
   try {
-    const url = new URL(withoutSuffix);
-    const path = url.pathname.replace(/^\/+|\/+$/gu, '');
-    if (path.length > 0) return path;
+    url = new URL(withoutSuffix);
   } catch {
-    // Fall through to an exact path-shaped remote (for local test repositories).
+    // Exact path-shaped remotes remain supported for local repositories.
   }
-  const path = withoutSuffix.replace(/^\/+|\/+$/gu, '');
+  const path = (url?.pathname ?? withoutSuffix).replace(/^\/+|\/+$/gu, '');
   if (path.length === 0) throw new Error('cannot derive repository identity from origin');
   return path;
 }
