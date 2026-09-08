@@ -77,7 +77,9 @@ export function senseHarnessCoverage(opts: HarnessCoverageOptions): SensorReadin
 
   // If any workflow has zero `paths:` filters, it runs on every push/PR
   // for the matching event — treat as full-repo coverage.
-  const anyUnfiltered = workflows.some((w) => w.onPaths.length === 0);
+  const anyUnfiltered = workflows.some(
+    (w) => w.onPaths.length === 0 && w.onPathsIgnore.length === 0,
+  );
   if (anyUnfiltered) {
     return buildSensorReading({
       sensorName: 'harness-coverage',
@@ -96,7 +98,9 @@ export function senseHarnessCoverage(opts: HarnessCoverageOptions): SensorReadin
     });
   }
 
-  const pathsRes = workflows.flatMap((w) => w.onPaths.map(globToRegExp));
+  const pathsRes = workflows.flatMap((w) =>
+    (w.onPaths.length === 0 ? ['**'] : w.onPaths).map(globToRegExp),
+  );
   const ignoreRes = workflows.flatMap((w) => w.onPathsIgnore.map(globToRegExp));
   const files = listGitFiles(opts.repoRoot);
   let covered = 0;

@@ -142,7 +142,9 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
   const filteredRuns =
     since === undefined
       ? ghResult.runs
-      : ghResult.runs.filter((r) => r.createdAt !== undefined && r.createdAt >= since);
+      : ghResult.runs.filter(
+          (r) => r.createdAt !== undefined && Date.parse(r.createdAt) >= Date.parse(since),
+        );
   const total = filteredRuns.length;
 
   if (total === 0) {
