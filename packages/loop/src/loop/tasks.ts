@@ -417,11 +417,16 @@ export function pauseTaskForRgr(opts: PauseRgrOptions): TaskRecord {
 export interface ResumeRgrOptions {
   readonly repoRoot: string;
   readonly rgrId: string;
+  /** When supplied, resolve this exact task before changing any persisted record. */
+  readonly taskId?: string;
 }
 
 export function resumeTaskFromRgr(opts: ResumeRgrOptions): TaskRecord {
   const tasks = listTasks(opts.repoRoot);
-  const target = tasks.find((t) => getPausedRgrId(t) === opts.rgrId);
+  const target = tasks.find(
+    (task) =>
+      getPausedRgrId(task) === opts.rgrId && (opts.taskId === undefined || task.id === opts.taskId),
+  );
   if (target === undefined) throw new Error(`no task paused on RGR ${opts.rgrId}`);
   const cleared = clearPausedRgrId(target);
   const updated: TaskRecord = { ...cleared, status: 'queued' };

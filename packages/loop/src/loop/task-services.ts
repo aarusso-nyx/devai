@@ -435,7 +435,11 @@ export function resumeRoundTask(options: {
   const { task } = roundBoundTask({ ...options, operation: 'resume' });
   if (task.status !== 'rgr_pending') fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   if (getPausedRgrId(task) !== options.gapId) fail('TASK_GAP_MISMATCH');
-  const updated = resumeTaskFromRgr({ repoRoot: options.repoRoot, rgrId: options.gapId });
+  const updated = resumeTaskFromRgr({
+    repoRoot: options.repoRoot,
+    rgrId: options.gapId,
+    taskId: options.taskId,
+  });
   if (updated.id !== options.taskId) fail('TASK_ID_MISMATCH');
   trackTaskTransition(
     options.repoRoot,
