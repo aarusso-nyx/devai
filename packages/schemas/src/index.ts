@@ -431,19 +431,62 @@ const PREDICATE_KEYWORDS = new Set(['if', 'then', 'else', 'contains', 'oneOf', '
 
 export function checkSchema(name: string, schema: unknown): CanonFinding[] {
   const findings: CanonFinding[] = [];
-  const walk = (node: unknown, path: string, predicateFragment: boolean): void => {
+  // A $ref applies its referenced constraints alongside sibling keywords. Follow
+  // local pointers only; unresolved references never establish an object policy.
+  const declaresObjectPolicy = (value: unknown, resource: unknown): boolean => {
+    const seen = new Set<object>();
+    let current = value;
+    let scope = resource;
+    while (current !== null && typeof current === 'object' && !Array.isArray(current)) {
+      if (seen.has(current)) return false;
+      seen.add(current);
+      const object = current as Record<string, unknown>;
+      if (object['additionalProperties'] !== undefined) return true;
+      const ref = object['$ref'];
+      if (typeof ref !== 'string' || !ref.startsWith('#')) return false;
+      let pointer: string;
+      try {
+        pointer = decodeURIComponent(ref.slice(1));
+      } catch {
+        return false;
+      }
+      if (pointer !== '' && !pointer.startsWith('/')) return false;
+      current = scope;
+      for (const token of pointer === '' ? [] : pointer.slice(1).split('/')) {
+        if (/~(?:[^01]|$)/u.test(token)) return false;
+        const key = token.replace(/~1/gu, '/').replace(/~0/gu, '~');
+        if (current === null || typeof current !== 'object' || !Object.hasOwn(current, key))
+          return false;
+        current = (current as Record<string, unknown>)[key];
+        if (
+          current !== null &&
+          typeof current === 'object' &&
+          typeof (current as Record<string, unknown>)['$id'] === 'string'
+        )
+          scope = current;
+      }
+    }
+    return false;
+  };
+  const walk = (
+    node: unknown,
+    path: string,
+    predicateFragment: boolean,
+    resource: unknown,
+  ): void => {
     if (Array.isArray(node)) {
-      node.forEach((v, i) => walk(v, `${path}[${i}]`, predicateFragment));
+      node.forEach((v, i) => walk(v, `${path}[${i}]`, predicateFragment, resource));
       return;
     }
     if (node === null || typeof node !== 'object') return;
     const o = node as Record<string, unknown>;
+    const scope = typeof o['$id'] === 'string' ? node : resource;
     // Predicate fragments intentionally match part of a containing object. Only
     // complete object shapes must declare their additional-properties policy.
     if (
       !predicateFragment &&
       o['properties'] !== undefined &&
-      o['additionalProperties'] === undefined &&
+      !declaresObjectPolicy(o, scope) &&
       path !== '$root'
     ) {
       findings.push({ schema: name, rule: 'open-world-object', path });
@@ -455,10 +498,10 @@ export function checkSchema(name: string, schema: unknown): CanonFinding[] {
         findings.push({ schema: name, rule: 'restated-verdict-enum', path });
     }
     for (const [k, v] of Object.entries(o)) {
-      walk(v, `${path}/${k}`, predicateFragment || PREDICATE_KEYWORDS.has(k));
+      walk(v, `${path}/${k}`, predicateFragment || PREDICATE_KEYWORDS.has(k), scope);
     }
   };
-  walk(schema, '$root', false);
+  walk(schema, '$root', false, schema);
   return findings;
 }
 
