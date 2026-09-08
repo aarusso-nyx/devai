@@ -1,6 +1,6 @@
 import { ROSTER } from '@devai-nyx/schemas';
 import { checkSchemaCanon } from '../../src/commands/check/schemas.js';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
@@ -96,7 +96,9 @@ describe('adopter schema report boundaries', () => {
 function canonFixture() {
   const root = fixture();
   const source = resolve(import.meta.dirname, '../../../..');
-  for (const name of ROSTER) {
+  for (const name of readdirSync(join(source, 'law/schemas')).filter((name) =>
+    name.endsWith('.schema.json'),
+  )) {
     const bytes = readFileSync(join(source, 'law/schemas', name));
     for (const base of ['law/schemas', 'packages/schemas/dist/schemas']) {
       mkdirSync(join(root, base), { recursive: true });
@@ -115,6 +117,43 @@ function canonFixture() {
 }
 
 describe('complete schema canon filesystem checks', () => {
+  it('accepts the complete source catalogue without expanding the runtime roster', () => {
+    const report = checkSchemaCanon(canonFixture());
+    expect(ROSTER).toHaveLength(89);
+    expect(report).toMatchObject({ ok: true, canonical_total: 96, findings: [] });
+  });
+  it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
+    'reports %s source inventory changes without throwing',
+    (kind) => {
+      const root = canonFixture();
+      if (kind === 'unexpected') put(root, 'law/schemas/unexpected.schema.json', {});
+      else
+        rmSync(
+          join(
+            root,
+            'law/schemas',
+            kind === 'missing-source-only'
+              ? 'claim-runtime-inputs.schema.json'
+              : 'release-intent.schema.json',
+          ),
+        );
+      const report = checkSchemaCanon(root);
+      expect(report.ok).toBe(false);
+      expect(report.canonical_total).toBe(kind === 'unexpected' ? 97 : 95);
+      expect(report.findings).toContainEqual({
+        rule: 'recursive-closed-complete-objects',
+        path: 'law/schemas',
+        message: 'Canonical directory and explicit source schema catalogue differ.',
+      });
+      if (kind === 'missing-runtime')
+        expect(report.findings).toContainEqual({
+          rule: 'dereferenced-publish-byte-identity',
+          path: 'release-intent.schema.json',
+          message: 'Bundled publish bytes differ from canonical law bytes.',
+        });
+    },
+  );
+
   it('aggregates absent and unmarked generated views while retaining valid views', () => {
     const root = canonFixture();
     const initial = checkSchemaCanon(root);

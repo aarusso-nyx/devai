@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { CAC } from 'cac';
-import { ROSTER, checkSchemas, getValidator, listSchemaFiles, metaGate } from '@devai-nyx/schemas';
+import { ROSTER, checkSchemas, getValidator, metaGate } from '@devai-nyx/schemas';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 
@@ -38,16 +38,30 @@ const RULES = [
   'dereferenced-publish-byte-identity',
 ] as const;
 
+// These source contracts are retained for development and historical compatibility.
+// They are not members of the current CLI/runtime validator roster.
+const SOURCE_ONLY_SCHEMAS = [
+  'claim-runtime-inputs.schema.json',
+  'documentation-information-architecture.schema.json',
+  'inv-override.schema.json',
+  'prompt-composition.schema.json',
+  'stack-adapter.schema.json',
+  'task-freshness.schema.json',
+  'test-task-descriptor.schema.json',
+] as const;
+
 export function checkSchemaCanon(repoRoot: string): SchemaCanonReport {
   const root = resolve(repoRoot);
   const findings: SchemaCanonFinding[] = [];
-  const canonical = listSchemaFiles();
-  const roster = [...ROSTER].sort();
+  const canonical = readdirSync(join(root, 'law/schemas'))
+    .filter((name) => name.endsWith('.schema.json'))
+    .sort();
+  const roster = [...ROSTER, ...SOURCE_ONLY_SCHEMAS].sort();
   if (JSON.stringify(canonical) !== JSON.stringify(roster)) {
     findings.push({
       rule: 'recursive-closed-complete-objects',
       path: 'law/schemas',
-      message: 'Canonical directory and explicit schema roster differ.',
+      message: 'Canonical directory and explicit source schema catalogue differ.',
     });
   }
   for (const name of ROSTER) {
@@ -100,6 +114,7 @@ export function checkSchemaCanon(repoRoot: string): SchemaCanonReport {
     const canonicalPath = join(root, 'law/schemas', name);
     const bundledPath = join(root, 'packages/schemas/dist/schemas', name);
     if (
+      !existsSync(canonicalPath) ||
       !existsSync(bundledPath) ||
       readFileSync(canonicalPath).compare(readFileSync(bundledPath)) !== 0
     ) {
