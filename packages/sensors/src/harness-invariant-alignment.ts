@@ -107,7 +107,8 @@ function stripYamlComment(line: string): string {
     const char = line[i];
     if (char === "'" && !double) single = !single;
     else if (char === '"' && !single && line[i - 1] !== '\\') double = !double;
-    else if (char === '#' && !single && !double) return line.slice(0, i).trimEnd();
+    else if (char === '#' && !single && !double && (i === 0 || /\s/.test(line[i - 1] ?? '')))
+      return line.slice(0, i).trimEnd();
   }
   return line;
 }
@@ -199,10 +200,49 @@ function loadRunSteps(workflowFiles: readonly string[]): WorkflowRunStep[] {
 }
 
 function shellSegments(script: string): readonly string[] {
-  return script
-    .split(/\n|&&|;/)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment !== '');
+  const segments: string[] = [];
+  let start = 0;
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  let comment = false;
+  const emit = (end: number): void => {
+    const segment = script.slice(start, end).trim();
+    if (segment !== '') segments.push(segment);
+  };
+  for (let index = 0; index < script.length; index += 1) {
+    const char = script[index];
+    if (comment) {
+      if (char !== '\n') continue;
+      comment = false;
+    }
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '#' && (index === 0 || /[\s;&|()]/.test(script[index - 1] ?? ''))) {
+      comment = true;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (char === '\n' || char === ';' || (char === '&' && script[index + 1] === '&')) {
+      emit(index);
+      if (char === '&') index += 1;
+      start = index + 1;
+    }
+  }
+  emit(script.length);
+  return segments;
 }
 
 function hasNonBindingControlFlow(script: string): boolean {

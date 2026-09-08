@@ -303,3 +303,43 @@ it.each(['set -- +e', 'set -o errexit', 'set -e'])(
     expect(sense().status).toBe('pass');
   },
 );
+
+it.each([
+  `echo "before; devai ${ACTION}; after"`,
+  `echo 'before; devai ${ACTION}; after'`,
+  `echo "before && devai ${ACTION} && after"`,
+  `echo ignored # before; devai ${ACTION}; after`,
+  String.raw`echo "before\"; devai ${ACTION}; after"`,
+])('does not treat quoted command-looking text as an executed gate: %s', (command) => {
+  workflow(command);
+  expect(sense().status).toBe('review');
+  workflow(`devai ${ACTION}`);
+  evidence(command);
+  expect(sense().status).toBe('review');
+});
+
+it.each([';', '&&'])(
+  'recognizes an actual unquoted gate after %s rather than quoted text',
+  (separator) => {
+    const command = `echo before ${separator} devai ${ACTION}`;
+    workflow(command);
+    evidence(command);
+    expect(sense().status).toBe('pass');
+  },
+);
+
+it('ends shell comments at a newline so a following real gate remains visible', () => {
+  const command = `echo ignored # explanation; not an executable\ndevai ${ACTION}`;
+  workflowFile(
+    `jobs:\n  check:\n    steps:\n      - run: |\n          ${command.replaceAll('\n', '\n          ')}\n`,
+  );
+  evidence(command);
+  expect(sense().status).toBe('pass');
+});
+
+it('does not mistake a hash inside an ordinary shell word for a comment', () => {
+  const command = `echo before#tag; devai ${ACTION}`;
+  workflow(command);
+  evidence(command);
+  expect(sense().status).toBe('pass');
+});
