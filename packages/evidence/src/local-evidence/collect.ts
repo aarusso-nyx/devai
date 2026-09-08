@@ -67,7 +67,7 @@ function readMetadata(artifactDir: string): Record<string, string> {
   if (!existsSync(metadataPath)) {
     throw new Error(`missing local CI metadata: ${metadataPath}`);
   }
-  const metadata: Record<string, string> = {};
+  const metadata = Object.create(null) as Record<string, string>;
   for (const line of readFileSync(metadataPath, 'utf8').split(/\r?\n/u)) {
     if (line.trim().length === 0) continue;
     const separator = line.indexOf('=');
@@ -173,12 +173,12 @@ export function collectLocalEvidence(inputs: CollectInputs): CollectResult {
   }
 
   for (const job of policy.requiredJobs) {
-    if (inputs.jobDirs[job] === undefined) {
+    if (!Object.hasOwn(inputs.jobDirs, job) || inputs.jobDirs[job] === undefined) {
       throw new Error(`missing artifact directory for required job: ${job}`);
     }
   }
 
-  const jobs: Record<string, ManifestJobEntry> = {};
+  const jobs = Object.create(null) as Record<string, ManifestJobEntry>;
   for (const [job, dir] of Object.entries(inputs.jobDirs)) {
     jobs[job] = jobEntry(job, isAbsolute(dir) ? dir : join(inputs.repoRoot, dir));
   }
