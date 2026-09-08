@@ -244,6 +244,24 @@ describe('lossless public projection', () => {
     ).toBeUndefined();
   });
 
+  it('withholds unprefixed environment assignments from sealed public summaries', async () => {
+    const root = repository();
+    await record(root, {
+      summary: 'Completed TOKEN=synthetic-private-token PASSWORD: synthetic-private-password',
+    });
+    await withAuthorityHostTestScope(() =>
+      sealGovernanceSegment({ repoRoot: root, round: 'R-0042', reason: 'checkpoint' }),
+    );
+    const batch = buildProjectionBatch({ repoRoot: root, round: 'R-0042', reason: 'checkpoint' });
+    if (batch === undefined) expect.unreachable('sealed event must produce a batch');
+    expect(validators.governanceProjectionBatch(batch)).toBe(true);
+    expect(batch.entries).toHaveLength(1);
+    const rendered = JSON.stringify(batch);
+    expect(rendered).toContain('Completed [REDACTED] [REDACTED]');
+    expect(rendered).not.toContain('synthetic-private-token');
+    expect(rendered).not.toContain('synthetic-private-password');
+  });
+
   it('publishes a digest in place of withheld payload content', async () => {
     const root = repository();
     const secret = 'ghp_0123456789abcdefghijklmnopqrstuvwxyzAB';

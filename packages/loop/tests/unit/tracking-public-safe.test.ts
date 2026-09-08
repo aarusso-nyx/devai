@@ -69,3 +69,14 @@ describe('public tracking disclosure boundaries', () => {
     );
   });
 });
+
+it.each(['TOKEN', 'SECRET', 'PASSWORD', 'KEY', 'CREDENTIAL', 'CREDENTIALS'])(
+  'withholds an unprefixed environment credential named %s',
+  (name) => {
+    for (const separator of ['=', ': ']) {
+      const credential = `${name}${separator}synthetic-private-value`;
+      expect(containsForbiddenContent(credential)).toBe(true);
+      expect(render(`Before ${credential} after.`)).toBe('Before [REDACTED] after.');
+    }
+  },
+);
