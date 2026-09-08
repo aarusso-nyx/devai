@@ -470,11 +470,28 @@ describe('local evidence independent trust and freshness checks', () => {
     );
   });
 
-  it.each(['{invalid', '{}'])('refuses malformed manifest content %s', (content) => {
-    const { root, now, manifestPath } = fixture();
-    put(root, manifestPath, content);
-    expect(() => gate(root, manifestPath, now)).toThrow(/not valid JSON|schema validation/u);
-  });
+  it.each([
+    ['{invalid', /^evidence manifest is not valid JSON:/u],
+    ['{}', /^evidence manifest fails schema validation:/u],
+  ] as const)(
+    'distinguishes malformed manifest content %s without rewriting it',
+    (content, diagnostic) => {
+      const { root, now, manifestPath } = fixture();
+      put(root, manifestPath, content);
+      let caught: unknown;
+      try {
+        gate(root, manifestPath, now);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      if (!(caught instanceof Error)) throw new Error('expected evidence refusal');
+      expect(caught).toMatchObject({ evidenceFailure: true });
+      expect(caught.message).toMatch(diagnostic);
+      if (content === '{}') expect(caught.message).toContain('must have required property');
+      expect(readFileSync(join(root, manifestPath), 'utf8')).toBe(content);
+    },
+  );
 
   it.each([
     ['absent actor', '', ['aarusso'], /requires a GitHub actor/u],
