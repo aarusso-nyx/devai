@@ -857,3 +857,44 @@ describe('task evidence append-only write race', () => {
     },
   );
 });
+
+describe('task evidence path refusal diagnosis', () => {
+  it.each([
+    ['', 'persistence path must be nonempty and relative to the repository root'],
+    [
+      '/TXE-0123456789abcdef.json',
+      'persistence path must be nonempty and relative to the repository root',
+    ],
+    ['..', 'persistence path cannot escape the repository root'],
+    ['../TXE-0123456789abcdef.json', 'persistence path cannot escape the repository root'],
+  ])(
+    'reports the precise rejected boundary for %j before creating files',
+    async (relativePath, reason) => {
+      const executor = {
+        kind: 'routine' as const,
+        action_id: null,
+        argv: ['node', 'fixture.mjs'],
+        cwd: '.',
+        effects: ['read' as const],
+      };
+      const boundTask = task('TASK-7901', executor);
+      const evidence = buildTaskExecutionEvidence(
+        boundTask,
+        facts('TXE-0123456789abcdef', executor),
+      );
+      const repoRoot = mkdtempSync(join(TARGET, 'path-refusal-'));
+      await withAuthorityHostTestScope(() => {
+        expect(() =>
+          persistTaskExecutionEvidence({
+            repoRoot,
+            relativePath,
+            task: boundTask,
+            candidate_sha: SHA,
+            evidence,
+          }),
+        ).toThrow(`TASK_EXECUTION_EVIDENCE_PATH_INVALID: ${reason}`);
+      });
+      expect(readdirSync(repoRoot)).toEqual([]);
+    },
+  );
+});
