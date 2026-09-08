@@ -714,6 +714,53 @@ export function archiveImmutability(options: {
   return { ok: findings.length === 0, findings };
 }
 
+function closedRoundHistoryFindings(
+  repoRoot: string,
+  rel: string,
+  name: string,
+): readonly GovernanceFinding[] {
+  const unavailable = (): readonly GovernanceFinding[] => [
+    {
+      code: 'ROUND_HISTORY_UNAVAILABLE',
+      message: `${name} closed history could not be verified completely.`,
+      path: rel,
+    },
+  ];
+  const history = git(repoRoot, ['log', '--format=%H', '--reverse', '--', rel]);
+  if (history === null || history.length === 0) return unavailable();
+  let sealedTree: string | undefined;
+  for (const commit of history.split('\n').filter(Boolean)) {
+    const tree = git(repoRoot, ['rev-parse', `${commit}:${rel}`]);
+    if (tree === null) return unavailable();
+    if (sealedTree !== undefined) {
+      if (tree !== sealedTree) {
+        return [
+          {
+            code: 'ROUND_ARCHIVE_MUTATED',
+            message: `${name} changed after its first closed commit.`,
+            path: rel,
+          },
+        ];
+      }
+      continue;
+    }
+    const recordPath = `${rel}/record.md`;
+    const population = git(repoRoot, ['ls-tree', '--name-only', commit, '--', recordPath]);
+    if (population === null) return unavailable();
+    if (population.length === 0) continue; // Working scaffold before a record exists.
+    const source = gitFile(repoRoot, commit, recordPath);
+    if (source === null) return unavailable();
+    let record: ParsedGovernanceRecord;
+    try {
+      record = parseRecordSource(recordPath, source);
+    } catch {
+      return unavailable();
+    }
+    if (record.frontmatter['status'] === 'closed') sealedTree = tree;
+  }
+  return sealedTree === undefined ? unavailable() : [];
+}
+
 export function roundRecordIntegrity(options: {
   readonly repoRoot: string;
   readonly roundsDir?: string;
@@ -766,20 +813,7 @@ export function roundRecordIntegrity(options: {
         });
       }
       const rel = relative(options.repoRoot, dir);
-      const commits = (git(options.repoRoot, ['log', '--format=%H', '--reverse', '--', rel]) ?? '')
-        .split('\n')
-        .filter(Boolean);
-      if (commits.length > 1) {
-        const sealedTree = git(options.repoRoot, ['rev-parse', `${commits[0]}:${rel}`]);
-        const currentTree = git(options.repoRoot, ['rev-parse', `HEAD:${rel}`]);
-        if (sealedTree !== null && currentTree !== null && sealedTree !== currentTree) {
-          findings.push({
-            code: 'ROUND_ARCHIVE_MUTATED',
-            message: `${name} changed after its first closed commit.`,
-            path: rel,
-          });
-        }
-      }
+      findings.push(...closedRoundHistoryFindings(options.repoRoot, rel, name));
     }
   }
   return { ok: findings.length === 0, findings };
