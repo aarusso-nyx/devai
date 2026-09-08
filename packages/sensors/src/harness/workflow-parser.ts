@@ -96,9 +96,15 @@ function trimComment(line: string): string {
   let double = false;
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
+    if (double && char === '\\') {
+      // Consume escape pairs: an even run leaves the next quote unescaped.
+      i += 1;
+      continue;
+    }
     if (char === "'" && !double) single = !single;
-    else if (char === '"' && !single && line[i - 1] !== '\\') double = !double;
-    else if (char === '#' && !single && !double) return line.slice(0, i).trimEnd();
+    else if (char === '"' && !single) double = !double;
+    else if (char === '#' && !single && !double && (i === 0 || /\s/.test(line[i - 1] ?? '')))
+      return line.slice(0, i).trimEnd();
   }
   return line;
 }

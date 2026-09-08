@@ -343,3 +343,20 @@ it('does not mistake a hash inside an ordinary shell word for a comment', () => 
   evidence(command);
   expect(sense().status).toBe('pass');
 });
+
+describe('hashes and escaped quote boundaries', () => {
+  it.each([2, 4])('closes a quote after %i backslashes before a real comment', (count) => {
+    const command = `devai ${ACTION} --root "C:${'\\'.repeat(count)}"`;
+    workflow(`${command} # explanatory || true text`);
+    evidence(command);
+    expect(sense().status).toBe('pass');
+  });
+
+  it.each(['v1#rc', 'dist/report#1.json'])('retains masking after a hash within %s', (word) => {
+    workflow(`devai ${ACTION} --out ${word} || true`);
+    expect(sense().status).toBe('review');
+    workflow(`devai ${ACTION}`);
+    evidence(`devai ${ACTION} --out ${word} || true`);
+    expect(sense().status).toBe('review');
+  });
+});

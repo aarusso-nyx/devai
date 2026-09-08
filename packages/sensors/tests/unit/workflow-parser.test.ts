@@ -339,3 +339,43 @@ describe('run script capture', () => {
     }
   });
 });
+
+describe('plain scalar hashes and quote escape parity', () => {
+  it('preserves embedded hashes in path filters and commands, removing only comments', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/ci.yml',
+      `on:
+  push:
+    paths:
+      - gen#out/**
+      - src/** # only sources
+    paths-ignore:
+      - docs/#drafts/**
+jobs:
+  check:
+    steps:
+      - run: devai check --only dependencies --out dist/report#1.json || true # note
+`,
+      '/repo',
+    );
+    expect(ast.onPaths).toEqual(['gen#out/**', 'src/**']);
+    expect(ast.onPathsIgnore).toEqual(['docs/#drafts/**']);
+    expect(ast.runScripts).toEqual([
+      'devai check --only dependencies --out dist/report#1.json || true',
+    ]);
+  });
+
+  it.each([2, 4])('strips a trailing comment after %i backslashes and a closing quote', (count) => {
+    const command = `devai check --only dependencies --root "C:${'\\'.repeat(count)}"`;
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/ci.yml',
+      `jobs:
+  check:
+    steps:
+      - run: ${command} # explanatory || true text
+`,
+      '/repo',
+    );
+    expect(ast.runScripts).toEqual([command]);
+  });
+});
