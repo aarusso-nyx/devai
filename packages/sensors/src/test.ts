@@ -24,7 +24,9 @@ function defaultCommand(suite: TestSuite): readonly string[] {
   }
 }
 
-const VITEST_SUMMARY = /Tests\s+(\d+) passed(?:\s+\|\s+(\d+) failed)?/;
+const VITEST_SUMMARY_LINE = /^\s*Tests\s+([^\n]*)/m;
+const VITEST_PASSED = /(\d+) passed/;
+const VITEST_FAILED = /(\d+) failed/;
 const ANSI_SEQUENCE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
 
 export interface VitestSummary {
@@ -33,11 +35,15 @@ export interface VitestSummary {
 }
 
 export function parseVitestSummary(output: string): VitestSummary | null {
-  const match = VITEST_SUMMARY.exec(output.replace(ANSI_SEQUENCE, ''));
-  if (match === null) return null;
+  const line = VITEST_SUMMARY_LINE.exec(output.replace(ANSI_SEQUENCE, ''));
+  if (line === null) return null;
+  const rest = line[1] ?? '';
+  const passed = VITEST_PASSED.exec(rest);
+  const failed = VITEST_FAILED.exec(rest);
+  if (passed === null && failed === null) return null;
   return {
-    passed: Number(match[1] ?? 0),
-    failed: Number(match[2] ?? 0),
+    passed: Number(passed?.[1] ?? 0),
+    failed: Number(failed?.[1] ?? 0),
   };
 }
 
