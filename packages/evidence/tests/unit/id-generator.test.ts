@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { computeManifestHash } from '../../src/evidence/chain.js';
 import { deriveEvidenceId, type IdDerivationInputs } from '../../src/evidence/id-generator.js';
 
 function baseInputs(): IdDerivationInputs {
@@ -78,3 +79,28 @@ describe('deriveEvidenceId', () => {
   });
 });
 // Invariants: INV-DEVAI-001
+
+it('binds null artifacts before numeric-leading hashes in every input ordering', () => {
+  const artifacts = [null, '0'.repeat(64), '9'.repeat(64), 'a'.repeat(64)];
+  function permutations(values: readonly (string | null)[]): (string | null)[][] {
+    if (values.length === 0) return [[]];
+    return values.flatMap((value, index) =>
+      permutations(values.filter((_item, other) => other !== index)).map((tail) => [
+        value,
+        ...tail,
+      ]),
+    );
+  }
+  const orders = permutations(artifacts);
+  expect(orders).toHaveLength(24);
+  // Independent Python hashlib vectors over the documented canonical arrays;
+  // the ID excludes itself, while the manifest adds the ID and GENESIS domain.
+  for (const order of orders) {
+    const input = { ...baseInputs(), artifact_sha256s: Object.freeze([...order]) };
+    expect(deriveEvidenceId(input)).toBe('EV-c3bbdfa6cbdc1617');
+    expect(computeManifestHash({ ...input, id: 'EV-c3bbdfa6cbdc1617' })).toBe(
+      'df68767c000334752f33413fb86c4f9b8c2cc3b0e8cfd85ace1bb6f4f3780d43',
+    );
+    expect(input.artifact_sha256s).toEqual(order);
+  }
+});
