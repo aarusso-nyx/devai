@@ -366,3 +366,51 @@ describe('atomic chain temporary-file collision', () => {
     },
   );
 });
+
+it('reports exact broken predecessor links even when every record hash was recomputed', () => {
+  initChain(chainPath);
+  appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+  appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+  const chain = loadChain(chainPath);
+  const [first, second] = chain.records;
+  if (!first || !second) throw new Error('expected two records');
+  first.previous_run_hash = 'a'.repeat(64);
+  first.manifest_hash = computeManifestHash(extractManifestInputs(first));
+  second.previous_hash = first.manifest_hash;
+  second.previous_run_hash = null;
+  second.manifest_hash = computeManifestHash(extractManifestInputs(second));
+  chain.head = 'b'.repeat(64);
+  writeFileSync(chainPath, JSON.stringify(chain));
+  const before = readFileSync(chainPath);
+  expect(verifyChain(chainPath)).toEqual({
+    valid: false,
+    errors: [
+      `record ${first.id}: previous_run_hash mismatch (expected null, got ${'a'.repeat(64)})`,
+      `record ${second.id}: previous_run_hash mismatch (expected ${first.manifest_hash}, got null)`,
+      `chain head mismatch (expected ${second.manifest_hash}, got ${'b'.repeat(64)})`,
+    ],
+  });
+  expect(readFileSync(chainPath)).toEqual(before);
+});
+
+it('reports the null predecessor when an empty chain falsely declares a head', () => {
+  writeFileSync(chainPath, JSON.stringify({ head: 'orphan', records: [] }));
+  expect(verifyChain(chainPath)).toEqual({
+    valid: false,
+    errors: ['chain head mismatch (expected null, got orphan)'],
+  });
+});
+
+it('preserves an existing populated chain byte-for-byte when initialized again', () => {
+  const empty = initChain(chainPath);
+  expect(readFileSync(chainPath, 'utf8')).toBe(`${JSON.stringify(empty, null, 2)}\n`);
+  appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+  const populated = loadChain(chainPath);
+  expect(readFileSync(chainPath, 'utf8')).toBe(`${JSON.stringify(populated, null, 2)}\n`);
+  // An existing valid serialization is retained, even with different indentation.
+  writeFileSync(chainPath, `${JSON.stringify(populated, null, 4)}\n`);
+  const before = readFileSync(chainPath);
+  expect(initChain(chainPath)).toEqual(populated);
+  expect(readFileSync(chainPath)).toEqual(before);
+  expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+});
