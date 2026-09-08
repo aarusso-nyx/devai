@@ -90,7 +90,9 @@ function entityTasks(
     name: string,
   ) => readonly ScaffolderTargetTask[],
 ): ScaffolderTargetTask[] {
-  return blueprint.database.entities.flatMap((entity) => make(entity, kebab(entity.name)));
+  return blueprint.database.entities.flatMap((entity) =>
+    make(entity, kebab(entity.name)).map((task) => ({ ...task, entity_name: entity.name })),
+  );
 }
 
 const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
