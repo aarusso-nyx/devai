@@ -82,9 +82,10 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
   const registry = loadRegistry(opts.repoRoot);
 
   // Cap enforcement (D-52). Human-adopted worktrees are cap-exempt.
-  // Re-creating an existing worktree id (the registry-update flow
-  // below dedupes by id) does not count against the cap.
-  const reusingExisting = registry.worktrees.some((w) => w.id === opts.id);
+  // Replacing an existing autonomous entry does not add a slot. Replacing a
+  // human-adopted entry with an autonomous one does, so it must satisfy the cap.
+  const existing = registry.worktrees.find((w) => w.id === opts.id);
+  const reusingExisting = existing !== undefined && existing.human_adopted !== true;
   if (
     !reusingExisting &&
     opts.humanAdopted !== true &&

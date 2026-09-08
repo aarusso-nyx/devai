@@ -165,6 +165,27 @@ describe('managed worktree lifecycle in an owned temporary repository', () => {
     expect(adopted.human_adopted).toBe(true);
     expect(run(() => listWorktrees({ repoRoot: root }))).toHaveLength(4);
   });
+  it('does not turn a stale human-adopted registry entry into an extra autonomous slot', () => {
+    const human = run(() =>
+      createWorktree({
+        repoRoot: root,
+        id: 'WT-human',
+        branch: 'human/review',
+        humanAdopted: true,
+      }),
+    );
+    for (let i = 0; i < WORKTREE_CAP; i++)
+      run(() => createWorktree({ repoRoot: root, id: `WT-auto-${i}`, branch: `auto/${i}` }));
+    git('worktree', 'remove', human.path);
+    const registry = join(root, '.devai/state/worktrees.json');
+    const before = readFileSync(registry);
+    expect(() =>
+      run(() => createWorktree({ repoRoot: root, id: human.id, branch: human.branch })),
+    ).toThrow('worktree cap exceeded');
+    expect(readFileSync(registry)).toEqual(before);
+    expect(existsSync(human.path)).toBe(false);
+  });
+
   it('does not count human-adopted entries against the autonomous cap', () => {
     run(() =>
       createWorktree({ repoRoot: root, id: 'WT-human', branch: 'human/new', humanAdopted: true }),
