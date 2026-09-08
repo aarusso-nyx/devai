@@ -250,7 +250,12 @@ describe('inventory invariant candidates', () => {
       now: NOW,
     });
     expect(result.summary.total).toBe(0);
-    expect(result.summary.unread_inputs).toHaveLength(3);
+    expect(result.summary.unread_inputs).toEqual([
+      'bad.json',
+      'missing-a.json',
+      'missing-b.json',
+      'missing-c.json',
+    ]);
   });
 
   it.each([

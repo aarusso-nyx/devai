@@ -132,9 +132,116 @@ const DEFAULT_DEP_GRAPH = '.devai/state/sensors/inventory_dep_graph/dep-graph.js
 const DEFAULT_RBAC = '.devai/state/sensors/inventory_rbac/rbac.json';
 const DEFAULT_OUT_DIR = '.devai/state/inv-candidates';
 
-function readJson<T>(path: string): T | null {
+type InventoryKind = 'coverage' | 'rbac' | 'data-handling' | 'dep-graph';
+
+function inventoryObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function inventoryList(value: unknown, accepts: (entry: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.every(accepts);
+}
+function inventoryString(value: unknown): boolean {
+  return typeof value === 'string';
+}
+function optionalInventoryField(
+  value: Record<string, unknown>,
+  key: string,
+  accepts: (entry: unknown) => boolean,
+): boolean {
+  return value[key] === undefined || accepts(value[key]);
+}
+
+// Validate the consumed projection, preserving richer sensor metadata and both
+// current and legacy body shapes. Invalid inventory is unavailable evidence,
+// never proof that a previously surfaced target has disappeared.
+function validInventoryBody(value: unknown, kind: InventoryKind): boolean {
+  if (!inventoryObject(value)) return false;
+  const strings = (entry: unknown) => inventoryList(entry, inventoryString);
+  const optional = optionalInventoryField;
+  if (kind === 'coverage') {
+    return optional(
+      value,
+      'unmapped',
+      (entry) =>
+        inventoryObject(entry) &&
+        optional(entry, 'routes', strings) &&
+        optional(entry, 'endpoints', strings),
+    );
+  }
+  if (kind === 'rbac') {
+    return (
+      optional(
+        value,
+        'unmapped',
+        (entry) => inventoryObject(entry) && optional(entry, 'endpointsWithoutRole', strings),
+      ) &&
+      optional(value, 'endpointsWithoutRole', (entry) =>
+        inventoryList(entry, (row) => inventoryObject(row) && optional(row, 'id', inventoryString)),
+      )
+    );
+  }
+  if (kind === 'data-handling') {
+    return (
+      optional(value, 'tables', (entry) =>
+        inventoryList(
+          entry,
+          (table) =>
+            inventoryObject(table) &&
+            inventoryString(table['name']) &&
+            inventoryList(
+              table['columns'],
+              (column) =>
+                inventoryObject(column) &&
+                inventoryString(column['name']) &&
+                optional(column, 'pii_class', inventoryString) &&
+                optional(column, 'legal_basis', inventoryString) &&
+                optional(column, 'retention', inventoryString),
+            ) &&
+            optional(table, 'evidence', (evidence) =>
+              inventoryList(
+                evidence,
+                (row) =>
+                  inventoryObject(row) &&
+                  inventoryString(row['path']) &&
+                  Number.isInteger(row['startLine']) &&
+                  Number.isInteger(row['endLine']),
+              ),
+            ),
+        ),
+      ) &&
+      optional(value, 'pii', (entry) =>
+        inventoryList(
+          entry,
+          (row) =>
+            inventoryObject(row) &&
+            optional(row, 'table', inventoryString) &&
+            optional(row, 'column', inventoryString),
+        ),
+      )
+    );
+  }
+  return (
+    optional(
+      value,
+      'graph',
+      (entry) => inventoryObject(entry) && Object.values(entry).every(strings),
+    ) &&
+    optional(value, 'forbiddenEdges', (entry) =>
+      inventoryList(
+        entry,
+        (row) =>
+          inventoryObject(row) &&
+          optional(row, 'from', inventoryString) &&
+          optional(row, 'to', inventoryString),
+      ),
+    )
+  );
+}
+
+function readJson<T>(path: string, kind: InventoryKind): T | null {
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as T;
+    const value: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    return validInventoryBody(value, kind) ? (value as T) : null;
   } catch {
     return null;
   }
@@ -182,7 +289,8 @@ export function suggestInvariants(opts: SuggestOptions): SuggestResult {
   } else {
     const cov = readJson<{
       unmapped?: { routes?: readonly string[]; endpoints?: readonly string[] };
-    }>(coveragePath);
+    }>(coveragePath, 'coverage');
+    if (cov === null) unread.push(relative(opts.repoRoot, coveragePath));
     if (cov !== null) {
       for (const id of cov.unmapped?.routes ?? []) {
         candidates.push(
@@ -260,7 +368,8 @@ export function suggestInvariants(opts: SuggestOptions): SuggestResult {
         }>;
         evidence?: readonly InvCandidateEvidence[];
       }>;
-    }>(dataHandlingPath);
+    }>(dataHandlingPath, 'data-handling');
+    if (dh === null) unread.push(relative(opts.repoRoot, dataHandlingPath));
     if (dh !== null) {
       for (const table of dh.tables ?? []) {
         for (const col of table.columns) {
@@ -311,7 +420,8 @@ export function suggestInvariants(opts: SuggestOptions): SuggestResult {
   if (!existsSync(depGraphPath)) {
     unread.push(relative(opts.repoRoot, depGraphPath));
   } else {
-    const dg = readJson<{ graph?: Record<string, readonly string[]> }>(depGraphPath);
+    const dg = readJson<{ graph?: Record<string, readonly string[]> }>(depGraphPath, 'dep-graph');
+    if (dg === null) unread.push(relative(opts.repoRoot, depGraphPath));
     if (dg !== null && dg.graph !== undefined) {
       for (const [from, tos] of Object.entries(dg.graph)) {
         const fromPkg = packageOf(from);
@@ -366,7 +476,8 @@ export function suggestInvariants(opts: SuggestOptions): SuggestResult {
   } else {
     const rb = readJson<{
       unmapped?: { endpointsWithoutRole?: readonly string[] };
-    }>(rbacPath);
+    }>(rbacPath, 'rbac');
+    if (rb === null) unread.push(relative(opts.repoRoot, rbacPath));
     for (const epId of rb?.unmapped?.endpointsWithoutRole ?? []) {
       candidates.push(
         emitCandidate(
@@ -498,13 +609,14 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
   const cov = existsSync(coveragePath)
     ? readJson<{ unmapped?: { routes?: readonly string[]; endpoints?: readonly string[] } }>(
         coveragePath,
+        'coverage',
       )
     : null;
   const rbac = existsSync(rbacPath)
     ? readJson<{
         unmapped?: { endpointsWithoutRole?: readonly string[] };
         endpointsWithoutRole?: readonly { id?: string }[];
-      }>(rbacPath)
+      }>(rbacPath, 'rbac')
     : null;
   const dh = existsSync(dataHandlingPath)
     ? readJson<{
@@ -523,13 +635,13 @@ export function gcStaleInvariantCandidates(opts: GcStaleOptions): GcStaleResult 
           legal_basis?: unknown;
           retention?: unknown;
         }[];
-      }>(dataHandlingPath)
+      }>(dataHandlingPath, 'data-handling')
     : null;
   const dg = existsSync(depGraphPath)
     ? readJson<{
         graph?: Record<string, readonly string[]>;
         forbiddenEdges?: readonly { from?: string; to?: string }[];
-      }>(depGraphPath)
+      }>(depGraphPath, 'dep-graph')
     : null;
 
   const unmappedRoutes = new Set(cov?.unmapped?.routes ?? []);
