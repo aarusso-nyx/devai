@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
 import { appendVerbEvidence } from '../../src/evidence/verb-evidence.js';
+import { loadChain } from '../../src/evidence/chain.js';
+import { deriveEvidenceId } from '../../src/evidence/id-generator.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 
 const roots: string[] = [];
@@ -50,6 +52,22 @@ describe('current operation evidence', () => {
     expect(chain.records[1]?.id).toBe(second.id);
     expect(chain.records[1]?.previous_run_hash).toBe(chain.records[0]?.manifest_hash);
     expect(chain.head).toBe(chain.records[1]?.manifest_hash);
+    // The identifier must bind exactly the facts that were persisted, including
+    // the actor role and previous record, not merely have the right hex shape.
+    for (const record of loadChain(join(root, 'record/proofs/chain.json')).records) {
+      expect(record.id).toBe(
+        deriveEvidenceId({
+          timestamp: record.timestamp,
+          actor: record.actor,
+          actor_role: record.actor_role,
+          action: record.action,
+          status: record.status,
+          git_head_sha: record.context.git.head_sha,
+          artifact_sha256s: record.artifacts.map((artifact) => artifact.sha256),
+          previous_run_hash: record.previous_run_hash,
+        }),
+      );
+    }
   });
 
   it('returns an error instead of throwing for an invalid chain', () => {
