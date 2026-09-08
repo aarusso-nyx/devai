@@ -253,7 +253,12 @@ export function nextRoundQueueEntry(options: {
   const roundId = requireActiveTaskRound(options);
   const next = pickNextTask(options.repoRoot);
   if (next?.round_id === roundId) return next;
-  return listRoundQueue(options).find((entry) => entry.status === 'queued') ?? null;
+  // Older entries without a status are queued, as in the global picker.
+  return (
+    listRoundQueue(options).find(
+      (entry) => entry.status === 'queued' || entry.status === undefined,
+    ) ?? null
+  );
 }
 
 export function completeRoundQueueEntry(options: {
