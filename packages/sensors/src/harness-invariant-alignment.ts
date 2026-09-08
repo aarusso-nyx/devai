@@ -164,9 +164,13 @@ function extractRunSteps(content: string): WorkflowRunStep[] {
       !/^\s*(?:-\s+)?continue-on-error\s*:\s*(?:false|['"]false['"])(?:\s|#|$)/i.test(
         continueOnErrorLine,
       );
-    const disabled = block.some((line) =>
-      /^\s*(?:-\s+)?if\s*:\s*(?:false|['"]false['"]|\$\{\{\s*false\s*\}\})(?:\s|#|$)/i.test(line),
-    );
+    const disabled = block.some((line) => {
+      const condition = stripYamlComment(line).match(/^\s*(?:-\s+)?if\s*:\s*(.*?)\s*$/)?.[1];
+      return (
+        condition !== undefined &&
+        /^(?:false|\$\{\{\s*false\s*\}\})(?:\s|#|$)/i.test(unquoteYamlScalar(condition))
+      );
+    });
     for (let offset = 0; offset < block.length; offset += 1) {
       const line = stripYamlComment(block[offset] ?? '');
       const runMatch = line.match(/^\s*(?:-\s+)?run\s*:\s*(.*)$/);
