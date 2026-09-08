@@ -712,8 +712,9 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
               'record/derived/inventory/README.md',
             ].includes(path));
         return (
-          /^(?:law\/|product\/|work\/(?:rounds|audit)\/|record\/|\.devai\/config\/)/u.test(path) &&
-          !bootstrapMaterialization
+          /^(?:law\/|product\/|work\/(?:rounds|audit)\/|record\/|\.devai\/(?:config|local\/rounds)\/)/u.test(
+            path,
+          ) && !bootstrapMaterialization
         );
       });
       const inspectorTestOnly =
