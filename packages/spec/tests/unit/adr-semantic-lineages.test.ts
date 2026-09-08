@@ -103,7 +103,13 @@ it('refuses a supersession cycle without leaking other valid authority results',
   const f = fixture();
   f.add(A, [X], [B]);
   f.add(B, [X], [A]);
-  noAuthority(f.validate(), 'adr-supersession-cycle');
+  const result = f.validate();
+  noAuthority(result, 'adr-supersession-cycle');
+  expect(result.errors).toContainEqual({
+    code: 'adr-supersession-cycle',
+    file: join(f.adrsDir, `${A}-fixture.md`),
+    message: `cycle includes '${A}'`,
+  });
 });
 
 it('refuses competing accepted direct successors for the same subject', () => {
@@ -111,7 +117,13 @@ it('refuses competing accepted direct successors for the same subject', () => {
   f.add(A, [X]);
   f.add(B, [X], [A]);
   f.add(C, [X], [A]);
-  noAuthority(f.validate(), 'adr-multiple-accepted-direct-successors');
+  const result = f.validate();
+  noAuthority(result, 'adr-multiple-accepted-direct-successors');
+  expect(result.errors).toContainEqual({
+    code: 'adr-multiple-accepted-direct-successors',
+    file: join(f.adrsDir, `${A}-fixture.md`),
+    message: `${A} has conflicting effective accepted successors for '${X}': ${B}, ${C}`,
+  });
 });
 
 it('allows successors to resolve different subjects independently', () => {
@@ -154,7 +166,13 @@ it('refuses multiple effective heads even when neither is a direct successor of 
   f.add(C, [X], [B]);
   f.add(D, [X], [A]);
   f.add(e, [X], [D]);
-  noAuthority(f.validate(), 'adr-multiple-effective-accepted-heads');
+  const result = f.validate();
+  noAuthority(result, 'adr-multiple-effective-accepted-heads');
+  expect(result.errors).toContainEqual({
+    code: 'adr-multiple-effective-accepted-heads',
+    file: join(f.adrsDir, `${A}-fixture.md`),
+    message: `subject lineage '${X}' has 2 effective accepted heads: ${C}, ${e}`,
+  });
 });
 
 it.each([

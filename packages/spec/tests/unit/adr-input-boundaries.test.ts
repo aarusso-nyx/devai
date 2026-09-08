@@ -74,3 +74,108 @@ it.each([
     expect(readFileSync(`${f.policyPath}.retained`)).toEqual(policyBytes);
   }
 });
+
+it('identifies the exact invalid frontmatter field without granting authority', () => {
+  const f = fixture();
+  const file = join(f.adrsDir, 'ADR-MUT-0006-measured-aggregation-and-activation-closure.md');
+  const invalid = readFileSync(file, 'utf8').replace(/^status: accepted$/mu, 'status: impossible');
+  writeFileSync(file, invalid);
+  const result = validateAdrs(f);
+  expect(result.ok).toBe(false);
+  expect(result.effective_authorities).toEqual([]);
+  expect(result.subject_authorities).toEqual([]);
+  expect(result.errors).toContainEqual({
+    code: 'adr-semantic-resolution-not-performed',
+    file,
+    pointer: '/status',
+    message: 'must be equal to one of the allowed values (enum)',
+  });
+  expect(readFileSync(file, 'utf8')).toBe(invalid);
+});
+
+it('identifies the exact invalid protected policy field before semantic resolution', () => {
+  const f = fixture();
+  const policy = JSON.parse(readFileSync(f.policyPath, 'utf8')) as {
+    semantic_resolver: { mandatory: boolean };
+  };
+  policy.semantic_resolver.mandatory = false;
+  const invalid = JSON.stringify(policy);
+  writeFileSync(f.policyPath, invalid);
+  const result = validateAdrs(f);
+  expect(result.ok).toBe(false);
+  expect(result.semantic_resolution_performed).toBe(false);
+  expect(result.effective_authorities).toEqual([]);
+  expect(result.errors).toContainEqual({
+    code: 'adr-semantic-resolution-not-performed',
+    file: f.policyPath,
+    pointer: '/semantic_resolver/mandatory',
+    message: 'must be equal to constant (const)',
+  });
+  expect(readFileSync(f.policyPath, 'utf8')).toBe(invalid);
+});
+
+it('refuses valid ADR bytes stored under a different declared identity', () => {
+  const f = fixture();
+  const original = join(f.adrsDir, 'ADR-MUT-0006-measured-aggregation-and-activation-closure.md');
+  const bytes = readFileSync(original);
+  const file = join(f.adrsDir, 'ADR-MUT-9999-wrong-identity.md');
+  renameSync(original, file);
+  const result = validateAdrs(f);
+  expect(result.ok).toBe(false);
+  expect(result.effective_authorities).toEqual([]);
+  expect(result.subject_authorities).toEqual([]);
+  expect(result.errors).toContainEqual({
+    code: 'adr-semantic-resolution-not-performed',
+    file,
+    message: 'filename does not bind declared id',
+  });
+  expect(readFileSync(file)).toEqual(bytes);
+});
+
+it('scans nested Markdown ADRs while ignoring similarly named backup files', () => {
+  const f = fixture();
+  const original = join(f.adrsDir, 'ADR-MUT-0006-measured-aggregation-and-activation-closure.md');
+  const bytes = readFileSync(original);
+  const directory = join(f.adrsDir, 'nested ç', 'decisions');
+  mkdirSync(directory, { recursive: true });
+  const file = join(directory, 'ADR-MUT-0006-relocated.MD');
+  renameSync(original, file);
+  const ignored = join(directory, 'broken.md.backup');
+  writeFileSync(ignored, 'this is not an ADR');
+  const result = validateAdrs(f);
+  expect(result.ok).toBe(true);
+  expect(result.adrs).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ file, adr_id: 'ADR-MUT-0006', effective: true }),
+    ]),
+  );
+  expect(result.adrs.some((record) => record.file === ignored)).toBe(false);
+  expect(readFileSync(file)).toEqual(bytes);
+  expect(readFileSync(ignored, 'utf8')).toBe('this is not an ADR');
+});
+
+it('refuses a symlinked ADR while retaining diagnostics for regular records', () => {
+  const f = fixture();
+  const original = join(f.adrsDir, 'ADR-MUT-0006-measured-aggregation-and-activation-closure.md');
+  const bytes = readFileSync(original);
+  const file = join(f.adrsDir, 'ADR-MUT-9999-link.md');
+  symlinkSync(original, file);
+  const result = validateAdrs(f);
+  expect(result.ok).toBe(false);
+  expect(result.effective_authorities).toEqual([]);
+  expect(result.subject_authorities).toEqual([]);
+  expect(result.errors.filter((error) => error.file === file)).toEqual([
+    {
+      code: 'adr-semantic-resolution-not-performed',
+      file,
+      message: 'symlinked ADR is forbidden',
+    },
+  ]);
+  expect(result.adrs.some((record) => record.file === file)).toBe(false);
+  expect(result.adrs).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ file: original, adr_id: 'ADR-MUT-0006', effective: false }),
+    ]),
+  );
+  expect(readFileSync(original)).toEqual(bytes);
+});
