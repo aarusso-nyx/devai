@@ -143,8 +143,8 @@ export function runScaffolder(opts: RunScaffolderOptions): ScaffoldOperationResu
   const { spec, ctx } = opts;
 
   // 1. Load + validate blueprint.
-  const blueprintPath = (ctx.inputs?.blueprint_path as string | undefined) ?? '';
-  if (blueprintPath === '') {
+  const blueprintPath = ctx.inputs?.blueprint_path;
+  if (typeof blueprintPath !== 'string' || blueprintPath.length === 0) {
     return {
       operation_id: spec.operationId,
       status: 'fail',
