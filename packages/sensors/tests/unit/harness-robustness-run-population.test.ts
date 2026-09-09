@@ -58,7 +58,12 @@ describe('harness robustness run populations', () => {
     const reading = senseHarnessRobustness({ repoRoot: root, now });
 
     expect(reading.status).toBe('fail');
-    expect(reading.metrics).toMatchObject({
+    expect(reading.sensor).toEqual({ name: 'harness-robustness', kind: 'harness_robustness' });
+    expect(reading.command).toBe('gh run list --branch main --json conclusion,attempt --limit 100');
+    expect(reading.deterministic).toBe(false);
+    expect(reading.tier).toBe('L2');
+    expect(reading.timestamp).toBe(now);
+    expect(reading.metrics).toEqual({
       run_count: 4,
       flaky_runs: 1,
       flakiness_pct: 25,
