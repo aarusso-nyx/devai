@@ -479,9 +479,10 @@ function captureReleaseHostLane(
  *
  * Existing CLI actions run sequentially against digest-pinned inputs and exact
  * prebound lane identities. No retry, next-action dispatch, adapter disposal,
- * cwd change or authority inference occurs. Export requires explicit protected controls;
- * offline verification and remote publication remain unavailable. Input revalidation detects races but
- * is not native openat containment or protection against ABA.
+ * cwd change or authority inference occurs. Export, offline verification and remote
+ * publication each require their explicit protected controls; absent stages remain
+ * unavailable. Input revalidation detects races but is not native openat containment
+ * or protection against ABA.
  */
 export function createProtectedReleaseHostRunner(
   input: ProtectedReleaseHostRunnerControls,
