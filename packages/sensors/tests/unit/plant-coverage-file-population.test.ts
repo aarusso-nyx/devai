@@ -48,6 +48,8 @@ describe('plant-coverage endpoint and route file population', () => {
 
     const result = reading();
 
+    expect(result.timestamp).toBe(now);
+
     expect(result.status).toBe('pass');
     expect(result.findings).toEqual([]);
     expect(result.metrics).toEqual({ endpoint_count: 2, route_count: 2, missing_files: 0 });
@@ -68,6 +70,8 @@ describe('plant-coverage endpoint and route file population', () => {
     );
 
     const result = reading();
+
+    expect(result.timestamp).toBe(now);
 
     expect(result.status).toBe('review');
     expect(result.metrics).toEqual({ endpoint_count: 3, route_count: 3, missing_files: 2 });
