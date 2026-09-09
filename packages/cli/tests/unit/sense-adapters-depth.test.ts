@@ -108,7 +108,12 @@ vi.mock('@devai-nyx/schemas', async (importOriginal) => {
 vi.mock('../../src/commands/sense/readings-rebuild.js', () => local);
 
 import { SENSOR_READING_KINDS } from '@devai-nyx/sensors';
-import { SENSE_SENSOR_ADAPTERS, sensorAdapter } from '../../src/commands/sense/adapters.js';
+
+let freshAdapters: typeof import('../../src/commands/sense/adapters.js');
+
+function sensorAdapter(kind: SensorKind) {
+  return freshAdapters.sensorAdapter(kind);
+}
 
 const roots: string[] = [];
 const originalBackend = process.env['DEVAI_LLM_BACKEND'];
@@ -127,10 +132,15 @@ function put(root: string, path: string, value: unknown): string {
   return absolute;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   delete process.env['DEVAI_LLM_BACKEND'];
   delete process.env['DEVAI_LLM_MODEL'];
+  // The adapter registry is initialized at module evaluation. Reload it after
+  // a mutation runner activates its candidate so every static adapter remains
+  // observable through the public dispatch boundary.
+  vi.resetModules();
+  freshAdapters = await import('../../src/commands/sense/adapters.js?fresh-adapters');
 });
 
 afterEach(() => {
@@ -143,7 +153,9 @@ afterEach(() => {
 
 describe('sense adapter deterministic boundaries', () => {
   it('retains exact adapter population and refuses an unregistered kind', () => {
-    expect(Object.keys(SENSE_SENSOR_ADAPTERS).sort()).toEqual([...SENSOR_READING_KINDS].sort());
+    expect(Object.keys(freshAdapters.SENSE_SENSOR_ADAPTERS).sort()).toEqual(
+      [...SENSOR_READING_KINDS].sort(),
+    );
     expect(() => sensorAdapter('absent' as SensorKind)).toThrow('SENSE_ADAPTER_MISSING:absent');
   });
 
