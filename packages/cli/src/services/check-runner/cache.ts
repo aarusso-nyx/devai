@@ -117,20 +117,28 @@ export class CheckCache {
       return { cacheState: 'execute', reason: 'protected-namespace-recapture-required' };
     const indexPath = join(this.#root, 'nodes', `${safeNodeId(task.nodeId)}.json`);
     if (!existsSync(indexPath)) return { cacheState: 'execute', reason: 'cache-miss' };
-    let index: NodeIndex;
+    let valueIndex: unknown;
     try {
-      index = readJson(indexPath) as NodeIndex;
+      valueIndex = readJson(indexPath);
     } catch {
       return { cacheState: 'stale', reason: 'cache-index-malformed' };
     }
-    if (index.nodeId !== task.nodeId || index.schemaVersion !== '1.0.0') {
+    if (valueIndex === null || typeof valueIndex !== 'object' || Array.isArray(valueIndex)) {
+      return { cacheState: 'stale', reason: 'cache-index-malformed' };
+    }
+    const index = valueIndex as Partial<NodeIndex>;
+    if (
+      index.nodeId !== task.nodeId ||
+      index.schemaVersion !== '1.0.0' ||
+      !['PASS', 'FAIL', 'TIMEOUT', 'KILLED', 'ABORTED'].some((outcome) => outcome === index.outcome)
+    ) {
       return { cacheState: 'stale', reason: 'cache-index-malformed' };
     }
     if (index.taskKey !== task.taskKey) {
       return { cacheState: 'stale', reason: 'task-key-changed' };
     }
     if (index.outcome !== 'PASS' || index.resultDigest === undefined) {
-      return { cacheState: 'execute', reason: `previous-${index.outcome.toLowerCase()}` };
+      return { cacheState: 'execute', reason: `previous-${String(index.outcome).toLowerCase()}` };
     }
     if (!isDigest(index.resultDigest)) {
       return { cacheState: 'stale', reason: 'cache-index-malformed' };
