@@ -82,4 +82,18 @@ describe('spec idiomaticity validation populations', () => {
       { severity: 'error', code: 'LEGACY_INVALID', message: 'severity defaults to error' },
     ]);
   });
+  it('fails when the only non-modal error omits severity', () => {
+    const reading = senseSpecIdiomaticity({
+      validationResult: {
+        ok: false,
+        errors: [{ code: 'LEGACY_INVALID', message: 'invalid invariant' }],
+      },
+      now: NOW,
+    });
+    expect(reading.status).toBe('fail');
+    expect(reading.findings).toEqual([
+      { severity: 'error', code: 'LEGACY_INVALID', message: 'invalid invariant' },
+    ]);
+    expect(reading.metrics).toMatchObject({ cnl_modal_warnings: 0, other_errors: 1 });
+  });
 });

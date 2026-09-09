@@ -90,4 +90,19 @@ describe('test coverage ratio boundaries', () => {
       },
     });
   });
+  it('reviews exactly at the lower threshold', () => {
+    const reading = senseTestCoverageDepth({
+      summary: { lines_total: 2, lines_covered: 1 },
+      now: NOW,
+    });
+    expect(reading.status).toBe('review');
+    expect(reading.metrics).toMatchObject({ lines_pct: 50, threshold_review: 50 });
+    expect(reading.findings).toEqual([
+      {
+        severity: 'warning',
+        code: 'TEST_COVERAGE_PARTIAL',
+        message: 'Lines coverage 50.0% is between review (50%) and pass (80%) thresholds.',
+      },
+    ]);
+  });
 });
