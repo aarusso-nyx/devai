@@ -106,6 +106,7 @@ vi.mock('../../src/services/release-lifecycle-execution.js', () => ({
 }));
 
 import { createProtectedReleaseHostRunner } from '../../src/services/release-protected-host-runner.js';
+import type { ImmutableReleaseContentSource } from '../../src/services/release-lifecycle-execution.js';
 
 const roots: string[] = [];
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -139,6 +140,12 @@ describe('protected release host runner direct orchestration', () => {
       tree: '2'.repeat(40),
     };
     const manifest = Buffer.from(JSON.stringify({ name: '@aarusso-nyx/devai', version: '1.5.0' }));
+    const blobId = '3'.repeat(40);
+    const proof = new Map([
+      [repository.commit, { type: 'commit' as const, bytes: Buffer.from('commit') }],
+      [repository.tree, { type: 'tree' as const, bytes: Buffer.from('tree') }],
+      [blobId, { type: 'blob' as const, bytes: Buffer.from(manifest) }],
+    ]);
     const candidate = {
       repository,
       paths: ['packages/cli/package.json'],
@@ -146,7 +153,7 @@ describe('protected release host runner direct orchestration', () => {
         if (path !== 'packages/cli/package.json') throw new Error(`unexpected path:${path}`);
         return Buffer.from(manifest);
       },
-      readProof: () => new Map(),
+      readProof: () => proof,
     };
     const intent = { release_unit: '@aarusso-nyx/devai', target_version: '1.5.0' };
     const controls = {
@@ -324,6 +331,7 @@ describe('protected release host runner direct orchestration', () => {
       );
     }
 
+    let contentSource: ImmutableReleaseContentSource | undefined;
     mocks.preflight.mockResolvedValue({ outcome: 'success' });
     mocks.invoke.mockImplementation(async (args: string[]) => {
       const action = args.slice(0, 2).join(' ');
@@ -346,7 +354,9 @@ describe('protected release host runner direct orchestration', () => {
       }
       if (action === 'release certify') mocks.adapters?.certification_provider?.(request);
       if (action === 'release prepare') {
-        mocks.adapters?.prepare_content_source?.(request);
+        contentSource = mocks.adapters?.prepare_content_source?.(
+          request,
+        ) as ImmutableReleaseContentSource;
         mocks.adapters?.artifact_sink?.(request);
         mocks.adapters?.artifact_reader?.(request);
         const verifier = mocks.adapters?.publication_signature_verifier?.(request);
@@ -454,6 +464,53 @@ describe('protected release host runner direct orchestration', () => {
           request: inputFile(repositoryRoot, `${action.replace(' ', '-')}.json`, actionRequest),
         }),
       ).resolves.toMatchObject({ exit_code: 0, stdout: action });
+    }
+    expect(
+      contentSource?.readGitObject({
+        repository,
+        object_format: 'sha1',
+        object_id: repository.commit,
+        type: 'commit',
+      }),
+    ).toEqual(Buffer.from('commit'));
+    const blobRequest = {
+      repository,
+      candidate: { commit: repository.commit, tree: repository.tree },
+      object_format: 'sha1' as const,
+      object_id: blobId,
+      type: 'blob' as const,
+      locator: {
+        repository: repository.id,
+        commit: repository.commit,
+        tree: repository.tree,
+        object_format: 'sha1' as const,
+        object_id: blobId,
+        path: 'packages/cli/package.json',
+        size_bytes: manifest.length,
+        content_digest_sha256: sha256(manifest),
+      },
+    };
+    expect(contentSource?.readGitBlob(blobRequest)).toEqual(manifest);
+    expect(() =>
+      contentSource?.readGitObject({
+        repository: { ...repository, tree: '0'.repeat(40) },
+        object_format: 'sha1',
+        object_id: repository.commit,
+        type: 'commit',
+      }),
+    ).toThrow('release-host-input-mismatch');
+    for (const invalid of [
+      {
+        ...blobRequest,
+        locator: { ...blobRequest.locator, object_format: 'sha256' as const },
+      },
+      { ...blobRequest, locator: { ...blobRequest.locator, size_bytes: manifest.length + 1 } },
+      {
+        ...blobRequest,
+        locator: { ...blobRequest.locator, content_digest_sha256: '0'.repeat(64) },
+      },
+    ]) {
+      expect(() => contentSource?.readGitBlob(invalid)).toThrow('release-host-input-mismatch');
     }
     const offlineRequest = { ...request, action_id: 'release offline-verify' };
     await expect(
