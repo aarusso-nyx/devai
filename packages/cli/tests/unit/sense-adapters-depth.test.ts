@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ACTION_EFFECT_CONTRACTS } from '@devai-nyx/effects-check';
 import type { SensorKind } from '@devai-nyx/sensors';
 
 const sensors = vi.hoisted(() => ({
@@ -165,7 +166,7 @@ describe('sense adapter deterministic boundaries', () => {
 
     sensors.senseMigrateCheck.mockReturnValue({ id: 'migration' });
     await sensorAdapter('migration_check')({ repoRoot: '/repo' });
-    expect(sensors.senseMigrateCheck).toHaveBeenLastCalledWith({
+    expect(sensors.senseMigrateCheck.mock.calls[0]?.[0]).toStrictEqual({
       cwd: '/repo',
       persistBody: false,
     });
@@ -180,6 +181,9 @@ describe('sense adapter deterministic boundaries', () => {
     });
     expect(() =>
       sensorAdapter('migration_check')({ repoRoot: '/repo', inputs: { databaseUrl: 1 } }),
+    ).toThrow('SENSE_INPUT_REQUIRED:databaseUrl');
+    expect(() =>
+      sensorAdapter('migration_check')({ repoRoot: '/repo', inputs: { databaseUrl: '' } }),
     ).toThrow('SENSE_INPUT_REQUIRED:databaseUrl');
   });
 
@@ -293,6 +297,17 @@ describe('sense adapter deterministic boundaries', () => {
       trace: { links: [] },
     });
     expect(sensors.senseInventoryAdherence).toHaveBeenCalledWith({ report });
+
+    const explicitInventory = put(root, 'custom/inventory.json', { modules: ['explicit'] });
+    const explicitTrace = put(root, 'custom/trace.json', { links: ['explicit'] });
+    await sensorAdapter('inventory_adherence')({
+      repoRoot: root,
+      inputs: { inventoryPath: explicitInventory, tracePath: explicitTrace },
+    });
+    expect(runtime.computeReverseAdherence).toHaveBeenLastCalledWith({
+      inventory: { modules: ['explicit'] },
+      trace: { links: ['explicit'] },
+    });
   });
 
   it('runs deterministic inventory generation twice with identical fixed identity inputs', async () => {
@@ -327,10 +342,15 @@ describe('sense adapter deterministic boundaries', () => {
     const absent = await sensorAdapter('spec_idiomaticity')({ repoRoot: root });
     expect(absent).toMatchObject({
       status: 'unknown',
+      command: 'devai sense run spec_idiomaticity',
+      deterministic: true,
       findings: [
         { code: 'DOMAINS_FILE_NOT_FOUND', message: expect.stringContaining('domains.json') },
       ],
     });
+    expect(absent.findings[0]?.message).toContain(
+      `${join(root, 'law/glossary/domains.json')}, ${join(root, '.devai/config/domains.json')}`,
+    );
 
     const domainsPath = put(root, 'custom/domains.json', { domains: ['core'] });
     runtime.loadDomains.mockReturnValue({ core: true });
@@ -404,11 +424,18 @@ describe('sense adapter deterministic boundaries', () => {
     const failed = await sensorAdapter('decision_record_integrity')({ repoRoot: '/repo' });
     expect(failed).toMatchObject({
       status: 'fail',
+      command: 'devai sense run decision_record_integrity',
+      deterministic: true,
       metrics: { finding_count: 2 },
       findings: [
         { severity: 'error', code: 'DECISION_INVALID', file: 'law/decisions/D-1.md' },
         { severity: 'error', code: 'DECISION_MISSING' },
       ],
+    });
+    expect(failed.findings[1]).toStrictEqual({
+      severity: 'error',
+      code: 'DECISION_MISSING',
+      message: 'missing decision',
     });
 
     runtime.archiveImmutability.mockReturnValue({ ok: true, findings: [] });
@@ -432,6 +459,9 @@ describe('sense adapter deterministic boundaries', () => {
     );
     expect(() =>
       sensorAdapter('llm_judge')({ repoRoot: '/repo', inputs: { family: 'claude' } }),
+    ).toThrow('SENSE_MODEL_NAME_REQUIRED');
+    expect(() =>
+      sensorAdapter('llm_judge')({ repoRoot: '/repo', inputs: { family: 'claude-cli' } }),
     ).toThrow('SENSE_MODEL_NAME_REQUIRED');
 
     const bridge = { id: 'bridge' };
@@ -458,12 +488,17 @@ describe('sense adapter deterministic boundaries', () => {
       { aspect: 'correctness', rubric: 'exact', evidence: 'E-1' },
       bridge,
     );
-    expect(() =>
-      sensorAdapter('llm_judge')({
-        repoRoot: '/repo',
-        inputs: { family: 'codex', model: 'm', rubric: 'r', evidence: 'e' },
-      }),
-    ).toThrow('SENSE_INPUT_REQUIRED:aspect');
+    for (const missing of ['aspect', 'rubric', 'evidence'] as const) {
+      const complete = { aspect: 'a', rubric: 'r', evidence: 'e' };
+      const inputs = Object.fromEntries(
+        Object.entries({ family: 'codex', model: 'm', ...complete }).filter(
+          ([name]) => name !== missing,
+        ),
+      );
+      expect(() => sensorAdapter('llm_judge')({ repoRoot: '/repo', inputs })).toThrow(
+        `SENSE_INPUT_REQUIRED:${missing}`,
+      );
+    }
   });
 
   it('loads action-effect and coverage inputs from exact resolved paths', async () => {
@@ -480,6 +515,17 @@ describe('sense adapter deterministic boundaries', () => {
     expect(sensors.senseActionEffectInference).toHaveBeenCalledWith(
       expect.objectContaining({
         tsconfigPath: join(root, 'tsconfig.x.json'),
+        catalog: ACTION_EFFECT_CONTRACTS.map((entry) => entry.action_id),
+        contracts: ACTION_EFFECT_CONTRACTS,
+        subprocessRegistry: { templates: [] },
+      }),
+    );
+
+    put(root, 'law/policy/subprocess-effects.json', { templates: [] });
+    await sensorAdapter('action_effect_inference')({ repoRoot: root });
+    expect(sensors.senseActionEffectInference).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        tsconfigPath: join(root, 'tsconfig.effects.json'),
         subprocessRegistry: { templates: [] },
       }),
     );
@@ -500,6 +546,16 @@ describe('sense adapter deterministic boundaries', () => {
     expect(sensors.senseTestCoverageDepth).toHaveBeenCalledWith({
       summary: { lines_total: 10, lines_covered: 8 },
       coveragePath: '/absolute/coverage.json',
+    });
+
+    runtime.normalizeCoverage.mockReturnValue({ summary: null });
+    await sensorAdapter('test_coverage_depth')({ repoRoot: root });
+    expect(runtime.normalizeCoverage).toHaveBeenLastCalledWith({
+      coveragePath: join(root, 'coverage/coverage-final.json'),
+    });
+    expect(sensors.senseTestCoverageDepth).toHaveBeenLastCalledWith({
+      summary: null,
+      coveragePath: join(root, 'coverage/coverage-final.json'),
     });
   });
 });
