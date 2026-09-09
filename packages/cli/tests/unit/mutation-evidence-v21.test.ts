@@ -363,7 +363,13 @@ async function finalizedReusedEvidence() {
 }
 
 function expectActivationRefusal(action: () => unknown): void {
-  expect(action).toThrow(expect.objectContaining({ code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH' }));
+  expect(action).toThrow(
+    expect.objectContaining({
+      name: 'MutationActivationError',
+      message: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+    }),
+  );
 }
 
 describe('source-pinned mutation evidence v2.1 activation', () => {
@@ -389,6 +395,153 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     });
     expect(snapshot.files).toHaveLength(26);
     expect(sha256(snapshot.manifestBytes)).toBe(provenance.vendor.manifestDigest);
+  });
+
+  it('enforces schema validation before accepting an otherwise valid snapshot', async () => {
+    const snapshot = activationSnapshot();
+    vi.resetModules();
+    vi.doMock('@devai-nyx/schemas', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+      return { ...actual, getValidator: () => () => false };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      expectActivationRefusal(() => isolated.validateMutationV21ActivationSnapshot(snapshot));
+    } finally {
+      vi.doUnmock('@devai-nyx/schemas');
+      vi.resetModules();
+    }
+  });
+
+  it('enforces the frozen source-only roster independently of schema validation', async () => {
+    const snapshot = activationSnapshot();
+    const missingSourceTest = structuredClone(snapshot.policy) as {
+      activationModel: { sourceOnlyTestPaths: string[] };
+    };
+    missingSourceTest.activationModel.sourceOnlyTestPaths.pop();
+    vi.resetModules();
+    vi.doMock('@devai-nyx/schemas', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+      return { ...actual, getValidator: () => () => true };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      expectActivationRefusal(() =>
+        isolated.validateMutationV21ActivationSnapshot({
+          ...snapshot,
+          policy: missingSourceTest,
+        }),
+      );
+    } finally {
+      vi.doUnmock('@devai-nyx/schemas');
+      vi.resetModules();
+    }
+  });
+
+  it('binds the raw manifest bytes even when alternate bytes decode identically', () => {
+    const snapshot = activationSnapshot();
+    expectActivationRefusal(() =>
+      validateMutationV21ActivationSnapshot({
+        ...snapshot,
+        manifestBytes: Buffer.concat([snapshot.manifestBytes, Buffer.from('\n')]),
+      }),
+    );
+  });
+
+  it('refuses undeclared manifest fields independently of schema validation', async () => {
+    const snapshot = activationSnapshot();
+    const manifest = JSON.parse(snapshot.manifestBytes.toString('utf8')) as Record<string, unknown>;
+    const manifestBytes = Buffer.from(JSON.stringify({ ...manifest, extra: true }));
+    const manifestDigest = sha256(manifestBytes);
+    const policy = structuredClone(snapshot.policy) as {
+      activation: { provenanceProof: { vendor: { manifestDigest: string } } };
+      activationModel: { semanticReceiptProvenance: { vendor: { manifestDigest: string } } };
+    };
+    policy.activation.provenanceProof.vendor.manifestDigest = manifestDigest;
+    policy.activationModel.semanticReceiptProvenance.vendor.manifestDigest = manifestDigest;
+
+    vi.resetModules();
+    vi.doMock('@devai-nyx/schemas', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+      return { ...actual, getValidator: () => () => true };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      expectActivationRefusal(() =>
+        isolated.validateMutationV21ActivationSnapshot({ ...snapshot, policy, manifestBytes }),
+      );
+    } finally {
+      vi.doUnmock('@devai-nyx/schemas');
+      vi.resetModules();
+    }
+  });
+
+  it('binds each manifest header and population digest independently', async () => {
+    const base = activationSnapshot();
+    type ActivationPolicy = {
+      approvedSource: { commit: string };
+      activation: {
+        provenanceProof: {
+          sourceByteSetDigest: string;
+          vendor: { manifestDigest: string; byteSetDigest: string };
+        };
+      };
+      activationModel: {
+        runtimeFileCount: number;
+        semanticReceiptProvenance: {
+          source: { byteSetDigest: string };
+          vendor: { manifestDigest: string; byteSetDigest: string };
+        };
+      };
+    };
+    const withManifest = (change: (manifest: Record<string, unknown>) => void) => {
+      const policy = structuredClone(base.policy) as ActivationPolicy;
+      const manifest = JSON.parse(base.manifestBytes.toString('utf8')) as Record<string, unknown>;
+      change(manifest);
+      const manifestBytes = Buffer.from(JSON.stringify(manifest));
+      const manifestDigest = sha256(manifestBytes);
+      policy.activation.provenanceProof.vendor.manifestDigest = manifestDigest;
+      policy.activationModel.semanticReceiptProvenance.vendor.manifestDigest = manifestDigest;
+      return { ...base, policy, manifestBytes };
+    };
+    const wrongRuntimeCount = structuredClone(base.policy) as ActivationPolicy;
+    wrongRuntimeCount.activationModel.runtimeFileCount -= 1;
+    const wrongVendorDigest = structuredClone(base.policy) as ActivationPolicy;
+    wrongVendorDigest.activation.provenanceProof.vendor.byteSetDigest = '0'.repeat(64);
+    wrongVendorDigest.activationModel.semanticReceiptProvenance.vendor.byteSetDigest = '0'.repeat(
+      64,
+    );
+    const wrongSourceDigest = structuredClone(base.policy) as ActivationPolicy;
+    wrongSourceDigest.activation.provenanceProof.sourceByteSetDigest = '0'.repeat(64);
+    wrongSourceDigest.activationModel.semanticReceiptProvenance.source.byteSetDigest = '0'.repeat(
+      64,
+    );
+    const substitutions = [
+      withManifest((manifest) => {
+        manifest.schemaVersion = '2.0.0';
+      }),
+      withManifest((manifest) => {
+        manifest.sourceCommit = '0'.repeat(40);
+      }),
+      { ...base, policy: wrongRuntimeCount },
+      { ...base, policy: wrongVendorDigest },
+      { ...base, policy: wrongSourceDigest },
+    ];
+
+    vi.resetModules();
+    vi.doMock('@devai-nyx/schemas', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+      return { ...actual, getValidator: () => () => true };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      for (const substitution of substitutions) {
+        expectActivationRefusal(() => isolated.validateMutationV21ActivationSnapshot(substitution));
+      }
+    } finally {
+      vi.doUnmock('@devai-nyx/schemas');
+      vi.resetModules();
+    }
   });
 
   it('refuses policy, manifest, membership, path, and file-byte substitutions', () => {
@@ -687,6 +840,7 @@ describe('retired mutation assurance v2 callables', () => {
       loadReusedReport: vi.fn(),
     };
     await expect(verifyMutationAssuranceV2({}, provider)).rejects.toMatchObject({
+      message: 'MUTATION_VERSION_UNSUPPORTED',
       code: 'MUTATION_VERSION_UNSUPPORTED',
     });
     expect(provider.readArtifact).not.toHaveBeenCalled();
@@ -701,6 +855,7 @@ describe('retired mutation assurance v2 callables', () => {
       execute: vi.fn(),
     };
     await expect(executeParameterizedMutationRoster(input)).rejects.toMatchObject({
+      message: 'MUTATION_VERSION_UNSUPPORTED',
       code: 'MUTATION_VERSION_UNSUPPORTED',
     });
     expect(input.loadPrior).not.toHaveBeenCalled();
@@ -715,6 +870,11 @@ describe('retired mutation assurance v2 callables', () => {
         runtime_error: 0,
         infrastructure_error: 0,
       }),
-    ).toThrow(expect.objectContaining({ code: 'MUTATION_VERSION_UNSUPPORTED' }));
+    ).toThrow(
+      expect.objectContaining({
+        message: 'MUTATION_VERSION_UNSUPPORTED',
+        code: 'MUTATION_VERSION_UNSUPPORTED',
+      }),
+    );
   });
 });

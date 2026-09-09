@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../src/services/check-runner/canonical.js';
 import {
   selectMutationEvidence,
@@ -68,5 +68,37 @@ describe('mutation evidence reuse', () => {
       status: 'execute',
       reason: 'prior-result-not-pass',
     });
+  });
+
+  it('checks candidate identity integrity before comparing required inputs', () => {
+    const substitutedIdentity = { ...identity, sourceInputsDigest: '0'.repeat(64) };
+    expect(
+      selectMutationEvidence(identity, {
+        ...candidate,
+        identity: substitutedIdentity,
+        identityDigest: sha256Hex(identity),
+      }),
+    ).toEqual({ status: 'execute', reason: 'identity-integrity-mismatch' });
+  });
+
+  it('rejects digest fields with valid hexadecimal prefixes longer than SHA-256', () => {
+    expect(() =>
+      selectMutationEvidence(
+        { ...identity, sourceInputsDigest: `${identity.sourceInputsDigest}0` },
+        candidate,
+      ),
+    ).toThrow('CHECK_MUTATION_EVIDENCE_IDENTITY_INVALID:sourceInputsDigest');
+  });
+
+  it('rejects coercible non-string digest fields without invoking caller code', () => {
+    const toString = vi.fn(() => identity.sourceInputsDigest);
+    const malformed = {
+      ...identity,
+      sourceInputsDigest: { toString },
+    } as unknown as MutationEvidenceIdentity;
+    expect(() => selectMutationEvidence(malformed, candidate)).toThrow(
+      'CHECK_MUTATION_EVIDENCE_IDENTITY_INVALID:sourceInputsDigest',
+    );
+    expect(toString).not.toHaveBeenCalled();
   });
 });
