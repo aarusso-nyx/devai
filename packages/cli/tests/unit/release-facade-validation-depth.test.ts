@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CAC } from 'cac';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
@@ -56,11 +56,18 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   process.exitCode = originalExitCode;
   process.stdout.write = originalStdout;
   process.stderr.write = originalStderr;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
+
+function ownedRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'devai-release-facade-'));
+  roots.push(root);
+  return root;
+}
 
 async function run<T>(invoke: Invoke<T>, options: T) {
   let stdout = '';
@@ -105,8 +112,7 @@ describe('release facade public validation boundaries', () => {
   });
 
   it('reports an empty release ledger and validates the kind filter', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'devai-release-facade-'));
-    roots.push(root);
+    const root = ownedRoot();
     const empty = await run(status, { repoRoot: root });
     expect(empty.stderr).toBe('');
     expect(empty.exit).toBe(EXIT_PASS);
@@ -118,6 +124,43 @@ describe('release facade public validation boundaries', () => {
     expect(invalid.stderr).toContain(
       '--kind must be one of gate, postdeploy-verify, runtime-drift',
     );
+  });
+
+  it('runs a release check and preserves strict failure semantics', async () => {
+    const result = await run(check, { repoRoot: ownedRoot(), strict: true });
+    expect(result.stderr).toBe('');
+    expect(result.exit).toBe(EXIT_FAIL);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      id: 'REL-0001',
+      kind: 'gate',
+      verdict: 'block',
+      reasons: ['invariants directory missing', 'no sensor readings'],
+    });
+  });
+
+  it('filters persisted releases by their exact kind', async () => {
+    const root = ownedRoot();
+    const chainHead = 'a'.repeat(64);
+    expect(
+      await run(verify, {
+        repoRoot: root,
+        artifact: 'sha256:artifact',
+        artifactChainHead: chainHead,
+        auditChainHead: chainHead,
+      }),
+    ).toMatchObject({ stderr: '', exit: EXIT_PASS });
+    expect(await run(drift, { repoRoot: root, observation: 'database=changed' })).toMatchObject({
+      stderr: '',
+      exit: EXIT_PASS,
+    });
+
+    const filtered = await run(status, { repoRoot: root, kind: 'postdeploy-verify' });
+    expect(filtered.stderr).toBe('');
+    expect(filtered.exit).toBe(EXIT_PASS);
+    expect(JSON.parse(filtered.stdout)).toMatchObject({
+      count: 1,
+      releases: [{ id: 'REL-0001', kind: 'postdeploy-verify', verdict: 'pass' }],
+    });
   });
 
   it('requires an artifact and exactly one postdeploy verification mode', async () => {
@@ -151,6 +194,50 @@ describe('release facade public validation boundaries', () => {
     );
   });
 
+  it('carries an optional artifact chain head through detector verification', async () => {
+    const root = ownedRoot();
+    const charterPath = join(root, 'runtime-charter.json');
+    writeFileSync(
+      charterPath,
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        id: 'RPC-facade',
+        kind: 'api',
+        mission: 'verify the release facade detector path',
+        target: { base_url: 'http://example.test/' },
+        probes: [
+          {
+            pid: 'P1',
+            name: 'GET /health',
+            method: 'GET',
+            path: '/health',
+            expect: { status: 200, contains: ['ok'] },
+          },
+        ],
+      }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('{"status":"ok"}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const result = await run(verify, {
+      repoRoot: root,
+      artifact: 'sha256:artifact',
+      artifactChainHead: 'b'.repeat(64),
+      runtimeCharter: charterPath,
+    });
+    expect(result.stderr).toBe('');
+    expect(result.exit).toBe(EXIT_PASS);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      kind: 'postdeploy-verify',
+      verdict: 'pass',
+      inputs: { artifact_chain_head: 'b'.repeat(64) },
+    });
+  });
+
   it('rejects mixed drift modes and malformed record observations', async () => {
     const mixed = await run(drift, {
       runtimeCharter: '/unused/charter.json',
@@ -163,5 +250,21 @@ describe('release facade public validation boundaries', () => {
     expect(malformed.stdout).toBe('');
     expect(malformed.exit).toBe(EXIT_FAIL);
     expect(malformed.stderr).toContain("--observation expects 'surface=delta'");
+
+    const missingSurface = await run(drift, { observation: '=changed' });
+    expect(missingSurface.stdout).toBe('');
+    expect(missingSurface.exit).toBe(EXIT_FAIL);
+    expect(missingSurface.stderr).toContain("--observation expects 'surface=delta'");
+  });
+
+  it('keeps a strict drift check successful when no drift is observed', async () => {
+    const result = await run(drift, { repoRoot: ownedRoot(), strict: true });
+    expect(result.stderr).toBe('');
+    expect(result.exit).toBe(EXIT_PASS);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      kind: 'runtime-drift',
+      verdict: 'pass',
+      drift_observations: [],
+    });
   });
 });
