@@ -1,6 +1,6 @@
 import { spawnSync as nodeSpawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { platform, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
@@ -260,7 +260,7 @@ describe('translation validation orchestration depth', () => {
     expect(result['verdict']).toBe('FAIL');
     expect(result['executions']).toEqual([]);
     expect(result['isolation']).toEqual({
-      mode: 'macos-best-effort',
+      mode: platform() === 'linux' ? 'linux-container-no-network' : 'macos-best-effort',
       network_egress: 'not-proven',
       database: 'per-task-database',
       readiness_eligible: false,
