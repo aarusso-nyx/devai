@@ -149,6 +149,10 @@ function* extractCreateTableBlocks(sql: string): Generator<{
     let i = open + 1;
     while (i < cleaned.length && depth > 0) {
       const ch = cleaned[i];
+      if (ch === "'" || ch === '"') {
+        i = sqlQuotedEnd(cleaned, i) + 1;
+        continue;
+      }
       if (ch === '(') depth += 1;
       else if (ch === ')') depth -= 1;
       i += 1;
@@ -446,12 +450,27 @@ function unquoteSql(s: string): string {
   return trimmed;
 }
 
+// SQL quote escapes repeat the delimiter; parentheses and commas inside are data.
+function sqlQuotedEnd(text: string, start: number): number {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    if (text[i] !== quote) continue;
+    if (text[i + 1] === quote) i += 1;
+    else return i;
+  }
+  return text.length - 1;
+}
+
 function splitTopLevelCommas(body: string): string[] {
   const out: string[] = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i < body.length; i++) {
     const ch = body[i];
+    if (ch === "'" || ch === '"') {
+      i = sqlQuotedEnd(body, i);
+      continue;
+    }
     if (ch === '(') depth += 1;
     else if (ch === ')') depth -= 1;
     else if (ch === ',' && depth === 0) {
@@ -510,11 +529,43 @@ function parseColumnLine(line: string): DataModelColumn | null {
     ...(upper.includes('PRIMARY KEY') && { primary: true }),
     ...(upper.includes('UNIQUE') && { unique: true }),
   };
-  const defMatch = tail.match(
-    /\bDEFAULT\s+([^,]+?)(?=$|\s+(?:NOT|NULL|PRIMARY|UNIQUE|REFERENCES|CHECK|CONSTRAINT))/i,
-  );
-  const defaultValue = defMatch?.[1];
-  if (defaultValue !== undefined) (col as { default: string }).default = defaultValue.trim();
+  const defMatch = /\bDEFAULT\s+/i.exec(tail);
+  if (defMatch !== null) {
+    const start = defMatch.index + defMatch[0].length;
+    let end = tail.length;
+    let depth = 0;
+    let quote = '';
+    for (let i = start; i < tail.length; i++) {
+      const ch = tail[i];
+      if (quote.length > 0) {
+        if (ch === quote) {
+          if (tail[i + 1] === quote) i += 1;
+          else quote = '';
+        }
+        continue;
+      }
+      if (ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth += 1;
+      else if (ch === ')') depth -= 1;
+      else if (
+        depth === 0 &&
+        i > start &&
+        /\s/.test(ch ?? '') &&
+        /^\s+(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|UNIQUE|REFERENCES|CHECK|CONSTRAINT)\b/i.test(
+          tail.slice(i),
+        )
+      ) {
+        end = i;
+        break;
+      }
+    }
+    const value = tail.slice(start, end).trim();
+    if (value.length > 0) (col as { default: string }).default = value;
+    const constraints = (tail.slice(0, defMatch.index) + tail.slice(end)).toUpperCase();
+    (col as { nullable: boolean }).nullable = !constraints.includes('NOT NULL');
+    if (!constraints.includes('PRIMARY KEY')) delete (col as { primary?: boolean }).primary;
+    if (!constraints.includes('UNIQUE')) delete (col as { unique?: boolean }).unique;
+  }
   return col;
 }
 
