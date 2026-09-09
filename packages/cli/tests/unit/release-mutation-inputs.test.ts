@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import { describe, expect, it } from 'vitest';
 import {
+  assertReleaseMutationInputPackageIdentity,
   assertReleaseMutationInputProjectionV21,
   buildReleaseMutationInputPlanV21,
+  captureReleaseMutationInputExecutionContext,
   isDerivedReleaseMutationInputPlanV21,
   type ReleaseMutationExecutionCoverageV21,
 } from '../../src/services/release-mutation-inputs.js';
@@ -30,6 +33,9 @@ describe('protected release mutation input derivation', () => {
 
     expect(value.receipt.determination).toMatchObject({ support: 'current', mutation: 'targeted' });
     expect(isDerivedReleaseMutationInputPlanV21(value.plan)).toBe(true);
+    expect(isDerivedReleaseMutationInputPlanV21(null)).toBe(false);
+    expect(isDerivedReleaseMutationInputPlanV21({})).toBe(false);
+    expect(isDerivedReleaseMutationInputPlanV21(() => undefined)).toBe(false);
     expect(value.plan.grants).toEqual({ execution: false, certification: false, reuse: false });
     expect(value.plan.packages).toHaveLength(10);
     for (const entry of value.plan.packages) {
@@ -55,6 +61,157 @@ describe('protected release mutation input derivation', () => {
     expect(
       value.plan.packages.find((entry) => entry.id === 'authority')?.workspace_dependencies,
     ).toEqual(['@devai-nyx/schemas', '@devai-nyx/utils']);
+  });
+
+  it('retains genuine package identity, candidate population, proof bytes, and projection custody', () => {
+    const base = currentFixture();
+    const value = build(base);
+    const entry = value.plan.packages.find((item) => item.id === 'utils');
+    if (entry === undefined) throw new Error('fixture package missing');
+
+    expect(() =>
+      assertReleaseMutationInputPackageIdentity(value.plan, base.installed.identity),
+    ).not.toThrow();
+    expect(() =>
+      assertReleaseMutationInputPackageIdentity(value.plan, {
+        ...base.installed.identity,
+        version: '1.5.1',
+      }),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    expect(() =>
+      assertReleaseMutationInputPackageIdentity({ ...value.plan }, base.installed.identity),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+
+    const context = captureReleaseMutationInputExecutionContext(value.plan);
+    expect(context.repository).toEqual(value.snapshot.repository);
+    expect(context.candidate_files.map((member) => member.path)).toEqual(
+      [...base.files.keys()].sort((left, right) =>
+        Buffer.compare(Buffer.from(left), Buffer.from(right)),
+      ),
+    );
+    expect(Object.isFrozen(context)).toBe(true);
+    expect(Object.isFrozen(context.candidate_files)).toBe(true);
+    expect(() => captureReleaseMutationInputExecutionContext({ ...value.plan })).toThrow(
+      'MUTATION_INPUT_IDENTITY_MISSING',
+    );
+
+    const proof = value.plan.readProof();
+    const [objectId, member] = [...proof][0] ?? [];
+    if (objectId === undefined || member === undefined || member.bytes.length === 0)
+      throw new Error('fixture proof missing');
+    const original = member.bytes[0];
+    member.bytes[0] = original === 0 ? 1 : 0;
+    expect(value.plan.readProof().get(objectId)?.bytes[0]).toBe(original);
+
+    const alleged = structuredClone(entry.expected.inputProjection) as Record<string, unknown>;
+    const bindings = alleged['bindings'] as Record<string, Record<string, unknown>>;
+    bindings['source'] = {
+      ...bindings['source'],
+      memberCount: Number(bindings['source']?.['memberCount']) + 1,
+    };
+    expect(() =>
+      assertReleaseMutationInputProjectionV21(value.plan, entry.expected.packageName, alleged),
+    ).toThrow('MUTATION_INPUT_DIGEST_MISMATCH');
+    expect(() =>
+      assertReleaseMutationInputProjectionV21(value.plan, '@fixture/unlisted', {}),
+    ).toThrow('MUTATION_INPUT_DIGEST_MISMATCH');
+  });
+
+  it('binds exact manifest and mutation-target populations and refuses their safety boundaries', () => {
+    const base = currentFixture();
+    for (const [name, source] of [
+      ['packages/utils/src/a.ts', 'export const a = true;\n'],
+      ['packages/utils/src/z.js', 'export const z = true;\n'],
+      ['packages/utils/src/skip.spec.ts', 'export const skipped = true;\n'],
+      ['packages/utils/src/nested/tests/skip.ts', 'export const skipped = true;\n'],
+      ['packages/utils/src/types.d.mts', 'export type Skipped = true;\n'],
+      ['packages/utils/src/asset.txt', 'not executable source\n'],
+    ] as const)
+      base.files.set(name, Buffer.from(source));
+    const value = build(base);
+    const entry = value.plan.packages.find((item) => item.id === 'utils');
+    if (entry === undefined) throw new Error('fixture package missing');
+
+    expect(entry.mutation_targets.map((member) => member.path)).toEqual([
+      'src/a.ts',
+      'src/main.ts',
+      'src/z.js',
+    ]);
+    expect(entry.selected_source.map((member) => member.path)).toEqual(
+      expect.arrayContaining([
+        'packages/utils/package.json',
+        'packages/utils/src/asset.txt',
+        'packages/utils/src/nested/tests/skip.ts',
+        'packages/utils/src/skip.spec.ts',
+        'packages/utils/src/types.d.mts',
+      ]),
+    );
+    expect(entry.selected_tests.map((member) => member.path)).toEqual([
+      'packages/utils/tests/main.test.ts',
+    ]);
+    const bindings = entry.expected.inputProjection['bindings'] as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(bindings['source']?.['memberCount']).toBe(entry.selected_source.length);
+    expect(bindings['tests']?.['memberCount']).toBe(entry.selected_tests.length);
+    expect(bindings['manifests']?.['memberCount']).toBe(12);
+    expect(entry.prerequisite_nodes).toEqual([]);
+    expect(entry.reuse.unresolved).toEqual([
+      'frozen-dependency-closure-missing',
+      'toolchain-fixture-validation-required',
+    ]);
+    const executionCoverage = value.controls.execution_coverage;
+    if (executionCoverage.kind !== 'owner-approved-complete-devai-roster')
+      throw new Error('fixture execution coverage missing');
+    expect(value.plan.execution_coverage).toEqual({
+      kind: 'owner-approved-complete-devai-roster',
+      repository: value.snapshot.repository,
+      release_unit: '@aarusso-nyx/devai',
+      target_version: '1.5.0',
+      release_plan_receipt_digest: value.receipt.receipt_digest_sha256,
+      release_profile_digest: value.plan.release_profile_digest,
+      policy_resolution_digest: executionCoverage.policy_resolution_digest,
+      expected_package_inputs_digest: canonicalSha256(
+        value.plan.packages.map((item) => ({
+          id: item.id,
+          package: item.expected.packageName,
+          input_digest: item.input_digest,
+          mutation_configuration: (
+            item.expected.inputProjection['bindings'] as Record<string, unknown>
+          )['mutationConfiguration'],
+        })),
+      ),
+    });
+
+    const invalidVersion = mutate(
+      base.files,
+      'packages/utils/package.json',
+      Buffer.from('{"name":"@devai-nyx/utils","version":"not-semver"}'),
+    );
+    expect(() => build(base, invalidVersion)).toThrow('MUTATION_ROSTER_MISMATCH');
+    expect(() =>
+      build(base, base.files, { modePath: 'packages/utils/package.json', mode: '120000' }),
+    ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    expect(() =>
+      build(
+        base,
+        mutate(base.files, 'pnpm-workspace.yaml', Buffer.from('packages:\n  - packages/**\n')),
+      ),
+    ).toThrow('MUTATION_ROSTER_MISMATCH');
+    for (const controls of [
+      { ...value.controls, maximum_source_entries: value.snapshot.paths.length - 1 },
+      { ...value.controls, maximum_source_bytes: 1 },
+      { ...value.controls, environment: { ...value.controls.environment, BAD: 'line\nbreak' } },
+    ])
+      expect(() =>
+        buildReleaseMutationInputPlanV21({
+          candidate: value.snapshot,
+          resolution: value.resolution,
+          plan_receipt: value.receipt,
+          controls,
+        }),
+      ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
   });
 
   it('requires the exact Owner campaign coverage for current targeted DEVAI and permits plan coverage only for lts full roster', () => {
