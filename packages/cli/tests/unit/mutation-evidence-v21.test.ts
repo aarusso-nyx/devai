@@ -544,6 +544,107 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     }
   });
 
+  it('binds manifest and supplied-file path populations before accepting file bytes', async () => {
+    const base = activationSnapshot();
+    type ManifestFile = { path: string; sha256: string; [key: string]: unknown };
+    type ActivationPolicy = {
+      activation: {
+        provenanceProof: {
+          sourceByteSetDigest: string;
+          vendor: { manifestDigest: string; byteSetDigest: string };
+        };
+      };
+      activationModel: {
+        semanticReceiptProvenance: {
+          source: { byteSetDigest: string };
+          vendor: { manifestDigest: string; byteSetDigest: string };
+        };
+      };
+    };
+    const withManifestFiles = (
+      change: (files: ManifestFile[]) => ManifestFile[],
+      suppliedFiles = base.files,
+    ) => {
+      const policy = structuredClone(base.policy) as ActivationPolicy;
+      const manifest = JSON.parse(base.manifestBytes.toString('utf8')) as {
+        files: ManifestFile[];
+      } & Record<string, unknown>;
+      manifest.files = change(manifest.files);
+      const manifestBytes = Buffer.from(JSON.stringify(manifest));
+      const manifestDigest = sha256(manifestBytes);
+      const byteSetDigest = canonicalSha256(manifest.files);
+      policy.activation.provenanceProof.vendor.manifestDigest = manifestDigest;
+      policy.activation.provenanceProof.vendor.byteSetDigest = byteSetDigest;
+      policy.activation.provenanceProof.sourceByteSetDigest = byteSetDigest;
+      policy.activationModel.semanticReceiptProvenance.vendor.manifestDigest = manifestDigest;
+      policy.activationModel.semanticReceiptProvenance.vendor.byteSetDigest = byteSetDigest;
+      policy.activationModel.semanticReceiptProvenance.source.byteSetDigest = byteSetDigest;
+      return { ...base, policy, manifestBytes, files: suppliedFiles };
+    };
+    const firstSuppliedFile = base.files[0];
+    if (firstSuppliedFile === undefined) throw new Error('fixture runtime population is empty');
+    const duplicateManifestFiles = base.files.map((file, index) =>
+      index === 1 ? { ...firstSuppliedFile } : file,
+    );
+    const duplicatePopulation = withManifestFiles((files) => {
+      const firstManifestFile = files[0];
+      if (firstManifestFile === undefined) throw new Error('fixture manifest is empty');
+      return files.map((file, index) => (index === 1 ? { ...firstManifestFile } : file));
+    }, duplicateManifestFiles);
+    const unsortedManifest = withManifestFiles((files) => [...files].reverse());
+    const extraSuppliedFile = {
+      ...base,
+      files: [...base.files, { ...firstSuppliedFile }],
+    };
+    const extraManifestKey = withManifestFiles((files) =>
+      files.map((file, index) => (index === 0 ? { ...file, extra: true } : file)),
+    );
+    const withChangedPath = (path: string) => {
+      const suppliedFiles = base.files
+        .map((file, index) => (index === 0 ? { ...file, path } : file))
+        .sort((left, right) => left.path.localeCompare(right.path));
+      return withManifestFiles(
+        (files) =>
+          files
+            .map((file, index) => (index === 0 ? { ...file, path } : file))
+            .sort((left, right) => left.path.localeCompare(right.path)),
+        suppliedFiles,
+      );
+    };
+    const reorderedManifestKeys = withManifestFiles((files) =>
+      files.map((file, index) => (index === 0 ? { sha256: file.sha256, path: file.path } : file)),
+    );
+
+    vi.resetModules();
+    vi.doMock('@devai-nyx/schemas', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+      return { ...actual, getValidator: () => () => true };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      for (const substitution of [
+        duplicatePopulation,
+        unsortedManifest,
+        extraSuppliedFile,
+        extraManifestKey,
+        withChangedPath('foreign/src/runtime.js'),
+        withChangedPath('src/runtime.js/foreign'),
+      ]) {
+        expectActivationRefusal(() => isolated.validateMutationV21ActivationSnapshot(substitution));
+      }
+      expect(isolated.validateMutationV21ActivationSnapshot(reorderedManifestKeys)).toBeDefined();
+      expect(
+        isolated.validateMutationV21ActivationSnapshot({
+          ...base,
+          files: [...base.files].reverse(),
+        }),
+      ).toBeDefined();
+    } finally {
+      vi.doUnmock('@devai-nyx/schemas');
+      vi.resetModules();
+    }
+  });
+
   it('refuses policy, manifest, membership, path, and file-byte substitutions', () => {
     const snapshot = activationSnapshot();
     const policyChanged = structuredClone(snapshot.policy) as {
