@@ -234,6 +234,16 @@ function drainOutbox(options: {
       ],
       last_error: null,
     };
+    // Persist each confirmed batch before selecting the next one. The batch
+    // selector reads delivery state from disk, so deferring this write until
+    // the whole drain completed would select the same batch forever. It also
+    // makes a later retry reconcile only the external effects that were not
+    // already confirmed.
+    writeDeliveryState({
+      repoRoot: options.repoRoot,
+      round: options.round,
+      state: delivery,
+    });
     projected += batch.event_ids.length;
   }
   return { delivery, projected };
