@@ -12,6 +12,8 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
+  writeFileSync,
   writeSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,6 +23,7 @@ import { canonicalJson } from '@devai-nyx/utils';
 import {
   createReleaseExportArtifactStore,
   RELEASE_EXPORT_SPEC_DIGEST,
+  RELEASE_EXPORT_SPEC_ID,
   type ProtectedReleaseExportBinding,
   type ReleaseExportArtifactObject,
   type ReleaseExportArtifactStoreOptions,
@@ -35,6 +38,8 @@ import type {
 const mocks = vi.hoisted(() => ({
   parentBytes: new Map<string, Buffer>(),
   checkRoot: vi.fn(),
+  capacity: vi.fn(),
+  artifactSpec: undefined as Readonly<Record<string, unknown>> | undefined,
   reverify: vi.fn(),
   verifyManifest: vi.fn(),
 }));
@@ -47,10 +52,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
       invokeSink: <T>(operation: () => T) => operation(),
     }),
     createProtectedReleaseSinkOwner: () => ({}),
-    readProtectedReleaseExportCapacity: () => ({
-      remaining_batches: 1_000,
-      remaining_targets: 1_000,
-    }),
+    readProtectedReleaseExportCapacity: (...args: unknown[]) => mocks.capacity(...args),
     createProtectedReleaseSinkFilesystem: () => ({
       closeSync,
       fsyncSync,
@@ -102,7 +104,7 @@ vi.mock('../../src/services/release-policy-closure.js', () => ({
       execution_contract: {
         prepare_kernel: {
           export_extension: {
-            artifact_spec: legacyArtifactSpec(),
+            artifact_spec: mocks.artifactSpec ?? legacyArtifactSpec(),
           },
         },
       },
@@ -183,6 +185,11 @@ function fixture(): {
   mocks.parentBytes.clear();
   mocks.reverify.mockClear();
   mocks.verifyManifest.mockClear();
+  mocks.capacity.mockReset().mockReturnValue({
+    remaining_batches: 1_000,
+    remaining_targets: 1_000,
+  });
+  mocks.artifactSpec = undefined;
   const root = temporary('devai export artifact store');
   const candidateRoot = temporary('devai export candidate');
   const packageJson = canonical({ name: '@fixture/package', version: '1.5.0' });
@@ -352,6 +359,23 @@ async function transactionFixture() {
   return { ...value, store, transaction, closureReceipt, providerReceipt, transcript };
 }
 
+async function committedFixture() {
+  const value = await transactionFixture();
+  const manifest = await value.transaction.readCommitManifest();
+  const manifestReceipt = await value.transaction.put(object('committed-manifest', null, manifest));
+  const commit = await value.transaction.commit(manifestReceipt);
+  return { ...value, manifest, manifestReceipt, commit };
+}
+
+function receiptPath(root: string, handle: string): string {
+  const [transaction, id] = handle.split(':');
+  return join(root, 'exports', transaction ?? '', 'receipts', `${id ?? ''}.json`);
+}
+
+function objectPath(root: string, sha256: string): string {
+  return join(root, 'objects', sha256);
+}
+
 async function refusal(callback: () => unknown | Promise<unknown>): Promise<void> {
   await expect(Promise.resolve().then(callback)).rejects.toThrow(ERROR);
 }
@@ -396,6 +420,38 @@ describe('release export artifact store depth', () => {
     }
     expect(mocks.reverify).toHaveBeenCalled();
     expect(mocks.verifyManifest).toHaveBeenCalled();
+  });
+
+  it('returns an exact receipt and canonical transcript binding', async () => {
+    const value = await transactionFixture();
+    const [transaction, id, sha256] = value.closureReceipt.opaque_handle.split(':');
+    expect(transaction).toBe(value.transaction.transaction_handle);
+    expect(id).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(sha256).toBe(hash(value.closure));
+    expect(value.closureReceipt).toEqual({
+      sink_id: SINK,
+      transaction_handle: value.transaction.transaction_handle,
+      opaque_handle: value.closureReceipt.opaque_handle,
+      kind: 'evidence-manifest',
+      package_id: '@fixture/package',
+      sha256: hash(value.closure),
+      size_bytes: value.closure.length,
+      export_spec_id: RELEASE_EXPORT_SPEC_ID,
+      export_spec_digest_sha256: RELEASE_EXPORT_SPEC_DIGEST,
+    });
+    const decoded = JSON.parse(value.transcript.toString('utf8')) as Record<string, unknown>;
+    expect(decoded).toMatchObject({
+      version: 'devai.release-export-transcript-json.v1',
+      binding: {
+        action_id: 'release export',
+        repository: REPOSITORY,
+        candidate: CANDIDATE,
+        sink_id: SINK,
+        attempt_id: 'RLA-0123456789abcdef',
+      },
+      destination: value.options.binding.destination,
+      trust: value.options.binding.trust,
+    });
   });
 
   it('refuses malformed objects, duplicate logical slots, and phase-invalid operations', async () => {
@@ -474,6 +530,331 @@ describe('release export artifact store depth', () => {
         parent_reader: changedParent,
       }),
     ).rejects.toThrow(ERROR);
+  });
+
+  it('rejects each independently invalid initializer boundary', async () => {
+    const mutations: Array<
+      (value: ReturnType<typeof fixture>) => ReleaseExportArtifactStoreOptions
+    > = [
+      (value) => ({ ...value.options, max_blob_bytes: 0 }),
+      (value) => ({
+        ...value.options,
+        closure_limits: { ...value.options.closure_limits, maximum_git_entries: 0 },
+      }),
+      (value) => ({
+        ...value.options,
+        closure_limits: { ...value.options.closure_limits, maximum_git_entries: 1.5 },
+      }),
+      (value) => ({
+        ...value.options,
+        transcript_limits: { ...value.options.transcript_limits, maximum_packages: 0x80000000 },
+      }),
+      (value) => ({
+        ...value.options,
+        prepared_state: { ...value.options.prepared_state, schemaVersion: '2.0.0' } as never,
+      }),
+      (value) => ({
+        ...value.options,
+        prepared_state: { ...value.options.prepared_state, action_id: 'release export' } as never,
+      }),
+      (value) => ({
+        ...value.options,
+        binding: { ...value.options.binding, repository: { ...REPOSITORY, tree: '9'.repeat(40) } },
+      }),
+      (value) => ({
+        ...value.options,
+        binding: { ...value.options.binding, candidate: { ...CANDIDATE, tree: '9'.repeat(40) } },
+      }),
+      (value) => ({
+        ...value.options,
+        prepared_state: { ...value.options.prepared_state, bound_receipts: [] } as never,
+      }),
+      (value) => ({
+        ...value.options,
+        prepared_state: { ...value.options.prepared_state, artifacts: [] } as never,
+      }),
+      (value) => {
+        const state = structuredClone(value.options.prepared_state) as ReleaseLifecycleStateV2;
+        const pkg = state.release_units[0]?.packages[0];
+        if (pkg === undefined) throw new Error('fixture package missing');
+        return {
+          ...value.options,
+          prepared_state: {
+            ...state,
+            release_units: [
+              {
+                ...state.release_units[0],
+                packages: [{ ...pkg, trust: { fixture: true } }],
+              },
+            ],
+          } as never,
+        };
+      },
+      (value) => {
+        const closure = value.options.closures[0];
+        if (closure === undefined) throw new Error('fixture closure missing');
+        return { ...value.options, closures: [{ ...closure, package_id: '@fixture/wrong' }] };
+      },
+      (value) => {
+        const closure = value.options.closures[0];
+        if (closure === undefined) throw new Error('fixture closure missing');
+        return {
+          ...value.options,
+          closures: [{ ...closure, expected: { ...closure.expected, release_unit: 'wrong' } }],
+        };
+      },
+    ];
+    for (const mutate of mutations) {
+      const value = fixture();
+      await expect(createReleaseExportArtifactStore(mutate(value))).rejects.toThrow(ERROR);
+    }
+
+    for (const key of [
+      'artifact_spec_id',
+      'artifact_spec_digest_sha256',
+      'artifact_spec_canonical_bytes',
+    ]) {
+      const value = fixture();
+      mocks.artifactSpec = { ...legacyArtifactSpec(), [key]: 'invalid' };
+      await expect(createReleaseExportArtifactStore(value.options)).rejects.toThrow(ERROR);
+    }
+  });
+
+  it('rejects hidden input structure without evaluating accessors', async () => {
+    {
+      const value = fixture();
+      const binding = Object.assign(Object.create({ inherited: true }), value.options.binding);
+      await expect(createReleaseExportArtifactStore({ ...value.options, binding })).rejects.toThrow(
+        ERROR,
+      );
+    }
+    {
+      const value = fixture();
+      let calls = 0;
+      const binding = { ...value.options.binding } as Record<string, unknown>;
+      Object.defineProperty(binding, 'sink_id', {
+        enumerable: true,
+        get: () => {
+          calls += 1;
+          return SINK;
+        },
+      });
+      await expect(
+        createReleaseExportArtifactStore({ ...value.options, binding } as never),
+      ).rejects.toThrow(ERROR);
+      expect(calls).toBe(0);
+    }
+    {
+      const value = fixture();
+      const closures = [...value.options.closures] as unknown[] & { extra?: string };
+      closures.extra = 'hidden-caller-state';
+      await expect(
+        createReleaseExportArtifactStore({ ...value.options, closures } as never),
+      ).rejects.toThrow(ERROR);
+    }
+  });
+
+  it('preserves approved authority failures and enforces the exact capacity boundary', async () => {
+    for (const message of [
+      'AUTHORITY_TEST_REFUSAL',
+      'release-export-capacity-unavailable',
+      'release-export-capacity-insufficient',
+    ]) {
+      const value = fixture();
+      mocks.capacity.mockImplementationOnce(() => {
+        throw new Error(message);
+      });
+      const store = await createReleaseExportArtifactStore(value.options);
+      await expect(store.begin()).rejects.toThrow(message);
+    }
+    for (const [remaining_batches, remaining_targets, accepted] of [
+      [35, 36, false],
+      [36, 35, false],
+      [36, 36, true],
+    ] as const) {
+      const value = fixture();
+      mocks.capacity.mockReturnValue({ remaining_batches, remaining_targets });
+      const store = await createReleaseExportArtifactStore(value.options);
+      if (accepted) await expect(store.begin()).resolves.toBeDefined();
+      else await expect(store.begin()).rejects.toThrow('release-export-capacity-insufficient');
+    }
+  });
+
+  it('detects committed receipt, object, marker, reservation, and population corruption', async () => {
+    const cases: Array<
+      (value: Awaited<ReturnType<typeof committedFixture>>) => { path: string; bytes?: Buffer }
+    > = [
+      (value) => ({
+        path: receiptPath(value.options.root, value.closureReceipt.opaque_handle),
+        bytes: Buffer.from('{}'),
+      }),
+      (value) => ({ path: objectPath(value.options.root, value.closureReceipt.sha256) }),
+      (value) => ({
+        path: join(
+          value.options.root,
+          'exports',
+          value.transaction.transaction_handle,
+          'commit.json',
+        ),
+        bytes: Buffer.from('{}'),
+      }),
+      (value) => ({
+        path: join(
+          value.options.root,
+          'exports',
+          'attempts',
+          `${value.options.binding.attempt_id}.json`,
+        ),
+        bytes: Buffer.from('{}'),
+      }),
+    ];
+    for (const corrupt of cases) {
+      const value = await committedFixture();
+      const selected = corrupt(value);
+      if (selected.bytes === undefined) unlinkSync(selected.path);
+      else writeFileSync(selected.path, selected.bytes);
+      await refusal(() =>
+        value.store.readArtifact({
+          sink_id: SINK,
+          opaque_handle: value.closureReceipt.opaque_handle,
+        }),
+      );
+    }
+
+    const value = await committedFixture();
+    writeFileSync(
+      join(
+        value.options.root,
+        'exports',
+        value.transaction.transaction_handle,
+        'receipts',
+        '00000000-0000-4000-8000-000000000000.json',
+      ),
+      Buffer.from('{}'),
+    );
+    await refusal(() =>
+      value.store.readArtifact({
+        sink_id: SINK,
+        opaque_handle: value.manifestReceipt.opaque_handle,
+      }),
+    );
+  });
+
+  it('refuses malformed handles and unknown or foreign reads in pending and committed phases', async () => {
+    const value = fixture();
+    const store = await createReleaseExportArtifactStore(value.options);
+    const transaction = await store.begin();
+    for (const input of [
+      { sink_id: 'foreign', opaque_handle: 'unknown' },
+      {
+        sink_id: SINK,
+        opaque_handle: `${transaction.transaction_handle}:00000000-0000-4000-8000-000000000000:${'0'.repeat(64)}`,
+      },
+    ])
+      await refusal(() => transaction.readArtifact(input));
+
+    const committed = await committedFixture();
+    for (const input of [
+      { sink_id: 'foreign', opaque_handle: committed.manifestReceipt.opaque_handle },
+      { sink_id: SINK, opaque_handle: 'malformed-handle' },
+      {
+        sink_id: SINK,
+        opaque_handle: `${committed.transaction.transaction_handle}:00000000-0000-4000-8000-000000000000:${'0'.repeat(64)}`,
+      },
+    ])
+      await refusal(() => committed.store.readArtifact(input));
+  });
+
+  it('checks each object boundary and makes signer-phase failures terminal', async () => {
+    for (const alter of [
+      (input: ReleaseExportArtifactObject) => ({ ...input, bytes: Buffer.alloc(0) }),
+      (input: ReleaseExportArtifactObject) => ({ ...input, size_bytes: input.size_bytes + 1 }),
+      (input: ReleaseExportArtifactObject) => ({
+        ...input,
+        bytes: Buffer.alloc(64 * 1024 + 1),
+        size_bytes: 64 * 1024 + 1,
+        sha256: hash(Buffer.alloc(64 * 1024 + 1)),
+      }),
+    ]) {
+      const value = fixture();
+      const store = await createReleaseExportArtifactStore(value.options);
+      const transaction = await store.begin();
+      await refusal(() =>
+        transaction.put(
+          alter(object('evidence-manifest', '@fixture/package', value.closure)) as never,
+        ),
+      );
+    }
+
+    for (const invalid of [
+      object('evidence-manifest', '@fixture/package', Buffer.from('wrong closure')),
+      object('evidence-manifest', '@fixture/unknown', Buffer.from('wrong closure')),
+    ]) {
+      const value = await transactionFixture();
+      await refusal(() => value.transaction.put(invalid));
+      await refusal(() => value.transaction.readTranscript());
+    }
+
+    {
+      const value = fixture();
+      const store = await createReleaseExportArtifactStore(value.options);
+      const transaction = await store.begin();
+      await transaction.put(object('evidence-manifest', '@fixture/package', value.closure));
+      const transcript = await transaction.markSigningStarted();
+      const provider = encodeReleaseExportProviderResult(
+        { package_id: '@fixture/package', transcript, signature: 'AQ==' },
+        value.options.transcript_limits,
+      );
+      await refusal(() => transaction.put(object('provider-result', '@fixture/unknown', provider)));
+      await refusal(() => transaction.readCommitManifest());
+    }
+  });
+
+  it('refuses each incomplete or altered commit input and abort after signer dispatch', async () => {
+    {
+      const value = fixture();
+      const store = await createReleaseExportArtifactStore(value.options);
+      const transaction = await store.begin();
+      await refusal(() => transaction.commit({} as never));
+    }
+    {
+      const value = await transactionFixture();
+      await refusal(() => value.transaction.abort());
+      await refusal(() => value.transaction.markSigningStarted());
+    }
+    for (const alter of [
+      (receipt: ReleaseExportArtifactObjectReceipt) => ({ ...receipt, kind: 'provider-result' }),
+      (receipt: ReleaseExportArtifactObjectReceipt) => ({ ...receipt, sha256: '0'.repeat(64) }),
+    ]) {
+      const value = await transactionFixture();
+      const manifest = await value.transaction.readCommitManifest();
+      const receipt = await value.transaction.put(object('committed-manifest', null, manifest));
+      await refusal(() => value.transaction.commit(alter(receipt) as never));
+    }
+    {
+      const value = await committedFixture();
+      await refusal(() => value.transaction.abort());
+      expect(() => value.transaction.preserve()).toThrow(ERROR);
+    }
+  });
+
+  it('refuses overlapping operations while protected revalidation is outstanding', async () => {
+    const value = fixture();
+    const store = await createReleaseExportArtifactStore(value.options);
+    const transaction = await store.begin();
+    await transaction.put(object('evidence-manifest', '@fixture/package', value.closure));
+    let release!: () => void;
+    mocks.reverify.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const pending = transaction.readTranscript();
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    await refusal(() => transaction.readTranscript());
+    release();
+    await pending;
   });
 
   it('refuses symlinked transaction storage and overlapping repository roots', async () => {
