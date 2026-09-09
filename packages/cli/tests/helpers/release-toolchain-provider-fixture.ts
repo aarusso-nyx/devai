@@ -106,6 +106,10 @@ function fixedDefinition(): {
     ['packages/fixture/tsconfig.json', bytes('packages/fixture/tsconfig.json')],
     ['packages/fixture/vitest.config.cjs', bytes('packages/fixture/vitest.config.cjs')],
     [
+      'host/mutation-typescript-plugin.mjs',
+      readFileSync(join(ROOT, 'scripts/release-host/mutation-typescript-plugin.mjs')),
+    ],
+    [
       'host/run-diagnostic.mjs',
       readFileSync(join(ROOT, 'scripts/release-host/mutation-diagnostic.mjs')),
     ],
