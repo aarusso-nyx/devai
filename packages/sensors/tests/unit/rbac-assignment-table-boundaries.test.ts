@@ -64,3 +64,59 @@ describe('RBAC assignment table naming boundary', () => {
     });
   });
 });
+
+function writeRoleJoinModel(): string {
+  const path = join(root, 'record/proofs/sensors/inventory_data_model/data-model.json');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(
+    path,
+    `${JSON.stringify({
+      schemaVersion: '1.0.0',
+      generatedAt: NOW,
+      dialect: 'postgres',
+      tables: [
+        'roles',
+        'permissions',
+        'user_has_role',
+        'user_has_roles',
+        'user_has_roles_archive',
+        'model_has_role',
+        'model_has_roles',
+        'model_has_roles_archive',
+        'xuser_has_role',
+      ].map((name) => ({
+        name,
+        columns: [{ name: 'id', type: 'bigint' }],
+        evidence: [{ path: `db/migrations/${name}.sql`, startLine: 1, endLine: 2 }],
+      })),
+    })}\n`,
+  );
+  return path;
+}
+
+describe('RBAC role join singular and plural boundaries', () => {
+  it('recognizes supported user/model role joins while excluding prefixed and suffixed lookalikes', () => {
+    const result = senseInventoryRbac({
+      repoRoot: root,
+      dataModelPath: writeRoleJoinModel(),
+      persistBody: false,
+      now: NOW,
+    });
+    const body = result.body as { rbacIlfTables: string[] };
+
+    expect(result.reading.status).toBe('pass');
+    expect(body.rbacIlfTables).toEqual([
+      'roles',
+      'permissions',
+      'user_has_role',
+      'user_has_roles',
+      'model_has_role',
+      'model_has_roles',
+    ]);
+    expect(result.reading.metrics).toMatchObject({
+      role_table_count: 1,
+      permission_table_count: 1,
+      join_table_count: 4,
+    });
+  });
+});
