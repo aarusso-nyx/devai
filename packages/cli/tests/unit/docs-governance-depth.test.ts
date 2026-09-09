@@ -122,3 +122,71 @@ describe('docs-governance public report boundaries', () => {
     ]);
   });
 });
+
+it('requires libraries to use Docusaurus while accepting the valid library builder', () => {
+  write(
+    '.devai/config/project.json',
+    JSON.stringify({
+      repo: { kind: 'library' },
+      docs: { builder: 'jekyll', build_command: '' },
+    }),
+  );
+  expect(finding('docs-governance.library-docusaurus-required')).toMatchObject({
+    severity: 'fail',
+    message: 'Library repos MUST use Docusaurus; got docs.builder = "jekyll"',
+  });
+
+  write(
+    '.devai/config/project.json',
+    JSON.stringify({
+      repo: { kind: 'library' },
+      docs: { builder: 'docusaurus', build_command: '' },
+    }),
+  );
+  expect(finding('docs-governance.library-docusaurus-required')).toMatchObject({
+    severity: 'pass',
+    message: 'Library correctly uses docusaurus',
+  });
+});
+
+it('accepts either Docusaurus config/sidebar extension and reports each missing required member', () => {
+  write(
+    '.devai/config/project.json',
+    JSON.stringify({
+      repo: { kind: 'application' },
+      docs: { builder: 'docusaurus', build_command: '' },
+    }),
+  );
+  write(
+    'docs/site/docusaurus.config.ts',
+    'export default { url: "https://docs.example.test", organizationName: "acme" };\n',
+  );
+  write('docs/site/sidebars.js', 'module.exports = {};\n');
+  write('docs/site/package.json', '{"private":true}\n');
+  expect(finding('docs-governance.site-dir-shape')).toMatchObject({
+    severity: 'pass',
+    message: 'docs/site/ has expected docusaurus structure',
+  });
+
+  rmSync(join(root, 'docs/site/docusaurus.config.ts'));
+  expect(finding('docs-governance.site-dir-shape')).toMatchObject({
+    severity: 'fail',
+    locations: ['docs/site/docusaurus.config.ts (or .js)'],
+  });
+  write('docs/site/docusaurus.config.js', 'module.exports = {};\n');
+  expect(finding('docs-governance.site-dir-shape')).toMatchObject({ severity: 'pass' });
+
+  rmSync(join(root, 'docs/site/sidebars.js'));
+  expect(finding('docs-governance.site-dir-shape')).toMatchObject({
+    severity: 'fail',
+    locations: ['docs/site/sidebars.ts (or .js)'],
+  });
+  write('docs/site/sidebars.ts', 'export default {};\n');
+  expect(finding('docs-governance.site-dir-shape')).toMatchObject({ severity: 'pass' });
+
+  rmSync(join(root, 'docs/site/package.json'));
+  expect(finding('docs-governance.site-dir-shape')).toMatchObject({
+    severity: 'fail',
+    locations: ['docs/site/package.json'],
+  });
+});
