@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -84,5 +84,33 @@ describe('data-handling exact-name boundaries', () => {
     ]) {
       expect(classified.get(name)).toBeUndefined();
     }
+  });
+  it('preserves schema errors instead of downgrading an invalid non-PII model to review', () => {
+    const path = writeModel();
+    const model = JSON.parse(readFileSync(path, 'utf8'));
+    model.tables[0].columns = [{ name: 'ordinary_label', type: 'text' }];
+    writeFileSync(path, JSON.stringify(model));
+    const valid = senseInventoryDataHandling({
+      repoRoot: root,
+      dataModelPath: path,
+      persistBody: false,
+      now: NOW,
+    });
+    expect(valid.reading.status).toBe('review');
+    expect(valid.reading.findings).toEqual([
+      expect.objectContaining({ code: 'DATA_HANDLING_NO_PII_DETECTED' }),
+    ]);
+    delete model.schemaVersion;
+    writeFileSync(path, JSON.stringify(model));
+    const invalid = senseInventoryDataHandling({
+      repoRoot: root,
+      dataModelPath: path,
+      persistBody: false,
+      now: NOW,
+    });
+    expect(invalid.reading.status).toBe('error');
+    expect(invalid.reading.findings).toEqual([
+      expect.objectContaining({ code: 'DATA_HANDLING_SCHEMA_INVALID' }),
+    ]);
   });
 });
