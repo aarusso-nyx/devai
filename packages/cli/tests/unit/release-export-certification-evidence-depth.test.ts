@@ -194,6 +194,19 @@ function refusal(run: () => unknown): void {
 }
 
 describe('release export certification evidence capture', () => {
+  it('exposes the stable refusal through a freshly evaluated module', async () => {
+    vi.resetModules();
+    const fresh =
+      await import('../../src/services/release-export-certification-evidence.js?fresh-refusal');
+    const value = fixture();
+    await expect(
+      fresh.createReleaseExportCertificationEvidence({
+        ...value.input,
+        maximum_provider_result_bytes: 0,
+      }),
+    ).rejects.toThrow(ERROR);
+  });
+
   it('projects every certified byte identity, elects the first package, and returns defensive copies', async () => {
     const value = fixture();
     const token = await createReleaseExportCertificationEvidence(value.input);
@@ -302,6 +315,10 @@ describe('release export certification evidence capture', () => {
       { certified_evidence_carrier_maximum_bytes: MAXIMUM },
       {
         certified_evidence_carrier_maximum_bytes: 0,
+        readCertifiedEvidenceCarrier: () => value.bytes,
+      },
+      {
+        certified_evidence_carrier_maximum_bytes: MAXIMUM + 0.5,
         readCertifiedEvidenceCarrier: () => value.bytes,
       },
     ]) {
