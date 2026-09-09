@@ -186,6 +186,44 @@ describe('sense run command boundaries', () => {
     );
   });
 
+  it('keeps optional-dependency diagnostics exact and preserves an explicit sweep round', async () => {
+    mocks.sensorAdapter.mockReturnValue(
+      vi.fn(async () => {
+        throw new Error('OPTIONAL_DEPENDENCY_MISSING:@scope/runtime:unexpected-suffix');
+      }),
+    );
+    const malformed = await run('type_check', {});
+    expect(malformed.exit).toBe(EXIT_GATE);
+    expect(JSON.parse(malformed.stdout)).toMatchObject({
+      execution_status: 'error',
+      results: [{ stderr: 'OPTIONAL_DEPENDENCY_MISSING:@scope/runtime:unexpected-suffix' }],
+    });
+
+    mocks.sensorAdapter.mockReturnValue(
+      vi.fn(async () => {
+        throw new Error('prefix OPTIONAL_DEPENDENCY_MISSING:@scope/runtime');
+      }),
+    );
+    const prefixed = await run('type_check', {});
+    expect(prefixed.exit).toBe(EXIT_GATE);
+    expect(JSON.parse(prefixed.stdout)).toMatchObject({
+      execution_status: 'error',
+      results: [{ stderr: 'prefix OPTIONAL_DEPENDENCY_MISSING:@scope/runtime' }],
+    });
+
+    const sweep = await run(undefined, {
+      preset: 'sweep',
+      round: 'R-0007',
+      dryRun: true,
+    });
+    expect(sweep.exit).toBe(EXIT_PASS);
+    expect(JSON.parse(sweep.stdout)).toMatchObject({
+      dry_run: true,
+      selection: { type: 'preset', value: 'sweep' },
+      round_id: 'R-0007',
+    });
+  });
+
   it('turns adapter identity and execution failures into failed child results', async () => {
     mocks.sensorAdapter.mockReturnValueOnce(
       vi.fn(async () => ({ sensor: { kind: 'lint' }, status: 'pass' })),
