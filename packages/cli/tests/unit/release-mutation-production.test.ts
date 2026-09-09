@@ -190,13 +190,16 @@ function productionFixture(
   } = {},
 ): ProductionFixture {
   const installed = installedPackage(
-    ['mutation-production.mjs', 'mutation-vitest-plugin.mjs', 'mutation-workspace-aliases.mjs'].map(
-      (name) => ({
-        path: `dist/runtime/host/${name}`,
-        mode: 0o644,
-        bytes: readFileSync(resolve(ROOT, 'scripts/release-host', name)),
-      }),
-    ),
+    [
+      'mutation-production.mjs',
+      'mutation-typescript-plugin.mjs',
+      'mutation-vitest-plugin.mjs',
+      'mutation-workspace-aliases.mjs',
+    ].map((name) => ({
+      path: `dist/runtime/host/${name}`,
+      mode: 0o644,
+      bytes: readFileSync(resolve(ROOT, 'scripts/release-host', name)),
+    })),
     { current: true },
   );
   const base = fixture(installed, { current: true });
