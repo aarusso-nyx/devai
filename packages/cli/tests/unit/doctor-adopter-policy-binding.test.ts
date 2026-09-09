@@ -297,6 +297,48 @@ describe('Doctor adopter-policy binding regression', () => {
     expectReason(await policyCheck(identityRepo), 'POLICY_IDENTITY_MISMATCH');
   });
 
+  it('rejects a policy source directory and a schema-invalid policy document', async () => {
+    const directoryRepo = await boundRepo();
+    rmSync(join(directoryRepo, SOURCE));
+    mkdirSync(join(directoryRepo, SOURCE));
+    expectReason(await policyCheck(directoryRepo), 'SOURCE_POLICY_INVALID');
+
+    const schemaRepo = await boundRepo();
+    put(schemaRepo, SOURCE, { schemaVersion: '1.0.0' });
+    const receipt = readJson(schemaRepo, BINDING);
+    receipt['source_digest_sha256'] = sha256(readFileSync(join(schemaRepo, SOURCE)));
+    put(schemaRepo, BINDING, receipt);
+    expectReason(await policyCheck(schemaRepo), 'SOURCE_POLICY_INVALID');
+  });
+
+  it('reports malformed and missing project targets without losing the safe source remediation', async () => {
+    const malformedRepo = await boundRepo();
+    put(malformedRepo, `${CONFIG}/project.json`, '{broken-json\n');
+    const malformed = await policyCheck(malformedRepo);
+    expectReason(malformed, 'TARGET_BYTES_MISMATCH');
+    expectReason(malformed, 'FRAMEWORK_VERSION_MISMATCH');
+    expect(malformed.info).toMatchObject({
+      remediation_commands: [
+        `devai init bind --target . --adopter-policy ${SOURCE} --as-role architect --write`,
+      ],
+    });
+
+    const missingRepo = await boundRepo();
+    rmSync(join(missingRepo, `${CONFIG}/project.json`));
+    const missing = await policyCheck(missingRepo);
+    expectReason(missing, 'TARGET_MISSING');
+    expectReason(missing, 'FRAMEWORK_VERSION_MISMATCH');
+    expect(missing.info['mismatches']).toEqual(
+      expect.arrayContaining([
+        {
+          file: `${CONFIG}/project.json`,
+          actual_sha256: 'missing',
+          expected_sha256: 'unknown',
+        },
+      ]),
+    );
+  });
+
   it('fails closed on a forged or stale receipt hash', async () => {
     const repo = await boundRepo();
     const receipt = readJson(repo, BINDING);
@@ -481,5 +523,15 @@ describe('Doctor adopter-policy binding regression', () => {
     check = await policyCheck(repo);
     expect(check.ok).toBe(false);
     expect(JSON.stringify(check.info)).toContain('subprocess-effects.json');
+
+    const missingRepo = await boundRepo({
+      schemaVersion: '1.0.0',
+      policy_id: 'fixture.canonical-only',
+      policy_version: '1.0.0',
+    });
+    rmSync(join(missingRepo, `${CONFIG}/forbidden-actions.json`));
+    check = await policyCheck(missingRepo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'TARGET_MISSING');
   });
 });
