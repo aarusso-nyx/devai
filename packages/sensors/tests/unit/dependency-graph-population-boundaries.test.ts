@@ -92,4 +92,14 @@ describe('dependency graph population boundaries', () => {
     expect(result.body.graph).toEqual({ 'node_modules/entry.ts': [] });
     expect(result.reading.metrics).toMatchObject({ node_count: 1, edge_count: 0 });
   });
+
+  it('sorts file keys across a directory and a neighboring TypeScript file', () => {
+    const root = fixtureRoot();
+    mkdirSync(join(root, 'a'));
+    writeFileSync(join(root, 'a', 'nested.ts'), 'export const nested = 1;\n');
+    writeFileSync(join(root, 'a.ts'), 'export const sibling = 1;\n');
+    const result = senseInventoryDepGraph({ repoRoot: root, persistBody: false, now: NOW });
+    expect(Object.keys(result.body.graph)).toEqual(['a.ts', 'a/nested.ts']);
+    expect(result.reading.status).toBe('pass');
+  });
 });
