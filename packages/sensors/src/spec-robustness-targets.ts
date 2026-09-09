@@ -22,7 +22,8 @@ export interface SpecRobustnessTargetsOptions {
 const DEFAULT_INVARIANTS_DIR = 'law/invariants';
 const DEFAULT_ERROR_DIRS = ['docs/reference/contracts'];
 const ERROR_FILE_RE = /^(errors?[-_].*|errors?\.json|error-.*\.(md|json))$/i;
-const ROBUSTNESS_STATEMENT_RE = /\b(error|retry|idempot|circuit|timeout|fallback|graceful)\b/i;
+const ROBUSTNESS_STATEMENT_RE =
+  /\b(error|retry|idempot(?:ent)?|circuit|timeout|fallback|graceful)\b/i;
 
 function abs(repoRoot: string, p: string): string {
   return isAbsolute(p) ? p : resolve(repoRoot, p);
