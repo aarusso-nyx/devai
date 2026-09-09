@@ -1,16 +1,35 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { executeTranslationValidation } from '../../src/commands/verify/translation.js';
 import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
+
+const observations = vi.hoisted(() => ({ strategyCoverageStatuses: [] as string[] }));
+
+vi.mock('#runtime-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/runtime-core.js')>();
+  return {
+    ...actual,
+    evaluateTranslationFrames(
+      input: Parameters<typeof actual.evaluateTranslationFrames>[0],
+    ): ReturnType<typeof actual.evaluateTranslationFrames> {
+      observations.strategyCoverageStatuses.push(input.strategy_coverage.status);
+      return actual.evaluateTranslationFrames(input);
+    },
+  };
+});
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const WITNESS_PATH = 'scratch/translation-feature-overlay-witness.json';
 const RECIPE_PATH = 'record/proofs/work/recipe-runs/devai-fix/test/2026-07-27T00-00-00-000Z.json';
 const TEST_PATH = 'packages/cli/tests/unit/translation-overlay.test.ts';
 const SOURCE_PATH = 'packages/cli/src/translation-overlay.ts';
-const TEST_REF = { suite: 'unit', path: TEST_PATH, names: ['overlay behavior'] } as const;
+const TEST_REF = {
+  suite: 'unit',
+  path: TEST_PATH,
+  names: ['overlay behavior', 'secondary behavior'],
+} as const;
 
 let fixture: ReturnType<typeof createSelfContainedRepositoryFixture>;
 let repository: string;
@@ -115,14 +134,12 @@ function bindWitness(value: Record<string, unknown>): void {
 
 async function validate(value: Record<string, unknown>): Promise<Record<string, unknown>> {
   bindWitness(value);
-  return withAuthorityHostTestScope(
-    () =>
-      executeTranslationValidation({
-        witness: WITNESS_PATH,
-        repoRoot: repository,
-        databaseUrl: 'postgres://127.0.0.1:1/postgres?connect_timeout=1',
-      }),
-    { allowMutationCandidateGit: true },
+  return withAuthorityHostTestScope(() =>
+    executeTranslationValidation({
+      witness: WITNESS_PATH,
+      repoRoot: repository,
+      databaseUrl: 'postgres://127.0.0.1:1/postgres?connect_timeout=1',
+    }),
   );
 }
 
@@ -171,7 +188,13 @@ beforeAll(() => {
 
   writeText(
     TEST_PATH,
-    "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('overlay behavior', () => assert.equal(1, 1));\n",
+    [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "test('overlay behavior', () => assert.equal(1, 1));",
+      "test('secondary behavior', () => assert.equal(2, 2));",
+      '',
+    ].join('\n'),
   );
   fixture.git(['add', '--force', '--', TEST_PATH]);
   fixture.git(['commit', '--quiet', '-m', 'add test overlay']);
@@ -187,13 +210,18 @@ beforeAll(() => {
 
 afterAll(() => fixture?.cleanup());
 
+beforeEach(() => {
+  observations.strategyCoverageStatuses.length = 0;
+});
+
 describe('translation feature-overlay validation', () => {
-  it('binds the registered exact ref and strategy before the host scope refuses rev-list', async () => {
-    await expect(validate(witness())).rejects.toThrow('AUTHORITY_TEST_PROCESS_NOT_READ_ONLY');
+  it('reaches valid strategy-frame evaluation through the sanctioned read-only rev-list scope', async () => {
+    await expect(validate(witness())).rejects.toThrow('VALIDATION_RESULT_INVALID');
+    expect(observations.strategyCoverageStatuses).toEqual(['pass', 'pass']);
   });
 
-  it('refuses a cited test whose exact registered name does not match', async () => {
-    const changedRef = { ...TEST_REF, names: ['different behavior'] };
+  it('refuses a same-length test ref when only one registered name matches', async () => {
+    const changedRef = { ...TEST_REF, names: ['overlay behavior', 'different behavior'] };
     const value = witness({
       red_green: [
         {
@@ -216,7 +244,9 @@ describe('translation feature-overlay validation', () => {
     });
 
     await expect(validate(value)).rejects.toThrow(
-      'TRANSLATION_TEST_REF_UNREGISTERED: unit:packages/cli/tests/unit/translation-overlay.test.ts:different behavior',
+      'TRANSLATION_TEST_REF_UNREGISTERED: ' +
+        'unit:packages/cli/tests/unit/translation-overlay.test.ts:' +
+        'overlay behavior > different behavior',
     );
   });
 
@@ -225,14 +255,12 @@ describe('translation feature-overlay validation', () => {
     bindWitness(value);
     writeJson('.devai/state/tasks/TASK-9002.json', { id: 'TASK-9002' });
     await expect(
-      withAuthorityHostTestScope(
-        () =>
-          executeTranslationValidation({
-            witness: WITNESS_PATH,
-            repoRoot: repository,
-            databaseUrl: 'postgres://unused',
-          }),
-        { allowMutationCandidateGit: true },
+      withAuthorityHostTestScope(() =>
+        executeTranslationValidation({
+          witness: WITNESS_PATH,
+          repoRoot: repository,
+          databaseUrl: 'postgres://unused',
+        }),
       ),
     ).rejects.toThrow('TRANSLATION_TASK_INVALID');
 
@@ -248,14 +276,12 @@ describe('translation feature-overlay validation', () => {
       evidence: { translation_witness: { ...value, candidate_sha: '0'.repeat(40) } },
     });
     await expect(
-      withAuthorityHostTestScope(
-        () =>
-          executeTranslationValidation({
-            witness: WITNESS_PATH,
-            repoRoot: repository,
-            databaseUrl: 'postgres://unused',
-          }),
-        { allowMutationCandidateGit: true },
+      withAuthorityHostTestScope(() =>
+        executeTranslationValidation({
+          witness: WITNESS_PATH,
+          repoRoot: repository,
+          databaseUrl: 'postgres://unused',
+        }),
       ),
     ).rejects.toThrow('TRANSLATION_RECIPE_RECORD_WITNESS_MISMATCH');
   });
