@@ -60,6 +60,8 @@ describe('data-handling exact-name boundaries', () => {
     const classified = new Map(columns.map((column) => [column.name, column.pii_class]));
 
     expect(result.reading.status).toBe('pass');
+    expect(result.reading.deterministic).toBe(true);
+    expect(result.reading).not.toHaveProperty('findings');
     expect(result.reading.metrics).toMatchObject({
       table_count: 1,
       pii_column_count: 5,
