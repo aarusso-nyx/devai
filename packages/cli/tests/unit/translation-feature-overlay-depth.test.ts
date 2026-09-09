@@ -294,4 +294,49 @@ describe('translation feature-overlay validation', () => {
       'TEST_OVERLAY_OBJECT_INVALID',
     );
   });
+
+  it('requires the overlay to have the declared base as its only parent', async () => {
+    await expect(validate(witness({ test_overlay_sha: candidateCommit }))).rejects.toThrow(
+      'TEST_OVERLAY_PARENT_MISMATCH',
+    );
+  });
+
+  it('requires the candidate to descend from the exact overlay object', async () => {
+    const candidateTree = fixture.git(['rev-parse', `${candidateCommit}^{tree}`]);
+    const siblingCandidate = fixture.git([
+      'commit-tree',
+      candidateTree,
+      '-p',
+      baseCommit,
+      '-m',
+      'candidate outside overlay ancestry',
+    ]);
+    await expect(validate(witness({ candidate_sha: siblingCandidate }))).rejects.toThrow(
+      'CANDIDATE_NOT_DESCENDANT_OF_TEST_OVERLAY',
+    );
+  });
+
+  it('rejects an empty overlay even when its objects and ancestry are valid', async () => {
+    const baseTree = fixture.git(['rev-parse', `${baseCommit}^{tree}`]);
+    const emptyOverlay = fixture.git([
+      'commit-tree',
+      baseTree,
+      '-p',
+      baseCommit,
+      '-m',
+      'empty test overlay',
+    ]);
+    const candidateTree = fixture.git(['rev-parse', `${candidateCommit}^{tree}`]);
+    const descendant = fixture.git([
+      'commit-tree',
+      candidateTree,
+      '-p',
+      emptyOverlay,
+      '-m',
+      'candidate after empty overlay',
+    ]);
+    await expect(
+      validate(witness({ test_overlay_sha: emptyOverlay, candidate_sha: descendant })),
+    ).rejects.toThrow('TEST_OVERLAY_SCOPE_INVALID');
+  });
 });

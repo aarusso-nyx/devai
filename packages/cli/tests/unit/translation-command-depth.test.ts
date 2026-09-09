@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { CAC } from 'cac';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
+import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { verifyTranslation } from '../../src/commands/verify/translation.js';
 import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
@@ -137,7 +137,7 @@ async function run(options: Options): Promise<{ stdout: string; stderr: string; 
     stderr += String(chunk);
     return true;
   }) as typeof process.stderr.write;
-  await withAuthorityHostTestScope(() => invoke(options), { allowMutationCandidateGit: true });
+  await withAuthorityHostTestScope(() => invoke(options));
   return { stdout, stderr, exit: process.exitCode ?? 0 };
 }
 
