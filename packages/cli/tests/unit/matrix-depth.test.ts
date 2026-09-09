@@ -138,6 +138,33 @@ function putResults(root: string): void {
 }
 
 describe('render matrix public command boundaries', () => {
+  it('keeps default discovery inside the test-results directory', async () => {
+    const root = repository();
+    putResults(root);
+    writeFileSync(
+      join(root, 'unrelated-result.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        id: 'outside-root',
+        scope: 'unrelated-root-scope',
+        tier: 'perf',
+        status: 'pass',
+        timestamp: '2026-09-09T10:03:00.000Z',
+        metrics: { passed: 1, failed: 0, duration_ms: 10 },
+      }),
+    );
+    const defaultResult = await invoke(root, ['render-matrix', '--repo-root', root]);
+    expect(defaultResult.exit).toBe(0);
+    expect(defaultResult.stdout).toContain('| Scope | unit | api |');
+    expect(defaultResult.stdout).not.toContain('unrelated-root-scope');
+
+    // An explicit broader input includes the same valid record, proving the default
+    // exclusion comes from the directory boundary rather than a malformed fixture.
+    const explicitResult = await invoke(root, ['render-matrix', '--repo-root', root, '--in', '.']);
+    expect(explicitResult.exit).toBe(0);
+    expect(explicitResult.stdout).toContain('unrelated-root-scope');
+    expect(explicitResult.stdout).toContain('perf');
+  });
   it('renders observed scope and tier cells and applies tier/status filters', async () => {
     const root = repository();
     putResults(root);
