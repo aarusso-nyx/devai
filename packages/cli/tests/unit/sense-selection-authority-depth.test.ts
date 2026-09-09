@@ -1,6 +1,6 @@
 import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveSenseInvocation } from '../../src/authority/sense-selection.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const senseRun = canonicalRegistry().find((entry) => entry.name === 'sense run');
 if (senseRun === undefined) throw new Error('sense run registry entry missing');
@@ -88,5 +88,35 @@ describe('sense invocation authority boundaries', () => {
       write: true,
       allow_publish: false,
     });
+  });
+
+  it('rejects an unknown selected capability before projecting an authority contract', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/commands/sense/facade.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/sense/facade.js')>();
+      return {
+        ...actual,
+        resolveSenseSelection: (
+          ...args: Parameters<typeof actual.resolveSenseSelection>
+        ): ReturnType<typeof actual.resolveSenseSelection> => {
+          const selection = actual.resolveSenseSelection(...args);
+          const member = selection.members[0];
+          if (member === undefined) throw new Error('sense selection member missing');
+          return {
+            ...selection,
+            members: [{ ...member, capabilities: ['unknown:capability'] }],
+          };
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      expect(() =>
+        isolated.resolveSenseInvocation(senseRun, argv('decision_record_integrity')),
+      ).toThrow('SENSE_CAPABILITY_UNKNOWN:unknown:capability');
+    } finally {
+      vi.doUnmock('../../src/commands/sense/facade.js');
+      vi.resetModules();
+    }
   });
 });
