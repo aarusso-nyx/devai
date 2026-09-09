@@ -4,7 +4,7 @@
   "title": "Signed release publication receipt",
   "description": "The signed attestation emitted by the protected external workflow after a dispatched publication completes. No DEVAI action emits it. It binds the exact publication_dispatched state it answers, the exact candidate and artifacts that were published, the exact workflow identity that observed the publication, and the exact trust identity that signed it. release resume may derive the observation-only state published from it, and only when every one of those bindings matches the recorded dispatch. The receipt grants no authority: it is evidence that a publication happened, never permission for one, and it is never appended as a state record. Every digest it carries is computed under one frozen canonicalization kernel in one computable order, so no digest is an input to itself.",
   "$comment": "The embedded example signature is verified only with the external fixture devai-publication-receipt-example-trust-fixture-v1, identified by trust_root_id, trust_store_digest_sha256, and key_id. Its signed-payload, receipt-id, and whole-receipt digests remain exact without embedding key material.",
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -28,7 +28,8 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0.0"
+      "enum": ["1.0.0", "1.1.0"],
+      "description": "Version 1.0.0 retains the legacy path artifact projection. Version 1.1.0 binds the current opaque sink-handle projection emitted by a v2.1 lifecycle state. The two projections never mix within one receipt."
     },
     "receipt_kind": {
       "const": "release-publication-receipt"
@@ -138,27 +139,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "description": "The exact artifacts the workflow observed published, pinned by content digest. A digest that differs from the dispatched artifact is a different artifact.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["kind", "path", "sha256", "size_bytes"],
-        "properties": {
-          "kind": {
-            "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
-          },
-          "path": {
-            "$ref": "#/$defs/relative_path"
-          },
-          "sha256": {
-            "$ref": "#/$defs/sha256"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "minimum": 0
-          }
-        }
-      }
+      "description": "The exact artifacts the workflow observed published, pinned by content digest. Version 1.0.0 uses the legacy path projection; version 1.1.0 uses the current opaque sink-handle projection. A digest or sink identity that differs from the dispatched artifact is a different artifact."
     },
     "publication": {
       "type": "object",
@@ -346,6 +327,34 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.0.0"
+          }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/legacy_publication_artifact"
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/opaque_publication_artifact"
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -399,6 +408,57 @@
         },
         "tree": {
           "$ref": "#/$defs/git_object"
+        }
+      }
+    },
+    "legacy_publication_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {
+          "enum": ["package-tarball", "evidence-bundle", "manifest", "attestation"]
+        },
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "opaque_publication_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sink_id", "opaque_handle", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "package-manifest",
+            "package-tarball",
+            "package-sbom",
+            "evidence-manifest",
+            "provider-result"
+          ]
+        },
+        "sink_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        },
+        "opaque_handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

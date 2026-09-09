@@ -16,6 +16,7 @@ import {
   type AuthorityHostEffectScope,
   type ProtectedReleaseExportCapacityBinding,
 } from '@devai-nyx/authority';
+import { parsers as schemaParsers } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 import { fixture as unitMutationEvidenceFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
@@ -62,6 +63,7 @@ import {
   type AuthorizationAttemptBinding,
   type AuthorizationBridge,
   type PublicationControls,
+  type ReleaseLifecycleStateV2,
   type TrustedReleaseAuthority,
 } from '../../src/services/release-lifecycle-execution.js';
 
@@ -1261,6 +1263,76 @@ function rehashReceipt(
   };
 }
 
+function finalizePublicationReceipt(
+  input: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const {
+    receipt_id: _receiptId,
+    receipt_digest_sha256: _receiptDigest,
+    trust: trustInput,
+    ...projection
+  } = input;
+  const {
+    signature: _signature,
+    signed_payload_digest_sha256: _signedPayloadDigest,
+    ...trust
+  } = objectValue(trustInput);
+  const signedDigest = canonicalSha256({ ...projection, trust });
+  const signed = {
+    ...projection,
+    receipt_id: `RPU-${signedDigest.slice(0, 16)}`,
+    trust: {
+      ...trust,
+      signature: 'AQ==',
+      signed_payload_digest_sha256: signedDigest,
+    },
+  };
+  return {
+    ...signed,
+    receipt_digest_sha256: canonicalSha256(signed),
+  };
+}
+
+function boundPublicationReceipt(
+  state: Readonly<Record<string, unknown>>,
+  changes: Readonly<Record<string, unknown>> = {},
+): Readonly<Record<string, unknown>> {
+  const schema = JSON.parse(
+    readFileSync(
+      join(process.cwd(), 'law/schemas/release-publication-receipt.schema.json'),
+      'utf8',
+    ),
+  ) as { examples: readonly Readonly<Record<string, unknown>>[] };
+  const example = required(schema.examples[0], 'missing publication receipt fixture');
+  const expectation = objectValue(state['publication_expectation']);
+  const workflow = objectValue(expectation['workflow']);
+  return finalizePublicationReceipt({
+    ...example,
+    schemaVersion: '1.1.0',
+    repository: state['repository'],
+    candidate: state['candidate'],
+    dispatched_state: {
+      state: state['state'],
+      state_id: state['state_id'],
+      record_digest_sha256: state['record_digest_sha256'],
+    },
+    artifacts: state['artifacts'],
+    publication: expectation['destination'],
+    workflow: {
+      ...workflow,
+      run_id: '9876543210',
+      run_attempt: 2,
+      candidate_product_execution: false,
+    },
+    trust: {
+      ...objectValue(expectation['trust']),
+      signature: 'AQ==',
+      signed_payload_digest_sha256: '0'.repeat(64),
+    },
+    ...changes,
+  });
+}
+
 async function advanceToExported(store: ReleaseLifecycleFileStore): Promise<void> {
   await seedPreflight(store);
   for (const action of ['release certify', 'release prepare', 'release export'] as const) {
@@ -1529,6 +1601,41 @@ async function advanceToEvidencePublished(store: ReleaseLifecycleFileStore): Pro
     }),
   );
   if (!result.ok) throw new Error(`evidence publish failed: ${result.code}`);
+}
+
+async function advanceToPublicationDispatched(
+  store: ReleaseLifecycleFileStore,
+): Promise<Readonly<Record<string, unknown>>> {
+  await advanceToEvidencePublished(store);
+  const value = request('release publish');
+  const prior = required(store.readStateRecords().at(-1), 'missing evidence state');
+  const result = await withAuthorityHostTestScope(() =>
+    executeReleaseLifecycleAction({
+      request: value,
+      action: 'release publish',
+      authority: authorityFor('release publish'),
+      publication_controls: publicationControls(),
+      store,
+      resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
+      artifactReader: artifactReaderFor('release evidence-publish'),
+      authorization: authorizationBridge(),
+      provider: () => ({
+        outcome: 'success',
+        provider_handle: 'publish-run-1',
+        material: {
+          release_units: prior.release_units,
+          inputs: prior['inputs'],
+          evidence: prior['evidence'],
+          artifacts: prior['artifacts'],
+          artifact_sink: prior.artifact_sink,
+        } as ReleaseStateMaterial,
+      }),
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    }),
+  );
+  if (!result.ok) throw new Error(`publication dispatch failed: ${result.code}`);
+  return result.state;
 }
 
 function root(): string {
@@ -2380,6 +2487,95 @@ describe('release lifecycle execution kernel', () => {
     expect(ambiguous).toMatchObject({ next_action: null, next_outcome: 'ambiguous' });
   });
 
+  it('derives each remaining next action from the exact verified lifecycle head', async () => {
+    await withAuthorityHostTestScope(async () => {
+      const observe = async (
+        store: ReleaseLifecycleFileStore,
+        options: {
+          readonly offlineReceipt?: Readonly<Record<string, unknown>>;
+        } = {},
+      ) => {
+        const head = required(store.readStateRecords().at(-1), 'missing lifecycle head');
+        return resumeReleaseLifecycleExecution({
+          states: store.readStateRecords(),
+          store_records: store.readStoreRecords(),
+          store_head: store.readHead(),
+          repository: head.repository,
+          candidate: head.candidate,
+          candidate_locator: request('release publish').candidate_locator,
+          receipt_documents: [
+            planReceipt(),
+            ...(options.offlineReceipt === undefined ? [] : [options.offlineReceipt]),
+          ],
+          resolve_plan_input: resolvePlanInput,
+          ...(options.offlineReceipt === undefined
+            ? {}
+            : {
+                offline_receipt_verifier: {
+                  verify: ({ receipt }: { receipt: Readonly<Record<string, unknown>> }) => receipt,
+                },
+              }),
+        });
+      };
+
+      const certified = new ReleaseLifecycleFileStore(root(), request('release certify'));
+      await seedCertified(certified);
+      await expect(observe(certified)).resolves.toMatchObject({
+        next_action: 'release prepare',
+        next_outcome: 'ready',
+      });
+
+      const prepared = new ReleaseLifecycleFileStore(root(), request('release prepare'));
+      await advanceToPrepared(prepared);
+      await expect(observe(prepared)).resolves.toMatchObject({
+        next_action: 'release export',
+        next_outcome: 'ready',
+      });
+
+      const exported = new ReleaseLifecycleFileStore(root(), request('release export'));
+      await advanceToExported(exported);
+      await expect(observe(exported)).resolves.toMatchObject({
+        next_action: 'release offline-verify',
+        next_outcome: 'ready',
+      });
+      const exportedState = required(exported.readStateRecords().at(-1), 'missing exported state');
+      const verifiedOfflineReceipt = boundOfflineReceipt(exportedState);
+      await expect(
+        observe(exported, { offlineReceipt: verifiedOfflineReceipt }),
+      ).resolves.toMatchObject({
+        next_action: 'release evidence-publish',
+        next_outcome: 'ready',
+        derived_states: expect.arrayContaining([
+          expect.objectContaining({
+            state: 'offline_verified',
+            receipt_id: verifiedOfflineReceipt['receipt_id'],
+            verified: true,
+          }),
+        ]),
+      });
+
+      const evidencePublished = new ReleaseLifecycleFileStore(
+        root(),
+        request('release evidence-publish'),
+      );
+      await advanceToEvidencePublished(evidencePublished);
+      await expect(observe(evidencePublished)).resolves.toMatchObject({
+        next_action: 'release publish',
+        next_outcome: 'ready',
+      });
+
+      const publicationDispatched = new ReleaseLifecycleFileStore(
+        root(),
+        request('release publish'),
+      );
+      await advanceToPublicationDispatched(publicationDispatched);
+      await expect(observe(publicationDispatched)).resolves.toMatchObject({
+        next_action: 'release resume',
+        next_outcome: 'awaiting-external-receipt',
+      });
+    });
+  });
+
   it('rejects corrupted and forked append-only records and symlinked stores', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
@@ -2669,6 +2865,195 @@ describe('release lifecycle execution kernel', () => {
         'exact_identifier'
       ],
     ).toBe('npm:@aarusso-nyx/devai@1.5.0');
+  });
+
+  it('observes publication only from an exact signed receipt for the dispatched state', async () => {
+    await withAuthorityHostTestScope(async () => {
+      const value = request('release publish');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      const dispatched = await advanceToPublicationDispatched(store);
+      const receipt = boundPublicationReceipt(dispatched);
+      const parsedReceipt = schemaParsers.releasePublicationReceipt.safeParse(receipt);
+      if (!parsedReceipt.ok) throw new Error(JSON.stringify(parsedReceipt.error.issues));
+      const verifySignature = vi.fn(() => true);
+      const observation = await resumeReleaseLifecycleExecution({
+        states: store.readStateRecords(),
+        store_records: store.readStoreRecords(),
+        store_head: store.readHead(),
+        repository: value.repository_locator,
+        candidate: dispatched['candidate'] as ReleaseLifecycleStateV2['candidate'],
+        candidate_locator: value.candidate_locator,
+        receipt_documents: [planReceipt()],
+        resolve_plan_input: resolvePlanInput,
+        publication_receipt: receipt,
+        verify_signature: verifySignature,
+      });
+
+      expect(observation).toMatchObject({
+        next_action: null,
+        next_outcome: 'complete',
+        published: {
+          observed: true,
+          receipt: {
+            kind: 'release-publication-receipt',
+            receipt_id: receipt['receipt_id'],
+            receipt_digest_sha256: receipt['receipt_digest_sha256'],
+            signature_verified: true,
+          },
+          verified_against: {
+            state: 'publication_dispatched',
+            state_id: dispatched['state_id'],
+            record_digest_sha256: dispatched['record_digest_sha256'],
+            candidate_identity_verified: true,
+            artifact_identity_verified: true,
+            destination_identity_verified: true,
+            workflow_identity_verified: true,
+            trust_identity_verified: true,
+          },
+        },
+        derived_states: expect.arrayContaining([
+          {
+            state: 'published',
+            receipt_kind: 'release-publication-receipt',
+            receipt_id: receipt['receipt_id'],
+            receipt_digest_sha256: receipt['receipt_digest_sha256'],
+            verified: true,
+          },
+        ]),
+      });
+      expect(verifySignature).toHaveBeenCalledWith({
+        signed_payload_digest_sha256: objectValue(receipt['trust'])['signed_payload_digest_sha256'],
+        signature: 'AQ==',
+        trust: publicationControls().trust,
+      });
+    });
+  });
+
+  it('rejects independently rehashed publication receipt identity and trust substitutions', async () => {
+    await withAuthorityHostTestScope(async () => {
+      const value = request('release publish');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      const dispatched = await advanceToPublicationDispatched(store);
+      const candidate = dispatched['candidate'] as ReleaseLifecycleStateV2['candidate'];
+      const expectation = objectValue(dispatched['publication_expectation']);
+      const exact = boundPublicationReceipt(dispatched);
+      const common = {
+        states: store.readStateRecords(),
+        store_records: store.readStoreRecords(),
+        store_head: store.readHead(),
+        repository: value.repository_locator,
+        candidate,
+        candidate_locator: value.candidate_locator,
+        receipt_documents: [planReceipt()],
+        resolve_plan_input: resolvePlanInput,
+      };
+      const rehashWholeReceipt = (receipt: Readonly<Record<string, unknown>>) => {
+        const { receipt_digest_sha256: _digest, ...projection } = receipt;
+        return { ...projection, receipt_digest_sha256: canonicalSha256(projection) };
+      };
+      const cases: readonly [string, Readonly<Record<string, unknown>>][] = [
+        [
+          'repository',
+          boundPublicationReceipt(dispatched, {
+            repository: { ...objectValue(dispatched['repository']), commit: 'f'.repeat(40) },
+          }),
+        ],
+        [
+          'candidate',
+          boundPublicationReceipt(dispatched, {
+            candidate: { ...candidate, tree: 'f'.repeat(40) },
+          }),
+        ],
+        [
+          'dispatched state',
+          boundPublicationReceipt(dispatched, {
+            dispatched_state: {
+              state: 'publication_dispatched',
+              state_id: dispatched['state_id'],
+              record_digest_sha256: 'f'.repeat(64),
+            },
+          }),
+        ],
+        [
+          'artifact set',
+          boundPublicationReceipt(dispatched, {
+            artifacts: [
+              {
+                ...objectValue((dispatched['artifacts'] as readonly unknown[])[0]),
+                sha256: 'f'.repeat(64),
+              },
+            ],
+          }),
+        ],
+        [
+          'destination',
+          boundPublicationReceipt(dispatched, {
+            publication: {
+              ...objectValue(expectation['destination']),
+              exact_identifier: 'npm:@aarusso-nyx/devai@1.5.1',
+            },
+          }),
+        ],
+        [
+          'workflow',
+          boundPublicationReceipt(dispatched, {
+            workflow: {
+              ...objectValue(exact['workflow']),
+              workflow_sha: 'f'.repeat(40),
+            },
+          }),
+        ],
+        [
+          'trust',
+          boundPublicationReceipt(dispatched, {
+            trust: {
+              ...objectValue(expectation['trust']),
+              key_id: 'substituted-release-key',
+            },
+          }),
+        ],
+        ['receipt id', rehashWholeReceipt({ ...exact, receipt_id: `RPU-${'f'.repeat(16)}` })],
+        ['receipt digest', { ...exact, receipt_digest_sha256: 'f'.repeat(64) }],
+        [
+          'signed payload digest',
+          rehashWholeReceipt({
+            ...exact,
+            trust: {
+              ...objectValue(exact['trust']),
+              signed_payload_digest_sha256: 'f'.repeat(64),
+            },
+          }),
+        ],
+      ];
+
+      for (const [label, publicationReceipt] of cases) {
+        const verifySignature = vi.fn(() => true);
+        const observation = await resumeReleaseLifecycleExecution({
+          ...common,
+          publication_receipt: publicationReceipt,
+          verify_signature: verifySignature,
+        });
+        expect(observation, label).toMatchObject({
+          next_action: 'release resume',
+          next_outcome: 'awaiting-external-receipt',
+          published: { observed: false, receipt: null, verified_against: null },
+        });
+      }
+
+      const rejectedSignature = vi.fn(() => false);
+      await expect(
+        resumeReleaseLifecycleExecution({
+          ...common,
+          publication_receipt: exact,
+          verify_signature: rejectedSignature,
+        }),
+      ).resolves.toMatchObject({
+        next_action: 'release resume',
+        next_outcome: 'awaiting-external-receipt',
+        published: { observed: false },
+      });
+      expect(rejectedSignature).toHaveBeenCalledOnce();
+    });
   });
 
   it('derives resume states only from verified receipts and ignores caller booleans', async () => {
