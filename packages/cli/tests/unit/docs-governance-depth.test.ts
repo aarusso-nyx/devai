@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { checkDocsGovernance } from '../../src/commands/check/docs-governance.js';
 
 let root: string;
@@ -27,6 +28,31 @@ function finding(ruleId: string) {
 }
 
 describe('docs-governance public report boundaries', () => {
+  it('resolves the default Docusaurus toolchain when no build command is configured', async () => {
+    write(
+      '.devai/config/project.json',
+      JSON.stringify({
+        repo: { kind: 'application' },
+        docs: { builder: 'docusaurus' },
+      }),
+    );
+    write('bin/npx', '#!/bin/sh\nexit 0\n');
+    chmodSync(join(root, 'bin/npx'), 0o700);
+    const previousPath = process.env.PATH;
+    try {
+      process.env.PATH = join(root, 'bin');
+      const result = await withAuthorityHostTestScope(() =>
+        finding('docs-governance.build-toolchain'),
+      );
+      expect(result).toMatchObject({
+        severity: 'pass',
+        message: 'Build toolchain "npx" is on PATH and responds to --version',
+      });
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  });
   it('fails closed when project configuration is absent or malformed', () => {
     expect(finding('docs-governance.classification')).toMatchObject({ severity: 'fail' });
     expect(finding('docs-governance.builder-declared')).toMatchObject({ severity: 'fail' });
