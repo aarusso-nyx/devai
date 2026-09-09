@@ -1419,7 +1419,8 @@ void adapters;
       throw new Error(`INSTALLED_RECIPE_INVOCATION_POLICY_INVALID:${name}`);
     }
   }
-  if (templates.length !== 19) {
+  // The Angular authorization fix adds Cognito and policy guard templates.
+  if (templates.length !== 21) {
     throw new Error(`INSTALLED_TEMPLATE_COUNT_INVALID:${templates.length}`);
   }
   if (requiredAssets.some((path) => !existsSync(join(installedPackage, path)))) {
