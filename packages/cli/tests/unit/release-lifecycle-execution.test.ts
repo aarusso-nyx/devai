@@ -661,6 +661,62 @@ function providerFor(action: ReleaseLifecycleRequest['action_id']) {
   });
 }
 
+function certificationProviderBoundaryInput(
+  certify = vi.fn(() => ({
+    outcome: 'success' as const,
+    material: materialFor('release certify'),
+  })),
+) {
+  const input = {
+    resolve_receipt: () => planReceipt(),
+    resolve_plan_input: resolvePlanInput,
+    provider: {
+      kind: 'protected-certification-provider-v3' as const,
+      certify,
+    },
+    evidence_sink: {
+      kind: 'certification-evidence-sink-v3' as const,
+      protocol: 'two-phase-content-addressed' as const,
+      begin: () => undefined as never,
+      readCertificationEvidenceReceipt: () => {
+        throw new Error('no generated output');
+      },
+      readCertificationOutputClosure: (binding: CertificationOutputClosureBinding) => ({
+        ...binding,
+        outputs: [],
+      }),
+      readGeneratedBlob: () => {
+        throw new Error('no generated output');
+      },
+    },
+    content_source: {
+      readGitObject: ({
+        type,
+        object_id,
+      }: {
+        readonly type: string;
+        readonly object_id: string;
+      }) => {
+        if (type === 'commit' && object_id === COMMIT) return COMMIT_BYTES;
+        if (type === 'tree' && object_id === TREE) return TREE_BYTES;
+        throw new Error('unknown Git object');
+      },
+      readGitBlob: ({ object_id }: { readonly object_id: string }) => {
+        if (object_id !== BLOB) throw new Error('unknown Git blob');
+        return ARTIFACT_BYTES;
+      },
+    },
+    task_policies: [
+      {
+        release_unit: '@aarusso-nyx/devai',
+        task_policy_digest_sha256: TASK_POLICY_DIGEST,
+        document: CERTIFICATION_TASK_POLICY,
+      },
+    ],
+  } satisfies Parameters<typeof createReleaseCertificationProvider>[0];
+  return { certify, input };
+}
+
 function requiredMutationRequest(): ReleaseLifecycleRequest {
   const fixture = REQUIRED_POLICY_FIXTURE;
   const manifestDigest = createHash('sha256').update(fixture.package_json).digest('hex');
@@ -1716,6 +1772,216 @@ describe('release lifecycle execution kernel', () => {
     expect(protectedProvider.certify).not.toHaveBeenCalled();
   });
 
+  it('checks each protected certification construction capability independently', () => {
+    const { input, certify } = certificationProviderBoundaryInput();
+    const construct = (overrides: Readonly<Record<string, unknown>>) =>
+      createReleaseCertificationProvider({
+        ...input,
+        ...overrides,
+      } as Parameters<typeof createReleaseCertificationProvider>[0]);
+
+    for (const provider of [
+      undefined,
+      {},
+      { kind: 'other-provider', certify },
+      { kind: 'protected-certification-provider-v3' },
+    ]) {
+      expect(() => construct({ provider })).toThrow('release-certification-provider-unavailable');
+    }
+
+    for (const [property, value] of [
+      ['kind', 'other-sink'],
+      ['protocol', 'other-protocol'],
+      ['begin', undefined],
+      ['readCertificationEvidenceReceipt', undefined],
+      ['readCertificationOutputClosure', undefined],
+      ['readGeneratedBlob', undefined],
+    ] as const) {
+      expect(() =>
+        construct({ evidence_sink: { ...input.evidence_sink, [property]: value } }),
+      ).toThrow('release-certification-evidence-sink-unavailable');
+    }
+
+    for (const property of ['readGitObject', 'readGitBlob'] as const) {
+      expect(() =>
+        construct({ content_source: { ...input.content_source, [property]: undefined } }),
+      ).toThrow('release-prepare-git-tree-membership-invalid');
+    }
+    expect(() => construct({ content_source: undefined })).toThrow(
+      'release-prepare-git-tree-membership-invalid',
+    );
+    expect(certify).not.toHaveBeenCalled();
+  });
+
+  it('refuses each task-policy identity defect before protected certification dispatch', async () => {
+    const wrongAction = certificationProviderBoundaryInput();
+    await expect(
+      createReleaseCertificationProvider(wrongAction.input)(request('release preflight')),
+    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
+    expect(wrongAction.certify).not.toHaveBeenCalled();
+
+    const wrongUnit = certificationProviderBoundaryInput();
+    const wrongUnitRequest = request('release certify');
+    const originalUnit = required(
+      wrongUnitRequest.candidate_locator.release_units[0],
+      'missing release unit',
+    );
+    await expect(
+      createReleaseCertificationProvider(wrongUnit.input)({
+        ...wrongUnitRequest,
+        candidate_locator: {
+          ...wrongUnitRequest.candidate_locator,
+          release_units: [{ ...originalUnit, release_unit: '@foreign/unit' }],
+        },
+      }),
+    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
+    expect(wrongUnit.certify).not.toHaveBeenCalled();
+
+    const wrongDigest = certificationProviderBoundaryInput();
+    const secondUnit = { ...originalUnit, release_unit: '@foreign/unit' };
+    const policyInput = {
+      ...wrongDigest.input,
+      task_policies: [
+        wrongDigest.input.task_policies[0],
+        {
+          release_unit: '@foreign/unit',
+          task_policy_digest_sha256: '0'.repeat(64),
+          document: { nodes: ['foreign'] },
+        },
+      ],
+    } as Parameters<typeof createReleaseCertificationProvider>[0];
+    await expect(
+      createReleaseCertificationProvider(policyInput)({
+        ...wrongUnitRequest,
+        candidate_locator: {
+          ...wrongUnitRequest.candidate_locator,
+          release_units: [originalUnit, secondUnit],
+        },
+      }),
+    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
+    expect(wrongDigest.certify).not.toHaveBeenCalled();
+  });
+
+  it('preserves protected provider refusals and rejects incomplete success dispositions', async () => {
+    for (const result of [
+      { outcome: 'failure' as const, code: 'release-provider-refused' },
+      { outcome: 'unknown' as const, provider_handle: 'provider-run-1' },
+    ]) {
+      const boundary = certificationProviderBoundaryInput(vi.fn(() => result));
+      await expect(
+        createReleaseCertificationProvider(boundary.input)(request('release certify')),
+      ).resolves.toEqual(result);
+    }
+
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      for (const result of [
+        { outcome: 'success' as const },
+        {
+          outcome: 'success' as const,
+          material: materialFor('release certify'),
+          transaction: {
+            commit: vi.fn(),
+            rollback: vi.fn(),
+            dispose: vi.fn(),
+          },
+        },
+      ]) {
+        stderr.mockClear();
+        const boundary = certificationProviderBoundaryInput(vi.fn(() => result));
+        await expect(
+          createReleaseCertificationProvider(boundary.input)(request('release certify')),
+        ).resolves.toMatchObject({
+          outcome: 'failure',
+          code: 'release-certification-generated-output-untrusted',
+        });
+        expect(boundary.certify).toHaveBeenCalledOnce();
+        expect(stderr.mock.calls[0]?.[0]).toContain(
+          'Error: release-certification-generated-output-untrusted',
+        );
+      }
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('keeps diagnostic details off-ledger while preserving only exact closed refusal codes', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      for (const [message, expectedCode] of [
+        ['release-valid-code', 'release-valid-code'],
+        ['rpl-valid-code', 'rpl-valid-code'],
+        ['prefix-release-valid-code', 'release-certification-generated-output-untrusted'],
+        ['release-valid-code-suffix!', 'release-certification-generated-output-untrusted'],
+      ] as const) {
+        stderr.mockClear();
+        const error = new Error(message);
+        error.stack = undefined;
+        const boundary = certificationProviderBoundaryInput(
+          vi.fn(() => {
+            throw error;
+          }),
+        );
+
+        await expect(
+          createReleaseCertificationProvider(boundary.input)(request('release certify')),
+        ).resolves.toEqual({ outcome: 'failure', code: expectedCode });
+        expect(stderr).toHaveBeenCalledOnce();
+        expect(stderr.mock.calls[0]?.[0]).toBe(`release certify: cause: ${message}\n`);
+      }
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('rejects one mismatched package policy among otherwise matching release units', async () => {
+    const good = materialFor('release certify');
+    const unit = required(good.release_units[0], 'missing certified release unit');
+    const pkg = required(unit.packages[0], 'missing certified package');
+    const certification = required(pkg.certification_manifest, 'missing certification manifest');
+    const materialWithWrongPolicy: ReleaseStateMaterial = {
+      ...good,
+      release_units: [
+        {
+          ...unit,
+          packages: [
+            pkg,
+            {
+              ...pkg,
+              package_id: '@foreign/package',
+              certification_manifest: {
+                ...certification,
+                package_id: '@foreign/package',
+                task_policy_digest_sha256: '0'.repeat(64),
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const boundary = certificationProviderBoundaryInput(
+      vi.fn(() => ({ outcome: 'success' as const, material: materialWithWrongPolicy })),
+    );
+
+    await expect(
+      createReleaseCertificationProvider(boundary.input)(request('release certify')),
+    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
+    expect(boundary.certify).toHaveBeenCalledOnce();
+  });
+
+  it('requires both a live provider context value and its exact object identity', () => {
+    const value = request('release prepare');
+    expect(() => assertReleaseProviderInvocationContext(value, null)).toThrow(
+      'release-provider-invocation-unbound',
+    );
+    expect(() => assertReleaseProviderInvocationContext(value, 'context')).toThrow(
+      'release-provider-invocation-unbound',
+    );
+    expect(() => assertReleaseProviderInvocationContext(value, {})).toThrow(
+      'release-provider-invocation-unbound',
+    );
+  });
+
   it('keeps a genuinely mutation-free certification compatible with its resolved plan', async () => {
     const result = await providerFor('release certify')(request('release certify'));
 
@@ -1747,6 +2013,45 @@ describe('release lifecycle execution kernel', () => {
       code: 'release-certification-generated-output-untrusted',
     });
     expect(certify).not.toHaveBeenCalled();
+  });
+
+  it('requires every unit mutation reader and a positive safe byte limit independently', async () => {
+    const input = await requiredMutationCertificationFixture();
+    const validSink = requiredMutationEvidenceSink(input.evidence);
+    const invalidSinks = [
+      { ...validSink, readUnitMutationEvidenceClosure: undefined },
+      { ...validSink, readUnitMutationEvidenceReceipt: undefined },
+      { ...validSink, readUnitMutationEvidenceBlob: undefined },
+      { ...validSink, unit_mutation_maximum_bytes: undefined },
+      { ...validSink, unit_mutation_maximum_bytes: 0 },
+      { ...validSink, unit_mutation_maximum_bytes: 1.5 },
+    ];
+
+    for (const evidenceSink of invalidSinks) {
+      const certify = vi.fn(() => ({ outcome: 'success' as const, material: input.material }));
+      const provider = createReleaseCertificationProvider({
+        provider: { kind: 'protected-certification-provider-v3', certify },
+        evidence_sink: evidenceSink as Parameters<
+          typeof createReleaseCertificationProvider
+        >[0]['evidence_sink'],
+        content_source: input.content_source,
+        task_policies: [
+          {
+            release_unit: '@aarusso-nyx/devai',
+            task_policy_digest_sha256: TASK_POLICY_DIGEST,
+            document: CERTIFICATION_TASK_POLICY,
+          },
+        ],
+        resolve_receipt: () => input.fixture.receipt,
+        resolve_plan_input: input.fixture.resolve_plan_input,
+      });
+
+      await expect(provider(input.request)).resolves.toMatchObject({
+        outcome: 'failure',
+        code: 'release-certification-generated-output-untrusted',
+      });
+      expect(certify).not.toHaveBeenCalled();
+    }
   });
 
   it('refuses missing, corrupted, or wrong-bound required unit mutation evidence', async () => {
