@@ -1,6 +1,7 @@
 import type { CAC } from 'cac';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXIT_GATE, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
+import { canonicalRegistry } from '../../src/define-command.js';
 
 const mocks = vi.hoisted(() => ({ sensorAdapter: vi.fn() }));
 
@@ -8,7 +9,7 @@ vi.mock('../../src/commands/sense/adapters.js', () => ({
   sensorAdapter: mocks.sensorAdapter,
 }));
 
-import { senseRunSetCmd } from '../../src/commands/sense/run-set.js';
+import { routeSensorChildArgv, senseRunSetCmd } from '../../src/commands/sense/run-set.js';
 
 interface Options {
   readonly preset?: string;
@@ -75,6 +76,19 @@ async function run(kind: string | undefined, options: Options) {
 }
 
 describe('sense run command boundaries', () => {
+  it('routes child argv only through a registered dispatch action', () => {
+    const entries = canonicalRegistry();
+    expect(
+      routeSensorChildArgv(['sense', 'run', 'type_check', '--json'], '/cli.js', entries, '1.5.0'),
+    ).toEqual(['sense', 'run', 'type_check']);
+    expect(() =>
+      routeSensorChildArgv(['sense', 'run', 'unknown'], '/cli.js', entries, '1.5.0'),
+    ).toThrow('SENSE_RUN_CHILD_ROUTE_INVALID');
+    expect(() => routeSensorChildArgv(['--version'], '/cli.js', entries, '1.5.0')).toThrow(
+      'SENSE_RUN_CHILD_ACTION_UNKNOWN',
+    );
+  });
+
   it('resolves an exact kind and preset without executing adapters in dry-run mode', async () => {
     const kind = await run('type_check', { dryRun: true, repoRoot: '/unused' });
     expect(kind.stderr).toBe('');
