@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cac } from 'cac';
@@ -224,5 +224,189 @@ describe('render matrix public command boundaries', () => {
     expect(result.stdout).toContain('| pkg-a | PASS 3/3 |');
     expect(result.stderr).toContain('strict mode');
     expect(result.stderr).toContain('missing: no test-result record found');
+  });
+
+  it('renders HTML cells with status classes and preserves the output path boundary', async () => {
+    const root = repository();
+    const dir = join(root, '.devai/state/test-results');
+    const record = (id: string, tier: 'coverage' | 'mutation', metrics: object) => ({
+      schemaVersion: '1.0.0',
+      id,
+      scope: 'pkg-html',
+      tier,
+      status: 'pass',
+      timestamp: `2026-09-09T10:0${id.endsWith('c') ? '3' : '4'}:00.000Z`,
+      metrics,
+      command: 'pnpm test',
+      exit_code: 0,
+    });
+    writeFileSync(
+      join(dir, 'coverage.json'),
+      JSON.stringify(record('coverage-c', 'coverage', { coverage_pct: { lines: 81.2 } })),
+    );
+    writeFileSync(
+      join(dir, 'mutation.json'),
+      JSON.stringify(record('mutation-m', 'mutation', { mutation_score: 72 })),
+    );
+    writeFileSync(
+      join(root, 'thresholds.json'),
+      JSON.stringify({ coverage: { lines: 80 }, mutation: { score_min: 70 } }),
+    );
+    const out = 'reports/nested/matrix.html';
+    const result = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--format',
+      'html',
+      '--out',
+      out,
+      '--human',
+      '--include-thresholds',
+      '--thresholds-path',
+      'thresholds.json',
+    ]);
+    expect(result.exit).toBe(0);
+    expect(result.stdout).toContain(`wrote 1 scope(s) × 2 tier(s) → ${out}`);
+    expect(result.stdout).not.toContain('<!doctype html>');
+    const html = readFileSync(join(root, out), 'utf8');
+    expect(html).toContain('<!doctype html>');
+    expect(html).toContain('cell-pass');
+    expect(html).toContain('PASS 81.2% / req 80.0%');
+    expect(html).toContain('PASS 72.0% / req 70.0%');
+
+    const rawOut = 'reports/raw.html';
+    const rawResult = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--format',
+      'html',
+      '--out',
+      rawOut,
+    ]);
+    expect(rawResult.exit).toBe(0);
+    expect(rawResult.stdout).toBe('');
+    expect(readFileSync(join(root, rawOut), 'utf8')).toContain('<!doctype html>');
+  });
+
+  it('renders duration presets and explicit duration values at each display boundary', async () => {
+    const root = repository();
+    const dir = join(root, '.devai/state/test-results');
+    const record = (id: string, timestamp: string, duration_ms: number) => ({
+      schemaVersion: '1.0.0',
+      id,
+      scope: `scope-${id}`,
+      tier: 'unit',
+      status: 'pass',
+      timestamp,
+      metrics: { passed: 1, failed: 0, duration_ms },
+      command: 'pnpm test',
+      exit_code: 0,
+    });
+    writeFileSync(
+      join(dir, 'short.json'),
+      JSON.stringify(record('short', '2026-09-09T10:00:00.000Z', 500)),
+    );
+    writeFileSync(
+      join(dir, 'seconds.json'),
+      JSON.stringify(record('seconds', '2026-09-09T10:01:00.000Z', 1500)),
+    );
+    writeFileSync(
+      join(dir, 'minutes.json'),
+      JSON.stringify(record('minutes', '2026-09-09T10:02:00.000Z', 70_000)),
+    );
+    const explicit = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--include-duration',
+    ]);
+    expect(explicit.exit).toBe(0);
+    expect(explicit.stdout).toContain('PASS 500ms');
+    expect(explicit.stdout).toContain('PASS 1.5s');
+    expect(explicit.stdout).toContain('PASS 1m 10s');
+    const preset = await invoke(root, ['render-matrix', '--repo-root', root, '--view', 'timings']);
+    expect(preset.exit).toBe(0);
+    expect(preset.stdout).toContain('PASS 1.5s');
+  });
+
+  it('renders threshold annotations before strict below-threshold failure', async () => {
+    const root = repository();
+    const dir = join(root, '.devai/state/test-results');
+    writeFileSync(
+      join(dir, 'coverage.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        id: 'coverage-low',
+        scope: 'pkg-threshold',
+        tier: 'coverage',
+        status: 'pass',
+        timestamp: '2026-09-09T10:00:00.000Z',
+        metrics: { coverage_pct: { lines: 74.9 } },
+      }),
+    );
+    writeFileSync(
+      join(dir, 'coverage-equal.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        id: 'coverage-equal',
+        scope: 'pkg-threshold-equal',
+        tier: 'coverage',
+        status: 'pass',
+        timestamp: '2026-09-09T10:00:00.000Z',
+        metrics: { coverage_pct: { lines: 75 } },
+      }),
+    );
+    writeFileSync(join(root, 'thresholds.json'), JSON.stringify({ coverage: { lines: 75 } }));
+    const result = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--include-thresholds',
+      '--thresholds-path',
+      'thresholds.json',
+      '--strict',
+    ]);
+    expect(result.exit).toBe(2);
+    expect(result.stdout).toContain('PASS 74.9% / req 75.0%');
+    expect(result.stdout).toContain('PASS 75.0% / req 75.0%');
+    expect(result.stderr).toContain('below threshold: coverage 74.9% < required 75.0%');
+    expect(result.stderr).not.toContain('[pkg-threshold-equal/coverage]');
+  });
+
+  it('applies configured scope inclusion, exclusion, and N/A overrides', async () => {
+    const root = repository();
+    const dir = join(root, '.devai/state/test-results');
+    const base = (id: string, scope: string) => ({
+      schemaVersion: '1.0.0',
+      id,
+      scope,
+      tier: 'unit',
+      status: 'pass',
+      timestamp: '2026-09-09T10:00:00.000Z',
+      metrics: { passed: 2, failed: 0 },
+    });
+    writeFileSync(join(dir, 'included.json'), JSON.stringify(base('included', 'pkg/included')));
+    writeFileSync(join(dir, 'excluded.json'), JSON.stringify(base('excluded', 'pkg/excluded')));
+    writeFileSync(
+      join(root, 'matrix.json'),
+      JSON.stringify({
+        tiers: ['unit', 'coverage'],
+        scopes_include: ['pkg/**'],
+        scopes_exclude: ['pkg/excluded'],
+        na_overrides: [{ scope: 'pkg/included', tier: 'coverage', reason: 'not applicable' }],
+      }),
+    );
+    const result = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--config',
+      'matrix.json',
+    ]);
+    expect(result.exit).toBe(0);
+    expect(result.stdout).toContain('| pkg/included | PASS 2/2 | N/A |');
+    expect(result.stdout).not.toContain('pkg/excluded');
   });
 });
