@@ -161,6 +161,7 @@ function sinkFixture(
   let closure: ReleaseUnitMutationEvidenceClosure | undefined;
   let committed = false;
   let aborted = false;
+  let begins = 0;
   let puts = 0;
   const transaction: UnitMutationEvidenceTransaction = {
     evidence_sink_id: 'retention-test-sink',
@@ -214,6 +215,7 @@ function sinkFixture(
   const value: UnitMutationEvidenceSink = {
     unit_mutation_maximum_bytes: 1_000_000,
     beginUnitMutationEvidence: (actual) => {
+      begins += 1;
       if (canonicalJson(actual) !== canonicalJson(binding)) throw new Error(REFUSAL);
       return transaction;
     },
@@ -275,6 +277,9 @@ function sinkFixture(
       },
       get aborted() {
         return aborted;
+      },
+      get begins() {
+        return begins;
       },
       get puts() {
         return puts;
@@ -426,6 +431,34 @@ describe('release mutation retention adapter', () => {
       const packages = [mutate(first(value.packages)), ...value.packages.slice(1)];
       await refuses(() => retainReleaseMutationEvidenceV21({ ...value.input, packages } as never));
       expect(value.sink.state.puts, name).toBe(0);
+    }
+  });
+
+  it('refuses malformed task-policy digest populations before invoking the sink', async () => {
+    const source = await evidenceFixture();
+    const digestA = '0'.repeat(64);
+    const digestB = 'f'.repeat(64);
+    const boxedDigest: unknown = Object(digestA);
+    const cases: readonly unknown[] = [
+      [],
+      ['invalid'],
+      [1],
+      [boxedDigest],
+      [digestA, 'invalid'],
+      [digestA, digestA],
+      [digestB, digestA],
+    ];
+
+    for (const task_policy_digests_sha256 of cases) {
+      const value = adapterFixture(source);
+      await refuses(() =>
+        retainReleaseMutationEvidenceV21({
+          ...value.input,
+          task_policy_digests_sha256,
+        } as never),
+      );
+      expect(value.sink.state.begins).toBe(0);
+      expect(value.sink.state.puts).toBe(0);
     }
   });
 
