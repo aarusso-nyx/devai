@@ -849,6 +849,61 @@ describe('protected mutation-program container transport', () => {
     }
   });
 
+  it('refuses an empty mutation envelope after an outer success', () => {
+    const value = fixture();
+    try {
+      state.envelope = Buffer.alloc(0);
+      expect(() => invoke({ ...value, mutation_program: program })).toThrow(
+        'release-certification-mutation-program-invalid',
+      );
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each(['status', 'signal', 'error'] as const)(
+    'retains an outer %s failure without requiring an unavailable mutation envelope',
+    (failure) => {
+      const value = fixture();
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      state.envelope = Buffer.alloc(0);
+      if (failure === 'status') {
+        state.outer_status = 1;
+      } else {
+        activeFixture = {
+          ...value,
+          docker(args, input) {
+            const result = value.docker(args, input);
+            if (args.slice(4)[0] !== 'start') return result;
+            return failure === 'signal'
+              ? { ...result, status: null, signal: 'SIGTERM' }
+              : {
+                  ...result,
+                  status: null,
+                  error: Object.assign(new Error('fixture'), { code: 'EIO' }),
+                };
+          },
+        };
+      }
+      try {
+        const result = invoke({ ...value, mutation_program: program });
+        expect(result.outputs).toEqual([]);
+        expect(result).not.toHaveProperty('mutation_observation');
+        expect(result).not.toHaveProperty('mutation_report');
+        expect(result.result).toMatchObject(
+          failure === 'status'
+            ? { status: 1, signal: null }
+            : failure === 'signal'
+              ? { status: 0, signal: 'SIGTERM' }
+              : { status: 0, signal: null, errorCode: 'PROTECTED_CONTAINER_ABNORMAL' },
+        );
+      } finally {
+        stderr.mockRestore();
+        value.dispose();
+      }
+    },
+  );
+
   it.each([
     [
       'malformed envelope JSON',
