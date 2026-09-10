@@ -384,6 +384,60 @@ describe('protected mutation program factory with explicit upstream-authority is
     ).not.toThrow();
   });
 
+  it.each([
+    ['a missing entry', undefined, {}],
+    [
+      'a substituted entry path',
+      { path: 'generated/substituted.json', mode: '100644' as const },
+      {},
+    ],
+    ['a substituted entry mode', { mode: '100755' as const }, {}],
+    ['a substituted entry size', {}, { size: Buffer.byteLength('{"needed":true}\n') + 1 }],
+    ['a substituted entry digest', { bytes: Buffer.from('{"needed":fals}\n') }, {}],
+  ] as const)(
+    'refuses %s at the protected prerequisite-output boundary',
+    (_label, outputChange, expectedChange) => {
+      const { input, pkg } = factoryUnit();
+      const neededBytes = Buffer.from('{"needed":true}\n');
+      const needed = {
+        path: 'generated/needed.json',
+        mode: '100644' as const,
+        size: neededBytes.length,
+        sha256: hash(neededBytes),
+        producer_task_node: 'release:needed',
+      };
+      Object.assign(pkg, { prerequisite_nodes: [needed.producer_task_node] });
+      executionContextCapture.mockImplementation(() => ({
+        ...isolatedExecutionContext,
+        prerequisite_outputs: [{ ...needed, ...expectedChange }],
+      }));
+
+      const program = createProtectedMutationProgram(input);
+      const priorOutputs =
+        outputChange === undefined
+          ? new Map<string, ContainerArchiveEntry>()
+          : new Map([
+              [
+                needed.path,
+                {
+                  path: needed.path,
+                  mode: needed.mode,
+                  bytes: neededBytes,
+                  ...outputChange,
+                },
+              ],
+            ]);
+      expect(() =>
+        assertProtectedMutationProgramExecution(program, {
+          container_identity: isolatedExecutionContext.container_identity,
+          environment: isolatedExecutionContext.environment,
+          source: [{ path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource }],
+          prior_outputs: priorOutputs,
+        }),
+      ).toThrow(INVALID);
+    },
+  );
+
   it('constructs only exact host-owned files and bound roster/config/threshold options', () => {
     const { input, pkg } = factoryUnit();
     const program = createProtectedMutationProgram(input);
