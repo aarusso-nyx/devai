@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cac } from 'cac';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { renderMatrix } from '../../src/commands/render/matrix.js';
 
@@ -15,6 +15,7 @@ interface Invocation {
 const roots: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -137,7 +138,217 @@ function putResults(root: string): void {
   });
 }
 
+function writeResult(root: string, name: string, value: Readonly<Record<string, unknown>>): void {
+  writeFileSync(
+    join(root, '.devai/state/test-results', `${name}.json`),
+    `${JSON.stringify(value)}\n`,
+  );
+}
+
+function matrixResult(
+  id: string,
+  input: Readonly<{
+    scope: string;
+    tier?: string;
+    status?: string;
+    timestamp?: string;
+    metrics?: Readonly<Record<string, unknown>>;
+  }>,
+): Readonly<Record<string, unknown>> {
+  return {
+    id,
+    scope: input.scope,
+    tier: input.tier ?? 'unit',
+    status: input.status ?? 'pass',
+    timestamp: input.timestamp ?? '2026-09-10T10:00:00.000Z',
+    metrics: input.metrics ?? { passed: 1, failed: 0 },
+  };
+}
+
 describe('render matrix public command boundaries', () => {
+  it('admits only complete result records while traversing nested input directories', async () => {
+    const root = repository();
+    const results = join(root, '.devai/state/test-results');
+    const nested = join(results, 'nested');
+    mkdirSync(nested);
+    writeFileSync(
+      join(nested, 'accepted.json'),
+      JSON.stringify(matrixResult('accepted', { scope: 'accepted-scope' })),
+    );
+    writeFileSync(
+      join(results, 'ignored.txt'),
+      JSON.stringify(matrixResult('wrong-extension', { scope: 'wrong-extension-scope' })),
+    );
+    writeFileSync(join(results, 'malformed.json'), '{');
+
+    const complete = matrixResult('invalid', { scope: 'invalid-scope' });
+    for (const [name, value] of [
+      ['id', { ...complete, id: 1 }],
+      ['tier', { ...complete, tier: 1 }],
+      ['status', { ...complete, status: 1 }],
+      ['timestamp', { ...complete, timestamp: 1 }],
+      ['timestamp-only', { timestamp: complete.timestamp, scope: 'timestamp-only-scope' }],
+    ] as const) {
+      writeResult(root, name, value);
+    }
+
+    const result = await invoke(root, ['render-matrix', '--repo-root', root]);
+
+    expect(result).toMatchObject({ exit: 0, stderr: '' });
+    expect(result.stdout).toContain('| accepted-scope | PASS 1/1 |');
+    for (const excluded of ['wrong-extension-scope', 'invalid-scope', 'timestamp-only-scope']) {
+      expect(result.stdout).not.toContain(excluded);
+    }
+  });
+
+  it('uses the latest record for strict status evaluation', async () => {
+    const root = repository();
+    writeResult(
+      root,
+      '00-older',
+      matrixResult('older', {
+        scope: 'latest-scope',
+        status: 'fail',
+        timestamp: '2026-09-10T09:00:00.000Z',
+        metrics: { passed: 0, failed: 1 },
+      }),
+    );
+    writeResult(
+      root,
+      '01-newer',
+      matrixResult('newer', {
+        scope: 'latest-scope',
+        timestamp: '2026-09-10T10:00:00.000Z',
+      }),
+    );
+
+    const result = await invoke(root, ['render-matrix', '--repo-root', root, '--strict']);
+
+    expect(result).toMatchObject({ exit: 0, stderr: '' });
+    expect(result.stdout).toContain('| latest-scope | PASS 1/1 |');
+  });
+
+  it('accepts only exact N/A overrides and retains configured strict tiers', async () => {
+    const root = repository();
+    writeResult(root, 'alpha', matrixResult('alpha', { scope: 'alpha' }));
+    writeFileSync(
+      join(root, 'matrix-strict.json'),
+      JSON.stringify({
+        tiers: ['unit', 'coverage', 'mutation'],
+        na_overrides: [
+          { scope: 'alpha', tier: 'coverage' },
+          { scope: 'alpha', tier: 'unused' },
+          { scope: 'decoy', tier: 'mutation' },
+        ],
+      }),
+    );
+
+    const exact = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--config',
+      'matrix-strict.json',
+      '--strict',
+    ]);
+
+    expect(exact.exit).toBe(2);
+    expect(exact.stderr).toContain('strict mode — 3 violation(s)');
+    expect(exact.stderr).toContain('[alpha/mutation] missing: no test-result record found');
+    expect(exact.stderr).not.toContain('[alpha/coverage]');
+    expect(exact.stderr).toContain('[decoy/unit] missing: no test-result record found');
+    expect(exact.stderr).toContain('[decoy/coverage] missing: no test-result record found');
+    expect(exact.stderr).not.toContain('[decoy/mutation]');
+
+    writeResult(root, 'failed', matrixResult('failed', { scope: 'failed-scope', status: 'fail' }));
+    writeFileSync(join(root, 'matrix-empty-tiers.json'), JSON.stringify({ tiers: [] }));
+    const fallback = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--config',
+      'matrix-empty-tiers.json',
+      '--strict',
+    ]);
+    expect(fallback.exit).toBe(2);
+    expect(fallback.stderr).toContain('[failed-scope/unit] status: fail');
+  });
+
+  it('reports only valid stale timestamps and failing statuses in strict mode', async () => {
+    const root = repository();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-10T12:00:00.000Z'));
+    for (const [name, value] of [
+      [
+        'stale',
+        matrixResult('stale', {
+          scope: 'stale-scope',
+          timestamp: '2026-09-03T11:59:59.999Z',
+        }),
+      ],
+      [
+        'boundary',
+        matrixResult('boundary', {
+          scope: 'boundary-scope',
+          timestamp: '2026-09-03T12:00:00.000Z',
+        }),
+      ],
+      [
+        'invalid-time',
+        matrixResult('invalid-time', { scope: 'invalid-time-scope', timestamp: 'invalid' }),
+      ],
+      ['failed', matrixResult('failed', { scope: 'failed-scope', status: 'fail' })],
+      ['errored', matrixResult('errored', { scope: 'errored-scope', status: 'error' })],
+    ] as const) {
+      writeResult(root, name, value);
+    }
+
+    const result = await invoke(root, ['render-matrix', '--repo-root', root, '--strict']);
+
+    expect(result.exit).toBe(2);
+    expect(result.stderr).toContain('[stale-scope/unit] stale: record is 168.0h old');
+    expect(result.stderr).not.toContain('[boundary-scope/unit] stale:');
+    expect(result.stderr).not.toContain('[invalid-time-scope/unit] stale:');
+    expect(result.stderr).toContain('[failed-scope/unit] status: fail');
+    expect(result.stderr).toContain('[errored-scope/unit] status: error');
+  });
+
+  it('enforces mutation thresholds below but not at or above the exact minimum', async () => {
+    const root = repository();
+    for (const [name, score] of [
+      ['below', 79.9],
+      ['equal', 80],
+      ['above', 80.1],
+    ] as const) {
+      writeResult(
+        root,
+        name,
+        matrixResult(name, {
+          scope: `${name}-scope`,
+          tier: 'mutation',
+          metrics: { mutation_score: score },
+        }),
+      );
+    }
+    writeFileSync(join(root, 'thresholds.json'), JSON.stringify({ mutation: { score_min: 80 } }));
+
+    const result = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--thresholds-path',
+      'thresholds.json',
+      '--strict',
+    ]);
+
+    expect(result.exit).toBe(2);
+    expect(result.stderr).toContain('strict mode — 1 violation(s)');
+    expect(result.stderr).toContain(
+      '[below-scope/mutation] below threshold: mutation score 79.9% < required 80.0%',
+    );
+    expect(result.stderr).not.toContain('[equal-scope/mutation]');
+    expect(result.stderr).not.toContain('[above-scope/mutation]');
+  });
+
   it('keeps default discovery inside the test-results directory', async () => {
     const root = repository();
     putResults(root);
