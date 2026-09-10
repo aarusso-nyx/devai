@@ -526,6 +526,55 @@ describe('protected release mutation input derivation', () => {
     ).toEqual(expect.arrayContaining(['test:schemas', 'test:utils']));
   });
 
+  it('distinguishes tracked prerequisites from generated outputs and unresolved declared inputs', () => {
+    const buildWith = (
+      outputContract: Record<string, unknown>,
+      inputSelectors: readonly Record<string, unknown>[],
+    ) => {
+      const base = currentFixture();
+      const descriptor = JSON.parse(
+        Buffer.from(base.files.get('test-tasks.json') ?? []).toString('utf8'),
+      ) as {
+        tasks: Array<{
+          nodeId: string;
+          dependencies: string[];
+          inputSelectors: readonly Record<string, unknown>[];
+          outputContract: Record<string, unknown>;
+        }>;
+      };
+      const producer = descriptor.tasks.find((task) => task.nodeId === 'test:schemas');
+      const consumer = descriptor.tasks.find((task) => task.nodeId === 'test:utils');
+      if (producer === undefined || consumer === undefined)
+        throw new Error('fixture prerequisite tasks missing');
+      producer.outputContract = outputContract;
+      producer.inputSelectors = inputSelectors;
+      consumer.dependencies = [producer.nodeId];
+      return build(
+        base,
+        mutate(base.files, 'test-tasks.json', Buffer.from(JSON.stringify(descriptor), 'utf8')),
+      ).plan.packages.find((entry) => entry.id === 'utils');
+    };
+    const tracked = buildWith({ kind: 'tracked-files', paths: ['packages/schemas/package.json'] }, [
+      { kind: 'prefix', pattern: 'packages/schemas/' },
+    ]);
+    expect(tracked?.prerequisite_nodes).toEqual(['test:schemas']);
+    expect(tracked?.reuse.unresolved).not.toContain('prerequisite-output-proof-required');
+    expect(tracked?.reuse.unresolved).not.toContain('declared-task-input-unresolved');
+
+    const generated = buildWith({ kind: 'build', paths: ['packages/schemas/dist/index.js'] }, [
+      { kind: 'prefix', pattern: 'packages/schemas/' },
+    ]);
+    expect(generated?.prerequisite_nodes).toEqual(['test:schemas']);
+    expect(generated?.reuse.unresolved).toContain('prerequisite-output-proof-required');
+
+    const missingInput = buildWith(
+      { kind: 'tracked-files', paths: ['packages/schemas/package.json'] },
+      [{ kind: 'prefix', pattern: 'packages/missing/' }],
+    );
+    expect(missingInput?.prerequisite_nodes).toEqual(['test:schemas']);
+    expect(missingInput?.reuse.unresolved).toContain('declared-task-input-unresolved');
+  });
+
   it.each([
     [
       'an unknown workspace dependency',
