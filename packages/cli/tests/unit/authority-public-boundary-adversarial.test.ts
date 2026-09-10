@@ -97,6 +97,14 @@ describe('authority public boundary adversarial behavior', () => {
       expect(JSON.parse(result.stderr)).toMatchObject({ code: failure.code, exit });
     }
 
+    const missingCode = renderAuthorityResult({ ok: false, category: 'refused' }, 'json');
+    expect(missingCode.exit_code).toBe(7);
+    expect(JSON.parse(missingCode.stderr)).toMatchObject({
+      code: 'AUTHORITY_RESULT_INVALID',
+      class: 'contract-violation',
+      exit: 7,
+    });
+
     const malformed = renderAuthorityResult(
       {
         ok: true,
