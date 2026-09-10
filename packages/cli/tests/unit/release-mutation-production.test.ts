@@ -435,6 +435,53 @@ describe('protected mutation production normalization', () => {
     }
   });
 
+  it.each([
+    [
+      'an incomplete source-file census',
+      (value: Record<string, unknown>) => {
+        value.source_files = [];
+      },
+    ],
+    [
+      'a substituted source-file path',
+      (value: Record<string, unknown>) => {
+        const row = (value.source_files as Array<Record<string, unknown>>)[0];
+        if (row === undefined) throw new Error('fixture source row missing');
+        row.path = 'src/substituted.ts';
+      },
+    ],
+    [
+      'a substituted source-file digest',
+      (value: Record<string, unknown>) => {
+        const row = (value.source_files as Array<Record<string, unknown>>)[0];
+        if (row === undefined) throw new Error('fixture source row missing');
+        row.sha256 = '0'.repeat(64);
+      },
+    ],
+    [
+      'a non-array source-file mutant population',
+      (value: Record<string, unknown>) => {
+        const row = (value.source_files as Array<Record<string, unknown>>)[0];
+        if (row === undefined) throw new Error('fixture source row missing');
+        row.mutants = {};
+      },
+    ],
+  ] as const)('refuses %s before interpreting discovered mutants', (_label, mutate) => {
+    const value = JSON.parse(observation().toString('utf8')) as Record<string, unknown>;
+    mutate(value);
+    const fixtureValue = productionFixture({ observed: Buffer.from(canonicalJson(value), 'utf8') });
+    try {
+      expect(() =>
+        normalizeProtectedMutationExecutionV21({
+          program: fixtureValue.program,
+          execution: execute(fixtureValue),
+        }),
+      ).toThrow('release-certification-mutation-program-invalid');
+    } finally {
+      fixtureValue.transport.dispose();
+    }
+  });
+
   it('refuses a custody result when paired with another genuine factory program', () => {
     const left = productionFixture();
     const right = productionFixture();
