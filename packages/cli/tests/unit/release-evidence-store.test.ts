@@ -527,6 +527,58 @@ describe('durable external certification evidence store', () => {
         Object.assign(value, { task_policy_digest_sha256: 'A'.repeat(64) }),
     ],
     [
+      'task-policy digest with leading data',
+      (value: Record<string, unknown>) =>
+        Object.assign(value, { task_policy_digest_sha256: `g${TASK_POLICY}` }),
+    ],
+    [
+      'task-policy digest with trailing data',
+      (value: Record<string, unknown>) =>
+        Object.assign(value, { task_policy_digest_sha256: `${TASK_POLICY}g` }),
+    ],
+    [
+      'candidate identities with leading data',
+      (value: Record<string, unknown>) => {
+        const identity = `g${COMMIT}`;
+        Object.assign(value.repository as Record<string, unknown>, {
+          commit: identity,
+          tree: identity,
+        });
+        Object.assign(value.candidate as Record<string, unknown>, {
+          commit: identity,
+          tree: identity,
+        });
+      },
+    ],
+    [
+      'candidate identities with trailing data',
+      (value: Record<string, unknown>) => {
+        const identity = `${COMMIT}g`;
+        Object.assign(value.repository as Record<string, unknown>, {
+          commit: identity,
+          tree: identity,
+        });
+        Object.assign(value.candidate as Record<string, unknown>, {
+          commit: identity,
+          tree: identity,
+        });
+      },
+    ],
+    [
+      'non-hexadecimal 64-character candidate identities',
+      (value: Record<string, unknown>) => {
+        const identity = 'g'.repeat(64);
+        Object.assign(value.repository as Record<string, unknown>, {
+          commit: identity,
+          tree: identity,
+        });
+        Object.assign(value.candidate as Record<string, unknown>, {
+          commit: identity,
+          tree: identity,
+        });
+      },
+    ],
+    [
       'package prefix outside grammar',
       (value: Record<string, unknown>) => Object.assign(value, { package_id: '!fixture/package' }),
     ],
@@ -549,6 +601,19 @@ describe('durable external certification evidence store', () => {
       ),
     );
     expect(readdirSync(fixture.evidenceRoot)).not.toContain('certification');
+  });
+
+  it('accepts full 64-character Git object identities for a certification transaction', async () => {
+    const fixture = storeFixture();
+    const selected = structuredClone(binding('@fixture/package'));
+    const identity = 'a'.repeat(64);
+    Object.assign(selected.repository, { commit: identity, tree: identity });
+    Object.assign(selected.candidate, { commit: identity, tree: identity });
+
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    await invokeSink(fixture.store.authority_owner, () => transaction.abort());
   });
 
   it('reopens committed closure, receipt and blob, including an explicit empty package', async () => {
@@ -1288,28 +1353,37 @@ describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', 
     );
   });
 
-  it.each(['unexpected-name', 'regular-file', 'symbolic-link'] as const)(
-    'refuses a %s in the durable unit-mutation transaction namespace',
-    async (fault) => {
-      const fixture = storeFixture();
-      const { evidence } = await commitUnitEvidence(fixture);
-      const namespace = join(fixture.evidenceRoot, 'unit-mutation');
-      const transactionDirectory = onlyTransactionDirectory(fixture, 'unit-mutation');
-      const injected = join(
-        namespace,
-        fault === 'unexpected-name' ? 'not-a-transaction' : randomUUID(),
-      );
-      if (fault === 'unexpected-name') mkdirSync(injected);
-      else if (fault === 'regular-file') writeFileSync(injected, 'not a transaction');
-      else symlinkSync(transactionDirectory, injected, 'dir');
+  it.each([
+    'unexpected-name',
+    'leading-valid-uuid',
+    'trailing-valid-uuid',
+    'regular-file',
+    'symbolic-link',
+  ] as const)('refuses a %s in the durable unit-mutation transaction namespace', async (fault) => {
+    const fixture = storeFixture();
+    const { evidence } = await commitUnitEvidence(fixture);
+    const namespace = join(fixture.evidenceRoot, 'unit-mutation');
+    const transactionDirectory = onlyTransactionDirectory(fixture, 'unit-mutation');
+    const injected = join(
+      namespace,
+      fault === 'unexpected-name'
+        ? 'not-a-transaction'
+        : fault === 'leading-valid-uuid'
+          ? `0${randomUUID()}`
+          : fault === 'trailing-valid-uuid'
+            ? `${randomUUID()}0`
+            : randomUUID(),
+    );
+    if (fault === 'regular-file') writeFileSync(injected, 'not a transaction');
+    else if (fault === 'symbolic-link') symlinkSync(transactionDirectory, injected, 'dir');
+    else mkdirSync(injected);
 
-      await refusal(() =>
-        createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
-          evidence.binding,
-        ),
-      );
-    },
-  );
+    await refusal(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
+        evidence.binding,
+      ),
+    );
+  });
 
   it('ignores an incomplete unit transaction but refuses an unreadable commit', async () => {
     const fixture = storeFixture();
