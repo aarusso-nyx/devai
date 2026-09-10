@@ -334,6 +334,7 @@ describe('render matrix public command boundaries', () => {
   it('renders threshold annotations before strict below-threshold failure', async () => {
     const root = repository();
     const dir = join(root, '.devai/state/test-results');
+    const freshTimestamp = new Date(Date.now() - 60_000).toISOString();
     writeFileSync(
       join(dir, 'coverage.json'),
       JSON.stringify({
@@ -342,7 +343,7 @@ describe('render matrix public command boundaries', () => {
         scope: 'pkg-threshold',
         tier: 'coverage',
         status: 'pass',
-        timestamp: '2026-09-09T10:00:00.000Z',
+        timestamp: freshTimestamp,
         metrics: { coverage_pct: { lines: 74.9 } },
       }),
     );
@@ -354,7 +355,7 @@ describe('render matrix public command boundaries', () => {
         scope: 'pkg-threshold-equal',
         tier: 'coverage',
         status: 'pass',
-        timestamp: '2026-09-09T10:00:00.000Z',
+        timestamp: freshTimestamp,
         metrics: { coverage_pct: { lines: 75 } },
       }),
     );

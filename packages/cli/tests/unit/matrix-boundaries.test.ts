@@ -98,6 +98,7 @@ async function invoke(root: string, args: readonly string[]): Promise<Invocation
     return {
       exit: typeof process.exitCode === 'number' ? process.exitCode : 0,
       stdout,
+      // The stubbed process.exit throws into the command's catch; remove only that impossible-in-production echo.
       stderr: stderr.replace(/^devai evidence test matrix: TEST_PROCESS_EXIT:\d+\n/gm, ''),
     };
   } finally {
