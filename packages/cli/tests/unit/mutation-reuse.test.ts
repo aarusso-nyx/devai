@@ -34,7 +34,11 @@ const candidate = {
 
 describe('mutation evidence reuse', () => {
   it('reuses only exact passing evidence with intact identities and report', () => {
-    expect(selectMutationEvidence(identity, candidate)).toMatchObject({ status: 'reused' });
+    expect(selectMutationEvidence(identity, candidate)).toEqual({
+      status: 'reused',
+      reason: 'exact-identity',
+      reportDigest: candidate.reportDigest,
+    });
   });
 
   it.each([
@@ -82,12 +86,13 @@ describe('mutation evidence reuse', () => {
   });
 
   it('rejects digest fields with valid hexadecimal prefixes longer than SHA-256', () => {
-    expect(() =>
-      selectMutationEvidence(
-        { ...identity, sourceInputsDigest: `${identity.sourceInputsDigest}0` },
-        candidate,
-      ),
-    ).toThrow('CHECK_MUTATION_EVIDENCE_IDENTITY_INVALID:sourceInputsDigest');
+    for (const sourceInputsDigest of [
+      `${identity.sourceInputsDigest}0`,
+      `0${identity.sourceInputsDigest}`,
+    ])
+      expect(() => selectMutationEvidence({ ...identity, sourceInputsDigest }, candidate)).toThrow(
+        'CHECK_MUTATION_EVIDENCE_IDENTITY_INVALID:sourceInputsDigest',
+      );
   });
 
   it('rejects coercible non-string digest fields without invoking caller code', () => {
