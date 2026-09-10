@@ -2812,12 +2812,22 @@ describe('release lifecycle execution kernel', () => {
     const requiredPlans = exactState['bound_receipts'];
     if (!Array.isArray(requiredPlans)) throw new Error('missing historical plan bindings');
     const requiredPlan = objectValue(required(requiredPlans[0], 'missing historical plan binding'));
-    const observe = (state: Readonly<Record<string, unknown>>) =>
+    const historicalInputs = historical['inputs'];
+    if (!Array.isArray(historicalInputs)) throw new Error('missing historical plan inputs');
+    const alternate = rehashReceipt(historical, {
+      inputs: historicalInputs.map((input, index) =>
+        index === 0 ? { ...objectValue(input), sha256: 'e'.repeat(64) } : input,
+      ),
+    });
+    const observe = (
+      state: Readonly<Record<string, unknown>>,
+      receipts: readonly Readonly<Record<string, unknown>>[] = [historical],
+    ) =>
       resumeReleaseLifecycleExecution({
         states: [state],
         repository: state['repository'] as ReleaseLifecycleRequest['repository_locator'],
         candidate: state['candidate'] as ReleaseLifecycleStateV2['candidate'],
-        receipt_documents: [historical],
+        receipt_documents: receipts,
       });
 
     await expect(observe(exactState)).resolves.toMatchObject({
@@ -2832,6 +2842,11 @@ describe('release lifecycle execution kernel', () => {
     await expect(observe(mismatched)).resolves.toMatchObject({
       next_outcome: 'blocked',
       blocked_reason: 'receipt-identity-mismatch',
+    });
+
+    await expect(observe(exactState, [historical, alternate])).resolves.toMatchObject({
+      next_outcome: 'blocked',
+      blocked_reason: 'legacy-plan-non-authoritative',
     });
   });
 
