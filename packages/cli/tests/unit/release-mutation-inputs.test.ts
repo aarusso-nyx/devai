@@ -414,6 +414,28 @@ describe('protected release mutation input derivation', () => {
         'MUTATION_INPUT_IDENTITY_MISSING',
       );
     }
+
+    const sparseDependencies = new Array<ProtectedContainerDependency>(1);
+    const foreignDependencies = [dependency];
+    Object.setPrototypeOf(foreignDependencies, Object.create(Array.prototype));
+    const extendedDependencies = [dependency] as ProtectedContainerDependency[] & {
+      unexpected?: boolean;
+    };
+    extendedDependencies.unexpected = true;
+    for (const [_label, entries] of [
+      ['a sparse dependency population', sparseDependencies],
+      ['a dependency population with a foreign prototype', foreignDependencies],
+      ['a dependency population with an extra own field', extendedDependencies],
+    ] as const) {
+      expect(() =>
+        buildReleaseMutationInputPlanV21({
+          candidate: current.snapshot,
+          resolution: current.resolution,
+          plan_receipt: current.receipt,
+          controls: { ...current.controls, dependencies: entries },
+        }),
+      ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+    }
   });
 
   it('selects declaration producers only from generated namespaces bound to workspace dependencies', () => {
