@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -197,6 +205,44 @@ function outputs(handle: { readonly sha256: string }) {
   ];
 }
 
+interface StoredCarrierIdentity {
+  evidence_sink_id: unknown;
+  release_unit: unknown;
+  derivation: Record<string, unknown>;
+  opaque_handle: unknown;
+  sha256: unknown;
+  size_bytes: unknown;
+}
+
+interface StoredCertificationCommit {
+  carriers: StoredCarrierIdentity[];
+}
+
+function rewriteCertificationCommit(
+  fixture: ReturnType<typeof storeFixture>,
+  change: (commit: StoredCertificationCommit) => void,
+): void {
+  const certificationRoot = join(fixture.input.root, 'certification');
+  const transactions = readdirSync(certificationRoot);
+  if (transactions.length !== 1) throw new Error('fixture certification transaction missing');
+  const path = join(certificationRoot, transactions[0] ?? '', 'commit.json');
+  const commit = JSON.parse(readFileSync(path, 'utf8')) as StoredCertificationCommit;
+  if (!Array.isArray(commit.carriers)) throw new Error('fixture committed carrier missing');
+  change(commit);
+  writeFileSync(path, canonicalJson(commit), 'utf8');
+}
+
+function rewriteCommittedCarrier(
+  fixture: ReturnType<typeof storeFixture>,
+  change: (carrier: StoredCarrierIdentity) => void,
+): void {
+  rewriteCertificationCommit(fixture, (commit) => {
+    const carrier = commit.carriers[0];
+    if (carrier === undefined) throw new Error('fixture committed carrier missing');
+    change(carrier);
+  });
+}
+
 describe('durable certified evidence retention', () => {
   it('commits the carrier atomically with the certification closure', async () => {
     const fixture = storeFixture();
@@ -244,6 +290,111 @@ describe('durable certified evidence retention', () => {
     expect(decoded.task_results).toHaveLength(1);
     expect(decoded.census.entries[0]?.path).toBe('generated/report.json');
   });
+
+  it.each([
+    [
+      'an extra member',
+      (carrier: StoredCarrierIdentity) => Object.assign(carrier, { extra: true }),
+    ],
+    [
+      'a coercible non-string release unit',
+      (carrier: StoredCarrierIdentity) => (carrier.release_unit = [UNIT]),
+    ],
+    [
+      'an invalid release unit',
+      (carrier: StoredCarrierIdentity) => (carrier.release_unit = '!invalid'),
+    ],
+    [
+      'a malformed digest',
+      (carrier: StoredCarrierIdentity) => {
+        const malformed = 'g'.repeat(64);
+        carrier.sha256 = malformed;
+        carrier.opaque_handle = `sha256:${malformed}`;
+      },
+    ],
+    ['a fractional size', (carrier: StoredCarrierIdentity) => (carrier.size_bytes = 1.5)],
+    ['a zero size', (carrier: StoredCarrierIdentity) => (carrier.size_bytes = 0)],
+    [
+      'a foreign derivation',
+      (carrier: StoredCarrierIdentity) =>
+        Object.assign(carrier.derivation, { task_policy_digest_sha256: '0'.repeat(64) }),
+    ],
+  ] as const)(
+    'refuses persisted carrier metadata with %s after store recreation',
+    async (_case, change) => {
+      const fixture = storeFixture();
+      const bytes = carrierBytes();
+      const { transaction, handle, owner } = await retain(fixture, bytes);
+      await invokeSink(owner, () =>
+        transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+      );
+      rewriteCommittedCarrier(fixture, change);
+
+      expect(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+          binding('@fixture/pkg'),
+        ),
+      ).toThrow(REFUSAL);
+    },
+  );
+
+  it.each(['duplicate', 'out-of-order'] as const)(
+    'refuses a %s persisted carrier population after store recreation',
+    async (fault) => {
+      const fixture = storeFixture();
+      const owner = fixture.store.authority_owner;
+      const transaction = await invokeSink(owner, () =>
+        fixture.store.begin([binding('@fixture/pkg')]),
+      );
+      const handle = await invokeSink(owner, () =>
+        transaction.put({
+          bytes: generated,
+          sha256: sha256(generated),
+          size_bytes: generated.length,
+        }),
+      );
+      const secondUnit = '@fixture/second';
+      const secondCensus = finalizeCertifiedEvidenceNamespaceCensus({
+        release_unit: secondUnit,
+        derivation,
+        entries: census.entries,
+      });
+      for (const carrier of [
+        { unit: UNIT, bytes: carrierBytes() },
+        {
+          unit: secondUnit,
+          bytes: carrierBytes({ release_unit: secondUnit, namespace_census: secondCensus }),
+        },
+      ]) {
+        await invokeSink(owner, () =>
+          transaction.putCertifiedEvidenceCarrier?.({
+            release_unit: carrier.unit,
+            bytes: carrier.bytes,
+            sha256: sha256(carrier.bytes),
+            size_bytes: carrier.bytes.length,
+          }),
+        );
+      }
+      await invokeSink(owner, () =>
+        transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+      );
+      rewriteCertificationCommit(fixture, (commit) => {
+        if (fault === 'duplicate') {
+          const first = commit.carriers[0];
+          if (first === undefined) throw new Error('fixture committed carrier missing');
+          commit.carriers.splice(1, 0, structuredClone(first));
+        } else {
+          commit.carriers.reverse();
+        }
+      });
+
+      expect(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+          binding('@fixture/pkg'),
+        ),
+      ).toThrow(REFUSAL);
+    },
+  );
 
   it('refuses a carrier read binding with an unexpected member', async () => {
     const fixture = storeFixture();
