@@ -285,8 +285,6 @@ function authorityErrorContext(error: unknown): JsonRecord | undefined {
   }
 }
 
-export { authorityErrorCode, authorityErrorContext, authorityRemediation, taggedFailure };
-
 function handleBoundaryError(error: unknown): undefined {
   const code = authorityErrorCode(error);
   if (code === undefined) throw error;
@@ -1510,6 +1508,9 @@ export function createAuthorityCliHarness(deps: Readonly<JsonRecord>) {
 export {
   actionId,
   allowedRoles,
+  authorityErrorCode,
+  authorityErrorContext,
+  authorityRemediation,
   canonical,
   entryForArgv,
   flagValue,
@@ -1517,5 +1518,6 @@ export {
   guardedInvocationDisposal,
   rememberResolvedInvocationAuthority,
   routeRoles,
+  taggedFailure,
   targetFor,
 };

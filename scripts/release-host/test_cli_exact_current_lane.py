@@ -124,7 +124,7 @@ def write_frozen_retention(root: Path) -> tuple[dict[str, str], str]:
 
 
 class HarnessRefusalTests(unittest.TestCase):
-    def test_source_binding_allows_only_changes_outside_mapped_lines(self) -> None:
+    def test_source_binding_allows_only_inert_named_export_suffixes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = root / "repo"
@@ -140,6 +140,12 @@ class HarnessRefusalTests(unittest.TestCase):
             source.write_text(frozen)
             subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
             subprocess.run(["git", "-C", str(repo), "commit", "-qm", "frozen"], check=True)
+            frozen_candidate = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
             (retained / "mutation.json").write_text(
                 json.dumps({"files": {"packages/cli/src/example.ts": {"source": frozen}}})
             )
@@ -158,9 +164,32 @@ class HarnessRefusalTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
+            bindings, changed = harness.verify_source_blobs(
+                repo, candidate, frozen_candidate, retained, [entry]
+            )
             self.assertEqual(
-                harness.verify_source_blobs(repo, candidate, retained, [entry]),
+                bindings,
                 {"packages/cli/src/example.ts": harness.sha_bytes(source.read_bytes())},
+            )
+            self.assertEqual(changed, {"packages/cli/src/example.ts"})
+
+            (retained / "mutation.json").write_text(
+                json.dumps(
+                    {
+                        "files": {
+                            "packages/cli/src/example.ts": {"source": "const value = true;\n"}
+                        }
+                    }
+                )
+            )
+            with self.assertRaisesRegex(
+                harness.Refusal, "FROZEN_REPORT_SOURCE_BINDING_INVALID"
+            ):
+                harness.verify_source_blobs(
+                    repo, candidate, frozen_candidate, retained, [entry]
+                )
+            (retained / "mutation.json").write_text(
+                json.dumps({"files": {"packages/cli/src/example.ts": {"source": frozen}}})
             )
 
             source.write_text("const value = true;\nexport { value };\n")
@@ -175,7 +204,41 @@ class HarnessRefusalTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 harness.Refusal, "TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP"
             ):
-                harness.verify_source_blobs(repo, candidate, retained, [entry])
+                harness.verify_source_blobs(
+                    repo, candidate, frozen_candidate, retained, [entry]
+                )
+
+    def test_inert_export_suffix_rejects_active_or_directive_content(self) -> None:
+        frozen = b"const value = false;\n"
+        self.assertTrue(harness.inert_named_export_suffix(frozen, frozen + b"export { value };\n"))
+        for suffix in (
+            b"export { value } from './other.js';\n",
+            b"export * from './other.js';\n",
+            b"export const other = false;\n",
+            b"// Stryker disable all\nexport { value };\n",
+            b"const helper = value;\nexport { helper };\n",
+        ):
+            with self.subTest(suffix=suffix):
+                self.assertFalse(harness.inert_named_export_suffix(frozen, frozen + suffix))
+        self.assertFalse(
+            harness.inert_named_export_suffix(
+                frozen, b"const changed = false;\nexport { changed };\n"
+            )
+        )
+
+    def test_changed_source_requires_full_file_plan_bijection(self) -> None:
+        frozen = [{"mutant": {key: value for key, value in mutant("7").items() if key != "status"}}]
+        current = [{"mutant": {**frozen[0]["mutant"], "id": "70"}}]
+        harness.verify_changed_source_plan_bijection(
+            frozen, current, {"packages/cli/src/example.ts"}
+        )
+        current[0]["mutant"]["replacement"] = "true"
+        with self.assertRaisesRegex(
+            harness.Refusal, "TARGET_SOURCE_CHANGED_PLAN_POPULATION_MISMATCH"
+        ):
+            harness.verify_changed_source_plan_bijection(
+                frozen, current, {"packages/cli/src/example.ts"}
+            )
 
     def test_attempt_identity_separates_lane_and_preparation(self) -> None:
         first = harness.attempt_identity("a" * 64, "shard-01")
@@ -272,6 +335,7 @@ class HarnessRefusalTests(unittest.TestCase):
             report_value = {
                 "files": {
                     value["fileName"]: {
+                        "source": "const value = false;\n",
                         "mutants": [
                             {key: item for key, item in value.items() if key != "fileName"}
                         ]
@@ -281,11 +345,33 @@ class HarnessRefusalTests(unittest.TestCase):
             report = root / "mutation.json"
             report.write_text(json.dumps(report_value))
             (events / "3-onMutationTestReportReady.json").write_text(json.dumps(report_value))
-            result = harness.verify_execution(events, report, [mapped(value)])
+            source_bindings = {
+                value["fileName"]: harness.sha_bytes(b"const value = false;\n")
+            }
+            result = harness.verify_execution(
+                events, report, [mapped(value)], source_bindings
+            )
             self.assertEqual(result["statusCounts"], {"Survived": 1})
             self.assertEqual(result["credit"]["killed"], 0)
             self.assertFalse(result["credit"]["allMappedClaimsKilled"])
             self.assertFalse(result["outcomes"][0]["credited"])
+
+            report_value["files"][value["fileName"]]["source"] = "changed\n"
+            report.write_text(json.dumps(report_value))
+            (events / "3-onMutationTestReportReady.json").write_text(json.dumps(report_value))
+            with self.assertRaisesRegex(
+                harness.Refusal, "EXECUTION_REPORT_SOURCE_BINDING_INVALID"
+            ):
+                harness.verify_execution(events, report, [mapped(value)], source_bindings)
+
+            report_value["files"][value["fileName"]]["source"] = "const value = false;\n"
+            report_value["files"][value["fileName"]]["mutants"][0]["static"] = True
+            report.write_text(json.dumps(report_value))
+            (events / "3-onMutationTestReportReady.json").write_text(json.dumps(report_value))
+            with self.assertRaisesRegex(
+                harness.Refusal, "EXECUTION_STRUCTURAL_POPULATION_MISMATCH"
+            ):
+                harness.verify_execution(events, report, [mapped(value)], source_bindings)
 
     def test_wrong_frozen_campaign_and_tampered_member_are_refused(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

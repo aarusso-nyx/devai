@@ -594,42 +594,115 @@ def derive_exact_ranges(
     ]
 
 
-def verify_source_blobs(repo: Path, candidate: str, retained: Path, mapped: list[dict[str, Any]]) -> dict[str, str]:
+def inert_named_export_suffix(frozen: bytes, current: bytes) -> bool:
+    if not current.startswith(frozen):
+        return False
+    try:
+        frozen_text = frozen.decode("utf-8")
+        suffix = current[len(frozen) :].decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    if not suffix:
+        return False
+    lowered = suffix.lower()
+    if any(
+        marker in lowered
+        for marker in ("stryker", "istanbul", "eslint", "@ts-", "sourcemappingurl")
+    ):
+        return False
+    identifier = r"[A-Za-z_$][A-Za-z0-9_$]*"
+    export_block = re.compile(rf"export\s*\{{(?P<body>[^}}]*)\}}\s*;")
+    exported: list[str] = []
+    cursor = 0
+    while cursor < len(suffix):
+        whitespace = re.match(r"[ \t\r\n]+", suffix[cursor:])
+        if whitespace is not None:
+            cursor += whitespace.end()
+            continue
+        if suffix.startswith("//", cursor):
+            end = suffix.find("\n", cursor)
+            cursor = len(suffix) if end < 0 else end + 1
+            continue
+        block = export_block.match(suffix, cursor)
+        if block is None:
+            return False
+        entries = [entry.strip() for entry in block.group("body").split(",") if entry.strip()]
+        if not entries:
+            return False
+        for entry in entries:
+            match = re.fullmatch(rf"({identifier})(?:\s+as\s+{identifier})?", entry)
+            if match is None:
+                return False
+            exported.append(match.group(1))
+        cursor = block.end()
+    if not exported or len(exported) != len(set(exported)):
+        return False
+    return all(
+        re.search(
+            rf"\b(?:function|class|const|let|var|interface|type|enum)\s+{re.escape(name)}\b",
+            frozen_text,
+        )
+        is not None
+        for name in exported
+    )
+
+
+def verify_changed_source_plan_bijection(
+    frozen_plans: list[dict[str, Any]],
+    current_plans: list[dict[str, Any]],
+    changed_paths: set[str],
+) -> None:
+    for path in sorted(changed_paths):
+        frozen = Counter(
+            structural(item["mutant"])
+            for item in frozen_plans
+            if relative_file_name(item["mutant"].get("fileName")) == path
+        )
+        current = Counter(
+            structural(item["mutant"])
+            for item in current_plans
+            if relative_file_name(item["mutant"].get("fileName")) == path
+        )
+        if not frozen or frozen != current:
+            raise Refusal("TARGET_SOURCE_CHANGED_PLAN_POPULATION_MISMATCH")
+
+
+def verify_source_blobs(
+    repo: Path,
+    candidate: str,
+    frozen_candidate: str,
+    retained: Path,
+    mapped: list[dict[str, Any]],
+) -> tuple[dict[str, str], set[str]]:
     report = load_json(retained / "mutation.json", "FROZEN_REPORT_INVALID")
     files = report.get("files")
     if not isinstance(files, dict):
         raise Refusal("FROZEN_REPORT_INVALID")
     bindings: dict[str, str] = {}
+    changed_paths: set[str] = set()
     for path in sorted({item["path"] for item in mapped}):
         report_file = files.get(path)
         if not isinstance(report_file, dict) or not isinstance(report_file.get("source"), str):
             raise Refusal("FROZEN_SOURCE_MISSING")
         frozen = report_file["source"].encode()
+        frozen_git = subprocess.run(
+            ["git", "-C", str(repo), "show", f"{frozen_candidate}:{path}"],
+            capture_output=True,
+            check=False,
+        )
+        if frozen_git.returncode or frozen_git.stdout != frozen:
+            raise Refusal("FROZEN_REPORT_SOURCE_BINDING_INVALID")
         current = subprocess.run(
             ["git", "-C", str(repo), "show", f"{candidate}:{path}"], capture_output=True, check=False
         )
         if current.returncode:
             raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP")
         if current.stdout != frozen:
-            try:
-                frozen_lines = frozen.decode("utf-8").splitlines(keepends=True)
-                current_lines = current.stdout.decode("utf-8").splitlines(keepends=True)
-            except UnicodeDecodeError as error:
-                raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP") from error
-            for item in (entry for entry in mapped if entry["path"] == path):
-                start, end = location_bounds(item["location"])
-                last_line = end[0] - 1 if end[0] > start[0] and end[1] == 0 else end[0]
-                if (
-                    start[0] >= len(frozen_lines)
-                    or last_line >= len(frozen_lines)
-                    or start[0] >= len(current_lines)
-                    or last_line >= len(current_lines)
-                    or frozen_lines[start[0] : last_line + 1]
-                    != current_lines[start[0] : last_line + 1]
-                ):
-                    raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP")
+            if not inert_named_export_suffix(frozen, current.stdout):
+                raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP")
+            changed_paths.add(path)
         bindings[path] = sha_bytes(current.stdout)
-    return bindings
+    return bindings, changed_paths
 
 
 def event_payload(path: Path) -> dict[str, Any]:
@@ -642,6 +715,7 @@ def verify_execution(
     events: Path,
     report_path: Path,
     mapped: list[dict[str, Any]],
+    source_bindings: dict[str, str] | None = None,
 ) -> dict[str, object]:
     plan_files = sorted(events.glob("*-onMutationTestingPlanReady.json"))
     tested_files = sorted(events.glob("*-onMutantTested.json"))
@@ -670,12 +744,13 @@ def verify_execution(
             json.dumps(item["location"], sort_keys=True, separators=(",", ":")),
             item["mutatorName"],
             item["replacement"],
+            item["static"],
         ): item
         for item in mapped
     }
     if len(expected) != len(mapped) or len(expected_by_structure) != len(mapped):
         raise Refusal("EXECUTION_EXPECTED_POPULATION_AMBIGUOUS")
-    planned = {structural(item["mutant"], include_static=False) for item in plans}
+    planned = {structural(item["mutant"]) for item in plans}
     if planned != set(expected_by_structure) or len(planned) != len(plans):
         raise Refusal("EXECUTION_PLAN_TARGET_POPULATION_MISMATCH")
     tested: dict[str, tuple[object, ...]] = {}
@@ -684,21 +759,30 @@ def verify_execution(
         mutant_id = mutant.get("id")
         if not isinstance(mutant_id, str) or mutant_id in tested:
             raise Refusal("EXECUTION_TESTED_ID_DUPLICATE")
-        tested[mutant_id] = structural(mutant, include_static=False)
+        tested[mutant_id] = structural(mutant)
     observed: dict[str, tuple[object, ...]] = {}
     statuses: dict[str, str] = {}
     files = report.get("files")
     if not isinstance(files, dict):
         raise Refusal("EXECUTION_REPORT_INVALID")
+    observed_source_bindings: dict[str, str] = {}
     for path, file in files.items():
         mutants = file.get("mutants") if isinstance(file, dict) else None
         if not isinstance(mutants, list):
             raise Refusal("EXECUTION_REPORT_INVALID")
+        normalized_path = relative_file_name(path)
+        if source_bindings is not None:
+            if normalized_path in observed_source_bindings:
+                raise Refusal("EXECUTION_REPORT_SOURCE_BINDING_INVALID")
+            source = file.get("source")
+            if not isinstance(source, str):
+                raise Refusal("EXECUTION_REPORT_SOURCE_BINDING_INVALID")
+            observed_source_bindings[normalized_path] = sha_bytes(source.encode())
         for mutant in mutants:
             mutant_id = mutant.get("id") if isinstance(mutant, dict) else None
             if not isinstance(mutant_id, str) or mutant_id in observed:
                 raise Refusal("EXECUTION_REPORT_ID_DUPLICATE")
-            observed[mutant_id] = structural({**mutant, "fileName": path}, include_static=False)
+            observed[mutant_id] = structural({**mutant, "fileName": path})
             status = mutant.get("status")
             if status not in {
                 "Killed",
@@ -711,7 +795,9 @@ def verify_execution(
             }:
                 raise Refusal("EXECUTION_REPORT_STATUS_INVALID")
             statuses[mutant_id] = status
-    planned_by_id = {item["mutant"]["id"]: structural(item["mutant"], include_static=False) for item in plans}
+    if source_bindings is not None and observed_source_bindings != source_bindings:
+        raise Refusal("EXECUTION_REPORT_SOURCE_BINDING_INVALID")
+    planned_by_id = {item["mutant"]["id"]: structural(item["mutant"]) for item in plans}
     if len(tested_files) != len(plans) or set(tested) != set(planned_by_id):
         raise Refusal("EXECUTION_MUTANT_EVENTS_INCOMPLETE")
     if set(observed) != set(planned_by_id):
@@ -728,6 +814,7 @@ def verify_execution(
             json.dumps(claim["location"], sort_keys=True, separators=(",", ":")),
             claim["mutatorName"],
             claim["replacement"],
+            claim["static"],
         )
         execution_id, status = by_structure[key]
         outcomes.append(
@@ -1443,12 +1530,18 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
         if len(retained_bindings) != 1:
             raise Refusal("SELECTED_LANE_FROZEN_RETENTION_BINDING_INVALID")
         frozen_retained = Path(retained_bindings[0]["path"])
-        frozen_plan = load_frozen_plan(
-            frozen_retained, frozen_campaign(inventory), lane_id
-        )
+        frozen_identity = frozen_campaign(inventory)
+        frozen_plan = load_frozen_plan(frozen_retained, frozen_identity, lane_id)
         mapped = map_claims(claims, frozen_plan, current_plan, mapper.structural)
-        source_bindings = verify_source_blobs(
-            repo, preparation["candidate"], frozen_retained, mapped
+        source_bindings, changed_source_paths = verify_source_blobs(
+            repo,
+            preparation["candidate"],
+            frozen_identity["commit"],
+            frozen_retained,
+            mapped,
+        )
+        verify_changed_source_plan_bijection(
+            frozen_plan, current_plan, changed_source_paths
         )
         ranges = derive_exact_ranges(mapped, current_plan)
         mapping = {
@@ -1461,6 +1554,10 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
             "consolidatedInventorySha256": inputs["consolidated"]["sha256"],
             "currentPlanSha256": sha_file(current_plan_path),
             "sourceBlobSha256": source_bindings,
+            "changedSourceContinuity": {
+                "policy": "append-only-inert-local-named-exports-and-full-file-plan-bijection",
+                "paths": sorted(changed_source_paths),
+            },
             "mappedClaims": mapped,
             "exactMutateRanges": ranges,
             "population": {
@@ -1527,6 +1624,7 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
             targeted / "mutation/results/events",
             targeted / "mutation/results/mutation.json",
             mapped,
+            source_bindings,
         )
         credit = completeness["credit"]
         completion = {
