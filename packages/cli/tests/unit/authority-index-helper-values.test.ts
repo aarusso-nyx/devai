@@ -47,6 +47,7 @@ describe('authority index helper values', () => {
   });
 
   it('reads exact flag values and selects the requested output format', () => {
+    expect(flagValue(['--format', 'json'], '--format')).toBe('json');
     expect(flagValue(['round', 'start', '--format', 'json'], '--format')).toBe('json');
     expect(flagValue(['round', 'start'], '--format')).toBeUndefined();
     expect(flagValue(['round', 'start', '--format'], '--format')).toBeUndefined();
@@ -61,6 +62,9 @@ describe('authority index helper values', () => {
     [['init', 'bind'], 'init bind'],
     [['init', 'record'], 'init record'],
     [['init', 'apply', 'owner'], 'init apply owner'],
+    [['other', 'apply', 'owner'], 'other apply'],
+    [['init', 'other', 'owner'], 'init other'],
+    [['init', 'apply', 'other'], 'init apply'],
     [['round', 'start', '--write'], 'round start'],
   ] as const)('resolves the exact action route for %j', (argv, expected) => {
     expect(actionId(argv)).toBe(expected);
@@ -90,9 +94,22 @@ describe('authority index helper values', () => {
       entries,
     );
     const catalog = entryForArgv([process.execPath, 'devai', 'catalog', 'actions'], entries);
+    const catalogWithLeadingFlag = entryForArgv(
+      [process.execPath, 'devai', '--json', 'catalog', 'actions'],
+      entries,
+    );
     const binding = entries.find((entry) => entry.name === 'init bind');
+    if (owner === undefined) throw new Error('owner route missing');
+    const shorterOwnerRoute = { ...owner, name: 'init apply', path: ['init', 'apply'] };
     expect(owner?.name).toBe('init apply owner');
     expect(catalog?.name).toBe('catalog actions');
+    expect(catalogWithLeadingFlag?.name).toBe('catalog actions');
+    expect(
+      entryForArgv(
+        [process.execPath, 'devai', 'init', 'apply', 'owner'],
+        [shorterOwnerRoute, owner],
+      )?.name,
+    ).toBe('init apply owner');
     expect(entryForArgv([process.execPath, 'devai', 'missing', 'action'], entries)).toBeUndefined();
     expect(owner === undefined ? [] : routeRoles(owner, [])).toEqual(['owner']);
     expect(owner === undefined ? [] : allowedRoles(owner.authority_contract)).toEqual(['owner']);
