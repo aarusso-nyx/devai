@@ -310,6 +310,107 @@ describe('canonical production authority refusal acceptance', () => {
     }
   });
 
+  it('refuses missing, malformed, invalid, compromised, and inactive sessions', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-session-integrity-'));
+    try {
+      const sessionId = 'AUTH-SESSION-0123456789abcdef';
+      const sessionPath = join(root, '.devai/state/authority-sessions', `${sessionId}.json`);
+      mkdirSync(join(root, '.devai/config'), { recursive: true });
+      mkdirSync(join(root, '.devai/pin'), { recursive: true });
+      mkdirSync(join(root, '.devai/state/authority-sessions'), { recursive: true });
+      writeFileSync(
+        join(root, '.devai/config/project.json'),
+        `${JSON.stringify({ schemaVersion: '1.0.0', project_type: 'runtime-host', name: 'fixture-repository' })}\n`,
+      );
+      writeFileSync(
+        join(root, '.devai/pin/constitution.md'),
+        readFileSync(join(import.meta.dirname, '../../../../.devai/pin/constitution.md')),
+      );
+      const sources = buildTrustedAuthoritySources(current, root, resolveCliVersion());
+      const baseUnsigned = {
+        schemaVersion: '1.0.0',
+        session_id: sessionId,
+        repository_id: sources.repository_id,
+        role: 'architect',
+        declaration_source: 'cli-flag',
+        status: 'active',
+        created_at: '2029-01-01T00:00:00.000Z',
+        expires_at: '2099-01-01T00:00:00.000Z',
+        created_by_invocation_id: 'fixture-invocation',
+        policy_binding: {
+          policy_id: sources.provenance.policy_id,
+          policy_version: sources.provenance.policy_version,
+          resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+        },
+        constitution_binding: sources.constitution_binding,
+        package_binding: sources.package_binding,
+      };
+      const signed = (unsigned: Record<string, unknown>) =>
+        `${JSON.stringify({ ...unsigned, session_digest_sha256: canonicalSha256(unsigned) })}\n`;
+      const cases = [
+        ['missing', 'AUTHORITY_SESSION_NOT_FOUND', 2, undefined],
+        ['malformed JSON', 'AUTHORITY_SESSION_SCHEMA_INVALID', 7, '{'],
+        ['schema-invalid', 'AUTHORITY_SESSION_SCHEMA_INVALID', 7, '{}\n'],
+        [
+          'digest-compromised',
+          'AUTHORITY_SESSION_DIGEST_MISMATCH',
+          2,
+          `${JSON.stringify({ ...baseUnsigned, session_digest_sha256: 'c'.repeat(64) })}\n`,
+        ],
+        [
+          'revoked',
+          'AUTHORITY_SESSION_REVOKED',
+          2,
+          signed({
+            ...baseUnsigned,
+            status: 'revoked',
+            revocation: {
+              revoked_at: '2030-01-01T00:00:00.000Z',
+              revoked_by_invocation_id: 'fixture-revocation',
+              reason: 'fixture revocation',
+            },
+          }),
+        ],
+        [
+          'stale',
+          'AUTHORITY_SESSION_STALE',
+          2,
+          signed({ ...baseUnsigned, status: 'stale', stale_reason: 'policy-changed' }),
+        ],
+        [
+          'repository-mismatched',
+          'AUTHORITY_SESSION_REPOSITORY_MISMATCH',
+          2,
+          signed({ ...baseUnsigned, repository_id: 'other-repository' }),
+        ],
+      ] as const;
+      const invocation = [
+        process.execPath,
+        'devai',
+        'round',
+        'plan',
+        '--documents',
+        'cli',
+        '--repo-root',
+        root,
+        '--authority-session',
+        sessionId,
+        '--write',
+        '--plan',
+        '--format',
+        'json',
+      ];
+
+      for (const [label, code, exit, contents] of cases) {
+        if (contents !== undefined) writeFileSync(sessionPath, contents);
+        const result = authorizeCliArgv(invocation, current);
+        expect(JSON.parse(result?.stderr ?? '{}'), label).toMatchObject({ code, exit });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('emits concrete remediation and structured context for common refusals', () => {
     const check = current.find((entry) => entry.name === 'check');
     const sense = current.find((entry) => entry.name === 'sense run');
