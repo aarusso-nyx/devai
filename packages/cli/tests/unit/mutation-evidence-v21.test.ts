@@ -750,7 +750,7 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       activationModel: {
         sourceOnlyTestPaths: string[];
         semanticReceiptRepositoryBinding: { wireRepository: string };
-        semanticReceiptProvenance: { source: { repository: string } };
+        semanticReceiptProvenance: { source: { repository: string }; byteEquality: boolean };
       };
     };
 
@@ -774,6 +774,15 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       validateMutationV21ActivationSnapshot({
         ...snapshot,
         policy: alternateReceiptProvenance,
+      }),
+    );
+
+    const unequalReceiptProvenance = structuredClone(snapshot.policy) as ActivationPolicy;
+    unequalReceiptProvenance.activationModel.semanticReceiptProvenance.byteEquality = false;
+    expectActivationRefusal(() =>
+      validateMutationV21ActivationSnapshot({
+        ...snapshot,
+        policy: unequalReceiptProvenance,
       }),
     );
   });
