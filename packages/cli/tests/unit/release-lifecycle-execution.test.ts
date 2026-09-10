@@ -3255,6 +3255,138 @@ describe('release lifecycle execution kernel', () => {
     }
   });
 
+  it.each(['release_units', 'inputs', 'evidence', 'artifacts', 'artifact_sink'] as const)(
+    'refuses evidence publication when provider material changes prior %s',
+    async (field) => {
+      const initial = request('release evidence-publish');
+      const store = new ReleaseLifecycleFileStore(root(), initial);
+      await advanceToExported(store);
+      const prior = required(store.readStateRecords().at(-1), 'missing exported state');
+      const receipt = boundOfflineReceipt(prior);
+      const value = request('release evidence-publish', receipt);
+      const unit = required(prior.release_units[0], 'missing exported release unit');
+      const pkg = required(unit.packages[0], 'missing exported package');
+      const trust = required(pkg.trust, 'missing exported package trust');
+      const input = required(prior['inputs'][0], 'missing exported input');
+      const artifact = required(prior['artifacts'][0], 'missing exported artifact');
+      const sink = required(prior.artifact_sink, 'missing exported artifact sink');
+      const exact: ReleaseStateMaterial = {
+        release_units: prior.release_units,
+        inputs: prior['inputs'],
+        evidence: prior['evidence'],
+        artifacts: prior['artifacts'],
+        artifact_sink: sink,
+      };
+      const changed: ReleaseStateMaterial = {
+        ...exact,
+        ...(field === 'release_units'
+          ? {
+              release_units: [
+                {
+                  ...unit,
+                  packages: [
+                    { ...pkg, trust: { ...trust, trust_store_digest_sha256: 'f'.repeat(64) } },
+                  ],
+                },
+              ],
+            }
+          : {}),
+        ...(field === 'inputs'
+          ? { inputs: [{ ...input, sha256: 'f'.repeat(64) }, ...prior['inputs'].slice(1)] }
+          : {}),
+        ...(field === 'evidence'
+          ? { evidence: { ...prior['evidence'], manifest_digest_sha256: 'f'.repeat(64) } }
+          : {}),
+        ...(field === 'artifacts'
+          ? { artifacts: [{ ...artifact, sha256: 'f'.repeat(64) }, ...prior['artifacts'].slice(1)] }
+          : {}),
+        ...(field === 'artifact_sink'
+          ? { artifact_sink: { ...sink, transaction_handle: 'changed-transaction' } }
+          : {}),
+      };
+      const provider = vi.fn(() => ({
+        outcome: 'success' as const,
+        provider_handle: 'evidence-publish-run-1',
+        material: changed,
+      }));
+
+      const result = await withAuthorityHostTestScope(() =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release evidence-publish',
+          authority: authorityFor('release evidence-publish'),
+          store,
+          resolveReceipt: () => receipt,
+          resolvePlanInput,
+          offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+          artifactReader: artifactReaderFor('release export'),
+          authorization: authorizationBridge(),
+          provider,
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+
+      expect(result, field).toMatchObject({
+        ok: false,
+        phase: 'ambiguous',
+        code: 'release-provider-result-unknown',
+      });
+      expect(provider).toHaveBeenCalledOnce();
+      expect(store.readStateRecords().at(-1)?.state).toBe('exported');
+      expect(store.readStoreRecords().at(-1)).toMatchObject({
+        record_kind: 'unknown-provider-result',
+        provider_dispatch: { status: 'unknown', handle_observed: true },
+      });
+    },
+  );
+
+  it('refuses publication when provider material changes prior inputs', async () => {
+    const value = request('release publish');
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    await advanceToEvidencePublished(store);
+    const prior = required(store.readStateRecords().at(-1), 'missing evidence-published state');
+    const input = required(prior['inputs'][0], 'missing evidence-published input');
+    const provider = vi.fn(() => ({
+      outcome: 'success' as const,
+      provider_handle: 'publish-run-1',
+      material: {
+        release_units: prior.release_units,
+        inputs: [{ ...input, sha256: 'f'.repeat(64) }, ...prior['inputs'].slice(1)],
+        evidence: prior['evidence'],
+        artifacts: prior['artifacts'],
+        artifact_sink: prior.artifact_sink,
+      } as ReleaseStateMaterial,
+    }));
+
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release publish',
+        authority: authorityFor('release publish'),
+        publication_controls: publicationControls(),
+        store,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        artifactReader: artifactReaderFor('release evidence-publish'),
+        authorization: authorizationBridge(),
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'ambiguous',
+      code: 'release-provider-result-unknown',
+    });
+    expect(provider).toHaveBeenCalledOnce();
+    expect(store.readStateRecords().at(-1)?.state).toBe('evidence_published');
+    expect(store.readStoreRecords().at(-1)).toMatchObject({
+      record_kind: 'unknown-provider-result',
+      provider_dispatch: { status: 'unknown', handle_observed: true },
+    });
+  });
+
   it('captures export results only from inert, enumerable, allowlisted own data properties', async () => {
     const invoke = async (provider: ReleaseProvider) => {
       const value = request('release export');
