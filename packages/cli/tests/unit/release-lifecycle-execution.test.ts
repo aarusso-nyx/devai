@@ -82,6 +82,7 @@ import {
   type AuthorizationBridge,
   type PublicationControls,
   type ReleaseLifecycleStateV2,
+  type TrustedOfflineReceiptVerifier,
   type TrustedReleaseAuthority,
 } from '../../src/services/release-lifecycle-execution.js';
 
@@ -3850,6 +3851,31 @@ describe('release lifecycle execution kernel', () => {
           }),
         ]),
       });
+      const reconstructedCandidateVerifier = vi.fn(
+        ({
+          candidate_locator,
+          receipt,
+        }: Parameters<TrustedOfflineReceiptVerifier['verify']>[0]) => {
+          expect(candidate_locator).toEqual(request('release publish').candidate_locator);
+          return receipt;
+        },
+      );
+      await expect(
+        resumeReleaseLifecycleExecution({
+          states: exported.readStateRecords(),
+          store_records: exported.readStoreRecords(),
+          store_head: exported.readHead(),
+          repository: exportedState.repository,
+          candidate: exportedState.candidate,
+          receipt_documents: [planReceipt(), verifiedOfflineReceipt],
+          resolve_plan_input: resolvePlanInput,
+          offline_receipt_verifier: { verify: reconstructedCandidateVerifier },
+        }),
+      ).resolves.toMatchObject({
+        next_action: 'release evidence-publish',
+        next_outcome: 'ready',
+      });
+      expect(reconstructedCandidateVerifier).toHaveBeenCalledOnce();
 
       const evidencePublished = new ReleaseLifecycleFileStore(
         root(),
