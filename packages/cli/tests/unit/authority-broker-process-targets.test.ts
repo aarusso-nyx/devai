@@ -143,6 +143,21 @@ describe('authority broker process target classification', () => {
     ],
     ['task start', 'engineer', 'gh', ['pr', 'create', '--draft'], 'UNCLASSIFIED_RESOURCE'],
     [
+      'task start',
+      'engineer',
+      'gh',
+      ['issue', 'create'],
+      'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED',
+    ],
+    [
+      'task start',
+      'engineer',
+      'other',
+      ['pr', 'create'],
+      'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED',
+    ],
+    ['task start', 'engineer', 'gh', ['pr', 'view'], 'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED'],
+    [
       'round run',
       'engineer',
       'claude',
