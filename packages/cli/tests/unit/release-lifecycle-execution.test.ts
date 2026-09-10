@@ -2753,6 +2753,25 @@ describe('release lifecycle execution kernel', () => {
     });
   });
 
+  it("verifies a resolved plan receipt's own digest and derived identifier before locator binding", () => {
+    const exact = request('release preflight');
+    const receipt = planReceipt();
+    for (const resolved of [
+      { ...receipt, receipt_digest_sha256: 'f'.repeat(64) },
+      { ...receipt, receipt_id: `RPL-${'f'.repeat(16)}` },
+    ]) {
+      const value = { ...exact, receipt_locators: [receiptLocator(resolved)] };
+      expect(
+        () =>
+          resolveReleaseMutationRequirements(value, {
+            resolve_receipt: () => resolved,
+            resolve_plan_input: resolvePlanInput,
+          }),
+        JSON.stringify(receiptLocator(resolved)),
+      ).toThrow('release-receipt-identity-mismatch');
+    }
+  });
+
   it('binds a provider only to its durable attempt and immutable verified parent', async () => {
     const value = request('release prepare');
     const store = new ReleaseLifecycleFileStore(root(), value);
