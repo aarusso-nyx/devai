@@ -4037,12 +4037,36 @@ describe('release lifecycle execution kernel', () => {
     expect(missing).toMatchObject({ ok: false, code: 'release-authority-context-invalid' });
     expect(provider).not.toHaveBeenCalled();
 
-    const wrong = await executeReleaseLifecycleAction({
+    const trusted = authorityFor('release preflight');
+    const invalidAuthorities = [
+      { ...trusted, actor: { ...trusted.actor, kind: 'machine' } },
+      { ...trusted, actor: { ...trusted.actor, role: 'engineer' } },
+      { ...trusted, actor: { ...trusted.actor, declaration_source: 'ambient' } },
+      { ...trusted, consent: { ...trusted.consent, write: false } },
+      { ...trusted, consent: { ...trusted.consent, experimental: true } },
+      { ...trusted, consent: { ...trusted.consent, allow_publish: true } },
+    ] as unknown as readonly TrustedReleaseAuthority[];
+    for (const authority of invalidAuthorities) {
+      const wrong = await executeReleaseLifecycleAction({
+        request: value,
+        action: 'release preflight',
+        authority,
+        store: new ReleaseLifecycleFileStore(root(), value),
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      });
+      expect(wrong).toMatchObject({ ok: false, code: 'release-authority-context-invalid' });
+    }
+    expect(provider).not.toHaveBeenCalled();
+
+    const accepted = await executeReleaseLifecycleAction({
       request: value,
       action: 'release preflight',
       authority: {
-        actor: { kind: 'human', role: 'engineer', declaration_source: 'session-state' },
-        consent: { write: true, allow_publish: false, experimental: false },
+        ...trusted,
+        actor: { ...trusted.actor, declaration_source: 'session-state' },
       },
       store: new ReleaseLifecycleFileStore(root(), value),
       resolveReceipt: () => planReceipt(),
@@ -4050,7 +4074,11 @@ describe('release lifecycle execution kernel', () => {
       provider,
       recorded_at: '2026-09-03T00:00:00.000Z',
     });
-    expect(wrong).toMatchObject({ ok: false, code: 'release-authority-context-invalid' });
+    expect(accepted).toMatchObject({
+      ok: false,
+      phase: 'provider',
+      code: 'release-certification-provider-unavailable',
+    });
     expect(provider).not.toHaveBeenCalled();
   });
 
