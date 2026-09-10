@@ -71,6 +71,10 @@ describe('authority index helper values', () => {
     [['other', 'apply', 'owner'], 'other apply'],
     [['init', 'other', 'owner'], 'init other'],
     [['init', 'apply', 'other'], 'init apply'],
+    [['round', 'actions'], 'round actions'],
+    [['round', 'cli'], 'round cli'],
+    [['round', 'bind'], 'round bind'],
+    [['round', 'record'], 'round record'],
     [['round', 'start', '--write'], 'round start'],
   ] as const)('resolves the exact action route for %j', (argv, expected) => {
     expect(actionId(argv)).toBe(expected);
