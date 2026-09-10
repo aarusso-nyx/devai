@@ -3131,6 +3131,34 @@ describe('release lifecycle execution kernel', () => {
         expect(reduceStoreRecords([...store.readStoreRecords(), impossibleTail]).errors).toContain(
           'release-provider-result-unknown',
         );
+        const records = store.readStoreRecords();
+        const exportAttempt = required(records.at(-2), 'missing export attempt');
+        expect(exportAttempt.record_kind).toBe('attempt');
+        const {
+          record_id: _attemptRecordId,
+          record_digest_sha256: _attemptRecordDigest,
+          ...attemptDraft
+        } = exportAttempt;
+        const retrySequence = unknown.sequence + 1;
+        const retryPredecessor = {
+          sequence: unknown.sequence,
+          record_id: unknown.record_id,
+          record_digest_sha256: unknown.record_digest_sha256,
+        };
+        const retryAttempt = finalizeStoreRecord({
+          ...attemptDraft,
+          sequence: retrySequence,
+          predecessor_record: retryPredecessor,
+          attempt_id: `RLA-${canonicalSha256({
+            request_digest_sha256: exportAttempt.request_digest_sha256,
+            action_id: exportAttempt.action_id,
+            sequence: retrySequence,
+            predecessor_record: retryPredecessor,
+          }).slice(0, 16)}`,
+        });
+        expect(reduceStoreRecords([...records, retryAttempt]).errors).toContain(
+          'release-store-attempt-predecessor-invalid',
+        );
         expect(await invoke()).toMatchObject({
           ok: false,
           phase: 'reconciliation',
@@ -4425,6 +4453,17 @@ describe('release lifecycle execution kernel', () => {
       return finalizeStoreRecord({ ...draft, ...patch });
     };
     const errorsFor = (...records: readonly StoreRecord[]) => reduceStoreRecords(records).errors;
+    const attemptIdFor = (
+      record: StoreRecord,
+      sequence: number,
+      predecessor_record: StoreRecord['predecessor_record'],
+    ) =>
+      `RLA-${canonicalSha256({
+        request_digest_sha256: record.request_digest_sha256,
+        action_id: record.action_id,
+        sequence,
+        predecessor_record,
+      }).slice(0, 16)}`;
 
     expect(errorsFor({ ...first, record_id: 'RLE-0000000000000000' })).toContain(
       'release-state-store-record-identity-invalid',
@@ -4441,6 +4480,20 @@ describe('release lifecycle execution kernel', () => {
       record_id: first.record_id,
       record_digest_sha256: '0'.repeat(64),
     };
+    const firstReference = {
+      sequence: first.sequence,
+      record_id: first.record_id,
+      record_digest_sha256: first.record_digest_sha256,
+    };
+    const consecutiveAttempt = refinalize(first, {
+      sequence: 1,
+      predecessor_record: firstReference,
+      attempt_id: attemptIdFor(first, 1, firstReference),
+    });
+    expect(errorsFor(first, consecutiveAttempt)).toContain(
+      'release-store-attempt-predecessor-invalid',
+    );
+
     const terminalCases: readonly [
       Partial<Omit<StoreRecord, 'record_id' | 'record_digest_sha256'>>,
       string,
