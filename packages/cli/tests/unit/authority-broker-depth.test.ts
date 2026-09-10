@@ -351,21 +351,49 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
-  it('admits only exact declared check tasks for stock release preflight execution', () => {
+  it('admits exact declared check tasks only for check and verifying release actions', () => {
     const fixture = createSelfContainedRepositoryFixture(ROOT, {
       paths: ['test-tasks.json', '.devai/pin/constitution.md'],
     });
     sourceFixtures.push(fixture);
     const root = fixture.root;
-    const host = brokerAt(root, 'release preflight', 'inspector', [
+    const releaseArgv = (action: 'preflight' | 'certify') => [
       process.execPath,
       'devai',
       'release',
-      'preflight',
+      action,
       '--request',
       'request.json',
       '--as-role',
       'inspector',
+      '--write',
+    ];
+    const checkHost = brokerAt(root, 'check', 'inspector', [
+      process.execPath,
+      'devai',
+      'check',
+      '--suite',
+      'standard',
+      '--as-role',
+      'inspector',
+      '--write',
+    ]);
+    const preflightHost = brokerAt(
+      root,
+      'release preflight',
+      'inspector',
+      releaseArgv('preflight'),
+    );
+    const certifyHost = brokerAt(root, 'release certify', 'inspector', releaseArgv('certify'));
+    const prepareHost = brokerAt(root, 'release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
       '--write',
     ]);
     const descriptor = readTaskDescriptor(join(root, 'test-tasks.json'));
@@ -399,14 +427,22 @@ describe('authority broker production boundary depth', () => {
           arguments: [identity.path, ['run', 'devai:prepare'], options],
         }),
       ).toMatchObject({ nodeId: task.nodeId });
-      expect(
-        host.scope.apply_effect(
-          effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
-          () => 'applied',
-        ),
-      ).toBe('applied');
+      for (const host of [checkHost, preflightHost, certifyHost]) {
+        expect(
+          host.scope.apply_effect(
+            effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
+            () => 'applied',
+          ),
+        ).toBe('applied');
+      }
       expect(() =>
-        host.scope.apply_effect(
+        prepareHost.scope.apply_effect(
+          effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        preflightHost.scope.apply_effect(
           effect(
             'spawnSync',
             ['pnpm', ['run', 'devai:prepare', '--extra'], { cwd: root, shell: false }],
@@ -416,7 +452,7 @@ describe('authority broker production boundary depth', () => {
         ),
       ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
       expect(() =>
-        host.scope.apply_effect(
+        preflightHost.scope.apply_effect(
           effect(
             'spawnSync',
             ['pnpm', ['run', 'devai:prepare'], { cwd: root, shell: true }],
@@ -426,7 +462,7 @@ describe('authority broker production boundary depth', () => {
         ),
       ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
     } finally {
-      host.dispose();
+      for (const host of [checkHost, preflightHost, certifyHost, prepareHost]) host.dispose();
     }
   });
 
