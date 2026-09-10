@@ -999,6 +999,8 @@ function makeEnvelope(input: {
   };
 }
 
+export { boundedSelectors, makeEnvelope };
+
 function snapshot(root: string, relativePath: string): unknown {
   const path = physicalCanonicalPath(root, relativePath);
   if (!existsSync(path)) return undefined;
