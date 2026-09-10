@@ -8,6 +8,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -211,6 +212,63 @@ async function committedFixture() {
   };
 }
 
+function receiptPath(
+  value: Awaited<ReturnType<typeof committedFixture>>,
+  receipt: ArtifactSinkObjectReceipt,
+): string {
+  const objectId = receipt.opaque_handle.split(':')[1];
+  if (objectId === undefined) throw new Error('fixture receipt object id missing');
+  return join(
+    value.artifactRoot,
+    'artifacts',
+    value.transaction.transaction_handle,
+    'receipts',
+    `${objectId}.json`,
+  );
+}
+
+function readRecord(path: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+}
+
+function writeRecord(path: string, value: unknown): void {
+  writeFileSync(path, Buffer.from(canonicalJson(value), 'utf8'));
+}
+
+function rewriteCommittedManifest(
+  value: Awaited<ReturnType<typeof committedFixture>>,
+  transform: (manifest: Record<string, unknown>) => Record<string, unknown>,
+): ArtifactSinkObjectReceipt {
+  const nextBytes = Buffer.from(
+    canonicalJson(
+      transform(JSON.parse(value.manifestBytes.toString('utf8')) as Record<string, unknown>),
+    ),
+    'utf8',
+  );
+  const nextSha = sha256(nextBytes);
+  const parts = value.committedManifest.opaque_handle.split(':');
+  const objectId = parts[1];
+  if (objectId === undefined) throw new Error('fixture committed manifest object id missing');
+  const nextReceipt = {
+    ...value.committedManifest,
+    opaque_handle: `${value.transaction.transaction_handle}:${objectId}:${nextSha}`,
+    sha256: nextSha,
+    size_bytes: nextBytes.length,
+  };
+  writeFileSync(join(value.artifactRoot, 'objects', nextSha), nextBytes);
+  writeRecord(receiptPath(value, value.committedManifest), nextReceipt);
+  writeRecord(
+    join(value.artifactRoot, 'artifacts', value.transaction.transaction_handle, 'commit.json'),
+    {
+      ...value.commit,
+      committed_manifest_handle: nextReceipt.opaque_handle,
+      committed_manifest_sha256: nextReceipt.sha256,
+      committed_manifest_size_bytes: nextReceipt.size_bytes,
+    },
+  );
+  return nextReceipt;
+}
+
 async function refusal(callback: () => unknown | Promise<unknown>): Promise<void> {
   await expect(Promise.resolve().then(callback)).rejects.toThrow(
     'release-artifact-sink-protocol-invalid',
@@ -363,6 +421,231 @@ describe('durable external release artifact store', () => {
     mkdirSync(contained, { mode: 0o700 });
     await refusal(() => createReleaseArtifactStore({ ...fresh.input, root: contained }));
     expect(lstatSync(linkRoot).isSymbolicLink()).toBe(true);
+  });
+
+  it('revalidates every persisted artifact receipt field before exposing committed bytes', async () => {
+    const value = await committedFixture();
+    const path = receiptPath(value, value.manifest);
+    const original = readRecord(path);
+    const mutations: ReadonlyArray<readonly [string, unknown]> = [
+      ['sink_id', 'foreign-sink'],
+      ['transaction_handle', '00000000-0000-4000-8000-000000000000'],
+      ['opaque_handle', value.tarball.opaque_handle],
+      ['kind', 'package-sbom'],
+      ['sha256', '0'.repeat(64)],
+      ['size_bytes', value.manifest.size_bytes + 1],
+      ['pack_spec_id', 'foreign-pack-spec'],
+      ['pack_spec_digest_sha256', '1'.repeat(64)],
+    ];
+    for (const [field, replacement] of mutations) {
+      writeRecord(path, { ...original, [field]: replacement });
+      await refusal(() =>
+        value.store.readArtifact({
+          sink_id: SINK_ID,
+          opaque_handle: value.manifest.opaque_handle,
+        }),
+      );
+    }
+    for (const replacement of [-1, 0.5]) {
+      writeRecord(path, { ...original, size_bytes: replacement });
+      await refusal(() =>
+        value.store.readArtifact({
+          sink_id: SINK_ID,
+          opaque_handle: value.manifest.opaque_handle,
+        }),
+      );
+    }
+    for (const replacement of [42, '', '.hidden', `${'a'.repeat(400)}x`]) {
+      writeRecord(path, { ...original, logical_name: replacement });
+      await refusal(() =>
+        value.store.readArtifact({
+          sink_id: SINK_ID,
+          opaque_handle: value.manifest.opaque_handle,
+        }),
+      );
+    }
+  });
+
+  it('distinguishes committed object hash and byte-size custody independently', async () => {
+    const hashMismatch = await committedFixture();
+    const objectPath = join(hashMismatch.artifactRoot, 'objects', hashMismatch.manifest.sha256);
+    const originalBytes = readFileSync(objectPath);
+    const changed = Buffer.from(originalBytes);
+    changed[0] = changed[0] === 0x7b ? 0x5b : 0x7b;
+    writeFileSync(objectPath, changed);
+    await refusal(() =>
+      hashMismatch.store.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: hashMismatch.manifest.opaque_handle,
+      }),
+    );
+
+    const sizeMismatch = await committedFixture();
+    const path = receiptPath(sizeMismatch, sizeMismatch.manifest);
+    writeRecord(path, {
+      ...readRecord(path),
+      size_bytes: sizeMismatch.manifest.size_bytes + 1,
+    });
+    await refusal(() =>
+      sizeMismatch.store.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: sizeMismatch.manifest.opaque_handle,
+      }),
+    );
+  });
+
+  it('binds each committed manifest artifact identity to its persisted receipt', async () => {
+    const mutations: ReadonlyArray<readonly [string, unknown]> = [
+      ['kind', 'package-sbom'],
+      ['sink_id', 'foreign-sink'],
+      ['opaque_handle', '00000000-0000-4000-8000-000000000000'],
+      ['sha256', '2'.repeat(64)],
+      ['size_bytes', 0],
+    ];
+    for (const [field, replacement] of mutations) {
+      const value = await committedFixture();
+      rewriteCommittedManifest(value, (manifest) => ({
+        ...manifest,
+        artifacts: (manifest['artifacts'] as Array<Record<string, unknown>>).map(
+          (artifact, index) => (index === 0 ? { ...artifact, [field]: replacement } : artifact),
+        ),
+      }));
+      await refusal(() =>
+        value.store.readArtifact({
+          sink_id: SINK_ID,
+          opaque_handle: value.manifest.opaque_handle,
+        }),
+      );
+    }
+  });
+
+  it('revalidates the committed marker and manifest envelope identities', async () => {
+    const markerValue = await committedFixture();
+    const markerPath = join(
+      markerValue.artifactRoot,
+      'artifacts',
+      markerValue.transaction.transaction_handle,
+      'commit.json',
+    );
+    const marker = readRecord(markerPath);
+    for (const [field, replacement] of [
+      ['committed', false],
+      ['sink_id', 'foreign-sink'],
+      ['transaction_handle', '00000000-0000-4000-8000-000000000000'],
+      ['committed_manifest_handle', markerValue.manifest.opaque_handle],
+      ['committed_manifest_sha256', '3'.repeat(64)],
+      ['committed_manifest_size_bytes', 0],
+      ['commit_protocol', 'foreign-protocol'],
+    ] as const) {
+      writeRecord(markerPath, { ...marker, [field]: replacement });
+      await refusal(() =>
+        markerValue.store.readArtifact({
+          sink_id: SINK_ID,
+          opaque_handle: markerValue.manifest.opaque_handle,
+        }),
+      );
+    }
+
+    for (const [field, replacement] of [
+      ['schemaVersion', '2.0.0'],
+      ['kind', 'foreign-manifest'],
+      ['sink_id', 'foreign-sink'],
+      ['transaction_handle', '00000000-0000-4000-8000-000000000000'],
+      ['repository', { ...REPOSITORY, tree: '4'.repeat(40) }],
+      ['candidate', { commit: REPOSITORY.commit, tree: '5'.repeat(40) }],
+      ['pack_spec_id', 'foreign-pack-spec'],
+      ['pack_spec_digest_sha256', '6'.repeat(64)],
+    ] as const) {
+      const value = await committedFixture();
+      rewriteCommittedManifest(value, (manifest) => ({ ...manifest, [field]: replacement }));
+      await refusal(() =>
+        value.store.readArtifact({
+          sink_id: SINK_ID,
+          opaque_handle: value.manifest.opaque_handle,
+        }),
+      );
+    }
+  });
+
+  it('refuses duplicate manifest handles, logical names, and an empty artifact population', async () => {
+    const duplicateHandle = await committedFixture();
+    rewriteCommittedManifest(duplicateHandle, (manifest) => ({
+      ...manifest,
+      artifacts: [
+        ...(manifest['artifacts'] as Array<Record<string, unknown>>),
+        (manifest['artifacts'] as Array<Record<string, unknown>>)[0],
+      ],
+    }));
+    await refusal(() =>
+      duplicateHandle.store.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: duplicateHandle.manifest.opaque_handle,
+      }),
+    );
+
+    const duplicateName = await committedFixture();
+    const sbomPath = receiptPath(duplicateName, duplicateName.sbom);
+    writeRecord(sbomPath, {
+      ...readRecord(sbomPath),
+      logical_name: duplicateName.manifest.logical_name,
+    });
+    await refusal(() =>
+      duplicateName.store.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: duplicateName.manifest.opaque_handle,
+      }),
+    );
+
+    const empty = await committedFixture();
+    const emptyReceipt = rewriteCommittedManifest(empty, (manifest) => ({
+      ...manifest,
+      artifacts: [],
+    }));
+    for (const receipt of [empty.manifest, empty.tarball, empty.sbom]) {
+      unlinkSync(receiptPath(empty, receipt));
+    }
+    await refusal(() =>
+      empty.store.readArtifact({ sink_id: SINK_ID, opaque_handle: emptyReceipt.opaque_handle }),
+    );
+
+    const unordered = await committedFixture();
+    rewriteCommittedManifest(unordered, (manifest) => ({
+      ...manifest,
+      artifacts: [...(manifest['artifacts'] as Array<Record<string, unknown>>)].reverse(),
+    }));
+    await refusal(() =>
+      unordered.store.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: unordered.manifest.opaque_handle,
+      }),
+    );
+  });
+
+  it('round-trips a committed zero-byte artifact without treating its size as invalid', async () => {
+    const value = fixture();
+    const store = createReleaseArtifactStore(value.input);
+    const transaction = await invokePrepare(value.binding, () => store.begin(beginInput()));
+    const empty = await invokePrepare(value.binding, () =>
+      transaction.put(object('package-manifest', 'empty-manifest', Buffer.alloc(0))),
+    );
+    const manifestBytes = Buffer.from(
+      canonicalJson({
+        schemaVersion: '1.0.0',
+        kind: 'release-artifact-sink-commit-manifest',
+        sink_id: SINK_ID,
+        transaction_handle: transaction.transaction_handle,
+        ...beginInput(),
+        artifacts: [identity(empty)],
+      }),
+      'utf8',
+    );
+    const committedManifest = await invokePrepare(value.binding, () =>
+      transaction.put(object('committed-manifest', 'commit-manifest', manifestBytes)),
+    );
+    await invokePrepare(value.binding, () => transaction.commit(committedManifest));
+    expect(store.readArtifact({ sink_id: SINK_ID, opaque_handle: empty.opaque_handle })).toEqual(
+      Buffer.alloc(0),
+    );
   });
 
   it('makes an uncertain commit terminal without abort or retry', async () => {
