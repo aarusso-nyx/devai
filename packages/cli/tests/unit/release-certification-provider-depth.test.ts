@@ -318,3 +318,29 @@ describe('protected certification provider output closure', () => {
     expect(value.declaredOutputs).toEqual([[]]);
   });
 });
+
+describe('protected certification provider plan object binding', () => {
+  it.each([null, 'not-an-object', []] as const)(
+    'returns the exact plan-binding failure for a malformed preflight receipt %#',
+    async (preflightReceipt) => {
+      const value = providerWithOutputContract({ kind: 'none' });
+      const original = fixtureRuntime.runCheckTasks;
+      if (original === undefined) throw new Error('fixture runner missing');
+      fixtureRuntime.runCheckTasks = (options) => {
+        const report = original(options);
+        return {
+          ...report,
+          preflightReceipt: {
+            ...report.preflightReceipt,
+            value: preflightReceipt,
+          },
+        };
+      };
+
+      await expect(value.adapters.preflight_provider(value.request)).resolves.toEqual({
+        outcome: 'failure',
+        code: 'release-certification-plan-binding-invalid',
+      });
+    },
+  );
+});
