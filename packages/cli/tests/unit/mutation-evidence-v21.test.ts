@@ -1422,10 +1422,11 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
         verifyMutationReportSetV21: vi.fn(
           (
             _contract: unknown,
-            _read: unknown,
+            read: (path: string) => unknown,
             options: { resolveReuseOrigin?: (origin: unknown) => unknown },
           ) => {
             options.resolveReuseOrigin?.({});
+            read('mutation/undeclared.json');
             return { passed: true };
           },
         ),
@@ -1475,7 +1476,10 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
         evidence.contract.summaryPath,
         Buffer.concat([summaryBytes, Buffer.from('\n')]),
       );
-      await expect(verify(nonCanonical)).rejects.toMatchObject({ code: 'NON_CANONICAL_JSON' });
+      await expect(verify(nonCanonical)).rejects.toMatchObject({
+        message: 'NON_CANONICAL_JSON',
+        code: 'NON_CANONICAL_JSON',
+      });
 
       const forgedCurrent = new Map(validArtifacts);
       forgedCurrent.set(
@@ -1489,6 +1493,11 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       await expect(
         verify(validArtifacts, () => ({ semanticReceipt: forgedReceipt })),
       ).rejects.toMatchObject({ code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH' });
+
+      await expect(verify(validArtifacts)).rejects.toMatchObject({
+        message: 'MUTATION_ROSTER_MISMATCH',
+        code: 'MUTATION_ROSTER_MISMATCH',
+      });
       expect(safety).toHaveBeenCalledWith(
         expect.objectContaining({ mediaType: 'application/json' }),
       );
