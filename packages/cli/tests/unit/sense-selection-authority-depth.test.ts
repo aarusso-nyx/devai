@@ -191,6 +191,10 @@ describe('sense invocation authority boundaries', () => {
       kind: 'mutation-adapters',
       adapter_ids: ['db-authority-boundary', 'remote-authority-boundary'],
     });
+    expect(resolved?.entry.authority_contract.consent).toMatchObject({
+      write: true,
+      allow_publish: true,
+    });
   });
   it('keeps a filesystem-only selection free of database and remote boundaries', () => {
     const resolved = resolveSenseInvocation(senseRun, argv('build'));
@@ -275,5 +279,83 @@ describe('sense invocation authority boundaries', () => {
       vi.doUnmock('../../src/commands/sense/facade.js');
       vi.resetModules();
     }
+  });
+
+  it('rejects a selected capability population whose derived effect differs', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/commands/sense/facade.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/sense/facade.js')>();
+      return {
+        ...actual,
+        resolveSenseSelection: (
+          ...args: Parameters<typeof actual.resolveSenseSelection>
+        ): ReturnType<typeof actual.resolveSenseSelection> => {
+          const selection = actual.resolveSenseSelection(...args);
+          const member = selection.members[0];
+          if (member === undefined) throw new Error('sense selection member missing');
+          return {
+            ...selection,
+            aggregate_effect: 'read',
+            members: [{ ...member, capabilities: ['fs:workspace'] }],
+          };
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      expect(() =>
+        isolated.resolveSenseInvocation(senseRun, argv('decision_record_integrity')),
+      ).toThrow('SENSE_EFFECT_CAPABILITY_DIVERGENCE');
+    } finally {
+      vi.doUnmock('../../src/commands/sense/facade.js');
+      vi.resetModules();
+    }
+  });
+
+  it('rejects a writing selection with no concrete mutation target', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/commands/sense/facade.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/sense/facade.js')>();
+      return {
+        ...actual,
+        resolveSenseSelection: (
+          ...args: Parameters<typeof actual.resolveSenseSelection>
+        ): ReturnType<typeof actual.resolveSenseSelection> => {
+          const selection = actual.resolveSenseSelection(...args);
+          const member = selection.members[0];
+          if (member === undefined) throw new Error('sense selection member missing');
+          return {
+            ...selection,
+            aggregate_effect: 'local-write',
+            members: [{ ...member, capabilities: ['host-cache:write'] }],
+          };
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      expect(() =>
+        isolated.resolveSenseInvocation(senseRun, argv('decision_record_integrity')),
+      ).toThrow('SENSE_MUTATION_BOUNDARY_UNRESOLVED');
+    } finally {
+      vi.doUnmock('../../src/commands/sense/facade.js');
+      vi.resetModules();
+    }
+  });
+
+  it.each([
+    ['planner', { kind: 'none' }],
+    ['boundary', { kind: 'none' }],
+  ] as const)('rejects an invalid generic sense %s contract', (field, value) => {
+    const invalid = {
+      ...senseRun,
+      authority_contract: {
+        ...senseRun.authority_contract,
+        [field]: value,
+      },
+    } as typeof senseRun;
+    expect(() => resolveSenseInvocation(invalid, argv('build'))).toThrow(
+      'SENSE_GENERIC_AUTHORITY_CONTRACT_INVALID',
+    );
   });
 });
