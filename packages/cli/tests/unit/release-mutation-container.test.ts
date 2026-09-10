@@ -161,6 +161,10 @@ function invoke(input: {
   readonly source?: readonly ContainerArchiveEntry[];
   readonly prior_outputs?: ReadonlyMap<string, ContainerArchiveEntry>;
   readonly declared_outputs?: readonly string[];
+  readonly declared_namespaces?: readonly {
+    readonly prefix: string;
+    readonly required_paths: readonly string[];
+  }[];
 }) {
   return input.container.runBound(
     {
@@ -181,6 +185,9 @@ function invoke(input: {
         ...(input.mutation_program === undefined
           ? {}
           : { mutation_program: input.mutation_program }),
+        ...(input.declared_namespaces === undefined
+          ? {}
+          : { declared_namespaces: input.declared_namespaces }),
       }),
   );
 }
@@ -224,6 +231,78 @@ afterEach(() => {
 });
 
 describe('protected mutation-program container transport', () => {
+  it('accepts disjoint output namespaces and captures every required member', () => {
+    const value = fixture();
+    const outputs: ContainerArchiveEntry[] = [
+      { path: 'dist/a.js', mode: '100644', bytes: Buffer.from('a') },
+      { path: 'reports/b.json', mode: '100644', bytes: Buffer.from('b') },
+    ];
+    state.source_archive = encodeContainerDependencyArchive([SOURCE, ...outputs]);
+    try {
+      const result = invoke({
+        ...value,
+        mutation_program: program,
+        declared_namespaces: [
+          { prefix: 'dist', required_paths: ['dist/a.js'] },
+          { prefix: 'reports', required_paths: ['reports/b.json'] },
+        ],
+      });
+      expect(result.outputs).toEqual(outputs);
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each([
+    ['a noncanonical prefix', [{ prefix: '../dist', required_paths: ['dist/a.js'] }]],
+    ['an empty required population', [{ prefix: 'dist', required_paths: [] }]],
+    ['a noncanonical required path', [{ prefix: 'dist', required_paths: ['dist/../output.js'] }]],
+    ['a required path outside its prefix', [{ prefix: 'dist', required_paths: ['other/a.js'] }]],
+    [
+      'a mixed valid and invalid required population',
+      [{ prefix: 'dist', required_paths: ['dist/a.js', 'other/a.js'] }],
+    ],
+    [
+      'duplicate prefixes',
+      [
+        { prefix: 'dist', required_paths: ['dist/a.js'] },
+        { prefix: 'dist', required_paths: ['dist/b.js'] },
+      ],
+    ],
+    [
+      'a child followed by its parent',
+      [
+        { prefix: 'dist/sub', required_paths: ['dist/sub/a.js'] },
+        { prefix: 'dist', required_paths: ['dist/b.js'] },
+      ],
+    ],
+    [
+      'a parent followed by its child',
+      [
+        { prefix: 'dist', required_paths: ['dist/a.js'] },
+        { prefix: 'dist/sub', required_paths: ['dist/sub/b.js'] },
+      ],
+    ],
+    [
+      'one overlap among otherwise disjoint predecessors',
+      [
+        { prefix: 'dist/sub', required_paths: ['dist/sub/a.js'] },
+        { prefix: 'reports', required_paths: ['reports/a.json'] },
+        { prefix: 'dist', required_paths: ['dist/b.js'] },
+      ],
+    ],
+  ] as const)('refuses %s before creating a container', (_description, declared_namespaces) => {
+    const value = fixture();
+    try {
+      expect(() => invoke({ ...value, mutation_program: program, declared_namespaces })).toThrow(
+        'release-certification-output-closure-invalid',
+      );
+      expect(state.calls).toEqual([]);
+    } finally {
+      value.dispose();
+    }
+  });
+
   it.each(['ETIMEDOUT', 'EPIPE', '/private/protected-value'])(
     'reports bounded transport metadata without disclosing command output: %s',
     (code) => {
