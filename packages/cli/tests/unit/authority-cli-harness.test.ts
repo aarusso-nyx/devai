@@ -240,12 +240,27 @@ describe('authority CLI harness branch matrix', () => {
         ])
       ).exit_code,
     ).toBe(0);
+    const planResult = await invoke(target, [
+      'round',
+      'plan',
+      '--documents',
+      'cli',
+      '--as-role',
+      'architect',
+      '--write',
+      '--plan',
+    ]);
+    expect(JSON.parse(planResult.stdout)).toMatchObject({
+      applied: false,
+      authority: { readiness_eligible: false },
+    });
     expect(handlerCalls).toBe(2);
     expect(boundaryCalls).toBe(1);
     expect(target.observations.runtime_inputs).toMatchObject([
       { action_id: 'catalog actions', invocation_id: 'invocation-1' },
       { action_id: 'init bind', invocation_id: 'invocation-2' },
       { action_id: 'round plan', invocation_id: 'invocation-3' },
+      { action_id: 'round plan', invocation_id: 'invocation-4', dry_run: true },
     ]);
   });
 });
