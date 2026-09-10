@@ -126,6 +126,93 @@ describe('authority CLI harness branch matrix', () => {
     }
   });
 
+  it.each([
+    {
+      argv: ['catalog', 'actions', '--as-role', 'architect'],
+      declaration: { as_role: 'architect' },
+      declared: { as_role: true, authority_session: false, write: false, allow_publish: false },
+    },
+    {
+      argv: ['catalog', 'actions', '--authority-session', 'AUTH-SESSION-1234567890ABCDEF'],
+      declaration: { authority_session: 'AUTH-SESSION-1234567890ABCDEF' },
+      declared: { as_role: false, authority_session: true, write: false, allow_publish: false },
+    },
+    {
+      argv: ['catalog', 'actions', '--write'],
+      declaration: undefined,
+      declared: { as_role: false, authority_session: false, write: true, allow_publish: false },
+    },
+    {
+      argv: ['catalog', 'actions', '--publish'],
+      declaration: undefined,
+      declared: { as_role: false, authority_session: false, write: false, allow_publish: true },
+    },
+  ] as const)(
+    'records and rejects declarations that do not apply to read action $argv',
+    async ({ argv, declaration, declared }) => {
+      const target = harness();
+      const result = await invoke(target, argv);
+      expect(code(result)).toBe('AUTHORITY_DECLARATION_NOT_APPLICABLE');
+      expect(error(result).context).toMatchObject({
+        action_id: 'catalog actions',
+        effect: 'read',
+        declared,
+      });
+      expect(target.observations).toMatchObject({
+        handler_calls: 0,
+        runtime_inputs: [
+          {
+            action_id: 'catalog actions',
+            invocation_id: 'invocation-1',
+            dry_run: false,
+            declaration,
+            consent: { write: declared.write, allow_publish: declared.allow_publish },
+          },
+        ],
+      });
+    },
+  );
+
+  it('records the complete read input and successful authority result', async () => {
+    const target = harness();
+    const result = await invoke(target, ['catalog', 'actions']);
+    expect(JSON.parse(result.stdout)).toEqual({
+      authority: { code: 'AUTHORITY_NOT_APPLICABLE', principal: null },
+      host_authority: { mode: 'cli-only', attestation: 'not-applicable' },
+    });
+    expect(target.observations).toMatchObject({
+      handler_calls: 1,
+      runtime_inputs: [
+        {
+          action_id: 'catalog actions',
+          invocation_id: 'invocation-1',
+          dry_run: false,
+          consent: { write: false, allow_publish: false, experimental: false },
+        },
+      ],
+    });
+    expect(target.observations.runtime_inputs[0]).toHaveProperty('declaration', undefined);
+  });
+
+  it('rejects machine declarations before a read handler can run', async () => {
+    const target = harness();
+    expect(
+      code(await invoke(target, ['catalog', 'actions', '--machine-actor', 'automation-1'])),
+    ).toBe('AUTHORITY_MACHINE_DECLARATION_FORBIDDEN');
+    expect(target.observations.handler_calls).toBe(0);
+  });
+
+  it.each([
+    ['--publish', 'without write consent'],
+    ['--write', 'without publication consent'],
+  ] as const)('rejects remote publication %s %s', async (consentFlag) => {
+    const target = harness();
+    expect(
+      code(await invoke(target, ['release', 'publish', '--as-role', 'owner', consentFlag])),
+    ).toBe('AUTHORITY_PUBLISH_CONSENT_REQUIRED');
+    expect(target.observations.handler_calls).toBe(0);
+  });
+
   it('covers host integration and runtime-handoff refusals', async () => {
     const unavailable = harness({ host_authority: { mode: 'host-integrated', adapter: {} } });
     expect(
