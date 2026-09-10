@@ -799,4 +799,36 @@ describe('durable certified evidence retention', () => {
       fixture.store.readCertifiedEvidenceCarrier?.({ ...derivation, release_unit: UNIT }),
     ).toThrow(REFUSAL);
   });
+
+  it('serves independently committed scoped and unscoped carrier identities after restart', async () => {
+    const fixture = storeFixture();
+    const unscopedUnit = 'fixture-unit';
+    const unscopedCensus = finalizeCertifiedEvidenceNamespaceCensus({
+      release_unit: unscopedUnit,
+      derivation,
+      entries: census.entries,
+    });
+    const carriers = [
+      { unit: UNIT, bytes: carrierBytes() },
+      {
+        unit: unscopedUnit,
+        bytes: carrierBytes({ release_unit: unscopedUnit, namespace_census: unscopedCensus }),
+      },
+    ];
+    for (const carrier of carriers) {
+      const { transaction, handle, owner } = await retain(fixture, carrier.bytes, carrier.unit);
+      await invokeSink(owner, () =>
+        transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+      );
+    }
+
+    const restarted = createReleaseCertificationEvidenceStore(fixture.input);
+    for (const carrier of carriers) {
+      const read = restarted.readCertifiedEvidenceCarrier?.({
+        ...derivation,
+        release_unit: carrier.unit,
+      }) as Buffer;
+      expect(read.equals(carrier.bytes)).toBe(true);
+    }
+  });
 });
