@@ -2782,6 +2782,67 @@ describe('release lifecycle execution kernel', () => {
     }
   });
 
+  it('keeps current plan schema failures distinct from historical plan receipts', () => {
+    const invalid = rehashReceipt(planReceipt(), { schemaVersion: '3.0.0' });
+    const value = {
+      ...request('release preflight'),
+      receipt_locators: [receiptLocator(invalid)],
+    } as ReleaseLifecycleRequest;
+    expect(() =>
+      resolveReleaseMutationRequirements(value, {
+        resolve_receipt: () => invalid,
+        resolve_plan_input: resolvePlanInput,
+      }),
+    ).toThrow('release-receipt-identity-mismatch');
+  });
+
+  it('dispatches offline v1 receipts through their schema parser before lifecycle controls', async () => {
+    const initial = request('release evidence-publish');
+    const unit = required(initial.candidate_locator.release_units[0], 'missing release unit');
+    const bound = rehashReceipt(offlineReceipt(), {
+      repository: initial.repository_locator,
+      candidate: {
+        release_unit: unit.release_unit,
+        version: unit.version,
+        commit: initial.candidate_locator.commit,
+        tree: initial.candidate_locator.tree,
+      },
+    });
+    const value = request('release evidence-publish', bound);
+    const common = {
+      request: value,
+      action: 'release evidence-publish' as const,
+      authority: authorityFor('release evidence-publish'),
+      store: new ReleaseLifecycleFileStore(root(), value),
+      resolvePlanInput,
+      authorization: authorizationBridge(),
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    };
+    await expect(
+      executeReleaseLifecycleAction({ ...common, resolveReceipt: () => bound }),
+    ).resolves.toMatchObject({
+      ok: false,
+      phase: 'validation',
+      code: 'release-offline-verifier-provider-unavailable',
+    });
+
+    const { checks: _checks, ...withoutChecks } = bound;
+    const malformed = rehashReceipt(withoutChecks, {});
+    const malformedRequest = request('release evidence-publish', malformed);
+    await expect(
+      executeReleaseLifecycleAction({
+        ...common,
+        request: malformedRequest,
+        store: new ReleaseLifecycleFileStore(root(), malformedRequest),
+        resolveReceipt: () => malformed,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      phase: 'validation',
+      code: 'release-receipt-identity-mismatch',
+    });
+  });
+
   it('binds a provider only to its durable attempt and immutable verified parent', async () => {
     const value = request('release prepare');
     const store = new ReleaseLifecycleFileStore(root(), value);
