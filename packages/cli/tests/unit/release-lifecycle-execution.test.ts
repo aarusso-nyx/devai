@@ -2994,6 +2994,24 @@ describe('release lifecycle execution kernel', () => {
         );
       if (outcome === 'unknown') {
         expect(record?.unknown).toMatchObject({ redispatch_permitted: false });
+        const unknown = required(record, 'missing unknown export record');
+        const {
+          record_id: _recordId,
+          record_digest_sha256: _recordDigest,
+          ...unknownDraft
+        } = unknown;
+        const impossibleTail = finalizeStoreRecord({
+          ...unknownDraft,
+          sequence: unknown.sequence + 1,
+          predecessor_record: {
+            sequence: unknown.sequence,
+            record_id: unknown.record_id,
+            record_digest_sha256: unknown.record_digest_sha256,
+          },
+        });
+        expect(reduceStoreRecords([...store.readStoreRecords(), impossibleTail]).errors).toContain(
+          'release-provider-result-unknown',
+        );
         expect(await invoke()).toMatchObject({
           ok: false,
           phase: 'reconciliation',
@@ -3871,8 +3889,12 @@ describe('release lifecycle execution kernel', () => {
       record_digest_sha256: _recordDigest,
       ...currentDraft
     } = success.state;
+    expect(() => verifyReleaseStateIdentity({})).toThrow('release-state-schema-invalid');
     for (const schemaVersion of ['2.0.0', '2.1.0'] as const) {
       const current = finalizeReleaseStateV2({ ...currentDraft, schemaVersion });
+      expect(() =>
+        verifyReleaseStateIdentity({ ...current, record_digest_sha256: 'f'.repeat(64) }),
+      ).toThrow('release-state-id-or-digest-mismatch');
       expect(() =>
         verifyReleaseStateIdentity({ ...current, state_id: `RLS-${'f'.repeat(16)}` }),
       ).toThrow('release-state-id-or-digest-mismatch');
