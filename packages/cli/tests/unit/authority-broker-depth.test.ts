@@ -1771,4 +1771,44 @@ describe('authority broker database process targets', () => {
     });
     expect(target('podman', ['run', '--name', 'fixture-db'])).toBeUndefined();
   });
+
+  it('keeps database routing at the exact remaining public decision boundaries', () => {
+    expect(target('psql', ['postgres://host/db', '-c', 'SELECT 1'], 'check')).toMatchObject({
+      kind: 'db',
+      object_id: 'check',
+    });
+    expect(target('psql', ['postgres://host/db', '-c', 'SELECT 1'], 'task finish')).toMatchObject({
+      kind: 'db',
+      object_id: 'task-finish',
+    });
+    expect(target('psql', ['postgres://host/db', '-c', '!DELETE FROM fixture'])).toMatchObject({
+      kind: 'db',
+      operation: 'execute',
+    });
+    expect(
+      target('psql', ['postgres://host/tenant/intermediate/final-db', '-c', 'SELECT 1']),
+    ).toMatchObject({ kind: 'db', database_id: 'final-db' });
+    expect(target('psql', ['postgres://host', '-c', 'SELECT 1'])).toMatchObject({
+      kind: 'db',
+      database_id: 'postgres',
+    });
+  });
+
+  it('admits only the exact check sandbox process shapes into the worktree target', () => {
+    const expected = {
+      kind: 'fs',
+      id: 'fs:.devai/worktrees',
+      repository_id: 'repo:fixture',
+      canonical_relative_path: '.devai/worktrees',
+      operation: 'update',
+    };
+
+    expect(target('docker', ['run'], 'check')).toEqual(expected);
+    expect(target('sandbox-exec', ['-p', 'profile'], 'check')).toEqual(expected);
+    expect(target('docker', ['start'], 'check')).toBeUndefined();
+    expect(target('podman', ['run'], 'check')).toBeUndefined();
+    expect(target('sandbox-exec', ['profile'], 'check')).toBeUndefined();
+    expect(target('seatbelt', ['-p', 'profile'], 'check')).toBeUndefined();
+    expect(target('sandbox-exec', ['-p', 'profile'], 'task start')).toBeUndefined();
+  });
 });
