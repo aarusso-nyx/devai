@@ -1155,6 +1155,48 @@ describe('v1.2 mapped mutation execution configuration (ADR-MUT-0008)', () => {
     },
   );
 
+  it('rejects an ambiguous multi-wildcard alias even when its literal prefix is populated', () => {
+    const { base, typescript } = mappedFixture();
+    base.files.set(
+      'packages/utils/src/*/main.ts',
+      Buffer.from('export const literalWildcardDirectory = true;\n'),
+    );
+    base.files.set(
+      typescript,
+      Buffer.from(
+        `${JSON.stringify({ compilerOptions: { paths: { '#u/*': ['../packages/utils/src/*/*'] } } })}\n`,
+      ),
+    );
+
+    expect(
+      build(base).plan.packages.find((item) => item.id === 'utils')?.reuse.unresolved,
+    ).toContain('typescript-path-alias-resolution-unproven');
+  });
+
+  it('accepts an alias inside one transitive dependency root and refuses an absent exact member', () => {
+    const dependency = currentFixture();
+    dependency.files.set(
+      'packages/authority/tsconfig.json',
+      Buffer.from(
+        `${JSON.stringify({ compilerOptions: { paths: { '#u/*': ['../utils/src/*'] } } })}\n`,
+      ),
+    );
+    expect(
+      build(dependency).plan.packages.find((item) => item.id === 'authority')?.reuse.unresolved,
+    ).not.toContain('typescript-path-alias-resolution-unproven');
+
+    const { base, typescript } = mappedFixture();
+    base.files.set(
+      typescript,
+      Buffer.from(
+        `${JSON.stringify({ compilerOptions: { paths: { '#missing': ['../packages/utils/src/absent.ts'] } } })}\n`,
+      ),
+    );
+    expect(
+      build(base).plan.packages.find((item) => item.id === 'utils')?.reuse.unresolved,
+    ).toContain('typescript-path-alias-resolution-unproven');
+  });
+
   it('refuses a symlink in the mapped TypeScript closure without following it', () => {
     const { base } = mappedFixture();
     expect(() =>
