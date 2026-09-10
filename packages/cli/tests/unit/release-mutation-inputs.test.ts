@@ -871,6 +871,31 @@ describe('v1.2 mapped mutation execution configuration (ADR-MUT-0008)', () => {
     expect(packageDigest(changed.plan, 'utils')).not.toBe(packageDigest(value.plan, 'utils'));
   });
 
+  it('resolves directory project references without granting shared root configuration source authority', () => {
+    const mapped = mappedFixture();
+    mapped.base.files.set(
+      mapped.typescript,
+      Buffer.from('{"references":[{"path":"../packages/utils"}]}\n'),
+    );
+    const mappedEntry = build(mapped.base).plan.packages.find((entry) => entry.id === 'utils');
+    expect(
+      mappedEntry?.execution_configuration?.typescript_closure.map((member) => member.path),
+    ).toEqual(['configs/typed-build.json', 'packages/utils/tsconfig.json', 'tsconfig.base.json']);
+    expect(mappedEntry?.reuse.unresolved).not.toContain(
+      'typescript-configuration-reference-unresolved',
+    );
+
+    const historical = fixture();
+    historical.files.set(
+      'tsconfig.base.json',
+      Buffer.from('{"references":[{"path":"./packages/evidence"}]}\n'),
+    );
+    const historicalEntry = build(historical).plan.packages.find((entry) => entry.id === 'utils');
+    expect(historicalEntry?.reuse.unresolved).not.toContain(
+      'typescript-project-dependency-unresolved',
+    );
+  });
+
   it.each(['vitest', 'typescript'] as const)(
     'binds mapped %s path and bytes independently of conventional config selectors',
     (kind) => {
