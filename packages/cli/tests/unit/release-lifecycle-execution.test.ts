@@ -69,6 +69,7 @@ import {
   finalizeStoreHead,
   finalizeStoreRecord,
   offlineArtifactProjection,
+  reduceReleaseStates,
   reduceStoreRecords,
   resumeReleaseLifecycleExecution,
   resolveReleaseMutationRequirements,
@@ -4474,6 +4475,178 @@ describe('release lifecycle execution kernel', () => {
         next_outcome: 'blocked',
         blocked_reason: 'stale-head',
       }),
+    );
+  });
+
+  it('reduces exact current and historical state transitions while reporting every identity drift', async () => {
+    const store = new ReleaseLifecycleFileStore(root(), request('release export'));
+    await advanceToExported(store);
+    const states = store.readStateRecords();
+    const preflight = required(states[0], 'missing preflight state');
+    const certified = required(states[1], 'missing certified state');
+    const prepared = required(states[2], 'missing prepared state');
+    const exported = required(states[3], 'missing exported state');
+    expect(reduceReleaseStates(states)).toEqual({ ok: true, head: exported, errors: [] });
+    expect(reduceReleaseStates([])).toEqual({ ok: true, head: null, errors: [] });
+
+    const refinalize = (
+      state: ReleaseLifecycleStateV2,
+      patch: Partial<Parameters<typeof finalizeReleaseStateV2>[0]>,
+    ) => {
+      const { state_id: _stateId, record_digest_sha256: _digest, ...draft } = state;
+      return finalizeReleaseStateV2({ ...draft, ...patch });
+    };
+    const assertReduction = (
+      label: string,
+      values: readonly unknown[],
+      head: ReleaseLifecycleStateV2 | null,
+      errors: readonly string[],
+    ) =>
+      expect(reduceReleaseStates(values), label).toEqual({ ok: errors.length === 0, head, errors });
+
+    const emptyPlans = refinalize(certified, { bound_receipts: [] });
+    assertReduction(
+      'empty later plan bindings are historical-compatible',
+      [preflight, emptyPlans],
+      emptyPlans,
+      [],
+    );
+
+    const plan = required(certified.bound_receipts[0], 'missing certified plan binding');
+    const driftedPlan = refinalize(certified, {
+      bound_receipts: [{ ...plan, receipt_digest_sha256: 'f'.repeat(64) }],
+    });
+    assertReduction('plan binding', [preflight, driftedPlan], driftedPlan, [
+      'release-receipt-identity-mismatch',
+    ]);
+
+    const repositoryDrift = refinalize(certified, {
+      repository: { ...certified.repository, id: 'aarusso-nyx/other' },
+    });
+    assertReduction('repository identity', [preflight, repositoryDrift], repositoryDrift, [
+      'release-state-identity-mismatch',
+    ]);
+    const candidateDrift = refinalize(certified, {
+      candidate: { ...certified.candidate, version: '1.5.1' },
+    });
+    assertReduction('candidate identity', [preflight, candidateDrift], candidateDrift, [
+      'release-state-identity-mismatch',
+    ]);
+
+    const predecessorDrift = refinalize(certified, {
+      prior_state: {
+        ...required(certified.prior_state, 'missing certified predecessor'),
+        record_digest_sha256: 'f'.repeat(64),
+      },
+    });
+    assertReduction('predecessor', [preflight, predecessorDrift], predecessorDrift, [
+      'release-state-predecessor-mismatch',
+    ]);
+    const generationDrift = refinalize(certified, {
+      storage: { ...certified.storage, generation: certified.storage.generation + 1 },
+    });
+    assertReduction('generation', [preflight, generationDrift], generationDrift, [
+      'release-state-head-mismatch',
+    ]);
+    const headGenerationDrift = refinalize(certified, {
+      storage: {
+        ...certified.storage,
+        head_before: {
+          ...required(certified.storage.head_before, 'missing certified head'),
+          generation: preflight.storage.generation + 1,
+        },
+      },
+    });
+    assertReduction('head generation', [preflight, headGenerationDrift], headGenerationDrift, [
+      'release-state-head-mismatch',
+    ]);
+    const headDigestDrift = refinalize(certified, {
+      storage: {
+        ...certified.storage,
+        head_before: {
+          ...required(certified.storage.head_before, 'missing certified head'),
+          record_digest_sha256: 'f'.repeat(64),
+        },
+      },
+    });
+    assertReduction('head digest', [preflight, headDigestDrift], headDigestDrift, [
+      'release-state-head-mismatch',
+    ]);
+    const preparedGenerationDrift = refinalize(prepared, {
+      storage: { ...prepared.storage, generation: prepared.storage.generation + 1 },
+    });
+    assertReduction(
+      'v2.1 generation',
+      [preflight, certified, preparedGenerationDrift],
+      preparedGenerationDrift,
+      ['release-state-head-mismatch'],
+    );
+    const preparedHeadDrift = refinalize(prepared, {
+      storage: {
+        ...prepared.storage,
+        head_before: {
+          ...required(prepared.storage.head_before, 'missing prepared head'),
+          record_digest_sha256: 'f'.repeat(64),
+        },
+      },
+    });
+    assertReduction('v2.1 head', [preflight, certified, preparedHeadDrift], preparedHeadDrift, [
+      'release-state-head-mismatch',
+    ]);
+    assertReduction(
+      'v2.1 prior generation independent of array index',
+      [prepared, exported],
+      exported,
+      ['release-state-transition-invalid'],
+    );
+
+    assertReduction('invalid first phase', [certified], certified, [
+      'release-state-transition-invalid',
+    ]);
+    assertReduction('skipped phase', [preflight, prepared], prepared, [
+      'release-state-predecessor-mismatch',
+      'release-state-head-mismatch',
+      'release-state-transition-invalid',
+    ]);
+    assertReduction(
+      'invalid state identity',
+      [{ ...preflight, record_digest_sha256: 'f'.repeat(64) }],
+      null,
+      ['release-state-id-or-digest-mismatch'],
+    );
+
+    const historical = (
+      state: ReleaseLifecycleStateV2,
+      prior: Readonly<Record<string, unknown>> | null,
+    ) => {
+      const {
+        canonicalization: _canonicalization,
+        release_units: _releaseUnits,
+        storage: _storage,
+        record_digest_sha256: _recordDigest,
+        ...common
+      } = state;
+      const draft = {
+        ...common,
+        schemaVersion: '1.0.0',
+        prior_state:
+          prior === null
+            ? null
+            : {
+                state: prior['state'],
+                state_id: prior['state_id'],
+                record_digest_sha256: prior['record_digest_sha256'],
+              },
+      };
+      return { ...draft, record_digest_sha256: canonicalSha256(draft) };
+    };
+    const historicalPreflight = historical(preflight, null);
+    const historicalCertified = historical(certified, historicalPreflight);
+    assertReduction(
+      'historical index generations',
+      [historicalPreflight, historicalCertified],
+      verifyReleaseStateIdentity(historicalCertified),
+      [],
     );
   });
 
