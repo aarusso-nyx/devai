@@ -285,6 +285,8 @@ function authorityErrorContext(error: unknown): JsonRecord | undefined {
   }
 }
 
+export { authorityErrorCode, authorityErrorContext, authorityRemediation, taggedFailure };
+
 function handleBoundaryError(error: unknown): undefined {
   const code = authorityErrorCode(error);
   if (code === undefined) throw error;
