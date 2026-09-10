@@ -517,6 +517,8 @@ describe('protected unit mutation driver', () => {
       executable: { path: '/usr/local/bin/node', sha256: 'f'.repeat(64) },
       input_digest: 'a'.repeat(64),
     });
+    expect(task.nodeId).toBe('mutation:@fixture/package');
+    expect(task.taskKey).toBe('mutation:@fixture/package@0');
     expect(task.argv).toEqual(['node', '/devai-host/run.mjs']);
     expect(task.cwd).toBe('.');
     expect(task.inputPaths).toEqual([]);
