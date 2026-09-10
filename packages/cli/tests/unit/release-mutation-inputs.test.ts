@@ -936,6 +936,28 @@ describe('v1.2 mapped mutation execution configuration (ADR-MUT-0008)', () => {
   });
 
   it.each([
+    ['invalid JSONC', '{'],
+    ['a null root', 'null'],
+    ['a scalar root', '"configuration"'],
+    ['an array root', '[]'],
+  ] as const)(
+    'keeps %s TypeScript configuration ineligible without evaluating it',
+    (_label, text) => {
+      const { base, typescript } = mappedFixture();
+      base.files.set(typescript, Buffer.from(`${text}\n`));
+      const value = build(base);
+      expect(value.plan.packages.find((entry) => entry.id === 'utils')?.reuse).toEqual({
+        eligible: false,
+        unresolved: expect.arrayContaining([
+          'typescript-configuration-syntax-unresolved',
+          'toolchain-fixture-validation-required',
+        ]),
+      });
+      expect(value.plan.grants).toEqual({ execution: false, certification: false, reuse: false });
+    },
+  );
+
+  it.each([
     ['missing', '{"extends":"./missing.json"}', 'typescript-configuration-reference-unresolved'],
     [
       'escaping',
