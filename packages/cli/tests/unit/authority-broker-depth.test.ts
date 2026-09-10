@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
+import {
+  authorizeCliArgv,
+  declaredInvocationAuthority,
+  disposeCliInvocationAuthority,
+} from '../../src/authority/index.js';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
@@ -219,6 +223,79 @@ describe('authority broker production boundary depth', () => {
     );
     expect(refused).toMatchObject({ exit_code: 2 });
     expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
+  it('distinguishes executable dry runs from plans and remote publish consent', () => {
+    const publish = [
+      process.execPath,
+      'devai',
+      'release',
+      'publish',
+      '--as-role',
+      'owner',
+      '--write',
+      '--format',
+      'json',
+    ] as const;
+    try {
+      const missingPublish = authorizeCliArgv(publish, entries);
+      expect(missingPublish).toMatchObject({ exit_code: 2 });
+      expect(JSON.parse(missingPublish?.stderr ?? 'null')).toMatchObject({
+        code: 'AUTHORITY_PUBLISH_CONSENT_REQUIRED',
+      });
+
+      const unsupportedDryRun = authorizeCliArgv([...publish, '--dry-run'], entries);
+      expect(unsupportedDryRun).toMatchObject({ exit_code: 0 });
+      expect(JSON.parse(unsupportedDryRun?.stdout ?? 'null')).toMatchObject({
+        authority: { code: 'POLICY_ALLOW', readiness_eligible: false },
+        applied: false,
+      });
+      expect(declaredInvocationAuthority()).toBeUndefined();
+
+      const plan = authorizeCliArgv(
+        [
+          process.execPath,
+          'devai',
+          'round',
+          'plan',
+          '--as-role',
+          'architect',
+          '--write',
+          '--plan',
+          '--format',
+          'json',
+        ],
+        entries,
+      );
+      expect(plan).toMatchObject({ exit_code: 0 });
+      expect(JSON.parse(plan?.stdout ?? 'null')).toMatchObject({
+        authority: { code: 'POLICY_ALLOW', readiness_eligible: false },
+        applied: false,
+      });
+
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'sense',
+            'run',
+            'runtime_probe_data',
+            '--as-role',
+            'auditor',
+            '--write',
+            '--dry-run',
+          ],
+          entries,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toMatchObject({
+        actor: { kind: 'human', role: 'auditor', declaration_source: 'cli-flag' },
+        consent: { write: true, allow_publish: false, experimental: false },
+      });
+    } finally {
+      disposeCliInvocationAuthority();
+    }
   });
 
   it('admits only exact declared check tasks for stock release preflight execution', () => {
