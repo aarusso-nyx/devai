@@ -120,7 +120,11 @@ function expectRefusal(fn: () => unknown, code: string, label: string): void {
     expect.unreachable(`${label} must refuse`);
   } catch (error) {
     expect(error, label).toBeInstanceOf(TrackingAuthorityError);
-    expect((error as TrackingAuthorityError).code, label).toBe(code);
+    expect(error, label).toMatchObject({
+      name: 'TrackingAuthorityError',
+      message: code,
+      code,
+    });
   }
 }
 
@@ -130,12 +134,13 @@ describe('replaying a recorded Owner authorization', () => {
     activate(root);
     const authorization = verify(root);
 
-    expect(authorization.round).toBe(ROUND);
-    expect(authorization.repository).toBe(REPOSITORY);
-    expect(authorization.issue).toBe(123);
-    // The authority is the Owner's recorded decision, not a live declaration.
-    expect(authorization.activation.authorization.role).toBe('owner');
-    expect(authorization.activation.authorization.publish_flag).toBe(true);
+    // The authority is the Owner's complete recorded decision, not a live declaration.
+    expect(authorization).toEqual({
+      round: ROUND,
+      repository: REPOSITORY,
+      issue: 123,
+      activation: activation(),
+    });
   });
 
   it('refuses a round that was never activated instead of assuming consent', () => {
@@ -367,7 +372,18 @@ describe('the derived effect scope is narrower than an Owner session', () => {
     ];
     for (const request of requests) expect(scope.apply_effect(request, apply)).toBe('applied');
     expect(apply).toHaveBeenCalledTimes(3);
-    expect(scope).toMatchObject({ action_id: 'round tracking sync', effect: 'remote-write' });
+    expect(scope).toMatchObject({
+      action_id: 'round tracking sync',
+      invocation_id: expect.stringMatching(
+        /^tracking-reconcile-R-0042-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+      ),
+      effect: 'remote-write',
+      receipt_store: {
+        issuer_id: 'devai-tracking-reconcile-adapter',
+        issuer_version: '1.0.0',
+      },
+      apply_effect: expect.any(Function),
+    });
     dispose();
   });
 
