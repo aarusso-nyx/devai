@@ -154,4 +154,88 @@ describe('certified evidence carrier scalar and byte boundaries', () => {
 
     expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
   });
+
+  it('authenticates the declared length of a canonical embedded document', () => {
+    const value = JSON.parse(carrier({ taskPolicy: 0 }).toString('utf8')) as {
+      task_policy: { size_bytes: number };
+    };
+    value.task_policy.size_bytes = 2;
+    const encoded = bytes(value);
+
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
+  });
+
+  it('authenticates the canonical base64 spelling of an embedded document', () => {
+    const value = JSON.parse(carrier({ taskPolicy: 0 }).toString('utf8')) as {
+      task_policy: { bytes_base64: string };
+    };
+    value.task_policy.bytes_base64 = 'MB==';
+    const encoded = bytes(value);
+
+    expect(Buffer.from('MB==', 'base64')).toEqual(Buffer.from('0'));
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
+  });
+
+  it('authenticates the declared digest of an embedded document', () => {
+    const value = JSON.parse(carrier({ taskPolicy: 0 }).toString('utf8')) as {
+      task_policy: { sha256: string };
+    };
+    value.task_policy.sha256 = '0'.repeat(64);
+    const encoded = bytes(value);
+
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
+  });
+
+  it('requires the namespace census document to preserve canonical entry order', () => {
+    const value = JSON.parse(carrier().toString('utf8')) as Record<string, unknown>;
+    const namespaceDocument = value.namespace_census as { bytes_base64: string };
+    const namespace = JSON.parse(
+      Buffer.from(namespaceDocument.bytes_base64, 'base64').toString('utf8'),
+    ) as Record<string, unknown>;
+    namespace.entries = [
+      {
+        path: 'dist/z.js',
+        mode: '100644',
+        sha256: 'f'.repeat(64),
+        size_bytes: 2,
+        task_node: 'build',
+      },
+      {
+        path: 'dist/a.js',
+        mode: '100644',
+        sha256: 'e'.repeat(64),
+        size_bytes: 1,
+        task_node: 'build',
+      },
+    ];
+    value.namespace_census = document(bytes(namespace));
+    const encoded = bytes(value);
+
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
+  });
+
+  it('maps a typed-array carrier input to the stable public refusal', () => {
+    const encoded = Uint8Array.from(bytes({}));
+
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded as never, MAXIMUM));
+  });
+
+  it.each([
+    ['schema version', 'schemaVersion', '2.0.0'],
+    ['carrier kind', 'kind', 'devai.release-certified-evidence-carrier-json.v2'],
+  ] as const)('binds the top-level %s identity', (_label, key, replacement) => {
+    const value = JSON.parse(carrier().toString('utf8')) as Record<string, unknown>;
+    value[key] = replacement;
+    const encoded = bytes(value);
+
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
+  });
+
+  it('binds the authenticated task-policy bytes to the protected derivation', () => {
+    const value = JSON.parse(carrier().toString('utf8')) as Record<string, unknown>;
+    value.task_policy = document(bytes({ tasks: ['test'] }));
+    const encoded = bytes(value);
+
+    expectRefusal(() => readCertifiedEvidenceCarrier(encoded, encoded.length));
+  });
 });
