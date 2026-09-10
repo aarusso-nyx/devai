@@ -3690,6 +3690,158 @@ describe('release lifecycle execution kernel', () => {
     ]);
   });
 
+  it.each(
+    [
+      {
+        defect: 'missing committed artifact sink',
+        change: (value: ReleaseStateMaterial) => ({ ...value, artifact_sink: null }),
+      },
+      {
+        defect: 'missing release unit',
+        change: (value: ReleaseStateMaterial) => ({ ...value, release_units: [] }),
+      },
+      {
+        defect: 'certified package-manifest digest drift',
+        change: (value: ReleaseStateMaterial) => {
+          const unit = required(value.release_units[0], 'missing prepared unit');
+          const pkg = required(unit.packages[0], 'missing prepared package');
+          const certification = required(
+            pkg.certification_manifest,
+            'missing certification manifest',
+          );
+          return {
+            ...value,
+            release_units: [
+              {
+                ...unit,
+                packages: [
+                  {
+                    ...pkg,
+                    certification_manifest: {
+                      ...certification,
+                      entries: certification.entries.map((entry) =>
+                        entry.path === 'package.json'
+                          ? { ...entry, sha256: 'f'.repeat(64) }
+                          : entry,
+                      ),
+                    },
+                  },
+                ],
+              },
+            ],
+          };
+        },
+      },
+      ...(
+        [
+          [
+            'legacy manifest identity',
+            { manifest: { path: 'package.json', sha256: MANIFEST_DIGEST } },
+          ],
+          [
+            'legacy tarball identity',
+            { tarball: { path: 'package.tgz', sha256: MANIFEST_DIGEST } },
+          ],
+          ['legacy SBOM identity', { sbom: { path: 'sbom.json', sha256: MANIFEST_DIGEST } }],
+          [
+            'wrong package-manifest kind',
+            { package_manifest: opaqueArtifact('provider-result', 'package-manifest') },
+          ],
+          [
+            'wrong package-tarball kind',
+            { package_tarball: opaqueArtifact('provider-result', 'package-tarball') },
+          ],
+          [
+            'wrong package-SBOM kind',
+            { package_sbom: opaqueArtifact('provider-result', 'package-sbom') },
+          ],
+          ['missing package tarball', { package_tarball: null }],
+          ['missing package SBOM', { package_sbom: null }],
+        ] as const
+      ).map(([defect, packageChange]) => ({
+        defect,
+        change: (value: ReleaseStateMaterial): ReleaseStateMaterial => {
+          const unit = required(value.release_units[0], 'missing prepared unit');
+          const pkg = required(unit.packages[0], 'missing prepared package');
+          return {
+            ...value,
+            release_units: [{ ...unit, packages: [{ ...pkg, ...packageChange } as typeof pkg] }],
+          };
+        },
+      })),
+      {
+        defect: 'duplicate top-level artifact identity',
+        change: (value: ReleaseStateMaterial) => ({
+          ...value,
+          artifacts: [
+            ...value.artifacts,
+            required(value.artifacts[0], 'missing prepared artifact'),
+          ],
+        }),
+      },
+      {
+        defect: 'missing top-level artifact identity',
+        change: (value: ReleaseStateMaterial) => ({
+          ...value,
+          artifacts: value.artifacts.slice(1),
+        }),
+      },
+      {
+        defect: 'non-canonical top-level artifact order',
+        change: (value: ReleaseStateMaterial) => ({
+          ...value,
+          artifacts: [...value.artifacts].reverse(),
+        }),
+      },
+    ].map((entry) => ({ ...entry, action: 'release prepare' as const })),
+  )(
+    'refuses $action material with $defect before committing its provider transaction',
+    async ({ action, change, defect }) => {
+      const value = request(action);
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      await seedCertified(store);
+      const commit = vi.fn();
+      const rollback = vi.fn();
+      const dispose = vi.fn();
+      const provider = vi.fn(() => ({
+        outcome: 'success' as const,
+        material: change(materialFor(action)),
+        transaction: { commit, rollback, dispose },
+      }));
+
+      const result = await withReleasePrepareAuthorityFixture(value, () =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action,
+          authority: authorityFor(action),
+          store,
+          resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
+          provider,
+          recorded_at: '2026-09-03T00:00:01.000Z',
+        }),
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        phase: 'validation',
+        code:
+          defect === 'missing committed artifact sink'
+            ? 'release-artifact-sink-protocol-invalid'
+            : 'release-release-unit-bijection-invalid',
+      });
+      expect(provider).toHaveBeenCalledOnce();
+      expect(commit).not.toHaveBeenCalled();
+      expect(rollback).toHaveBeenCalledOnce();
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(store.readStateRecords().at(-1)?.state).toBe('certified');
+      expect(store.readStoreRecords().at(-1)).toMatchObject({
+        record_kind: 'failure',
+        provider_dispatch: { status: 'not-dispatched', handle_observed: false },
+      });
+    },
+  );
+
   it('commits prepared artifacts only after semantic validation and preserves a committed sink on append failure', async () => {
     const value = request('release prepare');
     const invalidStore = new ReleaseLifecycleFileStore(root(), value);
