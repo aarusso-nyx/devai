@@ -1187,6 +1187,92 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     }
   });
 
+  it('binds finalization delegation and inspects each protected material independently', async () => {
+    const policy = activationSnapshot().policy;
+    const contract = exactNotRequiredContract(canonicalSha256(policy));
+    const input = {
+      contract,
+      candidate: CANDIDATE,
+      packages: [
+        {
+          packageName: '@fixture/package',
+          disposition: 'executed',
+          report: { score: 100 },
+          result: { verdict: 'pass' },
+        },
+      ],
+    };
+    const summary = { complete: true, verdict: 'pass' };
+    const validateMutationContractV21 = vi.fn();
+    const finalizeMutationReportSetV21 = vi.fn(() => summary);
+    const validateArtifactContent = vi.fn();
+    vi.resetModules();
+    vi.doMock('node:module', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:module')>();
+      const load = (path: string) => {
+        if (path.endsWith('/src/mutation-v21.js'))
+          return { validateMutationContractV21, finalizeMutationReportSetV21 };
+        if (path.endsWith('/src/artifact-safety.js')) return { validateArtifactContent };
+        if (path.endsWith('/src/canonical-json.js'))
+          return {
+            canonicalize: canonicalJson,
+            canonicalBytes: (value: unknown) => Buffer.from(canonicalJson(value)),
+            sha256Hex: canonicalSha256,
+            framedDigest,
+          };
+        if (path.endsWith('/src/verify.js') || path.endsWith('/src/trust.js')) return {};
+        throw new Error(`unexpected verified module: ${path}`);
+      };
+      return {
+        ...actual,
+        createRequire: () => load,
+        registerHooks: () => ({ deregister: vi.fn() }),
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await expect(isolated.finalizeMutationEvidenceV21(input)).resolves.toEqual(summary);
+      expect(validateMutationContractV21).toHaveBeenCalledWith(contract);
+      expect(finalizeMutationReportSetV21).toHaveBeenCalledWith(JSON.parse(canonicalJson(input)));
+      expect(validateArtifactContent.mock.calls.map(([value]) => value)).toEqual(
+        [
+          { contract, candidate: CANDIDATE },
+          {
+            packageName: '@fixture/package',
+            disposition: 'executed',
+          },
+          { score: 100 },
+          { verdict: 'pass' },
+        ].map((value) => ({
+          bytes: Buffer.from(canonicalJson(value)),
+          path: 'mutation-finalization.json',
+          mediaType: 'application/json',
+        })),
+      );
+
+      await expect(isolated.finalizeMutationEvidenceV21(null)).rejects.toMatchObject({
+        message: 'MUTATION_SEMANTIC_RECEIPT_MISMATCH',
+        code: 'MUTATION_SEMANTIC_RECEIPT_MISMATCH',
+      });
+      for (const invalidContract of [
+        undefined,
+        null,
+        1,
+        { ...contract, policyDigest: '0'.repeat(64) },
+      ]) {
+        await expect(
+          isolated.finalizeMutationEvidenceV21({ ...input, contract: invalidContract }),
+        ).rejects.toMatchObject({
+          message: 'MUTATION_SEMANTIC_RECEIPT_MISMATCH',
+          code: 'MUTATION_SEMANTIC_RECEIPT_MISMATCH',
+        });
+      }
+    } finally {
+      vi.doUnmock('node:module');
+      vi.resetModules();
+    }
+  });
+
   it('binds the complete active policy rather than an arbitrary task-policy digest', async () => {
     const contract = exactNotRequiredContract('0'.repeat(64));
     await expect(
