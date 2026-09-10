@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -102,6 +102,84 @@ async function invoke(
 }
 
 describe('authority repository identity boundary', () => {
+  it('refuses every caller-controlled protected release request binding drift', async () => {
+    const mutations: ReadonlyArray<
+      readonly [string, (request: Record<string, unknown>) => Record<string, unknown>]
+    > = [
+      ['action', (request) => ({ ...request, action_id: 'release prepare' })],
+      [
+        'repository locator',
+        (request) => ({
+          ...request,
+          repository_locator: {
+            ...(request.repository_locator as Record<string, unknown>),
+            commit: 'a'.repeat(40),
+          },
+        }),
+      ],
+      ['candidate shape', (request) => ({ ...request, candidate_locator: null })],
+      [
+        'candidate commit',
+        (request) => ({
+          ...request,
+          candidate_locator: {
+            ...(request.candidate_locator as Record<string, unknown>),
+            commit: 'a'.repeat(40),
+          },
+        }),
+      ],
+      [
+        'candidate tree',
+        (request) => ({
+          ...request,
+          candidate_locator: {
+            ...(request.candidate_locator as Record<string, unknown>),
+            tree: 'b'.repeat(40),
+          },
+        }),
+      ],
+      ['receipt locator shape', (request) => ({ ...request, receipt_locators: null })],
+      ['missing receipt locator', (request) => ({ ...request, receipt_locators: [] })],
+      [
+        'receipt kind',
+        (request) => ({
+          ...request,
+          receipt_locators: [
+            {
+              ...((request.receipt_locators as Record<string, unknown>[])[0] ?? {}),
+              kind: 'other-receipt',
+            },
+          ],
+        }),
+      ],
+      [
+        'receipt digest',
+        (request) => ({
+          ...request,
+          receipt_locators: [
+            {
+              ...((request.receipt_locators as Record<string, unknown>[])[0] ?? {}),
+              receipt_digest_sha256: 'f'.repeat(64),
+            },
+          ],
+        }),
+      ],
+    ];
+
+    for (const [label, mutate] of mutations) {
+      const value = fixture('aarusso-nyx/devai', 'devai');
+      try {
+        const declared = JSON.parse(readFileSync(value.request, 'utf8')) as Record<string, unknown>;
+        writeFileSync(value.request, `${JSON.stringify(mutate(declared))}\n`);
+        await expect(invoke(value), label).rejects.toThrow(
+          'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+        );
+      } finally {
+        value.dispose();
+      }
+    }
+  });
+
   it.each([
     ['DEVAI', 'aarusso-nyx/devai', 'devai', 'aarusso-nyx-devai'],
     ['STYNX', 'stynx-nyx/stynx', 'stynx', 'stynx-nyx-stynx'],
