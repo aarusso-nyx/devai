@@ -3,7 +3,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { canonicalRegistry, validateActionSurface } from '../../src/define-command.js';
+import {
+  canonicalRegistry,
+  defineCommand,
+  getFullRegistry,
+  validateActionSurface,
+} from '../../src/define-command.js';
+import { validateLiveAuthorityActionRegistry } from '../../src/authority/index.js';
 import { buildTrustedAuthoritySources, repositoryIdFor } from '../../src/authority/policy.js';
 import {
   invocationIsNonMutating,
@@ -18,6 +24,114 @@ afterEach(() => {
 });
 
 describe('canonical action registry constructor', () => {
+  it.each([
+    ['action id', { actionId: 'foreign action', effects: 'read' }],
+    ['declared effect', { actionId: 'doctor', effects: 'remote-write' }],
+  ] as const)(
+    'rejects a %s that disagrees with the capability-derived catalog',
+    (_label, fault) => {
+      const [doctor] = canonicalRegistry().filter((entry) => entry.name === 'doctor');
+      if (doctor === undefined) throw new Error('doctor registry entry missing');
+      const candidate = {
+        ...doctor,
+        effects: fault.effects,
+        authority_contract: {
+          ...doctor.authority_contract,
+          action_id: fault.actionId,
+        },
+      };
+
+      expect(() => validateLiveAuthorityActionRegistry([candidate])).toThrow(
+        'doctor: EFFECT_CAPABILITIES_CATALOG_MISMATCH',
+      );
+    },
+  );
+
+  it('registers stable, preview, and internal handlers with their exact canonical metadata', () => {
+    for (const definition of [
+      {
+        name: 'doctor',
+        description: 'doctor fixture',
+        authority: 'mesh_controller',
+        lifecycle: 'supported',
+        register: () => undefined,
+      },
+      {
+        name: 'round assess',
+        description: 'round assess fixture',
+        authority: 'mesh_controller',
+        lifecycle: 'experimental',
+        register: () => undefined,
+      },
+      {
+        name: 'catalog actions',
+        description: 'catalog fixture',
+        authority: 'mesh_controller',
+        lifecycle: 'supported',
+        register: () => undefined,
+      },
+    ] as const) {
+      defineCommand(definition);
+    }
+
+    expect(
+      getFullRegistry().map((entry) => ({
+        name: entry.name,
+        lifecycle: entry.lifecycle,
+        lifecycle_reason: entry.lifecycle_reason,
+        promotion_criteria: entry.promotion_criteria,
+        visibility: entry.visibility,
+        tier: entry.tier,
+      })),
+    ).toEqual([
+      {
+        name: 'catalog actions',
+        lifecycle: 'supported',
+        lifecycle_reason: 'Stable action.',
+        promotion_criteria: [],
+        visibility: 'maintainer',
+        tier: 'plumbing',
+      },
+      {
+        name: 'doctor',
+        lifecycle: 'supported',
+        lifecycle_reason: 'Stable action.',
+        promotion_criteria: [],
+        visibility: 'standard',
+        tier: 'porcelain',
+      },
+      {
+        name: 'round assess',
+        lifecycle: 'experimental',
+        lifecycle_reason: 'Preview action; contract may change before v1.0.',
+        promotion_criteria: [],
+        visibility: 'standard',
+        tier: 'porcelain',
+      },
+    ]);
+  });
+
+  it('refuses handler declarations whose authority or lifecycle differs from the registry', () => {
+    expect(() =>
+      defineCommand({
+        name: 'doctor',
+        description: 'wrong authority',
+        authority: 'sensor',
+        lifecycle: 'supported',
+        register: () => undefined,
+      }),
+    ).toThrow("action 'doctor' authority differs from the canonical registry");
+    expect(() =>
+      defineCommand({
+        name: 'round close',
+        description: 'wrong lifecycle',
+        authority: 'mesh_controller',
+        lifecycle: 'supported',
+        register: () => undefined,
+      }),
+    ).toThrow("action 'round close' status differs from the canonical registry");
+  });
+
   it('always constructs the complete 57-action surface without handler registration', () => {
     const first = canonicalRegistry();
     const second = canonicalRegistry();
