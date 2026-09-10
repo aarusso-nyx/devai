@@ -20,12 +20,24 @@ import { ProtectedCertificationContainer } from '../../src/services/release-cert
 
 type ProbeMode = 'correct' | 'extra-observed' | 'missing-executables' | 'omit-ps';
 
+interface ImageInspection {
+  readonly Os: string;
+  readonly Architecture: string;
+  readonly Id?: string;
+  readonly RepoDigests?: readonly string[];
+  readonly Descriptor?: { readonly annotations?: Readonly<Record<string, string>> };
+  readonly RootFS?: { readonly Type?: string; readonly Layers?: readonly string[] };
+}
+
 interface Fixture {
   readonly root: string;
   readonly controls: ConstructorParameters<typeof ProtectedCertificationContainer>[0];
 }
 
 const IMAGE = `fixture/node@sha256:${'a'.repeat(64)}`;
+const CONFIGURATION_SHA256 = 'b'.repeat(64);
+const MANIFEST_SHA256 = 'c'.repeat(64);
+const ROOTFS_DIFF_IDS = [`sha256:${'d'.repeat(64)}`, `sha256:${'e'.repeat(64)}`] as const;
 
 function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -36,7 +48,7 @@ function writeExecutable(path: string, contents: string): void {
   chmodSync(path, 0o700);
 }
 
-function fakeDockerSource(mode: ProbeMode): string {
+function fakeDockerSource(mode: ProbeMode, imageInspection?: ImageInspection): string {
   return `#!${process.execPath}
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -44,7 +56,7 @@ const args = process.argv.slice(2);
 const image = ${JSON.stringify(IMAGE)};
 const command = args.includes('version') ? 'version' : args.includes('image') ? 'image' : args.includes('run') ? 'run' : '';
 if (command === 'version') { process.stdout.write('fixture-engine\\n'); process.exit(0); }
-if (command === 'image') { process.stdout.write(JSON.stringify([{ Os: 'linux', Architecture: 'arm64', RepoDigests: [image] }])); process.exit(0); }
+if (command === 'image') { process.stdout.write(JSON.stringify([${JSON.stringify(imageInspection ?? { Os: 'linux', Architecture: 'arm64', RepoDigests: [IMAGE] })}])); process.exit(0); }
 if (command !== 'run') process.exit(64);
 const index = args.indexOf('-e');
 if (index < 0 || args[index + 1] === undefined || args[index + 2] === undefined) process.exit(64);
@@ -73,7 +85,7 @@ function executable(controls: Fixture['controls'], name: string) {
   return value;
 }
 
-function fixture(mode: ProbeMode = 'correct'): Fixture {
+function fixture(mode: ProbeMode = 'correct', imageInspection?: ImageInspection): Fixture {
   const root = mkdtempSync(join(tmpdir(), 'devai-container-probe-'));
   const config = join(root, 'config');
   mkdirSync(config, { mode: 0o700 });
@@ -83,7 +95,7 @@ function fixture(mode: ProbeMode = 'correct'): Fixture {
   writeExecutable(ps, '#!/bin/sh\necho fixture-ps\n');
   writeExecutable(git, '#!/bin/sh\necho fixture-git\n');
   const docker = join(root, 'docker');
-  writeExecutable(docker, fakeDockerSource(mode));
+  writeExecutable(docker, fakeDockerSource(mode, imageInspection));
   const nodeBytes = readFileSync(process.execPath);
   return {
     root,
@@ -108,6 +120,20 @@ function fixture(mode: ProbeMode = 'correct'): Fixture {
   };
 }
 
+function localImageControls(
+  controls: Fixture['controls'],
+  image = `sha256:${CONFIGURATION_SHA256}`,
+): Fixture['controls'] {
+  return {
+    ...controls,
+    image,
+    local_image: {
+      configuration_sha256: CONFIGURATION_SHA256,
+      rootfs_diff_ids: ROOTFS_DIFF_IDS,
+    },
+  };
+}
+
 function verify(controls: Fixture['controls']): void {
   const container = new ProtectedCertificationContainer(controls);
   container.runBound(
@@ -127,6 +153,228 @@ afterEach(() => {
 });
 
 describe('protected container runtime executable probe', () => {
+  it.each([
+    ['a missing local-image identity', undefined, undefined],
+    [
+      'a local image digest with a leading byte',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      `0sha256:${CONFIGURATION_SHA256}`,
+    ],
+    [
+      'a local image digest with a trailing byte',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      `sha256:${CONFIGURATION_SHA256}0`,
+    ],
+    [
+      'a short local image digest',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      'sha256:b',
+    ],
+    [
+      'a non-hex local image digest',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      `sha256:${'g'.repeat(64)}`,
+    ],
+    [
+      'a configuration digest with a leading byte',
+      { configuration_sha256: `0${CONFIGURATION_SHA256}`, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      undefined,
+    ],
+    [
+      'a configuration digest with a trailing byte',
+      { configuration_sha256: `${CONFIGURATION_SHA256}0`, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      undefined,
+    ],
+    [
+      'a short configuration digest',
+      { configuration_sha256: 'b', rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      undefined,
+    ],
+    [
+      'a non-hex configuration digest',
+      { configuration_sha256: 'g'.repeat(64), rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      undefined,
+    ],
+    [
+      'an empty rootfs population',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: [] },
+      undefined,
+    ],
+    [
+      'a rootfs digest with a leading byte',
+      {
+        configuration_sha256: CONFIGURATION_SHA256,
+        rootfs_diff_ids: [`0sha256:${'d'.repeat(64)}`],
+      },
+      undefined,
+    ],
+    [
+      'a rootfs digest with a trailing byte',
+      {
+        configuration_sha256: CONFIGURATION_SHA256,
+        rootfs_diff_ids: [`sha256:${'d'.repeat(64)}0`],
+      },
+      undefined,
+    ],
+    [
+      'a short rootfs digest',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: ['sha256:d'] },
+      undefined,
+    ],
+    [
+      'a non-hex rootfs digest',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: [`sha256:${'g'.repeat(64)}`] },
+      undefined,
+    ],
+    [
+      'a mixed valid and invalid rootfs population',
+      {
+        configuration_sha256: CONFIGURATION_SHA256,
+        rootfs_diff_ids: [ROOTFS_DIFF_IDS[0], 'sha256:d'],
+      },
+      undefined,
+    ],
+    [
+      'a local identity for a registry image',
+      { configuration_sha256: CONFIGURATION_SHA256, rootfs_diff_ids: ROOTFS_DIFF_IDS },
+      IMAGE,
+    ],
+  ] as const)(
+    'refuses %s before invoking the runtime',
+    (_description, localImage, image = `sha256:${CONFIGURATION_SHA256}`) => {
+      const value = fixture();
+      try {
+        const controls = {
+          ...value.controls,
+          image,
+          ...(localImage === undefined ? {} : { local_image: localImage }),
+        };
+        expect(() => new ProtectedCertificationContainer(controls)).toThrow(
+          'release-certification-container-controls-invalid',
+        );
+        expect(dockerCalls).toEqual([]);
+      } finally {
+        rmSync(value.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([
+    [
+      'configuration-pinned image',
+      `sha256:${CONFIGURATION_SHA256}`,
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${CONFIGURATION_SHA256}`,
+        RootFS: { Type: 'layers', Layers: ROOTFS_DIFF_IDS },
+      },
+    ],
+    [
+      'manifest-pinned image',
+      `sha256:${MANIFEST_SHA256}`,
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${CONFIGURATION_SHA256}` } },
+        RootFS: { Type: 'layers', Layers: ROOTFS_DIFF_IDS },
+      },
+    ],
+  ] as const)('accepts a %s with its exact rootfs identity', (_description, image, inspection) => {
+    const value = fixture('correct', inspection);
+    try {
+      verify(localImageControls(value.controls, image));
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [
+      'image ID',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${'f'.repeat(64)}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${CONFIGURATION_SHA256}` } },
+        RootFS: { Type: 'layers', Layers: ROOTFS_DIFF_IDS },
+      },
+    ],
+    [
+      'configuration digest',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${'f'.repeat(64)}` } },
+        RootFS: { Type: 'layers', Layers: ROOTFS_DIFF_IDS },
+      },
+    ],
+    [
+      'malformed configuration digest',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': 'sha256:bad' } },
+        RootFS: { Type: 'layers', Layers: ROOTFS_DIFF_IDS },
+      },
+    ],
+    [
+      'rootfs type',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${CONFIGURATION_SHA256}` } },
+        RootFS: { Type: 'unknown', Layers: ROOTFS_DIFF_IDS },
+      },
+    ],
+    [
+      'rootfs layer population',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${CONFIGURATION_SHA256}` } },
+        RootFS: { Type: 'layers', Layers: [ROOTFS_DIFF_IDS[0]] },
+      },
+    ],
+    [
+      'malformed rootfs layer digest',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${CONFIGURATION_SHA256}` } },
+        RootFS: { Type: 'layers', Layers: ['sha256:bad', ROOTFS_DIFF_IDS[1]] },
+      },
+    ],
+    [
+      'empty rootfs layer population',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        Id: `sha256:${MANIFEST_SHA256}`,
+        Descriptor: { annotations: { 'config.digest': `sha256:${CONFIGURATION_SHA256}` } },
+        RootFS: { Type: 'layers', Layers: [] },
+      },
+    ],
+  ] as const)(
+    'refuses a manifest-pinned image with a mismatched %s',
+    (_description, inspection) => {
+      const value = fixture('correct', inspection);
+      try {
+        expect(() =>
+          verify(localImageControls(value.controls, `sha256:${MANIFEST_SHA256}`)),
+        ).toThrow('release-certification-container-identity-mismatch');
+      } finally {
+        rmSync(value.root, { recursive: true, force: true });
+      }
+    },
+  );
+
   it('hashes every declared executable in one networkless readonly runtime probe', () => {
     const value = fixture();
     try {
