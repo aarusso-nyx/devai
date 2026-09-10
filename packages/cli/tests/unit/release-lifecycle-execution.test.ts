@@ -2685,6 +2685,35 @@ describe('release lifecycle execution kernel', () => {
     expect(stale.certify).not.toHaveBeenCalled();
   });
 
+  it('binds resolved plan documents to every locator field and the exact repository', () => {
+    const exact = request('release preflight');
+    const locator = required(exact.receipt_locators?.[0], 'missing exact plan locator');
+    const resolve = (value: ReleaseLifecycleRequest) =>
+      resolveReleaseMutationRequirements(value, {
+        resolve_receipt: () => planReceipt(),
+        resolve_plan_input: resolvePlanInput,
+      });
+    const reject = (value: ReleaseLifecycleRequest) =>
+      expect(() => resolve(value)).toThrow('release-receipt-identity-mismatch');
+
+    expect(resolve(exact)).toHaveLength(1);
+    expect(() => resolveReleaseMutationRequirements(exact, {})).toThrow(
+      'release-receipt-provider-unavailable',
+    );
+
+    for (const receiptLocator of [
+      { ...locator, kind: 'release-offline-verification-receipt' as const },
+      { ...locator, receipt_id: `RPL-${'f'.repeat(16)}` },
+      { ...locator, receipt_digest_sha256: 'f'.repeat(64) },
+    ]) {
+      reject({ ...exact, receipt_locators: [receiptLocator] });
+    }
+    reject({
+      ...exact,
+      repository_locator: { ...exact.repository_locator, id: 'foreign/repository' },
+    });
+  });
+
   it('binds a provider only to its durable attempt and immutable verified parent', async () => {
     const value = request('release prepare');
     const store = new ReleaseLifecycleFileStore(root(), value);
