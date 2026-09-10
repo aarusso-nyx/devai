@@ -1505,3 +1505,6 @@ export function createAuthorityCliHarness(deps: Readonly<JsonRecord>) {
 
   return Object.freeze({ invoke, observations });
 }
+
+// Explicit test seams for small deterministic authority-state helpers.
+export { canonical, guardedInvocationDisposal, rememberResolvedInvocationAuthority };
