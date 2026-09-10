@@ -3,14 +3,61 @@ import { createHash } from 'node:crypto';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { canonicalJson } from '@devai-nyx/utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ContainerArchiveEntry } from '../../src/services/container-archive.js';
+import type { PlannedTask } from '../../src/services/check-runner/types.js';
+import type { ProtectedMutationProgram } from '../../src/services/release-mutation-program.js';
+import {
+  createMutationContainerTransportFixture,
+  type MutationContainerTransportFixture,
+} from '../helpers/release-mutation-container-fixture.js';
 
-const { dockerCalls } = vi.hoisted(() => ({ dockerCalls: [] as string[][] }));
+const { dockerCalls, mutationTransport } = vi.hoisted(() => ({
+  dockerCalls: [] as string[][],
+  mutationTransport: {
+    docker: undefined as MutationContainerTransportFixture['docker'] | undefined,
+  },
+}));
+
+const mutationProgram = vi.hoisted(() =>
+  Object.freeze({
+    kind: 'protected-mutation-program-v1' as const,
+    identity_sha256: 'a'.repeat(64),
+  }),
+);
+
+const capturedMutationProgram = vi.hoisted(() => ({
+  identity_sha256: 'a'.repeat(64),
+  files: [] as ContainerArchiveEntry[],
+  argv: ['node', '/devai-host/run.mjs'] as string[],
+  maximum_observation_bytes: 8,
+  maximum_raw_report_bytes: 12,
+}));
+
+const mutationExecutionAssertion = vi.hoisted(() => vi.fn());
+
+vi.mock('../../src/services/release-mutation-program.js', () => ({
+  captureProtectedMutationProgram(value: unknown) {
+    if (value !== mutationProgram) throw new Error('release-mutation-program-invalid');
+    return {
+      ...capturedMutationProgram,
+      argv: [...capturedMutationProgram.argv],
+      files: capturedMutationProgram.files.map((entry) => ({
+        ...entry,
+        bytes: Buffer.from(entry.bytes),
+      })),
+    };
+  },
+  assertProtectedMutationProgramExecution: mutationExecutionAssertion,
+}));
 
 vi.mock('@devai-nyx/authority', () => ({
   createProtectedReleaseHostAdapter: () => ({
     spawnSync(command: string, args: readonly string[], options: Parameters<typeof spawnSync>[2]) {
       dockerCalls.push([...args]);
+      if (mutationTransport.docker !== undefined)
+        return mutationTransport.docker(args, options?.input as Buffer | undefined);
       return spawnSync(command, args, options);
     },
   }),
@@ -38,6 +85,15 @@ const IMAGE = `fixture/node@sha256:${'a'.repeat(64)}`;
 const CONFIGURATION_SHA256 = 'b'.repeat(64);
 const MANIFEST_SHA256 = 'c'.repeat(64);
 const ROOTFS_DIFF_IDS = [`sha256:${'d'.repeat(64)}`, `sha256:${'e'.repeat(64)}`] as const;
+const MUTATION_SOURCE: ContainerArchiveEntry = {
+  path: 'src/input.ts',
+  mode: '100644',
+  bytes: Buffer.from('export const input = true;\n', 'utf8'),
+};
+const VALID_MUTATION_FILES: readonly ContainerArchiveEntry[] = [
+  { path: 'invocation.json', mode: '100644', bytes: Buffer.from('{"fixture":true}', 'utf8') },
+  { path: 'run.mjs', mode: '100644', bytes: Buffer.from('export {};\n', 'utf8') },
+];
 
 function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -148,8 +204,300 @@ function verify(controls: Fixture['controls']): void {
   );
 }
 
+function plannedMutationTask(controls: Fixture['controls']): PlannedTask {
+  const node = controls.executables.node;
+  if (node === undefined) throw new Error('fixture node executable missing');
+  return {
+    nodeId: 'fixture-mutation',
+    taskKey: 'd'.repeat(64),
+    dependencies: [],
+    outputContract: {},
+    argv: ['node', '/devai-host/run.mjs'],
+    executable: node,
+    cwd: '.',
+    inputDigest: 'e'.repeat(64),
+    inputPaths: [],
+    matchedChangedPaths: [],
+    cacheState: 'execute',
+    reason: 'fixture',
+  };
+}
+
+function envelope(
+  input: {
+    readonly observation_base64?: unknown;
+    readonly report_base64?: unknown;
+    readonly process?: unknown;
+    readonly kind?: unknown;
+    readonly schemaVersion?: unknown;
+    readonly extra?: Readonly<Record<string, unknown>>;
+  } = {},
+): Buffer {
+  return Buffer.from(
+    canonicalJson({
+      kind: input.kind ?? 'devai.protected-mutation-program-result.v1',
+      observation_base64: input.observation_base64 ?? Buffer.from('observe').toString('base64'),
+      process: input.process ?? { error_absent: true, signal: null, status: 0 },
+      report_base64: input.report_base64 ?? Buffer.from('report').toString('base64'),
+      schemaVersion: input.schemaVersion ?? '1.0.0',
+      ...(input.extra ?? {}),
+    }),
+    'utf8',
+  );
+}
+
+function invokeMutation(value: MutationContainerTransportFixture) {
+  return value.container.runBound(
+    {
+      action_id: 'release preflight',
+      repository: { id: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+      task_policy_digest_sha256: 'c'.repeat(64),
+      plan_receipt_digest_sha256: 'd'.repeat(64),
+      helper_identity_sha256: 'e'.repeat(64),
+    },
+    () =>
+      value.container.execute({
+        task: plannedMutationTask(value.controls),
+        timeout_ms: 1_000,
+        environment: {},
+        source: [MUTATION_SOURCE],
+        prior_outputs: new Map(),
+        declared_outputs: [],
+        mutation_program: mutationProgram as ProtectedMutationProgram,
+      }),
+  );
+}
+
+function mutationFixture(
+  bytes = envelope(),
+  configure?: () => void,
+  transportConfiguredFiles = false,
+): MutationContainerTransportFixture {
+  capturedMutationProgram.files.splice(
+    0,
+    capturedMutationProgram.files.length,
+    ...VALID_MUTATION_FILES.map((entry) => ({ ...entry, bytes: Buffer.from(entry.bytes) })),
+  );
+  capturedMutationProgram.maximum_observation_bytes = 8;
+  capturedMutationProgram.maximum_raw_report_bytes = 12;
+  configure?.();
+  const value = createMutationContainerTransportFixture({
+    source: [MUTATION_SOURCE],
+    program_files: transportConfiguredFiles ? capturedMutationProgram.files : VALID_MUTATION_FILES,
+    envelope: bytes,
+  });
+  mutationTransport.docker = value.docker;
+  return value;
+}
+
 afterEach(() => {
   dockerCalls.length = 0;
+  mutationTransport.docker = undefined;
+  mutationExecutionAssertion.mockReset();
+});
+
+describe('protected mutation envelope and program manifest boundaries', () => {
+  it.each([
+    ['a non-string channel', { observation_base64: 7 }],
+    ['a noncanonical base64 channel', { observation_base64: 'AB==' }],
+    [
+      'an observation above its decoded-byte limit',
+      { observation_base64: Buffer.alloc(9).toString('base64') },
+    ],
+  ] as const)('refuses %s', (_description, override) => {
+    const value = mutationFixture(envelope(override));
+    try {
+      expect(() => invokeMutation(value)).toThrow('release-certification-mutation-program-invalid');
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it('accepts channels exactly at their decoded-byte limits', () => {
+    const value = mutationFixture(
+      envelope({
+        observation_base64: Buffer.alloc(8, 1).toString('base64'),
+        report_base64: Buffer.alloc(12, 2).toString('base64'),
+      }),
+    );
+    try {
+      expect(invokeMutation(value)).toMatchObject({
+        mutation_observation: Buffer.alloc(8, 1),
+        mutation_report: Buffer.alloc(12, 2),
+      });
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it('binds the container buffer to both encoded channel limits and its fixed envelope margin', () => {
+    const value = mutationFixture();
+    try {
+      invokeMutation(value);
+      expect(value.state.launch).toMatchObject({ maximum_buffer_bytes: 1052 });
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it('refuses a nonpositive computed envelope limit before a container effect', () => {
+    const value = mutationFixture(envelope(), () => {
+      capturedMutationProgram.maximum_observation_bytes = -384;
+      capturedMutationProgram.maximum_raw_report_bytes = -384;
+    });
+    try {
+      expect(() => invokeMutation(value)).toThrow('release-certification-mutation-program-invalid');
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each([
+    ['a writable file', [{ path: 'run.mjs', mode: '100755', bytes: Buffer.from('x') }]],
+    ['a noncanonical path', [{ path: '../run.mjs', mode: '100644', bytes: Buffer.from('x') }]],
+    ['an empty file', [{ path: 'run.mjs', mode: '100644', bytes: Buffer.alloc(0) }]],
+    [
+      'an oversized file',
+      [{ path: 'run.mjs', mode: '100644', bytes: Buffer.alloc(1024 * 1024 + 1) }],
+    ],
+    [
+      'an unordered population',
+      [
+        { path: 'z.mjs', mode: '100644', bytes: Buffer.from('z') },
+        { path: 'a.mjs', mode: '100644', bytes: Buffer.from('a') },
+      ],
+    ],
+    [
+      'a duplicate path',
+      [
+        { path: 'run.mjs', mode: '100644', bytes: Buffer.from('a') },
+        { path: 'run.mjs', mode: '100644', bytes: Buffer.from('b') },
+      ],
+    ],
+    ['an empty population', []],
+  ] as const)('refuses %s before a container effect', (_description, files) => {
+    const value = mutationFixture(
+      envelope(),
+      () => {
+        capturedMutationProgram.files.splice(
+          0,
+          capturedMutationProgram.files.length,
+          ...files.map((entry) => ({ ...entry, bytes: Buffer.from(entry.bytes) })),
+        );
+      },
+      false,
+    );
+    try {
+      expect(() => invokeMutation(value)).toThrow('release-certification-mutation-program-invalid');
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each([
+    [
+      'one file at the per-file maximum',
+      [{ path: 'run.mjs', mode: '100644', bytes: Buffer.alloc(1024 * 1024, 1) }],
+    ],
+    [
+      'multiple files whose aggregate is exactly the maximum',
+      [
+        { path: 'a.mjs', mode: '100644', bytes: Buffer.alloc(512 * 1024, 1) },
+        { path: 'b.mjs', mode: '100644', bytes: Buffer.alloc(512 * 1024, 2) },
+      ],
+    ],
+  ] as const)('permits %s through manifest validation', (_description, files) => {
+    const value = mutationFixture(
+      envelope(),
+      () => {
+        capturedMutationProgram.files.splice(
+          0,
+          capturedMutationProgram.files.length,
+          ...files.map((entry) => ({ ...entry, bytes: Buffer.from(entry.bytes) })),
+        );
+      },
+      true,
+    );
+    try {
+      // The content bytes pass this validator. The transport fixture then rejects the
+      // archive because its framing bytes make the transported representation larger.
+      expect(() => invokeMutation(value)).toThrow('release-certification-archive-invalid');
+      expect(dockerCalls.length).toBeGreaterThan(0);
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it('refuses a population whose safe aggregate exceeds the maximum', () => {
+    const value = mutationFixture(envelope(), () => {
+      capturedMutationProgram.files.splice(
+        0,
+        capturedMutationProgram.files.length,
+        { path: 'a.mjs', mode: '100644', bytes: Buffer.alloc(512 * 1024 + 1, 1) },
+        { path: 'b.mjs', mode: '100644', bytes: Buffer.alloc(512 * 1024, 2) },
+      );
+    });
+    try {
+      expect(() => invokeMutation(value)).toThrow('release-certification-mutation-program-invalid');
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each([
+    ['a wrong envelope kind', { kind: 'fixture.wrong-kind' }],
+    ['a wrong envelope schema', { schemaVersion: '2.0.0' }],
+    [
+      'an extra process member',
+      { process: { error_absent: true, signal: null, status: 0, extra: true } },
+    ],
+    ['a missing error flag', { process: { signal: null, status: 0 } }],
+    ['a missing signal', { process: { error_absent: true, status: 0 } }],
+    ['a missing status', { process: { error_absent: true, signal: null } }],
+    ['a non-boolean error flag', { process: { error_absent: 1, signal: null, status: 0 } }],
+    ['a non-string signal', { process: { error_absent: true, signal: 9, status: null } }],
+    [
+      'a signal with a leading byte',
+      { process: { error_absent: true, signal: 'XSIGTERM', status: null } },
+    ],
+    [
+      'a signal with a trailing byte',
+      { process: { error_absent: true, signal: 'SIGTERM-', status: null } },
+    ],
+    ['a non-number status', { process: { error_absent: true, signal: null, status: '0' } }],
+    ['a fractional status', { process: { error_absent: true, signal: null, status: 0.5 } }],
+    ['a negative status', { process: { error_absent: true, signal: null, status: -1 } }],
+    ['a status above 255', { process: { error_absent: true, signal: null, status: 256 } }],
+    ['both status and signal', { process: { error_absent: true, signal: 'SIGTERM', status: 1 } }],
+    [
+      'neither status nor signal after a successful spawn',
+      { process: { error_absent: true, signal: null, status: null } },
+    ],
+  ] as const)('refuses %s', (_description, override) => {
+    const value = mutationFixture(envelope(override));
+    try {
+      expect(() => invokeMutation(value)).toThrow('release-certification-mutation-program-invalid');
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it('accepts the maximum process exit status as a failed worker result', () => {
+    const value = mutationFixture(
+      envelope({ process: { error_absent: true, signal: null, status: 255 } }),
+    );
+    try {
+      expect(invokeMutation(value).result).toMatchObject({
+        status: 0,
+        errorCode: 'PROTECTED_CONTAINER_ABNORMAL',
+      });
+    } finally {
+      value.dispose();
+    }
+  });
 });
 
 describe('protected container runtime executable probe', () => {
