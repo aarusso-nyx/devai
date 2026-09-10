@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolve } from 'node:path';
 import { ProtectedCertificationContainer } from '../../src/services/release-certification-container.js';
 import {
   captureProtectedMutationPrerequisites,
@@ -74,6 +75,50 @@ function providerWithOutputContract(outputContract: Readonly<Record<string, unkn
     execute,
     request: value.request,
   };
+}
+
+async function captureRunnerOptions(
+  actionId: 'release preflight' | 'release certify',
+  withMutationDriver = false,
+) {
+  const value = providerFixture();
+  const { toolchain_fixture: _fixture, ...options } = value.options;
+  vi.spyOn(ProtectedCertificationContainer.prototype, 'runBound').mockImplementation(
+    <T>(_binding: unknown, operation: () => T): T => operation(),
+  );
+  vi.spyOn(ProtectedCertificationContainer.prototype, 'verifyRuntime').mockImplementation(
+    () => undefined,
+  );
+  vi.spyOn(ProtectedCertificationContainer.prototype, 'execute').mockReturnValue({
+    result: { status: 0, signal: null, stdout: '', stderr: '' },
+    outputs: [],
+  });
+  const adapters = createContainerReleaseCertificationAdapters(
+    asOptions({
+      ...options,
+      diagnostic_outputs: [],
+      ...(withMutationDriver ? { mutation_driver: {} } : {}),
+    }),
+  );
+  const request = { ...value.request, action_id: actionId };
+  runner.mockClear();
+  if (actionId === 'release preflight') {
+    await adapters.preflight_provider(request);
+  } else {
+    const assembly = adapters.certification_provider(request);
+    try {
+      await assembly.provider.certify({
+        request,
+        task_policies: assembly.task_policies,
+        evidence_sink: assembly.evidence_sink,
+      });
+    } catch {
+      // The fixture evidence sink intentionally refuses final certification.
+    }
+  }
+  const captured = runner.mock.calls.at(-1)?.[0];
+  if (captured === undefined) throw new Error('fixture runner options unavailable');
+  return { options: captured, repositoryRoot: value.options.repository_root };
 }
 
 describe('protected certification provider boundaries', () => {
@@ -156,6 +201,44 @@ describe('protected certification provider boundaries', () => {
     expect(() =>
       createContainerReleaseCertificationAdapters({ ...value.options, plans: [] }),
     ).toThrow('release-toolchain-fixture-compatibility-invalid');
+  });
+
+  it('validates each diagnostic control member before exposing the provider', () => {
+    const value = providerFixture();
+    const { toolchain_fixture: _fixture, ...options } = value.options;
+    expect(() =>
+      createContainerReleaseCertificationAdapters(
+        asOptions({
+          ...options,
+          diagnostic_outputs: [{ task_node: 'a', paths: ['a.json'], extra: true }],
+        }),
+      ),
+    ).toThrow('release-certification-diagnostic-controls-invalid');
+  });
+
+  it('accepts strictly ordered diagnostic tasks and paths', () => {
+    const value = providerFixture();
+    const { toolchain_fixture: _fixture, ...options } = value.options;
+    expect(() =>
+      createContainerReleaseCertificationAdapters({
+        ...options,
+        diagnostic_outputs: [
+          { task_node: 'a', paths: ['a.json', 'b.json'] },
+          { task_node: 'b', paths: ['c.json'] },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects an adjacent duplicate diagnostic path', () => {
+    const value = providerFixture();
+    const { toolchain_fixture: _fixture, ...options } = value.options;
+    expect(() =>
+      createContainerReleaseCertificationAdapters({
+        ...options,
+        diagnostic_outputs: [{ task_node: 'a', paths: ['a.json', 'a.json'] }],
+      }),
+    ).toThrow('release-certification-diagnostic-controls-invalid');
   });
 
   it('binds every public planning input and consumes no transferable lookalikes', () => {
@@ -300,6 +383,20 @@ describe('protected certification provider output closure', () => {
     expect(value.declaredOutputs).toEqual([['packages/fixture/reports/mutation/raw.json']]);
   });
 
+  it('refuses a duplicate output path before container execution', async () => {
+    const value = providerWithOutputContract({
+      kind: 'test',
+      requiredResult: 'pass',
+      paths: ['reports/result.json', 'reports/result.json'],
+    });
+
+    await expect(value.adapters.preflight_provider(value.request)).resolves.toEqual({
+      outcome: 'failure',
+      code: 'release-certification-output-closure-invalid',
+    });
+    expect(value.execute).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       'tracked-files contract',
@@ -316,6 +413,33 @@ describe('protected certification provider output closure', () => {
       outcome: 'success',
     });
     expect(value.declaredOutputs).toEqual([[]]);
+  });
+});
+
+describe('protected certification provider runner option custody', () => {
+  it('binds the preflight stage without a transferable receipt or mutation producer', async () => {
+    const captured = await captureRunnerOptions('release preflight');
+    expect(Object.hasOwn(captured.options, 'preflightReceipt')).toBe(false);
+    expect(Object.hasOwn(captured.options, 'resolveProtectedMutationProducer')).toBe(false);
+    expect(captured.options.cacheRoot).toMatch(
+      new RegExp(`^${resolve(captured.repositoryRoot, '.devai/state/check-cache/protected')}/`),
+    );
+    expect(() => captured.options.resolveExecutable?.('not-declared')).toThrow(
+      'release-certification-container-toolchain-mismatch',
+    );
+  });
+
+  it('binds the persisted preflight receipt only to certification', async () => {
+    const captured = await captureRunnerOptions('release certify');
+    expect(Object.hasOwn(captured.options, 'preflightReceipt')).toBe(true);
+  });
+
+  it('exposes the protected mutation producer only to certification with a driver', async () => {
+    const captured = await captureRunnerOptions('release certify', true);
+    expect(typeof captured.options.resolveProtectedMutationProducer).toBe('function');
+    expect(captured.options.resolveProtectedMutationProducer?.()).toBe(
+      'protected-mutation-producer-v21',
+    );
   });
 });
 
