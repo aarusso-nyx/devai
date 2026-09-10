@@ -28,6 +28,7 @@ import {
 import { fixture as unitMutationEvidenceFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
 import { createReleasePolicyClosure } from '../../src/services/release-policy-closure.js';
+import { buildResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
 import {
   createReleaseExportMutationEvidence,
   readReleaseExportMutationEvidence,
@@ -2534,6 +2535,35 @@ describe('release lifecycle execution kernel', () => {
       resolve_plan_input: fixture.resolve_plan_input,
     });
     expect(requirements.map((requirement) => requirement.binding === null)).toEqual([false, true]);
+
+    const duplicate = buildResolvedReleasePlanReceipt({
+      intent: {
+        ...required(fixture.intents[0], 'missing first mixed-unit intent'),
+        changed_paths: ['packages/cli/src/services/release-lifecycle.ts'],
+      },
+      resolution: required(fixture.resolutions[0], 'missing first mixed-unit resolution'),
+    });
+    const duplicatePlans = [required(fixture.receipts[0], 'missing first plan'), duplicate];
+    expect(() =>
+      resolveReleaseMutationRequirements(
+        {
+          ...value,
+          receipt_locators: duplicatePlans
+            .map(receiptLocator)
+            .sort((left, right) => left.receipt_id.localeCompare(right.receipt_id, 'en')),
+        },
+        {
+          resolve_receipt: (locator) =>
+            required(
+              duplicatePlans.find(
+                (receipt) => receipt['receipt_digest_sha256'] === locator.receipt_digest_sha256,
+              ),
+              'missing duplicate plan receipt',
+            ),
+          resolve_plan_input: fixture.resolve_plan_input,
+        },
+      ),
+    ).toThrow('release-receipt-identity-mismatch');
 
     const certify = vi.fn();
     const provider = createReleaseCertificationProvider({
