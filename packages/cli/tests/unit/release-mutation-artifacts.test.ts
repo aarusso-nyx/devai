@@ -354,6 +354,23 @@ describe('release mutation artifact normalization v2.1', () => {
     expect(read).not.toHaveBeenCalled();
   });
 
+  it.each(['record', 'array'] as const)(
+    'recursively rejects an accessor nested in a protected input %s without evaluating it',
+    (container) => {
+      const read = vi.fn(() => 'forbidden');
+      const member = {} as Record<string, unknown>;
+      Object.defineProperty(member, 'value', { enumerable: true, get: read });
+      const injected = container === 'array' ? [member] : { member };
+      const expected = {
+        ...EXPECTED,
+        inputProjection: { ...EXPECTED.inputProjection, injected },
+      };
+
+      expect(() => normalized(undefined, { expected })).toThrow('MUTATION_REPORT_INVALID');
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(
     (['start', 'end'] as const).flatMap((endpoint) =>
       (['line', 'column'] as const).flatMap((coordinate) =>
@@ -619,6 +636,40 @@ describe('release mutation artifact normalization v2.1', () => {
     ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
   });
 
+  it('accepts a raw report exactly at the protected byte quota', () => {
+    const report = rawReport(['Killed']);
+    const raw_report = Buffer.from(JSON.stringify(report));
+    expect(
+      normalized(report, {
+        raw_report,
+        source_files: emittedSources(['0']),
+        limits: { ...controls().limits, maximum_raw_report_bytes: raw_report.byteLength },
+      }),
+    ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+  });
+
+  it('refuses to coerce a string into protected raw-report bytes', () => {
+    const report = rawReport(['Killed']);
+    expect(() =>
+      normalized(report, {
+        raw_report: JSON.stringify(report),
+        source_files: emittedSources(['0']),
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+  });
+
+  it('refuses malformed UTF-8 even when it occurs only in discarded raw configuration', () => {
+    const report = rawReport(['Killed']);
+    const raw_report = Buffer.from(JSON.stringify(report));
+    const offset = raw_report.indexOf(Buffer.from(RAW_SECRET));
+    if (offset < 0) throw new Error('fixture raw configuration missing');
+    raw_report[offset] = 0xff;
+
+    expect(() => normalized(report, { raw_report, source_files: emittedSources(['0']) })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+  });
+
   it('refuses a fully matching source and test population above the protected file quota', () => {
     const report = rawReport(['Killed']);
     report.testFiles['tests/other.test.ts'] = { source: TEST_SOURCE, tests: [] };
@@ -644,6 +695,15 @@ describe('release mutation artifact normalization v2.1', () => {
         code: 'MUTATION_REPORT_INVALID',
       });
     }
+  });
+
+  it('refuses schema-invalid protected process fields before emitting artifacts', () => {
+    expect(() =>
+      normalized(rawReport(['Killed']), {
+        source_files: emittedSources(['0']),
+        process: { errorAbsent: 'yes', signal: null, status: 0 },
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
   });
 
   it('removes raw credential-like content and host paths while retaining only replacement digests', () => {
@@ -699,5 +759,21 @@ describe('release mutation artifact normalization v2.1', () => {
     await expect(finalizeReleaseMutationArtifactsV21({ ...input, packages: [] })).rejects.toThrow(
       'MUTATION_ROSTER_MISMATCH',
     );
+  });
+
+  it('refuses correctly addressed but noncanonical package artifacts during finalization', async () => {
+    const artifacts = normalized();
+    const bytes = Buffer.from(JSON.stringify(json(artifacts.report.bytes), null, 2));
+    const digest = sha256(bytes);
+    const report = {
+      ...artifacts.report,
+      path: `.devai/state/mutation/v2/store/inputs/${artifacts.inputDigest}/objects/${digest}.report.json`,
+      sha256: digest,
+      bytes,
+    };
+
+    await expect(
+      finalizeReleaseMutationArtifactsV21(finalizerInput({ ...artifacts, report })),
+    ).rejects.toThrow('NON_CANONICAL_JSON');
   });
 });
