@@ -590,6 +590,26 @@ describe('v1.2 mapped mutation execution configuration (ADR-MUT-0008)', () => {
     ],
     ['cyclic', '{"extends":"./typed-build.json"}', 'typescript-configuration-cycle'],
     [
+      'non-array project references',
+      '{"references":{}}',
+      'typescript-configuration-reference-unresolved',
+    ],
+    [
+      'null project-reference entry',
+      '{"references":[null]}',
+      'typescript-configuration-reference-unresolved',
+    ],
+    [
+      'scalar project-reference entry',
+      '{"references":[1]}',
+      'typescript-configuration-reference-unresolved',
+    ],
+    [
+      'array project-reference entry',
+      '{"references":[[]]}',
+      'typescript-configuration-reference-unresolved',
+    ],
+    [
       'outside-dependency-project',
       '{"references":[{"path":"../packages/evidence/tsconfig.json"}]}',
       'typescript-project-dependency-unresolved',
