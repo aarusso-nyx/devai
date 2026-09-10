@@ -17,6 +17,10 @@ import { dirname, join, resolve } from 'node:path';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initChain } from '../../../evidence/src/evidence/chain.js';
+import {
+  ACTIONS_FRESHNESS_JOBS,
+  ACTIONS_REUSABLE_JOBS,
+} from '../../../evidence/src/local-evidence/actions-run.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   evidenceCollect,
@@ -106,6 +110,151 @@ function mutationFixture(repo: string, status: 'Killed' | 'Survived'): void {
   _resetScenarioValidator();
 }
 
+function git(repo: string, args: readonly string[]): string {
+  return execFileSync('git', [...args], { cwd: repo, encoding: 'utf8' }).trim();
+}
+
+function initializeRepository(repo: string): void {
+  git(repo, ['init', '-q', '-b', 'main']);
+  git(repo, ['config', 'user.name', 'Evidence Facade Fixture']);
+  git(repo, ['config', 'user.email', 'evidence-facade@example.invalid']);
+  git(repo, ['remote', 'add', 'origin', 'https://github.com/example/adopter.git']);
+}
+
+function localCollectionFixture(): string {
+  const repo = root();
+  initializeRepository(repo);
+  put(
+    repo,
+    '.devai/config/project.json',
+    JSON.stringify({
+      schemaVersion: '1.0.0',
+      project_type: 'runtime-host',
+      authority_enforcement: { mode: 'cli-only' },
+      profile: 'tier3',
+      ci_economy: {
+        local_evidence: {
+          max_age_hours: 24,
+          required_jobs: ['unit'],
+          allowed_platforms: ['darwin/arm64'],
+        },
+      },
+    }),
+  );
+  put(repo, 'package.json', JSON.stringify({ name: 'fixture', engines: { node: '>=24' } }));
+  put(
+    repo,
+    '.artifacts/unit/metadata.txt',
+    `job=unit\nplatform=darwin/arm64\nnode=${process.version}\n`,
+  );
+  put(repo, '.artifacts/unit/result.txt', 'success\n');
+  git(repo, ['add', '.']);
+  git(repo, ['commit', '-qm', 'local collection fixture']);
+  return repo;
+}
+
+function actionsCollectionFixture(): { readonly repo: string; readonly mergeSha: string } {
+  const repo = root();
+  initializeRepository(repo);
+  put(repo, 'base.txt', 'base\n');
+  git(repo, ['add', '.']);
+  git(repo, ['commit', '-qm', 'base']);
+  const mergeBaseSha = git(repo, ['rev-parse', 'HEAD']);
+  git(repo, ['checkout', '-qb', 'feature']);
+  put(repo, 'feature.txt', 'feature\n');
+  git(repo, ['add', '.']);
+  git(repo, ['commit', '-qm', 'feature']);
+  const headSha = git(repo, ['rev-parse', 'HEAD']);
+  git(repo, ['checkout', '-q', 'main']);
+  put(repo, 'main.txt', 'main\n');
+  git(repo, ['add', '.']);
+  git(repo, ['commit', '-qm', 'main']);
+  const baseSha = git(repo, ['rev-parse', 'HEAD']);
+  git(repo, ['merge', '-q', '--no-ff', 'feature', '-m', 'merge']);
+  const mergeSha = git(repo, ['rev-parse', 'HEAD']);
+  const tree = { algorithm: 'sha1' as const, value: git(repo, ['rev-parse', 'HEAD^{tree}']) };
+  const sourceHash = { algorithm: 'sha256' as const, value: 'b'.repeat(64), fileCount: 3 };
+  const digests = {
+    workflowPolicySha256: '1'.repeat(64),
+    lockfileSha256: '2'.repeat(64),
+    toolchainContractSha256: '3'.repeat(64),
+    testContractSha256: '4'.repeat(64),
+    serviceContractSha256: '5'.repeat(64),
+  };
+  const identity = {
+    repository: 'example/adopter',
+    workflowRef: 'example/adopter/.github/workflows/ci.yml@refs/pull/1/merge',
+    eventName: 'pull_request' as const,
+    runId: '123',
+    runAttempt: 2,
+    actor: 'inspector',
+    headSha,
+    baseSha,
+    mergeBaseSha,
+    testedCommitSha: mergeSha,
+    testedTree: tree,
+    digests,
+  };
+  const generatedAt = new Date(Date.now());
+  const manifest = {
+    schemaVersion: 1,
+    origin: 'actions-run',
+    generatedAt: generatedAt.toISOString(),
+    expiresAt: new Date(generatedAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    subject: { repository: identity.repository, commitSha: mergeSha, tree },
+    sourceHash,
+    policy: {
+      maxAgeHours: 24,
+      requiredJobs: [...ACTIONS_REUSABLE_JOBS],
+      allowedPlatforms: ['linux/amd64'],
+    },
+    tools: {},
+    platforms: ['linux/amd64'],
+    jobs: Object.fromEntries(
+      ACTIONS_REUSABLE_JOBS.map((job) => [
+        job,
+        {
+          result: 'success',
+          metadata: { job, platform: 'linux/amd64' },
+          artifactChecksum: { algorithm: 'sha256', value: '6'.repeat(64), fileCount: 1 },
+        },
+      ]),
+    ),
+    actionsRun: identity,
+  };
+  const fullResult = {
+    schemaVersion: 1,
+    kind: 'actions-run-full-result',
+    result: 'success',
+    fullCiAuthoritative: true,
+    repository: identity.repository,
+    workflowRef: identity.workflowRef,
+    runId: identity.runId,
+    runAttempt: identity.runAttempt,
+    testedCommitSha: mergeSha,
+    testedTree: tree,
+    jobs: Object.fromEntries(ACTIONS_REUSABLE_JOBS.map((job) => [job, 'success'])),
+  };
+  const decision = {
+    schemaVersion: 1,
+    kind: 'actions-evidence-shadow-decision',
+    mainRunId: '456',
+    mainRunAttempt: 1,
+    mergedCommitSha: mergeSha,
+    fullCiResult: 'success',
+    executeFullCi: true,
+    disposition: 'promotion-hit',
+    shadowFullEquivalent: true,
+    reason: 'exact tested tree',
+    reusableJobs: [...ACTIONS_REUSABLE_JOBS],
+    freshnessJobs: [...ACTIONS_FRESHNESS_JOBS],
+  };
+  put(repo, 'tuple/manifest.json', JSON.stringify(manifest));
+  put(repo, 'tuple/full-result.json', JSON.stringify(fullResult));
+  put(repo, 'tuple/decision.json', JSON.stringify(decision));
+  return { repo, mergeSha };
+}
+
 async function invoke(
   definition: Definition,
   argv: readonly string[],
@@ -163,6 +312,125 @@ afterEach(() => {
 });
 
 describe('evidence collect acceptance', () => {
+  it.each([
+    [
+      ['evidence-collect', '--source', 'remote'],
+      'devai evidence collect: --source must be actions or local\n',
+    ],
+    [
+      ['evidence-collect', '--source', 'local'],
+      'devai evidence collect (error): at least one --job <name:dir> is required for --source local\n',
+    ],
+    [
+      ['evidence-collect', '--source', 'local', '--job', 'bad'],
+      'devai evidence collect (error): invalid --job "bad": expected name:dir\n',
+    ],
+    [
+      ['evidence-collect', '--source', 'local', '--job', ':artifacts'],
+      'devai evidence collect (error): invalid --job ":artifacts": expected name:dir\n',
+    ],
+    [
+      ['evidence-collect', '--source', 'local', '--job', 'unit:'],
+      'devai evidence collect (error): invalid --job "unit:": expected name:dir\n',
+    ],
+  ] as const)('preserves the exact public refusal for %j', async (argv, stderr) => {
+    const repo = root();
+    const result = await invoke(evidenceCollect, [...argv, '--repo-root', repo]);
+    expect(result).toEqual({ exit: 2, stdout: '', stderr });
+  });
+
+  it('forwards a local job and output path and preserves the human rendering switch', async () => {
+    const repo = localCollectionFixture();
+    const result = await invoke(evidenceCollect, [
+      'evidence-collect',
+      '--source',
+      'local',
+      '--job',
+      'unit:.artifacts/unit',
+      '--output',
+      'custom/local.json',
+      '--repo-root',
+      repo,
+    ]);
+    expect(result).toMatchObject({ exit: 0, stderr: '' });
+    expect(JSON.parse(result.stdout)).toEqual({
+      source: 'local',
+      output: 'custom/local.json',
+      sourceHash: expect.objectContaining({ algorithm: 'sha256' }),
+      jobs: ['unit'],
+    });
+    expect(existsSync(join(repo, 'custom/local.json'))).toBe(true);
+    expect(existsSync(join(repo, 'record/proofs/work/local-evidence/local-ci.json'))).toBe(false);
+
+    const humanRepo = localCollectionFixture();
+    const human = await invoke(evidenceCollect, [
+      'evidence-collect',
+      '--source',
+      'local',
+      '--job',
+      'unit:.artifacts/unit',
+      '--repo-root',
+      humanRepo,
+      '--human',
+    ]);
+    expect(human).toEqual({
+      exit: 0,
+      stdout: 'evidence collect: local collected\n',
+      stderr: '',
+    });
+  });
+
+  it('collects an exact Actions tuple with its artifacts and governed proof payload', async () => {
+    const { repo, mergeSha } = actionsCollectionFixture();
+    const result = await invoke(evidenceCollect, [
+      'evidence-collect',
+      '--source',
+      'actions',
+      '--round',
+      'R-0114',
+      '--tuple',
+      'tuple',
+      '--repo-root',
+      repo,
+    ]);
+    expect(result).toMatchObject({ exit: 0, stderr: '' });
+    const collected = JSON.parse(result.stdout) as Record<string, unknown>;
+    const artifacts = [
+      {
+        path: 'tuple/manifest.json',
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      },
+      {
+        path: 'tuple/full-result.json',
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      },
+      {
+        path: 'tuple/decision.json',
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      },
+    ];
+    expect(collected).toMatchObject({
+      source: 'actions',
+      observation: {
+        mergeSha,
+        disposition: 'promotion-hit',
+        shadowFullEquivalent: true,
+        durable: true,
+      },
+      artifacts,
+      proof: {
+        line_type: 'record',
+        round_id: 'R-0114',
+        kind: 'actions',
+        payload: {
+          source: 'actions',
+          observation: { mergeSha, disposition: 'promotion-hit' },
+          artifacts,
+        },
+      },
+    });
+  });
+
   it('refuses missing source bindings and malformed local jobs before collection', async () => {
     const repo = root();
     const cases = [
