@@ -156,6 +156,9 @@ describe('authority error values', () => {
     expect(authorityErrorContext(new Error('AUTHORITY_DENIED:{"source":"serialized"}'))).toEqual({
       source: 'serialized',
     });
+    expect(authorityErrorContext(new Error(':{"source":"leading-separator"}'))).toEqual({
+      source: 'leading-separator',
+    });
     expect(
       authorityErrorContext(
         Object.assign(new Error('AUTHORITY_DENIED:{"source":"json"}'), { context: [] }),
