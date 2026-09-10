@@ -2727,6 +2727,7 @@ describe('release lifecycle execution kernel', () => {
   it('binds resolved plan documents to every locator field and the exact repository', () => {
     const exact = request('release preflight');
     const locator = required(exact.receipt_locators?.[0], 'missing exact plan locator');
+    const unit = required(exact.candidate_locator.release_units[0], 'missing exact release unit');
     const resolve = (value: ReleaseLifecycleRequest) =>
       resolveReleaseMutationRequirements(value, {
         resolve_receipt: () => planReceipt(),
@@ -2751,6 +2752,15 @@ describe('release lifecycle execution kernel', () => {
       ...exact,
       repository_locator: { ...exact.repository_locator, id: 'foreign/repository' },
     });
+    for (const releaseUnit of [
+      { ...unit, release_unit: '@foreign/release' },
+      { ...unit, version: '1.5.1' },
+    ]) {
+      reject({
+        ...exact,
+        candidate_locator: { ...exact.candidate_locator, release_units: [releaseUnit] },
+      });
+    }
   });
 
   it("verifies a resolved plan receipt's own digest and derived identifier before locator binding", () => {
