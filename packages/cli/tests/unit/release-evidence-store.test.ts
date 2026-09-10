@@ -311,6 +311,51 @@ describe('durable external certification evidence store', () => {
     );
   });
 
+  it.each(['terminal transaction', 'non-Buffer bytes'] as const)(
+    'refuses a certification object write with %s',
+    async (fault) => {
+      const fixture = storeFixture();
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.begin([binding('@fixture/package')]),
+      );
+      const bytes = Buffer.from('certification object');
+      if (fault === 'terminal transaction') {
+        await invokeSink(fixture.store.authority_owner, () => transaction.abort());
+      }
+      const supplied = fault === 'non-Buffer bytes' ? new Uint8Array(bytes) : bytes;
+
+      await refusal(() =>
+        invokeSink(fixture.store.authority_owner, () =>
+          transaction.put({
+            bytes: supplied as never,
+            sha256: sha256(bytes),
+            size_bytes: bytes.length,
+          }),
+        ),
+      );
+    },
+  );
+
+  it('refuses empty, duplicate-package, and mixed-repository transaction selections', async () => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/package');
+    const duplicatePackage = {
+      ...selected,
+      task_policy_digest_sha256: 'd'.repeat(64),
+    };
+    const mixedRepository = {
+      ...binding('@fixture/other'),
+      repository: { ...selected.repository, id: 'fixture/other-repository' },
+    };
+
+    for (const bindings of [[], [selected, duplicatePackage], [selected, mixedRepository]]) {
+      await refusal(() =>
+        invokeSink(fixture.store.authority_owner, () => fixture.store.begin(bindings)),
+      );
+    }
+    expect(readdirSync(fixture.evidenceRoot)).not.toContain('certification');
+  });
+
   it('refuses unknown protected host binding keys before the callback can run', () => {
     const binding = {
       action_id: 'release certify' as const,
@@ -988,6 +1033,36 @@ describe('durable external certification evidence store', () => {
 });
 
 describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', () => {
+  it.each(['terminal', 'non-buffer', 'size-mismatch', 'digest-mismatch'] as const)(
+    'refuses a unit object write with %s input',
+    async (fault) => {
+      const fixture = storeFixture();
+      const evidence = await unitEvidence(fixture);
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.beginUnitMutationEvidence(evidence.binding),
+      );
+      const original = evidence.objects.get(evidence.projection.output_contract.sha256);
+      if (original === undefined) throw new Error('fixture unit object missing');
+      if (fault === 'terminal') {
+        await invokeSink(fixture.store.authority_owner, () => transaction.abort());
+      }
+      const supplied = fault === 'non-buffer' ? new Uint8Array(original) : original;
+
+      await refusal(() =>
+        invokeSink(fixture.store.authority_owner, () =>
+          transaction.put({
+            bytes: supplied as never,
+            sha256:
+              fault === 'digest-mismatch'
+                ? '0'.repeat(64)
+                : evidence.projection.output_contract.sha256,
+            size_bytes: original.length + (fault === 'size-mismatch' ? 1 : 0),
+          }),
+        ),
+      );
+    },
+  );
+
   it('commits one ten-package closure and rereads exact contract, receipt and members after store recreation', async () => {
     const fixture = storeFixture();
     const evidence = await unitEvidence(fixture, { reused: true, notRequired: true });
@@ -1265,6 +1340,26 @@ describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', 
         evidence.binding,
       ),
     ).toEqual(closure);
+  });
+
+  it('refuses a new unit transaction after the binding has a durable committed election', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+    await transaction.verify(evidence.projection);
+    await invokeSink(fixture.store.authority_owner, () => transaction.commit(evidence.projection));
+    const before = readdirSync(join(fixture.evidenceRoot, 'unit-mutation')).sort();
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+
+    await refusal(() =>
+      invokeSink(reopened.authority_owner, () =>
+        reopened.beginUnitMutationEvidence(evidence.binding),
+      ),
+    );
+    expect(readdirSync(join(fixture.evidenceRoot, 'unit-mutation')).sort()).toEqual(before);
   });
 
   it.each(['unverified', 'changed-projection', 'changed-bytes'] as const)(

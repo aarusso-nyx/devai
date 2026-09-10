@@ -115,14 +115,14 @@ function carrierBytes(overrides: Record<string, unknown> = {}): Buffer {
   });
 }
 
-function storeFixture() {
+function storeFixture(maxBlobBytes = MAX_BLOB) {
   const evidenceRoot = root('devai carrier evidence');
   const candidateRoot = root('devai carrier candidate');
   const input = {
     root: evidenceRoot,
     evidence_sink_id: 'carrier-evidence-sink',
     repository_roots: [candidateRoot],
-    max_blob_bytes: MAX_BLOB,
+    max_blob_bytes: maxBlobBytes,
   } as const;
   return { input, store: createReleaseCertificationEvidenceStore(input) };
 }
@@ -244,6 +244,50 @@ function rewriteCommittedCarrier(
 }
 
 describe('durable certified evidence retention', () => {
+  it('refuses a carrier whose declared size differs from its authenticated bytes', async () => {
+    const fixture = storeFixture();
+    const bytes = carrierBytes();
+    const owner = fixture.store.authority_owner;
+    const transaction = await invokeSink(owner, () =>
+      fixture.store.begin([binding('@fixture/pkg')]),
+    );
+
+    await expect(
+      invokeSink(owner, () =>
+        transaction.putCertifiedEvidenceCarrier?.({
+          release_unit: UNIT,
+          bytes,
+          sha256: sha256(bytes),
+          size_bytes: bytes.length + 1,
+        }),
+      ),
+    ).rejects.toThrow(REFUSAL);
+  });
+
+  it('accepts a carrier whose authenticated bytes exactly meet the protected maximum', async () => {
+    const bytes = carrierBytes();
+    const fixture = storeFixture(bytes.length);
+    const owner = fixture.store.authority_owner;
+    const transaction = await invokeSink(owner, () =>
+      fixture.store.begin([binding('@fixture/pkg')]),
+    );
+
+    await expect(
+      invokeSink(owner, () =>
+        transaction.putCertifiedEvidenceCarrier?.({
+          release_unit: UNIT,
+          bytes,
+          sha256: sha256(bytes),
+          size_bytes: bytes.length,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      release_unit: UNIT,
+      sha256: sha256(bytes),
+      size_bytes: bytes.length,
+    });
+  });
+
   it('commits the carrier atomically with the certification closure', async () => {
     const fixture = storeFixture();
     const bytes = carrierBytes();
