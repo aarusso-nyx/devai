@@ -4,7 +4,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 
@@ -109,6 +110,67 @@ describe('canonical production authority refusal acceptance', () => {
       });
     },
   );
+
+  it.each([
+    ['expired status', { status: 'expired', expires_at: '2099-01-01T00:00:00.000Z' }],
+    ['expiry boundary', { status: 'active', expires_at: '2030-01-01T00:00:00.000Z' }],
+  ] as const)('refuses an authority session at its %s', (_label, expiration) => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-expired-session-'));
+    try {
+      const sessionId = 'AUTH-SESSION-0123456789abcdef';
+      const unsigned = {
+        schemaVersion: '1.0.0',
+        session_id: sessionId,
+        repository_id: 'fixture-repository',
+        role: 'architect',
+        declaration_source: 'cli-flag',
+        ...expiration,
+        created_at: '2029-01-01T00:00:00.000Z',
+        created_by_invocation_id: 'fixture-invocation',
+        policy_binding: {
+          policy_id: 'fixture-policy',
+          policy_version: '1.0.0',
+          resolved_digest_sha256: 'a'.repeat(64),
+        },
+        constitution_binding: { version: '1.0.0', digest_sha256: 'b'.repeat(64) },
+        package_binding: { name: '@aarusso-nyx/devai', version: '1.5.0' },
+      };
+      mkdirSync(join(root, '.devai/state/authority-sessions'), { recursive: true });
+      writeFileSync(
+        join(root, '.devai/state/authority-sessions', `${sessionId}.json`),
+        `${JSON.stringify({ ...unsigned, session_digest_sha256: canonicalSha256(unsigned) })}\n`,
+      );
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-01-01T00:00:00.000Z'));
+      try {
+        const result = authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'round',
+            'plan',
+            '--documents',
+            'cli',
+            '--repo-root',
+            root,
+            '--authority-session',
+            sessionId,
+            '--write',
+            '--format',
+            'json',
+          ],
+          current,
+        );
+        expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({
+          code: 'AUTHORITY_SESSION_EXPIRED',
+          exit: 2,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 
   it('emits concrete remediation and structured context for common refusals', () => {
     const check = current.find((entry) => entry.name === 'check');
