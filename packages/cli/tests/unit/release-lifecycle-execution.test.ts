@@ -2799,6 +2799,42 @@ describe('release lifecycle execution kernel', () => {
     ).toThrow('release-receipt-identity-mismatch');
   });
 
+  it('checks historical plan population before reporting it as non-authoritative', async () => {
+    const planSchema = JSON.parse(
+      readFileSync(join(process.cwd(), 'law/schemas/release-plan-receipt.schema.json'), 'utf8'),
+    ) as { examples: readonly Readonly<Record<string, unknown>>[] };
+    const stateSchema = JSON.parse(
+      readFileSync(join(process.cwd(), 'law/schemas/release-lifecycle-state.schema.json'), 'utf8'),
+    ) as { examples: readonly Readonly<Record<string, unknown>>[] };
+    const historical = required(planSchema.examples[0], 'missing historical plan fixture');
+    const exactState = required(stateSchema.examples[0], 'missing historical state fixture');
+    const { state_id: _stateId, record_digest_sha256: _recordDigest, ...stateDraft } = exactState;
+    const requiredPlans = exactState['bound_receipts'];
+    if (!Array.isArray(requiredPlans)) throw new Error('missing historical plan bindings');
+    const requiredPlan = objectValue(required(requiredPlans[0], 'missing historical plan binding'));
+    const observe = (state: Readonly<Record<string, unknown>>) =>
+      resumeReleaseLifecycleExecution({
+        states: [state],
+        repository: state['repository'] as ReleaseLifecycleRequest['repository_locator'],
+        candidate: state['candidate'] as ReleaseLifecycleStateV2['candidate'],
+        receipt_documents: [historical],
+      });
+
+    await expect(observe(exactState)).resolves.toMatchObject({
+      next_outcome: 'blocked',
+      blocked_reason: 'legacy-plan-non-authoritative',
+    });
+
+    const mismatched = finalizeReleaseStateV2({
+      ...stateDraft,
+      bound_receipts: [{ ...requiredPlan, receipt_digest_sha256: 'f'.repeat(64) }],
+    } as Parameters<typeof finalizeReleaseStateV2>[0]);
+    await expect(observe(mismatched)).resolves.toMatchObject({
+      next_outcome: 'blocked',
+      blocked_reason: 'receipt-identity-mismatch',
+    });
+  });
+
   it('dispatches offline v1 receipts through their schema parser before lifecycle controls', async () => {
     const initial = request('release evidence-publish');
     const unit = required(initial.candidate_locator.release_units[0], 'missing release unit');
