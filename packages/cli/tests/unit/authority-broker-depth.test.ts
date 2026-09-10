@@ -11,6 +11,7 @@ import {
   disposeCliInvocationAuthority,
 } from '../../src/authority/index.js';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
+import { resolveInvocationEntry } from '../../src/authority/sense-selection.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
@@ -81,6 +82,22 @@ function brokerAt(
     repository_root: root,
     package_version: resolveCliVersion(),
     bootstrap_policy: bootstrapPolicy,
+  });
+}
+
+function resolvedBroker(name: string, role: Role, argv: readonly string[]) {
+  const registered = entries.find((candidate) => candidate.name === name);
+  if (registered === undefined) throw new Error(`missing action ${name}`);
+  const entry = resolveInvocationEntry(registered, argv);
+  return createAuthorityHostBroker({
+    entry,
+    entries,
+    argv,
+    role,
+    declaration: { as_role: role },
+    repository_root: ROOT,
+    package_version: resolveCliVersion(),
+    bootstrap_policy: true,
   });
 }
 
@@ -1099,6 +1116,62 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
+  it.each([
+    ['executable', 'test', 'bash', ['-c', 'pnpm test']],
+    ['evidence kind', 'mutation', 'sh', ['-c', 'pnpm test']],
+    ['shell flag', 'test', 'sh', ['-x', 'pnpm test']],
+    ['argument count', 'test', 'sh', ['-c', 'pnpm test', 'extra']],
+  ] as const)(
+    'refuses an evidence test command with a mismatched %s',
+    (_label, kind, executable, args) => {
+      const host = broker('evidence record', 'auditor', [
+        process.execPath,
+        'devai',
+        'evidence',
+        'record',
+        '--kind',
+        kind,
+        '--round',
+        'R-0007',
+        '--cmd',
+        'pnpm test',
+        '--as-role',
+        'auditor',
+        '--write',
+      ]);
+      try {
+        expect(() =>
+          host.scope.apply_effect(
+            effect('spawnSync', [executable, args], 'process'),
+            () => 'unexpected evidence process execution',
+          ),
+        ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      } finally {
+        host.dispose();
+      }
+    },
+  );
+
+  it('does not treat an evidence-shaped process as another action process', () => {
+    const host = broker('round run', 'engineer', [
+      ...roundRunArgv(),
+      '--kind',
+      'test',
+      '--cmd',
+      'pnpm test',
+    ]);
+    try {
+      expect(() =>
+        host.scope.apply_effect(
+          effect('spawnSync', ['sh', ['-c', 'pnpm test']], 'process'),
+          () => 'unexpected evidence process execution',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('carries declared check-task refusal detail outside the error message', () => {
     const host = broker('check', 'engineer', [
       process.execPath,
@@ -1187,6 +1260,46 @@ describe('authority broker production boundary depth', () => {
       }
     }
   });
+
+  it.each(['claude', 'codex'] as const)(
+    'classifies %s only for the public sense action before policy refusal',
+    (executable) => {
+      const senseArgv = [
+        process.execPath,
+        'devai',
+        'sense',
+        'run',
+        'llm_judge',
+        '--as-role',
+        'auditor',
+        '--write',
+        '--publish',
+      ] as const;
+      const sense = resolvedBroker('sense run', 'auditor', senseArgv);
+      try {
+        expect(() =>
+          sense.scope.apply_effect(
+            effect('spawnSync', [executable, ['exec', 'fixture']], 'process'),
+            () => 'sense-result',
+          ),
+        ).toThrow('UNCLASSIFIED_RESOURCE');
+      } finally {
+        sense.dispose();
+      }
+
+      const task = broker('task start', 'engineer', taskStartArgv());
+      try {
+        expect(() =>
+          task.scope.apply_effect(
+            effect('spawnSync', [executable, ['exec', 'fixture']], 'process'),
+            () => 'task-result',
+          ),
+        ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      } finally {
+        task.dispose();
+      }
+    },
+  );
 
   it('fails closed for malformed filesystem targets, escapes, and descriptors', () => {
     const host = broker('round run', 'engineer', roundRunArgv());
