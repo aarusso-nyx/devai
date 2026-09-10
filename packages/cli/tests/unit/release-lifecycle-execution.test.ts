@@ -4216,6 +4216,136 @@ describe('release lifecycle execution kernel', () => {
   });
 
   it.each([
+    ['a different action', { action_id: 'release publish' }],
+    ['a different effect', { effect: 'local-write' }],
+    [
+      'a grant that is not active yet',
+      { not_before: '2026-09-03T00:00:00.001Z', expires_at: '2026-09-03T01:00:00.000Z' },
+    ],
+    [
+      'a grant at its exclusive expiry boundary',
+      { not_before: '2026-09-02T23:00:00.000Z', expires_at: '2026-09-03T00:00:00.000Z' },
+    ],
+  ] as const)('persists refusal for a recomputed grant with %s', async (_label, change) => {
+    const initial = request('release evidence-publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const priorRecords = store.readStoreRecords();
+    const receipt = boundOfflineReceipt(exported);
+    const value = request('release evidence-publish', receipt);
+    const valid = authorizationBridge();
+    const forged: AuthorizationBridge = {
+      ...valid,
+      resolve: async (binding) => {
+        const resolution = await valid.resolve(binding);
+        if (!resolution.ok) return resolution;
+        const original = objectValue(required(resolution.events[0], 'missing grant event'));
+        const { event_id: _eventId, payload_digest_sha256: _payloadDigest, ...draft } = original;
+        const event = finalizeAuthorizationEvent({ ...draft, ...change });
+        return { ...resolution, events: [event], ledger: authorizationLedger([event]) };
+      },
+    };
+    const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release evidence-publish',
+        authority: authorityFor('release evidence-publish'),
+        store,
+        resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+        artifactReader: artifactReaderFor('release export'),
+        authorization: forged,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'authorization',
+      code: 'release-authorization-attempt-binding-invalid',
+    });
+    expect(provider).not.toHaveBeenCalled();
+    expect(store.readStoreRecords()).toEqual(priorRecords);
+  });
+
+  it.each(['not-durable', 'consumption-binding'] as const)(
+    'persists refusal for a consumed authorization proof with changed %s',
+    async (defect) => {
+      const initial = request('release evidence-publish');
+      const store = new ReleaseLifecycleFileStore(root(), initial);
+      await advanceToExported(store);
+      const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+      const receipt = boundOfflineReceipt(exported);
+      const value = request('release evidence-publish', receipt);
+      const valid = authorizationBridge();
+      const forged: AuthorizationBridge = {
+        ...valid,
+        consume: async (binding) => {
+          const proof = await valid.consume(binding);
+          if (defect === 'not-durable')
+            return { ...proof, durable: false } as unknown as Awaited<
+              ReturnType<typeof valid.consume>
+            >;
+          const grant = objectValue(required(proof.events[0], 'missing grant event'));
+          const consumed = objectValue(required(proof.events[1], 'missing consumed event'));
+          const {
+            event_id: _eventId,
+            payload_digest_sha256: _payloadDigest,
+            ...consumedDraft
+          } = consumed;
+          const bindingValue = objectValue(consumed['consumption_binding']);
+          const event = finalizeAuthorizationEvent({
+            ...consumedDraft,
+            consumption_binding: {
+              ...bindingValue,
+              request_digest_sha256: 'f'.repeat(64),
+            },
+          });
+          return {
+            durable: true,
+            events: [grant, event],
+            ledger: authorizationLedger([grant, event]),
+          };
+        },
+      };
+      const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+
+      const result = await withAuthorityHostTestScope(() =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release evidence-publish',
+          authority: authorityFor('release evidence-publish'),
+          store,
+          resolveReceipt: () => receipt,
+          resolvePlanInput,
+          offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+          artifactReader: artifactReaderFor('release export'),
+          authorization: forged,
+          provider,
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        phase: 'authorization',
+        code: 'release-authorization-consumption-not-durable',
+      });
+      expect(provider).not.toHaveBeenCalled();
+      expect(store.readStoreRecords().at(-1)).toMatchObject({
+        record_kind: 'failure',
+        authorization_event_id: expect.stringMatching(/^EA-[a-f0-9]{16}$/u),
+        failure: { code: 'release-authorization-consumption-failed' },
+      });
+    },
+  );
+
+  it.each([
     'grant-reference',
     'action',
     'effect',
@@ -5809,6 +5939,10 @@ describe('release lifecycle execution kernel', () => {
       code: 'release-provider-result-unknown',
     });
     expect(provider).toHaveBeenCalledOnce();
+    expect(store.readStoreRecords().at(-1)).toMatchObject({
+      record_kind: 'unknown-provider-result',
+      authorization_event_id: expect.stringMatching(/^EA-[a-f0-9]{16}$/u),
+    });
   });
 
   it.each([
