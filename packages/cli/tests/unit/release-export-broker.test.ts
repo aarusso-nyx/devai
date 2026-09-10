@@ -44,6 +44,7 @@ function request(
   repository: ReturnType<typeof fixture>,
   action: 'release export' | 'release prepare',
   destination = exportBinding(repository).destination,
+  overrides: Readonly<Record<string, unknown>> = {},
 ) {
   const path = join(repository.root, `${action.replaceAll(' ', '-')}-request.json`);
   writeFileSync(
@@ -69,6 +70,7 @@ function request(
       ...(action === 'release export'
         ? { provider: { kind: 'evidence-export', provider_id: 'fixture-export' }, destination }
         : {}),
+      ...overrides,
     })}\n`,
   );
   return path;
@@ -153,11 +155,12 @@ async function withExportBroker<T>(
     readonly signer: ReturnType<typeof createProtectedExportSignerAdapter>;
     readonly host: ReturnType<typeof broker>;
   }) => Promise<T>,
+  requestOverrides: Readonly<Record<string, unknown>> = {},
 ): Promise<T> {
   const host = broker(
     repository,
     'release export',
-    request(repository, 'release export', destination),
+    request(repository, 'release export', destination, requestOverrides),
   );
   const sink = createProtectedExportSinkAdapter(binding);
   const signer = createProtectedExportSignerAdapter(binding);
@@ -184,6 +187,38 @@ async function withExportBroker<T>(
 }
 
 describe('release export broker protected adapters', () => {
+  it('accepts one exact plan receipt among unrelated receipt locators', async () => {
+    const repository = fixture();
+    const binding = exportBinding(repository);
+    try {
+      await expect(
+        withExportBroker(
+          repository,
+          binding,
+          binding.destination,
+          async ({ sink }) =>
+            sink.invokeSink(
+              () => 'exported',
+              createProtectedReleaseSinkOwner('export', binding.sink_id),
+            ),
+          {
+            receipt_locators: [
+              { kind: 'unrelated-receipt', receipt_digest_sha256: DIGEST('5'), path: 'other' },
+              {
+                kind: 'release-plan-receipt',
+                receipt_id: 'RPL-0000000000000000',
+                receipt_digest_sha256: PLAN,
+                path: 'receipts/plan.json',
+              },
+            ],
+          },
+        ),
+      ).resolves.toBe('exported');
+    } finally {
+      repository.dispose();
+    }
+  });
+
   it('permits the lifecycle lock while denying unrelated state and product writes', async () => {
     const repository = fixture();
     const binding = exportBinding(repository);
