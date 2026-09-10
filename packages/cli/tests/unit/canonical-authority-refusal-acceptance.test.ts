@@ -81,6 +81,35 @@ describe('canonical production authority refusal acceptance', () => {
     ['role', ['--as-role', 'owner']],
     ['session', ['--authority-session', 'AUTH-SESSION-0123456789abcdef']],
     ['write consent', ['--write']],
+    ['machine identity', ['--machine-actor', 'harness']],
+  ] as const)('refuses caller-selected %s for a post-merge receipt', (_label, declaration) => {
+    const result = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'round',
+        'close',
+        '--post-merge-receipt',
+        '--host-receipt',
+        'receipt.json',
+        ...declaration,
+        '--format',
+        'json',
+      ],
+      current,
+    );
+
+    expect(result).toBeDefined();
+    expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({
+      code: 'HOST_RECEIPT_CALLER_AUTHORITY_FORBIDDEN',
+      exit: 2,
+    });
+  });
+
+  it.each([
+    ['role', ['--as-role', 'owner']],
+    ['session', ['--authority-session', 'AUTH-SESSION-0123456789abcdef']],
+    ['write consent', ['--write']],
     ['publication consent', ['--publish']],
     ['machine identity', ['--machine-actor', 'harness']],
   ] as const)(
