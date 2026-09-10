@@ -287,6 +287,73 @@ describe('release mutation artifact normalization v2.1', () => {
   });
 
   it.each([
+    { statuses: ['Timeout', 'Survived'] as const, score: 50 },
+    { statuses: ['Killed', 'NoCoverage'] as const, score: 50 },
+  ])('computes the score-bearing population for $statuses', ({ statuses, score }) => {
+    const result = json(normalized(rawReport(statuses), {}, ['0', '1']).result.bytes);
+    expect(result.score).toBe(score);
+    expect(result.complete).toBe(true);
+  });
+
+  it('makes a signalled status-zero process incomplete', () => {
+    const result = json(
+      normalized(
+        rawReport(['Killed']),
+        { process: { errorAbsent: true, signal: 'SIGTERM', status: 0 } },
+        ['0'],
+      ).result.bytes,
+    );
+    expect(result.complete).toBe(false);
+    expect(result.passed).toBe(false);
+  });
+
+  it('refuses a runtime error even when the scored population clears every threshold', () => {
+    const result = json(
+      normalized(rawReport(['Killed', 'RuntimeError']), {}, ['0', '1']).result.bytes,
+    );
+    expect(result.complete).toBe(true);
+    expect(result.score).toBe(100);
+    expect(result.passed).toBe(false);
+  });
+
+  it.each([
+    {
+      name: 'exact score and survivor ceilings',
+      statuses: ['Killed', 'Survived'] as const,
+      thresholds: { break: 50, high: 60, low: 50, scoreMin: 50, survivedMax: 1 },
+      passed: true,
+    },
+    {
+      name: 'stricter score minimum',
+      statuses: ['Killed', 'Survived'] as const,
+      thresholds: { break: 40, high: 60, low: 40, scoreMin: 60, survivedMax: 1 },
+      passed: false,
+    },
+    {
+      name: 'survivor ceiling exceeded',
+      statuses: ['Killed', 'Survived', 'Survived'] as const,
+      thresholds: { break: 0, high: 60, low: 0, scoreMin: 0, survivedMax: 1 },
+      passed: false,
+    },
+  ])('enforces $name', ({ statuses, thresholds, passed }) => {
+    const report = rawReport(statuses);
+    report.thresholds = {
+      break: thresholds.break,
+      high: thresholds.high,
+      low: thresholds.low,
+    };
+    const expected = { ...EXPECTED, thresholds };
+    const result = json(
+      normalized(
+        report,
+        { expected },
+        statuses.map((_, index) => String(index)),
+      ).result.bytes,
+    );
+    expect(result.passed).toBe(passed);
+  });
+
+  it.each([
     ['missing', 'MUTATION_ROSTER_MISMATCH'],
     ['added', 'MUTATION_ROSTER_MISMATCH'],
     ['id', 'MUTATION_ROSTER_MISMATCH'],
