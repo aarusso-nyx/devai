@@ -359,6 +359,76 @@ describe('release mutation retention adapter', () => {
     }
   });
 
+  it('refuses malformed caller package artifacts before opening a sink transaction', async () => {
+    const source = await evidenceFixture();
+    const packageCases: Array<readonly [string, (value: Package) => unknown]> = [
+      ['null package', () => null],
+      ['null artifacts', (value) => ({ ...value, artifacts: null })],
+      ['executed origin', (value) => ({ ...value, origin: {} })],
+      ['non-string package name', (value) => ({ ...value, packageName: 1 })],
+      ['unknown disposition', (value) => ({ ...value, disposition: 'cached' })],
+      [
+        'non-string input digest',
+        (value) => ({ ...value, artifacts: { ...value.artifacts, inputDigest: 1 } }),
+      ],
+      [
+        'invalid input digest',
+        (value) => ({ ...value, artifacts: { ...value.artifacts, inputDigest: 'invalid' } }),
+      ],
+    ];
+    const artifactCases: Array<readonly [string, (value: Package) => unknown]> = [
+      ['null report', (value) => ({ ...value, artifacts: { ...value.artifacts, report: null } })],
+      [
+        'non-string report path',
+        (value) => ({
+          ...value,
+          artifacts: { ...value.artifacts, report: { ...value.artifacts.report, path: 1 } },
+        }),
+      ],
+      [
+        'non-string report digest',
+        (value) => ({
+          ...value,
+          artifacts: { ...value.artifacts, report: { ...value.artifacts.report, sha256: 1 } },
+        }),
+      ],
+      [
+        'invalid report digest',
+        (value) => ({
+          ...value,
+          artifacts: {
+            ...value.artifacts,
+            report: { ...value.artifacts.report, sha256: 'invalid' },
+          },
+        }),
+      ],
+      [
+        'non-byte report',
+        (value) => ({
+          ...value,
+          artifacts: { ...value.artifacts, report: { ...value.artifacts.report, bytes: [] } },
+        }),
+      ],
+      [
+        'digest-mismatched report',
+        (value) => ({
+          ...value,
+          artifacts: {
+            ...value.artifacts,
+            report: { ...value.artifacts.report, bytes: Buffer.from('altered') },
+          },
+        }),
+      ],
+    ];
+
+    for (const [name, mutate] of [...packageCases, ...artifactCases]) {
+      const value = adapterFixture(source);
+      const packages = [mutate(first(value.packages)), ...value.packages.slice(1)];
+      await refuses(() => retainReleaseMutationEvidenceV21({ ...value.input, packages } as never));
+      expect(value.sink.state.puts, name).toBe(0);
+    }
+  });
+
   it('retains and rereads exact complete executed and mixed reused closures without package outputs', async () => {
     const executedSource = await evidenceFixture();
     const executed = adapterFixture(executedSource);
