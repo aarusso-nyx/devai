@@ -151,8 +151,6 @@ describe('authority broker process target values', () => {
   });
 
   it.each([
-    [['checkout', '--orphan', 'new branch'], 'refs/heads/new-branch', 'create'],
-    [['branch', '-D', 'old branch'], 'refs/heads/old-branch', 'delete'],
     [['worktree', 'add', '-b', 'topic branch', '/tmp/wt'], 'refs/worktrees/topic-branch', 'create'],
     [['worktree', 'remove', '/tmp/wt'], 'refs/worktrees/detached', 'delete'],
     [['add', 'packages/cli/src/bin.ts'], 'refs/devai/index', 'update'],
@@ -166,6 +164,32 @@ describe('authority broker process target values', () => {
       operation,
       protected: false,
     });
+  });
+
+  it.each([
+    [['checkout', '--orphan', 'new branch'], 'new-branch', 'create'],
+    [['checkout', '--orphan'], 'orphan', 'create'],
+    [['branch', '-D', 'old branch'], 'old-branch', 'delete'],
+    [['branch', '-D'], 'temporary', 'delete'],
+  ] as const)(
+    'binds Git branch command %j to its exact unprotected ref',
+    (args, branch, operation) => {
+      expect(target('round run', 'git', args)).toEqual({
+        kind: 'git-ref',
+        id: `git-ref:${REPOSITORY}:refs/heads/${branch}`,
+        repository_id: REPOSITORY,
+        ref: `refs/heads/${branch}`,
+        operation,
+        protected: false,
+      });
+    },
+  );
+
+  it.each([
+    ['checkout', 'new-branch', '--orphan'],
+    ['branch', 'old-branch', '-D'],
+  ] as const)('refuses reordered Git branch command %j', (...args) => {
+    expect(target('round run', 'git', args)).toBeUndefined();
   });
 
   it('classifies an exact Git move as a repository-local rename', () => {
