@@ -12,7 +12,11 @@ afterEach(() => {
 
 async function governedCommand(
   action: () => unknown,
-  options: Readonly<{ dryRun?: boolean }> = {},
+  options: Readonly<{
+    dryRun?: boolean;
+    scopeAction?: string;
+    scopeEffect?: 'read' | 'harness-write' | 'local-write' | 'remote-write';
+  }> = {},
 ) {
   vi.resetModules();
   const events: string[] = [];
@@ -35,9 +39,9 @@ async function governedCommand(
         });
         return {
           scope: Object.freeze({
-            action_id: input.entry.name,
+            action_id: options.scopeAction ?? input.entry.name,
             invocation_id: invocationId,
-            effect: options.dryRun === true ? 'read' : input.entry.effects,
+            effect: options.scopeEffect ?? (options.dryRun === true ? 'read' : input.entry.effects),
             receipt_store: issuer,
             apply_effect: (_request: unknown, apply: () => unknown) => apply(),
           }),
@@ -146,6 +150,18 @@ describe('public authority command finalization', () => {
     });
 
     expect(governed.invoke).toThrow('authority handler failure');
+    expect(governed.events).toEqual(['dispose']);
+  });
+
+  it.each([
+    ['action identity', { scopeAction: 'catalog actions' }],
+    ['effect', { scopeEffect: 'read' as const }],
+  ])('refuses a staged scope with the wrong %s and disposes it', async (_label, options) => {
+    const handler = vi.fn(() => 'must-not-run');
+    const governed = await governedCommand(handler, options);
+
+    expect(governed.invoke).toThrow('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
+    expect(handler).not.toHaveBeenCalled();
     expect(governed.events).toEqual(['dispose']);
   });
 });
