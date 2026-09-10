@@ -11,6 +11,7 @@ claims structurally, and runs only an exactly representable range population.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -2272,6 +2273,21 @@ def current_attempt_container_records(root: Path) -> list[Path]:
     return sorted(records)
 
 
+def current_attempt_invocation_records(root: Path) -> list[Path]:
+    records: list[Path] = []
+    for path in root.glob("**/invocation.json"):
+        parts = path.relative_to(root).parts
+        in_exact_candidate = (
+            len(parts) >= 4
+            and parts[0] in {"planready", "targeted"}
+            and parts[2] == "candidate"
+        )
+        if in_exact_candidate or (parts and parts[0] == "control-snapshot"):
+            continue
+        records.append(path)
+    return sorted(records)
+
+
 def observed_containers(root: Path, runner: ModuleType | None) -> list[dict[str, object]]:
     containers: list[dict[str, object]] = []
     for path in current_attempt_container_records(root):
@@ -2301,6 +2317,430 @@ def observed_containers(root: Path, runner: ModuleType | None) -> list[dict[str,
     return containers
 
 
+def expected_invocation_name(
+    invocation_path: Path,
+    docker: str,
+    group: str,
+    attempt_id: str,
+    lane_id: str,
+    candidate: str,
+    tree: str,
+) -> tuple[str, dict[str, Any], list[str]]:
+    try:
+        mode = invocation_path.lstat().st_mode
+        argv = json.loads(invocation_path.read_bytes())
+    except Exception as error:
+        raise Refusal("RECOVERY_INVOCATION_INVALID") from error
+    if invocation_path.is_symlink() or not stat.S_ISREG(mode):
+        raise Refusal("RECOVERY_INVOCATION_INVALID")
+    identity_path = invocation_path.parent / "identity.json"
+    try:
+        identity_mode = identity_path.lstat().st_mode
+    except OSError as error:
+        raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID") from error
+    if identity_path.is_symlink() or not stat.S_ISREG(identity_mode):
+        raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+    identity = load_json(identity_path, "RECOVERY_INVOCATION_IDENTITY_INVALID")
+    if (
+        not isinstance(argv, list)
+        or len(argv) < 4
+        or any(not isinstance(item, str) for item in argv)
+        or argv[0] != docker
+        or argv[1] != "create"
+        or argv.count("--name") != 1
+        or argv[2] != "--name"
+    ):
+        raise Refusal("RECOVERY_INVOCATION_INVALID")
+    recorded_name = argv[3]
+    if identity.get("phase") == "planready":
+        selected = validate_lane(identity.get("selectedLane"))
+        if (
+            identity.get("allocationId") != f"exact-current-{lane_id}"
+            or identity.get("shardId") != f"{lane_id}-planready"
+        ):
+            raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+        expected = (
+            f"devai-cli-{str(identity.get('candidate'))[:7]}-"
+            f"{attempt_id}-{selected}-planready"
+        )
+    else:
+        phase = identity.get("phase")
+        if phase not in {"baseline", "mutation"}:
+            raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+        if (
+            identity.get("allocationId") != f"exact-current-{lane_id}-{attempt_id}"
+            or identity.get("shardId") != f"{lane_id}-exact-current"
+        ):
+            raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+        expected = (
+            f"devai-cli-{str(identity.get('candidate'))[:7]}-"
+            f"{identity.get('allocationId')}-{identity.get('shardId')}-{phase}"
+        )
+    if (
+        identity.get("candidate") != candidate
+        or identity.get("tree") != tree
+        or recorded_name != expected
+        or not re.fullmatch(r"[A-Za-z0-9_.-]+", recorded_name)
+        or (identity.get("selectedLane") is not None and identity.get("selectedLane") != lane_id)
+    ):
+        raise Refusal("RECOVERY_INVOCATION_NAME_MISMATCH")
+    lane = identity.get("lane")
+    if not isinstance(lane, dict) or set(lane) != {
+        "cpus", "memory", "memorySwap", "pidsLimit", "workers"
+    }:
+        raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+    if (
+        not isinstance(lane["cpus"], int)
+        or isinstance(lane["cpus"], bool)
+        or lane["cpus"] < 1
+        or not isinstance(lane["pidsLimit"], int)
+        or isinstance(lane["pidsLimit"], bool)
+        or lane["pidsLimit"] < 1
+        or not isinstance(lane["workers"], int)
+        or isinstance(lane["workers"], bool)
+        or lane["workers"] < 1
+        or not re.fullmatch(r"[1-9][0-9]*[kKmMgG]?", str(lane["memory"]))
+        or not re.fullmatch(r"[1-9][0-9]*[kKmMgG]?", str(lane["memorySwap"]))
+        or not re.fullmatch(r"sha256:[a-f0-9]{64}", str(identity.get("image")))
+    ):
+        raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+    case = invocation_path.parent
+    candidate_path = case.parent / "candidate"
+    command = (
+        'mkdir -p /root/.npm; cp -a /npm-seed/. /root/.npm/; node /devai-host/run.mjs'
+        if identity.get("phase") == "planready"
+        else 'mkdir -p /root/.npm; cp -a /npm-seed/. /root/.npm/; node /devai-host/run.mjs & p=$!; wait "$p"; exit $?'
+    )
+    expected_argv = [
+        docker,
+        "create",
+        "--name",
+        expected,
+        "--label",
+        f"devai.diagnostic.group={group}",
+        "--network",
+        "none",
+        "--cpus",
+        str(lane["cpus"]),
+        "--memory",
+        str(lane["memory"]),
+        "--memory-swap",
+        str(lane["memorySwap"]),
+        "--pids-limit",
+        str(lane["pidsLimit"]),
+        "--env",
+        "npm_config_offline=true",
+        "--mount",
+        f"type=bind,source={candidate_path},target=/workspace/candidate,readonly",
+        "--mount",
+        f"type=bind,source={case / 'host'},target=/devai-host,readonly",
+        "--mount",
+        f"type=bind,source={case / 'results'},target=/results",
+        "--mount",
+        f"type=bind,source={candidate_path}/node_modules/.devai-npm-cache,target=/npm-seed,readonly",
+        "--workdir",
+        "/workspace/candidate",
+        str(identity.get("image")),
+        "/bin/sh",
+        "-ec",
+        command,
+    ]
+    if len(argv) != len(expected_argv):
+        raise Refusal("RECOVERY_INVOCATION_INVALID")
+    for recorded, required in zip(argv, expected_argv):
+        if recorded != required:
+            raise Refusal("RECOVERY_INVOCATION_INVALID")
+    return expected, identity, argv
+
+
+def docker_memory_bytes(value: str) -> int:
+    match = re.fullmatch(r"([1-9][0-9]*)([kKmMgG])?", value)
+    if match is None:
+        raise Refusal("RECOVERY_INVOCATION_IDENTITY_INVALID")
+    multiplier = {None: 1, "k": 1024, "m": 1024**2, "g": 1024**3}[
+        match.group(2).lower() if match.group(2) else None
+    ]
+    return int(match.group(1)) * multiplier
+
+
+def invocation_mounts(argv: list[str]) -> set[tuple[str, str, str, bool]]:
+    mounts: set[tuple[str, str, str, bool]] = set()
+    for index, item in enumerate(argv):
+        if item != "--mount":
+            continue
+        if index + 1 >= len(argv):
+            raise Refusal("RECOVERY_INVOCATION_INVALID")
+        fields: dict[str, str | bool] = {}
+        for part in argv[index + 1].split(","):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                fields[key] = value
+            else:
+                fields[part] = True
+        if not {"type", "source", "target"}.issubset(fields) or not set(fields).issubset(
+            {"type", "source", "target", "readonly"}
+        ):
+            raise Refusal("RECOVERY_INVOCATION_INVALID")
+        mounts.add(
+            (
+                str(fields["type"]),
+                str(fields["source"]),
+                str(fields["target"]),
+                fields.get("readonly") is True,
+            )
+        )
+    if len(mounts) != 4:
+        raise Refusal("RECOVERY_INVOCATION_INVALID")
+    return mounts
+
+
+def inspected_mounts(record: dict[str, Any]) -> set[tuple[str, str, str, bool]] | None:
+    observed = record.get("HostConfig", {}).get("Mounts")
+    if not isinstance(observed, list) or any(not isinstance(item, dict) for item in observed):
+        return None
+    normalized: set[tuple[str, str, str, bool]] = set()
+    for item in observed:
+        if not isinstance(item.get("ReadOnly"), bool):
+            return None
+        normalized.add(
+            (
+                str(item.get("Type")),
+                str(item.get("Source")),
+                str(item.get("Target")),
+                item["ReadOnly"],
+            )
+        )
+    return normalized
+
+
+def inspect_invocation_container(
+    runner: ModuleType,
+    name: str,
+    group: str,
+    identity: dict[str, Any],
+    argv: list[str],
+) -> dict[str, object]:
+    try:
+        output = runner.docker(
+            ["ps", "-aq", "--no-trunc", "--filter", f"name=^/{name}$"]
+        )
+        ids = [item for item in output.splitlines() if item]
+        if not ids:
+            return {"name": name, "status": "absent"}
+        if len(ids) != 1 or not re.fullmatch(r"[a-f0-9]{64}", ids[0]):
+            return {"name": name, "status": "mismatch", "ids": ids}
+        inspected = json.loads(runner.docker(["inspect", ids[0]]))
+        if len(inspected) != 1 or not isinstance(inspected[0], dict):
+            return {"name": name, "status": "mismatch", "ids": ids}
+        record = inspected[0]
+        configuration = record.get("Config", {})
+        host = record.get("HostConfig", {})
+        labels = configuration.get("Labels", {})
+        lane = identity["lane"]
+        mounts = invocation_mounts(argv)
+        expected_command = argv[argv.index("--workdir") + 3 :]
+        expected_memory = docker_memory_bytes(str(lane["memory"]))
+        custody_matches = (
+            record.get("Id") == ids[0]
+            and record.get("Name") == f"/{name}"
+            and labels.get("devai.diagnostic.group") == group
+            and configuration.get("Image") == identity.get("image")
+            and configuration.get("Cmd") == expected_command
+            and configuration.get("WorkingDir") == "/workspace/candidate"
+            and "npm_config_offline=true" in configuration.get("Env", [])
+            and host.get("NanoCpus") == int(float(lane["cpus"]) * 1_000_000_000)
+            and host.get("Memory") == expected_memory
+            and host.get("MemorySwap") == docker_memory_bytes(str(lane["memorySwap"]))
+            and host.get("PidsLimit") == lane["pidsLimit"]
+            and host.get("NetworkMode") == "none"
+            and inspected_mounts(record) == mounts
+        )
+        if not custody_matches:
+            return {
+                "name": name,
+                "status": "mismatch",
+                "id": ids[0],
+                "observedName": record.get("Name"),
+                "observedGroup": labels.get("devai.diagnostic.group"),
+            }
+        state = record.get("State")
+        if (
+            not isinstance(state, dict)
+            or not isinstance(state.get("Status"), str)
+            or any(
+                not isinstance(state.get(field), bool)
+                for field in ("Running", "Paused", "Restarting", "OOMKilled", "Dead")
+            )
+            or not isinstance(state.get("Pid"), int)
+            or isinstance(state.get("Pid"), bool)
+            or not isinstance(state.get("ExitCode"), int)
+            or isinstance(state.get("ExitCode"), bool)
+        ):
+            return {"name": name, "status": "mismatch", "id": ids[0]}
+        state_status = state["Status"]
+        if state_status in {"exited", "dead"}:
+            if (
+                state["Running"]
+                or state["Paused"]
+                or state["Restarting"]
+                or state["Pid"] != 0
+                or state["Dead"] != (state_status == "dead")
+            ):
+                return {"name": name, "status": "mismatch", "id": ids[0]}
+            recovery_status = "terminal-custody-matching"
+        elif state_status in {"created", "running", "paused", "restarting", "removing"}:
+            recovery_status = "nonterminal-custody-matching"
+        else:
+            return {
+                "name": name,
+                "status": "mismatch",
+                "id": ids[0],
+                "observedState": state_status,
+            }
+        return {
+            "name": name,
+            "status": recovery_status,
+            "custody": "full-invocation",
+            "id": ids[0],
+            "state": state,
+        }
+    except Exception as error:
+        return {
+            "name": name,
+            "status": "inspection-unavailable",
+            "error": type(error).__name__,
+        }
+
+
+def recover_invocation_intents(
+    root: Path,
+    runner: ModuleType,
+    group: str,
+    attempt_id: str,
+    lane_id: str,
+    candidate: str,
+    tree: str,
+) -> list[dict[str, object]]:
+    recovered: list[dict[str, object]] = []
+    invocation_parents: set[Path] = set()
+    for path in current_attempt_invocation_records(root):
+        invocation_parents.add(path.parent)
+        relative = path.relative_to(root).as_posix()
+        container_path = path.parent / "container.json"
+        try:
+            container_path.lstat()
+            has_container_record = True
+        except FileNotFoundError:
+            has_container_record = False
+        try:
+            name, identity, argv = expected_invocation_name(
+                path, str(runner.DOCKER), group, attempt_id, lane_id, candidate, tree
+            )
+            binding: dict[str, object] | None = None
+            if has_container_record:
+                try:
+                    mode = container_path.lstat().st_mode
+                    value = json.loads(container_path.read_bytes())
+                except Exception as error:
+                    raise Refusal("RECOVERY_CONTAINER_RECORD_INVALID") from error
+                if (
+                    container_path.is_symlink()
+                    or not stat.S_ISREG(mode)
+                    or not isinstance(value, dict)
+                    or set(value) != {"id", "name"}
+                    or value.get("name") != name
+                    or not re.fullmatch(r"[a-f0-9]{64}", str(value.get("id")))
+                ):
+                    raise Refusal("RECOVERY_CONTAINER_RECORD_INVALID")
+                binding = {"id": value["id"], "name": value["name"]}
+            inspection = inspect_invocation_container(runner, name, group, identity, argv)
+            if (
+                binding is not None
+                and inspection.get("id") is not None
+                and inspection.get("id") != binding["id"]
+            ):
+                inspection = {
+                    "name": name,
+                    "status": "mismatch",
+                    "error": "RECOVERY_CONTAINER_RECORD_ID_MISMATCH",
+                }
+            recovered.append({
+                "invocation": relative,
+                "adjacentContainerRecord": has_container_record,
+                **({"containerRecord": binding} if binding is not None else {}),
+                **inspection,
+            })
+        except Refusal as error:
+            recovered.append(
+                {
+                    "invocation": relative,
+                    "adjacentContainerRecord": has_container_record,
+                    "status": "mismatch",
+                    "error": str(error).split(":", 1)[0],
+                }
+            )
+    for container_path in current_attempt_container_records(root):
+        if container_path.parent in invocation_parents:
+            continue
+        recovered.append(
+            {
+                "containerRecord": container_path.relative_to(root).as_posix(),
+                "adjacentContainerRecord": True,
+                "status": "mismatch",
+                "error": "RECOVERY_CONTAINER_WITHOUT_INVOCATION",
+            }
+        )
+    return recovered
+
+
+def refuse_unsealable_recovery(inspections: list[dict[str, object]]) -> None:
+    if any(item.get("adjacentContainerRecord") is True for item in inspections):
+        raise Refusal("RECOVERY_ADJACENT_CONTAINER_RECORD_PRESENT")
+    statuses = {item.get("status") for item in inspections}
+    if "inspection-unavailable" in statuses:
+        raise Refusal("RECOVERY_ORPHAN_INSPECTION_UNAVAILABLE")
+    if "mismatch" in statuses or not statuses.issubset(
+        {
+            "absent",
+            "terminal-custody-matching",
+            "nonterminal-custody-matching",
+        }
+    ):
+        raise Refusal("RECOVERY_ORPHAN_CONTAINER_MISMATCH")
+    if "nonterminal-custody-matching" in statuses:
+        raise Refusal("RECOVERY_ORPHAN_CONTAINER_NONTERMINAL")
+    if "terminal-custody-matching" in statuses:
+        raise Refusal("RECOVERY_ORPHAN_CONTAINER_RESTARTABLE")
+
+
+def seal_recovered_partial_attempt(
+    root: Path,
+    preparation_sha: str,
+    attempt_id: str,
+    candidate: str,
+    tree: str,
+    lane_id: str,
+    runner: ModuleType,
+    group: str,
+) -> dict[str, object]:
+    inspections = recover_invocation_intents(
+        root, runner, group, attempt_id, lane_id, candidate, tree
+    )
+    refuse_unsealable_recovery(inspections)
+    return seal_attempt(
+        root,
+        preparation_sha,
+        attempt_id,
+        candidate,
+        tree,
+        lane_id,
+        "recovered-interrupted",
+        "PARTIAL_ATTEMPT_STATE_FOUND",
+        runner,
+        inspections,
+    )
+
+
 def seal_attempt(
     root: Path,
     preparation_sha256: str,
@@ -2311,6 +2751,7 @@ def seal_attempt(
     status_value: str,
     error_code: str | None,
     runner: ModuleType | None,
+    recovery_inspections: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     members = attempt_evidence_files(root)
     index = {
@@ -2335,9 +2776,46 @@ def seal_attempt(
         "errorCode": error_code,
         "attemptIndexSha256": sha_file(root / "attempt-index.json"),
         "containers": observed_containers(root, runner),
+        "recoveryInspections": recovery_inspections or [],
     }
     write_json_exclusive(root / "attempt-completion.json", completion)
     return completion
+
+
+def seal_failure_after_runtime_reconciliation(
+    root: Path,
+    preparation_sha: str,
+    attempt_id: str,
+    candidate: str,
+    tree: str,
+    lane_id: str,
+    status_value: str,
+    error_code: str,
+    runner: ModuleType,
+    group: str,
+) -> dict[str, object]:
+    has_runtime_records = bool(
+        current_attempt_invocation_records(root)
+        or current_attempt_container_records(root)
+    )
+    inspections: list[dict[str, object]] = []
+    if has_runtime_records:
+        inspections = recover_invocation_intents(
+            root, runner, group, attempt_id, lane_id, candidate, tree
+        )
+        refuse_unsealable_recovery(inspections)
+    return seal_attempt(
+        root,
+        preparation_sha,
+        attempt_id,
+        candidate,
+        tree,
+        lane_id,
+        status_value,
+        error_code,
+        runner,
+        inspections,
+    )
 
 
 def validate_attempt_seal(
@@ -2373,10 +2851,41 @@ def validate_attempt_seal(
 
 
 def runtime_attempt_started(root: Path) -> bool:
-    return bool(current_attempt_container_records(root)) or any(
+    return bool(
+        current_attempt_container_records(root)
+        or current_attempt_invocation_records(root)
+    ) or any(
         (root / name).exists()
         for name in ("retained-planready", "current-map.json", "targeted", "execution-completion.json")
     )
+
+
+def acquire_execution_lock(root: Path) -> int:
+    path = root / ".execution.lock"
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+        state = os.fstat(descriptor)
+        if not stat.S_ISREG(state.st_mode):
+            raise Refusal("EXECUTION_LOCK_INVALID")
+        os.fchmod(descriptor, 0o600)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as error:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise Refusal("EXECUTION_ALREADY_RUNNING") from error
+    except OSError as error:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise Refusal("EXECUTION_LOCK_INVALID") from error
+    return descriptor
+
+
+def release_execution_lock(descriptor: int) -> None:
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
 
 
 def attempt_identity(preparation_sha256: str, lane_id: str) -> tuple[str, str]:
@@ -2390,6 +2899,17 @@ def attempt_identity(preparation_sha256: str, lane_id: str) -> tuple[str, str]:
 def execute(args: argparse.Namespace) -> dict[str, object]:
     if args.authorization != "RUN_DIAGNOSTIC_CLI_LANE_EXACT_CURRENT":
         raise Refusal("EXPLICIT_DIAGNOSTIC_LAUNCH_AUTHORIZATION_REQUIRED")
+    completion_path, _ = parse_bound_file(
+        args.prepared, "PREPARATION_COMPLETION_BINDING_INVALID"
+    )
+    descriptor = acquire_execution_lock(completion_path.parent)
+    try:
+        return execute_locked(args)
+    finally:
+        release_execution_lock(descriptor)
+
+
+def execute_locked(args: argparse.Namespace) -> dict[str, object]:
     root, preparation, inputs, config = validate_preparation(args.prepared)
     repo = Path(inputs["repository"])
     bind_candidate(repo, preparation["candidate"], preparation["tree"])
@@ -2452,16 +2972,15 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
             }
         raise Refusal("PREVIOUS_ATTEMPT_TERMINAL_REQUIRES_NEW_PREPARATION")
     if runtime_attempt_started(root):
-        seal_attempt(
+        seal_recovered_partial_attempt(
             root,
             preparation_sha,
             attempt_id,
             preparation["candidate"],
             preparation["tree"],
             lane_id,
-            "recovered-interrupted",
-            "PARTIAL_ATTEMPT_STATE_FOUND",
             runner,
+            group,
         )
         raise Refusal("PARTIAL_ATTEMPT_SEALED_REQUIRES_NEW_PREPARATION")
     runner.assert_no_foreign_running(group)
@@ -2646,7 +3165,7 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
     except BaseException as error:
         if not (root / "attempt-completion.json").exists():
             code = str(error).split(":", 1)[0] or type(error).__name__
-            seal_attempt(
+            seal_failure_after_runtime_reconciliation(
                 root,
                 preparation_sha,
                 attempt_id,
@@ -2656,6 +3175,7 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
                 "interrupted" if isinstance(error, (KeyboardInterrupt, SystemExit)) else "failed",
                 code[:160],
                 runner,
+                group,
             )
         raise
 

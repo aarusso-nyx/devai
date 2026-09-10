@@ -222,6 +222,169 @@ def write_dependency_fixture(root: Path) -> tuple[Path, str, dict]:
     return repo, candidate, manifest
 
 
+def write_recovery_invocation(
+    root: Path, argv: list[object] | None = None, phase: str = "planready"
+) -> tuple[Path, str]:
+    case = (
+        root / "planready/shard-02-planready/baseline"
+        if phase == "planready"
+        else root / f"targeted/shard-02-exact-current/{phase}"
+    )
+    case.mkdir(parents=True)
+    candidate = "a" * 40
+    tree = "b" * 40
+    attempt = "c" * 12
+    name = (
+        f"devai-cli-{candidate[:7]}-{attempt}-shard-02-planready"
+        if phase == "planready"
+        else f"devai-cli-{candidate[:7]}-exact-current-shard-02-{attempt}-shard-02-exact-current-{phase}"
+    )
+    image = "sha256:" + "e" * 64
+    lane = {
+        "cpus": 6,
+        "memory": "8g",
+        "memorySwap": "8g",
+        "pidsLimit": 2048,
+        "workers": 4,
+    }
+    (case / "identity.json").write_bytes(
+        harness.canonical(
+            {
+                "candidate": candidate,
+                "tree": tree,
+                "phase": phase,
+                **({"selectedLane": "shard-02"} if phase == "planready" else {}),
+                "allocationId": (
+                    "exact-current-shard-02"
+                    if phase == "planready"
+                    else f"exact-current-shard-02-{attempt}"
+                ),
+                "shardId": (
+                    "shard-02-planready"
+                    if phase == "planready"
+                    else "shard-02-exact-current"
+                ),
+                "lane": lane,
+                "image": image,
+            }
+        )
+    )
+    candidate_path = case.parent / "candidate"
+    command = (
+        "mkdir -p /root/.npm; cp -a /npm-seed/. /root/.npm/; node /devai-host/run.mjs"
+        if phase == "planready"
+        else 'mkdir -p /root/.npm; cp -a /npm-seed/. /root/.npm/; node /devai-host/run.mjs & p=$!; wait "$p"; exit $?'
+    )
+    exact_argv = [
+        "/absolute/docker",
+        "create",
+        "--name",
+        name,
+        "--label",
+        "devai.diagnostic.group=group",
+        "--network",
+        "none",
+        "--cpus",
+        "6",
+        "--memory",
+        "8g",
+        "--memory-swap",
+        "8g",
+        "--pids-limit",
+        "2048",
+        "--env",
+        "npm_config_offline=true",
+        "--mount",
+        f"type=bind,source={candidate_path},target=/workspace/candidate,readonly",
+        "--mount",
+        f"type=bind,source={case / 'host'},target=/devai-host,readonly",
+        "--mount",
+        f"type=bind,source={case / 'results'},target=/results",
+        "--mount",
+        f"type=bind,source={candidate_path}/node_modules/.devai-npm-cache,target=/npm-seed,readonly",
+        "--workdir",
+        "/workspace/candidate",
+        image,
+        "/bin/sh",
+        "-ec",
+        command,
+    ]
+    (case / "invocation.json").write_bytes(
+        harness.canonical(argv if argv is not None else exact_argv)
+    )
+    return case / "invocation.json", name
+
+
+class RecoveryRunner:
+    DOCKER = "/absolute/docker"
+
+    def __init__(self, responses: dict[tuple[str, ...], str | Exception]):
+        self.responses = responses
+        self.calls: list[tuple[str, ...]] = []
+
+    def docker(self, args: list[str]) -> str:
+        key = tuple(args)
+        self.calls.append(key)
+        value = self.responses.get(key, "")
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+
+def recovery_inspection(root: Path, name: str, container_id: str, state: str) -> dict:
+    invocation_path = harness.current_attempt_invocation_records(root)[0]
+    invocation = json.loads(invocation_path.read_bytes())
+    identity = json.loads((invocation_path.parent / "identity.json").read_bytes())
+    mount_specs = [
+        invocation[index + 1]
+        for index, value in enumerate(invocation)
+        if value == "--mount"
+    ]
+    mounts = []
+    for spec in mount_specs:
+        fields = dict(
+            part.split("=", 1) if "=" in part else (part, True)
+            for part in spec.split(",")
+        )
+        mounts.append(
+            {
+                "Type": fields["type"],
+                "Source": fields["source"],
+                "Target": fields["target"],
+                "ReadOnly": fields.get("readonly") is True,
+            }
+        )
+    return {
+        "Id": container_id,
+        "Name": f"/{name}",
+        "Config": {
+            "Labels": {"devai.diagnostic.group": "group"},
+            "Image": identity["image"],
+            "Cmd": invocation[invocation.index("--workdir") + 3 :],
+            "WorkingDir": "/workspace/candidate",
+            "Env": ["npm_config_offline=true"],
+        },
+        "HostConfig": {
+            "NanoCpus": 6_000_000_000,
+            "Memory": 8 * 1024**3,
+            "MemorySwap": 8 * 1024**3,
+            "PidsLimit": 2048,
+            "NetworkMode": "none",
+            "Mounts": mounts,
+        },
+        "State": {
+            "Status": state,
+            "Running": state in {"running", "paused", "restarting", "removing"},
+            "Paused": state == "paused",
+            "Restarting": state == "restarting",
+            "OOMKilled": False,
+            "Dead": state == "dead",
+            "Pid": 0 if state in {"created", "exited", "dead"} else 123,
+            "ExitCode": 1 if state == "exited" else 0,
+        },
+    }
+
+
 class HarnessRefusalTests(unittest.TestCase):
     def test_dependency_control_requires_exact_declared_archive_population(self) -> None:
         for mutation in ("missing", "extra", "unsafe"):
@@ -906,22 +1069,427 @@ class HarnessRefusalTests(unittest.TestCase):
                     path.mkdir()
                 self.assertTrue(harness.runtime_attempt_started(root))
 
+    def test_execution_lock_refuses_a_competing_caller_without_attempt_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = harness.acquire_execution_lock(root)
+            try:
+                with self.assertRaisesRegex(
+                    harness.Refusal, "EXECUTION_ALREADY_RUNNING"
+                ):
+                    harness.acquire_execution_lock(root)
+                self.assertFalse((root / "attempt-index.json").exists())
+                self.assertFalse((root / "attempt-completion.json").exists())
+                self.assertEqual((root / ".execution.lock").read_bytes(), b"")
+            finally:
+                harness.release_execution_lock(first)
+            later = harness.acquire_execution_lock(root)
+            harness.release_execution_lock(later)
+
+    def test_invocation_intent_is_partial_but_snapshot_and_candidate_are_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                "control-snapshot/retained/shard-02/invocation.json",
+                "planready/shard-02-planready/candidate/fixture/invocation.json",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("[]\n")
+            self.assertFalse(harness.runtime_attempt_started(root))
+            invocation, _ = write_recovery_invocation(root)
+            self.assertTrue(harness.runtime_attempt_started(root))
+            self.assertEqual(harness.current_attempt_invocation_records(root), [invocation])
+
+    def test_recovery_inspects_exact_name_across_all_container_states(self) -> None:
+        candidate = "a" * 40
+        tree = "b" * 40
+        attempt = "c" * 12
+        group = "group"
+        container_id = "d" * 64
+        for expected_status, ps, state, mismatch in (
+            ("absent", "", None, False),
+            ("nonterminal-custody-matching", container_id, "created", False),
+            ("nonterminal-custody-matching", container_id, "running", False),
+            ("nonterminal-custody-matching", container_id, "paused", False),
+            ("nonterminal-custody-matching", container_id, "restarting", False),
+            ("terminal-custody-matching", container_id, "exited", False),
+            ("terminal-custody-matching", container_id, "dead", False),
+            ("mismatch", container_id, "unknown", False),
+            ("mismatch", container_id, "exited", True),
+        ):
+            with self.subTest(expected_status=expected_status, state=state), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _, name = write_recovery_invocation(root)
+                responses: dict[tuple[str, ...], str | Exception] = {
+                    ("ps", "-aq", "--no-trunc", "--filter", f"name=^/{name}$"): ps
+                }
+                inspection = None
+                if state is not None:
+                    inspection = recovery_inspection(root, name, container_id, state)
+                    if mismatch:
+                        inspection["Name"] = "/different"
+                        inspection["Config"]["Labels"]["devai.diagnostic.group"] = "other"
+                    responses[("inspect", container_id)] = json.dumps([inspection])
+                runner = RecoveryRunner(responses)
+                recovered = harness.recover_invocation_intents(
+                    root, runner, group, attempt, "shard-02", candidate, tree
+                )
+                self.assertEqual(recovered[0]["status"], expected_status)
+                self.assertNotIn("create", [part for call in runner.calls for part in call])
+                if inspection is not None and expected_status.endswith("custody-matching"):
+                    self.assertEqual(recovered[0]["custody"], "full-invocation")
+                    self.assertEqual(
+                        recovered[0]["state"]["Status"], inspection["State"]["Status"]
+                    )
+
+    def test_recovery_records_inspection_unavailable_and_malformed_intent(self) -> None:
+        candidate = "a" * 40
+        tree = "b" * 40
+        attempt = "c" * 12
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, name = write_recovery_invocation(root)
+            runner = RecoveryRunner(
+                {
+                    (
+                        "ps",
+                        "-aq",
+                        "--no-trunc",
+                        "--filter",
+                        f"name=^/{name}$",
+                    ): OSError("offline")
+                }
+            )
+            recovered = harness.recover_invocation_intents(
+                root, runner, "group", attempt, "shard-02", candidate, tree
+            )
+            self.assertEqual(recovered[0]["status"], "inspection-unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_recovery_invocation(root, ["/absolute/docker", "create", "--name"])
+            runner = RecoveryRunner({})
+            recovered = harness.recover_invocation_intents(
+                root, runner, "group", attempt, "shard-02", candidate, tree
+            )
+            self.assertEqual(recovered[0]["status"], "mismatch")
+            self.assertEqual(recovered[0]["error"], "RECOVERY_INVOCATION_INVALID")
+            self.assertEqual(runner.calls, [])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            invocation, name = write_recovery_invocation(root)
+            argv = json.loads(invocation.read_bytes())
+            argv[2:4] = [name, "--name"]
+            invocation.write_bytes(harness.canonical(argv))
+            runner = RecoveryRunner({})
+            recovered = harness.recover_invocation_intents(
+                root, runner, "group", attempt, "shard-02", candidate, tree
+            )
+            self.assertEqual(recovered[0]["status"], "mismatch")
+            self.assertEqual(recovered[0]["error"], "RECOVERY_INVOCATION_INVALID")
+            self.assertEqual(runner.calls, [])
+
+    def test_targeted_baseline_and_mutation_invocations_are_exactly_bound(self) -> None:
+        candidate = "a" * 40
+        tree = "b" * 40
+        attempt = "c" * 12
+        for phase in ("baseline", "mutation"):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _, name = write_recovery_invocation(root, phase=phase)
+                call = (
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"name=^/{name}$",
+                )
+                runner = RecoveryRunner({call: ""})
+                recovered = harness.recover_invocation_intents(
+                    root, runner, "group", attempt, "shard-02", candidate, tree
+                )
+                self.assertEqual(recovered[0]["status"], "absent")
+                self.assertEqual(runner.calls, [call])
+
+                invocation = harness.current_attempt_invocation_records(root)[0]
+                argv = json.loads(invocation.read_bytes())
+                argv[-1] += "; true"
+                invocation.write_bytes(harness.canonical(argv))
+                runner = RecoveryRunner({})
+                recovered = harness.recover_invocation_intents(
+                    root, runner, "group", attempt, "shard-02", candidate, tree
+                )
+                self.assertEqual(recovered[0]["status"], "mismatch")
+                self.assertEqual(runner.calls, [])
+
+    def test_partial_recovery_refuses_every_observed_container_without_sealing(self) -> None:
+        candidate = "a" * 40
+        tree = "b" * 40
+        attempt = "c" * 12
+        container_id = "d" * 64
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            completion = harness.seal_failure_after_runtime_reconciliation(
+                root,
+                "f" * 64,
+                attempt,
+                candidate,
+                tree,
+                "shard-02",
+                "failed",
+                "SIMULATED_PRE_RUNTIME_FAILURE",
+                RecoveryRunner({}),
+                "group",
+            )
+            self.assertEqual(completion["status"], "failed")
+            self.assertEqual(completion["recoveryInspections"], [])
+        for state, code in (
+            ("created", "RECOVERY_ORPHAN_CONTAINER_NONTERMINAL"),
+            ("running", "RECOVERY_ORPHAN_CONTAINER_NONTERMINAL"),
+            ("paused", "RECOVERY_ORPHAN_CONTAINER_NONTERMINAL"),
+            ("restarting", "RECOVERY_ORPHAN_CONTAINER_NONTERMINAL"),
+            ("removing", "RECOVERY_ORPHAN_CONTAINER_NONTERMINAL"),
+            ("exited", "RECOVERY_ORPHAN_CONTAINER_RESTARTABLE"),
+            ("dead", "RECOVERY_ORPHAN_CONTAINER_RESTARTABLE"),
+            ("unknown", "RECOVERY_ORPHAN_CONTAINER_MISMATCH"),
+        ):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _, name = write_recovery_invocation(root)
+                ps_call = (
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"name=^/{name}$",
+                )
+                runner = RecoveryRunner(
+                    {
+                        ps_call: container_id,
+                        ("inspect", container_id): json.dumps(
+                            [recovery_inspection(root, name, container_id, state)]
+                        ),
+                    }
+                )
+                with self.assertRaisesRegex(harness.Refusal, code):
+                    harness.seal_failure_after_runtime_reconciliation(
+                        root,
+                        "f" * 64,
+                        attempt,
+                        candidate,
+                        tree,
+                        "shard-02",
+                        "failed",
+                        "SIMULATED_EXECUTION_FAILURE",
+                        runner,
+                        "group",
+                    )
+                self.assertFalse((root / "attempt-index.json").exists())
+                self.assertFalse((root / "attempt-completion.json").exists())
+
+        for mode, code in (
+            ("mismatch", "RECOVERY_ORPHAN_CONTAINER_MISMATCH"),
+            ("unavailable", "RECOVERY_ORPHAN_INSPECTION_UNAVAILABLE"),
+        ):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _, name = write_recovery_invocation(root)
+                ps_call = (
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"name=^/{name}$",
+                )
+                if mode == "unavailable":
+                    responses = {ps_call: OSError("offline")}
+                else:
+                    inspection = recovery_inspection(root, name, container_id, "exited")
+                    inspection["Name"] = "/other"
+                    responses = {
+                        ps_call: container_id,
+                        ("inspect", container_id): json.dumps([inspection]),
+                    }
+                with self.assertRaisesRegex(harness.Refusal, code):
+                    harness.seal_failure_after_runtime_reconciliation(
+                        root,
+                        "f" * 64,
+                        attempt,
+                        candidate,
+                        tree,
+                        "shard-02",
+                        "failed",
+                        "SIMULATED_EXECUTION_FAILURE",
+                        RecoveryRunner(responses),
+                        "group",
+                    )
+                self.assertFalse((root / "attempt-index.json").exists())
+                self.assertFalse((root / "attempt-completion.json").exists())
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, name = write_recovery_invocation(root)
+            ps_call = (
+                "ps",
+                "-aq",
+                "--no-trunc",
+                "--filter",
+                f"name=^/{name}$",
+            )
+            completion = harness.seal_failure_after_runtime_reconciliation(
+                root,
+                "f" * 64,
+                attempt,
+                candidate,
+                tree,
+                "shard-02",
+                "failed",
+                "SIMULATED_EXECUTION_FAILURE",
+                RecoveryRunner({ps_call: ""}),
+                "group",
+            )
+            self.assertEqual(completion["status"], "failed")
+            self.assertEqual(completion["recoveryInspections"][0]["status"], "absent")
+
+    def test_adjacent_container_record_always_blocks_recovery_seal(self) -> None:
+        candidate = "a" * 40
+        tree = "b" * 40
+        attempt = "c" * 12
+        container_id = "d" * 64
+        for state in (
+            None,
+            "created",
+            "running",
+            "paused",
+            "restarting",
+            "removing",
+            "exited",
+            "dead",
+        ):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                invocation, name = write_recovery_invocation(root)
+                (invocation.parent / "container.json").write_bytes(
+                    harness.canonical({"id": container_id, "name": name})
+                )
+                ps_call = (
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"name=^/{name}$",
+                )
+                responses: dict[tuple[str, ...], str | Exception] = {
+                    ps_call: "" if state is None else container_id
+                }
+                if state is not None:
+                    responses[("inspect", container_id)] = json.dumps(
+                        [recovery_inspection(root, name, container_id, state)]
+                    )
+                with self.assertRaisesRegex(
+                    harness.Refusal, "RECOVERY_ADJACENT_CONTAINER_RECORD_PRESENT"
+                ):
+                    harness.seal_failure_after_runtime_reconciliation(
+                        root,
+                        "f" * 64,
+                        attempt,
+                        candidate,
+                        tree,
+                        "shard-02",
+                        "failed",
+                        "SIMULATED_EXECUTION_FAILURE",
+                        RecoveryRunner(responses),
+                        "group",
+                    )
+                self.assertFalse((root / "attempt-index.json").exists())
+                self.assertFalse((root / "attempt-completion.json").exists())
+
+    def test_adjacent_container_record_malformed_or_unavailable_blocks_without_seal(self) -> None:
+        candidate = "a" * 40
+        tree = "b" * 40
+        attempt = "c" * 12
+        container_id = "d" * 64
+        for mutation in ("bad-id", "bad-name", "malformed", "unavailable"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                invocation, name = write_recovery_invocation(root)
+                record = {"id": container_id, "name": name}
+                if mutation == "bad-id":
+                    record["id"] = "short"
+                elif mutation == "bad-name":
+                    record["name"] = "other"
+                if mutation == "malformed":
+                    (invocation.parent / "container.json").write_text("{\n")
+                else:
+                    (invocation.parent / "container.json").write_bytes(
+                        harness.canonical(record)
+                    )
+                ps_call = (
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"name=^/{name}$",
+                )
+                responses = (
+                    {ps_call: OSError("offline")}
+                    if mutation == "unavailable"
+                    else {}
+                )
+                with self.assertRaisesRegex(
+                    harness.Refusal, "RECOVERY_ADJACENT_CONTAINER_RECORD_PRESENT"
+                ):
+                    harness.seal_failure_after_runtime_reconciliation(
+                        root,
+                        "f" * 64,
+                        attempt,
+                        candidate,
+                        tree,
+                        "shard-02",
+                        "failed",
+                        "SIMULATED_EXECUTION_FAILURE",
+                        RecoveryRunner(responses),
+                        "group",
+                    )
+                self.assertFalse((root / "attempt-index.json").exists())
+                self.assertFalse((root / "attempt-completion.json").exists())
+
+    def test_hidden_or_unexpected_invocation_paths_remain_fail_closed(self) -> None:
+        for relative in (
+            ".hidden/invocation.json",
+            "unexpected/deep/invocation.json",
+            ".hidden/candidate/invocation.json",
+        ):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / relative
+                path.parent.mkdir(parents=True)
+                path.write_text("[]\n")
+                self.assertTrue(harness.runtime_attempt_started(root))
+
     def test_failed_attempt_is_sealed_and_detects_later_evidence_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             evidence = root / "output.log"
             evidence.write_text("failure\n")
-            harness.seal_attempt(
-                root,
-                "d" * 64,
-                "d" * 12,
-                "a" * 40,
-                "b" * 40,
-                "shard-10",
-                "failed",
-                "TEST_FAILURE",
-                None,
-            )
+            descriptor = harness.acquire_execution_lock(root)
+            try:
+                harness.seal_attempt(
+                    root,
+                    "d" * 64,
+                    "d" * 12,
+                    "a" * 40,
+                    "b" * 40,
+                    "shard-10",
+                    "failed",
+                    "TEST_FAILURE",
+                    None,
+                )
+            finally:
+                harness.release_execution_lock(descriptor)
+            index = json.loads((root / "attempt-index.json").read_bytes())
+            self.assertIn(".execution.lock", [item["path"] for item in index["files"]])
             value = harness.validate_attempt_seal(
                 root, "d" * 64, "a" * 40, "b" * 40, "shard-10"
             )
