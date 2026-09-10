@@ -608,8 +608,26 @@ def verify_source_blobs(repo: Path, candidate: str, retained: Path, mapped: list
         current = subprocess.run(
             ["git", "-C", str(repo), "show", f"{candidate}:{path}"], capture_output=True, check=False
         )
-        if current.returncode or current.stdout != frozen:
+        if current.returncode:
             raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP")
+        if current.stdout != frozen:
+            try:
+                frozen_lines = frozen.decode("utf-8").splitlines(keepends=True)
+                current_lines = current.stdout.decode("utf-8").splitlines(keepends=True)
+            except UnicodeDecodeError as error:
+                raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP") from error
+            for item in (entry for entry in mapped if entry["path"] == path):
+                start, end = location_bounds(item["location"])
+                last_line = end[0] - 1 if end[0] > start[0] and end[1] == 0 else end[0]
+                if (
+                    start[0] >= len(frozen_lines)
+                    or last_line >= len(frozen_lines)
+                    or start[0] >= len(current_lines)
+                    or last_line >= len(current_lines)
+                    or frozen_lines[start[0] : last_line + 1]
+                    != current_lines[start[0] : last_line + 1]
+                ):
+                    raise Refusal("TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP")
         bindings[path] = sha_bytes(current.stdout)
     return bindings
 

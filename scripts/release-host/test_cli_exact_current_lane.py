@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import subprocess
 import tempfile
 import tarfile
 import unittest
@@ -123,6 +124,59 @@ def write_frozen_retention(root: Path) -> tuple[dict[str, str], str]:
 
 
 class HarnessRefusalTests(unittest.TestCase):
+    def test_source_binding_allows_only_changes_outside_mapped_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            retained = root / "retained"
+            repo.mkdir()
+            retained.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.email", "fixture@example.test"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.name", "Fixture"], check=True)
+            source = repo / "packages/cli/src/example.ts"
+            source.parent.mkdir(parents=True)
+            frozen = "const value = false;\n"
+            source.write_text(frozen)
+            subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "frozen"], check=True)
+            (retained / "mutation.json").write_text(
+                json.dumps({"files": {"packages/cli/src/example.ts": {"source": frozen}}})
+            )
+            entry = mapped(mutant("7"))
+            entry["location"] = {
+                "start": {"line": 0, "column": 14},
+                "end": {"line": 0, "column": 19},
+            }
+
+            source.write_text(frozen + "export { value };\n")
+            subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "add export"], check=True)
+            candidate = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(
+                harness.verify_source_blobs(repo, candidate, retained, [entry]),
+                {"packages/cli/src/example.ts": harness.sha_bytes(source.read_bytes())},
+            )
+
+            source.write_text("const value = true;\nexport { value };\n")
+            subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "change mapped line"], check=True)
+            candidate = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            with self.assertRaisesRegex(
+                harness.Refusal, "TARGET_SOURCE_CHANGED_REQUIRES_MANUAL_REMAP"
+            ):
+                harness.verify_source_blobs(repo, candidate, retained, [entry])
+
     def test_attempt_identity_separates_lane_and_preparation(self) -> None:
         first = harness.attempt_identity("a" * 64, "shard-01")
         other_lane = harness.attempt_identity("a" * 64, "shard-02")
