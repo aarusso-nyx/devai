@@ -416,6 +416,50 @@ describe('protected release mutation input derivation', () => {
     }
   });
 
+  it('selects declaration producers only from generated namespaces bound to workspace dependencies', () => {
+    const base = currentFixture();
+    const descriptor = JSON.parse(
+      Buffer.from(base.files.get('test-tasks.json') ?? []).toString('utf8'),
+    ) as {
+      tasks: Array<{ nodeId: string; outputContract: Record<string, unknown> }>;
+    };
+    const schemas = descriptor.tasks.find((task) => task.nodeId === 'test:schemas');
+    if (schemas === undefined) throw new Error('fixture schemas task missing');
+    const buildWith = (generatedNamespaces: unknown) => {
+      schemas.outputContract = {
+        kind: 'tracked-files',
+        paths: ['packages/schemas/package.json'],
+        generated_namespaces: generatedNamespaces,
+      };
+      return build(
+        base,
+        mutate(base.files, 'test-tasks.json', Buffer.from(JSON.stringify(descriptor), 'utf8')),
+      ).plan.packages.find((entry) => entry.id === 'authority');
+    };
+
+    expect(
+      buildWith([
+        null,
+        1,
+        [],
+        {},
+        { package_manifest: 1 },
+        { package_manifest: 'packages/cli/package.json' },
+      ])?.prerequisite_nodes,
+    ).toEqual([]);
+    expect(
+      buildWith([
+        null,
+        { package_manifest: 'packages/cli/package.json' },
+        {
+          derivation: 'typescript-declarations',
+          prefix: 'packages/schemas/dist/',
+          package_manifest: 'packages/schemas/package.json',
+        },
+      ])?.prerequisite_nodes,
+    ).toContain('test:schemas');
+  });
+
   it('keeps input identity stable across commit-only changes but makes empty or dynamic configuration ineligible', () => {
     const base = fixture();
     const initial = build(base);
