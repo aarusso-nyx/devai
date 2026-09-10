@@ -3824,6 +3824,84 @@ describe('release lifecycle execution kernel', () => {
     });
   });
 
+  it('rejects independently valid store records that break append-log and attempt bindings', async () => {
+    const value = request();
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    await seedPreflight(store);
+    const [attempt, completion] = store.readStoreRecords();
+    const completedHead = required(store.readHead(), 'missing completed head');
+    const first = required(attempt, 'missing attempt');
+    const terminal = required(completion, 'missing completion');
+
+    const refinalize = (
+      record: StoreRecord,
+      patch: Partial<Omit<StoreRecord, 'record_id' | 'record_digest_sha256'>>,
+    ) => {
+      const { record_id: _id, record_digest_sha256: _digest, ...draft } = record;
+      return finalizeStoreRecord({ ...draft, ...patch });
+    };
+    const errorsFor = (...records: readonly StoreRecord[]) => reduceStoreRecords(records).errors;
+
+    expect(errorsFor({ ...first, record_id: 'RLE-0000000000000000' })).toContain(
+      'release-state-store-record-identity-invalid',
+    );
+    expect(errorsFor({ ...first, record_digest_sha256: '0'.repeat(64) })).toContain(
+      'release-state-store-record-identity-invalid',
+    );
+
+    const wrongAttemptId = refinalize(first, { attempt_id: 'RLA-0000000000000000' });
+    expect(errorsFor(wrongAttemptId)).toContain('release-store-opening-attempt-invalid');
+
+    const differentPredecessor = {
+      sequence: first.sequence,
+      record_id: first.record_id,
+      record_digest_sha256: '0'.repeat(64),
+    };
+    const terminalCases: readonly [
+      Partial<Omit<StoreRecord, 'record_id' | 'record_digest_sha256'>>,
+      string,
+    ][] = [
+      [{ sequence: 2 }, 'release-state-store-sequence-invalid'],
+      [{ predecessor_record: differentPredecessor }, 'release-state-store-broken-chain'],
+      [{ observed_head_before: completedHead }, 'release-state-head-mismatch'],
+      [
+        { repository: { ...value.repository_locator, id: 'aarusso-nyx/other' } },
+        'release-state-store-repository-mismatch',
+      ],
+      [
+        {
+          candidate: {
+            commit: '0'.repeat(40),
+            tree: value.candidate_locator.tree,
+            release_units: value.candidate_locator.release_units.map((unit) => ({
+              release_unit: unit.release_unit,
+              version: unit.version,
+              packages: unit.package_roster.map((pkg) => ({ package_id: pkg.package_id })),
+            })),
+          },
+        },
+        'release-state-store-candidate-mismatch',
+      ],
+      [{ attempt_id: 'RLA-0000000000000000' }, 'release-store-terminal-attempt-link-invalid'],
+      [{ action_id: 'release certify' }, 'release-store-terminal-attempt-link-invalid'],
+      [{ request_digest_sha256: '0'.repeat(64) }, 'release-store-terminal-attempt-link-invalid'],
+      [
+        {
+          completion: {
+            ...required(terminal.completion, 'missing completion material'),
+            state: 'certified',
+          },
+        },
+        'release-store-terminal-attempt-link-invalid',
+      ],
+    ];
+    for (const [patch, expected] of terminalCases) {
+      expect(errorsFor(first, refinalize(terminal, patch)), JSON.stringify(patch)).toContain(
+        expected,
+      );
+    }
+  });
+
   it('derives publication expectation only from trusted controls bound to request and grant', async () => {
     const initial = request('release publish');
     const store = new ReleaseLifecycleFileStore(root(), initial);
