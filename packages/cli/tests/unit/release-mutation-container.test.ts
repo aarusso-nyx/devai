@@ -161,6 +161,7 @@ function invoke(input: {
   readonly source?: readonly ContainerArchiveEntry[];
   readonly prior_outputs?: ReadonlyMap<string, ContainerArchiveEntry>;
   readonly declared_outputs?: readonly string[];
+  readonly diagnostic_output_paths?: readonly string[];
   readonly declared_namespaces?: readonly {
     readonly prefix: string;
     readonly required_paths: readonly string[];
@@ -182,6 +183,9 @@ function invoke(input: {
         source: input.source ?? [SOURCE],
         prior_outputs: input.prior_outputs ?? new Map(),
         declared_outputs: input.declared_outputs ?? [],
+        ...(input.diagnostic_output_paths === undefined
+          ? {}
+          : { diagnostic_output_paths: input.diagnostic_output_paths }),
         ...(input.mutation_program === undefined
           ? {}
           : { mutation_program: input.mutation_program }),
@@ -231,6 +235,28 @@ afterEach(() => {
 });
 
 describe('protected mutation-program container transport', () => {
+  it('refuses a nested binding and releases the same container after the outer operation', () => {
+    const value = fixture();
+    const binding = {
+      action_id: 'release preflight' as const,
+      repository: { id: 'fixture/repository', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+      task_policy_digest_sha256: 'c'.repeat(64),
+      plan_receipt_digest_sha256: 'd'.repeat(64),
+      helper_identity_sha256: 'e'.repeat(64),
+    };
+    try {
+      value.container.runBound(binding, () => {
+        expect(() => value.container.runBound(binding, () => undefined)).toThrow(
+          'release-certification-container-in-use',
+        );
+      });
+      expect(value.container.runBound(binding, () => 'released')).toBe('released');
+      expect(state.calls).toEqual([]);
+    } finally {
+      value.dispose();
+    }
+  });
+
   it('accepts disjoint output namespaces and captures every required member', () => {
     const value = fixture();
     const outputs: ContainerArchiveEntry[] = [
@@ -757,6 +783,32 @@ describe('protected mutation-program container transport', () => {
       );
     } finally {
       rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('retains the selected diagnostic population before protected callbacks can mutate it', () => {
+    const value = fixture();
+    const output: ContainerArchiveEntry = {
+      path: 'reports/diagnostic.json',
+      mode: '100644',
+      bytes: Buffer.from('{"diagnostic":true}\n', 'utf8'),
+    };
+    const diagnosticOutputPaths = [output.path];
+    try {
+      state.source_archive = encodeContainerDependencyArchive([SOURCE, output]);
+      executionAssertion.mockImplementation(() => {
+        diagnosticOutputPaths[0] = 'reports/substituted.json';
+      });
+      const result = invoke({
+        ...value,
+        mutation_program: program,
+        declared_outputs: [output.path],
+        diagnostic_output_paths: diagnosticOutputPaths,
+      });
+      expect(result.outputs).toEqual([output]);
+      expect(result.diagnostic_outputs).toEqual([output]);
+    } finally {
+      value.dispose();
     }
   });
 
