@@ -1,13 +1,19 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { CAC } from 'cac';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkGlobGuards } from '../../src/commands/check/glob-guards.js';
+import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
+import { checkGlobGuards, checkGlobGuardsCmd } from '../../src/commands/check/glob-guards.js';
 
 const roots: string[] = [];
+const originalStdout = process.stdout.write;
+const originalExitCode = process.exitCode;
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  process.stdout.write = originalStdout;
+  process.exitCode = originalExitCode;
 });
 
 function root(): string {
@@ -30,6 +36,58 @@ function registry(
   const path = join(base, relativePath);
   put(base, relativePath, `${JSON.stringify({ schemaVersion: '1.0.0', guards })}\n`);
   return path;
+}
+
+interface CommandOptions {
+  readonly repoRoot?: string;
+  readonly registry?: string;
+  readonly human?: boolean;
+}
+
+interface RegisteredCommand {
+  readonly command: readonly [string, string];
+  readonly options: readonly (readonly [string, string])[];
+  readonly invoke: (options: CommandOptions) => void;
+}
+
+function registeredCommand(): RegisteredCommand {
+  let action: ((options: CommandOptions) => void) | undefined;
+  let commandCall: readonly [string, string] | undefined;
+  const optionCalls: Array<readonly [string, string]> = [];
+  const chain = {
+    option(flag: string, description: string) {
+      optionCalls.push([flag, description]);
+      return chain;
+    },
+    action(callback: (options: CommandOptions) => void) {
+      action = callback;
+      return chain;
+    },
+  };
+  checkGlobGuardsCmd.register({
+    command: (name: string, description: string) => {
+      commandCall = [name, description];
+      return chain;
+    },
+  } as unknown as CAC);
+  if (commandCall === undefined || action === undefined) {
+    throw new Error('glob-guards command was not completely registered');
+  }
+  return { command: commandCall, options: optionCalls, invoke: action };
+}
+
+function invokeCommand(options: CommandOptions): {
+  readonly stdout: string;
+  readonly exitCode: number | undefined;
+} {
+  let stdout = '';
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+    return true;
+  }) as typeof process.stdout.write;
+  process.exitCode = undefined;
+  registeredCommand().invoke(options);
+  return { stdout, exitCode: process.exitCode };
 }
 
 describe('check glob-guards report aggregation', () => {
@@ -86,5 +144,69 @@ describe('check glob-guards report aggregation', () => {
     ]);
     expect(report.failing).toEqual([]);
     expect(report.ok).toBe(true);
+  });
+});
+
+describe('check glob-guards command boundary', () => {
+  it('registers the stable command name and public options', () => {
+    const command = registeredCommand();
+    expect(command.command).toEqual([
+      'check-glob-guards',
+      'Evaluate the glob-guards registry against the real tree',
+    ]);
+    expect(command.options).toEqual([
+      ['--repo-root <path>', 'Repo root (default: .)'],
+      ['--registry <path>', 'Registry path (default: <repo-root>/.devai/config/glob-guards.json)'],
+      ['--human', 'Human-readable output'],
+    ]);
+  });
+
+  it('uses the default registry and emits the exact passing JSON contract', () => {
+    const base = root();
+    registry(base, []);
+    const result = invokeCommand({ repoRoot: base });
+    expect(JSON.parse(result.stdout)).toEqual({
+      registry_entries: 0,
+      results: [],
+      failing: [],
+      ok: true,
+    });
+    expect(result.stdout.endsWith('\n')).toBe(true);
+    expect(result.exitCode).toBe(EXIT_PASS);
+  });
+
+  it('honors a registry override and renders a failing guard with its sample', () => {
+    const base = root();
+    put(base, 'src/one.ts', 'export {}');
+    const customRegistry = registry(
+      base,
+      [{ id: 'TOO_FEW', pattern: 'src/*.ts', min_matches: 2 }],
+      'policy/custom-guards.json',
+    );
+    const result = invokeCommand({ repoRoot: base, registry: customRegistry, human: true });
+    expect(result.stdout).toBe(
+      [
+        'check glob-guards: FAIL (1 guard(s), 1 failing)',
+        "  [✗] TOO_FEW: 'src/*.ts' matched 1 (need ≥2)",
+        '      sample matches: src/one.ts',
+        '',
+      ].join('\n'),
+    );
+    expect(result.exitCode).toBe(EXIT_FAIL);
+  });
+
+  it('renders passing human output without a failure sample', () => {
+    const base = root();
+    put(base, 'src/one.ts', 'export {}');
+    registry(base, [{ id: 'SOURCE', pattern: 'src/*.ts' }]);
+    const result = invokeCommand({ repoRoot: base, human: true });
+    expect(result.stdout).toBe(
+      [
+        'check glob-guards: OK (1 guard(s), 0 failing)',
+        "  [✓] SOURCE: 'src/*.ts' matched 1 (need ≥1)",
+        '',
+      ].join('\n'),
+    );
+    expect(result.exitCode).toBe(EXIT_PASS);
   });
 });
