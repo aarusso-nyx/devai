@@ -60,6 +60,43 @@ function expectCode(result: ReturnType<typeof refusal>, code: string): void {
 }
 
 describe('canonical production authority refusal acceptance', () => {
+  it('binds protected release adapters to exact action capabilities', () => {
+    const rule = (candidateEntries: readonly RegistryEntry[], id: string) =>
+      buildTrustedAuthoritySources(candidateEntries, process.cwd(), resolveCliVersion()).rules.find(
+        (candidate) => candidate.rule_id === id,
+      );
+    const withoutCapability = (action: string, capability: string): readonly RegistryEntry[] =>
+      current.map((entry) =>
+        entry.name === action
+          ? {
+              ...entry,
+              authority_contract: {
+                ...entry.authority_contract,
+                capabilities: entry.authority_contract.capabilities.filter(
+                  (candidate) => candidate !== capability,
+                ),
+              },
+            }
+          : entry,
+      );
+
+    expect(rule(current, 'core-protected-release-provider')).toMatchObject({
+      action_ids: ['release certify', 'release preflight'],
+    });
+    expect(
+      rule(
+        withoutCapability('release export', 'protected-export-signer-v1:sign'),
+        'core-protected-release-export-signer',
+      ),
+    ).toBeUndefined();
+    expect(
+      rule(
+        withoutCapability('release prepare', 'artifact-sink:write'),
+        'core-protected-release-artifact-sink',
+      ),
+    ).toBeUndefined();
+  });
+
   it.each(['--help', '-h'])('leaves %s entirely outside authority routing', (help) => {
     expect(
       authorizeCliArgv([process.execPath, 'devai', 'round', 'plan', help], current),
