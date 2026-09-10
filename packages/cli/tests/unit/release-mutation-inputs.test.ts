@@ -475,7 +475,11 @@ describe('protected release mutation input derivation', () => {
     const descriptor = JSON.parse(
       Buffer.from(base.files.get('test-tasks.json') ?? []).toString('utf8'),
     ) as {
-      tasks: Array<{ nodeId: string; outputContract: Record<string, unknown> }>;
+      tasks: Array<{
+        nodeId: string;
+        dependencies: string[];
+        outputContract: Record<string, unknown>;
+      }>;
     };
     const schemas = descriptor.tasks.find((task) => task.nodeId === 'test:schemas');
     if (schemas === undefined) throw new Error('fixture schemas task missing');
@@ -501,6 +505,7 @@ describe('protected release mutation input derivation', () => {
         { package_manifest: 'packages/cli/package.json' },
       ])?.prerequisite_nodes,
     ).toEqual([]);
+    schemas.dependencies = ['test:utils'];
     expect(
       buildWith([
         null,
@@ -511,7 +516,7 @@ describe('protected release mutation input derivation', () => {
           package_manifest: 'packages/schemas/package.json',
         },
       ])?.prerequisite_nodes,
-    ).toContain('test:schemas');
+    ).toEqual(expect.arrayContaining(['test:schemas', 'test:utils']));
   });
 
   it('keeps input identity stable across commit-only changes but makes empty or dynamic configuration ineligible', () => {
