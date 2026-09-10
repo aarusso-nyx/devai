@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,6 +10,7 @@ import {
   createProtectedExportSignerAdapter,
   createProtectedExportSinkAdapter,
   createProtectedReleaseSinkOwner,
+  readProtectedReleaseExportCapacity,
   runWithAuthorityHostEffects,
   withProtectedReleaseExportCapacity,
   withProtectedReleasePrepareCapacity,
@@ -154,15 +155,13 @@ async function withExportBroker<T>(
     readonly sink: ReturnType<typeof createProtectedExportSinkAdapter>;
     readonly signer: ReturnType<typeof createProtectedExportSignerAdapter>;
     readonly host: ReturnType<typeof broker>;
+    readonly requestPath: string;
   }) => Promise<T>,
   requestOverrides: Readonly<Record<string, unknown>> = {},
   capacityOverrides: Readonly<Record<string, unknown>> = {},
 ): Promise<T> {
-  const host = broker(
-    repository,
-    'release export',
-    request(repository, 'release export', destination, requestOverrides),
-  );
+  const requestPath = request(repository, 'release export', destination, requestOverrides);
+  const host = broker(repository, 'release export', requestPath);
   const sink = createProtectedExportSinkAdapter(binding);
   const signer = createProtectedExportSignerAdapter(binding);
   try {
@@ -179,7 +178,7 @@ async function withExportBroker<T>(
                 plan_receipt_digest_sha256: binding.plan_receipt_digest_sha256,
                 ...capacityOverrides,
               },
-              async () => await callback({ sink, signer, host }),
+              async () => await callback({ sink, signer, host, requestPath }),
             ),
         ),
     );
@@ -417,6 +416,25 @@ describe('release export broker protected adapters', () => {
         ],
       }),
     ],
+    [
+      'unique plan receipt population',
+      () => ({
+        receipt_locators: [
+          {
+            kind: 'release-plan-receipt',
+            receipt_id: 'RPL-0000000000000000',
+            receipt_digest_sha256: PLAN,
+            path: 'receipts/plan.json',
+          },
+          {
+            kind: 'release-plan-receipt',
+            receipt_id: 'RPL-1111111111111111',
+            receipt_digest_sha256: PLAN,
+            path: 'receipts/other-plan.json',
+          },
+        ],
+      }),
+    ],
   ] satisfies ReadonlyArray<
     readonly [string, (value: ProtectedReleaseExportBinding) => Readonly<Record<string, unknown>>]
   >)('refuses a request with a mismatched protected %s binding', async (_label, mutate) => {
@@ -435,6 +453,32 @@ describe('release export broker protected adapters', () => {
         ),
       ).rejects.toThrow('release-export-capacity-unavailable');
       expect(calls).toBe(0);
+    } finally {
+      repository.dispose();
+    }
+  });
+
+  it('pins the request bytes across repeated export-capacity reads', async () => {
+    const repository = fixture();
+    const binding = exportBinding(repository);
+    const capacity = {
+      action_id: binding.action_id,
+      repository: binding.repository,
+      candidate: binding.candidate,
+      plan_receipt_digest_sha256: binding.plan_receipt_digest_sha256,
+    };
+    try {
+      await withExportBroker(repository, binding, binding.destination, async ({ requestPath }) => {
+        expect(readProtectedReleaseExportCapacity(capacity)).toEqual({
+          remaining_batches: 128,
+          remaining_targets: 8192,
+        });
+        const original = JSON.parse(readFileSync(requestPath, 'utf8')) as Record<string, unknown>;
+        writeFileSync(requestPath, `${JSON.stringify({ ...original, changed: true })}\n`);
+        expect(() => readProtectedReleaseExportCapacity(capacity)).toThrow(
+          'release-export-capacity-unavailable',
+        );
+      });
     } finally {
       repository.dispose();
     }
