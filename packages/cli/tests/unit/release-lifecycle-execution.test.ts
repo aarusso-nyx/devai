@@ -66,6 +66,7 @@ import {
   createVerifiedReleaseMutationCheck,
   type VerifiedReleaseOfflineContext,
   finalizeReleaseStateV2,
+  finalizeStoreHead,
   finalizeStoreRecord,
   offlineArtifactProjection,
   reduceStoreRecords,
@@ -4229,6 +4230,251 @@ describe('release lifecycle execution kernel', () => {
       resolve_plan_input: resolvePlanInput,
     });
     expect(ambiguous).toMatchObject({ next_action: null, next_outcome: 'ambiguous' });
+  });
+
+  it('binds the complete resume observation to exact candidate, store, locator, and head identities', async () => {
+    const value = request();
+    const store = new ReleaseLifecycleFileStore(root(), value);
+    const success = await seedPreflight(store);
+    const exactState = success.state;
+    const exactRecords = store.readStoreRecords();
+    const exactHead = required(store.readHead(), 'missing exact store head');
+    const repository = value.repository_locator;
+    const candidate = exactState.candidate;
+    const candidateLocator = value.candidate_locator;
+    const stateHead = {
+      state: exactState.state,
+      state_id: exactState.state_id,
+      record_digest_sha256: exactState.record_digest_sha256,
+    };
+    const identify = (draft: Readonly<Record<string, unknown>>) => {
+      const digest = canonicalSha256(draft);
+      return {
+        ...draft,
+        observation_id: `RLO-${digest.slice(0, 16)}`,
+        observation_digest_sha256: digest,
+      };
+    };
+    const observation = (input: {
+      readonly head: Readonly<Record<string, unknown>> | null;
+      readonly next_action: string | null;
+      readonly next_outcome: 'ready' | 'blocked';
+      readonly blocked_reason?: 'candidate-identity-mismatch' | 'stale-head';
+      readonly derived_states?: readonly Readonly<Record<string, unknown>>[];
+    }) =>
+      identify({
+        schemaVersion: '1.1.0',
+        observation_kind: 'release-lifecycle-observation',
+        repository,
+        candidate,
+        verification_kernel: {
+          kernel_id: 'devai.kernel.release-lifecycle-observation.v1',
+          policy_source: 'law/policy/release-lifecycle.json#/observation_kernel',
+          schema_validation_alone_derives_published: false,
+        },
+        head: input.head,
+        derived_states: input.derived_states ?? [],
+        published: { observed: false, receipt: null, verified_against: null },
+        next_action: input.next_action,
+        next_outcome: input.next_outcome,
+        ...(input.next_outcome === 'blocked'
+          ? {
+              blocked_reason: input.blocked_reason,
+              blocked_requirements: [],
+            }
+          : {}),
+        emitted_by: {
+          action_id: 'release resume',
+          effect: 'read',
+          output_channel: 'stdout',
+          persists_repository_state: false,
+          appends_state_record: false,
+          writes_receipt_file: false,
+        },
+        grants: {
+          authority: false,
+          publication_authority: false,
+          lifecycle_transition: false,
+          appends_published_state: false,
+        },
+        determinism: {
+          deterministic: true,
+          derived_from_bound_inputs_only: true,
+          contains_wall_clock_time: false,
+        },
+      });
+    const exactPlanState = {
+      state: 'planned',
+      receipt_kind: 'release-plan-receipt',
+      receipt_id: planReceipt()['receipt_id'],
+      receipt_digest_sha256: planReceipt()['receipt_digest_sha256'],
+      verified: true,
+    };
+    const base = {
+      states: [exactState],
+      store_records: exactRecords,
+      store_head: exactHead,
+      repository,
+      candidate,
+      candidate_locator: candidateLocator,
+      receipt_documents: [planReceipt()],
+      resolve_plan_input: resolvePlanInput,
+    };
+
+    await expect(resumeReleaseLifecycleExecution(base)).resolves.toEqual(
+      observation({
+        head: stateHead,
+        derived_states: [exactPlanState],
+        next_action: 'release certify',
+        next_outcome: 'ready',
+      }),
+    );
+
+    const refinalizeRecord = (
+      record: StoreRecord,
+      patch: Partial<Omit<StoreRecord, 'record_id' | 'record_digest_sha256'>>,
+    ) => {
+      const { record_id: _recordId, record_digest_sha256: _digest, ...draft } = record;
+      return finalizeStoreRecord({ ...draft, ...patch });
+    };
+    const terminal = required(exactRecords.at(-1), 'missing exact completion');
+    const storeDrifts: readonly [string, Partial<StoreRecord>][] = [
+      ['repository', { repository: { ...repository, id: 'aarusso-nyx/other' } }],
+      [
+        'candidate commit',
+        { candidate: { ...objectValue(terminal.candidate), commit: 'f'.repeat(40) } },
+      ],
+      [
+        'candidate tree',
+        { candidate: { ...objectValue(terminal.candidate), tree: 'f'.repeat(40) } },
+      ],
+    ];
+    for (const [label, patch] of storeDrifts) {
+      const changed = refinalizeRecord(terminal, patch);
+      await expect(
+        resumeReleaseLifecycleExecution({
+          ...base,
+          store_records: [...exactRecords.slice(0, -1), changed],
+        }),
+        label,
+      ).resolves.toEqual(
+        observation({
+          head: stateHead,
+          next_action: null,
+          next_outcome: 'blocked',
+          blocked_reason: 'candidate-identity-mismatch',
+        }),
+      );
+    }
+
+    const { state_id: _stateId, record_digest_sha256: _stateDigest, ...stateDraft } = exactState;
+    const stateDrifts = [
+      ['repository', { repository: { ...repository, id: 'aarusso-nyx/other' } }],
+      ['candidate', { candidate: { ...candidate, version: '1.5.1' } }],
+    ] as const;
+    for (const [label, patch] of stateDrifts) {
+      const changed = finalizeReleaseStateV2({ ...stateDraft, ...patch });
+      await expect(
+        resumeReleaseLifecycleExecution({
+          states: [changed],
+          repository,
+          candidate,
+          receipt_documents: [planReceipt()],
+          resolve_plan_input: resolvePlanInput,
+        }),
+        label,
+      ).resolves.toEqual(
+        observation({
+          head: {
+            state: changed.state,
+            state_id: changed.state_id,
+            record_digest_sha256: changed.record_digest_sha256,
+          },
+          next_action: null,
+          next_outcome: 'blocked',
+          blocked_reason: 'candidate-identity-mismatch',
+        }),
+      );
+    }
+
+    const locatorDrifts = [
+      ['commit', { ...candidateLocator, commit: 'f'.repeat(40) }],
+      ['tree', { ...candidateLocator, tree: 'f'.repeat(40) }],
+      [
+        'release unit',
+        {
+          ...candidateLocator,
+          release_units: [
+            {
+              ...required(candidateLocator.release_units[0], 'missing unit'),
+              release_unit: 'other',
+            },
+          ],
+        },
+      ],
+      [
+        'version',
+        {
+          ...candidateLocator,
+          release_units: [
+            { ...required(candidateLocator.release_units[0], 'missing unit'), version: '1.5.1' },
+          ],
+        },
+      ],
+    ] as const;
+    for (const [label, changed] of locatorDrifts) {
+      await expect(
+        resumeReleaseLifecycleExecution({
+          states: [],
+          repository,
+          candidate,
+          candidate_locator: changed,
+        }),
+        label,
+      ).resolves.toEqual(
+        observation({
+          head: null,
+          next_action: null,
+          next_outcome: 'blocked',
+          blocked_reason: 'candidate-identity-mismatch',
+        }),
+      );
+    }
+
+    const { head_digest_sha256: _headDigest, ...headDraft } = exactHead;
+    const differentHead = finalizeStoreHead({
+      ...headDraft,
+      generation: exactHead.generation + 1,
+    });
+    const headDrifts: readonly [string, Readonly<Record<string, unknown>>][] = [
+      ['null', { ...base, store_head: null }],
+      ['invalid', { ...base, store_head: { ...exactHead, head_digest_sha256: '0'.repeat(64) } }],
+      ['different', { ...base, store_head: differentHead }],
+    ];
+    for (const [label, changed] of headDrifts) {
+      await expect(
+        resumeReleaseLifecycleExecution(
+          changed as Parameters<typeof resumeReleaseLifecycleExecution>[0],
+        ),
+        label,
+      ).resolves.toEqual(
+        observation({
+          head: stateHead,
+          next_action: null,
+          next_outcome: 'blocked',
+          blocked_reason: 'stale-head',
+        }),
+      );
+    }
+    const { store_head: _storeHead, ...withoutHead } = base;
+    await expect(resumeReleaseLifecycleExecution(withoutHead)).resolves.toEqual(
+      observation({
+        head: stateHead,
+        next_action: null,
+        next_outcome: 'blocked',
+        blocked_reason: 'stale-head',
+      }),
+    );
   });
 
   it('derives each remaining next action from the exact verified lifecycle head', async () => {
