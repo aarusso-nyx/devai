@@ -4732,6 +4732,120 @@ describe('release lifecycle execution kernel', () => {
     expect(provider).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'event-ledger',
+    'event-sequence',
+    'entry-sequence',
+    'entry-event',
+    'entry-digest',
+    'entry-predecessor',
+    'entry-kind',
+    'entry-reference',
+    'event-predecessor',
+  ] as const)('recomputes every authorization ledger link: %s', async (defect) => {
+    const initial = request('release evidence-publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const receipt = boundOfflineReceipt(exported);
+    const value = request('release evidence-publish', receipt);
+    const valid = authorizationBridge();
+    const forged: AuthorizationBridge = {
+      ...valid,
+      resolve: async (binding) => {
+        const resolution = await valid.resolve(binding);
+        if (!resolution.ok) return resolution;
+        const first = objectValue(required(resolution.events[0], 'missing first grant'));
+        const { event_id: _eventId, payload_digest_sha256: _payload, ...draft } = first;
+        let second = finalizeAuthorizationEvent({
+          ...draft,
+          sequence: 2,
+          previous_event_digest_sha256: canonicalSha256(first),
+        });
+        let events = [first, second] as readonly Readonly<Record<string, unknown>>[];
+        let ledger: Readonly<Record<string, unknown>> = authorizationLedger(events);
+        const entries = ledger['entries'] as readonly Readonly<Record<string, unknown>>[];
+        const entry = required(entries[1], 'missing second ledger entry');
+
+        if (defect === 'event-ledger') {
+          const changedFirst = finalizeAuthorizationEvent({
+            ...draft,
+            ledger_id: 'EAL-release-other',
+          });
+          second = finalizeAuthorizationEvent({
+            ...draft,
+            sequence: 2,
+            previous_event_digest_sha256: canonicalSha256(changedFirst),
+          });
+          events = [changedFirst, second];
+          ledger = authorizationLedger(events);
+        } else if (defect === 'event-sequence') {
+          second = finalizeAuthorizationEvent({ ...draft, sequence: 3 });
+          events = [first, second];
+          const rebuilt = authorizationLedger(events);
+          const rebuiltEntries = rebuilt.entries as readonly Readonly<Record<string, unknown>>[];
+          ledger = {
+            ...rebuilt,
+            head: { ...objectValue(rebuilt.head), sequence: 2 },
+            entries: [rebuiltEntries[0], { ...rebuiltEntries[1], sequence: 2 }],
+          };
+        } else if (defect === 'event-predecessor') {
+          second = finalizeAuthorizationEvent({
+            ...draft,
+            sequence: 2,
+            previous_event_digest_sha256: '0'.repeat(64),
+          });
+          events = [first, second];
+          const rebuilt = authorizationLedger(events);
+          const rebuiltEntries = rebuilt.entries as readonly Readonly<Record<string, unknown>>[];
+          ledger = {
+            ...rebuilt,
+            entries: [
+              rebuiltEntries[0],
+              { ...rebuiltEntries[1], previous_event_digest_sha256: canonicalSha256(first) },
+            ],
+          };
+        } else {
+          const changedEntry = {
+            ...entry,
+            ...(defect === 'entry-sequence' ? { sequence: 3 } : {}),
+            ...(defect === 'entry-event' ? { event_id: 'EA-0000000000000000' } : {}),
+            ...(defect === 'entry-digest' ? { event_digest_sha256: '0'.repeat(64) } : {}),
+            ...(defect === 'entry-predecessor'
+              ? { previous_event_digest_sha256: '0'.repeat(64) }
+              : {}),
+            ...(defect === 'entry-kind' ? { kind: 'consumed' } : {}),
+            ...(defect === 'entry-reference' ? { references_event_id: 'EA-0000000000000000' } : {}),
+          };
+          ledger = { ...ledger, entries: [entries[0], changedEntry] };
+        }
+        return { ...resolution, ledger, events };
+      },
+    };
+    const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release evidence-publish',
+        authority: authorityFor('release evidence-publish'),
+        store,
+        resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+        artifactReader: artifactReaderFor('release export'),
+        authorization: forged,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'authorization',
+      code: 'release-authorization-attempt-binding-invalid',
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
   it('refuses hard-linked state records through the no-follow fstat boundary', async () => {
     const value = request('release preflight');
     const store = new ReleaseLifecycleFileStore(root(), value);
