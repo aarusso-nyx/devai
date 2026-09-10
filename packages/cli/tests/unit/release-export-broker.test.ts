@@ -156,6 +156,7 @@ async function withExportBroker<T>(
     readonly host: ReturnType<typeof broker>;
   }) => Promise<T>,
   requestOverrides: Readonly<Record<string, unknown>> = {},
+  capacityOverrides: Readonly<Record<string, unknown>> = {},
 ): Promise<T> {
   const host = broker(
     repository,
@@ -176,6 +177,7 @@ async function withExportBroker<T>(
                 repository: binding.repository,
                 candidate: binding.candidate,
                 plan_receipt_digest_sha256: binding.plan_receipt_digest_sha256,
+                ...capacityOverrides,
               },
               async () => await callback({ sink, signer, host }),
             ),
@@ -187,6 +189,59 @@ async function withExportBroker<T>(
 }
 
 describe('release export broker protected adapters', () => {
+  it.each([
+    ['action', () => ({ action_id: 'release prepare' })],
+    ['repository id', () => ({ repository: { id: 'other/repository' } })],
+    [
+      'repository commit',
+      (value: ProtectedReleaseExportBinding) => ({
+        repository: { ...value.repository, commit: DIGEST('9') },
+      }),
+    ],
+    [
+      'repository tree',
+      (value: ProtectedReleaseExportBinding) => ({
+        repository: { ...value.repository, tree: DIGEST('8') },
+      }),
+    ],
+    [
+      'candidate commit',
+      (value: ProtectedReleaseExportBinding) => ({
+        candidate: { ...value.candidate, commit: DIGEST('7') },
+      }),
+    ],
+    [
+      'candidate tree',
+      (value: ProtectedReleaseExportBinding) => ({
+        candidate: { ...value.candidate, tree: DIGEST('6') },
+      }),
+    ],
+    ['plan receipt', () => ({ plan_receipt_digest_sha256: DIGEST('5') })],
+  ] satisfies ReadonlyArray<
+    readonly [string, (value: ProtectedReleaseExportBinding) => Readonly<Record<string, unknown>>]
+  >)('refuses a mismatched protected capacity %s', async (_label, mutate) => {
+    const repository = fixture();
+    const binding = exportBinding(repository);
+    try {
+      await expect(
+        withExportBroker(
+          repository,
+          binding,
+          binding.destination,
+          async ({ sink }) =>
+            sink.invokeSink(
+              () => 'unexpected',
+              createProtectedReleaseSinkOwner('export', binding.sink_id),
+            ),
+          {},
+          mutate(binding),
+        ),
+      ).rejects.toThrow('release-export-capacity-unavailable');
+    } finally {
+      repository.dispose();
+    }
+  });
+
   it('accepts one exact plan receipt among unrelated receipt locators', async () => {
     const repository = fixture();
     const binding = exportBinding(repository);
