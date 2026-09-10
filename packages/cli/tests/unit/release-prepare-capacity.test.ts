@@ -127,6 +127,12 @@ describe('release prepare broker capacity', () => {
             }),
         ),
       );
+      const readPrepareCapacity = host.scope.read_prepare_capacity;
+      if (readPrepareCapacity === undefined) throw new Error('prepare capacity reader missing');
+      host.dispose();
+      await withProtectedReleaseRepositoryContext(repositoryContext, () => {
+        expect(() => readPrepareCapacity(binding)).toThrow('release-prepare-capacity-unavailable');
+      });
     } finally {
       host.dispose();
       rmSync(requestRoot, { recursive: true, force: true });
