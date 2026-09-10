@@ -4755,6 +4755,42 @@ describe('release lifecycle execution kernel', () => {
     expect(planned).toMatchObject({ next_action: 'release preflight', next_outcome: 'ready' });
   });
 
+  it('binds a resolved resume receipt to every locator identity field', async () => {
+    const receipt = planReceipt();
+    const exact = receiptLocator(receipt);
+    const common = {
+      states: [],
+      repository: { id: 'aarusso-nyx/devai', commit: COMMIT, tree: TREE },
+      candidate: {
+        release_unit: '@aarusso-nyx/devai',
+        version: '1.5.0',
+        commit: COMMIT,
+        tree: TREE,
+      },
+      resolve_receipt: () => receipt,
+      resolve_plan_input: resolvePlanInput,
+    } as const;
+
+    await expect(
+      resumeReleaseLifecycleExecution({ ...common, receipt_locators: [exact] }),
+    ).resolves.toMatchObject({ next_action: 'release preflight', next_outcome: 'ready' });
+
+    for (const locator of [
+      { ...exact, kind: 'release-offline-verification-receipt' as const },
+      { ...exact, receipt_id: `RPL-${'f'.repeat(16)}` },
+      { ...exact, receipt_digest_sha256: 'f'.repeat(64) },
+    ]) {
+      await expect(
+        resumeReleaseLifecycleExecution({ ...common, receipt_locators: [locator] }),
+      ).resolves.toMatchObject({
+        derived_states: [],
+        next_action: null,
+        next_outcome: 'blocked',
+        blocked_reason: 'receipt-identity-mismatch',
+      });
+    }
+  });
+
   it('offline-verifies exact v2 package and external trust closure without writing state', async () => {
     const value = request('release export');
     const store = new ReleaseLifecycleFileStore(root(), value);
