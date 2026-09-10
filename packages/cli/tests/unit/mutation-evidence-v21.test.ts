@@ -915,6 +915,93 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     expect(closed).toHaveBeenCalledOnce();
   });
 
+  it('loads the protected verifier independently of directory enumeration order', async () => {
+    const snapshot = activationSnapshot();
+    const contract = exactNotRequiredContract(canonicalSha256(snapshot.policy));
+    vi.resetModules();
+    vi.doMock('node:fs', async (importOriginal) => {
+      const actual = await importOriginal<FsModule>();
+      return {
+        ...actual,
+        readdirSync: ((...args: Parameters<FsModule['readdirSync']>) => {
+          const entries = actual.readdirSync(...args);
+          return Array.isArray(entries) ? [...entries].reverse() : entries;
+        }) as FsModule['readdirSync'],
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await expect(
+        isolated.finalizeMutationEvidenceV21({
+          contract,
+          candidate: CANDIDATE,
+          packages: [
+            { disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' },
+          ],
+        }),
+      ).resolves.toMatchObject({ complete: true, verdict: 'not-applicable' });
+    } finally {
+      vi.doUnmock('node:fs');
+      vi.resetModules();
+    }
+  });
+
+  it('refuses a changed source-only verifier test population before loading code', async () => {
+    const testRoot = join(VENDOR_ROOT, 'test');
+    await expectProtectedFileRefusal((actual) => ({
+      readdirSync: ((...args: Parameters<FsModule['readdirSync']>) => {
+        const entries = actual.readdirSync(...args);
+        if (String(args[0]) !== testRoot || !Array.isArray(entries)) return entries;
+        return entries.filter((entry) => entry.name !== 'verifier.test.js');
+      }) as FsModule['readdirSync'],
+    }));
+  });
+
+  it('rechecks source-only verifier test bytes after loading the protected graph', async () => {
+    const target = join(VENDOR_ROOT, 'test/verifier.test.js');
+    const descriptorPaths = new Map<number, string>();
+    let targetReads = 0;
+    await expectProtectedFileRefusal((actual) => ({
+      openSync: (path: Parameters<FsModule['openSync']>[0], flags: number) => {
+        const descriptor = actual.openSync(path, flags);
+        descriptorPaths.set(descriptor, String(path));
+        return descriptor;
+      },
+      readFileSync: (path: Parameters<FsModule['readFileSync']>[0]) => {
+        const bytes = actual.readFileSync(path);
+        if (typeof path !== 'number' || descriptorPaths.get(path) !== target) return bytes;
+        targetReads += 1;
+        return targetReads === 1 ? bytes : Buffer.concat([bytes, Buffer.from('\n')]);
+      },
+    }));
+    expect(targetReads).toBe(2);
+  });
+
+  it('refuses a verifier directory population change observed before code loading', async () => {
+    let rootReads = 0;
+    await expectProtectedFileRefusal((actual) => ({
+      readdirSync: ((...args: Parameters<FsModule['readdirSync']>) => {
+        const entries = actual.readdirSync(...args);
+        if (String(args[0]) !== VENDOR_ROOT || !Array.isArray(entries)) return entries;
+        rootReads += 1;
+        if (rootReads === 1) return entries;
+        const file = entries.find((entry) => entry.isFile());
+        if (file === undefined) throw new Error('verifier file fixture missing');
+        return [
+          ...entries,
+          new Proxy(file, {
+            get(target, property, receiver) {
+              return property === 'name'
+                ? 'unexpected-verifier-file.js'
+                : Reflect.get(target, property, receiver);
+            },
+          }),
+        ];
+      }) as FsModule['readdirSync'],
+    }));
+    expect(rootReads).toBe(2);
+  });
+
   it('keeps the verified loader namespace closed to unselected and ambient modules', async () => {
     type HookSet = {
       resolve: (
