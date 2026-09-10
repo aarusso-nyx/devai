@@ -560,6 +560,33 @@ describe('durable external release artifact store', () => {
     }
   });
 
+  it('refuses a committed manifest that imports a receipt from another transaction', async () => {
+    const value = await committedFixture();
+    const foreignTransaction = await invokePrepare(value.binding, () =>
+      value.store.begin(beginInput()),
+    );
+    const foreign = await invokePrepare(value.binding, () =>
+      foreignTransaction.put(
+        object('package-manifest', 'foreign-package-manifest', Buffer.from('foreign-manifest')),
+      ),
+    );
+    rewriteCommittedManifest(value, (manifest) => ({
+      ...manifest,
+      artifacts: (manifest['artifacts'] as ArtifactSinkObjectReceipt[])
+        .map((artifact) =>
+          artifact.opaque_handle === value.manifest.opaque_handle ? identity(foreign) : artifact,
+        )
+        .sort(compare),
+    }));
+    unlinkSync(receiptPath(value, value.manifest));
+    writeRecord(receiptPath(value, foreign), foreign);
+
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.sbom.opaque_handle }),
+    );
+    await invokePrepare(value.binding, () => foreignTransaction.abort());
+  });
+
   it('revalidates the committed marker and manifest envelope identities', async () => {
     const markerValue = await committedFixture();
     const markerPath = join(
@@ -606,6 +633,43 @@ describe('durable external release artifact store', () => {
         }),
       );
     }
+  });
+
+  it('refuses a commit marker that imports its committed manifest receipt from another transaction', async () => {
+    const value = await committedFixture();
+    const foreignTransaction = await invokePrepare(value.binding, () =>
+      value.store.begin(beginInput()),
+    );
+    const foreignManifestBytes = Buffer.from(
+      canonicalJson({
+        schemaVersion: '1.0.0',
+        kind: 'release-artifact-sink-commit-manifest',
+        sink_id: SINK_ID,
+        transaction_handle: value.transaction.transaction_handle,
+        ...beginInput(),
+        artifacts: value.artifacts,
+      }),
+      'utf8',
+    );
+    const foreign = await invokePrepare(value.binding, () =>
+      foreignTransaction.put(
+        object('committed-manifest', 'foreign-commit-manifest', foreignManifestBytes),
+      ),
+    );
+    const markerPath = join(transactionDirectory(value), 'commit.json');
+    writeRecord(markerPath, {
+      ...readRecord(markerPath),
+      committed_manifest_handle: foreign.opaque_handle,
+      committed_manifest_sha256: foreign.sha256,
+      committed_manifest_size_bytes: foreign.size_bytes,
+    });
+    unlinkSync(receiptPath(value, value.committedManifest));
+    writeRecord(receiptPath(value, foreign), foreign);
+
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+    await invokePrepare(value.binding, () => foreignTransaction.abort());
   });
 
   it('refuses duplicate manifest handles, logical names, and an empty artifact population', async () => {
