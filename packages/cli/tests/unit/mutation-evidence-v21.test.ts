@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
@@ -81,6 +82,30 @@ function packagedActivationFiles(options: { readonly tamperVendorBytes?: boolean
           : file.bytes,
     })),
   ];
+}
+
+function installedActivationFixture() {
+  const root = mkdtempSync(join(realpathSync(tmpdir()), 'devai-mutation-evidence-installed-'));
+  const snapshot = activationSnapshot();
+  const vendorRoot = join(root, 'dist/runtime/evidence-verification');
+  const policyRoot = join(root, 'dist/law/policy');
+  mkdirSync(vendorRoot, { recursive: true });
+  mkdirSync(policyRoot, { recursive: true });
+  writeFileSync(join(vendorRoot, 'provenance.json'), snapshot.manifestBytes);
+  for (const file of snapshot.files) {
+    const path = join(vendorRoot, file.path);
+    mkdirSync(resolve(path, '..'), { recursive: true });
+    writeFileSync(path, file.bytes);
+  }
+  writeFileSync(
+    join(policyRoot, 'mutation-evidence-v2.json'),
+    Buffer.from(canonicalJson(snapshot.policy)),
+  );
+  return {
+    root,
+    modulePath: join(root, 'dist/runtime/index/mutation-evidence-v21.js'),
+    policy: snapshot.policy,
+  };
 }
 
 function exactNotRequiredContract(policyDigest: string) {
@@ -1260,6 +1285,76 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     } finally {
       vi.doUnmock('node:fs');
       vi.resetModules();
+    }
+  });
+
+  it('loads the verifier only from the installed runtime layout derived from its module URL', async () => {
+    const fixture = installedActivationFixture();
+    const contract = exactNotRequiredContract(canonicalSha256(fixture.policy));
+    vi.resetModules();
+    vi.doMock('node:url', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:url')>();
+      return {
+        ...actual,
+        fileURLToPath: (url: string | URL) =>
+          String(url).includes('mutation-evidence-v21')
+            ? fixture.modulePath
+            : actual.fileURLToPath(url),
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await expect(
+        isolated.finalizeMutationEvidenceV21({
+          contract,
+          candidate: CANDIDATE,
+          packages: [
+            { disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' },
+          ],
+        }),
+      ).resolves.toMatchObject({ complete: true, verdict: 'not-applicable' });
+    } finally {
+      vi.doUnmock('node:url');
+      vi.resetModules();
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['wrong runtime parent', 'dist/not-runtime/index'],
+    ['wrong index directory', 'dist/runtime/services'],
+  ])('refuses an installed verifier module under the %s', async (_label, directory) => {
+    const fixture = installedActivationFixture();
+    const contract = exactNotRequiredContract(canonicalSha256(fixture.policy));
+    const modulePath = join(fixture.root, directory, 'mutation-evidence-v21.js');
+    vi.resetModules();
+    vi.doMock('node:url', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:url')>();
+      return {
+        ...actual,
+        fileURLToPath: (url: string | URL) =>
+          String(url).includes('mutation-evidence-v21') ? modulePath : actual.fileURLToPath(url),
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await expect(
+        isolated.finalizeMutationEvidenceV21({
+          contract,
+          candidate: CANDIDATE,
+          packages: [
+            { disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        name: 'MutationActivationError',
+        message: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+        code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      });
+    } finally {
+      vi.doUnmock('node:url');
+      vi.resetModules();
+      rmSync(fixture.root, { recursive: true, force: true });
     }
   });
 
