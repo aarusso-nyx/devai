@@ -3,6 +3,7 @@ import { canonicalSha256 } from '@devai-nyx/utils';
 import { describe, expect, it } from 'vitest';
 import { encodeContainerDependencyArchive } from '../../src/services/container-archive.js';
 import type { ProtectedContainerDependency } from '../../src/services/release-certification-container.js';
+import { buildResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
 import {
   assertReleaseMutationInputPackageIdentity,
   assertReleaseMutationInputProjectionV21,
@@ -73,6 +74,43 @@ describe('protected release mutation input derivation', () => {
     expect(
       value.plan.packages.find((entry) => entry.id === 'authority')?.workspace_dependencies,
     ).toEqual(['@devai-nyx/schemas', '@devai-nyx/utils']);
+  });
+
+  it('preserves roster refusal identity for verified blocked receipts and duplicate roster ids', () => {
+    const base = currentFixture();
+    const current = build(base);
+    const receiptInput = current.receipt.inputs[0]?.inline_document;
+    if (receiptInput === null || typeof receiptInput !== 'object' || Array.isArray(receiptInput))
+      throw new Error('fixture receipt intent missing');
+    const blockedReceipt = buildResolvedReleasePlanReceipt({
+      resolution: current.resolution,
+      intent: { ...receiptInput, current_version: '1.5.0' },
+    });
+    expect(blockedReceipt.verdict).toBe('block');
+    expectRefusal(
+      () =>
+        buildReleaseMutationInputPlanV21({
+          candidate: current.snapshot,
+          resolution: current.resolution,
+          plan_receipt: blockedReceipt,
+          controls: current.controls,
+        }),
+      'MUTATION_ROSTER_MISMATCH',
+    );
+
+    const roster = currentRoster();
+    const original = roster.find((entry) => entry['id'] === 'utils');
+    if (original === undefined) throw new Error('fixture roster entry missing');
+    const duplicate = {
+      ...original,
+      package: '@fixture/duplicate',
+      task_node: 'test:duplicate',
+      manifest_path: 'packages/duplicate/package.json',
+    };
+    expectRefusal(
+      () => build(currentFixture({ mutation_roster: [...roster, duplicate] })),
+      'MUTATION_ROSTER_MISMATCH',
+    );
   });
 
   it('retains genuine package identity, candidate population, proof bytes, and projection custody', () => {
