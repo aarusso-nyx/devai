@@ -4150,6 +4150,85 @@ describe('release lifecycle execution kernel', () => {
     ).toBe('npm:@aarusso-nyx/devai@1.5.0');
   });
 
+  it.each([
+    'missing-controls',
+    'destination-system',
+    'destination-operation',
+    'workflow-repository',
+    'absolute-workflow-path',
+    'parent-workflow-path',
+    'backslash-workflow-path',
+    'nul-workflow-path',
+    'empty-workflow-path',
+    'workflow-sha',
+    'workflow-sha-prefix',
+    'workflow-sha-suffix',
+    'protected-environment',
+    'unprotected-workflow',
+    'trust',
+  ] as const)('rejects malformed protected publication controls: %s', async (defect) => {
+    const initial = request('release publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToEvidencePublished(store);
+    const exact = publicationControls();
+    const workflowPath =
+      defect === 'absolute-workflow-path'
+        ? '/release.yml'
+        : defect === 'parent-workflow-path'
+          ? '.github/../release.yml'
+          : defect === 'backslash-workflow-path'
+            ? '.github\\release.yml'
+            : defect === 'nul-workflow-path'
+              ? '.github/\0release.yml'
+              : defect === 'empty-workflow-path'
+                ? ''
+                : exact.workflow.workflow_path;
+    const controls =
+      defect === 'missing-controls'
+        ? undefined
+        : ({
+            ...exact,
+            destination: {
+              ...exact.destination,
+              ...(defect === 'destination-system' ? { system_id: 'evidence-destination' } : {}),
+              ...(defect === 'destination-operation' ? { operation: 'create' } : {}),
+            },
+            workflow: {
+              ...exact.workflow,
+              workflow_path: workflowPath,
+              ...(defect === 'workflow-repository' ? { repository: 'aarusso-nyx/other' } : {}),
+              ...(defect === 'workflow-sha' ? { workflow_sha: 'not-a-commit' } : {}),
+              ...(defect === 'workflow-sha-prefix' ? { workflow_sha: `z${'f'.repeat(40)}` } : {}),
+              ...(defect === 'workflow-sha-suffix' ? { workflow_sha: `${'f'.repeat(40)}z` } : {}),
+              ...(defect === 'protected-environment' ? { protected_environment: '' } : {}),
+              ...(defect === 'unprotected-workflow' ? { protected: false } : {}),
+            },
+            ...(defect === 'trust'
+              ? { trust: { ...exact.trust, trust_store_digest_sha256: 'f'.repeat(64) } }
+              : {}),
+          } as PublicationControls);
+    const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const result = await executeReleaseLifecycleAction({
+      request: request('release publish'),
+      action: 'release publish',
+      authority: authorityFor('release publish'),
+      publication_controls: controls,
+      store,
+      resolveReceipt: () => planReceipt(),
+      resolvePlanInput,
+      artifactReader: artifactReaderFor('release evidence-publish'),
+      authorization: authorizationBridge(),
+      provider,
+      recorded_at: '2026-09-03T00:00:00.000Z',
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'validation',
+      code: 'rpd-workflow-expectation-invalid',
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
   it('observes publication only from an exact signed receipt for the dispatched state', async () => {
     await withAuthorityHostTestScope(async () => {
       const value = request('release publish');
