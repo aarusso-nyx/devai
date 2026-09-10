@@ -90,6 +90,44 @@ describe('sense invocation authority boundaries', () => {
     });
   });
 
+  it('projects a multi-sensor preset with one canonical entry per capability', () => {
+    const resolved = resolveSenseInvocation(senseRun, argv('--preset', 'baseline'));
+    const capabilities = resolved?.entry.authority_contract.capabilities ?? [];
+    expect(capabilities.length).toBeGreaterThan(0);
+    expect(capabilities).toEqual([...new Set(capabilities)]);
+  });
+
+  it('deduplicates repeated selected capabilities before authority projection', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/commands/sense/facade.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/sense/facade.js')>();
+      return {
+        ...actual,
+        resolveSenseSelection: (
+          ...args: Parameters<typeof actual.resolveSenseSelection>
+        ): ReturnType<typeof actual.resolveSenseSelection> => {
+          const selection = actual.resolveSenseSelection(...args);
+          const member = selection.members[0];
+          if (member === undefined) throw new Error('sense selection member missing');
+          return {
+            ...selection,
+            aggregate_effect: 'local-write',
+            members: [{ ...member, capabilities: ['fs:workspace', 'fs:workspace'] }],
+          };
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      const resolved = isolated.resolveSenseInvocation(senseRun, argv('decision_record_integrity'));
+      expect(resolved?.entry.effects).toBe('local-write');
+      expect(resolved?.entry.authority_contract.capabilities).toEqual(['fs:workspace']);
+    } finally {
+      vi.doUnmock('../../src/commands/sense/facade.js');
+      vi.resetModules();
+    }
+  });
+
   it('rejects an unknown selected capability before projecting an authority contract', async () => {
     vi.resetModules();
     vi.doMock('../../src/commands/sense/facade.js', async (importOriginal) => {
