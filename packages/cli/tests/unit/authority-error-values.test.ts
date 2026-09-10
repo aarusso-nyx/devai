@@ -165,6 +165,7 @@ describe('authority error values', () => {
       ),
     ).toEqual({ source: 'json' });
     expect(authorityErrorContext(new Error('AUTHORITY_DENIED'))).toBeUndefined();
+    expect(authorityErrorContext(new Error('{}'))).toBeUndefined();
     expect(authorityErrorContext(new Error('AUTHORITY_DENIED:not-json'))).toBeUndefined();
     expect(authorityErrorContext(new Error('AUTHORITY_DENIED:[1]'))).toBeUndefined();
     expect(authorityErrorContext('AUTHORITY_DENIED:{"source":"string"}')).toBeUndefined();
