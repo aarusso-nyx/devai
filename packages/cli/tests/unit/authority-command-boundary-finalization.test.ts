@@ -14,6 +14,7 @@ async function governedCommand(
   action: () => unknown,
   options: Readonly<{
     dryRun?: boolean;
+    disposeFailure?: boolean;
     scopeAction?: string;
     scopeEffect?: 'read' | 'harness-write' | 'local-write' | 'remote-write';
   }> = {},
@@ -49,16 +50,19 @@ async function governedCommand(
           dispose: () => {
             events.push('dispose');
             issuer.dispose();
+            if (options.disposeFailure === true) throw new Error('authority disposal failure');
           },
         };
       },
     };
   });
-  const [{ attachAuthorityCommandBoundaries, authorizeCliArgv }, { canonicalRegistry }] =
-    await Promise.all([
-      import('../../src/authority/index.js'),
-      import('../../src/define-command.js'),
-    ]);
+  const [
+    { attachAuthorityCommandBoundaries, authorizeCliArgv, disposeCliInvocationAuthority },
+    { canonicalRegistry },
+  ] = await Promise.all([
+    import('../../src/authority/index.js'),
+    import('../../src/define-command.js'),
+  ]);
   const actionName = options.dryRun === true ? 'sense run' : 'round plan';
   const canonical = canonicalRegistry();
   const selected = canonical.find((candidate) => candidate.name === actionName);
@@ -103,7 +107,11 @@ async function governedCommand(
           '--write',
         ];
   expect(authorizeCliArgv(process.argv, entries)).toBeUndefined();
-  return { invoke: () => command.commandAction?.(), events };
+  return {
+    disposeInvocation: disposeCliInvocationAuthority,
+    invoke: () => command.commandAction?.(),
+    events,
+  };
 }
 
 describe('public authority command finalization', () => {
@@ -162,6 +170,14 @@ describe('public authority command finalization', () => {
 
     expect(governed.invoke).toThrow('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
     expect(handler).not.toHaveBeenCalled();
+    expect(governed.events).toEqual(['dispose']);
+  });
+
+  it('propagates and remembers a broker disposal failure after clearing the invocation', async () => {
+    const governed = await governedCommand(() => 'must-not-run', { disposeFailure: true });
+
+    expect(governed.disposeInvocation).toThrow('authority disposal failure');
+    expect(governed.disposeInvocation).toThrow('AUTHORITY_INVOCATION_DISPOSAL_FAILED');
     expect(governed.events).toEqual(['dispose']);
   });
 });
