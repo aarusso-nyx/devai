@@ -6,7 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
+import {
+  authorizeCliArgv,
+  declaredInvocationAuthority,
+  disposeCliInvocationAuthority,
+} from '../../src/authority/index.js';
 import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
@@ -61,6 +65,55 @@ describe('canonical production authority refusal acceptance', () => {
       authorizeCliArgv([process.execPath, 'devai', 'round', 'plan', help], current),
     ).toBeUndefined();
     expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
+  it('routes reconciliation only for round tracking sync', () => {
+    const reconcile = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'tracking', 'sync', '--reconcile', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(reconcile?.stderr ?? '{}')).toMatchObject({
+      code: 'TRACKING_ROUND_REQUIRED',
+    });
+
+    const ordinaryRound = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'plan', '--reconcile', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(ordinaryRound?.stderr ?? '{}')).toMatchObject({
+      code: 'AUTHORITY_DECLARATION_MISSING',
+    });
+  });
+
+  it('keeps check task planning read-only before an adopter policy is bound', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-task-plan-'));
+    mkdirSync(join(root, '.devai/pin'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/pin/constitution.md'),
+      readFileSync(join(process.cwd(), '.devai/pin/constitution.md')),
+    );
+    try {
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'check',
+            '--task-plan',
+            'test-tasks.json',
+            '--repo-root',
+            root,
+            '--format',
+            'json',
+          ],
+          current,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toBeUndefined();
+    } finally {
+      disposeCliInvocationAuthority();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('routes post-merge receipts only through round close', () => {
