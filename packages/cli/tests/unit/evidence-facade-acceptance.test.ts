@@ -1165,3 +1165,122 @@ describe('evidence render and verify acceptance', () => {
     expect(local.stdout).not.toBe('');
   });
 });
+
+describe('evidence record public decision table', () => {
+  it('returns exact diagnostics for every rejected input shape before service execution', async () => {
+    const repo = root();
+    put(repo, 'array.json', '[]\n');
+    const cases = [
+      {
+        argv: ['--kind', 'generic', '--payload', '{}', '--input', 'array.json'],
+        diagnostic: '--payload and --input are mutually exclusive',
+      },
+      {
+        argv: ['--kind', 'generic'],
+        diagnostic: '--payload <json> or --input <path> is required for --kind generic',
+      },
+      {
+        argv: ['--kind', 'generic', '--payload', 'null'],
+        diagnostic: '--payload: expected a JSON object',
+      },
+      {
+        argv: ['--kind', 'generic', '--payload', '7'],
+        diagnostic: '--payload: expected a JSON object',
+      },
+      {
+        argv: ['--kind', 'generic', '--input', 'array.json'],
+        diagnostic: '--input: expected a JSON object',
+      },
+      {
+        argv: ['--kind', 'test', '--tier', 'unknown'],
+        diagnostic:
+          '--tier must be one of: unit, api, db, e2e, mutation, perf, lint, typecheck, coverage',
+      },
+      {
+        argv: ['--kind', 'test', '--tier', 'unit'],
+        diagnostic: '--cmd is required for --kind test',
+      },
+      {
+        argv: ['--kind', 'mutation'],
+        diagnostic: '--run is required for --kind mutation',
+      },
+      {
+        argv: ['--kind', 'mutation', '--run'],
+        diagnostic: '--scenarios is required for --kind mutation --run',
+      },
+    ] as const;
+
+    for (const { argv, diagnostic } of cases) {
+      const result = await invoke(evidenceRecord, [
+        'evidence-record',
+        ...argv,
+        '--round',
+        'R-1700',
+        '--repo-root',
+        repo,
+      ]);
+      expect(result, argv.join(' ')).toEqual({
+        exit: 2,
+        stdout: '',
+        stderr: `devai evidence record: ${diagnostic}\n`,
+      });
+    }
+  });
+
+  it('preserves exact inline and file objects in public generic receipts', async () => {
+    const repo = root();
+    put(repo, 'payload.json', '{"source":"file","nested":{"enabled":false}}\n');
+    const cases = [
+      {
+        argv: ['--payload', '{"source":"inline","nested":{"enabled":true}}'],
+        expected: { source: 'inline', nested: { enabled: true } },
+      },
+      {
+        argv: ['--input', 'payload.json'],
+        expected: { source: 'file', nested: { enabled: false } },
+      },
+    ] as const;
+
+    for (const { argv, expected } of cases) {
+      const result = await invoke(evidenceRecord, [
+        'evidence-record',
+        '--kind',
+        'generic',
+        '--round',
+        'R-1701',
+        '--repo-root',
+        repo,
+        ...argv,
+      ]);
+      expect(result.exit).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        kind: 'generic',
+        round_id: 'R-1701',
+        result: expected,
+        proof: { kind: 'generic', payload: expected },
+      });
+    }
+  });
+
+  it('reports successful service recording through the exact human receipt', async () => {
+    const repo = root();
+    const result = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'coverage',
+      '--round',
+      'R-1702',
+      '--repo-root',
+      repo,
+      '--in',
+      'missing-coverage',
+      '--human',
+    ]);
+    expect(result).toEqual({
+      exit: 0,
+      stdout: 'evidence record: coverage sequence 1\n',
+      stderr: '',
+    });
+  });
+});
