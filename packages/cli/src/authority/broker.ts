@@ -553,6 +553,8 @@ function readOnlyProcess(
   return allowed?.includes(String(args[0])) === true;
 }
 
+export { readOnlyProcess };
+
 function safeLogical(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback;
   const normalized = value.replaceAll(/[^A-Za-z0-9._-]/gu, '-').replaceAll(/-+/gu, '-');
