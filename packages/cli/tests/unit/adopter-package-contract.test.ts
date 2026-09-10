@@ -460,6 +460,69 @@ describe('adopter-safe check and binding contracts', () => {
     });
   }, 30_000);
 
+  it('materializes the exact host enforcement selected by supported declarations', async () => {
+    const repo = root('devai-adopter-host-enforcement-');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/example/host-enforcement.git'],
+      { cwd: repo },
+    );
+    execFileSync('git', ['config', 'user.name', 'Host Enforcement Fixture'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: repo });
+    await establishTier3Binding(repo);
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'bind fixture'], { cwd: repo });
+    const policyPath = join(repo, '.devai/config/authority-policy.json');
+    const hostEnforcement = () =>
+      (
+        JSON.parse(readFileSync(policyPath, 'utf8')) as {
+          host_enforcement: unknown;
+        }
+      ).host_enforcement;
+
+    expect(hostEnforcement()).toEqual({ mode: 'cli-only' });
+
+    await expectCliPass([
+      'init',
+      'bind',
+      '--host-adapter',
+      'github-actions',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    expect(hostEnforcement()).toEqual({
+      mode: 'host-integrated',
+      adapter: {
+        adapter_id: 'github-actions-main-observation',
+        adapter_version: '1.5.0',
+      },
+    });
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'bind github actions adapter'], { cwd: repo });
+
+    const projectPath = join(repo, '.devai/config/project.json');
+    const project = JSON.parse(readFileSync(projectPath, 'utf8')) as Record<string, unknown>;
+    put(repo, '.devai/config/project.json', {
+      ...project,
+      authority_enforcement: {
+        mode: 'host-integrated',
+        adapter_config: '.devai/config/post-merge-host-adapter.json',
+      },
+    });
+    await expectCliPass(['init', 'bind', '--target', repo, '--as-role', 'architect', '--write']);
+    expect(hostEnforcement()).toEqual({
+      mode: 'host-integrated',
+      adapter: {
+        adapter_id: 'post-merge-host-adapter',
+        adapter_version: '1.5.0',
+      },
+    });
+  }, 30_000);
+
   it('executes the declared tier3 plan and role-separated apply sequence after binding', async () => {
     const repo = root('devai-tier3-role-sequence-');
     execFileSync('git', ['init', '-q'], { cwd: repo });
