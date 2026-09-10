@@ -139,4 +139,13 @@ describe('public authority command finalization', () => {
     await expect(governed.invoke()).rejects.toThrow('authority handler failure');
     expect(governed.events).toEqual(['dispose']);
   });
+
+  it('disposes a synchronous handler boundary before propagating its failure', async () => {
+    const governed = await governedCommand(() => {
+      throw new Error('authority handler failure');
+    });
+
+    expect(governed.invoke).toThrow('authority handler failure');
+    expect(governed.events).toEqual(['dispose']);
+  });
 });
