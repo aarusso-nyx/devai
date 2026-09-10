@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { describe, expect, it } from 'vitest';
+import { encodeContainerDependencyArchive } from '../../src/services/container-archive.js';
+import type { ProtectedContainerDependency } from '../../src/services/release-certification-container.js';
 import {
   assertReleaseMutationInputPackageIdentity,
   assertReleaseMutationInputProjectionV21,
@@ -333,6 +335,85 @@ describe('protected release mutation input derivation', () => {
         },
       }),
     ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+  });
+
+  it('accepts only exact bounded protected dependency archives', () => {
+    const base = currentFixture();
+    const current = build(base);
+    const archive = encodeContainerDependencyArchive([
+      {
+        path: '@fixture/dependency/index.js',
+        mode: '100644',
+        bytes: Buffer.from('module.exports = true;\n'),
+      },
+    ]);
+    const digest = (value: Uint8Array) => createHash('sha256').update(value).digest('hex');
+    const manifestPaths = [...base.files.keys()]
+      .filter((path) => /^packages\/[^/]+\/package\.json$/u.test(path))
+      .sort();
+    const inputPaths = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', ...manifestPaths];
+    const dependency: ProtectedContainerDependency = {
+      mount_path: 'node_modules',
+      archive,
+      sha256: digest(archive),
+      inputs: {
+        files: inputPaths.map((path) => {
+          const bytes = base.files.get(path);
+          if (bytes === undefined) throw new Error(`fixture dependency input missing: ${path}`);
+          return { path, sha256: digest(bytes) };
+        }),
+        workspace_packages: manifestPaths.map((path) => {
+          const bytes = base.files.get(path);
+          if (bytes === undefined) throw new Error(`fixture package manifest missing: ${path}`);
+          const manifest = JSON.parse(Buffer.from(bytes).toString('utf8')) as { name: string };
+          return {
+            path: path.slice(0, -'/package.json'.length),
+            name: manifest.name,
+            manifest_sha256: digest(bytes),
+          };
+        }),
+      },
+    };
+    const derive = (entry: ProtectedContainerDependency, maximumArchiveBytes = archive.length) =>
+      buildReleaseMutationInputPlanV21({
+        candidate: current.snapshot,
+        resolution: current.resolution,
+        plan_receipt: current.receipt,
+        controls: {
+          ...current.controls,
+          dependencies: [entry],
+          container: {
+            ...current.controls.container,
+            maximum_archive_bytes: maximumArchiveBytes,
+          },
+        },
+      });
+
+    expect(
+      captureReleaseMutationInputExecutionContext(derive(dependency)).container_identity,
+    ).toMatchObject({
+      dependencies: [{ mount_path: dependency.mount_path, sha256: dependency.sha256 }],
+    });
+
+    const foreignPrototype = Buffer.from(archive);
+    Object.setPrototypeOf(foreignPrototype, Object.create(Buffer.prototype));
+    for (const [label, entry, maximumArchiveBytes] of [
+      [
+        'a non-Buffer archive',
+        { ...dependency, archive: new Uint8Array(archive) as unknown as Buffer },
+        archive.length,
+      ],
+      [
+        'a Buffer with a foreign prototype',
+        { ...dependency, archive: foreignPrototype },
+        archive.length,
+      ],
+      ['an oversized archive', dependency, archive.length - 1],
+    ] as const) {
+      expect(() => derive(entry, maximumArchiveBytes), label).toThrow(
+        'MUTATION_INPUT_IDENTITY_MISSING',
+      );
+    }
   });
 
   it('keeps input identity stable across commit-only changes but makes empty or dynamic configuration ineligible', () => {
