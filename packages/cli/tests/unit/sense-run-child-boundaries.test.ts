@@ -13,6 +13,13 @@ const readAction = {
   path: ['sense', 'test'],
   effects: 'read',
 } satisfies RegistryEntry;
+const genericReadAction = {
+  ...readAction,
+  name: 'catalog actions',
+  handler: 'catalog actions',
+  internal_name: 'catalog-actions',
+  path: ['catalog', 'actions'],
+} satisfies RegistryEntry;
 const cliPath = '/tmp/devai-cli.js';
 
 function childArgs(...args: readonly string[]): readonly string[] {
@@ -153,6 +160,27 @@ describe('readOnlyDevaiChild authority boundary', () => {
     }
   });
 
+  it('requires the exact two-part repository tail for other read actions', () => {
+    const previous = process.argv;
+    process.argv = [...previous];
+    process.argv[1] = cliPath;
+    try {
+      const invoke = (...tail: readonly string[]) =>
+        readOnlyDevaiChild(
+          '/usr/local/bin/node',
+          childArgs('catalog', 'actions', ...tail),
+          [genericReadAction],
+          'sense run',
+        );
+      expect(invoke('--repo-root', '/tmp/repo')).toBe(true);
+      expect(invoke('--repo-root')).toBe(false);
+      expect(invoke('--repo-root', '/tmp/repo', '--extra')).toBe(false);
+      expect(invoke('--workspace', '/tmp/repo')).toBe(false);
+    } finally {
+      process.argv = previous;
+    }
+  });
+
   it('requires a matching read action and rejects write-effect or prefix-confusable entries', () => {
     const previous = process.argv;
     process.argv = [...previous];
@@ -197,6 +225,21 @@ describe('readOnlyDevaiChild authority boundary', () => {
           'sense run',
         ),
       ).toBe(true);
+      const exactShadow = {
+        ...readAction,
+        name: 'shadow exact child argv',
+        handler: 'shadow exact child argv',
+        internal_name: 'shadow-exact-child-argv',
+        path: ['sense', 'test', 'unit', '--repo-root', '/tmp/repo'],
+      } satisfies RegistryEntry;
+      expect(
+        readOnlyDevaiChild(
+          '/usr/local/bin/node',
+          childArgs('sense', 'test', 'unit', '--repo-root', '/tmp/repo'),
+          [readAction, exactShadow],
+          'sense run',
+        ),
+      ).toBe(false);
     } finally {
       process.argv = previous;
     }
