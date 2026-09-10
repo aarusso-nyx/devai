@@ -12,6 +12,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import * as authority from '@devai-nyx/authority';
 import {
   createAuthorityDecisionIssuer,
   runWithAuthorityHostEffects,
@@ -4178,6 +4179,34 @@ describe('release lifecycle execution kernel', () => {
       ok: false,
       code: 'release-state-store-concurrent-writer',
     });
+  });
+
+  it('accepts a concurrent private-directory creation race and propagates other mkdir failures', async () => {
+    const originalMkdirSync = authority.mkdirSync;
+    const initializeWith = async (failure: Error & { code: string }, createDirectory: boolean) => {
+      const store = new ReleaseLifecycleFileStore(root(), request('release preflight'));
+      let injected = false;
+      const mkdir = vi.spyOn(authority, 'mkdirSync').mockImplementation((path, options) => {
+        if (!injected && path === store.campaignDirectory) {
+          injected = true;
+          if (createDirectory) originalMkdirSync(path, options);
+          throw failure;
+        }
+        return originalMkdirSync(path, options);
+      });
+      try {
+        await withAuthorityHostTestScope(() => store.initialize());
+        return injected;
+      } finally {
+        mkdir.mockRestore();
+      }
+    };
+
+    const raced = Object.assign(new Error('mkdir-EEXIST'), { code: 'EEXIST' });
+    await expect(initializeWith(raced, true)).resolves.toBe(true);
+
+    const denied = Object.assign(new Error('mkdir-EACCES'), { code: 'EACCES' });
+    await expect(initializeWith(denied, false)).rejects.toBe(denied);
   });
 
   it('rejects independently valid store records that break append-log and attempt bindings', async () => {
