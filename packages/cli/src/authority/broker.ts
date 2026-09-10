@@ -399,6 +399,15 @@ function canonicalRelativePath(root: string, value: unknown): string {
   return result;
 }
 
+export {
+  canonicalRelativePath,
+  existingRealpath,
+  gitMetadataLayout,
+  gitMetadataLogicalPath,
+  physicalCanonicalPath,
+  within,
+};
+
 function pathOperation(symbol: string, targetPath: string): 'create' | 'update' | 'delete' {
   if (['rmSync', 'unlinkSync'].includes(symbol)) return 'delete';
   if (['mkdirSync', 'mkdtempSync', 'symlinkSync'].includes(symbol)) return 'create';
