@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ProtectedCertificationContainer } from '../../src/services/release-certification-container.js';
 import {
   captureProtectedMutationPrerequisites,
   createContainerReleaseCertificationAdapters,
@@ -31,6 +32,7 @@ vi.mock('../../src/services/check-runner/runner.js', async (importOriginal) => (
 }));
 
 afterEach(() => {
+  vi.restoreAllMocks();
   cleanupFixtures();
   runner.mockClear();
 });
@@ -41,6 +43,37 @@ function asOptions(value: unknown): ContainerReleaseCertificationOptions {
 
 function asRequest(value: unknown): ReleaseLifecycleRequest {
   return value as ReleaseLifecycleRequest;
+}
+
+function providerWithOutputContract(outputContract: Readonly<Record<string, unknown>>) {
+  const value = providerFixture();
+  Reflect.set(value.value.task, 'outputContract', outputContract);
+  const { toolchain_fixture: _fixture, ...options } = value.options;
+  const declaredOutputs: string[][] = [];
+  vi.spyOn(ProtectedCertificationContainer.prototype, 'runBound').mockImplementation(
+    <T>(_binding: unknown, operation: () => T): T => operation(),
+  );
+  vi.spyOn(ProtectedCertificationContainer.prototype, 'verifyRuntime').mockImplementation(
+    () => undefined,
+  );
+  const execute = vi
+    .spyOn(ProtectedCertificationContainer.prototype, 'execute')
+    .mockImplementation((input) => {
+      declaredOutputs.push([...input.declared_outputs]);
+      return {
+        result: { status: 0, signal: null, stdout: '', stderr: '' },
+        outputs: [],
+      };
+    });
+  return {
+    adapters: createContainerReleaseCertificationAdapters({
+      ...options,
+      diagnostic_outputs: [],
+    }),
+    declaredOutputs,
+    execute,
+    request: value.request,
+  };
 }
 
 describe('protected certification provider boundaries', () => {
@@ -218,5 +251,70 @@ describe('protected certification provider boundaries', () => {
     expect(first[0]?.release_unit).toBe('@devai-toolchain/diagnostic');
     Reflect.set(first[0]?.document ?? {}, 'tampered', true);
     expect(adapters.read_task_policies(request)[0]?.document).not.toHaveProperty('tampered');
+  });
+});
+
+describe('protected certification provider output closure', () => {
+  it.each([
+    [
+      'non-canonical path population',
+      {
+        kind: 'test',
+        requiredResult: 'pass',
+        paths: [
+          'packages/fixture/reports/mutation/raw.json',
+          'packages/fixture/reports//mutation.json',
+        ],
+      },
+    ],
+    [
+      'non-execution-only declaration',
+      {
+        kind: 'test',
+        requiredResult: 'pass',
+        paths: ['packages/fixture/reports/mutation/raw.json'],
+        execution_only_paths: false,
+      },
+    ],
+  ] as const)('returns the exact failure identity for a %s', async (_name, outputContract) => {
+    const value = providerWithOutputContract(outputContract);
+
+    await expect(value.adapters.preflight_provider(value.request)).resolves.toEqual({
+      outcome: 'failure',
+      code: 'release-certification-output-closure-invalid',
+    });
+    expect(value.execute).not.toHaveBeenCalled();
+  });
+
+  it('accepts an exact execution-only output declaration', async () => {
+    const value = providerWithOutputContract({
+      kind: 'test',
+      requiredResult: 'pass',
+      paths: ['packages/fixture/reports/mutation/raw.json'],
+      execution_only_paths: true,
+    });
+
+    await expect(value.adapters.preflight_provider(value.request)).resolves.toMatchObject({
+      outcome: 'success',
+    });
+    expect(value.declaredOutputs).toEqual([['packages/fixture/reports/mutation/raw.json']]);
+  });
+
+  it.each([
+    [
+      'tracked-files contract',
+      {
+        kind: 'tracked-files',
+        paths: ['packages/fixture/src/subject.ts'],
+      },
+    ],
+    ['contract without paths', { kind: 'none' }],
+  ] as const)('does not declare outputs for a %s', async (_name, outputContract) => {
+    const value = providerWithOutputContract(outputContract);
+
+    await expect(value.adapters.preflight_provider(value.request)).resolves.toMatchObject({
+      outcome: 'success',
+    });
+    expect(value.declaredOutputs).toEqual([[]]);
   });
 });
