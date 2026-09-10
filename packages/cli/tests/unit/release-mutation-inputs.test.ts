@@ -385,7 +385,11 @@ describe('protected release mutation input derivation', () => {
       if (typeof memberCount !== 'number') throw new Error('fixture binding count missing');
       return memberCount;
     };
-    const initial = count(build(base));
+    const initialBuild = build(base);
+    const initial = count(initialBuild);
+    expect(
+      initialBuild.plan.packages.find((entry) => entry.id === 'utils')?.reuse.unresolved,
+    ).not.toContain('typescript-package-configuration-missing');
     for (const [label, paths, increase] of [
       ['eligible roots', ['tsconfig.packet23.json', 'packages/utils/tsconfig.packet23.json'], 2],
       [
