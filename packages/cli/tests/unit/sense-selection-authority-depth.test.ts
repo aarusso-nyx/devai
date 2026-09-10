@@ -358,4 +358,126 @@ describe('sense invocation authority boundaries', () => {
       'SENSE_GENERIC_AUTHORITY_CONTRACT_INVALID',
     );
   });
+
+  it('passes no absent check selector properties to the planner', async () => {
+    vi.resetModules();
+    let selectorKeys: readonly string[] | undefined;
+    vi.doMock('../../src/commands/check/contracts.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/check/contracts.js')>();
+      return {
+        ...actual,
+        resolveCheckPlan: (
+          root: string,
+          selection: Parameters<typeof actual.resolveCheckPlan>[1],
+        ): ReturnType<typeof actual.resolveCheckPlan> => {
+          selectorKeys = Object.keys(selection);
+          return actual.resolveCheckPlan(root, { only: 'schema' });
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      isolated.resolveInvocationEntry(check, [
+        'node',
+        'devai',
+        'check',
+        '--repo-root',
+        process.cwd(),
+      ]);
+      expect(selectorKeys).toEqual([]);
+    } finally {
+      vi.doUnmock('../../src/commands/check/contracts.js');
+      vi.resetModules();
+    }
+  });
+
+  it('refuses when reduced check capabilities cannot produce the planned effect', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/commands/check/contracts.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/check/contracts.js')>();
+      return {
+        ...actual,
+        resolveCheckPlan: (): ReturnType<typeof actual.resolveCheckPlan> =>
+          ({ maximum_effect: 'remote-write', selection: { kind: 'fixture' } }) as ReturnType<
+            typeof actual.resolveCheckPlan
+          >,
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      const invalid = {
+        ...check,
+        authority_contract: { ...check.authority_contract, capabilities: ['fs:workspace'] },
+      } as typeof check;
+      expect(() => isolated.resolveCheckEntry(invalid, [])).toThrow(
+        'CHECK_EFFECT_CAPABILITY_DIVERGENCE:fixture',
+      );
+    } finally {
+      vi.doUnmock('../../src/commands/check/contracts.js');
+      vi.resetModules();
+    }
+  });
+
+  it('projects a harness-write check through its bounded mutation contract', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/commands/check/contracts.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/check/contracts.js')>();
+      return {
+        ...actual,
+        resolveCheckPlan: (): ReturnType<typeof actual.resolveCheckPlan> =>
+          ({ maximum_effect: 'harness-write', selection: { kind: 'fixture' } }) as ReturnType<
+            typeof actual.resolveCheckPlan
+          >,
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      const harness = {
+        ...check,
+        authority_contract: {
+          ...check.authority_contract,
+          capabilities: ['fs:f5-state', 'db:read'],
+        },
+      } as typeof check;
+      const resolved = isolated.resolveCheckEntry(harness, []);
+      expect(resolved.effects).toBe('harness-write');
+      expect(resolved.authority_contract.planner).toMatchObject({
+        kind: 'bounded-batches',
+        target_kinds: ['fs', 'db'],
+      });
+      expect(resolved.authority_contract.boundary).toMatchObject({
+        kind: 'mutation-adapters',
+        adapter_ids: ['fs-authority-boundary', 'db-authority-boundary'],
+      });
+    } finally {
+      vi.doUnmock('../../src/commands/check/contracts.js');
+      vi.resetModules();
+    }
+  });
+
+  it('omits the round option entirely when no round was requested', async () => {
+    vi.resetModules();
+    let optionKeys: readonly string[] | undefined;
+    vi.doMock('../../src/commands/sense/facade.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../../src/commands/sense/facade.js')>();
+      return {
+        ...actual,
+        resolveSenseSelection: (
+          selection: Parameters<typeof actual.resolveSenseSelection>[0],
+          options: Parameters<typeof actual.resolveSenseSelection>[1],
+        ): ReturnType<typeof actual.resolveSenseSelection> => {
+          optionKeys = Object.keys(options ?? {});
+          return actual.resolveSenseSelection(selection, options);
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/authority/sense-selection.js');
+      isolated.resolveSenseInvocation(senseRun, argv('decision_record_integrity'));
+      expect(optionKeys).toEqual([]);
+    } finally {
+      vi.doUnmock('../../src/commands/sense/facade.js');
+      vi.resetModules();
+    }
+  });
 });

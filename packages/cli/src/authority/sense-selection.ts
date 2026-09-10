@@ -214,3 +214,15 @@ export function resolveInvocationEntry(
   if (entry.name === 'check') return resolveCheckEntry(entry, argv);
   return resolveSenseInvocation(entry, argv)?.entry ?? entry;
 }
+
+// Kept as explicit test seams so the small authority projections can be
+// exercised without manufacturing a complete command invocation.
+export {
+  actionCapability,
+  capabilitiesForEffect,
+  flagValue,
+  resolvedCapabilities,
+  resolvedEntry,
+  resolveCheckEntry,
+  targetsFor,
+};
