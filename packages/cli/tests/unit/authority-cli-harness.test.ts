@@ -242,6 +242,10 @@ describe('authority CLI harness branch matrix', () => {
     ).toBe(0);
     expect(handlerCalls).toBe(2);
     expect(boundaryCalls).toBe(1);
-    expect(target.observations.runtime_inputs.length).toBe(3);
+    expect(target.observations.runtime_inputs).toMatchObject([
+      { action_id: 'catalog actions', invocation_id: 'invocation-1' },
+      { action_id: 'init bind', invocation_id: 'invocation-2' },
+      { action_id: 'round plan', invocation_id: 'invocation-3' },
+    ]);
   });
 });
