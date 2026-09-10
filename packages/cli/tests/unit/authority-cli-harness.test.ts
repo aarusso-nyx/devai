@@ -254,6 +254,19 @@ describe('authority CLI harness branch matrix', () => {
       applied: false,
       authority: { readiness_eligible: false },
     });
+    expect(
+      (
+        await invoke(target, [
+          'release',
+          'publish',
+          '--as-role',
+          'owner',
+          '--write',
+          '--publish',
+          '--dry-run',
+        ])
+      ).exit_code,
+    ).toBe(0);
     expect(handlerCalls).toBe(2);
     expect(boundaryCalls).toBe(1);
     expect(target.observations.runtime_inputs).toMatchObject([
@@ -261,6 +274,12 @@ describe('authority CLI harness branch matrix', () => {
       { action_id: 'init bind', invocation_id: 'invocation-2' },
       { action_id: 'round plan', invocation_id: 'invocation-3' },
       { action_id: 'round plan', invocation_id: 'invocation-4', dry_run: true },
+      {
+        action_id: 'release publish',
+        invocation_id: 'invocation-5',
+        dry_run: true,
+        consent: { write: true, allow_publish: true, experimental: false },
+      },
     ]);
   });
 });
