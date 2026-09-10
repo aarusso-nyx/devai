@@ -424,6 +424,40 @@ describe('protected mutation-program container transport', () => {
     },
   );
 
+  it.each([
+    ['a writable root filesystem', { ReadonlyRootfs: false }],
+    ['privileged execution', { Privileged: true }],
+    ['the host PID namespace', { PidMode: 'host' }],
+    ['the host IPC namespace', { IpcMode: 'host' }],
+    ['an automatic restart policy', { RestartPolicy: { Name: 'always' } }],
+    ['a larger memory limit', { Memory: 64 * 1024 * 1024 + 1 }],
+    ['a larger memory-swap limit', { MemorySwap: 128 * 1024 * 1024 }],
+    ['a larger CPU allocation', { NanoCpus: 1_000_000_001 }],
+    ['a larger process limit', { PidsLimit: 3 }],
+    ['an additional retained capability', { CapDrop: ['ALL', 'NET_RAW'] }],
+    ['missing no-new-privileges', { SecurityOpt: [] }],
+  ] as const)('refuses an inspection reporting %s', (_description, hostConfigPatch) => {
+    const value = fixture();
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        if (args[4] !== 'inspect') return result;
+        const inspection = JSON.parse(result.stdout.toString()) as [
+          { HostConfig: Record<string, unknown> },
+        ];
+        Object.assign(inspection[0].HostConfig, hostConfigPatch);
+        return { ...result, stdout: Buffer.from(canonicalJson(inspection)) };
+      },
+    };
+    try {
+      expect(() => invoke(value)).toThrow('release-certification-container-isolation-mismatch');
+      expectCleanup();
+    } finally {
+      value.dispose();
+    }
+  });
+
   it('preserves a copy failure when the created container is independently confirmed stopped', () => {
     const value = fixture();
     activeFixture = {
