@@ -192,7 +192,7 @@ function driverFixture(): DriverFixture {
     selected_source: [target],
     selected_tests: [selectedTest],
     mutation_targets: [target],
-    prerequisite_nodes: [],
+    prerequisite_nodes: ['needed'],
   });
   const direct = normalizeReleaseMutationPackageV21({
     expected,
@@ -259,8 +259,10 @@ function runDriver(value: DriverFixture, overrides: Record<string, unknown> = {}
   const executable = value.transport.controls.executables.node;
   if (executable === undefined) throw new Error('fixture node executable missing');
   const requests: ProtectedMutationExecutionRequest[] = [];
+  const executions: unknown[] = [];
   return {
     requests,
+    executions,
     result: produceUnitMutationEvidenceV21({
       input_plan: value.plan,
       package_snapshot: value.installed,
@@ -273,7 +275,7 @@ function runDriver(value: DriverFixture, overrides: Record<string, unknown> = {}
       execute: (request) => {
         requests.push(request);
         host.docker = value.transport.docker;
-        return value.transport.container.runBound(
+        const execution = value.transport.container.runBound(
           {
             action_id: 'release certify',
             repository: {
@@ -296,6 +298,8 @@ function runDriver(value: DriverFixture, overrides: Record<string, unknown> = {}
               mutation_program: request.program,
             }),
         );
+        executions.push(execution);
+        return execution;
       },
       ...overrides,
     }),
@@ -327,6 +331,10 @@ describe('protected unit mutation driver', () => {
     // The container accepts only this exact argv and working directory.
     expect(request.task.argv).toEqual([...PROTECTED_MUTATION_TASK_ARGV]);
     expect(request.task.cwd).toBe('.');
+    expect(request.task.nodeId).toBe('mutation:@fixture/package');
+    expect(request.task.taskKey).toBe(
+      `mutation:@fixture/package@${value.plan.packages[0]?.input_digest}`,
+    );
     expect(request.prerequisite_members).toEqual([]);
 
     expect(retention.retain).toHaveBeenCalledTimes(1);
@@ -436,6 +444,69 @@ describe('protected unit mutation driver', () => {
     await expect(runDriver(value, { execute: undefined }).result).rejects.toThrow(
       'release-certification-mutation-program-invalid',
     );
+    expect(retention.retain).not.toHaveBeenCalled();
+  });
+
+  it.each([null, [], {}, { packages: 'not-an-array' }])(
+    'refuses malformed input plan %j before execution',
+    async (input_plan) => {
+      const value = driverFixture();
+      const run = runDriver(value, { input_plan });
+      await expect(run.result).rejects.toThrow('release-certification-mutation-program-invalid');
+      expect(run.requests).toHaveLength(0);
+      expect(retention.retain).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([undefined, 1, ''])(
+    'refuses package name %j before constructing a protected program',
+    async (packageName) => {
+      const value = driverFixture();
+      const entry = value.plan.packages[0];
+      if (entry === undefined) throw new Error('fixture package missing');
+      Object.assign(entry.expected, { packageName });
+      const run = runDriver(value);
+      await expect(run.result).rejects.toThrow('release-certification-mutation-program-invalid');
+      expect(run.requests).toHaveLength(0);
+      expect(retention.retain).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses duplicate package names before retaining a partial population', async () => {
+    const value = driverFixture();
+    const first = value.plan.packages[0];
+    if (first === undefined) throw new Error('fixture package missing');
+    Object.assign(value.plan, { packages: [first, structuredClone(first)] });
+    const run = runDriver(value);
+    await expect(run.result).rejects.toThrow('release-certification-mutation-program-invalid');
+    expect(run.requests).toHaveLength(1);
+    expect(retention.retain).not.toHaveBeenCalled();
+  });
+
+  it('passes only the selected predecessor population into package execution', async () => {
+    const value = driverFixture();
+    const baseline = runDriver(value);
+    await baseline.result;
+    const execution = baseline.executions[0];
+    if (execution === undefined) throw new Error('fixture execution missing');
+    retention.retain.mockClear();
+    const context = executionContextCapture(value.plan);
+    const needed = { producer_task_node: 'needed', output: { digest: 'a'.repeat(64) } };
+    const unrelated = { producer_task_node: 'unrelated', output: { digest: 'b'.repeat(64) } };
+    executionContextCapture.mockReturnValue({
+      ...context,
+      prerequisite_outputs: [needed, unrelated],
+    });
+
+    let request: ProtectedMutationExecutionRequest | undefined;
+    const run = runDriver(value, {
+      execute: (value: ProtectedMutationExecutionRequest) => {
+        request = value;
+        return execution;
+      },
+    });
+    await expect(run.result).rejects.toThrow('release-certification-mutation-program-invalid');
+    expect(request?.prerequisite_members).toEqual([needed]);
     expect(retention.retain).not.toHaveBeenCalled();
   });
 
