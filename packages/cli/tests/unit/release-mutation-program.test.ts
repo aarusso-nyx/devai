@@ -499,6 +499,34 @@ describe('protected mutation program factory with explicit upstream-authority is
     expect(wrapper).not.toMatch(/npm run|pnpm run|process\.env|\.\/stryker\.conf/);
   });
 
+  it('accepts an executable candidate blob from a SHA-256 repository context', () => {
+    const { input } = factoryUnit();
+    const objectId = createHash('sha256')
+      .update(Buffer.from(`blob ${isolatedSource.length}\0`, 'utf8'))
+      .update(isolatedSource)
+      .digest('hex');
+    const context = {
+      ...isolatedExecutionContext,
+      repository: {
+        ...isolatedExecutionContext.repository,
+        commit: 'a'.repeat(64),
+        tree: 'b'.repeat(64),
+      },
+      candidate_files: [{ path: 'src/isolated.ts', mode: '100755' as const, object_id: objectId }],
+    };
+    executionContextCapture.mockImplementation(() => context);
+    const program = createProtectedMutationProgram(input);
+
+    expect(() =>
+      assertProtectedMutationProgramExecution(program, {
+        container_identity: context.container_identity,
+        environment: context.environment,
+        source: [{ path: 'src/isolated.ts', mode: '100755', bytes: isolatedSource }],
+        prior_outputs: new Map(),
+      }),
+    ).not.toThrow();
+  });
+
   it('retains private captured bytes despite caller mutation and refuses serialized capabilities', () => {
     const { input, pkg } = factoryUnit();
     const sourceBytes = new Map(
