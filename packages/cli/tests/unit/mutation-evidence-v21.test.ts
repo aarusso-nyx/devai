@@ -843,6 +843,34 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     expect(opened).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['symbolic-link', 'isSymbolicLink'],
+    ['non-regular-file', 'isFile'],
+  ] as const)('refuses a %s entry in the protected verifier tree', async (_label, property) => {
+    const vendorRoot = join(ROOT, 'packages/cli/vendor/evidence-verification');
+    let altered = false;
+    await expectProtectedFileRefusal((actual) => ({
+      readdirSync: (
+        path: Parameters<FsModule['readdirSync']>[0],
+        options?: { readonly withFileTypes?: boolean },
+      ) =>
+        options?.withFileTypes === true
+          ? actual.readdirSync(path, { withFileTypes: true }).map((entry) => {
+              if (altered || !String(path).startsWith(vendorRoot) || !entry.isFile()) return entry;
+              altered = true;
+              return new Proxy(entry, {
+                get(target, key) {
+                  if (key === property) return () => property === 'isSymbolicLink';
+                  const value = Reflect.get(target, key, target) as unknown;
+                  return typeof value === 'function' ? value.bind(target) : value;
+                },
+              });
+            })
+          : actual.readdirSync(path),
+    }));
+    expect(altered).toBe(true);
+  });
+
   it('refuses every ancestor identity change observed after reading protected bytes', async () => {
     const policyPath = join(ROOT, 'law/policy/mutation-evidence-v2.json');
     for (const alteration of ['symlink', 'device', 'inode'] as const) {
