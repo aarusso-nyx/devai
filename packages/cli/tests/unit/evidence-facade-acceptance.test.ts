@@ -255,13 +255,7 @@ function actionsCollectionFixture(): { readonly repo: string; readonly mergeSha:
   return { repo, mergeSha };
 }
 
-async function invoke(
-  definition: Definition,
-  argv: readonly string[],
-  options: { readonly writeConsent?: boolean } = {},
-): Promise<InvocationResult> {
-  const cli = cac('devai-evidence-facade-acceptance');
-  definition.register(cli);
+async function captureInvocation(run: () => Promise<void>): Promise<InvocationResult> {
   const originalArgv = process.argv;
   const originalExit = process.exit;
   const originalExitCode = process.exitCode;
@@ -270,7 +264,6 @@ async function invoke(
   let stdout = '';
   let stderr = '';
   try {
-    process.argv = ['node', 'devai', ...argv];
     process.exitCode = undefined;
     process.stdout.write = ((chunk: unknown) => {
       stdout += String(chunk);
@@ -284,10 +277,8 @@ async function invoke(
       process.exitCode = typeof exitCode === 'number' ? exitCode : 0;
       throw new Error(`TEST_PROCESS_EXIT:${String(process.exitCode)}`);
     }) as typeof process.exit;
-    cli.parse(process.argv, { run: false });
-    if (options.writeConsent === true) process.argv.push('--write');
     try {
-      await withAuthorityHostTestScope(() => cli.runMatchedCommand());
+      await run();
     } catch (error) {
       if (!(error instanceof Error) || !error.message.startsWith('TEST_PROCESS_EXIT:')) throw error;
     }
@@ -304,6 +295,34 @@ async function invoke(
     process.stdout.write = originalStdout;
     process.stderr.write = originalStderr;
   }
+}
+
+async function invoke(
+  definition: Definition,
+  argv: readonly string[],
+  options: { readonly writeConsent?: boolean } = {},
+): Promise<InvocationResult> {
+  const cli = cac('devai-evidence-facade-acceptance');
+  definition.register(cli);
+  return captureInvocation(async () => {
+    process.argv = ['node', 'devai', ...argv];
+    cli.parse(process.argv, { run: false });
+    if (options.writeConsent === true) process.argv.push('--write');
+    await withAuthorityHostTestScope(() => cli.runMatchedCommand());
+  });
+}
+
+async function invokeRegisteredAction(
+  definition: Definition,
+  options: Readonly<Record<string, unknown>>,
+): Promise<InvocationResult> {
+  const cli = cac('devai-evidence-facade-acceptance');
+  definition.register(cli);
+  const command = cli.commands[0];
+  if (command?.commandAction === undefined) throw new Error('registered command action missing');
+  return captureInvocation(async () => {
+    await withAuthorityHostTestScope(() => command.commandAction?.(options));
+  });
 }
 
 afterEach(() => {
@@ -1261,6 +1280,67 @@ describe('evidence record public decision table', () => {
         proof: { kind: 'generic', payload: expected },
       });
     }
+  });
+
+  it('rejects an explicit empty test command at the registered public action boundary', async () => {
+    const repo = root();
+    const result = await invokeRegisteredAction(evidenceRecord, {
+      kind: 'test',
+      round: 'R-1702',
+      repoRoot: repo,
+      tier: 'unit',
+      cmd: '',
+    });
+    expect(result).toEqual({
+      exit: 2,
+      stdout: '',
+      stderr: 'devai evidence record: --cmd is required for --kind test\n',
+    });
+  });
+
+  it('preserves a failing service diagnostic in the exact public failure receipt', async () => {
+    const repo = root();
+    put(repo, 'scenarios/failure.json', '{}');
+    _resetScenarioValidator();
+    const schemaPath = join(repo, 'law/schemas/mutation-scenario.schema.json');
+    const serviceError = `devai evidence record --kind mutation: mutation-scenario schema not found at ${schemaPath} (also tried ${schemaPath})`;
+    const result = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'mutation',
+      '--round',
+      'R-1703',
+      '--repo-root',
+      repo,
+      '--run',
+      '--scenarios',
+      'scenarios/failure.json',
+    ]);
+    expect(result).toEqual({
+      exit: 65,
+      stdout: '',
+      stderr: `devai evidence record: mutation exited 65; governed proof sequence 1: ${serviceError}\n`,
+    });
+  });
+
+  it('omits a fabricated suffix when a failed service emits no diagnostic', async () => {
+    const repo = root();
+    const result = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'rtd',
+      '--round',
+      'R-1704',
+      '--repo-root',
+      repo,
+      '--strict',
+      '--no-git',
+    ]);
+    expect(result).toEqual({
+      exit: 2,
+      stdout: '',
+      stderr: 'devai evidence record: rtd exited 2; governed proof sequence 1\n',
+    });
   });
 
   it('reports successful service recording through the exact human receipt', async () => {
