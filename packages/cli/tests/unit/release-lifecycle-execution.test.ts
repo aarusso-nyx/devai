@@ -5421,6 +5421,57 @@ describe('release lifecycle execution kernel', () => {
     ).toMatchObject({ ok: false, code: 'release-offline-receipt-binding-invalid' });
   });
 
+  it('refuses a rehashed offline receipt that changes any exported-state identity field', async () => {
+    const store = new ReleaseLifecycleFileStore(root(), request('release export'));
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const offlineRequest = request('release offline-verify');
+    const validReceipt = boundOfflineReceipt(exported);
+    const repository = objectValue(validReceipt['repository']);
+    const candidate = objectValue(validReceipt['candidate']);
+    const verifiedState = objectValue(validReceipt['verified_state']);
+    const defects = [
+      ['digest', { ...validReceipt, receipt_digest_sha256: 'f'.repeat(64) }],
+      ['receipt id', { ...validReceipt, receipt_id: `ROV-${'f'.repeat(16)}` }],
+      ['verdict', rehashReceipt(validReceipt, { verdict: 'fail', state_observed: null })],
+      [
+        'repository',
+        rehashReceipt(validReceipt, {
+          repository: { ...repository, id: `${String(repository['id'])}-other` },
+        }),
+      ],
+      [
+        'candidate',
+        rehashReceipt(validReceipt, {
+          candidate: { ...candidate, tree: 'f'.repeat(40) },
+        }),
+      ],
+      [
+        'verified state',
+        rehashReceipt(validReceipt, {
+          verified_state: { ...verifiedState, record_digest_sha256: 'f'.repeat(64) },
+        }),
+      ],
+    ] as const;
+
+    for (const [name, receipt] of defects) {
+      expect(
+        await executeOfflineVerification({
+          request: offlineRequest,
+          exported_state: exported,
+          artifactReader: artifactReaderFor('release export'),
+          provider: () => receipt,
+          policyClosures,
+        }),
+        name,
+      ).toStrictEqual({
+        ok: false,
+        phase: 'validation',
+        code: 'release-offline-receipt-binding-invalid',
+      });
+    }
+  });
+
   it('issues offline context only during a validated provider invocation and binds its inputs', async () => {
     const store = new ReleaseLifecycleFileStore(root(), request('release export'));
     await advanceToExported(store);
