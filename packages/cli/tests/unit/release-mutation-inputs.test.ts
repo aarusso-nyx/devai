@@ -526,6 +526,60 @@ describe('protected release mutation input derivation', () => {
     ).toEqual(expect.arrayContaining(['test:schemas', 'test:utils']));
   });
 
+  it.each([
+    [
+      'an unknown workspace dependency',
+      { '@fixture/missing': 'workspace:*' },
+      'workspace-dependency-alias-unresolved',
+      true,
+    ],
+    [
+      'an unknown ordinary registry dependency',
+      { '@fixture/missing': '^1.0.0' },
+      'workspace-dependency-alias-unresolved',
+      false,
+    ],
+    [
+      'an unknown dependency whose URL merely contains an alias token',
+      { '@fixture/missing': 'https://registry.invalid/workspace:package' },
+      'workspace-dependency-alias-unresolved',
+      false,
+    ],
+    [
+      'an incompatible workspace dependency',
+      { '@devai-nyx/schemas': 'workspace:^999.0.0' },
+      'workspace-dependency-range-unresolved',
+      true,
+    ],
+  ] as const)(
+    'keeps %s inside the exact fail-safe dependency population',
+    (_label, dependencies, reason, expandsToFullRoster) => {
+      const base = currentFixture();
+      const manifestPath = 'packages/utils/package.json';
+      const manifest = JSON.parse(base.files.get(manifestPath)?.toString() ?? '') as Record<
+        string,
+        unknown
+      >;
+      const value = build(
+        base,
+        mutate(
+          base.files,
+          manifestPath,
+          Buffer.from(JSON.stringify({ ...manifest, dependencies }), 'utf8'),
+        ),
+      );
+      const entry = value.plan.packages.find((item) => item.id === 'utils');
+      if (entry === undefined) throw new Error('fixture package missing');
+      const fullRoster = value.plan.packages
+        .map((item) => item.expected.packageName)
+        .filter((name) => name !== entry.expected.packageName)
+        .sort();
+
+      expect(entry.reuse.unresolved.includes(reason)).toBe(expandsToFullRoster);
+      expect(entry.workspace_dependencies).toEqual(expandsToFullRoster ? fullRoster : []);
+    },
+  );
+
   it('keeps input identity stable across commit-only changes but makes empty or dynamic configuration ineligible', () => {
     const base = fixture();
     const initial = build(base);
