@@ -71,7 +71,7 @@ interface ImageInspection {
   readonly Os: string;
   readonly Architecture: string;
   readonly Id?: string;
-  readonly RepoDigests?: readonly string[];
+  readonly RepoDigests?: readonly unknown[];
   readonly Descriptor?: { readonly annotations?: Readonly<Record<string, string>> };
   readonly RootFS?: { readonly Type?: string; readonly Layers?: readonly string[] };
 }
@@ -816,10 +816,19 @@ describe('protected container runtime executable probe', () => {
     const value = fixture();
     try {
       verify(value.controls);
-      expect(dockerCalls.filter((argv) => argv.includes('run'))).toHaveLength(1);
-      const probe = dockerCalls.find((argv) => argv.includes('run'));
-      expect(probe).toEqual(
-        expect.arrayContaining([
+      const prefix = [
+        '--config',
+        value.controls.docker_config_directory,
+        '--host',
+        value.controls.engine_socket,
+      ];
+      expect(dockerCalls).toEqual([
+        [...prefix, 'version', '--format', '{{.Server.Version}}'],
+        [...prefix, 'image', 'inspect', IMAGE],
+        [
+          ...prefix,
+          'run',
+          '--rm',
           '--network',
           'none',
           '--read-only',
@@ -827,10 +836,94 @@ describe('protected container runtime executable probe', () => {
           'ALL',
           '--security-opt',
           'no-new-privileges',
+          '--pids-limit',
+          '2',
+          '--memory',
+          String(64 * 1024 * 1024),
+          '--memory-swap',
+          String(64 * 1024 * 1024),
+          '--cpus',
+          '1',
+          '--user',
+          '10001:10001',
           '--ipc',
           'none',
-        ]),
-      );
+          '--restart',
+          'no',
+          '--tmpfs',
+          '/tmp:rw,exec,nosuid,nodev,size=536870912',
+          '--env',
+          'HOME=/tmp',
+          '--env',
+          'TMPDIR=/tmp',
+          IMAGE,
+          '/usr/local/bin/node',
+          '-e',
+          expect.any(String),
+          canonicalJson(value.controls.executables),
+        ],
+      ]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['engine version', undefined, { engine_version: 'fixture-engine-other' }],
+    ['operating system', { Os: 'darwin', Architecture: 'arm64', RepoDigests: [IMAGE] }, {}],
+    ['architecture', { Os: 'linux', Architecture: 'amd64', RepoDigests: [IMAGE] }, {}],
+    ['missing repository digests', { Os: 'linux', Architecture: 'arm64' }, {}],
+    ['empty repository digests', { Os: 'linux', Architecture: 'arm64', RepoDigests: [] }, {}],
+    [
+      'wrong repository digest',
+      {
+        Os: 'linux',
+        Architecture: 'arm64',
+        RepoDigests: [`fixture/node@sha256:${'f'.repeat(64)}`],
+      },
+      {},
+    ],
+  ] as const)(
+    'refuses a registry-pinned image with a mismatched %s',
+    (_description, inspection, controlsOverride) => {
+      const value = fixture('correct', inspection);
+      try {
+        expect(() => verify({ ...value.controls, ...controlsOverride })).toThrow(
+          'release-certification-container-identity-mismatch',
+        );
+      } finally {
+        rmSync(value.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('accepts a registry digest from a different repository with the exact selected digest', () => {
+    const value = fixture('correct', {
+      Os: 'linux',
+      Architecture: 'arm64',
+      RepoDigests: [`mirror.invalid/node@sha256:${'a'.repeat(64)}`],
+    });
+    try {
+      verify(value.controls);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [
+      'an unrelated string digest',
+      [`fixture/node@sha256:${'f'.repeat(64)}`, `mirror.invalid/node@sha256:${'a'.repeat(64)}`],
+    ],
+    ['a non-string digest', [7, `mirror.invalid/node@sha256:${'a'.repeat(64)}`]],
+  ] as const)('accepts one exact registry digest alongside %s', (_description, repoDigests) => {
+    const value = fixture('correct', {
+      Os: 'linux',
+      Architecture: 'arm64',
+      RepoDigests: repoDigests,
+    });
+    try {
+      verify(value.controls);
     } finally {
       rmSync(value.root, { recursive: true, force: true });
     }
