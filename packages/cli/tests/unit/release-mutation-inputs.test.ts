@@ -74,6 +74,13 @@ describe('protected release mutation input derivation', () => {
     expect(() =>
       assertReleaseMutationInputPackageIdentity(value.plan, base.installed.identity),
     ).not.toThrow();
+    const nullPrototypeIdentity = Object.assign(
+      Object.create(null) as Record<string, unknown>,
+      base.installed.identity,
+    );
+    expect(() =>
+      assertReleaseMutationInputPackageIdentity(value.plan, nullPrototypeIdentity),
+    ).not.toThrow();
     expect(() =>
       assertReleaseMutationInputPackageIdentity(value.plan, {
         ...base.installed.identity,
