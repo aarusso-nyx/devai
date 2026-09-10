@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@devai-nyx/utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   ReleaseMutationPackageArtifactsV21,
   ReleaseMutationPackageInputsV21,
@@ -20,12 +20,73 @@ import {
 } from '../../src/services/release-unit-mutation-evidence.js';
 import { fixture as evidenceFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
 
+const dependencyFault = vi.hoisted(() => ({
+  contractPackages: undefined as undefined | ((rows: readonly unknown[]) => readonly unknown[]),
+  artifacts: undefined as
+    | undefined
+    | ((artifacts: readonly { readonly path: string; readonly bytes: Buffer }[]) => readonly {
+        readonly path: string;
+        readonly bytes: Buffer;
+      }[]),
+  originalContract: undefined as undefined | Record<string, unknown>,
+}));
+
+vi.mock('../../src/services/release-mutation-artifacts.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/services/release-mutation-artifacts.js')>();
+  return {
+    ...actual,
+    finalizeReleaseMutationArtifactsV21: async (
+      ...args: Parameters<typeof actual.finalizeReleaseMutationArtifactsV21>
+    ) => {
+      const result = await actual.finalizeReleaseMutationArtifactsV21(...args);
+      dependencyFault.originalContract = result.contract as Record<string, unknown>;
+      const transform = dependencyFault.contractPackages;
+      if (transform === undefined) return result;
+      const rows = result.contract['packages'];
+      if (!Array.isArray(rows)) throw new Error('fixture contract package rows missing');
+      return {
+        ...result,
+        contract: { ...result.contract, packages: transform(rows) },
+      };
+    },
+  };
+});
+
+vi.mock('../../src/services/mutation-evidence-v21.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/services/mutation-evidence-v21.js')>();
+  return {
+    ...actual,
+    composeMutationEvidenceV21: async (
+      ...args: Parameters<typeof actual.composeMutationEvidenceV21>
+    ) => {
+      const [input, resolver] = args;
+      const contract = dependencyFault.originalContract;
+      const result = await actual.composeMutationEvidenceV21(
+        contract === undefined ? input : { ...input, contract },
+        resolver,
+      );
+      const transform = dependencyFault.artifacts;
+      return transform === undefined
+        ? result
+        : { ...result, artifacts: transform(result.artifacts) };
+    },
+  };
+});
+
 // This suite isolates the sidecar adapter. Production-only plan derivation and its fixture gate
 // have independent coverage; semantic finalization, canonical composition and closure rereads are real.
 vi.mock('../../src/services/release-mutation-inputs.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/services/release-mutation-inputs.js')>()),
   isDerivedReleaseMutationInputPlanV21: () => true,
 }));
+
+afterEach(() => {
+  dependencyFault.contractPackages = undefined;
+  dependencyFault.artifacts = undefined;
+  dependencyFault.originalContract = undefined;
+});
 
 const REFUSAL = 'release-certification-generated-output-untrusted';
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -448,6 +509,118 @@ describe('release mutation retention adapter', () => {
       await refuses(() => retainReleaseMutationEvidenceV21({ ...value.input, packages } as never));
       expect(value.sink.state.puts, name).toBe(0);
     }
+  });
+
+  it.each(['report', 'result'] as const)(
+    'refuses a duplicate caller %s path before opening a sink transaction',
+    async (kind) => {
+      const source = await evidenceFixture();
+      const value = adapterFixture(source);
+      const firstPackage = value.packages[0];
+      const secondPackage = value.packages[1];
+      if (firstPackage === undefined || secondPackage === undefined)
+        throw new Error('fixture packages missing');
+      secondPackage.artifacts[kind] = {
+        ...secondPackage.artifacts[kind],
+        path: firstPackage.artifacts[kind].path,
+      };
+
+      await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+      expect(value.sink.state.begins).toBe(0);
+    },
+  );
+
+  it.each([
+    ['non-string', 1],
+    ['unknown', 'mutation-untrusted-document-v2'],
+    ['package kind on a unit document', 'mutation-package-result-v2'],
+  ] as const)(
+    'refuses a %s composed document kind at its first invalid member',
+    async (_name, kind) => {
+      const source = await evidenceFixture();
+      const value = adapterFixture(source);
+      let expectedPuts = 0;
+      dependencyFault.artifacts = (artifacts) =>
+        artifacts.map((artifact, index) => {
+          const document = JSON.parse(artifact.bytes.toString('utf8')) as Record<string, unknown>;
+          if (document['kind'] !== 'mutation-composed-report-set-v2') return artifact;
+          expectedPuts = index + 2;
+          return { ...artifact, bytes: Buffer.from(canonicalJson({ ...document, kind })) };
+        });
+
+      await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+      expect(expectedPuts).toBeGreaterThan(1);
+      expect(value.sink.state.puts).toBe(expectedPuts);
+      expect(value.sink.state.aborted).toBe(true);
+    },
+  );
+
+  it('refuses an extra composed unit document before opening a sink transaction', async () => {
+    const source = await evidenceFixture();
+    const value = adapterFixture(source);
+    dependencyFault.artifacts = (artifacts) => {
+      const summary = artifacts.find((artifact) => artifact.path.endsWith('/summary.json'));
+      if (summary === undefined) throw new Error('fixture summary missing');
+      return [...artifacts, { ...summary, path: 'mutation/unit/unexpected/summary.json' }];
+    };
+
+    await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+    expect(value.sink.state.begins).toBe(0);
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+  ] as const)(
+    'refuses a %s finalized package row with the canonical refusal',
+    async (_name, row) => {
+      const source = await evidenceFixture();
+      const value = adapterFixture(source);
+      dependencyFault.contractPackages = (rows) => [row, ...rows.slice(1)];
+
+      await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+      expect(value.sink.state.begins).toBe(0);
+    },
+  );
+
+  it('refuses duplicate composed paths before opening a sink transaction', async () => {
+    const source = await evidenceFixture();
+    const value = adapterFixture(source);
+    dependencyFault.artifacts = (artifacts) => {
+      const summaryIndex = artifacts.findIndex((artifact) =>
+        artifact.path.endsWith('/summary.json'),
+      );
+      const receiptIndex = artifacts.findIndex((artifact) =>
+        artifact.path.endsWith('/semantic-receipt.json'),
+      );
+      if (summaryIndex < 0 || receiptIndex < 0) throw new Error('fixture unit documents missing');
+      return artifacts.map((artifact, index) =>
+        index === receiptIndex
+          ? { ...artifact, path: artifacts[summaryIndex]?.path ?? '' }
+          : artifact,
+      );
+    };
+
+    await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+    expect(value.sink.state.begins).toBe(0);
+  });
+
+  it('refuses changed composed package bytes before opening a sink transaction', async () => {
+    const source = await evidenceFixture();
+    const value = adapterFixture(source);
+    const reportPath = first(value.packages).artifacts.report.path;
+    dependencyFault.artifacts = (artifacts) =>
+      artifacts.map((artifact) => {
+        if (artifact.path !== reportPath) return artifact;
+        const document = JSON.parse(artifact.bytes.toString('utf8')) as Record<string, unknown>;
+        return {
+          ...artifact,
+          bytes: Buffer.from(canonicalJson({ ...document, projectRoot: 'changed' })),
+        };
+      });
+
+    await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+    expect(value.sink.state.begins).toBe(0);
   });
 
   it('refuses malformed task-policy digest populations before invoking the sink', async () => {
