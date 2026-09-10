@@ -298,6 +298,42 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
+  it('uses bootstrap authority only for a handler-supported dry run', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-supported-dry-run-'));
+    mkdirSync(join(root, '.devai/pin'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/pin/constitution.md'),
+      readFileSync(join(ROOT, '.devai/pin/constitution.md')),
+    );
+    try {
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'sense',
+            'run',
+            'runtime_probe_data',
+            '--repo-root',
+            root,
+            '--as-role',
+            'auditor',
+            '--write',
+            '--dry-run',
+          ],
+          entries,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toMatchObject({
+        actor: { role: 'auditor', declaration_source: 'cli-flag' },
+        consent: { write: true, allow_publish: false },
+      });
+    } finally {
+      disposeCliInvocationAuthority();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('admits only exact declared check tasks for stock release preflight execution', () => {
     const fixture = createSelfContainedRepositoryFixture(ROOT, {
       paths: ['test-tasks.json', '.devai/pin/constitution.md'],

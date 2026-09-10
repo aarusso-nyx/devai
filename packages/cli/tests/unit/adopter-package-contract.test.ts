@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { buildBootstrapPlan, executeBootstrapPlan } from '../../../skills/src/bootstrap/index.js';
 import { getValidator } from '../../../schemas/src/index.js';
@@ -15,6 +16,14 @@ import { evidenceRecord } from '../../src/commands/evidence/facade.js';
 import { initBind } from '../../src/commands/init/index.js';
 import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
 import { runWithAuthorityPolicyMaterialization } from '../../src/authority/command-capabilities.js';
+import {
+  authorizeCliArgv,
+  declaredInvocationAuthority,
+  disposeCliInvocationAuthority,
+} from '../../src/authority/index.js';
+import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
+import { canonicalRegistry } from '../../src/define-command.js';
+import { resolveCliVersion } from '../../src/version.js';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { createRequire } from 'node:module';
 
@@ -521,6 +530,64 @@ describe('adopter-safe check and binding contracts', () => {
         adapter_version: '1.5.0',
       },
     });
+  }, 30_000);
+
+  it('retains a validated authority session as the invocation declaration source', async () => {
+    const repo = root('devai-adopter-session-authority-');
+    await establishTier3Binding(repo);
+    const entries = canonicalRegistry();
+    const sources = buildTrustedAuthoritySources(entries, repo, resolveCliVersion());
+    const sessionId = 'AUTH-SESSION-0123456789abcdef0123';
+    const unsigned = {
+      schemaVersion: '1.0.0',
+      session_id: sessionId,
+      repository_id: sources.repository_id,
+      role: 'architect',
+      declaration_source: 'cli-flag',
+      status: 'active',
+      created_at: '2026-09-10T00:00:00.000Z',
+      expires_at: '2099-01-01T00:00:00.000Z',
+      created_by_invocation_id: 'cli-session-fixture',
+      policy_binding: {
+        policy_id: sources.provenance.policy_id,
+        policy_version: sources.provenance.policy_version,
+        resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+      },
+      constitution_binding: sources.constitution_binding,
+      package_binding: sources.package_binding,
+    };
+    put(repo, `.devai/state/authority-sessions/${sessionId}.json`, {
+      ...unsigned,
+      session_digest_sha256: canonicalSha256(unsigned),
+    });
+
+    try {
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'round',
+            'plan',
+            '--repo-root',
+            repo,
+            '--authority-session',
+            sessionId,
+            '--write',
+          ],
+          entries,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toMatchObject({
+        actor: {
+          kind: 'human',
+          role: 'architect',
+          declaration_source: 'session-state',
+        },
+      });
+    } finally {
+      disposeCliInvocationAuthority();
+    }
   }, 30_000);
 
   it('executes the declared tier3 plan and role-separated apply sequence after binding', async () => {
