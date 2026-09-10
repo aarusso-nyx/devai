@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare and run a fail-closed, diagnostic-only shard-10 verification.
+"""Prepare and run one fail-closed, diagnostic-only CLI lane verification.
 
 Preparation is deliberately separate from execution.  ``prepare`` materializes
 the exact candidate, dependencies, and dist without contacting Docker.
@@ -21,6 +21,7 @@ import stat
 import subprocess
 import tarfile
 import time
+from collections import Counter
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -70,6 +71,105 @@ def regular_file(path: Path, expected: str, code: str) -> None:
         raise Refusal(code) from error
     if path.is_symlink() or not stat.S_ISREG(mode) or sha_file(path) != expected:
         raise Refusal(code)
+
+
+def safe_relative_name(value: object, code: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise Refusal(code)
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts or path.as_posix() != value:
+        raise Refusal(code)
+    return value
+
+
+def materialization_entries(root: Path) -> list[dict[str, object]]:
+    if root.is_symlink() or not root.is_dir():
+        raise Refusal("MATERIALIZATION_ROOT_INVALID")
+    entries: list[dict[str, object]] = []
+
+    def visit(directory: Path, relative: Path) -> None:
+        try:
+            children = sorted(directory.iterdir(), key=lambda item: item.name)
+        except OSError as error:
+            raise Refusal("MATERIALIZATION_WALK_FAILED") from error
+        for child in children:
+            child_relative = relative / child.name
+            try:
+                mode = child.lstat().st_mode
+            except OSError as error:
+                raise Refusal("MATERIALIZATION_WALK_FAILED") from error
+            common: dict[str, object] = {
+                "path": child_relative.as_posix(),
+                "mode": stat.S_IMODE(mode),
+            }
+            if stat.S_ISLNK(mode):
+                try:
+                    resolved = child.resolve(strict=True)
+                except (OSError, RuntimeError) as error:
+                    raise Refusal("MATERIALIZATION_SYMLINK_INVALID") from error
+                if not resolved.is_relative_to(root.resolve()):
+                    raise Refusal("MATERIALIZATION_SYMLINK_ESCAPES_ROOT")
+                entries.append({**common, "kind": "symlink", "target": os.readlink(child)})
+            elif stat.S_ISDIR(mode):
+                entries.append({**common, "kind": "directory"})
+                visit(child, child_relative)
+            elif stat.S_ISREG(mode):
+                entries.append(
+                    {
+                        **common,
+                        "kind": "file",
+                        "bytes": child.stat().st_size,
+                        "sha256": sha_file(child),
+                    }
+                )
+            else:
+                raise Refusal("MATERIALIZATION_SPECIAL_MEMBER_REFUSED")
+
+    visit(root, Path())
+    return entries
+
+
+def write_materialization_manifest(
+    path: Path, candidate_root: Path, candidate: str, tree: str
+) -> str:
+    entries = materialization_entries(candidate_root)
+    value = {
+        "kind": "diagnostic-cli-execution-materialization",
+        "version": 1,
+        "candidate": candidate,
+        "tree": tree,
+        "excluded": [],
+        "population": {
+            "count": len(entries),
+            "sha256": sha_bytes(canonical(entries)),
+        },
+        "entries": entries,
+    }
+    write_json_exclusive(path, value)
+    return sha_file(path)
+
+
+def verify_materialization_manifest(
+    path: Path,
+    expected_sha256: str,
+    candidate_root: Path,
+    candidate: str,
+    tree: str,
+) -> None:
+    regular_file(path, expected_sha256, "MATERIALIZATION_MANIFEST_BINDING_INVALID")
+    value = load_json(path, "MATERIALIZATION_MANIFEST_INVALID")
+    entries = materialization_entries(candidate_root)
+    if (
+        value.get("kind") != "diagnostic-cli-execution-materialization"
+        or value.get("version") != 1
+        or value.get("candidate") != candidate
+        or value.get("tree") != tree
+        or value.get("excluded") != []
+        or value.get("entries") != entries
+        or value.get("population")
+        != {"count": len(entries), "sha256": sha_bytes(canonical(entries))}
+    ):
+        raise Refusal("EXECUTION_MATERIALIZATION_CHANGED")
 
 
 def parse_bound_file(value: str, code: str) -> tuple[Path, str]:
@@ -182,11 +282,122 @@ def plan_population(value: object, code: str = "CURRENT_PLAN_POPULATION_INVALID"
     return plans
 
 
-def load_frozen_plan(retained: Path) -> list[dict[str, Any]]:
+def frozen_campaign(value: dict[str, Any]) -> dict[str, str]:
+    campaign = value.get("frozenCampaign")
+    if not isinstance(campaign, dict):
+        raise Refusal("CONSOLIDATED_FROZEN_CAMPAIGN_INVALID")
+    expected = {
+        "commit": campaign.get("commit"),
+        "tree": campaign.get("tree"),
+        "id": campaign.get("id"),
+    }
+    if (
+        not re.fullmatch(r"[a-f0-9]{40}", str(expected["commit"]))
+        or not re.fullmatch(r"[a-f0-9]{40}", str(expected["tree"]))
+        or not isinstance(expected["id"], str)
+        or not expected["id"]
+    ):
+        raise Refusal("CONSOLIDATED_FROZEN_CAMPAIGN_INVALID")
+    return expected  # type: ignore[return-value]
+
+
+def validate_frozen_retention(
+    retained: Path, campaign: dict[str, str], lane: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
     completion = load_json(retained / "retention-completion.json", "FROZEN_RETENTION_INVALID")
+    expected_identity = {
+        "candidate": campaign["commit"],
+        "tree": campaign["tree"],
+        "campaignId": campaign["id"],
+        "shardId": lane,
+    }
+    if (
+        completion.get("kind") != "diagnostic-cli-shard-retention-completion"
+        or completion.get("version") != 1
+        or completion.get("diagnosticOnly") is not True
+        or {key: completion.get(key) for key in expected_identity} != expected_identity
+    ):
+        raise Refusal("FROZEN_RETENTION_IDENTITY_MISMATCH")
+    index_path = retained / "retention-index.json"
+    regular_file(
+        index_path,
+        completion.get("retentionIndexSha256", ""),
+        "FROZEN_RETENTION_INDEX_BINDING_INVALID",
+    )
+    index = load_json(index_path, "FROZEN_RETENTION_INDEX_INVALID")
+    container_id = completion.get("containerId")
+    if (
+        index.get("diagnosticOnly") is not True
+        or {key: index.get(key) for key in expected_identity} != expected_identity
+        or not re.fullmatch(r"[a-f0-9]{64}", str(container_id))
+        or index.get("containerId") != container_id
+    ):
+        raise Refusal("FROZEN_RETENTION_INDEX_IDENTITY_MISMATCH")
+    members = index.get("files")
+    event_members = index.get("eventMembers")
+    if not isinstance(members, list) or not isinstance(event_members, list):
+        raise Refusal("FROZEN_RETENTION_INDEX_INVALID")
+    indexed_names: set[str] = set()
+    for member in members:
+        if not isinstance(member, dict):
+            raise Refusal("FROZEN_RETENTION_INDEX_INVALID")
+        name = safe_relative_name(member.get("path"), "FROZEN_RETENTION_MEMBER_UNSAFE")
+        if Path(name).name != name or name in indexed_names:
+            raise Refusal("FROZEN_RETENTION_MEMBER_UNSAFE")
+        digest = member.get("sha256")
+        size = member.get("bytes")
+        if not re.fullmatch(r"[a-f0-9]{64}", str(digest)) or not isinstance(size, int) or size < 0:
+            raise Refusal("FROZEN_RETENTION_INDEX_INVALID")
+        path = retained / name
+        regular_file(path, str(digest), "FROZEN_RETENTION_MEMBER_BINDING_INVALID")
+        if path.stat().st_size != size:
+            raise Refusal("FROZEN_RETENTION_MEMBER_BINDING_INVALID")
+        indexed_names.add(name)
+    required = {
+        "identity.json",
+        "invocation.json",
+        "container.json",
+        "output.log",
+        "mutation.json",
+        "resources.json",
+        "execution-completion.json",
+        "events.tgz",
+    }
+    if not required.issubset(indexed_names):
+        raise Refusal("FROZEN_RETENTION_REQUIRED_MEMBER_MISSING")
+    actual_names = {path.name for path in retained.iterdir()}
+    if actual_names != indexed_names | {"retention-index.json", "retention-completion.json"}:
+        raise Refusal("FROZEN_RETENTION_MEMBER_POPULATION_MISMATCH")
+    regular_file(
+        retained / "identity.json",
+        completion.get("identitySha256", ""),
+        "FROZEN_RETENTION_IDENTITY_BINDING_INVALID",
+    )
+    regular_file(
+        retained / "execution-completion.json",
+        completion.get("executionCompletionSha256", ""),
+        "FROZEN_EXECUTION_COMPLETION_BINDING_INVALID",
+    )
+    identity = load_json(retained / "identity.json", "FROZEN_IDENTITY_INVALID")
+    if {key: identity.get(key) for key in expected_identity} != expected_identity:
+        raise Refusal("FROZEN_IDENTITY_MISMATCH")
+    execution = load_json(
+        retained / "execution-completion.json", "FROZEN_EXECUTION_COMPLETION_INVALID"
+    )
+    container_record = load_json(retained / "container.json", "FROZEN_CONTAINER_RECORD_INVALID")
+    if (
+        execution.get("candidate") != campaign["commit"]
+        or execution.get("phase") != "mutation"
+        or execution.get("containerId") != container_id
+        or container_record.get("id") != container_id
+    ):
+        raise Refusal("FROZEN_EXECUTION_COMPLETION_MISMATCH")
     archive = retained / "events.tgz"
-    if completion.get("eventsArchiveSha256") != sha_file(archive):
-        raise Refusal("FROZEN_EVENTS_ARCHIVE_BINDING_INVALID")
+    regular_file(
+        archive,
+        completion.get("eventsArchiveSha256", ""),
+        "FROZEN_EVENTS_ARCHIVE_BINDING_INVALID",
+    )
     with tarfile.open(archive, "r:gz") as bundle:
         members = bundle.getmembers()
         if any(
@@ -198,6 +409,33 @@ def load_frozen_plan(retained: Path) -> list[dict[str, Any]]:
             for member in members
         ):
             raise Refusal("FROZEN_EVENTS_ARCHIVE_UNSAFE")
+        archive_by_name = {member.name: member for member in members}
+        if len(archive_by_name) != len(members):
+            raise Refusal("FROZEN_EVENTS_ARCHIVE_DUPLICATE")
+        declared_events: dict[str, dict[str, Any]] = {}
+        for event in event_members:
+            if not isinstance(event, dict):
+                raise Refusal("FROZEN_EVENT_INDEX_INVALID")
+            name = safe_relative_name(event.get("path"), "FROZEN_EVENT_MEMBER_UNSAFE")
+            if Path(name).name != name or name in declared_events:
+                raise Refusal("FROZEN_EVENT_MEMBER_UNSAFE")
+            if (
+                not re.fullmatch(r"[a-f0-9]{64}", str(event.get("sha256")))
+                or not isinstance(event.get("bytes"), int)
+                or event["bytes"] < 0
+            ):
+                raise Refusal("FROZEN_EVENT_INDEX_INVALID")
+            declared_events[name] = event
+        if set(archive_by_name) != set(declared_events):
+            raise Refusal("FROZEN_EVENT_MEMBER_POPULATION_MISMATCH")
+        for name, member in archive_by_name.items():
+            extracted = bundle.extractfile(member)
+            if extracted is None:
+                raise Refusal("FROZEN_EVENT_MEMBER_BINDING_INVALID")
+            content = extracted.read()
+            declared = declared_events[name]
+            if len(content) != declared["bytes"] or sha_bytes(content) != declared["sha256"]:
+                raise Refusal("FROZEN_EVENT_MEMBER_BINDING_INVALID")
         matches = [member for member in members if member.name.endswith("-onMutationTestingPlanReady.json")]
         if len(matches) != 1:
             raise Refusal("FROZEN_PLAN_POPULATION_INVALID")
@@ -205,18 +443,30 @@ def load_frozen_plan(retained: Path) -> list[dict[str, Any]]:
         if extracted is None:
             raise Refusal("FROZEN_PLAN_POPULATION_INVALID")
         value = json.load(extracted)
+    return completion, value
+
+
+def load_frozen_plan(
+    retained: Path, campaign: dict[str, str], lane: str
+) -> list[dict[str, Any]]:
+    _, value = validate_frozen_retention(retained, campaign, lane)
     return plan_population(value, "FROZEN_PLAN_POPULATION_INVALID")
 
 
 def load_consolidated(path: Path, candidate: str, tree: str) -> dict[str, Any]:
     value = load_json(path, "CONSOLIDATED_INVENTORY_INVALID")
-    if value.get("kind") != "devai-cli-final-consolidated-remediation-inventory":
+    if (
+        value.get("kind") != "devai-cli-final-consolidated-remediation-inventory"
+        or value.get("schemaVersion") != "1.0.0"
+        or value.get("credit") != "zero-until-exact-current-plan-tuple-reports-killed"
+    ):
         raise Refusal("CONSOLIDATED_INVENTORY_INVALID")
     if value.get("diagnosticOnly") is not True or value.get("finalCandidate") != {
         "commit": candidate,
         "tree": tree,
     }:
         raise Refusal("CONSOLIDATED_CANDIDATE_BINDING_INVALID")
+    frozen_campaign(value)
     claims = value.get("claims")
     if not isinstance(claims, list) or not claims:
         raise Refusal("CONSOLIDATED_CLAIMS_INVALID")
@@ -225,7 +475,12 @@ def load_consolidated(path: Path, candidate: str, tree: str) -> dict[str, Any]:
     for claim in claims:
         lane = claim.get("lane") if isinstance(claim, dict) else None
         mutant_id = claim.get("frozenMutantId") if isinstance(claim, dict) else None
-        if not isinstance(lane, str) or not isinstance(mutant_id, str) or not mutant_id.isdigit():
+        if (
+            not isinstance(lane, str)
+            or not re.fullmatch(r"shard-(?:0[1-9]|1[0-2])", lane)
+            or not isinstance(mutant_id, str)
+            or not mutant_id.isdigit()
+        ):
             raise Refusal("CONSOLIDATED_CLAIMS_INVALID")
         key = (lane, mutant_id)
         if key in seen:
@@ -368,7 +623,7 @@ def event_payload(path: Path) -> dict[str, Any]:
 def verify_execution(
     events: Path,
     report_path: Path,
-    expected: set[tuple[object, ...]],
+    mapped: list[dict[str, Any]],
 ) -> dict[str, object]:
     plan_files = sorted(events.glob("*-onMutationTestingPlanReady.json"))
     tested_files = sorted(events.glob("*-onMutantTested.json"))
@@ -381,9 +636,29 @@ def verify_execution(
     report = load_json(report_path, "EXECUTION_REPORT_INVALID")
     if event_payload(report_files[0]) != report:
         raise Refusal("EXECUTION_TERMINAL_REPORT_MISMATCH")
+    expected = {
+        (
+            item["path"],
+            json.dumps(item["location"], sort_keys=True, separators=(",", ":")),
+            item["mutatorName"],
+            item["replacement"],
+            item["static"],
+        )
+        for item in mapped
+    }
+    expected_by_structure = {
+        (
+            item["path"],
+            json.dumps(item["location"], sort_keys=True, separators=(",", ":")),
+            item["mutatorName"],
+            item["replacement"],
+        ): item
+        for item in mapped
+    }
+    if len(expected) != len(mapped) or len(expected_by_structure) != len(mapped):
+        raise Refusal("EXECUTION_EXPECTED_POPULATION_AMBIGUOUS")
     planned = {structural(item["mutant"], include_static=False) for item in plans}
-    expected_without_static = {item[:-1] for item in expected}
-    if planned != expected_without_static or len(planned) != len(plans):
+    if planned != set(expected_by_structure) or len(planned) != len(plans):
         raise Refusal("EXECUTION_PLAN_TARGET_POPULATION_MISMATCH")
     tested: dict[str, tuple[object, ...]] = {}
     for path in tested_files:
@@ -393,6 +668,7 @@ def verify_execution(
             raise Refusal("EXECUTION_TESTED_ID_DUPLICATE")
         tested[mutant_id] = structural(mutant, include_static=False)
     observed: dict[str, tuple[object, ...]] = {}
+    statuses: dict[str, str] = {}
     files = report.get("files")
     if not isinstance(files, dict):
         raise Refusal("EXECUTION_REPORT_INVALID")
@@ -405,6 +681,18 @@ def verify_execution(
             if not isinstance(mutant_id, str) or mutant_id in observed:
                 raise Refusal("EXECUTION_REPORT_ID_DUPLICATE")
             observed[mutant_id] = structural({**mutant, "fileName": path}, include_static=False)
+            status = mutant.get("status")
+            if status not in {
+                "Killed",
+                "Survived",
+                "Timeout",
+                "NoCoverage",
+                "CompileError",
+                "RuntimeError",
+                "Ignored",
+            }:
+                raise Refusal("EXECUTION_REPORT_STATUS_INVALID")
+            statuses[mutant_id] = status
     planned_by_id = {item["mutant"]["id"]: structural(item["mutant"], include_static=False) for item in plans}
     if len(tested_files) != len(plans) or set(tested) != set(planned_by_id):
         raise Refusal("EXECUTION_MUTANT_EVENTS_INCOMPLETE")
@@ -412,22 +700,69 @@ def verify_execution(
         raise Refusal("EXECUTION_REPORT_POPULATION_INCOMPLETE")
     if tested != planned_by_id or observed != planned_by_id:
         raise Refusal("EXECUTION_STRUCTURAL_POPULATION_MISMATCH")
+    by_structure = {value: (mutant_id, statuses[mutant_id]) for mutant_id, value in observed.items()}
+    if len(by_structure) != len(observed):
+        raise Refusal("EXECUTION_STATUS_POPULATION_AMBIGUOUS")
+    outcomes = []
+    for claim in sorted(mapped, key=lambda item: int(item["frozenMutantId"])):
+        key = (
+            claim["path"],
+            json.dumps(claim["location"], sort_keys=True, separators=(",", ":")),
+            claim["mutatorName"],
+            claim["replacement"],
+        )
+        execution_id, status = by_structure[key]
+        outcomes.append(
+            {
+                "lane": claim["lane"],
+                "frozenMutantId": claim["frozenMutantId"],
+                "currentPlanMutantId": claim["currentMutantId"],
+                "executionMutantId": execution_id,
+                "structural": {
+                    "path": claim["path"],
+                    "location": claim["location"],
+                    "mutatorName": claim["mutatorName"],
+                    "replacement": claim["replacement"],
+                    "static": claim["static"],
+                },
+                "status": status,
+                "credited": status == "Killed",
+            }
+        )
+    status_counts = Counter(item["status"] for item in outcomes)
+    killed = [item for item in outcomes if item["credited"]]
     return {
         "plannedMutants": len(plans),
         "testedEvents": len(tested_files),
         "reportMutants": len(observed),
         "structuralPopulationSha256": sha_bytes(canonical(sorted([list(item) for item in expected], key=str))),
+        "statusCounts": dict(sorted(status_counts.items())),
+        "outcomes": outcomes,
+        "credit": {
+            "policy": "only-exact-current-Killed-status-receives-credit",
+            "killed": len(killed),
+            "notCredited": len(outcomes) - len(killed),
+            "allMappedClaimsKilled": len(killed) == len(outcomes),
+            "populationSha256": sha_bytes(canonical(outcomes)),
+        },
     }
 
 
-def shard10(config: dict[str, Any]) -> dict[str, Any]:
+def validate_lane(value: object) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"shard-(?:0[1-9]|1[0-2])", value):
+        raise Refusal("EXACT_CURRENT_LANE_INVALID")
+    return value
+
+
+def selected_lane(config: dict[str, Any], lane_id: str) -> dict[str, Any]:
+    lane_id = validate_lane(lane_id)
     shards = config.get("campaign_shards")
     if not isinstance(shards, list):
-        raise Refusal("SHARD10_SOURCE_POPULATION_INVALID")
-    matches = [item for item in shards if isinstance(item, dict) and item.get("id") in {"shard10", "shard-10"}]
+        raise Refusal("LANE_SOURCE_POPULATION_INVALID")
+    matches = [item for item in shards if isinstance(item, dict) and item.get("id") == lane_id]
     if len(matches) != 1 or not isinstance(matches[0].get("sources"), list) or not matches[0]["sources"]:
-        raise Refusal("SHARD10_SOURCE_POPULATION_INVALID")
-    return {"id": "shard10-planready", "sources": sorted(matches[0]["sources"])}
+        raise Refusal("LANE_SOURCE_POPULATION_INVALID")
+    return {"id": f"{lane_id}-planready", "sources": sorted(matches[0]["sources"])}
 
 
 def bind_source_partition(repo: Path, candidate: str, config: dict[str, Any]) -> None:
@@ -462,11 +797,23 @@ def refresh_case_bindings(case: Path, additions: dict[str, Any]) -> None:
     replace_json(case / "identity.json", identity)
 
 
-def prepare_planready(root: Path, config: dict[str, Any], runner: ModuleType, census_program: Path) -> Path:
+def prepare_planready(
+    root: Path,
+    config: dict[str, Any],
+    runner: ModuleType,
+    census_program: Path,
+    lane_id: str,
+) -> Path:
     prepared_parent = root / "planready"
     prepared_parent.mkdir()
-    prepared = runner.prepare(prepared_parent, config, shard10(config))
+    prepared = runner.prepare(prepared_parent, config, selected_lane(config, lane_id))
     case = prepared / "baseline"
+    materialization_sha = write_materialization_manifest(
+        prepared / "materialization.json",
+        prepared / "candidate",
+        config["candidate"],
+        config["tree"],
+    )
     policy_path = case / "host/stryker.config.json"
     policy = load_json(policy_path, "PREPARED_POLICY_INVALID")
     policy.update(
@@ -474,17 +821,19 @@ def prepare_planready(root: Path, config: dict[str, Any], runner: ModuleType, ce
         dryRunOnly=False,
         dryRunTimeoutMinutes=15,
         cleanTempDir=False,
-        tempDirName=f"/tmp/stryker-shard10-planready-{config['candidate'][:7]}",
+        tempDirName=f"/tmp/stryker-{lane_id}-planready-{config['candidate'][:7]}",
     )
     replace_json(policy_path, policy)
     shutil.copyfile(census_program, case / "host/run.mjs")
     refresh_case_bindings(
         case,
         {
-            "kind": "diagnostic-cli-shard10-planready",
+            "kind": "diagnostic-cli-exact-current-planready",
+            "selectedLane": lane_id,
             "phase": "planready",
             "mutantExecutionPermitted": False,
             "censusProgramSha256": sha_file(census_program),
+            "materializationSha256": materialization_sha,
         },
     )
     return prepared
@@ -492,14 +841,24 @@ def prepare_planready(root: Path, config: dict[str, Any], runner: ModuleType, ce
 
 def prepare(args: argparse.Namespace) -> dict[str, object]:
     repo = args.repo.resolve()
+    lane_id = validate_lane(args.lane)
     bind_candidate(repo, args.final_candidate, args.final_tree)
     inventory_path, inventory_sha = parse_bound_file(args.consolidated, "CONSOLIDATED_BINDING_INVALID")
-    load_consolidated(inventory_path, args.final_candidate, args.final_tree)
+    inventory = load_consolidated(inventory_path, args.final_candidate, args.final_tree)
     runner_path, runner_sha = parse_bound_file(args.runner, "SHARDED_RUNNER_BINDING_INVALID")
     mapper_path, mapper_sha = parse_bound_file(args.mapper, "MAPPER_REFERENCE_BINDING_INVALID")
     census_path, census_sha = parse_bound_file(args.census_program, "CENSUS_PROGRAM_BINDING_INVALID")
     config_path, config_sha = parse_bound_file(args.campaign_config, "CAMPAIGN_CONFIG_BINDING_INVALID")
     config = load_json(config_path, "CAMPAIGN_CONFIG_INVALID")
+    retained_bindings = [
+        {"lane": lane, "path": str(path), "completionSha256": digest}
+        for lane, path, digest in (parse_retained(spec) for spec in args.frozen_retained)
+    ]
+    if [item["lane"] for item in retained_bindings] != [lane_id]:
+        raise Refusal("SELECTED_LANE_FROZEN_RETENTION_BINDING_INVALID")
+    validate_frozen_retention(
+        Path(retained_bindings[0]["path"]), frozen_campaign(inventory), lane_id
+    )
     runner = load_module(
         runner_path, runner_sha, "devai_cli_sharded_bound", "SHARDED_RUNNER_BINDING_INVALID"
     )
@@ -514,10 +873,10 @@ def prepare(args: argparse.Namespace) -> dict[str, object]:
         runner_sha256=runner_sha,
         census_program_name=census_path.name,
         census_program_sha256=census_sha,
-        campaign_id=f"devai-cli-exact-current-shard10-{args.final_candidate[:12]}",
-        allocation_id="exact-current-shard10",
+        campaign_id=f"devai-cli-exact-current-{lane_id}-{args.final_candidate[:12]}",
+        allocation_id=f"exact-current-{lane_id}",
         parallel_shards=1,
-        assigned_shard_ids=["shard10-planready"],
+        assigned_shard_ids=[f"{lane_id}-planready"],
         output_root=str(args.output.resolve()),
         census_evidence={
             "candidate": args.final_candidate,
@@ -535,12 +894,13 @@ def prepare(args: argparse.Namespace) -> dict[str, object]:
     if not mapper_binder.is_file() or mapper_binder.is_symlink():
         raise Refusal("MAPPER_BINDER_REFERENCE_INVALID")
     inputs = {
-        "kind": "diagnostic-cli-shard10-exact-current-inputs",
+        "kind": "diagnostic-cli-exact-current-lane-inputs",
         "version": 1,
         "diagnosticOnly": True,
         "launchAuthorized": False,
         "candidate": args.final_candidate,
         "tree": args.final_tree,
+        "selectedLane": lane_id,
         "repository": str(repo),
         "consolidated": {"path": str(inventory_path), "sha256": inventory_sha},
         "runner": {"path": str(runner_path), "sha256": runner_sha},
@@ -548,25 +908,20 @@ def prepare(args: argparse.Namespace) -> dict[str, object]:
         "mapperBinderReference": {"path": str(mapper_binder), "sha256": sha_file(mapper_binder)},
         "censusProgram": {"path": str(census_path), "sha256": census_sha},
         "campaignConfig": {"path": str(config_path), "sha256": config_sha},
-        "frozenRetained": [
-            {"lane": lane, "path": str(path), "completionSha256": digest}
-            for lane, path, digest in (parse_retained(spec) for spec in args.frozen_retained)
-        ],
+        "frozenRetained": retained_bindings,
     }
-    lanes = [item["lane"] for item in inputs["frozenRetained"]]
-    if lanes.count("shard-10") != 1 or len(lanes) != len(set(lanes)):
-        raise Refusal("SHARD10_FROZEN_RETENTION_BINDING_INVALID")
     write_json_exclusive(args.output / "inputs.json", inputs)
     write_json_exclusive(args.output / "effective-config.json", config)
-    prepared = prepare_planready(args.output, config, runner, census_path)
+    prepared = prepare_planready(args.output, config, runner, census_path, lane_id)
     completion = {
-        "kind": "diagnostic-cli-shard10-exact-current-preparation",
+        "kind": "diagnostic-cli-exact-current-lane-preparation",
         "version": 1,
         "diagnosticOnly": True,
         "launchAuthorized": False,
         "status": "prepared-no-docker-launch",
         "candidate": args.final_candidate,
         "tree": args.final_tree,
+        "selectedLane": lane_id,
         "inputsSha256": sha_file(args.output / "inputs.json"),
         "effectiveConfigSha256": sha_file(args.output / "effective-config.json"),
         "planreadyIdentitySha256": sha_file(prepared / "baseline/identity.json"),
@@ -584,27 +939,47 @@ def validate_preparation(completion_spec: str) -> tuple[Path, dict[str, Any], di
     completion_path, _ = parse_bound_file(completion_spec, "PREPARATION_COMPLETION_BINDING_INVALID")
     completion = load_json(completion_path, "PREPARATION_COMPLETION_INVALID")
     root = completion_path.parent
-    if completion.get("kind") != "diagnostic-cli-shard10-exact-current-preparation" or completion.get("status") != "prepared-no-docker-launch":
+    if completion.get("kind") != "diagnostic-cli-exact-current-lane-preparation" or completion.get("status") != "prepared-no-docker-launch":
         raise Refusal("PREPARATION_COMPLETION_INVALID")
     regular_file(root / "inputs.json", completion.get("inputsSha256", ""), "PREPARATION_INPUTS_BINDING_INVALID")
     regular_file(root / "effective-config.json", completion.get("effectiveConfigSha256", ""), "PREPARATION_CONFIG_BINDING_INVALID")
     inputs = load_json(root / "inputs.json", "PREPARATION_INPUTS_INVALID")
     config = load_json(root / "effective-config.json", "PREPARATION_CONFIG_INVALID")
+    lane_id = validate_lane(completion.get("selectedLane"))
     candidate_binding = {"candidate": completion.get("candidate"), "tree": completion.get("tree")}
     if (
-        inputs.get("kind") != "diagnostic-cli-shard10-exact-current-inputs"
+        inputs.get("kind") != "diagnostic-cli-exact-current-lane-inputs"
         or inputs.get("diagnosticOnly") is not True
         or inputs.get("launchAuthorized") is not False
         or {key: inputs.get(key) for key in candidate_binding} != candidate_binding
         or {key: config.get(key) for key in candidate_binding} != candidate_binding
+        or inputs.get("selectedLane") != lane_id
+        or config.get("assigned_shard_ids") != [f"{lane_id}-planready"]
         or config.get("diagnosticOnly") is not True
     ):
         raise Refusal("PREPARATION_INTERNAL_BINDING_INVALID")
-    prepared = root / "planready/shard10-planready"
+    retained = inputs.get("frozenRetained")
+    if not isinstance(retained, list) or any(not isinstance(item, dict) for item in retained):
+        raise Refusal("SELECTED_LANE_FROZEN_RETENTION_BINDING_INVALID")
+    retained_lanes = [item.get("lane") for item in retained]
+    if retained_lanes != [lane_id]:
+        raise Refusal("SELECTED_LANE_FROZEN_RETENTION_BINDING_INVALID")
+    prepared = root / "planready" / f"{lane_id}-planready"
     regular_file(prepared / "baseline/identity.json", completion.get("planreadyIdentitySha256", ""), "PLANREADY_IDENTITY_BINDING_INVALID")
     planready_identity = load_json(prepared / "baseline/identity.json", "PLANREADY_IDENTITY_INVALID")
-    if {key: planready_identity.get(key) for key in candidate_binding} != candidate_binding:
+    if (
+        {key: planready_identity.get(key) for key in candidate_binding} != candidate_binding
+        or planready_identity.get("selectedLane") != lane_id
+        or planready_identity.get("shardId") != f"{lane_id}-planready"
+    ):
         raise Refusal("PLANREADY_CANDIDATE_BINDING_INVALID")
+    verify_materialization_manifest(
+        prepared / "materialization.json",
+        planready_identity.get("materializationSha256", ""),
+        prepared / "candidate",
+        str(candidate_binding["candidate"]),
+        str(candidate_binding["tree"]),
+    )
     for binding in (
         inputs["consolidated"],
         inputs["runner"],
@@ -616,14 +991,31 @@ def validate_preparation(completion_spec: str) -> tuple[Path, dict[str, Any], di
         regular_file(Path(binding["path"]), binding["sha256"], "PREPARATION_SOURCE_BINDING_CHANGED")
     for binding in inputs["frozenRetained"]:
         regular_file(Path(binding["path"]) / "retention-completion.json", binding["completionSha256"], "FROZEN_RETENTION_BINDING_CHANGED")
+    inventory = load_consolidated(
+        Path(inputs["consolidated"]["path"]),
+        str(candidate_binding["candidate"]),
+        str(candidate_binding["tree"]),
+    )
+    validate_frozen_retention(
+        Path(retained[0]["path"]), frozen_campaign(inventory), lane_id
+    )
     return root, completion, inputs, config
 
 
-def execute_planready(case: Path, runner: ModuleType, group: str) -> dict[str, Any]:
+def execute_planready(
+    case: Path, runner: ModuleType, group: str, attempt_id: str
+) -> dict[str, Any]:
     identity = load_json(case / "identity.json", "PLANREADY_IDENTITY_INVALID")
     candidate = case.parent / "candidate"
     if git(candidate, "rev-parse", "HEAD") != identity["candidate"]:
         raise Refusal("PLANREADY_CANDIDATE_CHANGED")
+    verify_materialization_manifest(
+        case.parent / "materialization.json",
+        identity.get("materializationSha256", ""),
+        candidate,
+        identity["candidate"],
+        identity["tree"],
+    )
     for member in identity["targets"] + identity["tests"]:
         regular_file(candidate / member["path"], member["sha256"], "PLANREADY_SOURCE_OR_TEST_CHANGED")
     for member in identity["controls"]:
@@ -631,7 +1023,8 @@ def execute_planready(case: Path, runner: ModuleType, group: str) -> dict[str, A
     lane = identity["lane"]
     if not re.fullmatch(r"sha256:[a-f0-9]{64}", identity.get("image", "")):
         raise Refusal("PLANREADY_IMAGE_NOT_PINNED")
-    name = f"devai-cli-{identity['candidate'][:7]}-exact-current-shard10-planready"
+    lane_id = validate_lane(identity.get("selectedLane"))
+    name = f"devai-cli-{identity['candidate'][:7]}-{attempt_id}-{lane_id}-planready"
     args = [
         runner.DOCKER,
         "create",
@@ -693,6 +1086,13 @@ def execute_planready(case: Path, runner: ModuleType, group: str) -> dict[str, A
             )
             raise Refusal("PLANREADY_EXECUTION_TIMEOUT") from error
     state = json.loads(runner.docker(["inspect", container_id]))[0]
+    verify_materialization_manifest(
+        case.parent / "materialization.json",
+        identity.get("materializationSha256", ""),
+        candidate,
+        identity["candidate"],
+        identity["tree"],
+    )
     if result.returncode or state["State"]["Status"] != "exited" or state["State"]["ExitCode"] or state["State"]["OOMKilled"]:
         raise Refusal("PLANREADY_EXECUTION_FAILED")
     plan_path = case / "results/census-plan.json"
@@ -710,7 +1110,7 @@ def execute_planready(case: Path, runner: ModuleType, group: str) -> dict[str, A
     if {item.get("path") for item in summary_files} != {item["path"] for item in identity["targets"]}:
         raise Refusal("PLANREADY_SOURCE_POPULATION_INVALID")
     completion = {
-        "kind": "diagnostic-cli-shard10-planready-completion",
+        "kind": "diagnostic-cli-exact-current-planready-completion",
         "version": 1,
         "diagnosticOnly": True,
         "mutantExecutionStarted": False,
@@ -748,14 +1148,14 @@ def retain_planready(case: Path, destination: Path) -> dict[str, Any]:
             os.fsync(stream.fileno())
         members.append({"path": target.name, "sha256": sha_file(target), "bytes": target.stat().st_size})
     index = {
-        "kind": "diagnostic-cli-shard10-planready-retention-index",
+        "kind": "diagnostic-cli-exact-current-planready-retention-index",
         "version": 1,
         "diagnosticOnly": True,
         "files": members,
     }
     write_json_exclusive(destination / "retention-index.json", index)
     completion = {
-        "kind": "diagnostic-cli-shard10-planready-retention-completion",
+        "kind": "diagnostic-cli-exact-current-planready-retention-completion",
         "version": 1,
         "diagnosticOnly": True,
         "retentionIndexSha256": sha_file(destination / "retention-index.json"),
@@ -771,13 +1171,15 @@ def patch_target_cases(
     mapped: list[dict[str, Any]],
     plan_sha: str,
     inventory_sha: str,
+    materialization_sha: str,
 ) -> None:
     additions = {
-        "kind": "diagnostic-cli-shard10-exact-current-target",
+        "kind": "diagnostic-cli-exact-current-lane-target",
         "exactMutateRanges": ranges,
         "mappedClaims": mapped,
         "currentPlanSha256": plan_sha,
         "consolidatedInventorySha256": inventory_sha,
+        "materializationSha256": materialization_sha,
     }
     for phase in ("baseline", "mutation"):
         case = prepared / phase
@@ -788,8 +1190,159 @@ def patch_target_cases(
         refresh_case_bindings(case, additions)
 
 
+def attempt_evidence_files(root: Path) -> list[dict[str, object]]:
+    members: list[dict[str, object]] = []
+    for directory, names, files in os.walk(root, topdown=True, followlinks=False):
+        base = Path(directory)
+        relative_base = base.relative_to(root)
+        if any((base / name).is_symlink() for name in names):
+            raise Refusal("ATTEMPT_EVIDENCE_MEMBER_INVALID")
+        names[:] = sorted(
+            name
+            for name in names
+            if name not in {".git", "node_modules", "candidate"}
+        )
+        for name in sorted(files):
+            path = base / name
+            relative = (relative_base / name).as_posix()
+            if relative in {"attempt-index.json", "attempt-completion.json"}:
+                continue
+            if path.is_symlink() or not path.is_file():
+                raise Refusal("ATTEMPT_EVIDENCE_MEMBER_INVALID")
+            members.append(
+                {
+                    "path": relative,
+                    "sha256": sha_file(path),
+                    "bytes": path.stat().st_size,
+                }
+            )
+    return members
+
+
+def observed_containers(root: Path, runner: ModuleType | None) -> list[dict[str, object]]:
+    containers: list[dict[str, object]] = []
+    for path in sorted(root.glob("**/container.json")):
+        if "candidate" in path.relative_to(root).parts:
+            continue
+        relative = path.relative_to(root).as_posix()
+        try:
+            value = load_json(path, "ATTEMPT_CONTAINER_RECORD_INVALID")
+            container_id = value.get("id")
+            if not re.fullmatch(r"[a-f0-9]{64}", str(container_id)):
+                raise Refusal("ATTEMPT_CONTAINER_RECORD_INVALID")
+            state: object = "inspection-unavailable"
+            if runner is not None:
+                try:
+                    inspected = json.loads(runner.docker(["inspect", container_id]))
+                    state = inspected[0].get("State", {}) if len(inspected) == 1 else "inspection-invalid"
+                except Exception:
+                    state = "inspection-unavailable"
+            containers.append(
+                {
+                    "record": relative,
+                    "id": container_id,
+                    "name": value.get("name"),
+                    "state": state,
+                }
+            )
+        except Exception as error:
+            containers.append({"record": relative, "state": "record-invalid", "error": type(error).__name__})
+    return containers
+
+
+def seal_attempt(
+    root: Path,
+    preparation_sha256: str,
+    attempt_id: str,
+    candidate: str,
+    tree: str,
+    lane_id: str,
+    status_value: str,
+    error_code: str | None,
+    runner: ModuleType | None,
+) -> dict[str, object]:
+    members = attempt_evidence_files(root)
+    index = {
+        "kind": "diagnostic-cli-exact-current-lane-attempt-index",
+        "version": 1,
+        "attemptId": attempt_id,
+        "selectedLane": lane_id,
+        "files": members,
+    }
+    replace_json(root / "attempt-index.json", index)
+    completion: dict[str, object] = {
+        "kind": "diagnostic-cli-exact-current-lane-attempt-completion",
+        "version": 1,
+        "diagnosticOnly": True,
+        "productionCertification": False,
+        "attemptId": attempt_id,
+        "candidate": candidate,
+        "tree": tree,
+        "selectedLane": lane_id,
+        "preparationCompletionSha256": preparation_sha256,
+        "status": status_value,
+        "errorCode": error_code,
+        "attemptIndexSha256": sha_file(root / "attempt-index.json"),
+        "containers": observed_containers(root, runner),
+    }
+    write_json_exclusive(root / "attempt-completion.json", completion)
+    return completion
+
+
+def validate_attempt_seal(
+    root: Path, preparation_sha256: str, candidate: str, tree: str, lane_id: str
+) -> dict[str, Any]:
+    completion = load_json(root / "attempt-completion.json", "ATTEMPT_COMPLETION_INVALID")
+    expected = {
+        "candidate": candidate,
+        "tree": tree,
+        "preparationCompletionSha256": preparation_sha256,
+        "selectedLane": lane_id,
+    }
+    if (
+        completion.get("kind") != "diagnostic-cli-exact-current-lane-attempt-completion"
+        or completion.get("diagnosticOnly") is not True
+        or {key: completion.get(key) for key in expected} != expected
+    ):
+        raise Refusal("ATTEMPT_COMPLETION_IDENTITY_MISMATCH")
+    index_path = root / "attempt-index.json"
+    regular_file(
+        index_path,
+        completion.get("attemptIndexSha256", ""),
+        "ATTEMPT_INDEX_BINDING_INVALID",
+    )
+    index = load_json(index_path, "ATTEMPT_INDEX_INVALID")
+    if (
+        index.get("attemptId") != completion.get("attemptId")
+        or index.get("selectedLane") != lane_id
+        or index.get("files") != attempt_evidence_files(root)
+    ):
+        raise Refusal("ATTEMPT_EVIDENCE_CHANGED")
+    return completion
+
+
+def runtime_attempt_started(root: Path) -> bool:
+    runtime_containers = [
+        path
+        for path in root.glob("**/container.json")
+        if "candidate" not in path.relative_to(root).parts
+    ]
+    return bool(runtime_containers) or any(
+        (root / name).exists()
+        for name in ("retained-planready", "current-map.json", "targeted", "execution-completion.json")
+    )
+
+
+def attempt_identity(preparation_sha256: str, lane_id: str) -> tuple[str, str]:
+    if not re.fullmatch(r"[a-f0-9]{64}", preparation_sha256):
+        raise Refusal("PREPARATION_COMPLETION_BINDING_INVALID")
+    lane_id = validate_lane(lane_id)
+    attempt_id = preparation_sha256[:12]
+    return attempt_id, f"cli-exact-current-{lane_id}-{attempt_id}"
+
+
 def execute(args: argparse.Namespace) -> dict[str, object]:
-    if args.authorization != "RUN_DIAGNOSTIC_SHARD10_EXACT_CURRENT":
+    if args.authorization != "RUN_DIAGNOSTIC_CLI_LANE_EXACT_CURRENT":
         raise Refusal("EXPLICIT_DIAGNOSTIC_LAUNCH_AUTHORIZATION_REQUIRED")
     root, preparation, inputs, config = validate_preparation(args.prepared)
     repo = Path(inputs["repository"])
@@ -810,96 +1363,212 @@ def execute(args: argparse.Namespace) -> dict[str, object]:
     )
     runner.BASE = Path(runner_binding["path"]).parent
     runner.REPOSITORY = repo
-    group = f"cli-exact-current-shard10-{preparation['candidate'][:12]}"
-    runner.assert_no_foreign_running(group)
-    planready_case = root / "planready/shard10-planready/baseline"
-    execute_planready(planready_case, runner, group)
-    retained_plan = root / "retained-planready"
-    retain_planready(planready_case, retained_plan)
-    current_plan_path = retained_plan / "results-census-plan.json"
-    current_plan = plan_population(load_json(current_plan_path, "CURRENT_PLAN_INVALID"))
-    inventory_path = Path(inputs["consolidated"]["path"])
-    inventory = load_consolidated(inventory_path, preparation["candidate"], preparation["tree"])
-    claims = [claim for claim in inventory["claims"] if claim["lane"] == "shard-10"]
-    if not claims:
-        raise Refusal("SHARD10_CLAIM_POPULATION_EMPTY")
-    retained_bindings = [item for item in inputs["frozenRetained"] if item["lane"] == "shard-10"]
-    if len(retained_bindings) != 1:
-        raise Refusal("SHARD10_FROZEN_RETENTION_BINDING_INVALID")
-    frozen_retained = Path(retained_bindings[0]["path"])
-    frozen_plan = load_frozen_plan(frozen_retained)
-    mapped = map_claims(claims, frozen_plan, current_plan, mapper.structural)
-    source_bindings = verify_source_blobs(repo, preparation["candidate"], frozen_retained, mapped)
-    ranges = derive_exact_ranges(mapped, current_plan)
-    mapping = {
-        "kind": "devai-cli-shard10-exact-current-plan-remediation-map",
-        "version": 1,
-        "diagnosticOnly": True,
-        "launchAuthorized": False,
-        "candidate": preparation["candidate"],
-        "tree": preparation["tree"],
-        "consolidatedInventorySha256": inputs["consolidated"]["sha256"],
-        "currentPlanSha256": sha_file(current_plan_path),
-        "sourceBlobSha256": source_bindings,
-        "mappedClaims": mapped,
-        "exactMutateRanges": ranges,
-        "population": {
-            "count": len(mapped),
-            "sha256": sha_bytes(canonical([[item["lane"], item["frozenMutantId"], item["currentMutantId"]] for item in mapped])),
-        },
-    }
-    write_json_exclusive(root / "current-map.json", mapping)
-    target_parent = root / "targeted"
-    target_parent.mkdir()
-    target_shard = {"id": "shard10-exact-current", "sources": sorted({item["path"] for item in mapped})}
-    config["census_evidence"] = {
-        "candidate": preparation["candidate"],
-        "tree": preparation["tree"],
-        "mutantExecutionStarted": False,
-        "maximumPossibleScore": load_json(planready_case / "results/census-summary.json", "PLANREADY_SUMMARY_INVALID").get("maximumPossibleScore"),
-    }
-    targeted = runner.prepare(target_parent, config, target_shard)
-    patch_target_cases(
-        targeted,
-        ranges,
-        mapped,
-        sha_file(current_plan_path),
-        inputs["consolidated"]["sha256"],
-    )
-    for phase in ("baseline", "mutation"):
-        runner.assert_no_foreign_running(group)
-        runner.execute(targeted, phase, group)
-    expected = {
-        (
-            item["path"],
-            json.dumps(item["location"], sort_keys=True, separators=(",", ":")),
-            item["mutatorName"],
-            item["replacement"],
-            item["static"],
+    lane_id = validate_lane(inputs.get("selectedLane"))
+    preparation_sha = parse_bound_file(
+        args.prepared, "PREPARATION_COMPLETION_BINDING_INVALID"
+    )[1]
+    attempt_id, group = attempt_identity(preparation_sha, lane_id)
+    if (root / "attempt-completion.json").exists():
+        prior = validate_attempt_seal(
+            root, preparation_sha, preparation["candidate"], preparation["tree"], lane_id
         )
-        for item in mapped
-    }
-    completeness = verify_execution(
-        targeted / "mutation/results/events",
-        targeted / "mutation/results/mutation.json",
-        expected,
-    )
-    completion = {
-        "kind": "diagnostic-cli-shard10-exact-current-completion",
-        "version": 1,
-        "diagnosticOnly": True,
-        "productionCertification": False,
-        "candidate": preparation["candidate"],
-        "tree": preparation["tree"],
-        "preparationCompletionSha256": parse_bound_file(args.prepared, "PREPARATION_COMPLETION_BINDING_INVALID")[1],
-        "planreadyRetentionCompletionSha256": sha_file(retained_plan / "retention-completion.json"),
-        "mappingSha256": sha_file(root / "current-map.json"),
-        "targetRetentionCompletionSha256": sha_file(targeted / "retained/retention-completion.json"),
-        "eventCompleteness": completeness,
-        "status": "execution-complete-diagnostic-only",
-    }
-    write_json_exclusive(root / "execution-completion.json", completion)
-    return {"output": str(root / "execution-completion.json"), "sha256": sha_file(root / "execution-completion.json"), "mapped": len(mapped)}
+        if prior.get("status") == "succeeded":
+            execution_path = root / "execution-completion.json"
+            execution = load_json(execution_path, "EXECUTION_COMPLETION_INVALID")
+            if (
+                execution.get("attemptId") != attempt_id
+                or execution.get("selectedLane") != lane_id
+                or execution.get("candidate") != preparation["candidate"]
+                or execution.get("tree") != preparation["tree"]
+                or execution.get("preparationCompletionSha256") != preparation_sha
+            ):
+                raise Refusal("EXECUTION_COMPLETION_ATTEMPT_MISMATCH")
+            return {
+                "output": str(execution_path),
+                "sha256": sha_file(execution_path),
+                "mapped": execution.get("eventCompleteness", {}).get("plannedMutants"),
+                "creditedKilled": execution.get("eventCompleteness", {}).get("credit", {}).get("killed"),
+                "reconciled": True,
+            }
+        raise Refusal("PREVIOUS_ATTEMPT_TERMINAL_REQUIRES_NEW_PREPARATION")
+    if runtime_attempt_started(root):
+        seal_attempt(
+            root,
+            preparation_sha,
+            attempt_id,
+            preparation["candidate"],
+            preparation["tree"],
+            lane_id,
+            "recovered-interrupted",
+            "PARTIAL_ATTEMPT_STATE_FOUND",
+            runner,
+        )
+        raise Refusal("PARTIAL_ATTEMPT_SEALED_REQUIRES_NEW_PREPARATION")
+    runner.assert_no_foreign_running(group)
+    try:
+        planready_case = root / "planready" / f"{lane_id}-planready" / "baseline"
+        execute_planready(planready_case, runner, group, attempt_id)
+        retained_plan = root / "retained-planready"
+        retain_planready(planready_case, retained_plan)
+        current_plan_path = retained_plan / "results-census-plan.json"
+        current_plan = plan_population(load_json(current_plan_path, "CURRENT_PLAN_INVALID"))
+        inventory_path = Path(inputs["consolidated"]["path"])
+        inventory = load_consolidated(
+            inventory_path, preparation["candidate"], preparation["tree"]
+        )
+        claims = [claim for claim in inventory["claims"] if claim["lane"] == lane_id]
+        if not claims:
+            raise Refusal("SELECTED_LANE_CLAIM_POPULATION_EMPTY")
+        retained_bindings = [
+            item for item in inputs["frozenRetained"] if item["lane"] == lane_id
+        ]
+        if len(retained_bindings) != 1:
+            raise Refusal("SELECTED_LANE_FROZEN_RETENTION_BINDING_INVALID")
+        frozen_retained = Path(retained_bindings[0]["path"])
+        frozen_plan = load_frozen_plan(
+            frozen_retained, frozen_campaign(inventory), lane_id
+        )
+        mapped = map_claims(claims, frozen_plan, current_plan, mapper.structural)
+        source_bindings = verify_source_blobs(
+            repo, preparation["candidate"], frozen_retained, mapped
+        )
+        ranges = derive_exact_ranges(mapped, current_plan)
+        mapping = {
+            "kind": "devai-cli-exact-current-lane-plan-remediation-map",
+            "version": 1,
+            "diagnosticOnly": True,
+            "launchAuthorized": False,
+            "candidate": preparation["candidate"],
+            "tree": preparation["tree"],
+            "consolidatedInventorySha256": inputs["consolidated"]["sha256"],
+            "currentPlanSha256": sha_file(current_plan_path),
+            "sourceBlobSha256": source_bindings,
+            "mappedClaims": mapped,
+            "exactMutateRanges": ranges,
+            "population": {
+                "count": len(mapped),
+                "sha256": sha_bytes(
+                    canonical(
+                        [
+                            [item["lane"], item["frozenMutantId"], item["currentMutantId"]]
+                            for item in mapped
+                        ]
+                    )
+                ),
+            },
+        }
+        write_json_exclusive(root / "current-map.json", mapping)
+        target_parent = root / "targeted"
+        target_parent.mkdir()
+        target_shard = {
+            "id": f"{lane_id}-exact-current",
+            "sources": sorted({item["path"] for item in mapped}),
+        }
+        config["allocation_id"] = f"exact-current-{lane_id}-{attempt_id}"
+        config["census_evidence"] = {
+            "candidate": preparation["candidate"],
+            "tree": preparation["tree"],
+            "mutantExecutionStarted": False,
+            "maximumPossibleScore": load_json(
+                planready_case / "results/census-summary.json", "PLANREADY_SUMMARY_INVALID"
+            ).get("maximumPossibleScore"),
+        }
+        targeted = runner.prepare(target_parent, config, target_shard)
+        target_materialization_sha = write_materialization_manifest(
+            targeted / "materialization.json",
+            targeted / "candidate",
+            preparation["candidate"],
+            preparation["tree"],
+        )
+        patch_target_cases(
+            targeted,
+            ranges,
+            mapped,
+            sha_file(current_plan_path),
+            inputs["consolidated"]["sha256"],
+            target_materialization_sha,
+        )
+        for phase in ("baseline", "mutation"):
+            verify_materialization_manifest(
+                targeted / "materialization.json",
+                target_materialization_sha,
+                targeted / "candidate",
+                preparation["candidate"],
+                preparation["tree"],
+            )
+            runner.assert_no_foreign_running(group)
+            runner.execute(targeted, phase, group)
+            verify_materialization_manifest(
+                targeted / "materialization.json",
+                target_materialization_sha,
+                targeted / "candidate",
+                preparation["candidate"],
+                preparation["tree"],
+            )
+        completeness = verify_execution(
+            targeted / "mutation/results/events",
+            targeted / "mutation/results/mutation.json",
+            mapped,
+        )
+        credit = completeness["credit"]
+        completion = {
+            "kind": "diagnostic-cli-exact-current-lane-completion",
+            "version": 1,
+            "diagnosticOnly": True,
+            "productionCertification": False,
+            "attemptId": attempt_id,
+            "selectedLane": lane_id,
+            "candidate": preparation["candidate"],
+            "tree": preparation["tree"],
+            "preparationCompletionSha256": preparation_sha,
+            "planreadyRetentionCompletionSha256": sha_file(
+                retained_plan / "retention-completion.json"
+            ),
+            "mappingSha256": sha_file(root / "current-map.json"),
+            "targetRetentionCompletionSha256": sha_file(
+                targeted / "retained/retention-completion.json"
+            ),
+            "eventCompleteness": completeness,
+            "status": (
+                "execution-complete-all-mapped-killed"
+                if credit["allMappedClaimsKilled"]
+                else "execution-complete-with-non-killed-claims"
+            ),
+        }
+        write_json_exclusive(root / "execution-completion.json", completion)
+        seal_attempt(
+            root,
+            preparation_sha,
+            attempt_id,
+            preparation["candidate"],
+            preparation["tree"],
+            lane_id,
+            "succeeded",
+            None,
+            runner,
+        )
+        return {
+            "output": str(root / "execution-completion.json"),
+            "sha256": sha_file(root / "execution-completion.json"),
+            "mapped": len(mapped),
+            "creditedKilled": credit["killed"],
+            "reconciled": False,
+        }
+    except BaseException as error:
+        if not (root / "attempt-completion.json").exists():
+            code = str(error).split(":", 1)[0] or type(error).__name__
+            seal_attempt(
+                root,
+                preparation_sha,
+                attempt_id,
+                preparation["candidate"],
+                preparation["tree"],
+                lane_id,
+                "interrupted" if isinstance(error, (KeyboardInterrupt, SystemExit)) else "failed",
+                code[:160],
+                runner,
+            )
+        raise
 
 
 def parser() -> argparse.ArgumentParser:
@@ -907,6 +1576,7 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="command", required=True)
     prepare_parser = commands.add_parser("prepare")
     prepare_parser.add_argument("--repo", type=Path, required=True)
+    prepare_parser.add_argument("--lane", required=True, metavar="shard-NN")
     prepare_parser.add_argument("--final-candidate", required=True)
     prepare_parser.add_argument("--final-tree", required=True)
     prepare_parser.add_argument("--consolidated", required=True, metavar="PATH=SHA256")
