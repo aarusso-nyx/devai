@@ -57,6 +57,7 @@ function adapterFixture(
     readonly failVerify?: boolean;
     readonly failPutAt?: number;
     readonly failCommit?: boolean;
+    readonly corruptPutIdentity?: 'sink' | 'sha256' | 'size' | 'handle';
   } = {},
 ) {
   const rows = source.contract['packages'] as readonly Record<string, unknown>[];
@@ -154,6 +155,7 @@ function sinkFixture(
     readonly failVerify?: boolean;
     readonly failPutAt?: number;
     readonly failCommit?: boolean;
+    readonly corruptPutIdentity?: 'sink' | 'sha256' | 'size' | 'handle';
   },
 ) {
   const objects = new Map<string, Buffer>();
@@ -172,12 +174,26 @@ function sinkFixture(
       puts += 1;
       if (options.failPutAt === puts) throw new Error(REFUSAL);
       objects.set(sha256, Buffer.from(bytes));
-      return {
+      const identity = {
         evidence_sink_id: 'retention-test-sink',
         opaque_handle: `sha256:${sha256}`,
         sha256,
         size_bytes,
       };
+      if (options.corruptPutIdentity === 'sink') {
+        return { ...identity, evidence_sink_id: 'substituted-sink' };
+      }
+      if (options.corruptPutIdentity === 'sha256') {
+        const substituted = '0'.repeat(64);
+        return { ...identity, sha256: substituted, opaque_handle: `sha256:${substituted}` };
+      }
+      if (options.corruptPutIdentity === 'size') {
+        return { ...identity, size_bytes: size_bytes + 1 };
+      }
+      if (options.corruptPutIdentity === 'handle') {
+        return { ...identity, opaque_handle: 'substituted-handle' };
+      }
+      return identity;
     },
     verify: async (projection) => {
       if (aborted || committed) throw new Error(REFUSAL);
@@ -459,6 +475,18 @@ describe('release mutation retention adapter', () => {
       );
       expect(value.sink.state.begins).toBe(0);
       expect(value.sink.state.puts).toBe(0);
+    }
+  });
+
+  it('aborts immediately when the sink returns a forged object identity', async () => {
+    const source = await evidenceFixture();
+    for (const corruptPutIdentity of ['sink', 'sha256', 'size', 'handle'] as const) {
+      const value = adapterFixture(source, { corruptPutIdentity });
+      await refuses(() => retainReleaseMutationEvidenceV21(value.input));
+      expect(value.sink.state.puts, corruptPutIdentity).toBe(1);
+      expect(value.sink.state.objects.size, corruptPutIdentity).toBe(1);
+      expect(value.sink.state.aborted, corruptPutIdentity).toBe(true);
+      expect(value.sink.state.committed, corruptPutIdentity).toBe(false);
     }
   });
 
