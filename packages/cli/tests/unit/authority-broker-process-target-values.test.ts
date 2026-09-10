@@ -93,6 +93,16 @@ describe('authority broker process target values', () => {
     });
   });
 
+  it.each(['start', 'stop'] as const)(
+    'uses the shared cluster when Docker %s omits a container name',
+    (verb) => {
+      expect(target('task start', 'docker', [verb])).toMatchObject({
+        database_id: 'cluster',
+        object_id: 'devai-shared-pg',
+      });
+    },
+  );
+
   it.each([
     ['other', ['run'], 'task start'],
     ['docker', ['other'], 'task start'],
@@ -120,6 +130,8 @@ describe('authority broker process target values', () => {
   it.each([
     ['docker', ['start', 'fixture'], 'check'],
     ['sandbox-exec', ['node'], 'check'],
+    ['docker', ['run', '--rm', 'fixture'], 'round run'],
+    ['sandbox-exec', ['-p', '(version 1)', 'node'], 'round run'],
   ] as const)(
     'does not classify altered check sandbox %s %j for %s',
     (executable, args, action) => {
