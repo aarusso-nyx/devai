@@ -3703,6 +3703,17 @@ describe('release lifecycle execution kernel', () => {
     const store = new ReleaseLifecycleFileStore(root(), value);
     const success = await seedPreflight(store);
     const {
+      state_id: _stateId,
+      record_digest_sha256: _recordDigest,
+      ...currentDraft
+    } = success.state;
+    for (const schemaVersion of ['2.0.0', '2.1.0'] as const) {
+      const current = finalizeReleaseStateV2({ ...currentDraft, schemaVersion });
+      expect(() =>
+        verifyReleaseStateIdentity({ ...current, state_id: `RLS-${'f'.repeat(16)}` }),
+      ).toThrow('release-state-id-or-digest-mismatch');
+    }
+    const {
       canonicalization: _canonicalization,
       release_units: _units,
       storage: _storage,
