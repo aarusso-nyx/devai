@@ -335,6 +335,140 @@ describe('durable certified evidence retention', () => {
     expect(decoded.census.entries[0]?.path).toBe('generated/report.json');
   });
 
+  it('accepts one retained carrier bound to one of several committed derivations', async () => {
+    const fixture = storeFixture();
+    const owner = fixture.store.authority_owner;
+    const selected = binding('@fixture/pkg');
+    const other = {
+      ...binding('@fixture/other'),
+      task_policy_digest_sha256: '0'.repeat(64),
+    };
+    const transaction = await invokeSink(owner, () => fixture.store.begin([selected, other]));
+    const handle = await invokeSink(owner, () =>
+      transaction.put({
+        bytes: generated,
+        sha256: sha256(generated),
+        size_bytes: generated.length,
+      }),
+    );
+    const bytes = carrierBytes();
+    await invokeSink(owner, () =>
+      transaction.putCertifiedEvidenceCarrier?.({
+        release_unit: UNIT,
+        bytes,
+        sha256: sha256(bytes),
+        size_bytes: bytes.length,
+      }),
+    );
+    await invokeSink(owner, () =>
+      transaction.commit([
+        { ...selected, outputs: outputs(handle) },
+        { ...other, outputs: [] },
+      ]),
+    );
+
+    expect(
+      createReleaseCertificationEvidenceStore(fixture.input)
+        .readCertifiedEvidenceCarrier?.({ ...derivation, release_unit: UNIT })
+        .equals(bytes),
+    ).toBe(true);
+  });
+
+  it('refuses same-size carrier bytes whose digest differs from the committed identity', async () => {
+    const fixture = storeFixture();
+    const bytes = carrierBytes();
+    const { transaction, handle, owner } = await retain(fixture, bytes);
+    await invokeSink(owner, () =>
+      transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+    );
+    const changedResult = { ...taskResult, inputDigest: 'c'.repeat(64) };
+    const changed = carrierBytes({
+      candidate_receipt: {
+        ...candidateReceipt,
+        tasks: [
+          {
+            nodeId: 'build',
+            taskKey: 'build@1',
+            resultDigest: canonicalSha256(changedResult),
+          },
+        ],
+      },
+      task_results: [changedResult],
+    });
+    expect(changed).toHaveLength(bytes.length);
+    expect(sha256(changed)).not.toBe(sha256(bytes));
+    writeFileSync(join(fixture.input.root, 'objects', sha256(bytes)), changed);
+
+    expect(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readCertifiedEvidenceCarrier?.({
+        ...derivation,
+        release_unit: UNIT,
+      }),
+    ).toThrow(REFUSAL);
+  });
+
+  it('refuses valid carrier bytes whose length differs from the committed identity', async () => {
+    const fixture = storeFixture();
+    const bytes = carrierBytes();
+    const { transaction, handle, owner } = await retain(fixture, bytes);
+    await invokeSink(owner, () =>
+      transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+    );
+    const entry = census.entries[0];
+    if (entry === undefined) throw new Error('fixture census entry missing');
+    const changed = carrierBytes({
+      namespace_census: finalizeCertifiedEvidenceNamespaceCensus({
+        release_unit: UNIT,
+        derivation,
+        entries: [{ ...entry, path: 'generated/longer-report-name.json' }],
+      }),
+    });
+    expect(changed.length).not.toBe(bytes.length);
+    writeFileSync(join(fixture.input.root, 'objects', sha256(changed)), changed);
+    rewriteCommittedCarrier(fixture, (carrier) => {
+      carrier.sha256 = sha256(changed);
+      carrier.opaque_handle = `sha256:${sha256(changed)}`;
+    });
+
+    expect(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readCertifiedEvidenceCarrier?.({
+        ...derivation,
+        release_unit: UNIT,
+      }),
+    ).toThrow(REFUSAL);
+  });
+
+  it('refuses authenticated carrier bytes for a different release unit', async () => {
+    const fixture = storeFixture();
+    const bytes = carrierBytes();
+    const { transaction, handle, owner } = await retain(fixture, bytes);
+    await invokeSink(owner, () =>
+      transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+    );
+    const otherUnit = '@fixture/other';
+    const changed = carrierBytes({
+      release_unit: otherUnit,
+      namespace_census: finalizeCertifiedEvidenceNamespaceCensus({
+        release_unit: otherUnit,
+        derivation,
+        entries: census.entries,
+      }),
+    });
+    writeFileSync(join(fixture.input.root, 'objects', sha256(changed)), changed);
+    rewriteCommittedCarrier(fixture, (carrier) => {
+      carrier.sha256 = sha256(changed);
+      carrier.opaque_handle = `sha256:${sha256(changed)}`;
+      carrier.size_bytes = changed.length;
+    });
+
+    expect(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readCertifiedEvidenceCarrier?.({
+        ...derivation,
+        release_unit: UNIT,
+      }),
+    ).toThrow(REFUSAL);
+  });
+
   it.each([
     [
       'an extra member',
