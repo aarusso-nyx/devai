@@ -555,6 +555,97 @@ describe('release mutation artifact normalization v2.1', () => {
     ).toThrow('MUTATION_REPORT_INVALID');
   });
 
+  it.each([
+    '',
+    '/src/value.ts',
+    'C:/src/value.ts',
+    'src\\value.ts',
+    'src/\u0000value.ts',
+    'src//value.ts',
+    'src/./value.ts',
+    'src/../value.ts',
+    'src/e\u0301.ts',
+  ])('refuses noncanonical or unsafe producer path %j', (unsafePath) => {
+    const report = rawReport(['Killed']);
+    const file = report.files['src/value.ts'];
+    const discovery = emittedSources(['0'])[0];
+    if (file === undefined || discovery === undefined) throw new Error('fixture source missing');
+    report.files = { [unsafePath]: file };
+
+    expect(() =>
+      normalized(report, {
+        source_files: [{ ...discovery, path: unsafePath }],
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+  });
+
+  it.each([null, 'not-an-object', []])(
+    'refuses non-record protected package input %j',
+    (expected) => {
+      expect(() => normalized(undefined, { expected })).toThrow('MUTATION_REPORT_INVALID');
+    },
+  );
+
+  it('refuses exotic, oversized, and extended protected source populations', () => {
+    const exotic = emittedSources(['0']);
+    Object.setPrototypeOf(exotic, null);
+    const extended = emittedSources(['0']);
+    Object.defineProperty(extended, 'extra', { enumerable: true, value: true });
+
+    expect(() => normalized(rawReport(['Killed']), { source_files: {} })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+    expect(() => normalized(rawReport(['Killed']), { source_files: exotic })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+    expect(() =>
+      normalized(rawReport(['Killed']), {
+        source_files: emittedSources(['0']),
+        limits: { ...controls().limits, maximum_files: 1 },
+        test_files: ['tests/value.test.ts', 'tests/other.test.ts'],
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+    expect(() => normalized(rawReport(['Killed']), { source_files: extended })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+  });
+
+  it('accepts source and test populations exactly at the protected file quota', () => {
+    expect(
+      normalized(rawReport(['Killed']), {
+        source_files: emittedSources(['0']),
+        limits: { ...controls().limits, maximum_files: 1 },
+      }),
+    ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+  });
+
+  it('refuses a fully matching source and test population above the protected file quota', () => {
+    const report = rawReport(['Killed']);
+    report.testFiles['tests/other.test.ts'] = { source: TEST_SOURCE, tests: [] };
+    expect(() =>
+      normalized(report, {
+        source_files: emittedSources(['0']),
+        test_files: ['tests/value.test.ts', 'tests/other.test.ts'],
+        limits: { ...controls().limits, maximum_files: 1 },
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+  });
+
+  it('retains the machine-readable refusal code on producer-boundary failures', () => {
+    try {
+      normalized(rawReport(['Killed']), {
+        source_files: emittedSources(['0']),
+        limits: { ...controls().limits, maximum_files: 0 },
+      });
+      throw new Error('expected protected producer-boundary refusal');
+    } catch (error) {
+      expect(error).toMatchObject({
+        message: 'MUTATION_REPORT_INVALID',
+        code: 'MUTATION_REPORT_INVALID',
+      });
+    }
+  });
+
   it('removes raw credential-like content and host paths while retaining only replacement digests', () => {
     const artifacts = normalized();
     const text = Buffer.concat([artifacts.report.bytes, artifacts.result.bytes]).toString('utf8');
