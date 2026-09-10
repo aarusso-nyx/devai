@@ -2575,6 +2575,43 @@ describe('release lifecycle execution kernel', () => {
     expect(certify).not.toHaveBeenCalled();
   });
 
+  it('derives exact immutable mutation requirements from genuine required and optional plans', () => {
+    const requiredRequest = requiredMutationRequest();
+    const profile = REQUIRED_POLICY_FIXTURE.resolution.readInput('release-verification-profile');
+    const policy = REQUIRED_POLICY_FIXTURE.resolution.tools.readJson(
+      'dist/law/policy/mutation-evidence-v2.json',
+    );
+    const required = resolveReleaseMutationRequirements(requiredRequest, {
+      resolve_receipt: () => REQUIRED_POLICY_FIXTURE.receipt,
+      resolve_plan_input: REQUIRED_POLICY_FIXTURE.resolve_plan_input,
+    });
+    expect(required).toEqual([
+      {
+        release_unit: '@aarusso-nyx/devai',
+        binding: {
+          repository_id: requiredRequest.repository_locator.id,
+          candidate_commit: requiredRequest.candidate_locator.commit,
+          candidate_tree: requiredRequest.candidate_locator.tree,
+          release_unit: '@aarusso-nyx/devai',
+          release_plan_receipt_digest_sha256: REQUIRED_POLICY_FIXTURE.receipt.receipt_digest_sha256,
+          release_profile_digest_sha256: canonicalSha256(profile),
+          mutation_policy_digest_sha256: canonicalSha256(policy),
+        },
+      },
+    ]);
+    expect(Object.isFrozen(required)).toBe(true);
+    expect(Object.isFrozen(required[0])).toBe(true);
+    expect(Object.isFrozen(required[0]?.binding)).toBe(true);
+
+    const optionalRequest = request('release preflight');
+    expect(
+      resolveReleaseMutationRequirements(optionalRequest, {
+        resolve_receipt: () => POLICY_FIXTURE.receipt,
+        resolve_plan_input: POLICY_FIXTURE.resolve_plan_input,
+      }),
+    ).toEqual([{ release_unit: '@aarusso-nyx/devai', binding: null }]);
+  });
+
   it('requires every unit mutation reader and a positive safe byte limit independently', async () => {
     const input = await requiredMutationCertificationFixture();
     const validSink = requiredMutationEvidenceSink(input.evidence);
