@@ -150,6 +150,33 @@ function object(value: unknown): JsonObject {
   return value as JsonObject;
 }
 
+function configureHostIntegrated(
+  repo: string,
+  policy: JsonObject,
+  adapterConfig: string,
+  adapterId: string,
+): void {
+  put(
+    repo,
+    '.git/config',
+    '[remote "origin"]\n\turl = https://github.com/example/doctor-authority-fixture.git\n',
+  );
+  put(repo, '.devai/config/project.json', {
+    schemaVersion: '1.0.0',
+    name: 'doctor-authority-fixture',
+    profile: 'tier3',
+    devai_version: resolveCliVersion(),
+    authority_enforcement: {
+      mode: 'host-integrated',
+      adapter_config: adapterConfig,
+    },
+  });
+  policy['host_enforcement'] = {
+    mode: 'host-integrated',
+    adapter: { adapter_id: adapterId, adapter_version: '1.5.0' },
+  };
+}
+
 describe('Doctor authority enforcement boundaries', () => {
   it('binds the materialized authority policy to recomputed trusted provenance', async () => {
     expect(await authorityCheck()).toMatchObject({
@@ -281,6 +308,132 @@ describe('Doctor authority enforcement boundaries', () => {
       local_post_merge_enforced: false,
       github_actions_enforced: false,
     });
+  });
+
+  it.each([
+    [
+      'post-merge policy and post-merge adapter',
+      '.devai/config/post-merge-host-adapter.json',
+      'post-merge-host-adapter',
+      true,
+    ],
+    [
+      'GitHub Actions policy and GitHub Actions adapter',
+      '.devai/config/github-actions-host-adapter.json',
+      'github-actions-main-observation',
+      true,
+    ],
+    [
+      'post-merge policy and GitHub Actions adapter',
+      '.devai/config/post-merge-host-adapter.json',
+      'github-actions-main-observation',
+      false,
+    ],
+    [
+      'GitHub Actions policy and post-merge adapter',
+      '.devai/config/github-actions-host-adapter.json',
+      'post-merge-host-adapter',
+      false,
+    ],
+  ] as const)(
+    'binds only the selected host adapter for %s',
+    async (_name, adapterConfig, adapterId, selected) => {
+      const result = await authorityCheck(({ repo, policy }) => {
+        configureHostIntegrated(repo, policy, adapterConfig, adapterId);
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        info: {
+          host_mode: 'host-integrated',
+          declared_mode: 'host-integrated',
+          selected_adapter_policy_bound: selected,
+          local_post_merge_enforced: false,
+          github_actions_enforced: false,
+        },
+      });
+    },
+  );
+
+  it('runs the selected post-merge verifier and reports its incomplete installation', async () => {
+    const result = await authorityCheck(({ repo, policy }) => {
+      configureHostIntegrated(
+        repo,
+        policy,
+        '.devai/config/post-merge-host-adapter.json',
+        'post-merge-host-adapter',
+      );
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      info: {
+        selected_adapter_policy_bound: true,
+        local_post_merge_enforced: false,
+        local_post_merge_facts: {
+          hook_present: false,
+          key_present: false,
+          attestation_present: false,
+          policy_present: true,
+        },
+      },
+      errors: [POSTURE_ERROR, 'POST_MERGE_ADAPTER_BINDING_MISSING'],
+    });
+  });
+
+  it('routes failures from the explicitly selected GitHub Actions adapter', async () => {
+    const result = await authorityCheck(({ repo, policy }) => {
+      configureHostIntegrated(
+        repo,
+        policy,
+        '.devai/config/github-actions-host-adapter.json',
+        'github-actions-main-observation',
+      );
+      put(repo, '.github/workflows/devai-main-observation.yml', 'not: [valid\n');
+      put(repo, '.devai/config/github-actions-host-adapter.json', {});
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      info: {
+        selected_adapter_policy_bound: true,
+        github_actions_enforced: false,
+        github_actions_facts: {
+          workflow_present: true,
+          config_present: true,
+          workflow_syntax_valid: false,
+        },
+      },
+    });
+    expect(result.errors).toContain('GITHUB_ACTIONS_WORKFLOW_SYNTAX_VALID_INVALID');
+  });
+
+  it('does not route GitHub Actions failures for an unselected adapter', async () => {
+    const result = await authorityCheck(({ repo, policy }) => {
+      policy['repository_id'] = 'other-repository';
+      put(
+        repo,
+        '.git/config',
+        '[remote "origin"]\n\turl = https://github.com/example/adopter.git\n',
+      );
+      put(repo, '.devai/config/project.json', {
+        schemaVersion: '1.0.0',
+        name: 'doctor-authority-fixture',
+        profile: 'tier3',
+        devai_version: resolveCliVersion(),
+        authority_enforcement: {
+          mode: 'cli-only',
+          adapter_config: '.devai/config/custom-host-adapter.json',
+        },
+      });
+      put(repo, '.github/workflows/devai-main-observation.yml', 'not: [valid\n');
+      put(repo, '.devai/config/github-actions-host-adapter.json', {});
+    });
+    expect(result.info).toMatchObject({
+      github_actions_facts: {
+        workflow_present: true,
+        config_present: true,
+        workflow_syntax_valid: false,
+      },
+    });
+    expect(result.errors).toEqual([POSTURE_ERROR]);
   });
 
   it('emits the exact refusal error set and no host adapter errors it did not collect', async () => {
