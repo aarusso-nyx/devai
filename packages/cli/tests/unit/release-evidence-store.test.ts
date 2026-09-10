@@ -204,6 +204,26 @@ function rebindStoredOutputReceipt(value: StoredCertificationOutput): void {
   });
 }
 
+function onlyTransactionDirectory(
+  fixture: ReturnType<typeof storeFixture>,
+  namespace: 'certification' | 'unit-mutation',
+): string {
+  const directory = join(fixture.evidenceRoot, namespace);
+  const transactions = readdirSync(directory);
+  if (transactions.length !== 1) throw new Error(`fixture ${namespace} transaction missing`);
+  return join(directory, transactions[0] ?? '');
+}
+
+function makeStoredJsonNoncanonical(path: string): void {
+  writeFileSync(path, Buffer.concat([Buffer.from(' '), readFileSync(path)]));
+}
+
+function addUnexpectedStoredMember(path: string): void {
+  const document = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+  document['unexpected'] = true;
+  writeFileSync(path, canonicalJson(document), 'utf8');
+}
+
 async function unitEvidence(
   fixture: ReturnType<typeof storeFixture>,
   options: {
@@ -254,6 +274,19 @@ async function putUnitDocuments(
       expect({ path: identity.path, ...handle }).toEqual(unitObjectIdentity(identity));
     }
   });
+}
+
+async function commitUnitEvidence(fixture: ReturnType<typeof storeFixture>) {
+  const evidence = await unitEvidence(fixture);
+  const transaction = await invokeSink(fixture.store.authority_owner, () =>
+    fixture.store.beginUnitMutationEvidence(evidence.binding),
+  );
+  await putUnitDocuments(fixture, evidence, transaction);
+  await transaction.verify(evidence.projection);
+  const closure = await invokeSink(fixture.store.authority_owner, () =>
+    transaction.commit(evidence.projection),
+  );
+  return { closure, evidence, transaction };
 }
 
 afterEach(() => {
@@ -559,6 +592,93 @@ describe('durable external certification evidence store', () => {
       }),
     ).toEqual(bytes);
   });
+
+  it.each(['unexpected-name', 'regular-file', 'symbolic-link'] as const)(
+    'refuses a %s in the durable certification transaction namespace',
+    async (fault) => {
+      const fixture = storeFixture();
+      const selected = binding('@fixture/generated');
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.begin([selected]),
+      );
+      await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...selected, outputs: [] }]),
+      );
+      const namespace = join(fixture.evidenceRoot, 'certification');
+      const transactionDirectory = onlyTransactionDirectory(fixture, 'certification');
+      const injected = join(
+        namespace,
+        fault === 'unexpected-name' ? 'not-a-transaction' : randomUUID(),
+      );
+      if (fault === 'unexpected-name') mkdirSync(injected);
+      else if (fault === 'regular-file') writeFileSync(injected, 'not a transaction');
+      else symlinkSync(transactionDirectory, injected, 'dir');
+
+      await refusal(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+          selected,
+        ),
+      );
+    },
+  );
+
+  it('ignores an incomplete certification transaction but refuses an unreadable commit', async () => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/generated');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const closure = (
+      await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...selected, outputs: [] }]),
+      )
+    )[0];
+    const namespace = join(fixture.evidenceRoot, 'certification');
+    const incomplete = join(namespace, randomUUID());
+    mkdirSync(incomplete);
+    expect(
+      createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+        selected,
+      ),
+    ).toEqual(closure);
+
+    rmSync(incomplete, { recursive: true });
+    const unreadable = join(namespace, randomUUID());
+    mkdirSync(join(unreadable, 'commit.json'), { recursive: true });
+    await refusal(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+        selected,
+      ),
+    );
+  });
+
+  it.each(['noncanonical-commit', 'extra-commit-member', 'noncanonical-begin', 'abort'] as const)(
+    'refuses certification transaction metadata with %s after restart',
+    async (fault) => {
+      const fixture = storeFixture();
+      const selected = binding('@fixture/generated');
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.begin([selected]),
+      );
+      await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...selected, outputs: [] }]),
+      );
+      const directory = onlyTransactionDirectory(fixture, 'certification');
+      if (fault === 'noncanonical-commit')
+        makeStoredJsonNoncanonical(join(directory, 'commit.json'));
+      else if (fault === 'extra-commit-member')
+        addUnexpectedStoredMember(join(directory, 'commit.json'));
+      else if (fault === 'noncanonical-begin')
+        makeStoredJsonNoncanonical(join(directory, 'begin.json'));
+      else writeFileSync(join(directory, 'abort.json'), canonicalJson({ aborted: true }), 'utf8');
+
+      await refusal(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+          selected,
+        ),
+      );
+    },
+  );
 
   it('serves two committed certification receipts and blobs only by their own identities', async () => {
     const fixture = storeFixture();
@@ -1136,6 +1256,76 @@ describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', 
       packages[0],
     );
   });
+
+  it.each(['unexpected-name', 'regular-file', 'symbolic-link'] as const)(
+    'refuses a %s in the durable unit-mutation transaction namespace',
+    async (fault) => {
+      const fixture = storeFixture();
+      const { evidence } = await commitUnitEvidence(fixture);
+      const namespace = join(fixture.evidenceRoot, 'unit-mutation');
+      const transactionDirectory = onlyTransactionDirectory(fixture, 'unit-mutation');
+      const injected = join(
+        namespace,
+        fault === 'unexpected-name' ? 'not-a-transaction' : randomUUID(),
+      );
+      if (fault === 'unexpected-name') mkdirSync(injected);
+      else if (fault === 'regular-file') writeFileSync(injected, 'not a transaction');
+      else symlinkSync(transactionDirectory, injected, 'dir');
+
+      await refusal(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
+          evidence.binding,
+        ),
+      );
+    },
+  );
+
+  it('ignores an incomplete unit transaction but refuses an unreadable commit', async () => {
+    const fixture = storeFixture();
+    const { closure, evidence } = await commitUnitEvidence(fixture);
+    const namespace = join(fixture.evidenceRoot, 'unit-mutation');
+    const incomplete = join(namespace, randomUUID());
+    mkdirSync(incomplete);
+    expect(
+      createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
+        evidence.binding,
+      ),
+    ).toEqual(closure);
+
+    rmSync(incomplete, { recursive: true });
+    const unreadable = join(namespace, randomUUID());
+    mkdirSync(join(unreadable, 'commit.json'), { recursive: true });
+    await refusal(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
+        evidence.binding,
+      ),
+    );
+  });
+
+  it.each(['noncanonical-commit', 'noncanonical-begin', 'noncanonical-index', 'abort'] as const)(
+    'refuses unit transaction metadata with %s after restart',
+    async (fault) => {
+      const fixture = storeFixture();
+      const { evidence } = await commitUnitEvidence(fixture);
+      const directory = onlyTransactionDirectory(fixture, 'unit-mutation');
+      if (fault === 'noncanonical-commit')
+        makeStoredJsonNoncanonical(join(directory, 'commit.json'));
+      else if (fault === 'noncanonical-begin')
+        makeStoredJsonNoncanonical(join(directory, 'begin.json'));
+      else if (fault === 'noncanonical-index') {
+        const indexDirectory = join(fixture.evidenceRoot, 'unit-mutation-index');
+        const indexes = readdirSync(indexDirectory);
+        if (indexes.length !== 1) throw new Error('fixture unit-mutation index missing');
+        makeStoredJsonNoncanonical(join(indexDirectory, indexes[0] ?? ''));
+      } else writeFileSync(join(directory, 'abort.json'), canonicalJson({ aborted: true }), 'utf8');
+
+      await refusal(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readUnitMutationEvidenceClosure(
+          evidence.binding,
+        ),
+      );
+    },
+  );
 
   it('requires the same protected sink owner for begin, put, commit and abort', async () => {
     const fixture = storeFixture();
