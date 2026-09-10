@@ -278,7 +278,12 @@ describe('protected mutation prerequisites', () => {
     base.files.set('test-tasks.json', Buffer.from(JSON.stringify(descriptor)));
     const derived = build(base);
     const unproved = derived.plan.packages.find((entry) => entry.id === 'utils');
+    if (unproved === undefined) throw new Error('fixture unproved package missing');
     expect(unproved?.reuse.unresolved).toContain('prerequisite-output-proof-required');
+    const unprovedRunner = (
+      unproved.expected.inputProjection['bindings'] as Record<string, Record<string, unknown>>
+    )['runner'];
+    if (unprovedRunner === undefined) throw new Error('fixture unproved runner binding missing');
 
     const repository = gitRepository(derived.snapshot);
     const executable = derived.controls.container.executables.node;
@@ -476,8 +481,14 @@ describe('protected mutation prerequisites', () => {
     const plan = provenPlan;
     if (plan === undefined) throw new Error('protected prerequisite plan missing');
     const entry = plan.packages.find((item) => item.id === 'utils');
+    if (entry === undefined) throw new Error('protected prerequisite package missing');
     expect(entry?.prerequisite_nodes).toEqual([producer.nodeId]);
     expect(entry?.reuse.unresolved).not.toContain('prerequisite-output-proof-required');
+    const provenRunner = (
+      entry.expected.inputProjection['bindings'] as Record<string, Record<string, unknown>>
+    )['runner'];
+    expect(provenRunner?.['memberCount']).toBe(unprovedRunner['memberCount']);
+    expect(provenRunner?.['populationDigest']).not.toBe(unprovedRunner['populationDigest']);
     expect(captureReleaseMutationInputExecutionContext(plan).prerequisite_outputs).toEqual([
       {
         path: generatedPath,
