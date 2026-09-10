@@ -501,6 +501,65 @@ describe('protected mutation envelope and program manifest boundaries', () => {
 });
 
 describe('protected container runtime executable probe', () => {
+  it('accepts the minimum archive capacity and refuses a smaller one before runtime effects', () => {
+    const value = fixture();
+    try {
+      expect(
+        () =>
+          new ProtectedCertificationContainer({
+            ...value.controls,
+            maximum_archive_bytes: 1023,
+          }),
+      ).toThrow('release-certification-container-controls-invalid');
+      expect(
+        () =>
+          new ProtectedCertificationContainer({
+            ...value.controls,
+            maximum_archive_bytes: 1024,
+          }),
+      ).not.toThrow();
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('requires the protected Node executable at its fixed container path', () => {
+    const value = fixture();
+    try {
+      expect(
+        () =>
+          new ProtectedCertificationContainer({
+            ...value.controls,
+            executables: {
+              ...value.controls.executables,
+              node: {
+                ...executable(value.controls, 'node'),
+                path: '/usr/bin/node',
+              },
+            },
+          }),
+      ).toThrow('release-certification-container-controls-invalid');
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('retains the complete local-image identity in its immutable public identity', () => {
+    const value = fixture();
+    const controls = localImageControls(value.controls);
+    try {
+      const container = new ProtectedCertificationContainer(controls);
+      expect(container.identity).toMatchObject({ local_image: controls.local_image });
+      expect(container.identity.local_image).not.toBe(controls.local_image);
+      expect(Object.isFrozen(container.identity.local_image)).toBe(true);
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ['zero', 0],
     ['a negative value', -1],

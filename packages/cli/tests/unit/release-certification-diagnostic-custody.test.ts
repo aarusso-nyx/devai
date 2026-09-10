@@ -233,17 +233,21 @@ function dependencySource(): readonly ContainerArchiveEntry[] {
   ];
 }
 
-function dependencyFixture(source: readonly ContainerArchiveEntry[]): ProtectedContainerDependency {
+function dependencyFixture(
+  source: readonly ContainerArchiveEntry[],
+  mountPath = 'node_modules',
+  entries: readonly ContainerDependencyArchiveEntry[] = [
+    { path: 'fixture/index.js', mode: '100644', bytes: Buffer.from('module.exports = 1;\n') },
+  ],
+): ProtectedContainerDependency {
   const file = (path: string): ContainerArchiveEntry => {
     const value = source.find((entry) => entry.path === path);
     if (value === undefined) throw new Error(`fixture dependency input missing: ${path}`);
     return value;
   };
-  const archive = encodeContainerDependencyArchive([
-    { path: 'fixture/index.js', mode: '100644', bytes: Buffer.from('module.exports = 1;\n') },
-  ]);
+  const archive = encodeContainerDependencyArchive(entries);
   return {
-    mount_path: 'node_modules',
+    mount_path: mountPath,
     archive,
     sha256: sha256(archive),
     inputs: {
@@ -307,6 +311,66 @@ afterEach(() => {
   transport.mounts = [];
   transport.isolationMismatch = false;
   transport.running = false;
+});
+
+describe('protected dependency identity custody', () => {
+  it('accepts a genuine workspace dependency mount and binds its exact identity', () => {
+    const value = fixture();
+    const source = dependencySource();
+    const dependency = dependencyFixture(source, 'packages/package/node_modules');
+    try {
+      const container = new ProtectedCertificationContainer(value.controls, [dependency]);
+      expect(container.identity).toMatchObject({
+        dependencies: [{ mount_path: dependency.mount_path, sha256: dependency.sha256 }],
+      });
+      expect(transport.calls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['the exact link', 'index.js', undefined],
+    ['a changed link', 'other.js', 'release-certification-dependency-changed'],
+  ] as const)('verifies %s from the captured dependency namespace', (_label, target, error) => {
+    const dependencyFile: ContainerDependencyArchiveEntry = {
+      path: 'fixture/index.js',
+      mode: '100644',
+      bytes: Buffer.from('module.exports = 1;\n'),
+    };
+    const entries: readonly ContainerDependencyArchiveEntry[] = [
+      dependencyFile,
+      { path: 'fixture/link.js', mode: '120000', target: 'index.js' },
+    ];
+    const value = fixture();
+    const source = dependencySource();
+    const dependency = dependencyFixture(source, 'node_modules', entries);
+    const bound = {
+      ...value,
+      container: new ProtectedCertificationContainer(value.controls, [dependency]),
+      dependencies: [dependency],
+      source,
+    };
+    try {
+      const operation = () =>
+        execute(bound, {
+          captured: [
+            ...source,
+            { ...dependencyFile, path: 'node_modules/fixture/index.js' },
+            { path: 'node_modules/fixture/link.js', mode: '120000', target },
+            OUTPUT_A,
+            OUTPUT_B,
+          ],
+        });
+      if (error === undefined) {
+        expect(operation().result.status).toBe(0);
+      } else {
+        expect(operation).toThrow(error);
+      }
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('protected container diagnostic output custody', () => {
