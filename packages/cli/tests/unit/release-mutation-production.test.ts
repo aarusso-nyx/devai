@@ -420,6 +420,66 @@ describe('protected mutation production normalization', () => {
     }
   });
 
+  it('accepts a complete observation whose JSON members are not lexically ordered', () => {
+    const canonicalObservation = JSON.parse(observation().toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    const observed = Buffer.from(
+      JSON.stringify({
+        source_files: canonicalObservation.source_files,
+        selected: canonicalObservation.selected,
+        instrumented: canonicalObservation.instrumented,
+      }),
+      'utf8',
+    );
+    const value = productionFixture({ observed });
+    try {
+      const artifacts = normalizeProtectedMutationExecutionV21({
+        program: value.program,
+        execution: execute(value),
+      });
+      expect(JSON.parse(artifacts.result.bytes.toString('utf8'))).toMatchObject({
+        complete: true,
+        passed: true,
+      });
+    } finally {
+      value.transport.dispose();
+    }
+  });
+
+  it.each([
+    [
+      'mutation observation',
+      observation,
+      LIMITS.maximum_document_bytes,
+      (bytes: Buffer) => ({ observed: bytes }),
+    ],
+    ['raw report', rawReport, LIMITS.maximum_raw_report_bytes, (bytes: Buffer) => ({ raw: bytes })],
+  ] as const)(
+    'accepts a %s exactly at its inclusive byte ceiling',
+    (_label, content, maximumBytes, channel) => {
+      const original = content();
+      const bytes = Buffer.concat([
+        original,
+        Buffer.alloc(maximumBytes - original.byteLength, 0x20),
+      ]);
+      const value = productionFixture(channel(bytes));
+      try {
+        const artifacts = normalizeProtectedMutationExecutionV21({
+          program: value.program,
+          execution: execute(value),
+        });
+        expect(JSON.parse(artifacts.result.bytes.toString('utf8'))).toMatchObject({
+          complete: true,
+          passed: true,
+        });
+      } finally {
+        value.transport.dispose();
+      }
+    },
+  );
+
   it.each([
     ['a substituted discovered mutant id', observation({ mutants: ['m-substituted'] })],
     ['an unknown observation member', observation({ extra: true })],
