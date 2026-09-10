@@ -1,19 +1,27 @@
 import { ROSTER } from '@devai-nyx/schemas';
-import { checkSchemaCanon } from '../../src/commands/check/schemas.js';
+import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import type { CAC } from 'cac';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   checkAdopterSchemas,
+  checkSchemaCanon,
+  checkSchemasCmd,
   checkSchemasForRepository,
+  registerCheckSchemas,
 } from '../../src/commands/check/schemas.js';
 
 const roots: string[] = [];
+const originalStdout = process.stdout.write;
+const originalExitCode = process.exitCode;
 aroundEach((run) => withAuthorityHostTestScope(run));
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true });
+  process.stdout.write = originalStdout;
+  process.exitCode = originalExitCode;
 });
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'devai-schema-adopter-'));
@@ -116,6 +124,59 @@ function canonFixture() {
   return root;
 }
 
+interface CommandOptions {
+  readonly repoRoot?: string;
+  readonly human?: boolean;
+}
+
+interface RegisteredCommand {
+  readonly command: readonly [string, string];
+  readonly options: readonly (readonly [string, string])[];
+  readonly invoke: (options: CommandOptions) => void;
+}
+
+function registeredCommand(useWrapper = false): RegisteredCommand {
+  let action: ((options: CommandOptions) => void) | undefined;
+  let commandCall: readonly [string, string] | undefined;
+  const optionCalls: Array<readonly [string, string]> = [];
+  const chain = {
+    option(flag: string, description: string) {
+      optionCalls.push([flag, description]);
+      return chain;
+    },
+    action(callback: (options: CommandOptions) => void) {
+      action = callback;
+      return chain;
+    },
+  };
+  const cli = {
+    command: (name: string, description: string) => {
+      commandCall = [name, description];
+      return chain;
+    },
+  } as unknown as CAC;
+  if (useWrapper) registerCheckSchemas(cli);
+  else checkSchemasCmd.register(cli);
+  if (commandCall === undefined || action === undefined) {
+    throw new Error('check-schemas command was not completely registered');
+  }
+  return { command: commandCall, options: optionCalls, invoke: action };
+}
+
+function invokeCommand(options: CommandOptions): {
+  readonly stdout: string;
+  readonly exitCode: number | undefined;
+} {
+  let stdout = '';
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+    return true;
+  }) as typeof process.stdout.write;
+  process.exitCode = undefined;
+  registeredCommand().invoke(options);
+  return { stdout, exitCode: process.exitCode };
+}
+
 describe('complete schema canon filesystem checks', () => {
   it('accepts the complete source catalogue without expanding the runtime roster', () => {
     const report = checkSchemaCanon(canonFixture());
@@ -206,5 +267,60 @@ describe('complete schema canon filesystem checks', () => {
       })),
     ]);
     expect(readFileSync(changedPath, 'utf8')).toBe('{}\n');
+  });
+});
+
+describe('check schemas command boundary', () => {
+  it('registers its stable name and options through the exported wrapper', () => {
+    const command = registeredCommand(true);
+    expect(command.command).toEqual([
+      'check-schemas',
+      'Validate the complete recursive schema canon and every governed schema rule.',
+    ]);
+    expect(command.options).toEqual([
+      ['--repo-root <path>', 'Repository root (default: .)'],
+      ['--format <format>', 'Output format: json or human'],
+      ['--human', 'Human-readable output'],
+    ]);
+  });
+
+  it('emits the complete passing JSON report and pass exit', () => {
+    const result = invokeCommand({ repoRoot: canonFixture() });
+    expect(JSON.parse(result.stdout)).toEqual({
+      ok: true,
+      canonical_total: 96,
+      rules: [
+        'recursive-closed-complete-objects',
+        'predicate-fragments-valid',
+        'shared-vocabulary',
+        'generated-marker-integrity',
+        'dereferenced-publish-byte-identity',
+      ],
+      findings: [],
+    });
+    expect(result.stdout.endsWith('\n')).toBe(true);
+    expect(result.exitCode).toBe(EXIT_PASS);
+  });
+
+  it('renders the exact passing human summary', () => {
+    const result = invokeCommand({ repoRoot: canonFixture(), human: true });
+    expect(result.stdout).toBe('policy check schemas: OK (96 canonical schemas, 0 findings)\n');
+    expect(result.exitCode).toBe(EXIT_PASS);
+  });
+
+  it('renders every failure and sets the fail exit', () => {
+    const root = canonFixture();
+    const missing = ROSTER[0];
+    if (missing === undefined) throw new Error('canonical schema fixture required');
+    rmSync(join(root, 'packages/schemas/dist/schemas', missing));
+    const result = invokeCommand({ repoRoot: root, human: true });
+    expect(result.stdout).toBe(
+      [
+        'policy check schemas: FAIL (96 canonical schemas, 1 findings)',
+        `  [dereferenced-publish-byte-identity] ${missing}: Bundled publish bytes differ from canonical law bytes.`,
+        '',
+      ].join('\n'),
+    );
+    expect(result.exitCode).toBe(EXIT_FAIL);
   });
 });
