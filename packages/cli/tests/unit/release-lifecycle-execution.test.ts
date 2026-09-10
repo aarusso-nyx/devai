@@ -3722,6 +3722,97 @@ describe('release lifecycle execution kernel', () => {
     expect(store.readStoreRecords().at(-1)?.record_kind).toBe('failure');
   });
 
+  it.each([
+    'grant-reference',
+    'action',
+    'effect',
+    'resource',
+    'repository',
+    'candidate',
+    'grantor',
+    'subject-role',
+    'consent',
+    'invalid-consumed-at',
+    'recorded-before-grant',
+    'recorded-at-expiry',
+  ] as const)(
+    'rejects a recomputed consumed authorization event with a changed %s',
+    async (defect) => {
+      const initial = request('release evidence-publish');
+      const store = new ReleaseLifecycleFileStore(root(), initial);
+      await advanceToExported(store);
+      const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+      const receipt = boundOfflineReceipt(exported);
+      const value = request('release evidence-publish', receipt);
+      const valid = authorizationBridge();
+      const forged: AuthorizationBridge = {
+        ...valid,
+        consume: async (binding) => {
+          const proof = await valid.consume(binding);
+          const grant = objectValue(required(proof.events[0], 'missing authorization grant'));
+          const consumed = objectValue(required(proof.events[1], 'missing consumed event'));
+          const {
+            event_id: _eventId,
+            payload_digest_sha256: _payloadDigest,
+            ...consumedDraft
+          } = consumed;
+          const changed = finalizeAuthorizationEvent({
+            ...consumedDraft,
+            ...(defect === 'grant-reference' ? { grant_event_id: 'EA-0000000000000000' } : {}),
+            ...(defect === 'action' ? { action_id: 'release publish' } : {}),
+            ...(defect === 'effect' ? { effect: 'local-write' } : {}),
+            ...(defect === 'resource'
+              ? { resource: { ...objectValue(consumed.resource), exact_identifier: 'other' } }
+              : {}),
+            ...(defect === 'repository' ? { repository: { id: 'aarusso-nyx/other' } } : {}),
+            ...(defect === 'candidate'
+              ? { candidate: { ...objectValue(consumed.candidate), tree: 'f'.repeat(40) } }
+              : {}),
+            ...(defect === 'grantor'
+              ? { grantor: { ...objectValue(consumed.grantor), role: 'engineer' } }
+              : {}),
+            ...(defect === 'subject-role' ? { subject_role: 'engineer' } : {}),
+            ...(defect === 'consent'
+              ? { consent: { ...objectValue(consumed.consent), allow_publish: false } }
+              : {}),
+            ...(defect === 'invalid-consumed-at' ? { recorded_at: 'not-an-instant' } : {}),
+            ...(defect === 'recorded-before-grant'
+              ? { recorded_at: '2026-09-02T23:59:59.999Z' }
+              : {}),
+            ...(defect === 'recorded-at-expiry' ? { recorded_at: '2026-09-03T01:00:00.000Z' } : {}),
+          });
+          return {
+            durable: true,
+            events: [grant, changed],
+            ledger: authorizationLedger([grant, changed]),
+          };
+        },
+      };
+      const provider = vi.fn(() => ({ outcome: 'success' as const }));
+      const result = await withAuthorityHostTestScope(() =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release evidence-publish',
+          authority: authorityFor('release evidence-publish'),
+          store,
+          resolveReceipt: () => receipt,
+          resolvePlanInput,
+          offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+          artifactReader: artifactReaderFor('release export'),
+          authorization: forged,
+          provider,
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+      expect(result).toMatchObject({
+        ok: false,
+        phase: 'authorization',
+        code: 'release-authorization-attempt-binding-invalid',
+      });
+      expect(provider).not.toHaveBeenCalled();
+    },
+  );
+
   it('binds plan coverage and offline evidence to every release unit and exported artifact', async () => {
     const single = request();
     const unit = required(single.candidate_locator.release_units[0], 'missing unit');
