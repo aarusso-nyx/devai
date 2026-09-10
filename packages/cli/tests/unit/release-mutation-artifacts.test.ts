@@ -979,6 +979,67 @@ describe('release mutation artifact normalization v2.1', () => {
     });
   });
 
+  it('preserves roster refusals while coercing unexpected protected-input failures', () => {
+    const invalidPackage = {
+      ...EXPECTED,
+      packageName: 'fixture/package',
+      inputProjection: { ...EXPECTED.inputProjection, packageName: 'fixture/package' },
+    };
+    expect(() => normalized(undefined, { expected: invalidPackage })).toThrow(
+      'MUTATION_ROSTER_MISMATCH',
+    );
+
+    const hostileExpected = { ...EXPECTED };
+    Object.defineProperty(hostileExpected, 'packageName', {
+      enumerable: true,
+      get: () => {
+        throw new Error('HOSTILE_PROTECTED_INPUT');
+      },
+    });
+    expect(() => normalized(undefined, { expected: hostileExpected })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+    expect(() => normalized(undefined, { expected: hostileExpected })).not.toThrow(
+      'HOSTILE_PROTECTED_INPUT',
+    );
+  });
+
+  it('binds replacement digests, cross-line coordinates, and a nonempty emitted census', () => {
+    const invalidDigest = emittedSources();
+    const first = invalidDigest[0]?.mutants[0];
+    if (first === undefined) throw new Error('fixture mutant missing');
+    invalidDigest[0] = {
+      ...invalidDigest[0],
+      mutants: [
+        { ...first, replacementDigest: 'not-a-digest' },
+        ...invalidDigest[0].mutants.slice(1),
+      ],
+    };
+    expect(() => normalized(undefined, { source_files: invalidDigest })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+
+    const report = rawReport(['Killed']);
+    const crossLine = emittedSources(['0']);
+    const raw = report.files['src/value.ts']?.mutants[0];
+    const discovered = crossLine[0]?.mutants[0];
+    if (raw === undefined || discovered === undefined) throw new Error('fixture mutant missing');
+    raw.location = { start: { line: 1, column: 20 }, end: { line: 2, column: 1 } };
+    crossLine[0] = {
+      ...crossLine[0],
+      mutants: [{ ...discovered, location: raw.location }],
+    };
+    expect(normalized(report, { source_files: crossLine }, ['0'])).toMatchObject({
+      inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+
+    const empty = emittedSources(['0']);
+    empty[0] = { ...empty[0], mutants: [] };
+    expect(() => normalized(rawReport([]), { source_files: empty }, [])).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+  });
+
   it('refuses schema-invalid protected process fields before emitting artifacts', () => {
     expect(() =>
       normalized(rawReport(['Killed']), {
