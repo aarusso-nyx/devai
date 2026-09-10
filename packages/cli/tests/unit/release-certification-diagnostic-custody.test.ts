@@ -275,6 +275,12 @@ function execute(
     readonly status?: number;
     readonly diagnostic_output_paths?: readonly string[];
     readonly prior_outputs?: ReadonlyMap<string, ContainerArchiveEntry>;
+    readonly source?: readonly ContainerArchiveEntry[];
+    readonly declared_outputs?: readonly string[];
+    readonly declared_namespaces?: readonly {
+      readonly prefix: string;
+      readonly required_paths: readonly string[];
+    }[];
   },
 ) {
   transport.captured = encodeContainerDependencyArchive(options.captured);
@@ -292,12 +298,15 @@ function execute(
         task: task(value.controls),
         timeout_ms: 1_000,
         environment: {},
-        source: value.source,
+        source: options.source ?? value.source,
         prior_outputs: options.prior_outputs ?? new Map(),
-        declared_outputs: [OUTPUT_A.path, OUTPUT_B.path],
+        declared_outputs: options.declared_outputs ?? [OUTPUT_A.path, OUTPUT_B.path],
         ...(options.diagnostic_output_paths === undefined
           ? {}
           : { diagnostic_output_paths: options.diagnostic_output_paths }),
+        ...(options.declared_namespaces === undefined
+          ? {}
+          : { declared_namespaces: options.declared_namespaces }),
       }),
   );
 }
@@ -367,6 +376,200 @@ describe('protected dependency identity custody', () => {
       } else {
         expect(operation).toThrow(error);
       }
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['duplicate source paths', { source: [SOURCE, SOURCE] }],
+    ['a source that is also an output', { declared_outputs: [SOURCE.path] }],
+    [
+      'a source inside an output namespace',
+      {
+        declared_namespaces: [{ prefix: 'src', required_paths: ['src/generated.json'] }],
+      },
+    ],
+    [
+      'a predecessor inside an output namespace',
+      {
+        prior_outputs: new Map([
+          [
+            'reports/prior.json',
+            {
+              path: 'reports/prior.json',
+              mode: '100644' as const,
+              bytes: Buffer.from('{"prior":true}\n', 'utf8'),
+            },
+          ],
+        ]),
+        declared_namespaces: [{ prefix: 'reports', required_paths: ['reports/generated.json'] }],
+      },
+    ],
+  ] as const)('refuses %s before creating a container namespace', (_label, options) => {
+    const value = fixture();
+    try {
+      expect(() => execute(value, { captured: [], ...options })).toThrow(
+        'release-certification-output-closure-invalid',
+      );
+      expect(transport.calls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['an exact source path', 'source', 'node_modules'],
+    ['a nested source path', 'source', 'node_modules/injected.js'],
+    ['an exact output path', 'output', 'node_modules'],
+    ['a nested output path', 'output', 'node_modules/generated.json'],
+    ['an exact namespace prefix', 'namespace', 'node_modules'],
+    ['a nested namespace prefix', 'namespace', 'node_modules/generated'],
+  ] as const)(
+    'refuses %s that collides with the protected dependency mount',
+    (_label, kind, path) => {
+      const value = fixture();
+      const source = dependencySource();
+      const dependency = dependencyFixture(source, 'node_modules', [
+        { path: 'fixture/index.js', mode: '100644', bytes: Buffer.from('module.exports = 1;\n') },
+      ]);
+      const bound = {
+        ...value,
+        container: new ProtectedCertificationContainer(value.controls, [dependency]),
+        dependencies: [dependency],
+        source,
+      };
+      const collision: ContainerArchiveEntry = {
+        path,
+        mode: '100644',
+        bytes: Buffer.from('collision\n', 'utf8'),
+      };
+      try {
+        expect(() =>
+          execute(bound, {
+            captured: [],
+            ...(kind === 'source' ? { source: [...source, collision] } : {}),
+            ...(kind === 'output' ? { declared_outputs: [path] } : {}),
+            ...(kind === 'namespace'
+              ? {
+                  declared_outputs: [],
+                  declared_namespaces: [
+                    { prefix: path, required_paths: [`${path}/required.json`] },
+                  ],
+                }
+              : {}),
+          }),
+        ).toThrow('release-certification-output-closure-invalid');
+        expect(transport.calls).toEqual([]);
+      } finally {
+        rmSync(value.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('uses the exact isolated loader and readonly mount for a verified dependency', () => {
+    const value = fixture();
+    const source = dependencySource();
+    const dependencyEntry: ContainerDependencyArchiveEntry = {
+      path: 'fixture/index.js',
+      mode: '100644',
+      bytes: Buffer.from('module.exports = 1;\n'),
+    };
+    const dependency = dependencyFixture(source, 'node_modules', [dependencyEntry]);
+    const bound = {
+      ...value,
+      container: new ProtectedCertificationContainer(value.controls, [dependency]),
+      dependencies: [dependency],
+      source,
+    };
+    try {
+      const result_ = execute(bound, {
+        captured: [
+          ...source,
+          { ...dependencyEntry, path: `node_modules/${dependencyEntry.path}` },
+          OUTPUT_A,
+          OUTPUT_B,
+        ],
+      });
+      expect(result_.result.status).toBe(0);
+      const id = transport.id;
+      if (id === undefined) throw new Error('fixture main container id missing');
+      const commands = transport.calls.map((args) => args.slice(4));
+      const restrictions = [
+        '--network',
+        'none',
+        '--read-only',
+        '--cap-drop',
+        'ALL',
+        '--security-opt',
+        'no-new-privileges',
+        '--pids-limit',
+        '2',
+        '--memory',
+        String(64 * 1024 * 1024),
+        '--memory-swap',
+        String(64 * 1024 * 1024),
+        '--cpus',
+        '1',
+        '--user',
+        '10001:10001',
+        '--ipc',
+        'none',
+        '--restart',
+        'no',
+        '--tmpfs',
+        '/tmp:rw,exec,nosuid,nodev,size=536870912',
+        '--env',
+        'HOME=/tmp',
+        '--env',
+        'TMPDIR=/tmp',
+      ];
+      expect(commands).toContainEqual([
+        'volume',
+        'create',
+        '--label',
+        `devai.certification=${id}`,
+        `${id}-workspace`,
+      ]);
+      expect(commands).toContainEqual([
+        'volume',
+        'create',
+        '--label',
+        `devai.certification=${id}`,
+        `${id}-dependency-0`,
+      ]);
+      expect(commands).toContainEqual([
+        'create',
+        '--name',
+        `${id}-dependency-loader`,
+        ...restrictions,
+        '--mount',
+        `type=volume,source=${id}-workspace,target=/workspace`,
+        '--mount',
+        `type=volume,source=${id}-dependency-0,target=/workspace/candidate/node_modules`,
+        IMAGE,
+        '/usr/local/bin/node',
+        '--version',
+      ]);
+      expect(commands).toContainEqual(['cp', '-a', '-', `${id}-dependency-loader:/workspace`]);
+      const mainCreate = commands.find((command) => command[0] === 'create' && command[2] === id);
+      expect(mainCreate).toEqual(
+        expect.arrayContaining([
+          '--mount',
+          `type=volume,source=${id}-dependency-0,target=/workspace/candidate/node_modules,readonly`,
+        ]),
+      );
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('creates no dependency loader or dependency volume when the population is empty', () => {
+    const value = fixture();
+    try {
+      expect(execute(value, { captured: [SOURCE, OUTPUT_A, OUTPUT_B] }).result.status).toBe(0);
+      const commands = transport.calls.map((args) => args.slice(4));
+      expect(commands.flat().some((value_) => value_.includes('-dependency-'))).toBe(false);
     } finally {
       rmSync(value.root, { recursive: true, force: true });
     }
