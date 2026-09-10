@@ -1,6 +1,29 @@
 import type { CAC } from 'cac';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EXIT_USAGE } from '@devai-nyx/utils';
+
+const schemaState = vi.hoisted(() => ({
+  rejectActions: false,
+  errors: null as unknown,
+}));
+
+vi.mock('@devai-nyx/schemas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+  const actionsListOutput = ((value: unknown) =>
+    schemaState.rejectActions
+      ? false
+      : actual.validators.actionsListOutput(value)) as typeof actual.validators.actionsListOutput;
+  Object.defineProperty(actionsListOutput, 'errors', {
+    configurable: true,
+    get: () =>
+      schemaState.rejectActions ? schemaState.errors : actual.validators.actionsListOutput.errors,
+  });
+  return {
+    ...actual,
+    validators: { ...actual.validators, actionsListOutput },
+  };
+});
+
 import { actionsList } from '../../src/commands/actions-list.js';
 
 interface CommandOptions {
@@ -68,6 +91,8 @@ class ExitSignal extends Error {
 }
 
 afterEach(() => {
+  schemaState.rejectActions = false;
+  schemaState.errors = null;
   invoke = undefined;
   process.stdout.write = originalWrite;
   process.stderr.write = originalError;
@@ -125,5 +150,61 @@ describe('catalog actions command boundaries', () => {
       actions.map((action) => action.name),
     );
     expect(lines.slice(1).every((line) => line.trim().length > 0)).toBe(true);
+  });
+
+  it.each([
+    [
+      'validator issues',
+      [
+        {
+          instancePath: '/0',
+          schemaPath: '#/items/type',
+          keyword: 'type',
+          params: { type: 'object' },
+          message: 'must be object',
+        },
+      ],
+    ],
+    ['an unavailable validator issue list', null],
+  ] as const)('emits the governed JSON contract refusal with %s', (_description, issues) => {
+    schemaState.rejectActions = true;
+    schemaState.errors = issues;
+
+    const captured = capture(() => {
+      process.exit = ((code?: number) => {
+        throw new ExitSignal(code ?? 7);
+      }) as typeof process.exit;
+      expect(() => run({})).toThrowError(new ExitSignal(7));
+    });
+
+    expect(JSON.parse(captured.stderr)).toEqual({
+      schemaVersion: '1.0.0',
+      code: 'ACTIONS_LIST_OUTPUT_INVALID',
+      class: 'contract-violation',
+      exit: 7,
+      message: 'Action catalog output failed its governed schema.',
+      remediation: 'Run the CLI contract test suite and repair the action manifest.',
+      refs: { doc: 'law/schemas/actions-list-output.schema.json' },
+      context: { issues: issues ?? [] },
+    });
+    expect(captured.stdout).toBe('');
+  });
+
+  it('renders a human contract refusal without leaking validator internals', () => {
+    schemaState.rejectActions = true;
+    schemaState.errors = [{ instancePath: '/private', message: 'fixture detail' }];
+
+    const captured = capture(() => {
+      process.exit = ((code?: number) => {
+        throw new ExitSignal(code ?? 7);
+      }) as typeof process.exit;
+      expect(() => run({ human: true })).toThrowError(new ExitSignal(7));
+    });
+
+    expect(captured.stderr).toBe(
+      'devai: Action catalog output failed its governed schema. Remediation: Run the CLI contract test suite and repair the action manifest.\n',
+    );
+    expect(captured.stderr).not.toContain('/private');
+    expect(captured.stdout).toBe('');
   });
 });
