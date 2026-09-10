@@ -37,6 +37,15 @@ function treeEntry(
   ]);
 }
 
+function rawTreeEntry(name: Buffer, bytes = FILE_BYTES): Buffer {
+  return Buffer.concat([
+    Buffer.from('100644 ', 'ascii'),
+    name,
+    Buffer.from([0]),
+    Buffer.from(gitObjectId('blob', bytes), 'hex'),
+  ]);
+}
+
 interface Fixture {
   readonly request: ReleaseLifecycleRequest;
   readonly source: readonly ContainerArchiveEntry[];
@@ -103,7 +112,7 @@ function fixture(
   };
 }
 
-function createMetadata(value: Fixture) {
+function createMetadata(value: Fixture, maximumBytes = 64 * 1024) {
   return createProtectedCandidateGitMetadata({
     request: value.request,
     source: value.source,
@@ -116,7 +125,7 @@ function createMetadata(value: Fixture) {
         return Buffer.from(object.bytes);
       },
     },
-    maximum_bytes: 64 * 1024,
+    maximum_bytes: maximumBytes,
   });
 }
 
@@ -196,6 +205,23 @@ describe('protected candidate Git metadata', () => {
     const value = fixture({ commit_tree: 'f'.repeat(40) });
     await expect(createMetadata(value)).rejects.toThrow(INVALID);
   });
+
+  it.each([1023, Number.NaN])(
+    'refuses the invalid metadata byte ceiling %s',
+    async (maximumBytes) => {
+      await expect(createMetadata(fixture(), maximumBytes)).rejects.toThrow(INVALID);
+    },
+  );
+
+  it.each([
+    ['a path separator', 'dir/file', treeEntry('dir/file')],
+    ['invalid UTF-8', '\ufffd', rawTreeEntry(Buffer.from([0xff]))],
+  ] as const)('refuses a tree entry name containing %s', async (_label, name, tree) => {
+    await expect(createMetadata(fixture({ name, candidate_tree_bytes: tree }))).rejects.toThrow(
+      INVALID,
+    );
+  });
+
   it('refuses the reserved Git metadata name without case sensitivity', async () => {
     const value = fixture({ name: '.GiT' });
     await expect(createMetadata(value)).rejects.toThrow(INVALID);
