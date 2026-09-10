@@ -1,5 +1,6 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -11,6 +12,7 @@ import {
   disposeCliInvocationAuthority,
 } from '../../src/authority/index.js';
 import { createAuthorityHostBroker, processTarget } from '../../src/authority/broker.js';
+import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
 import { resolveInvocationEntry } from '../../src/authority/sense-selection.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
@@ -83,6 +85,53 @@ function brokerAt(
     package_version: resolveCliVersion(),
     bootstrap_policy: bootstrapPolicy,
   });
+}
+
+function exactEntry(name: 'init apply harness' | 'init apply owner'): RegistryEntry {
+  const entry = entries.find((candidate) => candidate.name === name);
+  if (entry === undefined) throw new Error(`missing action ${name}`);
+  return {
+    ...entry,
+    authority_contract: {
+      ...entry.authority_contract,
+      planner: {
+        kind: 'exact-plan',
+        planner_id: `${name.replaceAll(' ', '-')}-test-exact-plan`,
+        target_kinds: ['fs'],
+        atomicity: 'whole-plan',
+      },
+    },
+  } as RegistryEntry;
+}
+
+function exactBrokerAt(
+  root: string,
+  name: 'init apply harness' | 'init apply owner',
+  role: 'architect' | 'owner',
+  declaration: { readonly as_role: 'architect' | 'owner' } | { readonly authority_session: string },
+) {
+  const entry = exactEntry(name);
+  const exactEntries = entries.map((candidate) => (candidate.name === name ? entry : candidate));
+  return {
+    host: createAuthorityHostBroker({
+      entry,
+      entries: exactEntries,
+      argv: [
+        process.execPath,
+        'devai',
+        ...name.split(' '),
+        ...('as_role' in declaration
+          ? ['--as-role', declaration.as_role]
+          : ['--authority-session', declaration.authority_session]),
+        '--write',
+      ],
+      role,
+      declaration,
+      repository_root: root,
+      package_version: resolveCliVersion(),
+      bootstrap_policy: true,
+    }),
+  };
 }
 
 function resolvedBroker(name: string, role: Role, argv: readonly string[]) {
@@ -764,6 +813,179 @@ describe('authority broker production boundary depth', () => {
       ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
     } finally {
       host.dispose();
+    }
+  });
+
+  it('commits empty and duplicate filesystem effects through one exact atomic boundary', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const { host } = exactBrokerAt(fixture.root, 'init apply owner', 'owner', {
+      as_role: 'owner',
+    });
+    try {
+      expect(host.commit_exact).toBeTypeOf('function');
+      expect(() => host.commit_exact?.()).not.toThrow();
+
+      const path = join(fixture.root, 'product/packet-74.json');
+      const applied: string[] = [];
+      host.scope.apply_effect(effect('writeFileSync', [path, 'first\n']), () => {
+        applied.push('first');
+      });
+      host.scope.apply_effect(effect('writeFileSync', [path, 'second\n']), () => {
+        applied.push('second');
+      });
+
+      expect(applied).toEqual([]);
+      host.commit_exact?.();
+      expect(applied).toEqual(['first', 'second']);
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('refuses conflicting duplicate exact targets before applying either effect', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const { host } = exactBrokerAt(fixture.root, 'init apply owner', 'owner', {
+      as_role: 'owner',
+    });
+    try {
+      const path = join(fixture.root, 'product/packet-74-conflict.json');
+      const applied: string[] = [];
+      host.scope.apply_effect(effect('writeFileSync', [path, 'created\n']), () => {
+        applied.push('create');
+      });
+      mkdirSync(join(fixture.root, 'product'), { recursive: true });
+      writeFileSync(path, 'ambient\n');
+      host.scope.apply_effect(effect('writeFileSync', [path, 'updated\n']), () => {
+        applied.push('update');
+      });
+
+      expect(() => host.commit_exact?.()).toThrow('AUTHORITY_EXACT_PLAN_TARGET_CONFLICT');
+      expect(applied).toEqual([]);
+      expect(readFileSync(path, 'utf8')).toBe('ambient\n');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('refuses an exact target outside the declared action policy without applying it', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const { host } = exactBrokerAt(fixture.root, 'init apply owner', 'owner', {
+      as_role: 'owner',
+    });
+    try {
+      const path = join(fixture.root, '.devai/state/packet-74-denied.json');
+      let applied = false;
+      host.scope.apply_effect(effect('writeFileSync', [path, '{}\n']), () => {
+        applied = true;
+      });
+
+      expect(() => host.commit_exact?.()).toThrow('AUTHORITY_ACTION_DENIED');
+      expect(applied).toBe(false);
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('binds an exact machine action to its direct or session initiator', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const sessionId = 'AUTH-SESSION-74abcdef01234567';
+    const entry = exactEntry('init apply harness');
+    const exactEntries = entries.map((candidate) =>
+      candidate.name === entry.name ? entry : candidate,
+    );
+    const sources = buildTrustedAuthoritySources(exactEntries, fixture.root, resolveCliVersion());
+    const unsigned = {
+      schemaVersion: '1.0.0',
+      session_id: sessionId,
+      repository_id: sources.repository_id,
+      role: 'architect',
+      declaration_source: 'cli-flag',
+      status: 'active',
+      created_at: '2029-01-01T00:00:00.000Z',
+      expires_at: '2099-01-01T00:00:00.000Z',
+      created_by_invocation_id: 'packet-74-session-creator',
+      policy_binding: {
+        policy_id: sources.provenance.policy_id,
+        policy_version: sources.provenance.policy_version,
+        resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+      },
+      constitution_binding: sources.constitution_binding,
+      package_binding: sources.package_binding,
+    };
+    mkdirSync(join(fixture.root, '.devai/state/authority-sessions'), { recursive: true });
+    const sessionPath = join(fixture.root, '.devai/state/authority-sessions', `${sessionId}.json`);
+    writeFileSync(
+      sessionPath,
+      `${JSON.stringify({ ...unsigned, session_digest_sha256: canonicalSha256(unsigned) })}\n`,
+    );
+    const { host: directHost } = exactBrokerAt(fixture.root, 'init apply harness', 'architect', {
+      as_role: 'architect',
+    });
+    let directApplied = false;
+    try {
+      directHost.scope.apply_effect(
+        effect('writeFileSync', [join(fixture.root, '.devai/state/packet-74-direct.json'), '{}\n']),
+        () => {
+          directApplied = true;
+        },
+      );
+      directHost.commit_exact?.();
+      expect(directApplied).toBe(true);
+    } finally {
+      directHost.dispose();
+    }
+
+    const { host } = exactBrokerAt(fixture.root, 'init apply harness', 'architect', {
+      authority_session: sessionId,
+    });
+    try {
+      let applied = false;
+      host.scope.apply_effect(
+        effect('writeFileSync', [
+          join(fixture.root, '.devai/state/packet-74-session.json'),
+          '{}\n',
+        ]),
+        () => {
+          applied = true;
+        },
+      );
+      host.commit_exact?.();
+      expect(applied).toBe(true);
+    } finally {
+      host.dispose();
+    }
+
+    writeFileSync(sessionPath, '{}\n');
+    const { host: malformedHost } = exactBrokerAt(fixture.root, 'init apply harness', 'architect', {
+      authority_session: sessionId,
+    });
+    let malformedApplied = false;
+    try {
+      malformedHost.scope.apply_effect(
+        effect('writeFileSync', [
+          join(fixture.root, '.devai/state/packet-74-malformed.json'),
+          '{}\n',
+        ]),
+        () => {
+          malformedApplied = true;
+        },
+      );
+      expect(() => malformedHost.commit_exact?.()).toThrow('AUTHORITY_SESSION_SCHEMA_INVALID');
+      expect(malformedApplied).toBe(false);
+    } finally {
+      malformedHost.dispose();
     }
   });
 
