@@ -2185,14 +2185,21 @@ export function createAuthorityHostBroker(input: BrokerInput): {
 }
 
 export {
+  actionContractRegistry,
+  authorityPolicySemantics,
   boundedSelectors,
   canonicalRelativePath,
   existingRealpath,
+  expectSuccess,
+  flagValue,
   gitMetadataLayout,
   gitMetadataLogicalPath,
+  isRecord,
   makeEnvelope,
   physicalCanonicalPath,
   processTarget,
   readOnlyProcess,
+  unchangedAuthorityPolicy,
+  validatePolicySchema,
   within,
 };
