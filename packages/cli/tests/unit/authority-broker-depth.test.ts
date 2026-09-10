@@ -1689,3 +1689,86 @@ describe('authority broker production boundary depth', () => {
     }
   });
 });
+
+describe('authority broker database process targets', () => {
+  const target = (executable: string, args: readonly string[], actionName = 'task start') =>
+    processTarget(
+      effect('spawnSync', [executable, args], 'process'),
+      actionName,
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  it('classifies exact PostgreSQL operations, database identities, and refusal neighbors', () => {
+    const expected = (databaseId: string, actionName: string, operation: string) => ({
+      kind: 'db',
+      id: `db:devai-control:${databaseId}:${actionName.replace(' ', '-')}`,
+      connection_id: 'devai-control',
+      database_id: databaseId,
+      object_id: actionName.replace(' ', '-'),
+      operation,
+    });
+    const statements = [
+      ['   create table fixture(id int)', 'ddl'],
+      ['DROP TABLE fixture', 'ddl'],
+      ['ALTER TABLE fixture ADD COLUMN value text', 'ddl'],
+      ['TRUNCATE TABLE fixture', 'ddl'],
+      ['INSERT INTO fixture VALUES (1)', 'insert'],
+      ['UPDATE fixture SET id = 2', 'update'],
+      ['DELETE FROM fixture', 'delete'],
+      ['SELECT * FROM fixture', 'execute'],
+    ] as const;
+
+    for (const [sql, operation] of statements) {
+      expect(target('psql', ['postgres://host/tenant/team-db', '-c', sql])).toEqual(
+        expected('team-db', 'task start', operation),
+      );
+    }
+    expect(target('psql', ['-c', 'DELETE FROM fixture'])).toEqual(
+      expected('postgres', 'task start', 'delete'),
+    );
+    expect(target('psql', ['INSERT INTO fixture VALUES (1)'])).toEqual(
+      expected('postgres', 'task start', 'execute'),
+    );
+    expect(target('psql', ['postgres://host/tenant/trailing-db/', '-c', 'SELECT 1'])).toEqual(
+      expected('trailing-db', 'task start', 'execute'),
+    );
+    expect(target('psql', ['not-a-url', '-c', 'SELECT 1'], 'sense migrate')).toEqual(
+      expected('postgres', 'sense migrate', 'execute'),
+    );
+    expect(
+      target('psql', ['postgres://host/db', '-c', 'SELECT 1'], 'release preflight'),
+    ).toBeUndefined();
+    expect(target('mysql', ['postgres://host/db', '-c', 'SELECT 1'])).toBeUndefined();
+  });
+
+  it('classifies exact Docker database lifecycle targets and refusal neighbors', () => {
+    const expected = (container: string) => ({
+      kind: 'db',
+      id: `db:devai-control:cluster:${container}`,
+      connection_id: 'devai-control',
+      database_id: 'cluster',
+      object_id: container,
+      operation: 'execute',
+    });
+
+    expect(target('docker', ['run', '--name', 'fixture db'])).toEqual(expected('fixture-db'));
+    expect(target('docker', ['run'])).toEqual(expected('devai-shared-pg'));
+    expect(target('docker', ['start', 'started db'], 'task finish')).toEqual(
+      expected('started-db'),
+    );
+    expect(target('docker', ['stop', 'stopped db'], 'sense migrate')).toEqual(
+      expected('stopped-db'),
+    );
+    expect(target('docker', ['exec', 'fixture-db'])).toBeUndefined();
+    expect(target('docker', ['run', '--name', 'fixture-db'], 'check')).toEqual({
+      kind: 'fs',
+      id: 'fs:.devai/worktrees',
+      repository_id: 'repo:fixture',
+      canonical_relative_path: '.devai/worktrees',
+      operation: 'update',
+    });
+    expect(target('podman', ['run', '--name', 'fixture-db'])).toBeUndefined();
+  });
+});
