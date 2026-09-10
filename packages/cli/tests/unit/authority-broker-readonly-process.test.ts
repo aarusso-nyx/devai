@@ -37,6 +37,33 @@ function invoke(kind: string, executable: unknown, args: unknown): () => unknown
 
 describe('sense read-only process shape boundaries', () => {
   it.each([
+    ['lint', 'npx', ['eslint', '--format=json', '.']],
+    ['type_check', 'npx', ['tsc', '--noEmit']],
+    ['type_check', 'npx', ['tsc', '--noEmit', '-p', 'packages/cli/tsconfig.json']],
+    ['build', 'pnpm', ['-r', 'build']],
+    ['unit_test', 'pnpm', ['vitest', 'run']],
+    [
+      'integration_test',
+      'pnpm',
+      ['vitest', 'run', '--config', 'tests/config/t4.regression.config.ts'],
+    ],
+    ['runtime_probe_api', 'true', []],
+    ['runtime_probe_api', 'false', []],
+    ['runtime_probe_api', 'node', ['-e', 'process.exit(1);']],
+    ['runtime_probe_api', 'node', ['--version']],
+    ['runtime_probe_api', 'node', ['--help']],
+    ['runtime_probe_api', 'pnpm', ['audit', '--json']],
+    ['runtime_probe_api', 'npm', ['audit', '--json', '--package-lock-only']],
+    ['runtime_probe_api', 'sh', ['-lc', 'command -v claude']],
+    ['runtime_probe_api', 'sh', ['-lc', 'command -v codex']],
+    ['runtime_probe_api', 'git', ['rev-parse', 'HEAD']],
+    ['runtime_probe_api', 'docker', ['ps']],
+    ['runtime_probe_api', 'command', ['-v', 'git']],
+  ] as const)('admits %s: %s %j', (kind, executable, args) => {
+    expect(invoke(kind, executable, args)()).toBe('allowed');
+  });
+
+  it.each([
     ['lint', 1, ['eslint', '--format=json', '.']],
     ['lint', 'npx', 'not-an-array'],
     ['lint', 'npx', ['eslint', '--format=json']],
@@ -96,9 +123,5 @@ describe('sense read-only process shape boundaries', () => {
     ['runtime_probe_api', 'sh', ['-lc', 'echo unsafe']],
   ] as const)('refuses %s: %s %j', (kind, executable, args) => {
     expect(invoke(kind, executable, args)).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
-  });
-
-  it('admits the second exact tool-discovery command', () => {
-    expect(invoke('runtime_probe_api', 'sh', ['-lc', 'command -v codex'])()).toBe('allowed');
   });
 });
