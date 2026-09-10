@@ -177,6 +177,32 @@ describe('canonical action registry constructor', () => {
     expect(repositoryIdFor(secondCheckout)).toBe('teat');
   });
 
+  it('normalizes declared project names before using them as authority identities', () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-authority-normalized-'));
+    temporaryRoots.push(temporaryRoot);
+    const repositoryRoot = join(temporaryRoot, 'normalized-repository');
+    mkdirSync(join(repositoryRoot, '.devai/config'), { recursive: true });
+    writeFileSync(
+      join(repositoryRoot, '.devai/config/project.json'),
+      `${JSON.stringify({ name: '  owner/project name  ' })}\n`,
+    );
+
+    expect(repositoryIdFor(repositoryRoot)).toBe('owner-project-name');
+  });
+
+  it('falls back to the checkout identity for an empty normalized project name', () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-authority-empty-name-'));
+    temporaryRoots.push(temporaryRoot);
+    const repositoryRoot = join(temporaryRoot, 'fallback-repository');
+    mkdirSync(join(repositoryRoot, '.devai/config'), { recursive: true });
+    writeFileSync(
+      join(repositoryRoot, '.devai/config/project.json'),
+      `${JSON.stringify({ name: ' \t ' })}\n`,
+    );
+
+    expect(repositoryIdFor(repositoryRoot)).toBe('fallback-repository');
+  });
+
   it('retains the directory fallback when the declared project name is unavailable', () => {
     const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-authority-fallback-'));
     temporaryRoots.push(temporaryRoot);
