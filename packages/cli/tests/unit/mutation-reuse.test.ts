@@ -34,6 +34,10 @@ const candidate = {
 
 describe('mutation evidence reuse', () => {
   it('reuses only exact passing evidence with intact identities and report', () => {
+    expect(selectMutationEvidence(identity, undefined)).toEqual({
+      status: 'execute',
+      reason: 'evidence-missing',
+    });
     expect(selectMutationEvidence(identity, candidate)).toEqual({
       status: 'reused',
       reason: 'exact-identity',
