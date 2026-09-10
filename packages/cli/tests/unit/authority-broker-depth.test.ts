@@ -1028,6 +1028,36 @@ describe('authority broker production boundary depth', () => {
     expect(classified).toBe(cases.length);
   });
 
+  it('authorizes only a complete repository-local Git move', () => {
+    const host = broker('round run', 'engineer', roundRunArgv());
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['git', ['mv', '.devai/state/source.json', '.devai/state/destination.json']],
+            'process',
+          ),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('spawnSync', ['git', ['mv', '.devai/state/source.json']], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('renameSync', ['.devai/state/source.json', '.claude/settings.json']),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_PATH_DOMAIN_VIOLATION');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('authorizes only the exact test command declared by evidence record', () => {
     const argv = [
       process.execPath,
