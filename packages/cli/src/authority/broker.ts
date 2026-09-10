@@ -559,7 +559,7 @@ function safeLogical(value: unknown, fallback: string): string {
   return normalized.replaceAll(/^-|-$/gu, '') || fallback;
 }
 
-function processTarget(
+export function processTarget(
   request: AuthorityHostEffectRequest,
   actionName: string,
   root: string,
