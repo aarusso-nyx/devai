@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -210,6 +211,46 @@ async function committedFixture() {
     committedManifest,
     commit,
   };
+}
+
+async function preparedFixture() {
+  const value = fixture();
+  const store = createReleaseArtifactStore(value.input);
+  const transaction = await invokePrepare(value.binding, () => store.begin(beginInput()));
+  const artifact = await invokePrepare(value.binding, () =>
+    transaction.put(object('package-manifest', 'package-manifest', Buffer.from('manifest'))),
+  );
+  const artifacts = [identity(artifact)];
+  const manifestBytes = Buffer.from(
+    canonicalJson({
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: SINK_ID,
+      transaction_handle: transaction.transaction_handle,
+      ...beginInput(),
+      artifacts,
+    }),
+    'utf8',
+  );
+  const committedManifest = await invokePrepare(value.binding, () =>
+    transaction.put(object('committed-manifest', 'commit-manifest', manifestBytes)),
+  );
+  return {
+    ...value,
+    store,
+    transaction,
+    artifact,
+    artifacts,
+    manifestBytes,
+    committedManifest,
+  };
+}
+
+function transactionDirectory(value: {
+  readonly artifactRoot: string;
+  readonly transaction: { readonly transaction_handle: string };
+}): string {
+  return join(value.artifactRoot, 'artifacts', value.transaction.transaction_handle);
 }
 
 function receiptPath(
@@ -618,6 +659,282 @@ describe('durable external release artifact store', () => {
         sink_id: SINK_ID,
         opaque_handle: unordered.manifest.opaque_handle,
       }),
+    );
+  });
+
+  it('refuses a host error whose message merely contains an authority code', async () => {
+    for (const message of ['boom AUTHORITY_SINK_DENIED', 'AUTHORITY_SINK_DENIED boom']) {
+      const value = fixture();
+      const binding = { ...value.binding };
+      Object.defineProperty(binding, 'sink_id', {
+        enumerable: true,
+        get: () => {
+          throw new Error(message);
+        },
+      });
+      await refusal(() => createReleaseArtifactStore({ ...value.input, binding }));
+    }
+  });
+
+  it("refuses a host binding whose sink identity or pack spec digest is not the store's", async () => {
+    const sink = fixture();
+    await refusal(() =>
+      createReleaseArtifactStore({
+        ...sink.input,
+        binding: { ...sink.binding, sink_id: 'foreign-artifact-sink' },
+      }),
+    );
+    const pack = fixture();
+    await refusal(() =>
+      createReleaseArtifactStore({
+        ...pack.input,
+        binding: { ...pack.binding, pack_spec_digest_sha256: 'f'.repeat(64) },
+      }),
+    );
+  });
+
+  it('refuses persisted evidence that parses but is not canonical bytes', async () => {
+    const value = await committedFixture();
+    const path = join(transactionDirectory(value), 'begin.json');
+    writeFileSync(path, JSON.stringify(readRecord(path), null, 2));
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it('revalidates the persisted begin envelope against the host binding', async () => {
+    const value = await committedFixture();
+    const path = join(transactionDirectory(value), 'begin.json');
+    writeRecord(path, { ...readRecord(path), plan_receipt_digest_sha256: '9'.repeat(64) });
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it('refuses a committed transaction that also carries an abort marker', async () => {
+    const value = await committedFixture();
+    writeRecord(join(transactionDirectory(value), 'abort.json'), {
+      sink_id: SINK_ID,
+      transaction_handle: value.transaction.transaction_handle,
+      aborted: true,
+    });
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it('refuses an abort marker it cannot read as a file', async () => {
+    const value = await committedFixture();
+    mkdirSync(join(transactionDirectory(value), 'abort.json'));
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it('refuses a commit marker pointing at a receipt that is not a committed manifest', async () => {
+    const value = await committedFixture();
+    const path = receiptPath(value, value.committedManifest);
+    writeRecord(path, { ...readRecord(path), kind: 'package-sbom' });
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it('refuses a manifest artifact whose persisted receipt claims committed-manifest kind', async () => {
+    const value = await committedFixture();
+    const changed = { ...value.sbom, kind: 'committed-manifest' as const };
+    writeRecord(receiptPath(value, value.sbom), changed);
+    rewriteCommittedManifest(value, (manifest) => ({
+      ...manifest,
+      artifacts: (manifest['artifacts'] as ArtifactSinkObjectReceipt[])
+        .map((artifact) =>
+          artifact.opaque_handle === value.sbom.opaque_handle ? identity(changed) : artifact,
+        )
+        .sort(compare),
+    }));
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it("refuses an artifact that reuses the committed manifest's logical name", async () => {
+    const value = await committedFixture();
+    const path = receiptPath(value, value.sbom);
+    writeRecord(path, { ...readRecord(path), logical_name: value.committedManifest.logical_name });
+    await refusal(() =>
+      value.store.readArtifact({ sink_id: SINK_ID, opaque_handle: value.manifest.opaque_handle }),
+    );
+  });
+
+  it('refuses a committed read request that is not exactly the sink identity', async () => {
+    const value = await committedFixture();
+    await refusal(() =>
+      value.store.readArtifact({
+        sink_id: 'foreign-sink',
+        opaque_handle: value.manifest.opaque_handle,
+      }),
+    );
+    await refusal(() =>
+      value.store.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: value.manifest.opaque_handle,
+        unexpected: true,
+      } as never),
+    );
+  });
+
+  it('serves committed bytes through the transaction reader after commit', async () => {
+    const value = await committedFixture();
+    expect(
+      value.transaction.readArtifact({
+        sink_id: SINK_ID,
+        opaque_handle: value.manifest.opaque_handle,
+      }),
+    ).toEqual(Buffer.from('{"name":"fixture"}\n'));
+  });
+
+  it('refuses a pre-commit transaction read issued against a foreign sink', async () => {
+    const value = fixture();
+    const store = createReleaseArtifactStore(value.input);
+    const transaction = await invokePrepare(value.binding, () => store.begin(beginInput()));
+    const receipt = await invokePrepare(value.binding, () =>
+      transaction.put(object('package-manifest', 'manifest', Buffer.from('manifest'))),
+    );
+    await refusal(() =>
+      transaction.readArtifact({
+        sink_id: 'foreign-sink',
+        opaque_handle: receipt.opaque_handle,
+      }),
+    );
+  });
+
+  it('refuses a put whose bytes are not a Buffer', async () => {
+    const value = fixture();
+    const transaction = await invokePrepare(value.binding, () =>
+      createReleaseArtifactStore(value.input).begin(beginInput()),
+    );
+    const valid = object('package-manifest', 'manifest', Buffer.from('manifest'));
+    await refusal(() =>
+      invokePrepare(value.binding, () =>
+        transaction.put({ ...valid, bytes: Uint8Array.from(valid.bytes) as unknown as Buffer }),
+      ),
+    );
+  });
+
+  it('refuses a put that declares a foreign pack spec identity', async () => {
+    for (const mutation of [
+      { pack_spec_id: 'foreign-pack-spec' },
+      { pack_spec_digest_sha256: '1'.repeat(64) },
+    ]) {
+      const value = fixture();
+      const transaction = await invokePrepare(value.binding, () =>
+        createReleaseArtifactStore(value.input).begin(beginInput()),
+      );
+      const valid = object('package-manifest', 'manifest', Buffer.from('manifest'));
+      await refusal(() =>
+        invokePrepare(value.binding, () => transaction.put({ ...valid, ...mutation })),
+      );
+    }
+  });
+
+  it('refuses a put whose logical name is not a string', async () => {
+    const value = fixture();
+    const transaction = await invokePrepare(value.binding, () =>
+      createReleaseArtifactStore(value.input).begin(beginInput()),
+    );
+    const valid = object('package-manifest', 'manifest', Buffer.from('manifest'));
+    await refusal(() =>
+      invokePrepare(value.binding, () =>
+        transaction.put({ ...valid, logical_name: 42 as unknown as string }),
+      ),
+    );
+  });
+
+  it('refuses a put whose logical name is only prefixed by a safe segment', async () => {
+    const value = fixture();
+    const transaction = await invokePrepare(value.binding, () =>
+      createReleaseArtifactStore(value.input).begin(beginInput()),
+    );
+    const valid = object('package-manifest', 'manifest', Buffer.from('manifest'));
+    await refusal(() =>
+      invokePrepare(value.binding, () => transaction.put({ ...valid, logical_name: 'ok/../evil' })),
+    );
+  });
+
+  it('refuses a commit whose receipt is not byte-identical to the issued receipt', async () => {
+    const value = await preparedFixture();
+    await refusal(() =>
+      invokePrepare(value.binding, () =>
+        value.transaction.commit({ ...value.committedManifest, logical_name: 'other-name' }),
+      ),
+    );
+  });
+
+  it('refuses a commit with an empty artifact population and leaves no commit evidence', async () => {
+    const value = fixture();
+    const store = createReleaseArtifactStore(value.input);
+    const transaction = await invokePrepare(value.binding, () => store.begin(beginInput()));
+    const manifestBytes = Buffer.from(
+      canonicalJson({
+        schemaVersion: '1.0.0',
+        kind: 'release-artifact-sink-commit-manifest',
+        sink_id: SINK_ID,
+        transaction_handle: transaction.transaction_handle,
+        ...beginInput(),
+        artifacts: [],
+      }),
+      'utf8',
+    );
+    const committedManifest = await invokePrepare(value.binding, () =>
+      transaction.put(object('committed-manifest', 'commit-manifest', manifestBytes)),
+    );
+    await refusal(() => invokePrepare(value.binding, () => transaction.commit(committedManifest)));
+    expect(existsSync(join(transactionDirectory({ ...value, transaction }), 'commit.json'))).toBe(
+      false,
+    );
+    await invokePrepare(value.binding, () => transaction.abort());
+  });
+
+  it('refuses a commit that issued more than one committed manifest', async () => {
+    const value = await preparedFixture();
+    const second = await invokePrepare(value.binding, () =>
+      value.transaction.put(
+        object('committed-manifest', 'second-commit-manifest', value.manifestBytes),
+      ),
+    );
+    await refusal(() => invokePrepare(value.binding, () => value.transaction.commit(second)));
+    expect(existsSync(join(transactionDirectory(value), 'commit.json'))).toBe(false);
+    await invokePrepare(value.binding, () => value.transaction.abort());
+  });
+
+  it('revalidates every issued receipt against disk before the commit becomes terminal', async () => {
+    const value = await preparedFixture();
+    const path = receiptPath(value as Awaited<ReturnType<typeof committedFixture>>, value.artifact);
+    writeRecord(path, { ...readRecord(path), logical_name: 'changed-manifest-name' });
+    await refusal(() =>
+      invokePrepare(value.binding, () => value.transaction.commit(value.committedManifest)),
+    );
+    expect(existsSync(join(transactionDirectory(value), 'commit.json'))).toBe(false);
+    await invokePrepare(value.binding, () => value.transaction.abort());
+  });
+
+  it('persists an exact abort marker payload', async () => {
+    const value = fixture();
+    const transaction = await invokePrepare(value.binding, () =>
+      createReleaseArtifactStore(value.input).begin(beginInput()),
+    );
+    await invokePrepare(value.binding, () => transaction.abort());
+    expect(
+      readFileSync(join(transactionDirectory({ ...value, transaction }), 'abort.json')),
+    ).toEqual(
+      Buffer.from(
+        canonicalJson({
+          sink_id: SINK_ID,
+          transaction_handle: transaction.transaction_handle,
+          aborted: true,
+        }),
+        'utf8',
+      ),
     );
   });
 
