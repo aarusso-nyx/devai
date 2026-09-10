@@ -652,6 +652,67 @@ describe('release mutation artifact normalization v2.1', () => {
     ).toThrow('MUTATION_REPORT_INVALID');
   });
 
+  it('binds raw report kind, framework identity, and thresholds independently', () => {
+    const withKind = rawReport(['Killed']);
+    Object.assign(withKind, { kind: 'mutation-normalized-stryker-report-v2' });
+    expect(() => normalized(withKind, {}, ['0'])).toThrow('MUTATION_VERSION_UNSUPPORTED');
+
+    const wrongFramework = rawReport(['Killed']);
+    wrongFramework.framework.name = 'CompatibleStryker';
+    expect(() => normalized(wrongFramework, {}, ['0'])).toThrow('MUTATION_VERSION_UNSUPPORTED');
+
+    const wrongVersion = rawReport(['Killed']);
+    wrongVersion.framework.version = '9.6.2';
+    expect(() => normalized(wrongVersion, {}, ['0'])).toThrow('MUTATION_VERSION_UNSUPPORTED');
+
+    const wrongThresholds = rawReport(['Killed']);
+    wrongThresholds.thresholds.high = 61;
+    expect(() => normalized(wrongThresholds, {}, ['0'])).toThrow('MUTATION_THRESHOLD_MISMATCH');
+  });
+
+  it.each([
+    ['relative/package', 'MUTATION_INPUT_DIGEST_MISMATCH'],
+    ['/trusted/../alternate/package', 'MUTATION_REPORT_INVALID'],
+  ])('refuses a matching but noncanonical execution root %j', (execution_cwd, error) => {
+    const report = rawReport(['Killed']);
+    report.projectRoot = execution_cwd;
+    expect(() => normalized(report, { execution_cwd }, ['0'])).toThrow(error);
+  });
+
+  it('binds raw file membership, language, complete mutant ids, and test paths independently', () => {
+    const emptyRoster = rawReport(['Killed']);
+    emptyRoster.files = {};
+    expect(() => normalized(emptyRoster, {}, ['0'])).toThrow('MUTATION_ROSTER_MISMATCH');
+
+    const wrongLanguage = rawReport(['Killed']);
+    const source = wrongLanguage.files['src/value.ts'];
+    if (source === undefined) throw new Error('source fixture missing');
+    source.language = 'json';
+    expect(() => normalized(wrongLanguage, {}, ['0'])).toThrow('MUTATION_REPORT_INVALID');
+
+    const javascript = rawReport(['Killed']);
+    const javascriptSource = javascript.files['src/value.ts'];
+    if (javascriptSource === undefined) throw new Error('source fixture missing');
+    javascriptSource.language = 'javascript';
+    expect(
+      (json(normalized(javascript, {}, ['0']).report.bytes)['files'] as Record<string, unknown>)[
+        'src/value.ts'
+      ],
+    ).toMatchObject({ language: 'javascript' });
+
+    for (const id of ['/leading-slash', 'trailing-slash/']) {
+      const invalidId = rawReport(['Killed']);
+      const mutant = invalidId.files['src/value.ts']?.mutants[0];
+      if (mutant === undefined) throw new Error('mutant fixture missing');
+      mutant.id = id;
+      expect(() => normalized(invalidId, {}, [id])).toThrow('MUTATION_REPORT_INVALID');
+    }
+
+    const undeclaredTest = rawReport(['Killed']);
+    undeclaredTest.testFiles['tests/other.test.ts'] = { source: '', tests: [] };
+    expect(() => normalized(undeclaredTest, {}, ['0'])).toThrow('MUTATION_INPUT_DIGEST_MISMATCH');
+  });
+
   it.each([
     '',
     '/src/value.ts',
