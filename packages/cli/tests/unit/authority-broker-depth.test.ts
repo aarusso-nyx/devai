@@ -1812,3 +1812,50 @@ describe('authority broker database process targets', () => {
     expect(target('sandbox-exec', ['-p', 'profile'], 'task start')).toBeUndefined();
   });
 });
+
+describe('authority broker Git reference process targets', () => {
+  const target = (executable: string, args: readonly string[]) =>
+    processTarget(
+      effect('spawnSync', [executable, args], 'process'),
+      'round run',
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  const expected = (ref: string, operation: string, remoteId?: string) => ({
+    kind: 'git-ref',
+    id: `git-ref:repo:fixture:${ref}`,
+    repository_id: 'repo:fixture',
+    ref,
+    ...(remoteId === undefined ? {} : { remote_id: remoteId }),
+    operation,
+    protected: false,
+  });
+
+  it('maps exact fetch arguments and fallback identities into one remote reference', () => {
+    expect(target('git', ['fetch', 'upstream remote!', 'topic/name'])).toEqual(
+      expected('refs/remotes/upstream-remote/topic-name', 'update', 'upstream-remote'),
+    );
+    expect(target('git', ['fetch', '', ''])).toEqual(
+      expected('refs/remotes/origin/remote', 'update', 'origin'),
+    );
+    expect(target('git', ['fetch', 'origin', 'main', 'extra'])).toEqual(
+      expected('refs/remotes/main/extra', 'update', 'main'),
+    );
+    expect(target('git', ['fetchx', 'origin', 'main'])).toBeUndefined();
+    expect(target('hg', ['fetch', 'origin', 'main'])).toBeUndefined();
+  });
+
+  it('maps only an exact orphan checkout into a local branch reference', () => {
+    expect(target('git', ['checkout', '--orphan', 'feature branch'])).toEqual(
+      expected('refs/heads/feature-branch', 'create'),
+    );
+    expect(target('git', ['checkout', '--orphan'])).toEqual(
+      expected('refs/heads/orphan', 'create'),
+    );
+    expect(target('git', ['checkout', '-b', 'feature'])).toBeUndefined();
+    expect(target('git', ['checkoutx', '--orphan', 'feature'])).toBeUndefined();
+    expect(target('hg', ['checkout', '--orphan', 'feature'])).toBeUndefined();
+  });
+});
