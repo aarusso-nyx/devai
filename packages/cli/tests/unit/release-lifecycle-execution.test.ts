@@ -3902,6 +3902,99 @@ describe('release lifecycle execution kernel', () => {
     }
   });
 
+  it('binds terminal kind, authorization, action, and observed provider dispatch', async () => {
+    const refinalize = (
+      record: StoreRecord,
+      patch: Partial<Omit<StoreRecord, 'record_id' | 'record_digest_sha256'>>,
+    ) => {
+      const { record_id: _id, record_digest_sha256: _digest, ...draft } = record;
+      return finalizeStoreRecord({ ...draft, ...patch });
+    };
+    const reference = (record: StoreRecord) => ({
+      sequence: record.sequence,
+      record_id: record.record_id,
+      record_digest_sha256: record.record_digest_sha256,
+    });
+
+    const preflightStore = new ReleaseLifecycleFileStore(root(), request());
+    await seedPreflight(preflightStore);
+    const [attemptValue, completionValue] = preflightStore.readStoreRecords();
+    const attempt = required(attemptValue, 'missing preflight attempt');
+    const completion = required(completionValue, 'missing preflight completion');
+    const completedHead = required(preflightStore.readHead(), 'missing preflight head');
+    const repeated = refinalize(completion, {
+      sequence: 2,
+      predecessor_record: reference(completion),
+      observed_head_before: completedHead,
+    });
+    expect(reduceStoreRecords([attempt, completion, repeated]).errors).toContain(
+      'release-store-terminal-attempt-link-invalid',
+    );
+    const wrongAction = refinalize(completion, {
+      action_id: 'release certify',
+      completion: {
+        ...required(completion.completion, 'missing completion material'),
+        state: 'certified',
+      },
+    });
+    expect(reduceStoreRecords([attempt, wrongAction]).errors).toContain(
+      'release-store-terminal-attempt-link-invalid',
+    );
+
+    const remoteStore = new ReleaseLifecycleFileStore(root(), request('release evidence-publish'));
+    await advanceToEvidencePublished(remoteStore);
+    const remoteRecords = remoteStore.readStoreRecords();
+    const remoteAttempt = required(remoteRecords.at(-2), 'missing remote attempt');
+    const remoteCompletion = required(remoteRecords.at(-1), 'missing remote completion');
+    const wrongAuthorization = refinalize(remoteCompletion, {
+      authorization_event_id: 'EA-0000000000000000',
+    });
+    expect(
+      reduceStoreRecords([...remoteRecords.slice(0, -1), wrongAuthorization]).errors,
+    ).toContain('release-store-terminal-attempt-link-invalid');
+    expect(remoteAttempt.record_kind).toBe('attempt');
+
+    const exportValue = request('release export');
+    const exportStore = new ReleaseLifecycleFileStore(root(), exportValue);
+    await advanceToPrepared(exportStore);
+    const exportProvider = providerFor('release export');
+    const exported = await withReleaseExportAuthorityFixture(exportValue, () =>
+      executeReleaseLifecycleAction({
+        request: exportValue,
+        action: 'release export',
+        authority: authorityFor('release export'),
+        store: exportStore,
+        resolveReceipt: () => planReceipt(),
+        resolvePlanInput,
+        provider: async (...args) => ({
+          ...(await exportProvider(...args)),
+          dispatch_status: 'dispatched',
+          provider_handle: 'local-export-transaction',
+        }),
+        artifactReader: artifactReaderFor('release prepare'),
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(exported.ok).toBe(true);
+    const exportRecords = exportStore.readStoreRecords();
+    const exportCompletion = required(exportRecords.at(-1), 'missing export completion');
+    for (const patch of [
+      {
+        provider_dispatch: { status: 'unknown' as const, handle_observed: true },
+        provider_handle: 'local-export-transaction',
+      },
+      {
+        provider_dispatch: { status: 'dispatched' as const, handle_observed: false },
+        provider_handle: null,
+      },
+    ]) {
+      const invalidDispatch = refinalize(exportCompletion, patch);
+      expect(reduceStoreRecords([...exportRecords.slice(0, -1), invalidDispatch]).errors).toContain(
+        'release-store-terminal-attempt-link-invalid',
+      );
+    }
+  });
+
   it('derives publication expectation only from trusted controls bound to request and grant', async () => {
     const initial = request('release publish');
     const store = new ReleaseLifecycleFileStore(root(), initial);
