@@ -702,4 +702,33 @@ describe('release offline provider verification depth', () => {
       createReleaseOfflineVerifierProvider(value.controls)(value.request, value.state, {} as never),
     ).rejects.toThrow('release-offline-verifier-failed');
   });
+
+  it('uses the closed provider refusal when the installed DAG control is absent', () => {
+    const value = fixture();
+    Object.assign(value.controls, { dag: undefined });
+
+    expect(() => createReleaseOfflineVerifierProvider(value.controls)).toThrow(
+      /^release-offline-verifier-failed$/u,
+    );
+  });
+
+  it.each([
+    ['null', () => null],
+    [
+      'array carrying successful-looking properties',
+      () => Object.assign([], { ok: true, verification: 'candidate-receipt-dag' }),
+    ],
+    [
+      'callable carrying successful-looking properties',
+      () => Object.assign(() => undefined, { ok: true, verification: 'candidate-receipt-dag' }),
+    ],
+  ])('rejects a non-record installed DAG result: %s', async (_label, createResult) => {
+    const value = fixture();
+    value.dag.verify.mockResolvedValue(createResult() as never);
+
+    await expect(
+      createReleaseOfflineVerifierProvider(value.controls)(value.request, value.state, {} as never),
+    ).rejects.toThrow(/^release-offline-verifier-failed$/u);
+    expect(value.dag.verify).toHaveBeenCalledOnce();
+  });
 });
