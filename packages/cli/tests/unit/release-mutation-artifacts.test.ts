@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { describe, expect, it, vi } from 'vitest';
 import {
   finalizeReleaseMutationArtifactsV21,
@@ -196,6 +196,19 @@ function finalizerInput(artifacts = normalized()) {
       },
     ],
     maximum_document_bytes: 100_000,
+  };
+}
+
+function readdressResult(artifacts: ReturnType<typeof normalized>, value: Record<string, unknown>) {
+  const bytes = Buffer.from(canonicalJson(value));
+  const digest = sha256(bytes);
+  return {
+    ...artifacts,
+    result: {
+      path: `.devai/state/mutation/v2/store/inputs/${artifacts.inputDigest}/objects/${digest}.result.json`,
+      sha256: digest,
+      bytes,
+    },
   };
 }
 
@@ -1057,6 +1070,87 @@ describe('release mutation artifact normalization v2.1', () => {
     await expect(
       finalizeReleaseMutationArtifactsV21(finalizerInput({ ...artifacts, report })),
     ).rejects.toThrow('NON_CANONICAL_JSON');
+  });
+
+  it('binds finalization package labels, byte custody, addressed paths, and exact byte limits', async () => {
+    const input = finalizerInput();
+    const artifacts = input.packages[0]?.artifacts;
+    if (artifacts === undefined) throw new Error('fixture artifacts missing');
+    const maximum = Math.max(artifacts.report.bytes.byteLength, artifacts.result.bytes.byteLength);
+    await expect(
+      finalizeReleaseMutationArtifactsV21({ ...input, maximum_document_bytes: maximum }),
+    ).resolves.toMatchObject({ summary: { verdict: 'pass', passed: true } });
+
+    await expect(
+      finalizeReleaseMutationArtifactsV21({
+        ...input,
+        packages: input.packages.map((entry) => ({ ...entry, packageName: '@fixture/other' })),
+      }),
+    ).rejects.toThrow('MUTATION_ROSTER_MISMATCH');
+    await expect(
+      finalizeReleaseMutationArtifactsV21({
+        ...input,
+        packages: input.packages.map((entry) => ({
+          ...entry,
+          artifacts: {
+            ...entry.artifacts,
+            report: {
+              ...entry.artifacts.report,
+              bytes: entry.artifacts.report.bytes.toString('utf8'),
+            },
+          },
+        })),
+      }),
+    ).rejects.toThrow('MUTATION_REPORT_INVALID');
+    await expect(
+      finalizeReleaseMutationArtifactsV21({
+        ...input,
+        packages: input.packages.map((entry) => ({
+          ...entry,
+          artifacts: {
+            ...entry.artifacts,
+            report: { ...entry.artifacts.report, path: `${entry.artifacts.report.path}.other` },
+          },
+        })),
+      }),
+    ).rejects.toThrow('ARTIFACT_DIGEST_MISMATCH');
+  });
+
+  it.each([
+    'pair-input-digest',
+    'result-input-digest',
+    'input-projection',
+    'thresholds',
+    'tool-versions',
+  ] as const)('refuses re-addressed finalization %s drift', async (change) => {
+    const input = finalizerInput();
+    const artifacts = input.packages[0]?.artifacts;
+    if (artifacts === undefined) throw new Error('fixture artifacts missing');
+    let changed = artifacts;
+    if (change === 'pair-input-digest') {
+      changed = { ...artifacts, inputDigest: '0'.repeat(64) };
+    } else {
+      const result = json(artifacts.result.bytes);
+      switch (change) {
+        case 'result-input-digest':
+          result['inputDigest'] = '0'.repeat(64);
+          break;
+        case 'input-projection':
+          result['inputProjection'] = { ...(result['inputProjection'] as object), changed: true };
+          break;
+        case 'thresholds':
+          result['thresholds'] = { ...(result['thresholds'] as object), scoreMin: 61 };
+          break;
+        case 'tool-versions':
+          result['toolVersions'] = { ...(result['toolVersions'] as object), node: 'changed' };
+          break;
+      }
+      changed = readdressResult(artifacts, result);
+    }
+
+    await expect(finalizeReleaseMutationArtifactsV21(finalizerInput(changed))).rejects.toThrow(
+      'MUTATION_INPUT_DIGEST_MISMATCH',
+    );
   });
 
   it('accepts the inclusive upper document limit during pure finalization', async () => {
