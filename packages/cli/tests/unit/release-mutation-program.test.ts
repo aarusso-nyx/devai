@@ -299,6 +299,91 @@ describe('protected mutation program factory with explicit upstream-authority is
     },
   );
 
+  it('accepts exact population limits and refuses empty or oversized target and test sets', () => {
+    const exact = factoryUnit();
+    exact.input.limits.maximum_files = 1;
+    expect(() => createProtectedMutationProgram(exact.input)).not.toThrow();
+
+    const boundary = factoryUnit();
+    boundary.input.limits = {
+      maximum_raw_report_bytes: limits.maximum_raw_report_bytes,
+      maximum_mutants: 0x7fffffff,
+      maximum_files: limits.maximum_files,
+      maximum_document_bytes: limits.maximum_document_bytes,
+    };
+    expect(() => createProtectedMutationProgram(boundary.input)).not.toThrow();
+
+    for (const population of ['mutation_targets', 'selected_tests'] as const) {
+      for (const fault of ['empty', 'oversized'] as const) {
+        const { input, pkg } = factoryUnit();
+        input.limits.maximum_files = 1;
+        const member = pkg[population][0];
+        if (member === undefined) throw new Error('fixture population missing');
+        Object.assign(pkg, {
+          [population]:
+            fault === 'empty' ? [] : [member, { ...member, path: `extra/${member.path}` }],
+        });
+        expect(() => createProtectedMutationProgram(input)).toThrow(INVALID);
+      }
+    }
+  });
+
+  it.each(['execution template', 'execution configuration'] as const)(
+    'refuses a missing current %s at the isolated factory boundary',
+    (fault) => {
+      const { input, pkg } = factoryUnit();
+      if (fault === 'execution template') {
+        Object.assign(input.input_plan, { execution_template_version: '1.1.0' });
+      } else {
+        Object.assign(pkg, { execution_configuration: undefined });
+      }
+      expect(() => createProtectedMutationProgram(input)).toThrow(INVALID);
+    },
+  );
+
+  it('includes only prerequisite outputs from package-declared producer nodes', () => {
+    const { input, pkg } = factoryUnit();
+    const neededBytes = Buffer.from('{"needed":true}\n');
+    const unrelatedBytes = Buffer.from('{"unrelated":true}\n');
+    const needed = {
+      path: 'generated/needed.json',
+      mode: '100644' as const,
+      size: neededBytes.length,
+      sha256: hash(neededBytes),
+      producer_task_node: 'release:needed',
+    };
+    const unrelated = {
+      path: 'generated/unrelated.json',
+      mode: '100644' as const,
+      size: unrelatedBytes.length,
+      sha256: hash(unrelatedBytes),
+      producer_task_node: 'release:unrelated',
+    };
+    Object.assign(pkg, { prerequisite_nodes: [needed.producer_task_node] });
+    executionContextCapture.mockImplementation(() => ({
+      ...isolatedExecutionContext,
+      prerequisite_outputs: [needed, unrelated],
+    }));
+
+    const program = createProtectedMutationProgram(input);
+    const invocation = json(captureProtectedMutationProgram(program), 'invocation.json');
+    const paths = (invocation['inputs'] as readonly { readonly path: string }[]).map(
+      (entry) => entry.path,
+    );
+    expect(paths).toContain(needed.path);
+    expect(paths).not.toContain(unrelated.path);
+    expect(() =>
+      assertProtectedMutationProgramExecution(program, {
+        container_identity: isolatedExecutionContext.container_identity,
+        environment: isolatedExecutionContext.environment,
+        source: [{ path: 'src/isolated.ts', mode: '100644', bytes: isolatedSource }],
+        prior_outputs: new Map([
+          [needed.path, { path: needed.path, mode: needed.mode, bytes: neededBytes }],
+        ]),
+      }),
+    ).not.toThrow();
+  });
+
   it('constructs only exact host-owned files and bound roster/config/threshold options', () => {
     const { input, pkg } = factoryUnit();
     const program = createProtectedMutationProgram(input);
