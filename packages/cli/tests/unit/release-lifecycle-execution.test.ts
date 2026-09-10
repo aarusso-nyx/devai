@@ -1348,8 +1348,12 @@ function requiredMutationEvidenceSink(
     readonly closure?: typeof evidence.closure;
     readonly read_blob?: (identity: Parameters<typeof evidence.read>[0]) => Buffer;
     readonly omit_unit_readers?: boolean;
+    readonly omit_unit_reader?: 'closure' | 'receipt' | 'blob';
+    readonly omit_unit_maximum?: boolean;
+    readonly unit_maximum_bytes?: number;
   } = {},
 ) {
+  const omitAllUnitReaders = options.omit_unit_readers === true;
   return {
     kind: 'certification-evidence-sink-v3' as const,
     protocol: 'two-phase-content-addressed' as const,
@@ -1364,12 +1368,20 @@ function requiredMutationEvidenceSink(
     readGeneratedBlob: () => {
       throw new Error('no generated output');
     },
-    ...(options.omit_unit_readers
+    ...(omitAllUnitReaders || options.omit_unit_maximum
+      ? {}
+      : { unit_mutation_maximum_bytes: options.unit_maximum_bytes ?? 1_000_000 }),
+    ...(omitAllUnitReaders || options.omit_unit_reader === 'closure'
+      ? {}
+      : { readUnitMutationEvidenceClosure: () => options.closure ?? evidence.closure }),
+    ...(omitAllUnitReaders || options.omit_unit_reader === 'receipt'
       ? {}
       : {
-          unit_mutation_maximum_bytes: 1_000_000,
-          readUnitMutationEvidenceClosure: () => options.closure ?? evidence.closure,
           readUnitMutationEvidenceReceipt: () => (options.closure ?? evidence.closure).receipt,
+        }),
+    ...(omitAllUnitReaders || options.omit_unit_reader === 'blob'
+      ? {}
+      : {
           readUnitMutationEvidenceBlob: ({
             identity,
           }: {
@@ -2474,17 +2486,40 @@ describe('release lifecycle execution kernel', () => {
     expect(input.evidence.read).toHaveBeenCalledTimes(23);
   });
 
-  it('refuses required mutation material without the trusted unit closure readers', async () => {
+  it('refuses required mutation material without each trusted unit evidence prerequisite', async () => {
+    const input = await requiredMutationCertificationFixture();
+    const missingRequirements = [
+      { omit_unit_readers: true },
+      { omit_unit_reader: 'closure' as const },
+      { omit_unit_reader: 'receipt' as const },
+      { omit_unit_reader: 'blob' as const },
+      { omit_unit_maximum: true },
+      { unit_maximum_bytes: 0 },
+      { unit_maximum_bytes: 1.5 },
+    ];
+
+    for (const options of missingRequirements) {
+      const { provider, certify } = requiredMutationProvider(input, undefined, options);
+
+      await expect(provider(input.request)).resolves.toMatchObject({
+        outcome: 'failure',
+        code: 'release-certification-generated-output-untrusted',
+      });
+      expect(certify).not.toHaveBeenCalled();
+    }
+  });
+
+  it('accepts one byte as the minimum trusted unit evidence limit', async () => {
     const input = await requiredMutationCertificationFixture();
     const { provider, certify } = requiredMutationProvider(input, undefined, {
-      omit_unit_readers: true,
+      unit_maximum_bytes: 1,
     });
 
     await expect(provider(input.request)).resolves.toMatchObject({
       outcome: 'failure',
       code: 'release-certification-generated-output-untrusted',
     });
-    expect(certify).not.toHaveBeenCalled();
+    expect(certify).toHaveBeenCalledOnce();
   });
 
   it('requires mutation readers when any unit in a mixed certification is bound', async () => {
