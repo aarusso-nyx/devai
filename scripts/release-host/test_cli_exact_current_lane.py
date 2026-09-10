@@ -863,10 +863,48 @@ class HarnessRefusalTests(unittest.TestCase):
             root = Path(directory)
             (root / "planready/lane/candidate/fixture").mkdir(parents=True)
             (root / "planready/lane/candidate/fixture/container.json").write_text("{}\n")
+            (root / "control-snapshot/retained/shard-02").mkdir(parents=True)
+            historical = root / "control-snapshot/retained/shard-02/container.json"
+            historical.write_text('{"id":"historical"}\n')
             self.assertFalse(harness.runtime_attempt_started(root))
+            self.assertEqual(harness.current_attempt_container_records(root), [])
+            self.assertEqual(harness.observed_containers(root, None), [])
             (root / "planready/lane/baseline").mkdir()
             (root / "planready/lane/baseline/container.json").write_text("{}\n")
             self.assertTrue(harness.runtime_attempt_started(root))
+
+    def test_actual_planready_and_targeted_runtime_records_remain_fail_closed(self) -> None:
+        for relative in (
+            "planready/shard-02-planready/baseline/container.json",
+            "targeted/shard-02-exact-current/baseline/container.json",
+            "targeted/shard-02-exact-current/mutation/container.json",
+        ):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / relative
+                path.parent.mkdir(parents=True)
+                path.write_text('{"id":"' + "a" * 64 + '"}\n')
+                self.assertTrue(harness.runtime_attempt_started(root))
+                self.assertEqual(harness.current_attempt_container_records(root), [path])
+                observed = harness.observed_containers(root, None)
+                self.assertEqual(len(observed), 1)
+                self.assertEqual(observed[0]["id"], "a" * 64)
+
+    def test_non_container_partial_markers_remain_fail_closed(self) -> None:
+        for relative in (
+            "retained-planready",
+            "current-map.json",
+            "targeted",
+            "execution-completion.json",
+        ):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / relative
+                if path.suffix:
+                    path.write_text("{}\n")
+                else:
+                    path.mkdir()
+                self.assertTrue(harness.runtime_attempt_started(root))
 
     def test_failed_attempt_is_sealed_and_detects_later_evidence_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

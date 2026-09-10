@@ -2262,11 +2262,19 @@ def attempt_evidence_files(root: Path) -> list[dict[str, object]]:
     return members
 
 
+def current_attempt_container_records(root: Path) -> list[Path]:
+    records: list[Path] = []
+    for path in root.glob("**/container.json"):
+        parts = path.relative_to(root).parts
+        if "candidate" in parts or (parts and parts[0] == "control-snapshot"):
+            continue
+        records.append(path)
+    return sorted(records)
+
+
 def observed_containers(root: Path, runner: ModuleType | None) -> list[dict[str, object]]:
     containers: list[dict[str, object]] = []
-    for path in sorted(root.glob("**/container.json")):
-        if "candidate" in path.relative_to(root).parts:
-            continue
+    for path in current_attempt_container_records(root):
         relative = path.relative_to(root).as_posix()
         try:
             value = load_json(path, "ATTEMPT_CONTAINER_RECORD_INVALID")
@@ -2365,12 +2373,7 @@ def validate_attempt_seal(
 
 
 def runtime_attempt_started(root: Path) -> bool:
-    runtime_containers = [
-        path
-        for path in root.glob("**/container.json")
-        if "candidate" not in path.relative_to(root).parts
-    ]
-    return bool(runtime_containers) or any(
+    return bool(current_attempt_container_records(root)) or any(
         (root / name).exists()
         for name in ("retained-planready", "current-map.json", "targeted", "execution-completion.json")
     )
