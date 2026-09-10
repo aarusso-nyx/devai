@@ -22,7 +22,7 @@ import {
   runWithAuthorityHostEffects,
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
-import { canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { createReleaseRepositoryTestFixture } from '../../../authority/tests/unit/release-repository-test-fixture.js';
 import { createReleaseCertificationEvidenceStore } from '../../src/services/release-evidence-store.js';
 import {
@@ -149,6 +149,59 @@ function output(handle: {
   readonly size_bytes: number;
 }) {
   return { path: 'generated/report.json', mode: '100644' as const, output_blob_handle: handle };
+}
+
+interface StoredCertificationOutput {
+  path: unknown;
+  mode: unknown;
+  output_blob_handle: Record<string, unknown>;
+  certification_evidence_receipt: unknown;
+}
+
+interface StoredCertificationClosure {
+  outputs: StoredCertificationOutput[];
+}
+
+function rewriteCommittedClosure(
+  fixture: ReturnType<typeof storeFixture>,
+  change: (closure: StoredCertificationClosure) => void,
+): void {
+  const certificationRoot = join(fixture.evidenceRoot, 'certification');
+  const transactions = readdirSync(certificationRoot);
+  if (transactions.length !== 1) throw new Error('fixture certification transaction missing');
+  const commitPath = join(certificationRoot, transactions[0] ?? '', 'commit.json');
+  const document = JSON.parse(readFileSync(commitPath, 'utf8')) as {
+    closures: StoredCertificationClosure[];
+  };
+  const closure = document.closures[0];
+  if (closure === undefined) throw new Error('fixture committed closure missing');
+  change(closure);
+  writeFileSync(commitPath, canonicalJson(document), 'utf8');
+}
+
+function rewriteCommittedOutput(
+  fixture: ReturnType<typeof storeFixture>,
+  change: (output: StoredCertificationOutput) => void,
+): void {
+  rewriteCommittedClosure(fixture, (closure) => {
+    const committedOutput = closure.outputs[0];
+    if (committedOutput === undefined) throw new Error('fixture committed output missing');
+    change(committedOutput);
+  });
+}
+
+function rebindStoredOutputReceipt(value: StoredCertificationOutput): void {
+  const handle = value.output_blob_handle as Parameters<
+    typeof finalizeCertificationReceipt
+  >[0]['output_blob_handle'];
+  value.certification_evidence_receipt = finalizeCertificationReceipt({
+    candidate_commit: COMMIT,
+    candidate_tree: TREE,
+    task_policy_digest_sha256: TASK_POLICY,
+    package_id: '@fixture/generated',
+    output_blob_sha256: handle.sha256,
+    output_blob_handle: handle,
+  });
 }
 
 async function unitEvidence(
@@ -512,6 +565,139 @@ describe('durable external certification evidence store', () => {
         }),
       ).toEqual(values[index]);
     }
+  });
+
+  it.each([
+    ['an unsafe path', (value: StoredCertificationOutput) => (value.path = '../report.json')],
+    ['an unsupported mode', (value: StoredCertificationOutput) => (value.mode = '100600')],
+    [
+      'a malformed digest',
+      (value: StoredCertificationOutput) => {
+        const malformed = 'g'.repeat(64);
+        value.output_blob_handle['sha256'] = malformed;
+        value.output_blob_handle['opaque_handle'] = `sha256:${malformed}`;
+        rebindStoredOutputReceipt(value);
+      },
+    ],
+    [
+      'a fractional size',
+      (value: StoredCertificationOutput) => {
+        value.output_blob_handle['size_bytes'] = 0.5;
+        rebindStoredOutputReceipt(value);
+      },
+    ],
+    [
+      'a negative size',
+      (value: StoredCertificationOutput) => {
+        value.output_blob_handle['size_bytes'] = -1;
+        rebindStoredOutputReceipt(value);
+      },
+    ],
+    [
+      'an extra handle member',
+      (value: StoredCertificationOutput) => {
+        value.output_blob_handle['extra'] = true;
+        rebindStoredOutputReceipt(value);
+      },
+    ],
+  ] as const)(
+    'refuses committed output metadata with %s after store recreation',
+    async (_case, change) => {
+      const fixture = storeFixture();
+      const selected = binding('@fixture/generated');
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.begin([selected]),
+      );
+      const bytes = Buffer.from('persisted generated output');
+      const handle = await invokeSink(fixture.store.authority_owner, () =>
+        transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+      );
+      await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...selected, outputs: [output(handle)] }]),
+      );
+      rewriteCommittedOutput(fixture, change);
+
+      await refusal(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+          selected,
+        ),
+      );
+    },
+  );
+
+  it.each(['duplicate', 'out-of-order'] as const)(
+    'refuses a %s persisted output population after store recreation',
+    async (fault) => {
+      const fixture = storeFixture();
+      const selected = binding('@fixture/generated');
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.begin([selected]),
+      );
+      const values = [
+        Buffer.from('first persisted output'),
+        Buffer.from('second persisted output'),
+      ];
+      const handles = await Promise.all(
+        values.map((bytes) =>
+          invokeSink(fixture.store.authority_owner, () =>
+            transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+          ),
+        ),
+      );
+      await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([
+          {
+            ...selected,
+            outputs: handles.map((handle, index) => ({
+              ...output(handle),
+              path: `generated/${String(index)}.json`,
+            })),
+          },
+        ]),
+      );
+      rewriteCommittedClosure(fixture, (closure) => {
+        if (fault === 'duplicate') {
+          const first = closure.outputs[0];
+          if (first === undefined) throw new Error('fixture committed output missing');
+          closure.outputs.push(structuredClone(first));
+        } else {
+          closure.outputs.reverse();
+        }
+      });
+
+      await refusal(() =>
+        createReleaseCertificationEvidenceStore(fixture.input).readCertificationOutputClosure(
+          selected,
+        ),
+      );
+    },
+  );
+
+  it('retains and reopens a zero-byte generated output', async () => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/empty-output');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const bytes = Buffer.alloc(0);
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+    );
+    const closures = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit([{ ...selected, outputs: [output(handle)] }]),
+    );
+
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+    expect(reopened.readCertificationOutputClosure(selected)).toEqual(closures[0]);
+    expect(
+      reopened.readGeneratedBlob({
+        repository: selected.repository,
+        candidate: { ...selected.candidate, release_units: [] },
+        receipt: closures[0]?.outputs[0]?.certification_evidence_receipt,
+        output_blob_sha256: handle.sha256,
+        output_blob_handle: handle,
+      }),
+    ).toEqual(bytes);
   });
 
   it('refuses a generated blob whose declared digest differs from its receipt', async () => {
