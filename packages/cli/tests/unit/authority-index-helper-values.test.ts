@@ -46,6 +46,12 @@ describe('authority index helper values', () => {
     expect(canonical({ z: 1, a: { y: 2, b: 3 } })).toBe('{"a":{"b":3,"y":2},"z":1}');
   });
 
+  it('canonicalizes ordered arrays with explicit framing and separators', () => {
+    expect(canonical({ values: ['second', 'first'], empty: [] })).toBe(
+      '{"empty":[],"values":["second","first"]}',
+    );
+  });
+
   it('reads exact flag values and selects the requested output format', () => {
     expect(flagValue(['--format', 'json'], '--format')).toBe('json');
     expect(flagValue(['round', 'start', '--format', 'json'], '--format')).toBe('json');
