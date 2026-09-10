@@ -214,6 +214,7 @@ class HarnessRefusalTests(unittest.TestCase):
         for suffix in (
             b"export { value } from './other.js';\n",
             b"export * from './other.js';\n",
+            b"export { value as default };\n",
             b"export const other = false;\n",
             b"// Stryker disable all\nexport { value };\n",
             b"const helper = value;\nexport { helper };\n",

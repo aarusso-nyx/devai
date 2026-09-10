@@ -630,8 +630,8 @@ def inert_named_export_suffix(frozen: bytes, current: bytes) -> bool:
         if not entries:
             return False
         for entry in entries:
-            match = re.fullmatch(rf"({identifier})(?:\s+as\s+{identifier})?", entry)
-            if match is None:
+            match = re.fullmatch(rf"({identifier})(?:\s+as\s+({identifier}))?", entry)
+            if match is None or "default" in match.groups():
                 return False
             exported.append(match.group(1))
         cursor = block.end()
@@ -684,7 +684,10 @@ def verify_source_blobs(
         report_file = files.get(path)
         if not isinstance(report_file, dict) or not isinstance(report_file.get("source"), str):
             raise Refusal("FROZEN_SOURCE_MISSING")
-        frozen = report_file["source"].encode()
+        try:
+            frozen = report_file["source"].encode()
+        except UnicodeEncodeError as error:
+            raise Refusal("FROZEN_SOURCE_MISSING") from error
         frozen_git = subprocess.run(
             ["git", "-C", str(repo), "show", f"{frozen_candidate}:{path}"],
             capture_output=True,
@@ -777,7 +780,10 @@ def verify_execution(
             source = file.get("source")
             if not isinstance(source, str):
                 raise Refusal("EXECUTION_REPORT_SOURCE_BINDING_INVALID")
-            observed_source_bindings[normalized_path] = sha_bytes(source.encode())
+            try:
+                observed_source_bindings[normalized_path] = sha_bytes(source.encode())
+            except UnicodeEncodeError as error:
+                raise Refusal("EXECUTION_REPORT_SOURCE_BINDING_INVALID") from error
         for mutant in mutants:
             mutant_id = mutant.get("id") if isinstance(mutant, dict) else None
             if not isinstance(mutant_id, str) or mutant_id in observed:
