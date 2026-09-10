@@ -26,6 +26,10 @@ import { fixture as unitMutationEvidenceFixture } from '../helpers/release-unit-
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
 import { createReleasePolicyClosure } from '../../src/services/release-policy-closure.js';
 import {
+  createReleaseExportMutationEvidence,
+  readReleaseExportMutationEvidence,
+} from '../../src/services/release-export-mutation-evidence.js';
+import {
   RELEASE_EXPORT_SPEC_DIGEST,
   RELEASE_EXPORT_SPEC_ID,
 } from '../../src/services/release-export-artifact-store.js';
@@ -33,6 +37,13 @@ import {
   encodeReleaseExportProviderResult,
   encodeReleaseExportTranscript,
 } from '../../src/services/release-export-transcript.js';
+import {
+  RELEASE_EXPORT_SPEC_V3_DIGEST,
+  RELEASE_EXPORT_SPEC_V3_ID,
+  RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
+  encodeReleaseExportProviderResultV2,
+  encodeReleaseExportTranscriptV2,
+} from '../../src/services/release-export-transcript-v2.js';
 import {
   RELEASE_PACK_SPEC_DIGEST,
   RELEASE_PACK_SPEC_ID,
@@ -618,6 +629,310 @@ function exportFixture(): {
       artifact_sink: exportSink,
     },
     bytes: objectBytes,
+  };
+}
+
+async function requiredExportFixture(template: ReleaseLifecycleStateV2) {
+  const requiredInput = await requiredMutationCertificationFixture();
+  const selected: ReleaseLifecycleRequest = {
+    ...requiredInput.request,
+    action_id: 'release offline-verify',
+    provider: { kind: 'offline-verifier', provider_id: 'canonical-verifier' },
+    destination: required(
+      request('release offline-verify').destination,
+      'missing offline destination',
+    ),
+  };
+  const mutationRequest: ReleaseLifecycleRequest = {
+    ...requiredInput.request,
+    action_id: 'release prepare',
+  };
+  const mutationToken = await createReleaseExportMutationEvidence({
+    request: mutationRequest,
+    material: requiredInput.material,
+    source: requiredMutationEvidenceSink(requiredInput.evidence),
+    plan: {
+      resolve_receipt: () => requiredInput.fixture.receipt,
+      resolve_plan_input: requiredInput.fixture.resolve_plan_input,
+    },
+    maximum_provider_result_bytes: 1_000_000,
+  });
+  const mutation = readReleaseExportMutationEvidence(mutationToken, {
+    repository: mutationRequest.repository_locator,
+    plan_receipt_digest_sha256: String(requiredInput.fixture.receipt['receipt_digest_sha256']),
+    release_units: requiredInput.material.release_units,
+    inputs: requiredInput.material.inputs,
+  });
+  const mutationUnit = required(mutation.mutation_units[0], 'missing required mutation unit');
+  const portable = required(mutation.portable_units[0], 'missing portable mutation unit');
+  if (mutationUnit.mutation_evidence === null || portable.mutation_evidence === null)
+    throw new Error('required mutation evidence unexpectedly absent');
+
+  const releaseUnit = required(
+    mutationRequest.candidate_locator.release_units[0],
+    'missing required release unit',
+  );
+  const certifiedPackage = required(
+    requiredInput.material.release_units[0]?.packages[0],
+    'missing certified package',
+  );
+  const certificationManifest = required(
+    certifiedPackage.certification_manifest,
+    'missing certification manifest',
+  );
+  const packageTarball = opaqueArtifact('package-tarball', 'package-tarball');
+  const packageSbom = opaqueArtifact('package-sbom', 'package-sbom');
+  const packageManifestBytes = Buffer.from(
+    canonicalJson({
+      schemaVersion: '2.0.0',
+      kind: 'release-prepared-package-manifest',
+      candidate: {
+        commit: mutationRequest.candidate_locator.commit,
+        tree: mutationRequest.candidate_locator.tree,
+      },
+      package_id: certifiedPackage.package_id,
+      package_version: releaseUnit.version,
+      pack_spec_id: RELEASE_PACK_SPEC_ID,
+      pack_spec_digest_sha256: RELEASE_PACK_SPEC_DIGEST,
+      certification_manifest_digest_sha256: certificationManifest.manifest_digest_sha256,
+      artifacts: {
+        tarball: { sha256: packageTarball.sha256, size_bytes: packageTarball.size_bytes },
+        sbom: { sha256: packageSbom.sha256, size_bytes: packageSbom.size_bytes },
+      },
+    }),
+  );
+  const packageManifest = opaqueBytes('package-manifest', 'package-manifest', packageManifestBytes);
+  const preparedArtifacts = sortOpaque([packageManifest, packageTarball, packageSbom]);
+  const parentManifest = Buffer.from(
+    canonicalJson({
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: SINK_ID,
+      transaction_handle: TRANSACTION_HANDLE,
+      repository: mutationRequest.repository_locator,
+      candidate: {
+        commit: mutationRequest.candidate_locator.commit,
+        tree: mutationRequest.candidate_locator.tree,
+      },
+      pack_spec_id: RELEASE_PACK_SPEC_ID,
+      pack_spec_digest_sha256: RELEASE_PACK_SPEC_DIGEST,
+      artifacts: preparedArtifacts,
+    }),
+  );
+  const parent = {
+    manifest: parentManifest,
+    identity: {
+      sink_id: SINK_ID,
+      transaction_handle: TRANSACTION_HANDLE,
+      committed_manifest_handle: COMMIT_MANIFEST_HANDLE,
+      committed_manifest_sha256: createHash('sha256').update(parentManifest).digest('hex'),
+      committed_manifest_size_bytes: parentManifest.byteLength,
+      commit_protocol: 'devai.artifact-sink.two-phase.v1' as const,
+    },
+  };
+  const trust = {
+    trust_root_id: 'release-root',
+    trust_store_digest_sha256: 'b'.repeat(64),
+    key_id: 'release-key',
+    signature_algorithm: 'ed25519' as const,
+  };
+  const closureBytes = Buffer.from(
+    canonicalJson({
+      format: 'opaque-policy-closure-fixture',
+      package_id: certifiedPackage.package_id,
+    }),
+  );
+  const evidenceManifest = opaqueBytes('evidence-manifest', 'evidence-manifest', closureBytes);
+  const destination = {
+    kind: 'evidence-destination' as const,
+    exact_identifier: 'external/devai-1.5.0',
+  };
+  const limits = {
+    maximum_transcript_bytes: 1_000_000,
+    maximum_provider_result_bytes: 1_000_000,
+    maximum_packages: 1,
+  };
+  const binding = {
+    action_id: 'release export' as const,
+    repository: mutationRequest.repository_locator,
+    candidate: {
+      commit: mutationRequest.candidate_locator.commit,
+      tree: mutationRequest.candidate_locator.tree,
+    },
+    plan_receipt_digest_sha256: String(requiredInput.fixture.receipt['receipt_digest_sha256']),
+    parent_artifact_sink: parent.identity,
+    sink_id: SINK_ID,
+    destination,
+    trust,
+    attempt_id: 'RLA-0123456789abcdef',
+    export_spec_digest_sha256: RELEASE_EXPORT_SPEC_V3_DIGEST,
+    mutation_units: [mutationUnit],
+    closure_inputs: [
+      {
+        package_id: certifiedPackage.package_id,
+        release_unit: releaseUnit.release_unit,
+        sha256: evidenceManifest.sha256,
+        size_bytes: evidenceManifest.size_bytes,
+        expected_installed_package: {
+          name: '@aarusso-nyx/devai' as const,
+          version: '1.5.0',
+          archive_sha256: 'a'.repeat(64),
+          content_manifest_sha256: 'c'.repeat(64),
+        },
+        policy_resolution_digest_sha256: 'd'.repeat(64),
+      },
+    ],
+  };
+  const transcript = encodeReleaseExportTranscriptV2(
+    {
+      version: RELEASE_EXPORT_TRANSCRIPT_V2_FORMAT,
+      binding: {
+        action_id: binding.action_id,
+        repository: binding.repository,
+        candidate: binding.candidate,
+        plan_receipt_digest_sha256: binding.plan_receipt_digest_sha256,
+        parent_artifact_sink: binding.parent_artifact_sink,
+        sink_id: binding.sink_id,
+        destination: binding.destination,
+        trust: binding.trust,
+        attempt_id: binding.attempt_id,
+      },
+      parent: preparedArtifacts,
+      closures: [
+        {
+          package_id: certifiedPackage.package_id,
+          release_unit: releaseUnit.release_unit,
+          evidence_manifest: evidenceManifest,
+          expected_installed_package:
+            binding.closure_inputs[0]?.expected_installed_package ??
+            (() => {
+              throw new Error('missing closure input');
+            })(),
+          policy_resolution_digest_sha256: 'd'.repeat(64),
+        },
+      ],
+      mutation_units: [mutationUnit],
+      destination,
+      trust,
+    },
+    limits,
+  );
+  const providerBytes = encodeReleaseExportProviderResultV2(
+    {
+      package_id: certifiedPackage.package_id,
+      transcript,
+      signature: 'AQ==',
+      mutation_evidence: portable.mutation_evidence,
+    },
+    limits,
+  );
+  const providerResult = opaqueBytes('provider-result', 'provider-result', providerBytes);
+  const exportedPackage = {
+    package_id: certifiedPackage.package_id,
+    package_manifest: packageManifest,
+    package_tarball: packageTarball,
+    package_sbom: packageSbom,
+    evidence_manifest: evidenceManifest,
+    provider_result: providerResult,
+    trust,
+    certification_manifest: certificationManifest,
+  };
+  const artifacts = sortOpaque([...preparedArtifacts, evidenceManifest, providerResult]);
+  const manifest = Buffer.from(
+    canonicalJson({
+      schemaVersion: '1.0.0',
+      kind: 'release-artifact-sink-commit-manifest',
+      sink_id: SINK_ID,
+      transaction_handle: 'export-transaction',
+      repository: binding.repository,
+      candidate: binding.candidate,
+      export_spec_id: RELEASE_EXPORT_SPEC_V3_ID,
+      export_spec_digest_sha256: RELEASE_EXPORT_SPEC_V3_DIGEST,
+      parent_artifact_sink: parent.identity,
+      binding,
+      artifacts,
+    }),
+  );
+  const artifactSink = {
+    sink_id: SINK_ID,
+    transaction_handle: 'export-transaction',
+    committed_manifest_handle: 'export-commit-manifest',
+    committed_manifest_sha256: createHash('sha256').update(manifest).digest('hex'),
+    committed_manifest_size_bytes: manifest.byteLength,
+    commit_protocol: 'devai.artifact-sink.two-phase.v1' as const,
+  };
+  const bytes = new Map<string, Buffer>([
+    [packageManifest.opaque_handle, packageManifestBytes],
+    [packageTarball.opaque_handle, Buffer.from(ARTIFACT_BYTES)],
+    [packageSbom.opaque_handle, Buffer.from(ARTIFACT_BYTES)],
+    [evidenceManifest.opaque_handle, closureBytes],
+  ]);
+  bytes.set(parent.identity.committed_manifest_handle, parent.manifest);
+  bytes.set(providerResult.opaque_handle, providerBytes);
+  bytes.set(artifactSink.committed_manifest_handle, manifest);
+  const artifactReader = {
+    readArtifact: ({ opaque_handle }: { readonly opaque_handle: string }) => {
+      const value = bytes.get(opaque_handle);
+      if (value === undefined) throw new Error('required export artifact missing');
+      return Buffer.from(value);
+    },
+  };
+  const { state_id: _stateId, record_digest_sha256: _recordDigest, ...templateDraft } = template;
+  const stateDraft = {
+    ...templateDraft,
+    repository: mutationRequest.repository_locator,
+    candidate: {
+      release_unit: releaseUnit.release_unit,
+      version: releaseUnit.version,
+      commit: mutationRequest.candidate_locator.commit,
+      tree: mutationRequest.candidate_locator.tree,
+    },
+    bound_receipts: [
+      {
+        kind: 'release-plan-receipt',
+        receipt_id: String(requiredInput.fixture.receipt['receipt_id']),
+        receipt_digest_sha256: String(requiredInput.fixture.receipt['receipt_digest_sha256']),
+        verdict: 'pass',
+      },
+    ],
+    release_units: [
+      {
+        release_unit: releaseUnit.release_unit,
+        version: releaseUnit.version,
+        packages: [exportedPackage],
+        mutation_evidence: requiredInput.evidence.closure,
+      },
+    ],
+    inputs: requiredInput.material.inputs,
+    evidence: {
+      ...template.evidence,
+      receipt_digests: [String(requiredInput.fixture.receipt['receipt_digest_sha256'])],
+    },
+    artifacts,
+    artifact_sink: artifactSink,
+  } as Parameters<typeof finalizeReleaseStateV2>[0];
+  const state = finalizeReleaseStateV2(stateDraft);
+  return {
+    state,
+    request: selected,
+    artifactReader,
+    limits,
+    policyClosures: [
+      {
+        closure: createReleasePolicyClosure({
+          plan: requiredInput.fixture.receipt,
+          resolution: requiredInput.fixture.resolution,
+        }),
+        expected: requiredInput.fixture.expected,
+        implementation: requiredInput.fixture.package_snapshot,
+        limits: {
+          maximum_archive_bytes: 4 * 1024 * 1024,
+          maximum_unpacked_bytes: 4 * 1024 * 1024,
+          maximum_git_bytes: 4 * 1024 * 1024,
+          maximum_git_entries: 2000,
+        },
+      },
+    ],
   };
 }
 
@@ -3770,6 +4085,41 @@ describe('release lifecycle execution kernel', () => {
           : { ok: true },
       );
     }
+  });
+
+  it('binds required mutation evidence into a verified current export check', async () => {
+    const store = new ReleaseLifecycleFileStore(root(), request('release export'));
+    await advanceToExported(store);
+    const template = required(store.readStateRecords().at(-1), 'missing exported template');
+    const fixture = await requiredExportFixture(template);
+
+    const result = await executeOfflineVerification({
+      request: fixture.request,
+      exported_state: fixture.state,
+      artifactReader: fixture.artifactReader,
+      exportLimits: fixture.limits,
+      policyClosures: fixture.policyClosures,
+      provider: (validatedRequest, validatedState, context) => {
+        const check = createVerifiedReleaseMutationCheck(context, validatedRequest, validatedState);
+        expect(check).toMatchObject({
+          check_id: 'mutation-semantics',
+          evidence_kind: 'devai.release-unit-mutation-check.v1',
+          status: 'pass',
+          units: [
+            {
+              release_unit: '@aarusso-nyx/devai',
+              requirement: 'required',
+            },
+          ],
+        });
+        const receipt = boundOfflineReceipt(fixture.state);
+        const checks = [...(receipt['checks'] as readonly unknown[])];
+        checks[8] = check;
+        return rehashReceipt(receipt, { checks });
+      },
+    });
+
+    expect(result).toMatchObject({ ok: true });
   });
 
   it('binds an optional v2.1 unit mutation closure into offline receipts without claiming portable mutation semantics', async () => {
