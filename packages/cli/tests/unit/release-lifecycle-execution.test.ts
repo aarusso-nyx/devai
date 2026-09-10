@@ -3453,6 +3453,30 @@ describe('release lifecycle execution kernel', () => {
     );
   });
 
+  it.each([
+    'generation',
+    'record_digest_sha256',
+    'actor',
+    'role',
+    'authority',
+    'effective_authorities',
+    'provider_handle',
+  ] as const)('rejects protected request projection key %s at a nested boundary', (key) => {
+    const valid = request('release preflight');
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...valid,
+        candidate_locator: {
+          ...valid.candidate_locator,
+          release_units: valid.candidate_locator.release_units.map((unit) => ({
+            ...unit,
+            package_roster: unit.package_roster.map((pkg) => ({ ...pkg, [key]: 'injected' })),
+          })),
+        },
+      }),
+    ).toThrow(`release-request-projection-invalid:${key}`);
+  });
+
   it('binds receipt kind and population to the requested lifecycle action', () => {
     const preflight = request();
     const unit = required(preflight.candidate_locator.release_units[0], 'missing release unit');
