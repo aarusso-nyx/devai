@@ -4457,10 +4457,11 @@ describe('release lifecycle execution kernel', () => {
       record: StoreRecord,
       sequence: number,
       predecessor_record: StoreRecord['predecessor_record'],
+      action_id = record.action_id,
     ) =>
       `RLA-${canonicalSha256({
         request_digest_sha256: record.request_digest_sha256,
-        action_id: record.action_id,
+        action_id,
         sequence,
         predecessor_record,
       }).slice(0, 16)}`;
@@ -4493,6 +4494,16 @@ describe('release lifecycle execution kernel', () => {
     expect(errorsFor(first, consecutiveAttempt)).toContain(
       'release-store-attempt-predecessor-invalid',
     );
+
+    const prematureCertification = refinalize(first, {
+      action_id: 'release certify',
+      attempt_id: attemptIdFor(first, 0, null, 'release certify'),
+    });
+    expect(errorsFor(prematureCertification)).toContain('release-state-transition-invalid');
+
+    expect(
+      errorsFor(first, refinalize(terminal, { predecessor_record: differentPredecessor })),
+    ).toContain('release-store-terminal-attempt-link-invalid');
 
     const terminalCases: readonly [
       Partial<Omit<StoreRecord, 'record_id' | 'record_digest_sha256'>>,
