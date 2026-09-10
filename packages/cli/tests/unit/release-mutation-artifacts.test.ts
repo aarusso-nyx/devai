@@ -716,6 +716,57 @@ describe('release mutation artifact normalization v2.1', () => {
     ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
   });
 
+  it('enforces result and report document limits independently at their exact boundaries', () => {
+    const compact = normalized();
+    expect(compact.result.bytes.byteLength).toBeGreaterThan(compact.report.bytes.byteLength);
+    expect(
+      normalized(undefined, {
+        limits: {
+          ...controls().limits,
+          maximum_document_bytes: compact.result.bytes.byteLength,
+        },
+      }),
+    ).toEqual(compact);
+    expect(() =>
+      normalized(undefined, {
+        limits: {
+          ...controls().limits,
+          maximum_document_bytes: compact.result.bytes.byteLength - 1,
+        },
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+
+    const statuses = Array.from({ length: 100 }, () => 'Killed' as const);
+    const ids = statuses.map((_, index) => String(index));
+    const report = rawReport(statuses);
+    const expanded = normalized(report, {}, ids);
+    expect(expanded.report.bytes.byteLength).toBeGreaterThan(expanded.result.bytes.byteLength);
+    expect(
+      normalized(
+        report,
+        {
+          limits: {
+            ...controls().limits,
+            maximum_document_bytes: expanded.report.bytes.byteLength,
+          },
+        },
+        ids,
+      ),
+    ).toEqual(expanded);
+    expect(() =>
+      normalized(
+        report,
+        {
+          limits: {
+            ...controls().limits,
+            maximum_document_bytes: expanded.report.bytes.byteLength - 1,
+          },
+        },
+        ids,
+      ),
+    ).toThrow('MUTATION_REPORT_INVALID');
+  });
+
   it('accepts a raw report exactly at the protected byte quota', () => {
     const report = rawReport(['Killed']);
     const raw_report = Buffer.from(JSON.stringify(report));
@@ -1007,4 +1058,86 @@ describe('release mutation artifact normalization v2.1', () => {
       finalizeReleaseMutationArtifactsV21(finalizerInput({ ...artifacts, report })),
     ).rejects.toThrow('NON_CANONICAL_JSON');
   });
+
+  it('accepts the inclusive upper document limit during pure finalization', async () => {
+    await expect(
+      finalizeReleaseMutationArtifactsV21({
+        ...finalizerInput(),
+        maximum_document_bytes: 0x7fffffff,
+      }),
+    ).resolves.toMatchObject({ summary: { verdict: 'pass', passed: true } });
+  });
+
+  it('refuses an empty finalization roster', async () => {
+    await expect(
+      finalizeReleaseMutationArtifactsV21({
+        ...finalizerInput(),
+        expected: [],
+        packages: [],
+      }),
+    ).rejects.toThrow('MUTATION_ROSTER_MISMATCH');
+  });
+
+  it('accepts a complete two-package finalization roster', async () => {
+    const input = finalizerInput();
+    const secondExpected = {
+      ...EXPECTED,
+      packageName: '@fixture/other',
+      workspace: 'packages/other',
+      inputProjection: {
+        ...EXPECTED.inputProjection,
+        packageName: '@fixture/other',
+        workspace: 'packages/other',
+      },
+    };
+    const secondArtifacts = normalized(undefined, { expected: secondExpected });
+
+    await expect(
+      finalizeReleaseMutationArtifactsV21({
+        ...input,
+        expected: [EXPECTED, secondExpected],
+        packages: [
+          ...input.packages,
+          {
+            packageName: secondExpected.packageName,
+            disposition: 'executed',
+            origin: null,
+            artifacts: secondArtifacts,
+          },
+        ],
+      }),
+    ).resolves.toMatchObject({
+      contract: { expectedPackageCount: 2 },
+      materials: [{}, {}],
+      summary: { verdict: 'pass', passed: true },
+    });
+  });
+
+  it.each(['packageName', 'workspace'] as const)(
+    'refuses a duplicate expected finalization %s',
+    async (field) => {
+      const input = finalizerInput();
+      const firstPackage = input.packages[0];
+      if (firstPackage === undefined) throw new Error('fixture package missing');
+      const secondPackageName = '@fixture/other';
+      const secondWorkspace = 'packages/other';
+      const second = {
+        ...EXPECTED,
+        packageName: field === 'packageName' ? EXPECTED.packageName : secondPackageName,
+        workspace: field === 'workspace' ? EXPECTED.workspace : secondWorkspace,
+        inputProjection: {
+          ...EXPECTED.inputProjection,
+          packageName: field === 'packageName' ? EXPECTED.packageName : secondPackageName,
+          workspace: field === 'workspace' ? EXPECTED.workspace : secondWorkspace,
+        },
+      };
+      await expect(
+        finalizeReleaseMutationArtifactsV21({
+          ...input,
+          expected: [EXPECTED, second],
+          packages: [...input.packages, { ...firstPackage, packageName: second.packageName }],
+        }),
+      ).rejects.toThrow('MUTATION_ROSTER_MISMATCH');
+    },
+  );
 });
