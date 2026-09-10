@@ -476,7 +476,11 @@ describe('authority broker production boundary depth', () => {
         expect(
           exact.scope.apply_effect(
             effect('writeFileSync', [join(root, '.devai/config/project.json'), '{}\n']),
-            () => 'allowed',
+            () => {
+              mkdirSync(join(root, '.devai/config'), { recursive: true });
+              writeFileSync(join(root, '.devai/config/project.json'), '{}\n');
+              return 'allowed';
+            },
           ),
         ).toBe('allowed');
         expect(() =>
@@ -1182,6 +1186,23 @@ describe('authority broker production boundary depth', () => {
       host.dispose();
     }
   });
+
+  it.each(['copyFileSync', 'cpSync', 'symlinkSync'])(
+    'authorizes the destination of %s independently from its source',
+    (symbol) => {
+      const host = broker('round run', 'engineer', roundRunArgv());
+      try {
+        expect(() =>
+          host.scope.apply_effect(
+            effect(symbol, ['.devai/state/source', '.claude/settings.json']),
+            () => 'forbidden',
+          ),
+        ).toThrow('AUTHORITY_PATH_DOMAIN_VIOLATION');
+      } finally {
+        host.dispose();
+      }
+    },
+  );
 
   it('maps only exact linked-worktree Git metadata namespaces into authority paths', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'devai-authority-linked-worktree-'));
