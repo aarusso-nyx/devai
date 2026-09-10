@@ -245,6 +245,94 @@ describe('durable certified evidence retention', () => {
     expect(decoded.census.entries[0]?.path).toBe('generated/report.json');
   });
 
+  it('refuses a carrier read binding with an unexpected member', async () => {
+    const fixture = storeFixture();
+    const bytes = carrierBytes();
+    const { transaction, handle, owner } = await retain(fixture, bytes);
+    await invokeSink(owner, () =>
+      transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+    );
+
+    expect(() =>
+      fixture.store.readCertifiedEvidenceCarrier?.({
+        ...derivation,
+        release_unit: UNIT,
+        unexpected: true,
+      } as never),
+    ).toThrow(REFUSAL);
+  });
+
+  it('serves two units retained in one transaction independently', async () => {
+    const fixture = storeFixture();
+    const owner = fixture.store.authority_owner;
+    const transaction = await invokeSink(owner, () =>
+      fixture.store.begin([binding('@fixture/pkg')]),
+    );
+    const handle = await invokeSink(owner, () =>
+      transaction.put({
+        bytes: generated,
+        sha256: sha256(generated),
+        size_bytes: generated.length,
+      }),
+    );
+    const secondUnit = '@fixture/second';
+    const secondCensus = finalizeCertifiedEvidenceNamespaceCensus({
+      release_unit: secondUnit,
+      derivation,
+      entries: census.entries,
+    });
+    const carriers = [
+      { unit: UNIT, bytes: carrierBytes() },
+      {
+        unit: secondUnit,
+        bytes: carrierBytes({ release_unit: secondUnit, namespace_census: secondCensus }),
+      },
+    ];
+    for (const carrier of carriers) {
+      await invokeSink(owner, () =>
+        transaction.putCertifiedEvidenceCarrier?.({
+          release_unit: carrier.unit,
+          bytes: carrier.bytes,
+          sha256: sha256(carrier.bytes),
+          size_bytes: carrier.bytes.length,
+        }),
+      );
+    }
+    await invokeSink(owner, () =>
+      transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+    );
+
+    for (const carrier of carriers) {
+      expect(
+        fixture.store
+          .readCertifiedEvidenceCarrier?.({ ...derivation, release_unit: carrier.unit })
+          .equals(carrier.bytes),
+      ).toBe(true);
+    }
+  });
+
+  it('refuses conflicting durable carriers for one unit and derivation', async () => {
+    const fixture = storeFixture();
+    const censusEntry = census.entries[0];
+    if (censusEntry === undefined) throw new Error('fixture census entry missing');
+    const changedCensus = finalizeCertifiedEvidenceNamespaceCensus({
+      release_unit: UNIT,
+      derivation,
+      entries: [{ ...censusEntry, path: 'generated/changed-report.json' }],
+    });
+    const carriers = [carrierBytes(), carrierBytes({ namespace_census: changedCensus })];
+    for (const bytes of carriers) {
+      const { transaction, handle, owner } = await retain(fixture, bytes);
+      await invokeSink(owner, () =>
+        transaction.commit([{ ...binding('@fixture/pkg'), outputs: outputs(handle) }]),
+      );
+    }
+
+    expect(() =>
+      fixture.store.readCertifiedEvidenceCarrier?.({ ...derivation, release_unit: UNIT }),
+    ).toThrow(REFUSAL);
+  });
+
   it('preserves committed evidence after a later reader failure', async () => {
     const fixture = storeFixture();
     const bytes = carrierBytes();

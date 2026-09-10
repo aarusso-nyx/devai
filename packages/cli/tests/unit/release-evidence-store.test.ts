@@ -25,7 +25,10 @@ import {
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { createReleaseRepositoryTestFixture } from '../../../authority/tests/unit/release-repository-test-fixture.js';
 import { createReleaseCertificationEvidenceStore } from '../../src/services/release-evidence-store.js';
-import type { CertificationOutputClosureBinding } from '../../src/services/release-prepare-kernel.js';
+import {
+  finalizeCertificationReceipt,
+  type CertificationOutputClosureBinding,
+} from '../../src/services/release-prepare-kernel.js';
 import {
   verifyUnitMutationEvidenceDocuments,
   type UnitMutationEvidenceObject,
@@ -150,7 +153,12 @@ function output(handle: {
 
 async function unitEvidence(
   fixture: ReturnType<typeof storeFixture>,
-  options: { reused?: boolean; notRequired?: boolean } = {},
+  options: {
+    reused?: boolean;
+    notRequired?: boolean;
+    releaseUnit?: string;
+    planDigest?: string;
+  } = {},
 ) {
   return await unitFixture({
     ...options,
@@ -159,8 +167,9 @@ async function unitEvidence(
       repository_id: REPOSITORY_FIXTURE.repository.id,
       candidate_commit: COMMIT,
       candidate_tree: TREE,
-      release_plan_receipt_digest_sha256: 'd'.repeat(64),
+      release_plan_receipt_digest_sha256: options.planDigest ?? 'd'.repeat(64),
       task_policy_digests_sha256: [TASK_POLICY],
+      ...(options.releaseUnit === undefined ? {} : { release_unit: options.releaseUnit }),
     },
   });
 }
@@ -451,6 +460,130 @@ describe('durable external certification evidence store', () => {
         output_blob_handle: handle,
       }),
     ).toEqual(bytes);
+  });
+
+  it('serves two committed certification receipts and blobs only by their own identities', async () => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/generated');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const values = [Buffer.from('first generated blob'), Buffer.from('second generated blob')];
+    const handles = await Promise.all(
+      values.map((bytes) =>
+        invokeSink(fixture.store.authority_owner, () =>
+          transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+        ),
+      ),
+    );
+    const closures = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit([
+        {
+          ...selected,
+          outputs: handles.map((handle, index) => ({
+            ...output(handle),
+            path: `generated/${String(index)}.json`,
+          })),
+        },
+      ]),
+    );
+    const outputs = closures[0]?.outputs;
+    if (outputs?.length !== 2) throw new Error('fixture outputs missing');
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+
+    expect(outputs[0]?.certification_evidence_receipt).not.toEqual(
+      outputs[1]?.certification_evidence_receipt,
+    );
+    for (const [index, committed] of outputs.entries()) {
+      const receipt = committed.certification_evidence_receipt;
+      expect(
+        reopened.readCertificationEvidenceReceipt({
+          evidence_sink_id: fixture.input.evidence_sink_id,
+          receipt_digest_sha256: receipt.receipt_digest_sha256,
+        }),
+      ).toEqual(receipt);
+      expect(
+        reopened.readGeneratedBlob({
+          repository: selected.repository,
+          candidate: { ...selected.candidate, release_units: [] },
+          receipt,
+          output_blob_sha256: committed.output_blob_handle.sha256,
+          output_blob_handle: committed.output_blob_handle,
+        }),
+      ).toEqual(values[index]);
+    }
+  });
+
+  it('refuses a generated blob whose declared digest differs from its receipt', async () => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/generated');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const bytes = Buffer.from('digest-bound blob');
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.put({ bytes, sha256: sha256(bytes), size_bytes: bytes.length }),
+    );
+    const closures = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit([{ ...selected, outputs: [output(handle)] }]),
+    );
+    const receipt = closures[0]?.outputs[0]?.certification_evidence_receipt;
+    if (receipt === undefined) throw new Error('fixture receipt missing');
+
+    await refusal(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readGeneratedBlob({
+        repository: selected.repository,
+        candidate: { ...selected.candidate, release_units: [] },
+        receipt,
+        output_blob_sha256: 'f'.repeat(64),
+        output_blob_handle: handle,
+      }),
+    );
+  });
+
+  it('refuses a generated blob receipt outside the committed closure population', async () => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/generated');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const retained = Buffer.from('retained blob');
+    const unreferenced = Buffer.from('unreferenced blob');
+    const retainedHandle = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.put({
+        bytes: retained,
+        sha256: sha256(retained),
+        size_bytes: retained.length,
+      }),
+    );
+    const unreferencedHandle = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.put({
+        bytes: unreferenced,
+        sha256: sha256(unreferenced),
+        size_bytes: unreferenced.length,
+      }),
+    );
+    await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit([{ ...selected, outputs: [output(retainedHandle)] }]),
+    );
+    const receipt = finalizeCertificationReceipt({
+      candidate_commit: selected.candidate.commit,
+      candidate_tree: selected.candidate.tree,
+      task_policy_digest_sha256: selected.task_policy_digest_sha256,
+      package_id: selected.package_id,
+      output_blob_sha256: unreferencedHandle.sha256,
+      output_blob_handle: unreferencedHandle,
+    });
+
+    await refusal(() =>
+      createReleaseCertificationEvidenceStore(fixture.input).readGeneratedBlob({
+        repository: selected.repository,
+        candidate: { ...selected.candidate, release_units: [] },
+        receipt,
+        output_blob_sha256: unreferencedHandle.sha256,
+        output_blob_handle: unreferencedHandle,
+      }),
+    );
   });
 
   it('keeps pre-commit and aborted evidence unreadable and makes commit terminal', async () => {
@@ -1032,5 +1165,42 @@ describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', 
         receipt_digest_sha256: closure.receipt.receipt_digest_sha256,
       }),
     );
+  });
+
+  it('serves each committed unit-mutation receipt only by its own digest', async () => {
+    const fixture = storeFixture();
+    const evidence = [
+      await unitEvidence(fixture, {
+        releaseUnit: '@fixture/first',
+        planDigest: '1'.repeat(64),
+      }),
+      await unitEvidence(fixture, {
+        releaseUnit: '@fixture/second',
+        planDigest: '2'.repeat(64),
+      }),
+    ];
+    const receipts = [];
+    for (const item of evidence) {
+      const transaction = await invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.beginUnitMutationEvidence(item.binding),
+      );
+      await putUnitDocuments(fixture, item, transaction);
+      await transaction.verify(item.projection);
+      const closure = await invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit(item.projection),
+      );
+      receipts.push(closure.receipt);
+    }
+    const reopened = createReleaseCertificationEvidenceStore(fixture.input);
+
+    expect(receipts[0]).not.toEqual(receipts[1]);
+    for (const receipt of receipts) {
+      expect(
+        reopened.readUnitMutationEvidenceReceipt({
+          evidence_sink_id: fixture.input.evidence_sink_id,
+          receipt_digest_sha256: receipt.receipt_digest_sha256,
+        }),
+      ).toEqual(receipt);
+    }
   });
 });
