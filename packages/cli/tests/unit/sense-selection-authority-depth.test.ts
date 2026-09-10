@@ -1,15 +1,134 @@
 import { canonicalRegistry } from '../../src/define-command.js';
-import { resolveSenseInvocation } from '../../src/authority/sense-selection.js';
+import {
+  resolveInvocationEntry,
+  resolveSenseInvocation,
+} from '../../src/authority/sense-selection.js';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const senseRun = canonicalRegistry().find((entry) => entry.name === 'sense run');
 if (senseRun === undefined) throw new Error('sense run registry entry missing');
+const check = canonicalRegistry().find((entry) => entry.name === 'check');
+if (check === undefined) throw new Error('check registry entry missing');
 
 function argv(...tail: readonly string[]): readonly string[] {
   return ['node', 'devai', 'sense', 'run', ...tail];
 }
 
 describe('sense invocation authority boundaries', () => {
+  it('reduces a read-only check to an authority contract with no mutation boundary', () => {
+    const resolved = resolveInvocationEntry(check, [
+      'node',
+      'devai',
+      'check',
+      '--only',
+      'schema',
+      '--repo-root',
+      process.cwd(),
+    ]);
+
+    expect(resolved.effects).toBe('read');
+    expect(resolved.authority_contract.effect).toBe('read');
+    expect(resolved.authority_contract.capabilities).toEqual([
+      'db:read',
+      'proc:docker',
+      'proc:dynamic',
+      'proc:git',
+      'proc:pnpm',
+      'proc:psql',
+      'proc:sandbox-exec',
+    ]);
+    expect(resolved.authority_contract.subject).toEqual({ kind: 'none' });
+    expect(resolved.authority_contract.consent).toEqual({
+      write: false,
+      allow_publish: false,
+      experimental: false,
+    });
+    expect(resolved.authority_contract.planner).toEqual({ kind: 'none' });
+    expect(resolved.authority_contract.boundary).toEqual({ kind: 'none' });
+    expect(resolved.authority_contract.readiness).toEqual({
+      requires_binding: false,
+      independent_acceptance_required: true,
+    });
+  });
+
+  it('projects a translation check to its exact filesystem mutation boundary', () => {
+    const resolved = resolveInvocationEntry(check, [
+      'node',
+      'devai',
+      'check',
+      '--only',
+      'translation',
+      '--repo-root',
+      process.cwd(),
+    ]);
+
+    expect(resolved).toBe(check);
+    expect(resolved.effects).toBe('local-write');
+    expect(resolved.authority_contract.effect).toBe('local-write');
+  });
+
+  it('forwards the exact check suite and only selectors to the check planner', () => {
+    expect(() =>
+      resolveInvocationEntry(check, [
+        'node',
+        'devai',
+        'check',
+        '--suite',
+        'not-a-suite',
+        '--repo-root',
+        process.cwd(),
+      ]),
+    ).toThrow('CHECK_SUITE_UNKNOWN:not-a-suite');
+    expect(() =>
+      resolveInvocationEntry(check, [
+        'node',
+        'devai',
+        'check',
+        '--only',
+        'not-a-member',
+        '--repo-root',
+        process.cwd(),
+      ]),
+    ).toThrow('CHECK_MEMBER_UNKNOWN:not-a-member');
+    expect(() =>
+      resolveInvocationEntry(check, [
+        'node',
+        'devai',
+        'check',
+        '--suite',
+        'standard',
+        '--only',
+        'schema',
+        '--repo-root',
+        process.cwd(),
+      ]),
+    ).toThrow('CHECK_SELECTION_CONFLICT');
+  });
+
+  it('loads check policy from the exact explicit repository root', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-check-authority-root-'));
+    try {
+      mkdirSync(join(root, 'law/policy'), { recursive: true });
+      writeFileSync(join(root, 'law/policy/check-suites.json'), '{}\n');
+      expect(() =>
+        resolveInvocationEntry(check, [
+          'node',
+          'devai',
+          'check',
+          '--only',
+          'schema',
+          '--repo-root',
+          root,
+        ]),
+      ).toThrow('CHECK_POLICY_INVALID');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('projects a canonical read kind into a read authority contract', () => {
     const resolved = resolveSenseInvocation(senseRun, argv('decision_record_integrity'));
     expect(resolved?.selection.selection).toEqual({
