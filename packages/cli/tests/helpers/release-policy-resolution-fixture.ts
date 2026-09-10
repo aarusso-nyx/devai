@@ -235,6 +235,7 @@ export interface LifecyclePolicyResolutionSetFixture {
   readonly resolutions: readonly VerifiedReleasePolicyResolution[];
   readonly receipts: readonly ReturnType<typeof buildResolvedReleasePlanReceipt>[];
   readonly intents: readonly Readonly<Record<string, unknown>>[];
+  readonly resolve_plan_input: (input: Readonly<Record<string, unknown>>) => unknown;
   readonly foreign_resolution: VerifiedReleasePolicyResolution;
 }
 
@@ -243,8 +244,26 @@ export interface LifecyclePolicyResolutionSetFixture {
  * installed package, and materialized policy binding.  This is the only
  * supported multi-unit shape for a single candidate replay.
  */
-export function createLifecyclePolicyResolutionSetFixture(): LifecyclePolicyResolutionSetFixture {
-  const checked = packageSnapshot();
+export function createLifecyclePolicyResolutionSetFixture(
+  options: {
+    readonly mutation_roster?: readonly unknown[];
+    readonly profile_overrides?: Readonly<Record<string, unknown>>;
+    readonly changed_packages?: readonly (readonly string[])[];
+    readonly change_kinds?: readonly ('behavioral' | 'documentation' | 'metadata')[];
+  } = {},
+): LifecyclePolicyResolutionSetFixture {
+  const profileOverrides = options.profile_overrides ?? {};
+  const checked = packageSnapshot(
+    profileOverrides['mutation_execution'] === undefined
+      ? []
+      : [
+          {
+            path: 'dist/law/policy/mutation-evidence-v2.json',
+            mode: 0o644,
+            bytes: readFileSync(join(ROOT, 'law/policy/mutation-evidence-v2.json')),
+          },
+        ],
+  );
   const pin = checked.read('dist/law/constitution.md');
   const version = parseConstitutionVersion(pin.toString());
   if (version === null) throw new Error('fixture constitution');
@@ -261,7 +280,9 @@ export function createLifecyclePolicyResolutionSetFixture(): LifecyclePolicyReso
       default_support: 'current',
       capability_tasks: { lint: ['lint'] },
       risk_capabilities: {},
-      mutation_roster: [],
+      mutation_roster: options.mutation_roster ?? [],
+      ...profileOverrides,
+      release_unit: '@fixture/unit-one',
     },
   };
   const materialized = resolveAdopterPolicyMaterialization({
@@ -333,15 +354,15 @@ export function createLifecyclePolicyResolutionSetFixture(): LifecyclePolicyReso
     });
   const units = ['@fixture/unit-one', '@fixture/unit-two'] as const;
   const resolutions = units.map((release_unit) => makeResolution(release_unit));
-  const intents = units.map((release_unit) => ({
+  const intents = units.map((release_unit, index) => ({
     schemaVersion: '1.0.0',
     release_unit,
     current_version: VERSION,
     target_version: '1.4.6',
     support: 'current',
-    change_kind: 'behavioral',
+    change_kind: options.change_kinds?.[index] ?? 'behavioral',
     changed_paths: ['packages/cli/src/services/release-policy-resolution.ts'],
-    changed_packages: [PACKAGE],
+    changed_packages: options.changed_packages?.[index] ?? [PACKAGE],
     candidate: {
       commit: candidateResult.snapshot.repository.commit,
       tree: candidateResult.snapshot.repository.tree,
@@ -364,6 +385,7 @@ export function createLifecyclePolicyResolutionSetFixture(): LifecyclePolicyReso
       }),
     ),
     intents,
+    resolve_plan_input: createResolvedReleasePlanInputResolver(resolutions),
     foreign_resolution: makeResolution('@fixture/foreign-unit', foreignCandidate),
   };
 }

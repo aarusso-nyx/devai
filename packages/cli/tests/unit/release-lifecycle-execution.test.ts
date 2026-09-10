@@ -18,7 +18,10 @@ import {
 } from '@devai-nyx/authority';
 import { parsers as schemaParsers } from '@devai-nyx/schemas';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
-import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
+import {
+  createLifecyclePolicyFixture,
+  createLifecyclePolicyResolutionSetFixture,
+} from '../helpers/release-policy-resolution-fixture.js';
 import { fixture as unitMutationEvidenceFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
 import { createReleasePolicyClosure } from '../../src/services/release-policy-closure.js';
@@ -2015,6 +2018,100 @@ describe('release lifecycle execution kernel', () => {
     expect(certify).not.toHaveBeenCalled();
   });
 
+  it('requires mutation readers when any unit in a mixed certification is bound', async () => {
+    const fixture = createLifecyclePolicyResolutionSetFixture({
+      mutation_roster: DEVAI_ADOPTION.release_verification.mutation_roster,
+      profile_overrides: DEVAI_ADOPTION.release_verification,
+      changed_packages: [['@aarusso-nyx/devai'], []],
+      change_kinds: ['behavioral', 'documentation'],
+    });
+    const packageBytes = fixture.candidate.read('package.json');
+    const packageDigest = createHash('sha256').update(packageBytes).digest('hex');
+    const releaseUnits = fixture.receipts.map((receipt) => {
+      const candidate = receipt['candidate'] as Readonly<Record<string, unknown>>;
+      return {
+        release_unit: String(candidate['release_unit']),
+        version: String(candidate['version']),
+        package_roster: [
+          {
+            package_id: String(candidate['release_unit']),
+            manifest_path: 'package.json',
+            manifest_digest_sha256: packageDigest,
+          },
+        ],
+      };
+    });
+    const value: ReleaseLifecycleRequest = {
+      schemaVersion: '1.0.0',
+      request_kind: 'release-lifecycle-request',
+      action_id: 'release certify',
+      repository_locator: fixture.candidate.repository,
+      candidate_locator: {
+        commit: fixture.candidate.repository.commit,
+        tree: fixture.candidate.repository.tree,
+        release_units: releaseUnits,
+      },
+      receipt_locators: fixture.receipts
+        .map(receiptLocator)
+        .sort((left, right) => left.receipt_id.localeCompare(right.receipt_id, 'en')),
+    };
+    const requirements = resolveReleaseMutationRequirements(value, {
+      resolve_receipt: (locator) =>
+        required(
+          fixture.receipts.find(
+            (receipt) => receipt['receipt_digest_sha256'] === locator.receipt_digest_sha256,
+          ),
+          'missing mixed-unit receipt',
+        ),
+      resolve_plan_input: fixture.resolve_plan_input,
+    });
+    expect(requirements.map((requirement) => requirement.binding === null)).toEqual([false, true]);
+
+    const certify = vi.fn();
+    const provider = createReleaseCertificationProvider({
+      provider: { kind: 'protected-certification-provider-v3', certify },
+      evidence_sink: {
+        kind: 'certification-evidence-sink-v3',
+        protocol: 'two-phase-content-addressed',
+        begin: () => undefined as never,
+        readCertificationEvidenceReceipt: () => {
+          throw new Error('no generated output');
+        },
+        readCertificationOutputClosure: (binding) => ({ ...binding, outputs: [] }),
+        readGeneratedBlob: () => {
+          throw new Error('no generated output');
+        },
+      },
+      content_source: {
+        readGitObject: () => {
+          throw new Error('must fail before content reads');
+        },
+        readGitBlob: () => {
+          throw new Error('must fail before content reads');
+        },
+      },
+      task_policies: releaseUnits.map((unit) => ({
+        release_unit: unit.release_unit,
+        task_policy_digest_sha256: TASK_POLICY_DIGEST,
+        document: CERTIFICATION_TASK_POLICY,
+      })),
+      resolve_receipt: (locator) =>
+        required(
+          fixture.receipts.find(
+            (receipt) => receipt['receipt_digest_sha256'] === locator.receipt_digest_sha256,
+          ),
+          'missing mixed-unit receipt',
+        ),
+      resolve_plan_input: fixture.resolve_plan_input,
+    });
+
+    await expect(provider(value)).resolves.toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-generated-output-untrusted',
+    });
+    expect(certify).not.toHaveBeenCalled();
+  });
+
   it('requires every unit mutation reader and a positive safe byte limit independently', async () => {
     const input = await requiredMutationCertificationFixture();
     const validSink = requiredMutationEvidenceSink(input.evidence);
@@ -2356,6 +2453,133 @@ describe('release lifecycle execution kernel', () => {
       });
       expect(provider).toHaveBeenCalledOnce();
     }
+  });
+
+  it('captures export results only from inert, enumerable, allowlisted own data properties', async () => {
+    const invoke = async (provider: ReleaseProvider) => {
+      const value = request('release export');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      await advanceToPrepared(store);
+      const result = await withReleaseExportAuthorityFixture(value, () =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release export',
+          authority: authorityFor('release export'),
+          store,
+          resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
+          provider,
+          artifactReader: artifactReaderFor('release prepare'),
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+      return { result, store };
+    };
+    const managedFailure = (transaction: {
+      rollback: ReturnType<typeof vi.fn>;
+      dispose: ReturnType<typeof vi.fn>;
+    }) => ({
+      outcome: 'failure' as const,
+      dispatch_status: 'failed-before-dispatch' as const,
+      code: 'release-export-before-sign-failed',
+      transaction: { commit: vi.fn(), ...transaction },
+    });
+
+    const validTransaction = { rollback: vi.fn(), dispose: vi.fn() };
+    const validProvider = vi.fn(() =>
+      Object.assign(Object.create(null) as object, managedFailure(validTransaction)),
+    ) as unknown as ReleaseProvider;
+    const valid = await invoke(validProvider);
+    expect(valid.result).toMatchObject({
+      ok: false,
+      phase: 'provider',
+      code: 'release-export-before-sign-failed',
+    });
+    expect(validTransaction.rollback).toHaveBeenCalledOnce();
+    expect(validTransaction.dispose).toHaveBeenCalledOnce();
+
+    let accessorReads = 0;
+    let proxyPrototypeReads = 0;
+    const malformedResults: readonly [
+      string,
+      (transaction: {
+        rollback: ReturnType<typeof vi.fn>;
+        dispose: ReturnType<typeof vi.fn>;
+      }) => unknown,
+    ][] = [
+      ['null', () => null],
+      ['primitive', () => 'success'],
+      [
+        'proxy',
+        (transaction) =>
+          new Proxy(managedFailure(transaction), {
+            getPrototypeOf: () => {
+              proxyPrototypeReads += 1;
+              return Object.prototype;
+            },
+          }),
+      ],
+      [
+        'foreign prototype',
+        (transaction) =>
+          Object.assign(Object.create({ inherited: true }), managedFailure(transaction)),
+      ],
+      [
+        'symbol key',
+        (transaction) => ({ ...managedFailure(transaction), [Symbol('hidden')]: true }),
+      ],
+      ['unknown key', (transaction) => ({ ...managedFailure(transaction), extra: true })],
+      [
+        'non-enumerable property',
+        (transaction) => {
+          const { code: _code, ...base } = managedFailure(transaction);
+          return Object.defineProperty(base, 'code', { value: 'hidden-code' });
+        },
+      ],
+      [
+        'accessor property',
+        (transaction) => {
+          const { code: _code, ...base } = managedFailure(transaction);
+          return Object.defineProperty(base, 'code', {
+            enumerable: true,
+            get: () => {
+              accessorReads += 1;
+              return 'accessor-code';
+            },
+          });
+        },
+      ],
+      [
+        'missing outcome',
+        (transaction) => {
+          const { outcome: _outcome, ...base } = managedFailure(transaction);
+          return base;
+        },
+      ],
+      ['invalid outcome', (transaction) => ({ ...managedFailure(transaction), outcome: 'maybe' })],
+    ];
+
+    for (const [label, malformed] of malformedResults) {
+      const transaction = { rollback: vi.fn(), dispose: vi.fn() };
+      const provider = vi.fn(() => malformed(transaction)) as unknown as ReleaseProvider;
+      const { result, store } = await invoke(provider);
+
+      expect(result, label).toMatchObject({
+        ok: false,
+        phase: 'ambiguous',
+        code: 'release-provider-result-unknown',
+      });
+      expect(provider, label).toHaveBeenCalledOnce();
+      expect(transaction.rollback, label).not.toHaveBeenCalled();
+      expect(transaction.dispose, label).not.toHaveBeenCalled();
+      expect(store.readStateRecords().at(-1)?.state, label).toBe('prepared');
+      expect(store.readStoreRecords().at(-1), label).toMatchObject({
+        record_kind: 'unknown-provider-result',
+        provider_dispatch: { status: 'not-dispatched', handle_observed: false },
+      });
+    }
+    expect(accessorReads).toBe(0);
+    expect(proxyPrototypeReads).toBe(1);
   });
 
   it('keeps an explicitly managed pre-sign export failure retryable', async () => {
