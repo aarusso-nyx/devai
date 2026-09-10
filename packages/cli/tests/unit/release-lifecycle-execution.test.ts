@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import {
   existsSync,
   linkSync,
@@ -7,6 +8,7 @@ import {
   realpathSync,
   symlinkSync,
 } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -5353,6 +5355,35 @@ describe('release lifecycle execution kernel', () => {
     linkSync(join(attempts, name), join(root(), 'linked-record.json'));
     expect(() => store.readStoreRecords()).toThrow('release-state-store-unsafe');
   });
+
+  it.each(['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs'] as const)(
+    'refuses a state record whose opened identity changes during the read: %s',
+    async (property) => {
+      const value = request('release preflight');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      await seedPreflight(store);
+      const originalFstatSync = fs.fstatSync;
+      let regularFileObservations = 0;
+      fs.fstatSync = ((descriptor: number) => {
+        const stat = originalFstatSync(descriptor);
+        if (!stat.isFile() || ++regularFileObservations !== 2) return stat;
+        return new Proxy(stat, {
+          get(target, key, receiver) {
+            if (key === property) return Reflect.get(target, key, receiver) + 1;
+            return Reflect.get(target, key, receiver);
+          },
+        });
+      }) as typeof fs.fstatSync;
+      syncBuiltinESMExports();
+      try {
+        expect(() => store.readStoreRecords()).toThrow('release-state-store-unsafe');
+      } finally {
+        fs.fstatSync = originalFstatSync;
+        syncBuiltinESMExports();
+      }
+      expect(regularFileObservations).toBe(2);
+    },
+  );
 
   it('fails a missing action adapter before creating the state store', async () => {
     const value = request('release preflight');
