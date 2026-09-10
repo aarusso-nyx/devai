@@ -632,6 +632,94 @@ describe('v1.2 mapped mutation execution configuration (ADR-MUT-0008)', () => {
     },
   );
 
+  it.each([
+    [
+      'a wildcard alias inside the package root',
+      { paths: { '#u/*': ['../packages/utils/src/*'] } },
+      false,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'a non-string alias target',
+      { paths: { '#a/*': [1] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    ['a null alias map', { paths: null }, true, 'typescript-path-alias-resolution-unproven'],
+    [
+      'a missing path below the package root',
+      { paths: { '#a/*': ['../packages/utils/missing/*'] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'an empty alias target population',
+      { paths: { '#a/*': [] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'the exact package root',
+      { paths: { '#a/*': ['../packages/utils'] } },
+      false,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'a scalar alias map',
+      { paths: 'packages' },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'an interior wildcard',
+      { paths: { '#a/*': ['../packages/utils/*/../src'] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'another package root',
+      { paths: { '#a/*': ['../packages/schemas/src/*'] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'an explicit parent base URL',
+      { baseUrl: '..', paths: { '#a/*': ['packages/utils/src/*'] } },
+      false,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'an absolute base URL',
+      { baseUrl: '/../packages/utils', paths: { '#a/*': ['src/*'] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'an absolute alias target',
+      { paths: { '#a/*': ['/../packages/utils/src/*'] } },
+      true,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    [
+      'an exact package source member',
+      { paths: { '#a/*': ['../packages/utils/src/main.ts'] } },
+      false,
+      'typescript-path-alias-resolution-unproven',
+    ],
+    ['an array compiler configuration', [], true, 'typescript-configuration-syntax-unresolved'],
+  ] as const)(
+    'classifies %s without expanding mutation source authority',
+    (_label, compilerOptions, blocked, reason) => {
+      const { base, typescript } = mappedFixture();
+      base.files.set(typescript, Buffer.from(`${JSON.stringify({ compilerOptions })}\n`));
+      const unresolved = build(base).plan.packages.find((item) => item.id === 'utils')?.reuse
+        .unresolved;
+      expect(unresolved).toEqual(
+        blocked ? expect.arrayContaining([reason]) : expect.not.arrayContaining([reason]),
+      );
+    },
+  );
+
   it('refuses a symlink in the mapped TypeScript closure without following it', () => {
     const { base } = mappedFixture();
     expect(() =>
