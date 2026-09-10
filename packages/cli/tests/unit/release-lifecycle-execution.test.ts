@@ -5165,6 +5165,68 @@ describe('release lifecycle execution kernel', () => {
   });
 
   it.each([
+    [
+      'before-not-before',
+      {
+        not_before: '2026-09-03T00:00:01.000Z',
+        expires_at: '2026-09-03T01:00:00.000Z',
+      },
+    ],
+    [
+      'at-expiry',
+      {
+        not_before: '2026-09-02T23:00:00.000Z',
+        expires_at: '2026-09-03T00:00:00.000Z',
+      },
+    ],
+  ] as const)('enforces the resolved grant validity window: %s', async (_label, window) => {
+    const initial = request('release evidence-publish');
+    const store = new ReleaseLifecycleFileStore(root(), initial);
+    await advanceToExported(store);
+    const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+    const receipt = boundOfflineReceipt(exported);
+    const value = request('release evidence-publish', receipt);
+    const valid = authorizationBridge();
+    const forged: AuthorizationBridge = {
+      ...valid,
+      resolve: async (binding) => {
+        const resolution = await valid.resolve(binding);
+        if (!resolution.ok) return resolution;
+        const original = objectValue(required(resolution.events[0], 'missing authorization event'));
+        const {
+          event_id: _eventId,
+          payload_digest_sha256: _payloadDigest,
+          ...eventPayload
+        } = original;
+        const event = finalizeAuthorizationEvent({ ...eventPayload, ...window });
+        return { ...resolution, events: [event], ledger: authorizationLedger([event]) };
+      },
+    };
+    const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+    const result = await withAuthorityHostTestScope(() =>
+      executeReleaseLifecycleAction({
+        request: value,
+        action: 'release evidence-publish',
+        authority: authorityFor('release evidence-publish'),
+        store,
+        resolveReceipt: () => receipt,
+        resolvePlanInput,
+        offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+        artifactReader: artifactReaderFor('release export'),
+        authorization: forged,
+        provider,
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      phase: 'authorization',
+      code: 'release-authorization-attempt-binding-invalid',
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it.each([
     'event-ledger',
     'event-sequence',
     'entry-sequence',
