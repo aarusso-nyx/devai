@@ -631,6 +631,25 @@ describe('protected mutation program factory with explicit upstream-authority is
     ).toThrow(INVALID);
   });
 
+  it('accepts a host source asset exactly at the driver byte ceiling', () => {
+    const { input } = factoryUnit();
+    const target = 'dist/runtime/host/mutation-production.mjs';
+    const bytes = Buffer.alloc(128 * 1024, 0x61);
+    const manifest = current.installed.manifest.map((entry) =>
+      entry.path === target ? { ...entry, size: bytes.length, sha256: hash(bytes) } : { ...entry },
+    );
+    const snapshot: ReleasePackageSnapshot = {
+      ...current.installed,
+      manifest,
+      read: (path) => (path === target ? Buffer.from(bytes) : current.installed.read(path)),
+    };
+
+    const program = createProtectedMutationProgram({ ...input, package_snapshot: snapshot });
+    expect(file(captureProtectedMutationProgram(program), 'mutation-production.mjs').bytes).toEqual(
+      bytes,
+    );
+  });
+
   it.each(['absent', 'mode', 'size', 'digest', 'empty', 'oversized'] as const)(
     'refuses %s source asset bytes or metadata',
     (fault) => {
