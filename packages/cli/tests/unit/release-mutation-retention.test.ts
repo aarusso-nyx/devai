@@ -288,6 +288,77 @@ async function refuses(operation: () => Promise<unknown>) {
 }
 
 describe('release mutation retention adapter', () => {
+  it('refuses every malformed retention capability before opening a sink transaction', async () => {
+    await refuses(() => retainReleaseMutationEvidenceV21(null as never));
+    const source = await evidenceFixture();
+    const methodNames = [
+      'beginUnitMutationEvidence',
+      'readUnitMutationEvidenceClosure',
+      'readUnitMutationEvidenceReceipt',
+      'readUnitMutationEvidenceBlob',
+    ] as const;
+    const cases: Array<
+      readonly [string, (input: ReleaseMutationRetentionInputV21) => Record<string, unknown>]
+    > = [
+      [
+        'wrong execution template',
+        (input) => ({ ...input.plan, execution_template_version: '1.1.0' }),
+      ],
+      [
+        'unresolved reuse',
+        (input) => ({
+          ...input.plan,
+          packages: input.plan.packages.map((entry, index) =>
+            index === 0 ? { ...entry, reuse: { ...entry.reuse, unresolved: ['source'] } } : entry,
+          ),
+        }),
+      ],
+    ];
+
+    for (const [name, plan] of cases) {
+      const value = adapterFixture(source);
+      await refuses(() =>
+        retainReleaseMutationEvidenceV21({ ...value.input, plan: plan(value.input) } as never),
+      );
+      expect(value.sink.state.puts, name).toBe(0);
+    }
+
+    for (const evidence_sink of [
+      null,
+      [],
+      { ...adapterFixture(source).sink.value, unit_mutation_maximum_bytes: 0 },
+      { ...adapterFixture(source).sink.value, unit_mutation_maximum_bytes: 1.5 },
+      ...methodNames.map((name) => ({
+        ...adapterFixture(source).sink.value,
+        [name]: undefined,
+      })),
+    ]) {
+      const value = adapterFixture(source);
+      await refuses(() =>
+        retainReleaseMutationEvidenceV21({ ...value.input, evidence_sink } as never),
+      );
+      expect(value.sink.state.puts).toBe(0);
+    }
+
+    for (const authority_owner of [null, []]) {
+      const value = adapterFixture(source);
+      await refuses(() =>
+        retainReleaseMutationEvidenceV21({ ...value.input, authority_owner } as never),
+      );
+      expect(value.sink.state.puts).toBe(0);
+    }
+
+    for (const sink_host of [
+      null,
+      [],
+      { ...adapterFixture(source).sink.host, invokeSink: undefined },
+    ]) {
+      const value = adapterFixture(source);
+      await refuses(() => retainReleaseMutationEvidenceV21({ ...value.input, sink_host } as never));
+      expect(value.sink.state.puts).toBe(0);
+    }
+  });
+
   it('retains and rereads exact complete executed and mixed reused closures without package outputs', async () => {
     const executedSource = await evidenceFixture();
     const executed = adapterFixture(executedSource);
