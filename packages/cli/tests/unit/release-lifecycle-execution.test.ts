@@ -5032,6 +5032,59 @@ describe('release lifecycle execution kernel', () => {
     expect(provider).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['sequence', { sequence: 2 }],
+    ['event-id', { event_id: 'EA-0000000000000000' }],
+  ] as const)(
+    'binds the authorization ledger head %s to its terminal event',
+    async (_label, head) => {
+      const initial = request('release evidence-publish');
+      const store = new ReleaseLifecycleFileStore(root(), initial);
+      await advanceToExported(store);
+      const exported = required(store.readStateRecords().at(-1), 'missing exported state');
+      const receipt = boundOfflineReceipt(exported);
+      const value = request('release evidence-publish', receipt);
+      const valid = authorizationBridge();
+      const forged: AuthorizationBridge = {
+        ...valid,
+        resolve: async (binding) => {
+          const resolution = await valid.resolve(binding);
+          if (!resolution.ok) return resolution;
+          const ledger = objectValue(resolution.ledger);
+          return {
+            ...resolution,
+            ledger: {
+              ...ledger,
+              head: { ...objectValue(ledger['head']), ...head },
+            },
+          };
+        },
+      };
+      const provider = vi.fn(() => ({ outcome: 'unknown' as const }));
+      const result = await withAuthorityHostTestScope(() =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release evidence-publish',
+          authority: authorityFor('release evidence-publish'),
+          store,
+          resolveReceipt: () => receipt,
+          resolvePlanInput,
+          offlineReceiptVerifier: { verify: ({ receipt: document }) => document },
+          artifactReader: artifactReaderFor('release export'),
+          authorization: forged,
+          provider,
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+      expect(result).toMatchObject({
+        ok: false,
+        phase: 'authorization',
+        code: 'release-authorization-attempt-binding-invalid',
+      });
+      expect(provider).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['payload-digest', 'event-id'] as const)(
     'recomputes the authorization event %s before accepting its ledger entry',
     async (defect) => {
