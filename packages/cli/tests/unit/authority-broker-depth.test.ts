@@ -1859,3 +1859,50 @@ describe('authority broker Git reference process targets', () => {
     expect(target('hg', ['checkout', '--orphan', 'feature'])).toBeUndefined();
   });
 });
+
+describe('authority broker local Git branch process targets', () => {
+  const target = (executable: string, args: readonly string[]) =>
+    processTarget(
+      effect('spawnSync', [executable, args], 'process'),
+      'round run',
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  const expected = (ref: string, operation: string) => ({
+    kind: 'git-ref',
+    id: `git-ref:repo:fixture:${ref}`,
+    repository_id: 'repo:fixture',
+    ref,
+    operation,
+    protected: false,
+  });
+
+  it('maps only exact forced branch deletion into a local branch reference', () => {
+    expect(target('git', ['branch', '-D', 'feature branch'])).toEqual(
+      expected('refs/heads/feature-branch', 'delete'),
+    );
+    expect(target('git', ['branch', '-D'])).toEqual(expected('refs/heads/temporary', 'delete'));
+    expect(target('git', ['branch', '-d', 'feature'])).toBeUndefined();
+    expect(target('git', ['branchx', '-D', 'feature'])).toBeUndefined();
+    expect(target('hg', ['branch', '-D', 'feature'])).toBeUndefined();
+  });
+
+  it('binds worktree creation and removal to exact branch and operation identities', () => {
+    expect(target('git', ['worktree', 'add', '-b', 'feature branch', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/feature-branch', 'create'),
+    );
+    expect(target('git', ['worktree', 'add', '-b', '', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/worktree', 'create'),
+    );
+    expect(target('git', ['worktree', 'add', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/detached', 'create'),
+    );
+    expect(target('git', ['worktree', 'remove', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/detached', 'delete'),
+    );
+    expect(target('git', ['worktreex', 'add', '-b', 'feature'])).toBeUndefined();
+    expect(target('hg', ['worktree', 'add', '-b', 'feature'])).toBeUndefined();
+  });
+});
