@@ -372,6 +372,50 @@ function expectActivationRefusal(action: () => unknown): void {
   );
 }
 
+type FsModule = typeof import('node:fs');
+type FsStat = ReturnType<FsModule['lstatSync']>;
+
+function alteredStat(
+  stat: FsStat,
+  alteration: 'symlink' | 'not-file' | 'device' | 'inode',
+): FsStat {
+  return new Proxy(stat, {
+    get(target, property) {
+      if (property === 'isSymbolicLink' && alteration === 'symlink') return () => true;
+      if (property === 'isFile' && alteration === 'not-file') return () => false;
+      if (property === 'dev' && alteration === 'device') return target.dev + 1;
+      if (property === 'ino' && alteration === 'inode') return target.ino + 1;
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
+async function expectProtectedFileRefusal(
+  decorate: (actual: FsModule) => Record<string, unknown>,
+): Promise<void> {
+  const snapshot = activationSnapshot();
+  const contract = exactNotRequiredContract(canonicalSha256(snapshot.policy));
+  vi.resetModules();
+  vi.doMock('node:fs', async (importOriginal) => {
+    const actual = await importOriginal<FsModule>();
+    return { ...actual, ...decorate(actual) };
+  });
+  try {
+    const isolated = await import('../../src/services/mutation-evidence-v21.js');
+    await expect(
+      isolated.finalizeMutationEvidenceV21({
+        contract,
+        candidate: CANDIDATE,
+        packages: [{ disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' }],
+      }),
+    ).rejects.toThrow('MUTATION_VENDOR_PROVENANCE_MISMATCH');
+  } finally {
+    vi.doUnmock('node:fs');
+    vi.resetModules();
+  }
+}
+
 describe('source-pinned mutation evidence v2.1 activation', () => {
   it('accepts exactly the policy, raw manifest, declared 26-file population, and bytes', () => {
     const snapshot = activationSnapshot();
@@ -766,6 +810,100 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       vi.doUnmock('node:fs');
       vi.resetModules();
     }
+  });
+
+  it('refuses a symbolic-link ancestor before opening protected verifier bytes', async () => {
+    const vendorRoot = join(ROOT, 'packages/cli/vendor/evidence-verification');
+    const opened = vi.fn();
+    await expectProtectedFileRefusal((actual) => ({
+      lstatSync: (path: Parameters<FsModule['lstatSync']>[0]) => {
+        const stat = actual.lstatSync(path);
+        return String(path) === vendorRoot ? alteredStat(stat, 'symlink') : stat;
+      },
+      openSync: opened,
+    }));
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it('refuses every ancestor identity change observed after reading protected bytes', async () => {
+    const policyPath = join(ROOT, 'law/policy/mutation-evidence-v2.json');
+    for (const alteration of ['symlink', 'device', 'inode'] as const) {
+      let policyStats = 0;
+      await expectProtectedFileRefusal((actual) => ({
+        lstatSync: (path: Parameters<FsModule['lstatSync']>[0]) => {
+          const stat = actual.lstatSync(path);
+          if (String(path) !== policyPath) return stat;
+          policyStats += 1;
+          return policyStats === 5 ? alteredStat(stat, alteration) : stat;
+        },
+      }));
+    }
+  });
+
+  it('refuses a protected path that is not a regular file before opening it', async () => {
+    const policyPath = join(ROOT, 'law/policy/mutation-evidence-v2.json');
+    let policyStats = 0;
+    await expectProtectedFileRefusal((actual) => ({
+      lstatSync: (path: Parameters<FsModule['lstatSync']>[0]) => {
+        const stat = actual.lstatSync(path);
+        if (String(path) !== policyPath) return stat;
+        policyStats += 1;
+        return policyStats === 2 ? alteredStat(stat, 'not-file') : stat;
+      },
+    }));
+  });
+
+  it('refuses every opened-descriptor identity mismatch', async () => {
+    const policyPath = join(ROOT, 'law/policy/mutation-evidence-v2.json');
+    for (const alteration of ['not-file', 'device', 'inode'] as const) {
+      let policyStats = 0;
+      let openedStats = 0;
+      await expectProtectedFileRefusal((actual) => ({
+        lstatSync: (path: Parameters<FsModule['lstatSync']>[0]) => {
+          const stat = actual.lstatSync(path);
+          if (String(path) !== policyPath) return stat;
+          policyStats += 1;
+          return policyStats === 3 && alteration !== 'not-file'
+            ? alteredStat(stat, alteration)
+            : stat;
+        },
+        fstatSync: (descriptor: number) => {
+          const stat = actual.fstatSync(descriptor);
+          openedStats += 1;
+          return openedStats === 1 ? alteredStat(stat, alteration) : stat;
+        },
+      }));
+    }
+  });
+
+  it('refuses every protected-path identity change observed after opening', async () => {
+    const policyPath = join(ROOT, 'law/policy/mutation-evidence-v2.json');
+    for (const alteration of ['symlink', 'device', 'inode'] as const) {
+      let policyStats = 0;
+      await expectProtectedFileRefusal((actual) => ({
+        lstatSync: (path: Parameters<FsModule['lstatSync']>[0]) => {
+          const stat = actual.lstatSync(path);
+          if (String(path) !== policyPath) return stat;
+          policyStats += 1;
+          return policyStats === 3 ? alteredStat(stat, alteration) : stat;
+        },
+      }));
+    }
+  });
+
+  it('closes an opened protected descriptor when reading fails', async () => {
+    const closed = vi.fn();
+    await expectProtectedFileRefusal((actual) => ({
+      readFileSync: (path: Parameters<FsModule['readFileSync']>[0]) => {
+        if (typeof path === 'number') throw new Error('injected protected read failure');
+        return actual.readFileSync(path);
+      },
+      closeSync: (descriptor: number) => {
+        closed(descriptor);
+        actual.closeSync(descriptor);
+      },
+    }));
+    expect(closed).toHaveBeenCalledOnce();
   });
 
   it('finalizes without launching mutation work and verifies only the exact current receipt provenance', async () => {
