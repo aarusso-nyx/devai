@@ -127,6 +127,63 @@ function effect(
 }
 
 describe('authority broker production boundary depth', () => {
+  it('exposes optional broker controls only for their owning actions', () => {
+    const catalog = broker('catalog actions', 'auditor', [
+      process.execPath,
+      'devai',
+      'catalog',
+      'actions',
+    ]);
+    const prepare = broker('release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    const exportHost = broker('release export', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'export',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    const binding = broker('init bind', 'architect', [
+      process.execPath,
+      'devai',
+      'init',
+      'bind',
+      '--constitution',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    try {
+      expect(Object.hasOwn(catalog.scope, 'read_prepare_capacity')).toBe(false);
+      expect(Object.hasOwn(catalog.scope, 'read_export_capacity')).toBe(false);
+      expect(Object.hasOwn(catalog, 'session_operation')).toBe(false);
+      expect(Object.hasOwn(catalog, 'policy_materialization')).toBe(false);
+      expect(typeof prepare.scope.read_prepare_capacity).toBe('function');
+      expect(Object.hasOwn(prepare.scope, 'read_export_capacity')).toBe(false);
+      expect(typeof exportHost.scope.read_export_capacity).toBe('function');
+      expect(Object.hasOwn(exportHost.scope, 'read_prepare_capacity')).toBe(false);
+      expect(typeof binding.policy_materialization).toBe('function');
+    } finally {
+      catalog.dispose();
+      prepare.dispose();
+      exportHost.dispose();
+      binding.dispose();
+    }
+  });
+
   it('exposes only the exact consent admitted by the production authority boundary', () => {
     const allowed = authorizeCliArgv(
       [
