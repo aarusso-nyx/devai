@@ -1188,6 +1188,154 @@ async function requiredMutationCertificationFixture() {
   return { request, fixture, evidence, material, content_source };
 }
 
+async function mixedMutationCertificationFixture() {
+  const fixture = createLifecyclePolicyResolutionSetFixture({
+    mutation_roster: DEVAI_ADOPTION.release_verification.mutation_roster,
+    profile_overrides: DEVAI_ADOPTION.release_verification,
+    changed_packages: [['@aarusso-nyx/devai'], []],
+    change_kinds: ['behavioral', 'documentation'],
+  });
+  const packageJson = fixture.candidate.read('package.json');
+  const packageDigest = createHash('sha256').update(packageJson).digest('hex');
+  const releaseUnits = fixture.receipts.map((receipt) => {
+    const candidate = receipt['candidate'] as Readonly<Record<string, unknown>>;
+    return {
+      release_unit: String(candidate['release_unit']),
+      version: String(candidate['version']),
+      package_roster: [
+        {
+          package_id: String(candidate['release_unit']),
+          manifest_path: 'package.json',
+          manifest_digest_sha256: packageDigest,
+        },
+      ],
+    };
+  });
+  const request: ReleaseLifecycleRequest = {
+    schemaVersion: '1.0.0',
+    request_kind: 'release-lifecycle-request',
+    action_id: 'release certify',
+    repository_locator: fixture.candidate.repository,
+    candidate_locator: {
+      commit: fixture.candidate.repository.commit,
+      tree: fixture.candidate.repository.tree,
+      release_units: releaseUnits,
+    },
+    receipt_locators: fixture.receipts
+      .map(receiptLocator)
+      .sort((left, right) => left.receipt_id.localeCompare(right.receipt_id, 'en')),
+  };
+  const resolveReceipt = (locator: { readonly receipt_digest_sha256: string }) =>
+    required(
+      fixture.receipts.find(
+        (receipt) => receipt['receipt_digest_sha256'] === locator.receipt_digest_sha256,
+      ),
+      'missing mixed export receipt',
+    );
+  const requirements = resolveReleaseMutationRequirements(request, {
+    resolve_receipt: resolveReceipt,
+    resolve_plan_input: fixture.resolve_plan_input,
+  });
+  const binding = required(requirements[0]?.binding, 'first mixed unit must require mutation');
+  if (requirements[1]?.binding !== null) throw new Error('second mixed unit must omit mutation');
+  const evidence = await unitMutationEvidenceFixture({
+    binding: { ...binding, task_policy_digests_sha256: [TASK_POLICY_DIGEST] },
+    packages: DEVAI_ADOPTION.release_verification.mutation_roster.map((entry) => ({
+      packageName: entry.package,
+      workspace: entry.manifest_path.replace(/\/package\.json$/u, ''),
+    })),
+  });
+  const certification = (releaseUnit: (typeof releaseUnits)[number]) =>
+    finalizeCertificationManifest({
+      candidate: {
+        commit: fixture.candidate.repository.commit,
+        tree: fixture.candidate.repository.tree,
+      },
+      task_policy_digest_sha256: TASK_POLICY_DIGEST,
+      package_id: releaseUnit.package_roster[0]?.package_id ?? '',
+      package_version: releaseUnit.version,
+      entry_order: 'ascending-utf-8-byte-collation-by-path;duplicates-refuse',
+      manifest_digest_contract: {
+        domain: 'DEVAI-CERTIFIED-PACKAGE-ENTRY-MANIFEST-V1\0',
+        payload:
+          'utf-8-rfc8785-jcs-of-the-entire-manifest-with-manifest_digest_sha256-omitted;framed-as-domain-utf8-bytes-plus-payload-utf8-bytes',
+        canonicalization: 'rfc8785-jcs',
+        algorithm: 'sha256',
+      },
+      entries: [
+        {
+          path: 'package.json',
+          mode: '100644',
+          size_bytes: packageJson.byteLength,
+          sha256: packageDigest,
+          immutable_blob_locator: {
+            kind: 'git-object',
+            repository: fixture.candidate.repository.id,
+            commit: fixture.candidate.repository.commit,
+            tree: fixture.candidate.repository.tree,
+            object_format: 'sha1',
+            path: 'package.json',
+            mode: '100644',
+            object_id: 'a'.repeat(40),
+            size_bytes: packageJson.byteLength,
+            content_digest_sha256: packageDigest,
+          },
+        },
+      ],
+    });
+  const material: ReleaseStateMaterial = {
+    release_units: releaseUnits.map((unit, index) => ({
+      release_unit: unit.release_unit,
+      version: unit.version,
+      packages: [
+        {
+          package_id: unit.package_roster[0]?.package_id ?? '',
+          manifest: {
+            path: 'package.json',
+            sha256: packageDigest,
+            size_bytes: packageJson.byteLength,
+          },
+          tarball: null,
+          sbom: null,
+          evidence_manifest: null,
+          provider_result: null,
+          trust: null,
+          certification_manifest: certification(unit),
+        },
+      ],
+      ...(index === 0 ? { mutation_evidence: evidence.closure } : {}),
+    })),
+    inputs: [
+      {
+        kind: 'release-lifecycle-policy',
+        path: 'law/policy/release-lifecycle.json',
+        sha256: packageDigest,
+      },
+      {
+        kind: 'task-policy',
+        path: 'task-policy/certify/selection',
+        sha256: TASK_POLICY_DIGEST,
+      },
+    ],
+    evidence: {
+      manifest_digest_sha256: EVIDENCE_DIGEST,
+      receipt_digests: fixture.receipts.map((receipt) => String(receipt['receipt_digest_sha256'])),
+      independently_checkable: true,
+    },
+    artifacts: [],
+  };
+  return {
+    request,
+    receipts: fixture.receipts,
+    resolve_plan_input: fixture.resolve_plan_input,
+    resolutions: fixture.resolutions,
+    package_snapshot: fixture.package_snapshot,
+    candidate: fixture.candidate,
+    evidence,
+    material,
+  };
+}
+
 function requiredMutationEvidenceSink(
   evidence: Awaited<ReturnType<typeof unitMutationEvidenceFixture>>,
   options: {
@@ -4085,6 +4233,36 @@ describe('release lifecycle execution kernel', () => {
           : { ok: true },
       );
     }
+  });
+
+  it('refuses portable export evidence when mixed release units require independent plans', async () => {
+    const input = await mixedMutationCertificationFixture();
+    const resolveReceipt = (locator: { readonly receipt_digest_sha256: string }) =>
+      required(
+        input.receipts.find(
+          (receipt) => receipt['receipt_digest_sha256'] === locator.receipt_digest_sha256,
+        ),
+        'missing mixed export receipt',
+      );
+    const token = await createReleaseExportMutationEvidence({
+      request: { ...input.request, action_id: 'release prepare' },
+      material: input.material,
+      source: requiredMutationEvidenceSink(input.evidence),
+      plan: {
+        resolve_receipt: resolveReceipt,
+        resolve_plan_input: input.resolve_plan_input,
+      },
+      maximum_provider_result_bytes: 1_000_000,
+    });
+
+    expect(() =>
+      readReleaseExportMutationEvidence(token, {
+        repository: input.request.repository_locator,
+        plan_receipt_digest_sha256: String(input.receipts[0]?.['receipt_digest_sha256']),
+        release_units: input.material.release_units,
+        inputs: input.material.inputs,
+      }),
+    ).toThrow('release-export-artifact-sink-protocol-invalid');
   });
 
   it('binds required mutation evidence into a verified current export check', async () => {
