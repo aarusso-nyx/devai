@@ -1153,6 +1153,37 @@ describe('durable external certification evidence store', () => {
 });
 
 describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', () => {
+  it('propagates an unreadable durable binding index without creating a transaction', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const bindingIndex = join(
+      fixture.evidenceRoot,
+      'unit-mutation-index',
+      `${canonicalSha256(evidence.binding)}.json`,
+    );
+    mkdirSync(bindingIndex, { recursive: true });
+
+    await expect(
+      invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.beginUnitMutationEvidence(evidence.binding),
+      ),
+    ).rejects.toThrow();
+    expect(() => lstatSync(join(fixture.evidenceRoot, 'unit-mutation'))).toThrow();
+  });
+
+  it('requires every projected unit document to have been admitted by the transaction', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    for (const [digest, content] of evidence.objects) {
+      writeFileSync(join(fixture.evidenceRoot, 'objects', digest), content);
+    }
+
+    await refusal(() => transaction.verify(evidence.projection));
+  });
+
   it.each(['terminal', 'non-buffer', 'size-mismatch', 'digest-mismatch'] as const)(
     'refuses a unit object write with %s input',
     async (fault) => {
@@ -1550,6 +1581,61 @@ describe('durable unit mutation evidence (ADR-MUT-0008 IA-002 through IA-004)', 
       ),
     );
     expect(readdirSync(join(fixture.evidenceRoot, 'unit-mutation')).sort()).toEqual(before);
+  });
+
+  it('keeps a committed transaction terminal if its durable election is removed', async () => {
+    const fixture = storeFixture();
+    const { evidence, transaction } = await commitUnitEvidence(fixture);
+    rmSync(
+      join(
+        fixture.evidenceRoot,
+        'unit-mutation-index',
+        `${canonicalSha256(evidence.binding)}.json`,
+      ),
+    );
+    rmSync(
+      join(fixture.evidenceRoot, 'unit-mutation', transaction.transaction_handle, 'commit.json'),
+    );
+
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () => transaction.commit(evidence.projection)),
+    );
+  });
+
+  it('consumes an unverified transaction after its commit is refused', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await putUnitDocuments(fixture, evidence, transaction);
+
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () => transaction.commit(evidence.projection)),
+    );
+    await refusal(() => transaction.verify(evidence.projection));
+  });
+
+  it('keeps an aborted transaction closed to later object admission', async () => {
+    const fixture = storeFixture();
+    const evidence = await unitEvidence(fixture);
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.beginUnitMutationEvidence(evidence.binding),
+    );
+    await invokeSink(fixture.store.authority_owner, () => transaction.abort());
+    const identity = evidence.projection.output_contract;
+    const content = evidence.objects.get(identity.sha256);
+    if (content === undefined) throw new Error('fixture unit contract missing');
+
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () =>
+        transaction.put({
+          bytes: content,
+          sha256: identity.sha256,
+          size_bytes: identity.size_bytes,
+        }),
+      ),
+    );
   });
 
   it.each(['unverified', 'changed-projection', 'changed-bytes'] as const)(
