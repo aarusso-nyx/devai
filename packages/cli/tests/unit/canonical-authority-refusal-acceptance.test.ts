@@ -76,6 +76,40 @@ describe('canonical production authority refusal acceptance', () => {
     });
   });
 
+  it.each([
+    ['role', ['--as-role', 'owner']],
+    ['session', ['--authority-session', 'AUTH-SESSION-0123456789abcdef']],
+    ['write consent', ['--write']],
+    ['publication consent', ['--publish']],
+    ['machine identity', ['--machine-actor', 'harness']],
+  ] as const)(
+    'refuses caller-selected %s during tracking reconciliation',
+    (_label, declaration) => {
+      const result = authorizeCliArgv(
+        [
+          process.execPath,
+          'devai',
+          'round',
+          'tracking',
+          'sync',
+          '--round',
+          'R-0007',
+          '--reconcile',
+          ...declaration,
+          '--format',
+          'json',
+        ],
+        current,
+      );
+
+      expect(result).toBeDefined();
+      expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({
+        code: 'TRACKING_RECONCILE_CALLER_AUTHORITY_FORBIDDEN',
+        exit: 2,
+      });
+    },
+  );
+
   it('emits concrete remediation and structured context for common refusals', () => {
     const check = current.find((entry) => entry.name === 'check');
     const sense = current.find((entry) => entry.name === 'sense run');
