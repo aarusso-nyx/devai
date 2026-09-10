@@ -111,6 +111,31 @@ describe('authority public boundary adversarial behavior', () => {
       code: 'AUTHORITY_OUTPUT_CONTRACT_INVALID',
     });
 
+    const cliDeclared = renderAuthorityResult(
+      {
+        ok: true,
+        authority: {
+          principal: { kind: 'human', declaration_source: 'cli-flag' },
+        },
+      },
+      'json',
+    );
+    expect(cliDeclared.exit_code).toBe(0);
+
+    const unknownDeclarationSource = renderAuthorityResult(
+      {
+        ok: true,
+        authority: {
+          principal: { kind: 'human', declaration_source: 'caller-claim' },
+        },
+      },
+      'json',
+    );
+    expect(unknownDeclarationSource.exit_code).toBe(7);
+    expect(JSON.parse(unknownDeclarationSource.stderr)).toMatchObject({
+      code: 'AUTHORITY_OUTPUT_CONTRACT_INVALID',
+    });
+
     const successful = renderAuthorityResult(
       { ok: true, value: 3, authority: { code: 'POLICY_ALLOW', principal: null } },
       'json',
