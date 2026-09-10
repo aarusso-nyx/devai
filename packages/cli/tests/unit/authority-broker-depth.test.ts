@@ -1906,3 +1906,44 @@ describe('authority broker local Git branch process targets', () => {
     expect(target('hg', ['worktree', 'add', '-b', 'feature'])).toBeUndefined();
   });
 });
+
+describe('authority broker Git index and move process targets', () => {
+  const target = (args: readonly string[]) =>
+    processTarget(
+      effect('spawnSync', ['git', args], 'process'),
+      'round run',
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  const expectedRef = (ref: string) => ({
+    kind: 'git-ref',
+    id: `git-ref:repo:fixture:${ref}`,
+    repository_id: 'repo:fixture',
+    ref,
+    operation: 'update',
+    protected: false,
+  });
+
+  it('maps only add, remove, and commit into their exact repository references', () => {
+    expect(target(['add', 'packages/cli/src/bin.ts'])).toEqual(expectedRef('refs/devai/index'));
+    expect(target(['rm', 'packages/cli/src/bin.ts'])).toEqual(expectedRef('refs/devai/index'));
+    expect(target(['commit', '-m', 'fixture'])).toEqual(expectedRef('refs/heads/HEAD'));
+    expect(target(['stage', 'packages/cli/src/bin.ts'])).toBeUndefined();
+    expect(target(['commitx', '-m', 'fixture'])).toBeUndefined();
+  });
+
+  it('maps an exact three-argument move into one complete filesystem rename target', () => {
+    expect(target(['mv', 'scratch/source file', 'scratch/destination file'])).toEqual({
+      kind: 'fs',
+      id: 'fs:scratch/source file->scratch/destination file',
+      repository_id: 'repo:fixture',
+      canonical_relative_path: 'scratch/destination file',
+      rename_from_canonical_relative_path: 'scratch/source file',
+      operation: 'rename',
+    });
+    expect(target(['mv', 'scratch/source-only'])).toBeUndefined();
+    expect(target(['move', 'scratch/source', 'scratch/destination'])).toBeUndefined();
+  });
+});
