@@ -3317,6 +3317,50 @@ describe('release lifecycle execution kernel', () => {
     );
   });
 
+  it('binds receipt kind and population to the requested lifecycle action', () => {
+    const preflight = request();
+    const unit = required(preflight.candidate_locator.release_units[0], 'missing release unit');
+    const offline = request('release evidence-publish');
+    const offlineLocator = required(offline.receipt_locators?.[0], 'missing offline receipt');
+    const mixedLocators = [
+      required(preflight.receipt_locators?.[0], 'missing plan receipt'),
+      offlineLocator,
+    ].sort((left, right) =>
+      `${left.kind}\0${left.receipt_id}`.localeCompare(`${right.kind}\0${right.receipt_id}`, 'en'),
+    );
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...preflight,
+        candidate_locator: {
+          ...preflight.candidate_locator,
+          release_units: [unit, { ...unit, release_unit: '@aarusso-nyx/secondary' }],
+        },
+        receipt_locators: mixedLocators,
+      }),
+    ).toThrow('release-receipt-identity-mismatch');
+
+    const secondOffline = {
+      ...offlineLocator,
+      receipt_id: `ROV-${'f'.repeat(16)}`,
+      receipt_digest_sha256: 'f'.repeat(64),
+      path: 'receipts/offline-secondary.json',
+    };
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...offline,
+        receipt_locators: [offlineLocator, secondOffline].sort((left, right) =>
+          left.receipt_id.localeCompare(right.receipt_id, 'en'),
+        ),
+      }),
+    ).toThrow('release-receipt-identity-mismatch');
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...offline,
+        receipt_locators: [required(preflight.receipt_locators?.[0], 'missing plan receipt')],
+      }),
+    ).toThrow('release-receipt-identity-mismatch');
+  });
+
   it('persists a valid v2 preflight fixture, completion, and head durably', async () => {
     const value = request();
     const store = new ReleaseLifecycleFileStore(root(), value);
