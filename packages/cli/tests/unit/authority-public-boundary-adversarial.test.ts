@@ -101,6 +101,13 @@ describe('authority public boundary adversarial behavior', () => {
       });
     }
 
+    expect(renderAuthorityResult(failures[0][0], 'human')).toMatchObject({
+      exit_code: 2,
+      stdout: '',
+      stderr:
+        'devai: authority declaration missing Remediation: Use a declared role and the required consent flags.\n',
+    });
+
     const missingCode = renderAuthorityResult({ ok: false, category: 'refused' }, 'json');
     expect(missingCode.exit_code).toBe(7);
     expect(JSON.parse(missingCode.stderr)).toMatchObject({
