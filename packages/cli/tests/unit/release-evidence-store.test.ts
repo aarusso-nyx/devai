@@ -263,6 +263,154 @@ describe('durable external certification evidence store', () => {
     );
   });
 
+  it.each([
+    ['non-NFC Unicode', 'generated/re\u0301port.json'],
+    ['backslash', 'generated\\report.json'],
+    ['colon', 'generated/report:alternate.json'],
+    ['NUL control', 'generated/report\u0000.json'],
+    ['unit-separator control', 'generated/report\u001f.json'],
+    ['DEL control', 'generated/report\u007f.json'],
+    ['absolute path', '/generated/report.json'],
+    ['trailing slash', 'generated/report.json/'],
+    ['empty segment', 'generated//report.json'],
+    ['dot segment', 'generated/./report.json'],
+    ['parent segment', 'generated/../report.json'],
+  ] as const)('refuses a generated output path containing %s', async (_case, path) => {
+    const fixture = storeFixture();
+    const selected = binding('@fixture/path');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const value = Buffer.from('path-bound output');
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.put({ bytes: value, sha256: sha256(value), size_bytes: value.length }),
+    );
+
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () =>
+        transaction.commit([{ ...selected, outputs: [{ ...output(handle), path }] }]),
+      ),
+    );
+    expect(
+      readdirSync(join(fixture.evidenceRoot, 'certification', transaction.transaction_handle)),
+    ).not.toContain('commit.json');
+  });
+
+  it.each([
+    ['100644', 'generated/résumé report.json'],
+    ['100755', 'generated/executable report.json'],
+  ] as const)('accepts bound %s output at normalized path %s', async (mode, path) => {
+    const fixture = storeFixture();
+    const selected = binding('unscoped-package');
+    const transaction = await invokeSink(fixture.store.authority_owner, () =>
+      fixture.store.begin([selected]),
+    );
+    const value = Buffer.from(`${mode}:${path}`);
+    const handle = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.put({ bytes: value, sha256: sha256(value), size_bytes: value.length }),
+    );
+    const closures = await invokeSink(fixture.store.authority_owner, () =>
+      transaction.commit([{ ...selected, outputs: [{ ...output(handle), path, mode }] }]),
+    );
+
+    expect(closures[0]).toMatchObject({
+      ...selected,
+      outputs: [{ path, mode, output_blob_handle: handle }],
+    });
+    const committedOutput = closures[0]?.outputs[0];
+    if (committedOutput === undefined) throw new Error('missing accepted output');
+    expect(
+      createReleaseCertificationEvidenceStore(fixture.input).readGeneratedBlob({
+        repository: selected.repository,
+        candidate: { ...selected.candidate, release_units: [] },
+        receipt: committedOutput.certification_evidence_receipt,
+        output_blob_sha256: handle.sha256,
+        output_blob_handle: handle,
+      }),
+    ).toEqual(value);
+  });
+
+  it.each([
+    [
+      'toolchain injection',
+      (value: Record<string, unknown>) => Object.assign(value, { toolchain: { id: 'unbound' } }),
+    ],
+    [
+      'environment injection',
+      (value: Record<string, unknown>) => Object.assign(value, { environment: { id: 'unbound' } }),
+    ],
+    [
+      'provider injection',
+      (value: Record<string, unknown>) => Object.assign(value, { provider: { id: 'unbound' } }),
+    ],
+    [
+      'repository projection injection',
+      (value: Record<string, unknown>) =>
+        Object.assign(value.repository as Record<string, unknown>, { provider: 'unbound' }),
+    ],
+    [
+      'candidate projection injection',
+      (value: Record<string, unknown>) =>
+        Object.assign(value.candidate as Record<string, unknown>, { environment: 'unbound' }),
+    ],
+    [
+      'non-string repository id',
+      (value: Record<string, unknown>) =>
+        Object.assign(value.repository as Record<string, unknown>, { id: 1 }),
+    ],
+    [
+      'empty repository id',
+      (value: Record<string, unknown>) =>
+        Object.assign(value.repository as Record<string, unknown>, { id: '' }),
+    ],
+    [
+      'mixed candidate object formats',
+      (value: Record<string, unknown>) => {
+        const candidate = value.candidate as Record<string, unknown>;
+        Object.assign(candidate, { tree: 'a'.repeat(64) });
+        Object.assign(value.repository as Record<string, unknown>, { tree: candidate.tree });
+      },
+    ],
+    [
+      'repository commit drift',
+      (value: Record<string, unknown>) =>
+        Object.assign(value.repository as Record<string, unknown>, { commit: 'a'.repeat(40) }),
+    ],
+    [
+      'repository tree drift',
+      (value: Record<string, unknown>) =>
+        Object.assign(value.repository as Record<string, unknown>, { tree: 'a'.repeat(40) }),
+    ],
+    [
+      'invalid task-policy digest',
+      (value: Record<string, unknown>) =>
+        Object.assign(value, { task_policy_digest_sha256: 'A'.repeat(64) }),
+    ],
+    [
+      'package prefix outside grammar',
+      (value: Record<string, unknown>) => Object.assign(value, { package_id: '!fixture/package' }),
+    ],
+    [
+      'package suffix outside grammar',
+      (value: Record<string, unknown>) =>
+        Object.assign(value, { package_id: '@fixture/package/extra' }),
+    ],
+  ] as const)('refuses %s before creating a certification transaction', async (_case, change) => {
+    const fixture = storeFixture();
+    const changed = structuredClone(binding('@fixture/package')) as unknown as Record<
+      string,
+      unknown
+    >;
+    change(changed);
+
+    await refusal(() =>
+      invokeSink(fixture.store.authority_owner, () =>
+        fixture.store.begin([changed as unknown as CertificationOutputClosureBinding]),
+      ),
+    );
+    expect(readdirSync(fixture.evidenceRoot)).not.toContain('certification');
+  });
+
   it('reopens committed closure, receipt and blob, including an explicit empty package', async () => {
     const fixture = storeFixture();
     const empty = binding('@fixture/empty');
