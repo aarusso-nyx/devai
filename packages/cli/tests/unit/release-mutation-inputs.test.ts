@@ -374,6 +374,42 @@ describe('protected release mutation input derivation', () => {
       ),
     ).toBe(true);
   });
+
+  it('discovers only root and package-root TypeScript configurations for the historical closure', () => {
+    const base = fixture();
+    const count = (value: ReturnType<typeof build>): number => {
+      const entry = value.plan.packages.find((item) => item.id === 'utils');
+      const bindings = entry?.expected.inputProjection['bindings'] as
+        Record<string, Record<string, unknown>> | undefined;
+      const memberCount = bindings?.['mutationConfiguration']?.['memberCount'];
+      if (typeof memberCount !== 'number') throw new Error('fixture binding count missing');
+      return memberCount;
+    };
+    const initial = count(build(base));
+    for (const [label, paths, increase] of [
+      ['eligible roots', ['tsconfig.packet23.json', 'packages/utils/tsconfig.packet23.json'], 2],
+      [
+        'ineligible names and directories',
+        [
+          'configs/tsconfig.packet23.json',
+          'packages/utils/nested/tsconfig.packet23.json',
+          'packages/utils/prefix-tsconfig.packet23.json',
+          'packages/utils/tsconfig.packet23.json.backup',
+        ],
+        0,
+      ],
+    ] as const) {
+      const files = new Map(base.files);
+      for (const path of paths) files.set(path, Buffer.from('{"compilerOptions":{}}\n'));
+      expect(count(build(base, files)), label).toBe(initial + increase);
+    }
+
+    const missing = new Map(base.files);
+    missing.delete('packages/utils/tsconfig.json');
+    expect(
+      build(base, missing).plan.packages.find((entry) => entry.id === 'utils')?.reuse.unresolved,
+    ).toContain('typescript-package-configuration-missing');
+  });
 });
 
 function currentRoster() {
