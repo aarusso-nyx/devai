@@ -502,6 +502,36 @@ describe('protected mutation envelope and program manifest boundaries', () => {
 
 describe('protected container runtime executable probe', () => {
   it.each([
+    ['zero', 0],
+    ['a negative value', -1],
+    ['a value above the maximum', 16.5],
+  ] as const)('refuses %s CPU capacity before invoking the runtime', (_description, cpus) => {
+    const value = fixture();
+    try {
+      expect(() => new ProtectedCertificationContainer({ ...value.controls, cpus })).toThrow(
+        'release-certification-container-controls-invalid',
+      );
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['fractional capacity', 0.5],
+    ['the maximum capacity', 16],
+  ] as const)('accepts %s and binds it into the public identity', (_description, cpus) => {
+    const value = fixture();
+    try {
+      const container = new ProtectedCertificationContainer({ ...value.controls, cpus });
+      expect(container.identity).toMatchObject({ cpus });
+      expect(dockerCalls).toEqual([]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
     ['a missing local-image identity', undefined, undefined],
     [
       'a local image digest with a leading byte',
