@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { authorizeCliArgv } from '../../src/authority/index.js';
+import { authorizeCliArgv, declaredInvocationAuthority } from '../../src/authority/index.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 
 const originalArgv = [...process.argv];
@@ -53,6 +53,29 @@ function expectCode(result: ReturnType<typeof refusal>, code: string): void {
 }
 
 describe('canonical production authority refusal acceptance', () => {
+  it.each(['--help', '-h'])('leaves %s entirely outside authority routing', (help) => {
+    expect(
+      authorizeCliArgv([process.execPath, 'devai', 'round', 'plan', help], current),
+    ).toBeUndefined();
+    expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
+  it('routes post-merge receipts only through round close', () => {
+    const roundClose = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'close', '--post-merge-receipt', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(roundClose?.stderr ?? '{}')).toMatchObject({ code: 'HOST_RECEIPT_MISSING' });
+
+    const otherAction = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'plan', '--post-merge-receipt', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(otherAction?.stderr ?? '{}')).toMatchObject({
+      code: 'AUTHORITY_DECLARATION_MISSING',
+    });
+  });
+
   it('emits concrete remediation and structured context for common refusals', () => {
     const check = current.find((entry) => entry.name === 'check');
     const sense = current.find((entry) => entry.name === 'sense run');
