@@ -97,6 +97,37 @@ describe('canonical production authority refusal acceptance', () => {
     ).toBeUndefined();
   });
 
+  it('preserves exact policy action groups, consent, and provenance', () => {
+    const sources = buildTrustedAuthoritySources(current, process.cwd(), resolveCliVersion());
+    const rule = (id: string) => sources.rules.find((candidate) => candidate.rule_id === id);
+    const actionsFor = (role: string) =>
+      current
+        .filter((entry) => {
+          const subject = entry.authority_contract.subject;
+          return (
+            entry.effects !== 'read' &&
+            subject.kind === 'human' &&
+            subject.allowed_roles.includes(role as never)
+          );
+        })
+        .map((entry) => entry.name)
+        .sort();
+
+    expect(rule('adopter-engineer-packages')).toMatchObject({
+      action_ids: ['round run', 'task finish', 'task start'],
+    });
+    expect(rule('core-round-workspace-container-1')).toMatchObject({
+      action_ids: [...new Set([...actionsFor('architect'), ...actionsFor('auditor')])].sort(),
+    });
+    expect(rule('adopter-remote-sense-run-1')).toMatchObject({
+      required_consent: { write: true, allow_publish: true, experimental: false },
+    });
+    expect(sources.provenance.materialized_from).toEqual({
+      kind: 'project-config',
+      path: '.devai/config/authority-policy.json',
+    });
+  });
+
   it.each(['--help', '-h'])('leaves %s entirely outside authority routing', (help) => {
     expect(
       authorizeCliArgv([process.execPath, 'devai', 'round', 'plan', help], current),
