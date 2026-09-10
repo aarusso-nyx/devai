@@ -64,6 +64,25 @@ function activationSnapshot() {
   return { policy, manifestBytes, files };
 }
 
+function packagedActivationFiles(options: { readonly tamperVendorBytes?: boolean } = {}) {
+  const snapshot = activationSnapshot();
+  return [
+    {
+      path: 'dist/runtime/evidence-verification/provenance.json',
+      mode: 0o644,
+      bytes: snapshot.manifestBytes,
+    },
+    ...snapshot.files.map((file, index) => ({
+      path: `dist/runtime/evidence-verification/${file.path}`,
+      mode: 0o644,
+      bytes:
+        options.tamperVendorBytes === true && index === 0
+          ? Buffer.concat([file.bytes, Buffer.from('\n')])
+          : file.bytes,
+    })),
+  ];
+}
+
 function exactNotRequiredContract(policyDigest: string) {
   return {
     schemaVersion: V21,
@@ -1167,6 +1186,79 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       expectActivationRefusal(() => isolated.bindMutationEvidenceV21PackageSnapshot({} as never));
     } finally {
       vi.doUnmock('../../src/services/release-package-snapshot.js');
+      vi.resetModules();
+    }
+  });
+
+  it('uses the first verified package snapshot and refuses a second binding', async () => {
+    vi.resetModules();
+    const { installedPackage } = await import('../helpers/release-mutation-inputs-fixture.js');
+    const snapshot = installedPackage(packagedActivationFiles(), { current: true });
+    const activation = activationSnapshot();
+    const contract = exactNotRequiredContract(canonicalSha256(activation.policy));
+    vi.doMock('node:fs', async (importOriginal) => {
+      const actual = await importOriginal<FsModule>();
+      return {
+        ...actual,
+        lstatSync: () => {
+          throw new Error('source installation must not be read after package binding');
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      isolated.bindMutationEvidenceV21PackageSnapshot(snapshot);
+      expectActivationRefusal(() => isolated.bindMutationEvidenceV21PackageSnapshot(snapshot));
+      await expect(
+        isolated.finalizeMutationEvidenceV21({
+          contract,
+          candidate: CANDIDATE,
+          packages: [
+            { disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' },
+          ],
+        }),
+      ).resolves.toMatchObject({ complete: true, verdict: 'not-applicable' });
+    } finally {
+      vi.doUnmock('node:fs');
+      vi.resetModules();
+    }
+  });
+
+  it('refuses a verified package snapshot whose vendor bytes contradict its provenance', async () => {
+    vi.resetModules();
+    const { installedPackage } = await import('../helpers/release-mutation-inputs-fixture.js');
+    const snapshot = installedPackage(packagedActivationFiles({ tamperVendorBytes: true }), {
+      current: true,
+    });
+    const activation = activationSnapshot();
+    const contract = exactNotRequiredContract(canonicalSha256(activation.policy));
+    vi.doMock('node:fs', async (importOriginal) => {
+      const actual = await importOriginal<FsModule>();
+      return {
+        ...actual,
+        lstatSync: () => {
+          throw new Error('source installation must not be read after package binding');
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      isolated.bindMutationEvidenceV21PackageSnapshot(snapshot);
+      await expect(
+        isolated.finalizeMutationEvidenceV21({
+          contract,
+          candidate: CANDIDATE,
+          packages: [
+            { disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        name: 'MutationActivationError',
+        message: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+        code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      });
+    } finally {
+      vi.doUnmock('node:fs');
       vi.resetModules();
     }
   });
