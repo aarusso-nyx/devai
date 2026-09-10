@@ -384,6 +384,63 @@ describe('release export broker protected adapters', () => {
   });
 
   it.each([
+    ['action', () => ({ action_id: 'release prepare' })],
+    [
+      'repository',
+      (value: ProtectedReleaseExportBinding) => ({
+        repository_locator: { ...value.repository, commit: DIGEST('9') },
+      }),
+    ],
+    [
+      'candidate commit',
+      (value: ProtectedReleaseExportBinding) => ({
+        candidate_locator: { ...value.candidate, commit: DIGEST('8') },
+      }),
+    ],
+    [
+      'candidate tree',
+      (value: ProtectedReleaseExportBinding) => ({
+        candidate_locator: { ...value.candidate, tree: DIGEST('7') },
+      }),
+    ],
+    ['receipt population', () => ({ receipt_locators: null })],
+    [
+      'plan receipt',
+      () => ({
+        receipt_locators: [
+          {
+            kind: 'release-plan-receipt',
+            receipt_id: 'RPL-0000000000000000',
+            receipt_digest_sha256: DIGEST('6'),
+            path: 'receipts/plan.json',
+          },
+        ],
+      }),
+    ],
+  ] satisfies ReadonlyArray<
+    readonly [string, (value: ProtectedReleaseExportBinding) => Readonly<Record<string, unknown>>]
+  >)('refuses a request with a mismatched protected %s binding', async (_label, mutate) => {
+    const repository = fixture();
+    const binding = exportBinding(repository);
+    const owner = createProtectedReleaseSinkOwner('export', binding.sink_id);
+    let calls = 0;
+    try {
+      await expect(
+        withExportBroker(
+          repository,
+          binding,
+          binding.destination,
+          async ({ sink }) => sink.invokeSink(() => ++calls, owner),
+          mutate(binding),
+        ),
+      ).rejects.toThrow('release-export-capacity-unavailable');
+      expect(calls).toBe(0);
+    } finally {
+      repository.dispose();
+    }
+  });
+
+  it.each([
     [
       'destination',
       (value: ProtectedReleaseExportBinding) => ({
