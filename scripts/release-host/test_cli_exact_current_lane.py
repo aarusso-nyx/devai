@@ -4,11 +4,15 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import os
+import io
 import subprocess
+import shutil
 import tempfile
 import tarfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 HERE = Path(__file__).resolve().parent
@@ -16,6 +20,14 @@ SPEC = importlib.util.spec_from_file_location("harness", HERE / "cli_exact_curre
 assert SPEC and SPEC.loader
 harness = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(harness)
+TEST_GIT = Path("/usr/bin/git")
+TEST_NODE = Path(shutil.which("node") or "")
+harness.activate_executables(
+    {
+        "git": harness.executable_binding(TEST_GIT, harness.sha_file(TEST_GIT)),
+        "node": harness.executable_binding(TEST_NODE, harness.sha_file(TEST_NODE)),
+    }
+)
 
 
 def mutant(mutant_id: str, replacement: str = "false", status: str = "Killed") -> dict:
@@ -123,7 +135,434 @@ def write_frozen_retention(root: Path) -> tuple[dict[str, str], str]:
     return campaign, lane
 
 
+def write_preparation_pins(root: Path) -> tuple[Path, dict[str, str]]:
+    runner = root / "runner.py"
+    runner.write_text("# runner\n")
+    values = {
+        "extract-dependencies.mjs": "extractor\n",
+        "local-small-packages-inputs/dependencies/dependencies.json": "{}\n",
+        "notebook-baselines-1/cli/stryker.config.json": "{}\n",
+    }
+    pins: dict[str, str] = {}
+    for relative, content in values.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        pins[relative] = harness.sha_file(path)
+    return runner, pins
+
+
+def write_dependency_fixture(root: Path) -> tuple[Path, str, dict]:
+    repo = root / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "fixture@example.test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Fixture"], check=True)
+    input_files = []
+    for name, content in (
+        ("package.json", '{"name":"root"}\n'),
+        ("pnpm-lock.yaml", "lock\n"),
+        ("pnpm-workspace.yaml", "workspace\n"),
+    ):
+        (repo / name).write_text(content)
+        input_files.append({"path": name, "sha256": harness.sha_bytes(content.encode())})
+    workspaces = []
+    for index in range(harness.EXPECTED_DEPENDENCY_WORKSPACES):
+        path = f"packages/pkg-{index}"
+        content = json.dumps({"name": f"pkg-{index}"}, separators=(",", ":")) + "\n"
+        manifest_path = repo / path / "package.json"
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text(content)
+        digest = harness.sha_bytes(content.encode())
+        input_files.append({"path": f"{path}/package.json", "sha256": digest})
+        workspaces.append(
+            {"path": path, "name": f"pkg-{index}", "manifest_sha256": digest}
+        )
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "fixture"], check=True)
+    candidate = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    control = root / "control"
+    dependency = control / Path(harness.DEPENDENCY_MANIFEST).parent
+    dependency.mkdir(parents=True)
+    artifacts = []
+    for index in range(harness.EXPECTED_DEPENDENCY_ARCHIVES):
+        archive = dependency / f"dep-{index}.tgz"
+        archive.write_bytes(f"archive-{index}".encode())
+        artifacts.append(
+            {
+                "file": archive.name,
+                "mount_path": f"node_modules/dep-{index}",
+                "sha256": harness.sha_file(archive),
+                "size_bytes": archive.stat().st_size,
+                "regular_files": 1,
+                "links": 0,
+            }
+        )
+    tree = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD^{tree}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    manifest = {
+        "protocol": "devai.protected-linux-dependencies.v1",
+        "offline_rebuild_identical": True,
+        "identity_sha256": "a" * 64,
+        "image": "sha256:" + "b" * 64,
+        "candidate": {"commit": candidate, "tree": tree},
+        "inputs": {"files": input_files, "workspace_packages": workspaces},
+        "artifacts": artifacts,
+    }
+    (control / harness.DEPENDENCY_MANIFEST).write_bytes(harness.canonical(manifest))
+    return repo, candidate, manifest
+
+
 class HarnessRefusalTests(unittest.TestCase):
+    def test_dependency_control_requires_exact_declared_archive_population(self) -> None:
+        for mutation in ("missing", "extra", "unsafe"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                repo, candidate, manifest = write_dependency_fixture(root)
+                if mutation == "missing":
+                    manifest["artifacts"] = manifest["artifacts"][:-1]
+                elif mutation == "extra":
+                    manifest["artifacts"].append(dict(manifest["artifacts"][0]))
+                else:
+                    manifest["artifacts"][0]["file"] = "../dep-0.tgz"
+                (root / "control" / harness.DEPENDENCY_MANIFEST).write_bytes(
+                    harness.canonical(manifest)
+                )
+                with self.assertRaises(harness.Refusal):
+                    harness.validate_dependency_control(
+                        root / "control", {}, repo, candidate, manifest["candidate"]["tree"]
+                    )
+
+    def test_dependency_control_rejects_archive_hash_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo, candidate, manifest = write_dependency_fixture(root)
+            archive = (
+                root
+                / "control"
+                / Path(harness.DEPENDENCY_MANIFEST).parent
+                / manifest["artifacts"][0]["file"]
+            )
+            archive.write_bytes(b"drift")
+            with self.assertRaisesRegex(
+                harness.Refusal, "PREPARATION_DEPENDENCY_ARTIFACT_INVALID"
+            ):
+                harness.validate_dependency_control(
+                    root / "control", {}, repo, candidate, manifest["candidate"]["tree"]
+                )
+
+    def test_dist_control_rejects_manifest_mode_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "dist.tgz"
+            content = b"export {};\n"
+            member_name = "packages/cli/dist/index.js"
+            with tarfile.open(archive, "w:gz") as bundle:
+                member = tarfile.TarInfo(member_name)
+                member.size = len(content)
+                member.mode = 0o644
+                bundle.addfile(member, io.BytesIO(content))
+            manifest = root / "dist.json"
+            manifest_value = {
+                "candidate": "a" * 40,
+                "tree": "b" * 40,
+                "archiveSha256": harness.sha_file(archive),
+                "members": {
+                    member_name: {
+                        "bytes": len(content),
+                        "sha256": harness.sha_bytes(content),
+                        "mode": 0o600,
+                    }
+                },
+            }
+            manifest.write_bytes(harness.canonical(manifest_value))
+            config = {
+                "current_dist_archive": archive.name,
+                "current_dist_archive_sha256": harness.sha_file(archive),
+                "current_dist_manifest_path": manifest.name,
+                "current_dist_manifest_sha256": harness.sha_file(manifest),
+            }
+            with self.assertRaisesRegex(
+                harness.Refusal, "PREPARATION_DIST_ARCHIVE_INVALID"
+            ):
+                harness.validate_dist_control(
+                    root, config, "a" * 40, "b" * 40
+                )
+    def test_preparation_pins_are_resolved_recorded_and_revalidated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runner, pins = write_preparation_pins(Path(directory))
+            resolved = harness.resolve_preparation_pins(runner, pins)
+            self.assertEqual(
+                [entry["relativePath"] for entry in resolved], sorted(pins)
+            )
+            self.assertTrue(all(Path(entry["path"]).is_absolute() for entry in resolved))
+            inputs = {"runner": {"path": str(runner)}, "preparationPins": resolved}
+            self.assertEqual(
+                harness.revalidate_preparation_pins(
+                    inputs, {"preparation_pins": pins}
+                ),
+                resolved,
+            )
+
+    def test_preparation_pin_drift_is_refused_for_every_consumed_input(self) -> None:
+        for relative in sorted(harness.PREPARATION_PIN_PATHS):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                runner, pins = write_preparation_pins(root)
+                resolved = harness.resolve_preparation_pins(runner, pins)
+                (root / relative).write_text("drifted\n")
+                with self.assertRaisesRegex(
+                    harness.Refusal, "PREPARATION_PIN_BINDING_INVALID"
+                ):
+                    harness.revalidate_preparation_pins(
+                        {"runner": {"path": str(runner)}, "preparationPins": resolved},
+                        {"preparation_pins": pins},
+                    )
+
+    def test_missing_preparation_pin_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runner, pins = write_preparation_pins(root)
+            (root / "extract-dependencies.mjs").unlink()
+            with self.assertRaisesRegex(
+                harness.Refusal, "PREPARATION_PIN_PATH_ESCAPE"
+            ):
+                harness.resolve_preparation_pins(runner, pins)
+
+    def test_relative_control_names_reject_backslash_and_controls(self) -> None:
+        for value in ("a\\b", "a\nb", "a\x7fb", "/a", "../a"):
+            with self.subTest(value=repr(value)), self.assertRaises(harness.Refusal):
+                harness.safe_relative_name(value, "UNSAFE")
+
+    def test_basename_control_fields_reject_paths_and_controls(self) -> None:
+        for value in ("a/b", "a\\b", "../a", "/a", "a\nb", ".", ".."):
+            with self.subTest(value=repr(value)), self.assertRaises(harness.Refusal):
+                harness.basename_field(value, "UNSAFE")
+
+    def test_strict_copy_rejects_symlink_source_and_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            (source / "real").write_text("bytes")
+            (source / "link").symlink_to("real")
+            destination = root / "destination"
+            destination.mkdir(mode=0o700)
+            with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_SOURCE_INVALID"):
+                harness.copy_regular_exclusive(source, "link", destination, "copy")
+            source_link = root / "source-link"
+            source_link.symlink_to(source, target_is_directory=True)
+            with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_SOURCE_INVALID"):
+                harness.copy_regular_exclusive(source_link, "real", destination, "copy")
+
+    def test_strict_copy_rejects_special_source_and_existing_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            fifo = source / "fifo"
+            os.mkfifo(fifo)
+            destination = root / "destination"
+            destination.mkdir(mode=0o700)
+            with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_SOURCE_INVALID"):
+                harness.copy_regular_exclusive(source, "fifo", destination, "copy")
+            (source / "regular").write_text("bytes")
+            (destination / "copy").write_text("owned")
+            with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_DESTINATION_INVALID"):
+                harness.copy_regular_exclusive(source, "regular", destination, "copy")
+
+    def test_strict_copy_rejects_symlink_destination_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            (source / "regular").write_text("bytes")
+            destination = root / "destination"
+            destination.mkdir(mode=0o700)
+            outside = root / "outside"
+            outside.mkdir()
+            (destination / "nested").symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_DESTINATION_INVALID"):
+                harness.copy_regular_exclusive(source, "regular", destination, "nested/copy")
+
+    def test_snapshot_manifest_detects_changed_deleted_and_extra_members(self) -> None:
+        for mutation in ("changed", "deleted", "extra"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                snapshot = root / "snapshot"
+                snapshot.mkdir(mode=0o700)
+                member = snapshot / "member"
+                member.write_text("bound")
+                member.chmod(0o600)
+                manifest = root / "manifest.json"
+                digest = harness.write_control_snapshot_manifest(
+                    manifest, snapshot, "a" * 40, "b" * 40
+                )
+                if mutation == "changed":
+                    member.write_text("drift")
+                elif mutation == "deleted":
+                    member.unlink()
+                else:
+                    (snapshot / "extra").write_text("extra")
+                    (snapshot / "extra").chmod(0o600)
+                with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_CHANGED"):
+                    harness.verify_control_snapshot_manifest(
+                        manifest, snapshot, "a" * 40, "b" * 40, digest
+                    )
+
+    def test_snapshot_walker_rejects_symlinks_and_special_members(self) -> None:
+        for kind in ("symlink", "fifo"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                snapshot = Path(directory) / "snapshot"
+                snapshot.mkdir(mode=0o700)
+                if kind == "symlink":
+                    (snapshot / "member").symlink_to("missing")
+                else:
+                    os.mkfifo(snapshot / "member")
+                with self.assertRaisesRegex(harness.Refusal, "CONTROL_SNAPSHOT_MEMBER_INVALID"):
+                    harness.control_snapshot_entries(snapshot)
+
+    def test_bound_module_import_does_not_change_snapshot_population(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory) / "snapshot"
+            snapshot.mkdir(mode=0o700)
+            module_path = snapshot / "bound.py"
+            module_path.write_text("VALUE = 7\n")
+            module_path.chmod(0o600)
+            before = harness.control_snapshot_entries(snapshot)
+            loaded = harness.load_module(
+                module_path,
+                harness.sha_file(module_path),
+                "bound_fixture",
+                "BOUND_FIXTURE_INVALID",
+            )
+            self.assertEqual(loaded.VALUE, 7)
+            self.assertEqual(harness.control_snapshot_entries(snapshot), before)
+            self.assertFalse((snapshot / "__pycache__").exists())
+
+    def test_bound_module_executes_the_bytes_read_before_path_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bound.py"
+            original = b"VALUE = 'bound'\n"
+            path.write_bytes(original)
+            real_compile = compile
+
+            def replace_then_compile(source, filename, mode):
+                path.write_text("VALUE = 'swapped'\n")
+                return real_compile(source, filename, mode)
+
+            with mock.patch("builtins.compile", side_effect=replace_then_compile):
+                loaded = harness.load_module(
+                    path,
+                    harness.sha_bytes(original),
+                    "bound_swap_fixture",
+                    "BOUND_FIXTURE_INVALID",
+                )
+            self.assertEqual(loaded.VALUE, "bound")
+
+    def test_runner_subprocess_ignores_path_and_rechecks_bound_binary(self) -> None:
+        saved = dict(harness.BOUND_EXECUTABLES)
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / "node"
+                path.write_text("node")
+                bindings = {
+                    "git": saved["git"],
+                    "node": harness.executable_binding(path, harness.sha_file(path)),
+                }
+                harness.activate_executables(bindings)
+                proxy = harness.BoundSubprocess("/absolute/docker")
+                with mock.patch.object(harness.subprocess, "run", return_value="ok") as run:
+                    self.assertEqual(proxy.run(["node", "--version"]), "ok")
+                    self.assertEqual(run.call_args.args[0][0], str(root / "node"))
+                (root / "node").write_text("same-version-substitution")
+                with self.assertRaisesRegex(
+                    harness.Refusal, "PREPARATION_EXECUTABLE_CHANGED"
+                ):
+                    proxy.run(["node", "--version"])
+                with self.assertRaisesRegex(
+                    harness.Refusal, "RUNNER_SUBPROCESS_EXECUTABLE_UNBOUND"
+                ):
+                    proxy.run(["python3", "-V"])
+                with mock.patch.object(harness.subprocess, "run", return_value="docker") as run:
+                    self.assertEqual(proxy.run(["/absolute/docker", "ps"]), "docker")
+                    self.assertEqual(run.call_args.args[0], ["/absolute/docker", "ps"])
+        finally:
+            harness.activate_executables(saved)
+
+    def test_malformed_missing_or_extra_preparation_pins_are_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runner, pins = write_preparation_pins(Path(directory))
+            missing = dict(pins)
+            missing.pop("extract-dependencies.mjs")
+            extra = {**pins, "other.json": "0" * 64}
+            malformed = {**pins, "extract-dependencies.mjs": "not-a-digest"}
+            for value, code in (
+                (missing, "PREPARATION_PIN_POPULATION_INVALID"),
+                (extra, "PREPARATION_PIN_POPULATION_INVALID"),
+                (malformed, "PREPARATION_PIN_BINDING_INVALID"),
+            ):
+                with self.subTest(code=code), self.assertRaisesRegex(
+                    harness.Refusal, code
+                ):
+                    harness.resolve_preparation_pins(runner, value)
+
+    def test_preparation_pin_parent_symlink_escape_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runner, pins = write_preparation_pins(root)
+            outside = root.parent / f"{root.name}-outside"
+            try:
+                outside.mkdir()
+                escaped = outside / "cli"
+                escaped.mkdir()
+                (escaped / "stryker.config.json").write_text("{}\n")
+                target = root / "notebook-baselines-1"
+                for child in sorted(target.rglob("*"), reverse=True):
+                    if child.is_file():
+                        child.unlink()
+                    elif child.is_dir():
+                        child.rmdir()
+                target.rmdir()
+                target.symlink_to(outside, target_is_directory=True)
+                pins["notebook-baselines-1/cli/stryker.config.json"] = harness.sha_file(
+                    escaped / "stryker.config.json"
+                )
+                with self.assertRaisesRegex(
+                    harness.Refusal, "PREPARATION_PIN_PATH_ESCAPE"
+                ):
+                    harness.resolve_preparation_pins(runner, pins)
+            finally:
+                if outside.exists():
+                    for child in sorted(outside.rglob("*"), reverse=True):
+                        if child.is_file():
+                            child.unlink()
+                        elif child.is_dir():
+                            child.rmdir()
+                    outside.rmdir()
+
+    def test_recorded_preparation_pin_population_mismatch_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runner, pins = write_preparation_pins(Path(directory))
+            resolved = harness.resolve_preparation_pins(runner, pins)
+            with self.assertRaisesRegex(
+                harness.Refusal, "PREPARATION_PIN_INPUT_BINDING_INVALID"
+            ):
+                harness.revalidate_preparation_pins(
+                    {"runner": {"path": str(runner)}, "preparationPins": resolved[:-1]},
+                    {"preparation_pins": pins},
+                )
+
     def test_source_binding_allows_only_inert_named_export_suffixes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
