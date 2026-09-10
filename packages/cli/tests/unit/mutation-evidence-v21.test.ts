@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -904,6 +905,138 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       },
     }));
     expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the verified loader namespace closed to unselected and ambient modules', async () => {
+    type HookSet = {
+      resolve: (
+        specifier: string,
+        context: { parentURL?: string },
+        nextResolve: (specifier: string, context: { parentURL?: string }) => unknown,
+      ) => unknown;
+      load: (
+        url: string,
+        context: object,
+        nextLoad: (url: string, context: object) => unknown,
+      ) => unknown;
+    };
+    const snapshot = activationSnapshot();
+    const contract = exactNotRequiredContract(canonicalSha256(snapshot.policy));
+    const loadedUrls: string[] = [];
+    const deregistered = vi.fn();
+    let hooks: HookSet | undefined;
+    vi.resetModules();
+    vi.doMock('node:module', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:module')>();
+      return {
+        ...actual,
+        registerHooks: (registeredHooks: HookSet) => {
+          hooks = registeredHooks;
+          const registration = actual.registerHooks({
+            resolve: registeredHooks.resolve,
+            load(url, context, nextLoad) {
+              if (url.includes('/.verified-mutation-')) loadedUrls.push(url);
+              return registeredHooks.load(url, context, nextLoad);
+            },
+          });
+          return {
+            deregister() {
+              deregistered();
+              registration.deregister();
+            },
+          };
+        },
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await isolated.finalizeMutationEvidenceV21({
+        contract,
+        candidate: CANDIDATE,
+        packages: [{ disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' }],
+      });
+      if (hooks === undefined) throw new Error('verified loader hooks were not registered');
+      const loadedEntry = loadedUrls.find((url) => url.endsWith('/src/mutation-v21.js'));
+      if (loadedEntry === undefined) throw new Error('verified loader entry was not observed');
+      const scope = loadedEntry.slice(0, -'src/mutation-v21.js'.length);
+      const insideParent = new URL('src/verify.js', scope).href;
+
+      const outsideResolve = vi.fn(() => ({ url: 'node:fs' }));
+      expect(hooks.resolve('node:fs', { parentURL: 'file:///outside.js' }, outsideResolve)).toEqual(
+        {
+          url: 'node:fs',
+        },
+      );
+      expect(outsideResolve).toHaveBeenCalledOnce();
+
+      const testFilename = fileURLToPath(new URL('test/verifier.test.js', scope));
+      const unselectedResolve = vi.fn(() => ({ url: 'file:///unselected.js' }));
+      expect(hooks.resolve(testFilename, {}, unselectedResolve)).toEqual({
+        url: 'file:///unselected.js',
+      });
+      expect(unselectedResolve).toHaveBeenCalledOnce();
+
+      expect(hooks.resolve('node:fs', { parentURL: insideParent }, vi.fn())).toEqual({
+        url: new URL('offline-fs.js', scope).href,
+        shortCircuit: true,
+      });
+      expect(hooks.resolve('node:child_process', { parentURL: insideParent }, vi.fn())).toEqual({
+        url: new URL('offline-process.js', scope).href,
+        shortCircuit: true,
+      });
+      expect(() => hooks?.resolve('ambient-package', { parentURL: insideParent }, vi.fn())).toThrow(
+        'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      );
+      expect(() => hooks?.resolve('./missing.js', { parentURL: insideParent }, vi.fn())).toThrow(
+        'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      );
+      expect(hooks.resolve(loadedEntry, {}, vi.fn())).toEqual({
+        url: loadedEntry,
+        shortCircuit: true,
+      });
+      const missingUrl = new URL('src/missing.js', scope).href;
+      expect(() => hooks?.resolve(missingUrl, {}, vi.fn())).toThrow(
+        'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      );
+
+      const outsideLoad = vi.fn(() => ({ format: 'builtin' }));
+      expect(hooks.load('node:fs', {}, outsideLoad)).toEqual({ format: 'builtin' });
+      expect(outsideLoad).toHaveBeenCalledOnce();
+      expect(() => hooks?.load(missingUrl, {}, vi.fn())).toThrow(
+        'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      );
+      expect(hooks.load(loadedEntry, {}, vi.fn())).toMatchObject({
+        format: 'module',
+        shortCircuit: true,
+      });
+      expect(deregistered).toHaveBeenCalledOnce();
+    } finally {
+      vi.doUnmock('node:module');
+      vi.resetModules();
+    }
+  });
+
+  it('refuses package snapshot binding after the verifier has loaded', async () => {
+    const snapshot = activationSnapshot();
+    const contract = exactNotRequiredContract(canonicalSha256(snapshot.policy));
+    vi.resetModules();
+    vi.doMock('../../src/services/release-package-snapshot.js', async (importOriginal) => {
+      const actual =
+        await importOriginal<typeof import('../../src/services/release-package-snapshot.js')>();
+      return { ...actual, isVerifiedReleasePackageSnapshot: () => true };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      await isolated.finalizeMutationEvidenceV21({
+        contract,
+        candidate: CANDIDATE,
+        packages: [{ disposition: 'not-required', reasonCode: 'no-mutatable-production-surface' }],
+      });
+      expectActivationRefusal(() => isolated.bindMutationEvidenceV21PackageSnapshot({} as never));
+    } finally {
+      vi.doUnmock('../../src/services/release-package-snapshot.js');
+      vi.resetModules();
+    }
   });
 
   it('finalizes without launching mutation work and verifies only the exact current receipt provenance', async () => {
