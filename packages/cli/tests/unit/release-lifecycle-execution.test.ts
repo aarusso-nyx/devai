@@ -3507,12 +3507,16 @@ describe('release lifecycle execution kernel', () => {
   });
 
   it.each([
+    'state_id',
     'generation',
+    'digest',
     'record_digest_sha256',
     'actor',
     'role',
     'authority',
+    'consent',
     'effective_authorities',
+    'provider_result',
     'provider_handle',
   ] as const)('rejects protected request projection key %s at a nested boundary', (key) => {
     const valid = request('release preflight');
