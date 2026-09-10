@@ -29,6 +29,16 @@ function mutate(
   return result;
 }
 
+function expectRefusal(run: () => unknown, code: string): void {
+  try {
+    run();
+  } catch (error) {
+    expect(error).toMatchObject({ message: code, code });
+    return;
+  }
+  throw new Error(`fixture expected refusal ${code}`);
+}
+
 describe('protected release mutation input derivation', () => {
   it('derives all ten packages and all twelve immutable bindings from genuine snapshots', () => {
     const value = build(fixture());
@@ -101,6 +111,15 @@ describe('protected release mutation input derivation', () => {
     expect(Object.isFrozen(context)).toBe(true);
     expect(Object.isFrozen(context.candidate_files)).toBe(true);
     expect(() => captureReleaseMutationInputExecutionContext({ ...value.plan })).toThrow(
+      'MUTATION_INPUT_IDENTITY_MISSING',
+    );
+    expectRefusal(
+      () =>
+        assertReleaseMutationInputProjectionV21(
+          { ...value.plan },
+          entry.expected.packageName,
+          entry.expected.inputProjection,
+        ),
       'MUTATION_INPUT_IDENTITY_MISSING',
     );
 
@@ -221,6 +240,18 @@ describe('protected release mutation input derivation', () => {
           controls,
         }),
       ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+
+    expect(() =>
+      buildReleaseMutationInputPlanV21({
+        candidate: value.snapshot,
+        resolution: value.resolution,
+        plan_receipt: value.receipt,
+        controls: {
+          ...value.controls,
+          toolchain: { ...value.controls.toolchain, stryker: '9.6.2' },
+        },
+      }),
+    ).toThrow('MUTATION_VERSION_UNSUPPORTED');
   });
 
   it('requires the exact Owner campaign coverage for current targeted DEVAI and permits plan coverage only for lts full roster', () => {
