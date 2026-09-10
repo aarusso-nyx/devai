@@ -436,6 +436,38 @@ describe('protected release mutation input derivation', () => {
         }),
       ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
     }
+
+    const firstInput = dependency.inputs.files[0];
+    const firstWorkspace = dependency.inputs.workspace_packages[0];
+    if (firstInput === undefined || firstWorkspace === undefined)
+      throw new Error('fixture dependency population missing');
+    for (const entry of [
+      {
+        ...dependency,
+        inputs: {
+          ...dependency.inputs,
+          files: [{ ...firstInput, sha256: '0'.repeat(64) }, ...dependency.inputs.files.slice(1)],
+        },
+      },
+      {
+        ...dependency,
+        inputs: {
+          ...dependency.inputs,
+          workspace_packages: dependency.inputs.workspace_packages.slice(1),
+        },
+      },
+      {
+        ...dependency,
+        inputs: {
+          ...dependency.inputs,
+          workspace_packages: [
+            { ...firstWorkspace, name: '@fixture/foreign' },
+            ...dependency.inputs.workspace_packages.slice(1),
+          ],
+        },
+      },
+    ])
+      expect(() => derive(entry)).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
   });
 
   it('selects declaration producers only from generated namespaces bound to workspace dependencies', () => {
