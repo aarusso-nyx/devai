@@ -1,5 +1,6 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -10,6 +11,14 @@ import { runWithAuthorityPolicyMaterialization } from '../../src/authority/comma
 import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
 import { doctor } from '../../src/commands/doctor.js';
 import { canonicalRegistry } from '../../src/define-command.js';
+import {
+  buildGithubActionsAdapterPlan,
+  executeGithubActionsAdapterPlan,
+} from '../../src/services/github-actions-adapter/index.js';
+import {
+  buildHooksInstallPlan,
+  executeHooksInstallPlan,
+} from '../../src/services/hooks-install/index.js';
 import { resolveCliVersion } from '../../src/version.js';
 
 interface DoctorCheck {
@@ -132,10 +141,13 @@ async function invoke(repo: string): Promise<DoctorReport> {
 }
 
 async function authorityCheck(
-  update?: (fixture: { readonly repo: string; readonly policy: JsonObject }) => void,
+  update?: (fixture: {
+    readonly repo: string;
+    readonly policy: JsonObject;
+  }) => void | Promise<void>,
 ): Promise<DoctorCheck> {
   const value = fixture();
-  update?.(value);
+  await update?.(value);
   put(value.repo, '.devai/config/authority-policy.json', value.policy);
   const report = await invoke(value.repo);
   const found = report.checks.find((candidate) => candidate.name === 'authority-enforcement');
@@ -175,6 +187,28 @@ function configureHostIntegrated(
     mode: 'host-integrated',
     adapter: { adapter_id: adapterId, adapter_version: '1.5.0' },
   };
+}
+
+function initializeGitRepository(repo: string): void {
+  const run = (args: readonly string[]) => {
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
+    }
+  };
+  run(['init', '--quiet']);
+  put(repo, 'README.md', '# Doctor authority fixture\n');
+  run(['add', 'README.md']);
+  run([
+    '-c',
+    'user.name=DEVAI Test',
+    '-c',
+    'user.email=devai@example.invalid',
+    'commit',
+    '--quiet',
+    '-m',
+    'fixture',
+  ]);
 }
 
 describe('Doctor authority enforcement boundaries', () => {
@@ -377,6 +411,87 @@ describe('Doctor authority enforcement boundaries', () => {
       },
       errors: [POSTURE_ERROR, 'POST_MERGE_ADAPTER_BINDING_MISSING'],
     });
+  });
+
+  it('accepts a fully installed and verified post-merge host adapter', async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      initializeGitRepository(repo);
+      configureHostIntegrated(
+        repo,
+        policy,
+        '.devai/config/post-merge-host-adapter.json',
+        'post-merge-host-adapter',
+      );
+      put(repo, '.devai/config/authority-policy.json', policy);
+      const binary = join(repo, 'node_modules/.bin/devai');
+      put(
+        repo,
+        'node_modules/.bin/devai',
+        `#!/usr/bin/env sh\nif [ "$1" = "--version" ]; then echo "devai/${resolveCliVersion()}"; fi\nexit 0\n`,
+      );
+      chmodSync(binary, 0o755);
+      const plan = buildHooksInstallPlan({
+        targetRoot: repo,
+        hook: 'post-merge',
+        devaiVersion: resolveCliVersion(),
+      });
+      await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      info: {
+        selected_adapter_policy_bound: true,
+        local_post_merge_enforced: true,
+        local_post_merge_facts: {
+          hook_present: true,
+          key_present: true,
+          attestation_present: true,
+          policy_present: true,
+          hook_local_binary: true,
+          local_binary_present: true,
+          local_binary_version: true,
+          key_private: true,
+          signature_valid: true,
+          repository_bound: true,
+          hook_bound: true,
+          key_bound: true,
+          policy_bound: true,
+          constitution_bound: true,
+          package_bound: true,
+          installed_head_bound: true,
+        },
+      },
+    });
+    expect(result.errors).toBeUndefined();
+  });
+
+  it('accepts a generated and verified GitHub Actions host adapter', async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      configureHostIntegrated(
+        repo,
+        policy,
+        '.devai/config/github-actions-host-adapter.json',
+        'github-actions-main-observation',
+      );
+      const plan = buildGithubActionsAdapterPlan(repo, resolveCliVersion());
+      await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      info: {
+        selected_adapter_policy_bound: true,
+        github_actions_enforced: true,
+        github_actions_facts: {
+          workflow_present: true,
+          config_present: true,
+          workflow_syntax_valid: true,
+          workflow_bound: true,
+          repository_bound: true,
+          package_bound: true,
+        },
+      },
+    });
+    expect(result.errors).toBeUndefined();
   });
 
   it('routes failures from the explicitly selected GitHub Actions adapter', async () => {
