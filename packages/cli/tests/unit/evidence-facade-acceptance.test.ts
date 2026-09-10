@@ -2,7 +2,16 @@
 // Inspector acceptance: canonical evidence facades preserve append-only local
 // records, contained rendering, verification, and structured refusals.
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
@@ -16,7 +25,7 @@ import {
   evidenceRender,
   evidenceVerify,
 } from '../../src/commands/evidence/facade.js';
-import { mutationRun } from '../../src/commands/mutation/run.js';
+import { _resetScenarioValidator, mutationRun } from '../../src/commands/mutation/run.js';
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
   cac: (name?: string) => CAC;
@@ -46,6 +55,55 @@ function put(repo: string, path: string, contents: string): string {
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, contents);
   return target;
+}
+
+function coverageCounts(total: number, covered: number) {
+  return {
+    lines: { total, covered },
+    branches: { total: total * 2, covered: covered * 2 },
+    functions: { total: total + 1, covered: covered + 1 },
+    statements: { total: total * 3, covered: covered * 3 },
+  };
+}
+
+function finalCoverage(path: string, covered: number): string {
+  return JSON.stringify({
+    [path]: {
+      path,
+      statementMap: { '0': { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } } },
+      fnMap: {},
+      branchMap: {},
+      s: { '0': covered },
+      f: {},
+      b: {},
+    },
+  });
+}
+
+function mutationFixture(repo: string, status: 'Killed' | 'Survived'): void {
+  put(
+    repo,
+    'law/schemas/mutation-scenario.schema.json',
+    readFileSync(join(ROOT, 'law/schemas/mutation-scenario.schema.json'), 'utf8'),
+  );
+  put(
+    repo,
+    'scenarios/current.json',
+    JSON.stringify({
+      schema_version: '1.0.0',
+      id: 'current-contract',
+      kind: 'mutation',
+      target: { file: 'src/current.ts', symbol: 'currentContract' },
+      mutations: [{ type: 'string-replace', find: 'true', replace: 'false' }],
+      expectations: [{ assertion: 'tests-detect', specs: ['tests/current.test.ts'] }],
+    }),
+  );
+  put(
+    repo,
+    'reports/current.json',
+    JSON.stringify([{ id: 'current-contract', status, duration_ms: 12 }]),
+  );
+  _resetScenarioValidator();
 }
 
 async function invoke(
@@ -100,6 +158,7 @@ async function invoke(
 }
 
 afterEach(() => {
+  _resetScenarioValidator();
   for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 
@@ -282,28 +341,7 @@ describe('evidence record and errata acceptance', () => {
 
   it('records a validated mutation result and its governed proof', async () => {
     const repo = root();
-    put(
-      repo,
-      'law/schemas/mutation-scenario.schema.json',
-      readFileSync(join(ROOT, 'law/schemas/mutation-scenario.schema.json'), 'utf8'),
-    );
-    put(
-      repo,
-      'scenarios/current.json',
-      JSON.stringify({
-        schema_version: '1.0.0',
-        id: 'current-contract',
-        kind: 'mutation',
-        target: { file: 'src/current.ts', symbol: 'currentContract' },
-        mutations: [{ type: 'string-replace', find: 'true', replace: 'false' }],
-        expectations: [{ assertion: 'tests-detect', specs: ['tests/current.test.ts'] }],
-      }),
-    );
-    put(
-      repo,
-      'reports/current.json',
-      JSON.stringify([{ id: 'current-contract', status: 'Killed', duration_ms: 12 }]),
-    );
+    mutationFixture(repo, 'Killed');
 
     const result = await invoke(evidenceRecord, [
       'evidence-record',
@@ -351,6 +389,252 @@ describe('evidence record and errata acceptance', () => {
       kind: 'mutation',
       sequence: 1,
       payload: { service_exit_code: 0, result: { mutation_score: 100 } },
+    });
+  });
+
+  it('forwards every declared coverage option into the aggregate service', async () => {
+    const repo = root();
+    put(
+      repo,
+      'cov-in/pkg-a/coverage/coverage-summary.json',
+      JSON.stringify({ total: coverageCounts(10, 8) }),
+    );
+    put(repo, 'cov-final-in/pkg-a/coverage/coverage-final.json', finalCoverage('/src/a.ts', 1));
+
+    const perPackage = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'coverage',
+      '--round',
+      'R-0100',
+      '--repo-root',
+      repo,
+      '--in',
+      'cov-in',
+      '--out',
+      'cov-out/summary.json',
+      '--per-package',
+    ]);
+    const perPackageResult = (JSON.parse(perPackage.stdout) as { result: Record<string, unknown> })
+      .result;
+    expect(perPackage).toMatchObject({ exit: 0, stderr: '' });
+    expect(perPackageResult).toMatchObject({
+      schemaVersion: '1.0.0',
+      inputs: ['cov-in/pkg-a/coverage/coverage-summary.json'],
+      scopes: { 'cov-in/pkg-a': { lines: 80 } },
+    });
+    expect(existsSync(join(repo, 'cov-out/summary.json'))).toBe(true);
+    expect(existsSync(join(repo, '.devai/state/coverage/summary.json'))).toBe(false);
+
+    const aggregate = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'coverage',
+      '--round',
+      'R-0101',
+      '--repo-root',
+      repo,
+      '--in',
+      'cov-in',
+      '--out',
+      'cov-out/aggregate.json',
+    ]);
+    expect(
+      (JSON.parse(aggregate.stdout) as { result: Record<string, unknown> }).result,
+    ).not.toHaveProperty('scopes');
+
+    const final = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'coverage',
+      '--round',
+      'R-0102',
+      '--repo-root',
+      repo,
+      '--in',
+      'cov-final-in',
+      '--out',
+      'cov-out/final.json',
+      '--final',
+    ]);
+    expect(final).toMatchObject({ exit: 0, stderr: '' });
+    expect((JSON.parse(final.stdout) as { result: Record<string, unknown> }).result).toMatchObject({
+      schemaVersion: '1.0.0',
+      mode: 'final',
+      inputs: ['cov-final-in/pkg-a/coverage/coverage-final.json'],
+      out: 'cov-out/final.json',
+      files: 1,
+    });
+    expect(Object.keys(JSON.parse(readFileSync(join(repo, 'cov-out/final.json'), 'utf8')))).toEqual(
+      ['/src/a.ts'],
+    );
+  });
+
+  it('forwards mutation adapter, report path, and survivor policy into the recorder', async () => {
+    const repo = root();
+    mutationFixture(repo, 'Killed');
+    const recorded = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'mutation',
+      '--round',
+      'R-0110',
+      '--repo-root',
+      repo,
+      '--run',
+      '--scenarios',
+      'scenarios/current.json',
+      '--external',
+      'reports/current.json',
+      '--out',
+      '.devai/state/mutation/alt.json',
+      '--report-path',
+      'reports/rich.json',
+    ]);
+    expect(recorded).toMatchObject({ exit: 0, stderr: '' });
+    expect(
+      JSON.parse(readFileSync(join(repo, '.devai/state/mutation/alt.json'), 'utf8')),
+    ).toMatchObject({ report_path: 'reports/rich.json' });
+
+    const exclusive = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'mutation',
+      '--round',
+      'R-0111',
+      '--repo-root',
+      repo,
+      '--run',
+      '--scenarios',
+      'scenarios/current.json',
+      '--mutator',
+      './adapter.js',
+      '--external',
+      'reports/current.json',
+    ]);
+    expect(exclusive.exit).toBe(2);
+    expect(exclusive.stderr).toContain('--mutator and --external are mutually exclusive');
+
+    mutationFixture(repo, 'Survived');
+    const allowed = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'mutation',
+      '--round',
+      'R-0112',
+      '--repo-root',
+      repo,
+      '--run',
+      '--scenarios',
+      'scenarios/current.json',
+      '--external',
+      'reports/current.json',
+      '--out',
+      '.devai/state/mutation/survived-allowed.json',
+    ]);
+    expect(allowed).toMatchObject({ exit: 0, stderr: '' });
+    const refused = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'mutation',
+      '--round',
+      'R-0113',
+      '--repo-root',
+      repo,
+      '--run',
+      '--scenarios',
+      'scenarios/current.json',
+      '--external',
+      'reports/current.json',
+      '--out',
+      '.devai/state/mutation/survived-refused.json',
+      '--fail-on-survivors',
+    ]);
+    expect(refused.exit).toBe(2);
+  });
+
+  it('executes the rtd bundle kind and forwards output, strict, and git bindings', async () => {
+    const repo = root();
+    put(repo, 'README.md', 'fixture\n');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    execFileSync('git', ['config', 'user.name', 'Inspector Fixture'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'inspector@example.invalid'], { cwd: repo });
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'fixture'], { cwd: repo });
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+    mkdirSync(join(repo, 'rtd'));
+    const output = join(repo, 'rtd/copy.json');
+
+    const bundled = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'rtd',
+      '--round',
+      'R-0200',
+      '--repo-root',
+      repo,
+      '--output',
+      output,
+    ]);
+    expect(bundled).toMatchObject({ exit: 0, stderr: '' });
+    expect(
+      (JSON.parse(bundled.stdout) as { result: Record<string, unknown> }).result,
+    ).toMatchObject({
+      schemaVersion: '1.0.0',
+      integration_head: head,
+    });
+    expect(existsSync(output)).toBe(true);
+    expect(
+      readdirSync(join(repo, 'record/proofs/compliance/rtd-manifests')).length,
+    ).toBeGreaterThan(0);
+
+    const strict = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'rtd',
+      '--round',
+      'R-0201',
+      '--repo-root',
+      repo,
+      '--strict',
+    ]);
+    expect(strict).toEqual({
+      exit: 2,
+      stdout: '',
+      stderr: 'devai evidence record: rtd exited 2; governed proof sequence 1\n',
+    });
+  });
+
+  it("binds a failing service's diagnostics into the proof and forwards its exit code", async () => {
+    const repo = root();
+    put(repo, 'scenarios/x.json', '{}');
+    _resetScenarioValidator();
+    const schemaPath = join(repo, 'law/schemas/mutation-scenario.schema.json');
+    const serviceError = `devai evidence record --kind mutation: mutation-scenario schema not found at ${schemaPath} (also tried ${schemaPath})`;
+    const result = await invoke(evidenceRecord, [
+      'evidence-record',
+      '--kind',
+      'mutation',
+      '--round',
+      'R-0300',
+      '--repo-root',
+      repo,
+      '--run',
+      '--scenarios',
+      'scenarios/x.json',
+    ]);
+    expect(result).toEqual({
+      exit: 65,
+      stdout: '',
+      stderr: `devai evidence record: mutation exited 65; governed proof sequence 1: ${serviceError}\n`,
+    });
+    const proof = JSON.parse(
+      readFileSync(join(repo, 'record/proofs/work/mutation/R-0300.jsonl'), 'utf8').trim(),
+    ) as { payload: Record<string, unknown> };
+    expect(proof.payload).toEqual({
+      result: { kind: 'mutation', service_exit_code: 65, error: serviceError },
+      service_exit_code: 65,
+      service_error: serviceError,
     });
   });
 
