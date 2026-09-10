@@ -10,7 +10,7 @@ import {
   declaredInvocationAuthority,
   disposeCliInvocationAuthority,
 } from '../../src/authority/index.js';
-import { createAuthorityHostBroker } from '../../src/authority/broker.js';
+import { createAuthorityHostBroker, processTarget } from '../../src/authority/broker.js';
 import { resolveInvocationEntry } from '../../src/authority/sense-selection.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
@@ -357,6 +357,13 @@ describe('authority broker production boundary depth', () => {
     });
     sourceFixtures.push(fixture);
     const root = fixture.root;
+    const descriptorPath = join(root, 'test-tasks.json');
+    writeFileSync(
+      descriptorPath,
+      readFileSync(descriptorPath, 'utf8').replaceAll('"generate"', '":"'),
+    );
+    fixture.git(['add', '--', 'test-tasks.json']);
+    fixture.git(['commit', '--quiet', '-m', 'admit punctuation-only task identifier']);
     const releaseArgv = (action: 'preflight' | 'certify') => [
       process.execPath,
       'devai',
@@ -368,7 +375,7 @@ describe('authority broker production boundary depth', () => {
       'inspector',
       '--write',
     ];
-    const checkHost = brokerAt(root, 'check', 'inspector', [
+    const checkArgv = [
       process.execPath,
       'devai',
       'check',
@@ -377,7 +384,8 @@ describe('authority broker production boundary depth', () => {
       '--as-role',
       'inspector',
       '--write',
-    ]);
+    ];
+    const checkHost = brokerAt(root, 'check', 'inspector', checkArgv);
     const preflightHost = brokerAt(
       root,
       'release preflight',
@@ -396,7 +404,7 @@ describe('authority broker production boundary depth', () => {
       'architect',
       '--write',
     ]);
-    const descriptor = readTaskDescriptor(join(root, 'test-tasks.json'));
+    const descriptor = readTaskDescriptor(descriptorPath);
     const task = descriptor.tasks.find(
       (candidate) =>
         JSON.stringify(candidate.argv) === JSON.stringify(['pnpm', 'run', 'devai:prepare']),
@@ -404,8 +412,8 @@ describe('authority broker production boundary depth', () => {
     if (task === undefined) throw new Error('devai:prepare task fixture missing');
     const identity = resolveTaskExecutable(root, 'pnpm');
     const candidate = {
-      commit: fixture.commit,
-      tree: fixture.tree,
+      commit: fixture.git(['rev-parse', 'HEAD']),
+      tree: fixture.git(['rev-parse', 'HEAD^{tree}']),
     };
     const options = bindReleaseTaskProcessOptions(
       { cwd: realpathSync(root), shell: false },
@@ -419,14 +427,24 @@ describe('authority broker production boundary depth', () => {
         cwd: task.cwd,
       },
     );
+    const declaredRequest: AuthorityHostEffectRequest = {
+      kind: 'process',
+      symbol: 'spawnSync',
+      arguments: [identity.path, ['run', 'devai:prepare'], options],
+    };
     try {
+      expect(matchDeclaredReleaseTaskProcess(root, declaredRequest)).toMatchObject({
+        nodeId: task.nodeId,
+      });
       expect(
-        matchDeclaredReleaseTaskProcess(root, {
-          kind: 'process',
-          symbol: 'spawnSync',
-          arguments: [identity.path, ['run', 'devai:prepare'], options],
-        }),
-      ).toMatchObject({ nodeId: task.nodeId });
+        processTarget(declaredRequest, 'check', root, 'repo:declared-check', checkArgv),
+      ).toEqual({
+        kind: 'fs',
+        id: 'fs:.devai/state/check-cache/v1:task',
+        repository_id: 'repo:declared-check',
+        canonical_relative_path: '.devai/state/check-cache/v1',
+        operation: 'update',
+      });
       for (const host of [checkHost, preflightHost, certifyHost]) {
         expect(
           host.scope.apply_effect(
