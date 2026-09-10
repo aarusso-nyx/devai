@@ -41,6 +41,14 @@ function framedDigest(domain: string, value: unknown): string {
     .digest('hex');
 }
 
+function withSemanticReceiptDigest(receipt: Record<string, unknown>): Record<string, unknown> {
+  const { receiptDigest: _discarded, ...withoutDigest } = receipt;
+  return {
+    ...withoutDigest,
+    receiptDigest: framedDigest('devai:mutation-semantic-receipt:v2.1', withoutDigest),
+  };
+}
+
 function activationSnapshot() {
   const policy = JSON.parse(
     readFileSync(join(ROOT, 'law/policy/mutation-evidence-v2.json'), 'utf8'),
@@ -1064,9 +1072,12 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
 
     const altered = structuredClone(evidence.receipt) as {
       verifierProvenance: { vendor: { root: string } };
-    };
+    } & Record<string, unknown>;
     altered.verifierProvenance.vendor.root = 'dist/runtime/evidence-verification';
-    artifacts.set(evidence.contract.semanticReceiptPath, Buffer.from(canonicalJson(altered)));
+    artifacts.set(
+      evidence.contract.semanticReceiptPath,
+      Buffer.from(canonicalJson(withSemanticReceiptDigest(altered))),
+    );
     await expect(
       verifyMutationEvidenceV21(evidence.contract, readArtifact, {
         releaseUnit: CANDIDATE.releaseUnit,
@@ -1075,6 +1086,105 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
         mutationVerificationMode: 'offline',
       }),
     ).rejects.toMatchObject({ code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH' });
+  });
+
+  it('enforces artifact and provenance trust before delegating to the pinned kernel', async () => {
+    const evidence = await finalizedNotRequiredEvidence();
+    const validArtifacts = new Map<string, Uint8Array>([
+      [evidence.contract.summaryPath, Buffer.from(canonicalJson(evidence.summary))],
+      [evidence.contract.semanticReceiptPath, Buffer.from(canonicalJson(evidence.receipt))],
+    ]);
+    const altered = structuredClone(evidence.receipt) as {
+      verifierProvenance: { source: { commit: string } };
+    } & Record<string, unknown>;
+    altered.verifierProvenance.source.commit = '0'.repeat(40);
+    const forgedReceipt = withSemanticReceiptDigest(altered);
+    const safety = vi.fn(
+      ({ mediaType }: { mediaType?: string }) => mediaType === 'application/json',
+    );
+    vi.resetModules();
+    vi.doMock('node:module', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:module')>();
+      const kernel = {
+        validateMutationContractV21: vi.fn(),
+        finalizeMutationReportSetV21: vi.fn(),
+        verifyMutationReportSetV21: vi.fn(
+          (
+            _contract: unknown,
+            _read: unknown,
+            options: { resolveReuseOrigin?: (origin: unknown) => unknown },
+          ) => {
+            options.resolveReuseOrigin?.({});
+            return { passed: true };
+          },
+        ),
+      };
+      const load = (path: string) => {
+        if (path.endsWith('/src/mutation-v21.js')) return kernel;
+        if (path.endsWith('/src/artifact-safety.js')) return { validateArtifactContent: safety };
+        if (path.endsWith('/src/canonical-json.js'))
+          return {
+            canonicalize: canonicalJson,
+            canonicalBytes: (value: unknown) => Buffer.from(canonicalJson(value)),
+            sha256Hex: canonicalSha256,
+            framedDigest,
+          };
+        if (path.endsWith('/src/verify.js')) return {};
+        if (path.endsWith('/src/trust.js')) return {};
+        throw new Error(`unexpected verified module: ${path}`);
+      };
+      return {
+        ...actual,
+        createRequire: () => load,
+        registerHooks: () => ({ deregister: vi.fn() }),
+      };
+    });
+    try {
+      const isolated = await import('../../src/services/mutation-evidence-v21.js');
+      const verify = (
+        artifacts: ReadonlyMap<string, Uint8Array>,
+        resolveReuseOrigin?: () => { semanticReceipt: unknown },
+      ) =>
+        isolated.verifyMutationEvidenceV21(
+          evidence.contract,
+          (path) => artifacts.get(path) ?? Buffer.alloc(0),
+          {
+            releaseUnit: CANDIDATE.releaseUnit,
+            candidateCommit: CANDIDATE.commit,
+            candidateTree: CANDIDATE.tree,
+            mutationVerificationMode: 'offline',
+            ...(resolveReuseOrigin === undefined ? {} : { resolveReuseOrigin }),
+          },
+        );
+
+      const nonCanonical = new Map(validArtifacts);
+      const summaryBytes = validArtifacts.get(evidence.contract.summaryPath);
+      if (summaryBytes === undefined) throw new Error('summary fixture missing');
+      nonCanonical.set(
+        evidence.contract.summaryPath,
+        Buffer.concat([summaryBytes, Buffer.from('\n')]),
+      );
+      await expect(verify(nonCanonical)).rejects.toMatchObject({ code: 'NON_CANONICAL_JSON' });
+
+      const forgedCurrent = new Map(validArtifacts);
+      forgedCurrent.set(
+        evidence.contract.semanticReceiptPath,
+        Buffer.from(canonicalJson(forgedReceipt)),
+      );
+      await expect(verify(forgedCurrent)).rejects.toMatchObject({
+        code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH',
+      });
+
+      await expect(
+        verify(validArtifacts, () => ({ semanticReceipt: forgedReceipt })),
+      ).rejects.toMatchObject({ code: 'MUTATION_VENDOR_PROVENANCE_MISMATCH' });
+      expect(safety).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaType: 'application/json' }),
+      );
+    } finally {
+      vi.doUnmock('node:module');
+      vi.resetModules();
+    }
   });
 
   it('binds the complete active policy rather than an arbitrary task-policy digest', async () => {
@@ -1126,14 +1236,14 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     ).resolves.toMatchObject({ reusedPackageCount: 1, verdict: 'pass', passed: true });
     expect(resolveReuseOrigin).toHaveBeenCalledOnce();
 
-    const forgedOriginReceipt = structuredClone(evidence.originReceipt);
+    const forgedOriginReceipt = structuredClone(evidence.originReceipt) as Record<string, unknown>;
     const forgedProvenance = forgedOriginReceipt.verifierProvenance as unknown as {
       source: { commit: string };
     };
     forgedProvenance.source.commit = '0'.repeat(40);
     resolveReuseOrigin.mockReturnValue({
       composition: evidence.originComposition,
-      semanticReceipt: forgedOriginReceipt,
+      semanticReceipt: withSemanticReceiptDigest(forgedOriginReceipt),
     });
     await expect(
       verifyMutationEvidenceV21(
