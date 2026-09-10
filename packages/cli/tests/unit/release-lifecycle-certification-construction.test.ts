@@ -58,13 +58,17 @@ describe('release certification provider construction', () => {
         content_source: contentSource,
         task_policies: [],
       } as never);
+      await expect(provider({ action_id: 'release preflight' } as never)).resolves.toEqual({
+        outcome: 'failure',
+        code: 'release-task-policy-identity-mismatch',
+      });
       await expect(
         provider({ action_id: 'release certify', candidate_locator: null } as never),
       ).resolves.toEqual({
         outcome: 'failure',
         code: 'release-certification-generated-output-untrusted',
       });
-      expect(write).toHaveBeenCalledOnce();
+      expect(write).toHaveBeenCalledTimes(2);
     } finally {
       write.mockRestore();
     }
