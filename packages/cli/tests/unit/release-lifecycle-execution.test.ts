@@ -3476,6 +3476,7 @@ describe('release lifecycle execution kernel', () => {
     const receipt = boundOfflineReceipt(exported);
     const value = request('release evidence-publish', receipt);
     const order: string[] = [];
+    let authorizationBinding: AuthorizationAttemptBinding | undefined;
     const provider = vi.fn(() => {
       order.push('provider');
       return { outcome: 'unknown' as const, provider_handle: 'run-1' };
@@ -3490,7 +3491,8 @@ describe('release lifecycle execution kernel', () => {
         resolvePlanInput,
         offlineReceiptVerifier: { verify: ({ receipt: value }) => value },
         artifactReader: artifactReaderFor('release export'),
-        authorization: authorizationBridge(() => {
+        authorization: authorizationBridge((binding) => {
+          authorizationBinding = binding;
           order.push(store.readStoreRecords().at(-1)?.record_kind ?? 'missing');
         }),
         provider,
@@ -3498,6 +3500,7 @@ describe('release lifecycle execution kernel', () => {
       }),
     );
     expect(first).toMatchObject({ ok: false, phase: 'ambiguous' });
+    expect(authorizationBinding?.destination.operation).toBe('create');
     expect(order.at(-2)).toBe('attempt');
     expect(order.at(-1)).toBe('provider');
     const unknownObservation = await resumeReleaseLifecycleExecution({
@@ -4204,6 +4207,7 @@ describe('release lifecycle execution kernel', () => {
     });
     expect(refused).toMatchObject({ ok: false, code: 'rpd-workflow-expectation-invalid' });
     expect(provider).not.toHaveBeenCalled();
+    let authorizationBinding: AuthorizationAttemptBinding | undefined;
     const result = await withAuthorityHostTestScope(() =>
       executeReleaseLifecycleAction({
         request: value,
@@ -4214,13 +4218,16 @@ describe('release lifecycle execution kernel', () => {
         resolveReceipt: () => planReceipt(),
         resolvePlanInput,
         artifactReader: artifactReaderFor('release evidence-publish'),
-        authorization: authorizationBridge(),
+        authorization: authorizationBridge((binding) => {
+          authorizationBinding = binding;
+        }),
         provider,
         recorded_at: '2026-09-03T00:00:00.000Z',
       }),
     );
     expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
+    expect(authorizationBinding?.destination.operation).toBe('publish');
     expect(result.state['publication_expectation']).toMatchObject(publicationControls());
     expect(
       objectValue(objectValue(result.state['publication_expectation'])['destination'])[
