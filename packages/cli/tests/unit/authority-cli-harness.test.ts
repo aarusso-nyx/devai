@@ -55,6 +55,16 @@ function error(result: Awaited<ReturnType<typeof invoke>>): {
 }
 
 describe('authority CLI harness branch matrix', () => {
+  it('preserves the requested human format for authority refusals', async () => {
+    const result = await harness().invoke({ argv: ['unknown', 'action'], format: 'human' });
+    expect(result).toMatchObject({
+      exit_code: 7,
+      stdout: '',
+      stderr:
+        'devai: authority action contract not found Remediation: Use a declared role and the required consent flags.\n',
+    });
+  });
+
   it('fails closed for absent, internal, declaration, consent, and session errors', async () => {
     const target = harness();
     const cases: ReadonlyArray<readonly [readonly string[], number, string]> = [
