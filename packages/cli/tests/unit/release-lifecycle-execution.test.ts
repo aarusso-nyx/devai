@@ -66,6 +66,7 @@ import {
   type VerifiedReleaseOfflineContext,
   finalizeReleaseStateV2,
   finalizeStoreRecord,
+  offlineArtifactProjection,
   reduceStoreRecords,
   resumeReleaseLifecycleExecution,
   resolveReleaseMutationRequirements,
@@ -4813,6 +4814,40 @@ describe('release lifecycle execution kernel', () => {
         blocked_reason: 'receipt-identity-mismatch',
       });
     }
+  });
+
+  it('retains every portable legacy artifact kind in an offline projection', () => {
+    const schema = JSON.parse(
+      readFileSync(join(process.cwd(), 'law/schemas/release-lifecycle-state.schema.json'), 'utf8'),
+    ) as { examples: readonly Readonly<Record<string, unknown>>[] };
+    const example = required(schema.examples[0], 'missing lifecycle state fixture');
+    const {
+      state_id: _stateId,
+      record_digest_sha256: _recordDigest,
+      ...draft
+    } = example as unknown as ReleaseLifecycleStateV2;
+    const portableKinds = [
+      'package-tarball',
+      'evidence-bundle',
+      'manifest',
+      'attestation',
+    ] as const;
+    const portable = portableKinds.map((kind) => ({
+      kind,
+      path: `artifacts/${kind}.json`,
+      sha256: canonicalSha256(kind),
+      size_bytes: kind.length,
+    }));
+    const localOnly = {
+      kind: 'sbom',
+      path: 'artifacts/local-sbom.json',
+      sha256: canonicalSha256('sbom'),
+      size_bytes: 4,
+    };
+    const state = finalizeReleaseStateV2({ ...draft, artifacts: [...portable, localOnly] });
+
+    expect(offlineArtifactProjection(state)).toEqual(expect.arrayContaining(portable));
+    expect(offlineArtifactProjection(state)).not.toContainEqual(localOnly);
   });
 
   it('offline-verifies exact v2 package and external trust closure without writing state', async () => {
