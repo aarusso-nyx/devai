@@ -1047,4 +1047,264 @@ describe('protected mutation-program container transport', () => {
       rmSync(value.root, { recursive: true, force: true });
     }
   });
+
+  it.each([
+    ['status', { status: 7 }, { status: 7, signal: null, error_code: null }],
+    [
+      'signal',
+      { status: null, signal: 'SIGTERM' },
+      { status: null, signal: 'SIGTERM', error_code: null },
+    ],
+    [
+      'host error',
+      {
+        status: null,
+        error: Object.assign(new Error('private host detail'), { code: 'EIO' }),
+      },
+      { status: null, signal: null, error_code: 'EIO' },
+    ],
+  ] as const)('reports an attach failure caused only by %s', (_label, changed, expected) => {
+    const value = fixture();
+    const messages: string[] = [];
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      messages.push(String(chunk));
+      return true;
+    });
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        return args.slice(4)[0] === 'start' ? { ...result, ...changed } : result;
+      },
+    };
+    try {
+      invoke({ ...value, mutation_program: program });
+      expect(messages).toHaveLength(1);
+      expect(JSON.parse(messages[0] ?? '')).toEqual({
+        kind: 'release-container-attach-failure',
+        ...expected,
+        timeout_ms: 11_000,
+      });
+      expect(messages.join('')).not.toContain('private host detail');
+    } finally {
+      stderr.mockRestore();
+      value.dispose();
+    }
+  });
+
+  it.each([
+    ['signal prefix', 'noiseSIGTERM', 'EIO'],
+    ['signal suffix', 'SIGTERMnoise', 'EIO'],
+    ['error-code prefix', 'SIGTERM', 'noiseEIO'],
+    ['error-code suffix', 'SIGTERM', 'EIO/noise'],
+  ] as const)('rejects an attach diagnostic with an invalid %s', (_label, signal, code) => {
+    const value = fixture();
+    const messages: string[] = [];
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      messages.push(String(chunk));
+      return true;
+    });
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        if (args.slice(4)[0] !== 'start') return result;
+        return {
+          ...result,
+          status: null,
+          signal,
+          error: Object.assign(new Error('private host detail'), { code }),
+        };
+      },
+    };
+    try {
+      invoke({ ...value, mutation_program: program });
+      expect(messages).toHaveLength(1);
+      expect(JSON.parse(messages[0] ?? '')).toMatchObject({
+        kind: 'release-container-attach-failure',
+        signal: signal === 'SIGTERM' ? 'SIGTERM' : null,
+        error_code: code === 'EIO' ? 'EIO' : 'UNAVAILABLE',
+      });
+      expect(messages.join('')).not.toContain('private host detail');
+    } finally {
+      stderr.mockRestore();
+      value.dispose();
+    }
+  });
+
+  it.each([
+    ['running', { Running: true }],
+    ['owned pid', { Pid: 12 }],
+    ['restarting', { Restarting: true }],
+  ] as const)(
+    'refuses a post-start container that remains %s and uses the exact shutdown commands',
+    (_label, changed) => {
+      const value = fixture();
+      let inspections = 0;
+      activeFixture = {
+        ...value,
+        docker(args, input) {
+          const result = value.docker(args, input);
+          if (args.slice(4)[0] !== 'inspect' || inspections++ !== 0) return result;
+          const inspection = JSON.parse(result.stdout.toString()) as Array<{
+            State: Record<string, unknown>;
+          }>;
+          Object.assign(inspection[0]?.State ?? {}, changed);
+          return { ...result, stdout: Buffer.from(JSON.stringify(inspection)) };
+        },
+      };
+      try {
+        expect(() => invoke({ ...value, mutation_program: program })).toThrow(
+          'release-certification-container-quiescence-unproven',
+        );
+        const commands = state.calls.map((args) => args.slice(4));
+        expect(commands.filter(([command]) => command === 'inspect')).toHaveLength(2);
+        expect(commands.filter(([command]) => command === 'kill')).toEqual([
+          ['kill', '--signal', 'KILL', state.id],
+        ]);
+        expect(commands.filter(([command]) => command === 'wait')).toEqual([['wait', state.id]]);
+        expectCleanup();
+      } finally {
+        value.dispose();
+      }
+    },
+  );
+
+  it('accepts a clean stopped tuple after one inspection and never invokes shutdown', () => {
+    const value = fixture();
+    try {
+      const result = invoke({ ...value, mutation_program: program });
+      expect(result.result).toEqual({ status: 0, signal: null, stdout: '', stderr: '' });
+      const commands = state.calls.map((args) => args.slice(4));
+      expect(commands.filter(([command]) => command === 'inspect')).toHaveLength(1);
+      expect(commands.some(([command]) => command === 'kill' || command === 'wait')).toBe(false);
+      expectCleanup();
+    } finally {
+      value.dispose();
+    }
+  });
+
+  it.each([
+    ['host spawn error', { executionError: true }],
+    ['container OOM', { oomKilled: true }],
+    ['engine state error', { stateError: 'fixture-engine-error' }],
+  ] as const)('retains an abnormal result caused only by %s', (_label, changed) => {
+    const value = fixture();
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        const command = args.slice(4)[0];
+        if (command === 'start' && changed.executionError === true)
+          return {
+            ...result,
+            error: Object.assign(new Error('fixture'), { code: 'EIO' }),
+          };
+        if (command !== 'inspect') return result;
+        const inspection = JSON.parse(result.stdout.toString()) as Array<{
+          State: Record<string, unknown>;
+        }>;
+        Object.assign(inspection[0]?.State ?? {}, {
+          OOMKilled: changed.oomKilled ?? false,
+          Error: changed.stateError ?? '',
+        });
+        return { ...result, stdout: Buffer.from(JSON.stringify(inspection)) };
+      },
+    };
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const result = invoke({ ...value, mutation_program: program });
+      expect(result.result).toEqual({
+        status: 0,
+        signal: null,
+        stdout: '',
+        stderr: '',
+        errorCode: 'PROTECTED_CONTAINER_ABNORMAL',
+      });
+      expect(result.outputs).toEqual([]);
+      expect(result.mutation_observation).toEqual(Buffer.from('{"observed":true}', 'utf8'));
+      expect(result.mutation_report).toEqual(Buffer.from('{"raw":true}', 'utf8'));
+    } finally {
+      stderr.mockRestore();
+      value.dispose();
+    }
+  });
+
+  it('returns ordinary task streams without sending them through mutation diagnostics', () => {
+    const value = fixture();
+    const messages: string[] = [];
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      messages.push(String(chunk));
+      return true;
+    });
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        return args.slice(4)[0] === 'start'
+          ? {
+              ...result,
+              stdout: Buffer.from('ordinary stdout', 'utf8'),
+              stderr: Buffer.from('ordinary stderr', 'utf8'),
+            }
+          : result;
+      },
+    };
+    try {
+      const result = invoke(value);
+      expect(result.result).toEqual({
+        status: 0,
+        signal: null,
+        stdout: 'ordinary stdout',
+        stderr: 'ordinary stderr',
+      });
+      expect(messages).toEqual([]);
+    } finally {
+      stderr.mockRestore();
+      value.dispose();
+    }
+  });
+
+  it('keeps mutation task channels empty while delivering nonempty worker stderr separately', () => {
+    const value = fixture();
+    const messages: string[] = [];
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      messages.push(String(chunk));
+      return true;
+    });
+    activeFixture = {
+      ...value,
+      docker(args, input) {
+        const result = value.docker(args, input);
+        return args.slice(4)[0] === 'start'
+          ? { ...result, stderr: Buffer.from('fixture diagnostic', 'utf8') }
+          : result;
+      },
+    };
+    try {
+      const result = invoke({ ...value, mutation_program: program });
+      expect(result.result).toEqual({ status: 0, signal: null, stdout: '', stderr: '' });
+      expect(messages).toEqual(['release certify: mutation worker stderr: fixture diagnostic\n']);
+    } finally {
+      stderr.mockRestore();
+      value.dispose();
+    }
+  });
+
+  it('does not create a mutation diagnostic when worker stderr is empty', () => {
+    const value = fixture();
+    const messages: string[] = [];
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      messages.push(String(chunk));
+      return true;
+    });
+    try {
+      const result = invoke({ ...value, mutation_program: program });
+      expect(result.result).toEqual({ status: 0, signal: null, stdout: '', stderr: '' });
+      expect(messages).toEqual([]);
+    } finally {
+      stderr.mockRestore();
+      value.dispose();
+    }
+  });
 });
