@@ -1491,6 +1491,11 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     expect(first.artifacts.map((artifact) => artifact.path)).toEqual(input.contract.paths);
     expect(first.summary).toMatchObject({ verdict: 'pass', passed: true });
     expect(first.semanticReceipt).toMatchObject({
+      receiptId: `MSV2-${canonicalSha256({
+        candidate: CANDIDATE,
+        outputContractDigest: framedDigest('devai:mutation-output-contract:v2.1', input.contract),
+        evidenceSetDigest: (first.summary.aggregate as Record<string, unknown>).evidenceSetDigest,
+      }).slice(0, 16)}`,
       verifierProvenance: validateMutationV21ActivationSnapshot(activationSnapshot()),
       policyDigest: input.contract.policyDigest,
     });
