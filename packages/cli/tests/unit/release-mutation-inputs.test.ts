@@ -412,23 +412,35 @@ describe('protected release mutation input derivation', () => {
         }),
       },
     };
-    const derive = (entry: ProtectedContainerDependency, maximumArchiveBytes = archive.length) =>
+    const derivePopulation = (
+      entries: readonly ProtectedContainerDependency[],
+      maximumArchiveBytes = archive.length,
+    ) =>
       buildReleaseMutationInputPlanV21({
         candidate: current.snapshot,
         resolution: current.resolution,
         plan_receipt: current.receipt,
         controls: {
           ...current.controls,
-          dependencies: [entry],
+          dependencies: entries,
           container: {
             ...current.controls.container,
             maximum_archive_bytes: maximumArchiveBytes,
           },
         },
       });
+    const derive = (entry: ProtectedContainerDependency, maximumArchiveBytes = archive.length) =>
+      derivePopulation([entry], maximumArchiveBytes);
 
     expect(
       captureReleaseMutationInputExecutionContext(derive(dependency)).container_identity,
+    ).toMatchObject({
+      dependencies: [{ mount_path: dependency.mount_path, sha256: dependency.sha256 }],
+    });
+    const frozenDependencies = Object.freeze([dependency]);
+    expect(
+      captureReleaseMutationInputExecutionContext(derivePopulation(frozenDependencies))
+        .container_identity,
     ).toMatchObject({
       dependencies: [{ mount_path: dependency.mount_path, sha256: dependency.sha256 }],
     });
@@ -460,20 +472,33 @@ describe('protected release mutation input derivation', () => {
       unexpected?: boolean;
     };
     extendedDependencies.unexpected = true;
+    const nonEnumerableDependencies = new Array<ProtectedContainerDependency>(1);
+    Object.defineProperty(nonEnumerableDependencies, '0', {
+      value: dependency,
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    let accessorReads = 0;
+    const accessorDependencies = new Array<ProtectedContainerDependency>(1);
+    Object.defineProperty(accessorDependencies, '0', {
+      get: () => {
+        accessorReads += 1;
+        return dependency;
+      },
+      enumerable: true,
+      configurable: true,
+    });
     for (const [_label, entries] of [
       ['a sparse dependency population', sparseDependencies],
       ['a dependency population with a foreign prototype', foreignDependencies],
       ['a dependency population with an extra own field', extendedDependencies],
+      ['a dependency population with a non-enumerable element', nonEnumerableDependencies],
+      ['a dependency population with an accessor element', accessorDependencies],
     ] as const) {
-      expect(() =>
-        buildReleaseMutationInputPlanV21({
-          candidate: current.snapshot,
-          resolution: current.resolution,
-          plan_receipt: current.receipt,
-          controls: { ...current.controls, dependencies: entries },
-        }),
-      ).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
+      expect(() => derivePopulation(entries)).toThrow('MUTATION_INPUT_IDENTITY_MISSING');
     }
+    expect(accessorReads).toBe(0);
 
     const firstInput = dependency.inputs.files[0];
     const firstWorkspace = dependency.inputs.workspace_packages[0];
