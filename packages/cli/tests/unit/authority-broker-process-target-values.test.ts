@@ -52,6 +52,24 @@ describe('authority broker process target values', () => {
     });
   });
 
+  it('recognizes SQL when -c is the first argument and binds the nested database path', () => {
+    expect(target('check', 'psql', ['-c', '  INSERT INTO x VALUES (1)'])).toMatchObject({
+      database_id: 'postgres',
+      object_id: 'check',
+      operation: 'insert',
+    });
+    expect(
+      target('task start', 'psql', ['postgres://host/outer/inner', '-c', 'SELECT 1']),
+    ).toMatchObject({ database_id: 'inner', operation: 'execute' });
+  });
+
+  it.each([
+    ['other', ['postgres://host/db', '-c', 'SELECT 1'], 'task start'],
+    ['psql', ['postgres://host/db', '-c', 'SELECT 1'], 'round run'],
+  ] as const)('does not classify altered SQL boundary %s %j for %s', (executable, args, action) => {
+    expect(target(action, executable, args)).toBeUndefined();
+  });
+
   it.each([
     [['run', '--name', 'fixture-db'], 'fixture-db'],
     [['run'], 'devai-shared-pg'],
@@ -68,6 +86,24 @@ describe('authority broker process target values', () => {
     });
   });
 
+  it('normalizes an unusable Docker container name to the shared cluster', () => {
+    expect(target('task start', 'docker', ['run', '--name', '!!!'])).toMatchObject({
+      database_id: 'cluster',
+      object_id: 'devai-shared-pg',
+    });
+  });
+
+  it.each([
+    ['other', ['run'], 'task start'],
+    ['docker', ['other'], 'task start'],
+    ['docker', ['run'], 'round run'],
+  ] as const)(
+    'does not classify altered Docker boundary %s %j for %s',
+    (executable, args, action) => {
+      expect(target(action, executable, args)).toBeUndefined();
+    },
+  );
+
   it.each([
     ['docker', ['run', '--rm', 'fixture']],
     ['sandbox-exec', ['-p', '(version 1)', 'node']],
@@ -81,6 +117,23 @@ describe('authority broker process target values', () => {
     });
   });
 
+  it.each([
+    ['docker', ['start', 'fixture'], 'check'],
+    ['sandbox-exec', ['node'], 'check'],
+  ] as const)(
+    'does not classify altered check sandbox %s %j for %s',
+    (executable, args, action) => {
+      expect(target(action, executable, args)).toBeUndefined();
+    },
+  );
+
+  it('keeps a task-start Docker run in the database boundary', () => {
+    expect(target('task start', 'docker', ['run', '--rm', 'fixture'])).toMatchObject({
+      kind: 'db',
+      database_id: 'cluster',
+    });
+  });
+
   it('normalizes fetched remote and branch names into an unprotected ref target', () => {
     expect(target('init bind', 'git', ['fetch', 'upstream remote!', 'branch/name'])).toEqual({
       kind: 'git-ref',
@@ -90,6 +143,10 @@ describe('authority broker process target values', () => {
       remote_id: 'upstream-remote',
       operation: 'update',
       protected: false,
+    });
+    expect(target('init bind', 'git', ['fetch'])).toMatchObject({
+      ref: 'refs/remotes/origin/fetch',
+      remote_id: 'origin',
     });
   });
 

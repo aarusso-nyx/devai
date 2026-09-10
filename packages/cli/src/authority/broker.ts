@@ -399,15 +399,6 @@ function canonicalRelativePath(root: string, value: unknown): string {
   return result;
 }
 
-export {
-  canonicalRelativePath,
-  existingRealpath,
-  gitMetadataLayout,
-  gitMetadataLogicalPath,
-  physicalCanonicalPath,
-  within,
-};
-
 function pathOperation(symbol: string, targetPath: string): 'create' | 'update' | 'delete' {
   if (['rmSync', 'unlinkSync'].includes(symbol)) return 'delete';
   if (['mkdirSync', 'mkdtempSync', 'symlinkSync'].includes(symbol)) return 'create';
@@ -562,15 +553,13 @@ function readOnlyProcess(
   return allowed?.includes(String(args[0])) === true;
 }
 
-export { readOnlyProcess };
-
 function safeLogical(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback;
   const normalized = value.replaceAll(/[^A-Za-z0-9._-]/gu, '-').replaceAll(/-+/gu, '-');
   return normalized.replaceAll(/^-|-$/gu, '') || fallback;
 }
 
-export function processTarget(
+function processTarget(
   request: AuthorityHostEffectRequest,
   actionName: string,
   root: string,
@@ -1009,8 +998,6 @@ function makeEnvelope(input: {
     },
   };
 }
-
-export { boundedSelectors, makeEnvelope };
 
 function snapshot(root: string, relativePath: string): unknown {
   const path = physicalCanonicalPath(root, relativePath);
@@ -2196,3 +2183,16 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     },
   };
 }
+
+export {
+  boundedSelectors,
+  canonicalRelativePath,
+  existingRealpath,
+  gitMetadataLayout,
+  gitMetadataLogicalPath,
+  makeEnvelope,
+  physicalCanonicalPath,
+  processTarget,
+  readOnlyProcess,
+  within,
+};
