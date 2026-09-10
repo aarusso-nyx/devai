@@ -3170,7 +3170,12 @@ describe('release lifecycle execution kernel', () => {
   );
 
   it('treats an export provider exception or post-sign material defect as unknown without cleanup or redispatch', async () => {
-    for (const kind of ['throw', 'missing-material', 'invalid-material'] as const) {
+    for (const kind of [
+      'throw',
+      'missing-material',
+      'invalid-material',
+      'missing-trust',
+    ] as const) {
       const value = request('release export');
       const store = new ReleaseLifecycleFileStore(root(), value);
       await advanceToPrepared(store);
@@ -3183,9 +3188,18 @@ describe('release lifecycle execution kernel', () => {
             outcome: 'success' as const,
             transaction: { commit: vi.fn(), rollback, dispose },
           };
+        const material = materialFor('release export');
+        const unit = required(material.release_units[0], 'missing exported release unit');
+        const pkg = required(unit.packages[0], 'missing exported package');
         return {
           outcome: 'success' as const,
-          material: { ...materialFor('release export'), release_units: [] },
+          material:
+            kind === 'missing-trust'
+              ? {
+                  ...material,
+                  release_units: [{ ...unit, packages: [{ ...pkg, trust: null }] }],
+                }
+              : { ...material, release_units: [] },
           transaction: { commit: vi.fn(), rollback, dispose },
         };
       });
