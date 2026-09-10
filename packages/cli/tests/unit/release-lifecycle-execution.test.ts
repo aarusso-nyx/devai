@@ -3277,7 +3277,12 @@ describe('release lifecycle execution kernel', () => {
 
   it('rejects recursive authority injection, identity drift, and non-canonical rosters', () => {
     const valid = request();
+    const unit = required(valid.candidate_locator.release_units[0], 'missing release unit');
+    const planLocator = required(valid.receipt_locators?.[0], 'missing plan receipt');
     expect(validateReleaseLifecycleRequest(valid, 'release preflight')).toEqual(valid);
+    expect(() => validateReleaseLifecycleRequest(valid, 'release certify')).toThrow(
+      'release-request-action-mismatch',
+    );
     expect(() =>
       validateReleaseLifecycleRequest({
         ...valid,
@@ -3290,6 +3295,57 @@ describe('release lifecycle execution kernel', () => {
         candidate_locator: { ...valid.candidate_locator, tree: 'f'.repeat(40) },
       }),
     ).toThrow('release-request-identity-mismatch');
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...valid,
+        repository_locator: { ...valid.repository_locator, commit: 'f'.repeat(40) },
+      }),
+    ).toThrow('release-request-identity-mismatch');
+
+    const secondUnit = { ...unit, release_unit: '@z/release' };
+    const thirdUnit = { ...unit, release_unit: '@zz/release' };
+    const secondLocator = {
+      ...planLocator,
+      receipt_id: `RPL-${'f'.repeat(16)}`,
+      receipt_digest_sha256: 'f'.repeat(64),
+      path: 'receipts/second-plan.json',
+    };
+    const thirdLocator = {
+      ...planLocator,
+      receipt_id: `RPL-${'e'.repeat(16)}`,
+      receipt_digest_sha256: 'e'.repeat(64),
+      path: 'receipts/third-plan.json',
+    };
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...valid,
+        candidate_locator: {
+          ...valid.candidate_locator,
+          release_units: [secondUnit, unit, thirdUnit],
+        },
+        receipt_locators: [planLocator, secondLocator, thirdLocator].sort((left, right) =>
+          left.receipt_id.localeCompare(right.receipt_id, 'en'),
+        ),
+      }),
+    ).toThrow('release-release-unit-bijection-invalid');
+
+    const sortedLocators = [planLocator, secondLocator, thirdLocator].sort((left, right) =>
+      `${left.kind}\0${left.receipt_id}`.localeCompare(`${right.kind}\0${right.receipt_id}`, 'en'),
+    );
+    expect(() =>
+      validateReleaseLifecycleRequest({
+        ...valid,
+        candidate_locator: {
+          ...valid.candidate_locator,
+          release_units: [unit, secondUnit, thirdUnit],
+        },
+        receipt_locators: [
+          required(sortedLocators[1], 'missing second sorted locator'),
+          required(sortedLocators[0], 'missing first sorted locator'),
+          required(sortedLocators[2], 'missing third sorted locator'),
+        ],
+      }),
+    ).toThrow('release-request-receipt-order-invalid');
     const twoPackages = {
       ...valid,
       candidate_locator: {
