@@ -375,6 +375,89 @@ describe('render matrix public command boundaries', () => {
     expect(result.stderr).not.toContain('[pkg-threshold-equal/coverage]');
   });
 
+  it('preserves configured matrix selection, canonical order, exact population, and override precedence', async () => {
+    const root = repository();
+    const dir = join(root, '.devai/state/test-results');
+    const record = (
+      id: string,
+      scope: string,
+      tier: 'unit' | 'mutation',
+      status: 'pass' | 'fail',
+    ) => ({
+      schemaVersion: '1.0.0',
+      id,
+      scope,
+      tier,
+      status,
+      timestamp: '2026-09-09T10:00:00.000Z',
+      metrics: { passed: status === 'pass' ? 1 : 0, failed: status === 'fail' ? 1 : 0 },
+    });
+    for (const [name, value] of [
+      ['00-zeta-unit.json', record('zeta-unit', 'zeta/core', 'unit', 'pass')],
+      ['01-alpha-unit.json', record('alpha-unit', 'alpha/core', 'unit', 'pass')],
+      ['02-zeta-mutation.json', record('zeta-mutation', 'zeta/core', 'mutation', 'fail')],
+      ['03-excluded.json', record('excluded', 'pkg/excluded', 'unit', 'pass')],
+      ['04-outside.json', record('outside', 'outside/scope', 'unit', 'pass')],
+    ] as const) {
+      writeFileSync(join(dir, name), JSON.stringify(value));
+    }
+    writeFileSync(
+      join(root, 'matrix-selection.json'),
+      JSON.stringify({
+        tiers: ['mutation', 'coverage', 'perf', 'unit'],
+        scopes_include: ['zeta/**', 'alpha/**', 'extra/**', 'pkg/**'],
+        scopes_exclude: ['pkg/excluded*', 'never/**'],
+        na_overrides: [
+          { scope: 'zeta/core', tier: 'coverage' },
+          { scope: 'zeta/core', tier: 'unit' },
+          { scope: 'extra/only', tier: 'coverage' },
+          { scope: 'extra/only', tier: 'unit' },
+          { scope: 'pkg/excluded-only', tier: 'coverage' },
+        ],
+      }),
+    );
+
+    const selected = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--config',
+      'matrix-selection.json',
+      '--format',
+      'md',
+    ]);
+    expect(selected).toMatchObject({ exit: 0, stderr: '' });
+    expect(selected.stdout.split('\n').filter((line) => line.startsWith('|'))).toEqual([
+      '| Scope | mutation | coverage | unit |',
+      '|---|---|---|---|',
+      '| alpha/core | N/A | N/A | PASS 1/1 |',
+      '| extra/only | N/A | N/A | N/A |',
+      '| zeta/core | FAIL 0/1 | N/A | N/A |',
+    ]);
+    expect(selected.stdout).not.toContain('perf');
+    expect(selected.stdout).not.toContain('pkg/excluded');
+    expect(selected.stdout).not.toContain('outside/scope');
+
+    writeFileSync(
+      join(root, 'matrix-empty-selection.json'),
+      JSON.stringify({ tiers: [], scopes_include: [] }),
+    );
+    const emptySelection = await invoke(root, [
+      'render-matrix',
+      '--repo-root',
+      root,
+      '--config',
+      'matrix-empty-selection.json',
+      '--format',
+      'md',
+    ]);
+    expect(emptySelection).toMatchObject({ exit: 0, stderr: '' });
+    expect(emptySelection.stdout).toContain('| Scope | unit | mutation |');
+    for (const scope of ['alpha/core', 'outside/scope', 'pkg/excluded', 'zeta/core']) {
+      expect(emptySelection.stdout).toContain(`| ${scope} |`);
+    }
+  });
+
   it('applies configured scope inclusion, exclusion, and N/A overrides', async () => {
     const root = repository();
     const dir = join(root, '.devai/state/test-results');
