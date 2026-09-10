@@ -203,13 +203,14 @@ describe('authority CLI harness branch matrix', () => {
   });
 
   it.each([
-    ['--publish', 'without write consent'],
-    ['--write', 'without publication consent'],
-  ] as const)('rejects remote publication %s %s', async (consentFlag) => {
+    [['--publish'], 'AUTHORITY_PUBLISH_CONSENT_REQUIRED'],
+    [['--write'], 'AUTHORITY_PUBLISH_CONSENT_REQUIRED'],
+    [['--write', '--publish', '--dry-run'], undefined],
+  ] as const)('binds remote publication consent for %j', async (consentFlags, expectedCode) => {
     const target = harness();
     expect(
-      code(await invoke(target, ['release', 'publish', '--as-role', 'owner', consentFlag])),
-    ).toBe('AUTHORITY_PUBLISH_CONSENT_REQUIRED');
+      code(await invoke(target, ['release', 'publish', '--as-role', 'owner', ...consentFlags])),
+    ).toBe(expectedCode);
     expect(target.observations.handler_calls).toBe(0);
   });
 
