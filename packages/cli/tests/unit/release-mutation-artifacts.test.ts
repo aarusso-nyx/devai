@@ -636,6 +636,19 @@ describe('release mutation artifact normalization v2.1', () => {
     ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
   });
 
+  it('accepts the inclusive upper bound for every protected artifact limit', () => {
+    expect(
+      normalized(undefined, {
+        limits: {
+          maximum_raw_report_bytes: 0x7fffffff,
+          maximum_document_bytes: 0x7fffffff,
+          maximum_files: 0x7fffffff,
+          maximum_mutants: 0x7fffffff,
+        },
+      }),
+    ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+  });
+
   it('accepts a raw report exactly at the protected byte quota', () => {
     const report = rawReport(['Killed']);
     const raw_report = Buffer.from(JSON.stringify(report));
@@ -695,6 +708,83 @@ describe('release mutation artifact normalization v2.1', () => {
         code: 'MUTATION_REPORT_INVALID',
       });
     }
+  });
+
+  it('refuses malformed and duplicate independent source identities', () => {
+    const malformed = emittedSources();
+    if (malformed[0] === undefined) throw new Error('fixture source missing');
+    malformed[0].sha256 = 'not-a-digest';
+    expect(() => normalized(undefined, { source_files: malformed })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+
+    const source = emittedSources();
+    expect(() => normalized(undefined, { source_files: [...source, ...source] })).toThrow(
+      'MUTATION_REPORT_INVALID',
+    );
+  });
+
+  it('enforces the aggregate mutant quota across independently emitted source files', () => {
+    const report = rawReport(['Killed']);
+    const original = emittedSources(['0'])[0];
+    if (original === undefined) throw new Error('fixture source missing');
+    const otherSource = 'export const other = true;\n';
+    const otherMutant = { ...original.mutants[0], id: 'other-0' };
+    if (otherMutant.mutatorName === undefined) throw new Error('fixture mutant missing');
+    report.files['src/other.ts'] = {
+      language: 'typescript',
+      source: otherSource,
+      mutants: [
+        {
+          id: otherMutant.id,
+          mutatorName: otherMutant.mutatorName,
+          replacement: REPLACEMENT,
+          location: otherMutant.location,
+          status: 'Killed',
+          statusReason: RAW_REASON,
+        },
+      ],
+    };
+    const source_files = [
+      original,
+      { path: 'src/other.ts', sha256: sha256(otherSource), mutants: [otherMutant] },
+    ];
+
+    expect(
+      normalized(report, {
+        source_files,
+        limits: { ...controls().limits, maximum_mutants: 2 },
+      }),
+    ).toMatchObject({ inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+
+    expect(() =>
+      normalized(report, {
+        source_files,
+        limits: { ...controls().limits, maximum_mutants: 1 },
+      }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+  });
+
+  it('refuses a duplicate protected test population', () => {
+    expect(() =>
+      normalized(undefined, { test_files: ['tests/value.test.ts', 'tests/value.test.ts'] }),
+    ).toThrow('MUTATION_REPORT_INVALID');
+  });
+
+  it('accepts exact coordinate and mutator-name boundaries from independent discovery', () => {
+    const report = rawReport(['Killed']);
+    const discovery = emittedSources(['0']);
+    const raw = report.files['src/value.ts']?.mutants[0];
+    const emitted = discovery[0]?.mutants[0];
+    if (raw === undefined || emitted === undefined) throw new Error('fixture mutant missing');
+    raw.mutatorName = 'M'.repeat(160);
+    emitted.mutatorName = raw.mutatorName;
+    raw.location.end = { ...raw.location.start };
+    emitted.location.end = { ...emitted.location.start };
+
+    expect(normalized(report, { source_files: discovery })).toMatchObject({
+      inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
   });
 
   it('refuses schema-invalid protected process fields before emitting artifacts', () => {
