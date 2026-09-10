@@ -706,6 +706,80 @@ describe('release mutation artifact normalization v2.1', () => {
     ).toThrow('MUTATION_REPORT_INVALID');
   });
 
+  it.each([
+    ['break', -1],
+    ['break', 101],
+    ['high', -1],
+    ['high', 101],
+    ['low', -1],
+    ['low', 101],
+    ['scoreMin', -1],
+    ['scoreMin', 101],
+    ['scoreMin', '60'],
+  ] as const)('refuses protected threshold %s=%j', (key, value) => {
+    const expected = {
+      ...EXPECTED,
+      thresholds: { ...EXPECTED.thresholds, [key]: value },
+    };
+    expect(() => normalized(undefined, { expected })).toThrow('MUTATION_THRESHOLD_MISMATCH');
+  });
+
+  it.each([{ low: 61, high: 60 }, { survivedMax: -1 }, { survivedMax: 1.5 }])(
+    'refuses inconsistent protected thresholds %j',
+    (thresholds) => {
+      const report = rawReport(['Killed']);
+      const expected = {
+        ...EXPECTED,
+        thresholds: { ...EXPECTED.thresholds, ...thresholds },
+      };
+      report.thresholds = {
+        break: expected.thresholds.break,
+        high: expected.thresholds.high,
+        low: expected.thresholds.low,
+      };
+      expect(() => normalized(report, { expected, source_files: emittedSources(['0']) })).toThrow(
+        'MUTATION_THRESHOLD_MISMATCH',
+      );
+    },
+  );
+
+  it('accepts inclusive protected score boundaries and a zero-survivor ceiling', () => {
+    const report = rawReport(['Killed']);
+    report.thresholds = { break: 0, high: 100, low: 0 };
+    const expected = {
+      ...EXPECTED,
+      thresholds: { break: 0, high: 100, low: 0, scoreMin: 100, survivedMax: 0 },
+    };
+    expect(normalized(report, { expected, source_files: emittedSources(['0']) })).toMatchObject({
+      inputDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+  });
+
+  it.each(['packageName', 'workspace'] as const)(
+    'refuses protected input projection %s drift',
+    (field) => {
+      const expected = {
+        ...EXPECTED,
+        inputProjection: { ...EXPECTED.inputProjection, [field]: `different-${field}` },
+      };
+      expect(() => normalized(undefined, { expected })).toThrow('MUTATION_INPUT_DIGEST_MISMATCH');
+    },
+  );
+
+  it('requires an explicit Stryker version in the protected toolchain identity', () => {
+    const expected = { ...EXPECTED, toolVersions: { node: '24.20.0', vitest: '4.1.10' } };
+    expect(() => normalized(undefined, { expected })).toThrow('MUTATION_REPORT_INVALID');
+  });
+
+  it.each([
+    { 'bad/name': '1.0.0' },
+    { stryker: '9.6.1', plugin: 'bad/version' },
+    { stryker: '9.6.1', plugin: 1 },
+  ])('refuses malformed protected toolchain identity %j', (toolVersions) => {
+    const expected = { ...EXPECTED, toolVersions };
+    expect(() => normalized(undefined, { expected })).toThrow('MUTATION_REPORT_INVALID');
+  });
+
   it('removes raw credential-like content and host paths while retaining only replacement digests', () => {
     const artifacts = normalized();
     const text = Buffer.concat([artifacts.report.bytes, artifacts.result.bytes]).toString('utf8');
