@@ -56,6 +56,18 @@ describe('CI scaffold verifier policy boundary', () => {
       (policy: VerifierPolicy) => (policy.package = { name: '@fixture/verifier' }),
     ],
     [
+      'package version with leading data',
+      (policy: VerifierPolicy) => {
+        if (policy.package !== undefined) policy.package.version = 'v1.2.3';
+      },
+    ],
+    [
+      'package version with trailing data',
+      (policy: VerifierPolicy) => {
+        if (policy.package !== undefined) policy.package.version = '1.2.3-dev';
+      },
+    ],
+    [
       'authentication container',
       (policy: VerifierPolicy) => {
         policy.authentication = undefined;
@@ -104,9 +116,33 @@ describe('CI scaffold verifier policy boundary', () => {
       },
     ],
     [
+      'provenance digest with leading data',
+      (policy: VerifierPolicy) => {
+        if (policy.verifier !== undefined) policy.verifier.provenance_sha256 = `g${'0'.repeat(64)}`;
+      },
+    ],
+    [
+      'provenance digest with trailing data',
+      (policy: VerifierPolicy) => {
+        if (policy.verifier !== undefined) policy.verifier.provenance_sha256 = `${'0'.repeat(64)}g`;
+      },
+    ],
+    [
       'source commit',
       (policy: VerifierPolicy) => {
         if (policy.verifier !== undefined) policy.verifier.source_commit = '0'.repeat(39);
+      },
+    ],
+    [
+      'source commit with leading data',
+      (policy: VerifierPolicy) => {
+        if (policy.verifier !== undefined) policy.verifier.source_commit = `g${'0'.repeat(40)}`;
+      },
+    ],
+    [
+      'source commit with trailing data',
+      (policy: VerifierPolicy) => {
+        if (policy.verifier !== undefined) policy.verifier.source_commit = `${'0'.repeat(40)}g`;
       },
     ],
     [
@@ -152,6 +188,17 @@ describe('CI scaffold verifier policy boundary', () => {
     mutate(policy);
     await expect(importScaffoldWithPolicy(policy)).rejects.toThrow(
       'CI_SCAFFOLD_VERIFIER_PACKAGE_POLICY_INVALID',
+    );
+  });
+
+  it('accepts multi-digit SemVer components in an exact package version', async () => {
+    const policy = structuredClone(canonicalPolicy);
+    if (policy.package === undefined) throw new Error('canonical package policy missing');
+    policy.package.version = '10.11.12';
+
+    const scaffold = await importScaffoldWithPolicy(policy);
+    expect(scaffold.ledgerVerificationWorkflow()).toContain(
+      "const selected = metadata.versions?.['10.11.12'];",
     );
   });
 });
