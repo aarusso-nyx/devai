@@ -1,15 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createReleaseRepositoryTestFixture } from './release-repository-test-fixture.js';
 
-const fault = vi.hoisted(() => ({ result: undefined as unknown, calls: 0, at: 1 }));
+const fault = vi.hoisted(() => ({
+  result: undefined as unknown,
+  mutate: undefined as ((result: unknown) => unknown) | undefined,
+  calls: 0,
+  at: 1,
+}));
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return {
     ...actual,
     spawnSync: (...args: unknown[]) => {
-      if (fault.result !== undefined) {
+      if (fault.result !== undefined || fault.mutate !== undefined) {
         fault.calls += 1;
-        if (fault.calls === fault.at) return fault.result;
+        if (fault.calls === fault.at) {
+          if (fault.mutate !== undefined)
+            return fault.mutate(Reflect.apply(actual.spawnSync, undefined, args));
+          return fault.result;
+        }
       }
       return Reflect.apply(actual.spawnSync, undefined, args);
     },
@@ -19,6 +28,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 const fixtures: ReturnType<typeof createReleaseRepositoryTestFixture>[] = [];
 afterEach(() => {
   fault.result = undefined;
+  fault.mutate = undefined;
   fault.calls = 0;
   fault.at = 1;
   for (const fixture of fixtures.splice(0)) fixture.dispose();
@@ -58,23 +68,22 @@ describe('protected repository probe failure before context entry', () => {
   });
 
   it.each([
-    ['repository root', 2],
-    ['Git directory', 3],
-    ['common Git directory', 4],
-    ['candidate commit', 5],
-    ['candidate tree', 6],
-  ] as const)('refuses malformed %s probe output before entry', async (_name, at) => {
+    ['repository root', 2, 0],
+    ['Git directory', 2, 1],
+    ['common Git directory', 2, 2],
+    ['candidate commit', 3, 0],
+    ['candidate tree', 3, 1],
+  ] as const)('refuses malformed %s probe output before entry', async (_name, at, field) => {
     const fixture = createReleaseRepositoryTestFixture();
     fixtures.push(fixture);
     // Keep every preceding Git response real, then corrupt only the selected
     // identity field. A valid context captured earlier cannot authorize entry.
     fault.at = at;
-    fault.result = {
-      status: 0,
-      signal: null,
-      error: undefined,
-      stdout: Buffer.from('untrusted\nextra\n'),
-      stderr: Buffer.alloc(0),
+    fault.mutate = (result) => {
+      const observed = result as { readonly stdout: Buffer };
+      const fields = observed.stdout.toString('utf8').slice(0, -1).split('\n');
+      fields[field] = 'untrusted';
+      return { ...observed, stdout: Buffer.from(`${fields.join('\n')}\n`) };
     };
     const callback = vi.fn();
     await expect(fixture.run(callback)).rejects.toThrow(
