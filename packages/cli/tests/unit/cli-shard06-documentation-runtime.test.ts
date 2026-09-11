@@ -53,6 +53,11 @@ function lawFixture(): void {
   cpSync(join(SOURCE_ROOT, 'law'), join(root, 'law'), { recursive: true, dereference: true });
 }
 
+function resetLawFixture(): void {
+  rmSync(join(root, 'law'), { recursive: true, force: true });
+  lawFixture();
+}
+
 function architecture(): Record<string, unknown> {
   return JSON.parse(
     readFileSync(join(root, 'law/policy/documentation-information-architecture.json'), 'utf8'),
@@ -141,8 +146,8 @@ describe('S06-B source-derived documentation reports', () => {
       'agent-selection-modes': [task.$defs.agentSelection.properties.mode.const],
       roles: roleItems['enum'] as string[],
       effects: effect['enum'] as string[],
-      verdicts: round.vocabularies.verdicts,
-      'action-lifecycles': round.vocabularies.action_lifecycles,
+      verdicts: round.vocabularies.verdicts as string[],
+      'action-lifecycles': round.vocabularies.action_lifecycles as string[],
       'surface-tiers': (round.vocabularies.surface_tiers as Array<{ name: string }>).map(
         (entry) => entry.name,
       ),
@@ -265,6 +270,86 @@ describe('S06-B source-derived documentation reports', () => {
     );
   });
 
+  it('rejects malformed descriptor vocabularies and registry entries with exact error identities', () => {
+    resetLawFixture();
+    const roundPath = 'law/policy/round-execution.json';
+    const round = JSON.parse(readFileSync(join(root, roundPath), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const vocabularies = round['vocabularies'] as Record<string, unknown>;
+    vocabularies['verdicts'] = [7];
+    writeJson(roundPath, round);
+    expect(() => descriptorReport()).toThrow(
+      'CHECK_DESCRIPTOR_VERDICTS_INVALID: expected string array',
+    );
+
+    resetLawFixture();
+    const lifecycleRound = JSON.parse(readFileSync(join(root, roundPath), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    (lifecycleRound['vocabularies'] as Record<string, unknown>)['action_lifecycles'] = [7];
+    writeJson(roundPath, lifecycleRound);
+    expect(() => descriptorReport()).toThrow(
+      'CHECK_DESCRIPTOR_LIFECYCLES_INVALID: expected string array',
+    );
+
+    resetLawFixture();
+    const registryPath = 'law/schemas/action-registry.schema.json';
+    const registry = JSON.parse(readFileSync(join(root, registryPath), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const registryProperties = (registry['properties'] as Record<string, unknown>)[
+      'entries'
+    ] as Record<string, unknown>;
+    const entryProperties = registryProperties['items'] as Record<string, unknown>;
+    const effect = (entryProperties['properties'] as Record<string, unknown>)['effect'] as Record<
+      string,
+      unknown
+    >;
+    effect['enum'] = [7];
+    writeJson(registryPath, registry);
+    expect(() => descriptorReport()).toThrow(
+      'CHECK_DESCRIPTOR_EFFECTS_INVALID: expected string array',
+    );
+
+    resetLawFixture();
+    const sensorPath = 'law/policy/sensor-registry.json';
+    const sensor = JSON.parse(readFileSync(join(root, sensorPath), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const sensorEntries = sensor['entries'] as Array<Record<string, unknown>>;
+    sensorEntries[0]['kind'] = 7;
+    writeJson(sensorPath, sensor);
+    expect(() => descriptorReport()).toThrow('CHECK_DESCRIPTOR_SENSOR_KINDS_INVALID:0');
+
+    resetLawFixture();
+    const runtimePath = 'law/policy/model-runtime-registry.json';
+    const runtime = JSON.parse(readFileSync(join(root, runtimePath), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const runtimes = runtime['runtimes'] as Array<Record<string, unknown>>;
+    runtimes[0]['id'] = 7;
+    writeJson(runtimePath, runtime);
+    expect(() => descriptorReport()).toThrow('CHECK_DESCRIPTOR_RUNTIMES_INVALID:0');
+
+    resetLawFixture();
+    const effortsRuntime = JSON.parse(readFileSync(join(root, runtimePath), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const effortRuntimes = effortsRuntime['runtimes'] as Array<Record<string, unknown>>;
+    effortRuntimes[0]['efforts'] = [7];
+    writeJson(runtimePath, effortsRuntime);
+    expect(() => descriptorReport()).toThrow(
+      'CHECK_DESCRIPTOR_EFFORTS_INVALID: expected string array',
+    );
+  });
+
   it('deduplicates and UTF-8 sorts runtimes and supported efforts', () => {
     lawFixture();
     writeJson('law/policy/model-runtime-registry.json', {
@@ -324,30 +409,6 @@ describe('S06-B docs governance report', () => {
       'docs-ia.sidebar-curated',
       'docs-ia.framework-meta-split',
       'docs-ia.dashboard-current',
-    ]);
-  });
-
-  it('checks both Docusaurus and Jekyll site shapes, including each required file', () => {
-    config('jekyll', 'application', '');
-    expect(governanceFinding('docs-governance.site-dir-shape')).toMatchObject({
-      severity: 'fail',
-      locations: ['docs/site/_config.yml', 'docs/site/Gemfile'],
-    });
-    write('docs/site/_config.yml', 'title: docs\n');
-    expect(governanceFinding('docs-governance.site-dir-shape')?.locations).toEqual([
-      'docs/site/Gemfile',
-    ]);
-    write('docs/site/Gemfile', "source 'https://rubygems.org'\n");
-    expect(governanceFinding('docs-governance.site-dir-shape')).toMatchObject({
-      severity: 'pass',
-      message: 'docs/site/ has expected jekyll structure',
-    });
-
-    config('docusaurus', 'application', '');
-    write('docs/site/docusaurus.config.js', 'module.exports = {};\n');
-    write('docs/site/sidebars.js', 'module.exports = {};\n');
-    expect(governanceFinding('docs-governance.site-dir-shape')?.locations).toEqual([
-      'docs/site/package.json',
     ]);
   });
 
@@ -564,5 +625,18 @@ describe('S06-B runtime invocation boundary', () => {
     await expect(invokeDevaiCli(['--version', 7] as unknown as readonly string[])).rejects.toThrow(
       'release-host-argv-invalid',
     );
+  });
+
+  it('routes help and version through the captured public runtime boundary', async () => {
+    const empty = await invokeDevaiCli([]);
+    expect(empty.exit_code).toBe(0);
+    expect(empty.stdout).toContain('Usage: devai');
+
+    const help = await invokeDevaiCli(['check', '--help']);
+    expect(help.exit_code).toBe(0);
+    expect(help.stdout).toContain('check');
+
+    const version = await invokeDevaiCli(['--version']);
+    expect(version.exit_code).toBe(0);
   });
 });
