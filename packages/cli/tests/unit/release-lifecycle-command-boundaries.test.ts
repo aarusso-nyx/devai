@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CAC } from 'cac';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const doubles = vi.hoisted(() => ({
   action: vi.fn(),
@@ -20,6 +20,7 @@ const doubles = vi.hoisted(() => ({
   storeStates: { value: [] as unknown[] },
   storeRecords: { value: [] as unknown[] },
   storeHead: { value: { head: true } as unknown },
+  storeConstructor: vi.fn(),
 }));
 
 vi.mock('../../src/authority/index.js', () => ({
@@ -28,6 +29,9 @@ vi.mock('../../src/authority/index.js', () => ({
 
 vi.mock('../../src/services/release-lifecycle-execution.js', () => ({
   ReleaseLifecycleFileStore: class {
+    constructor(...args: unknown[]) {
+      doubles.storeConstructor(...args);
+    }
     readStateRecords() {
       return doubles.storeStates.value;
     }
@@ -73,13 +77,7 @@ type Handler = (options: Record<string, unknown>) => void | Promise<void>;
 
 const cleanups: Array<() => void> = [];
 
-afterEach(() => {
-  cleanups
-    .splice(0)
-    .reverse()
-    .forEach((cleanup) => cleanup());
-  vi.restoreAllMocks();
-  vi.clearAllMocks();
+beforeEach(() => {
   process.exitCode = undefined;
   doubles.authority.value = { actor: { kind: 'human' } };
   doubles.storeStates.value = [];
@@ -97,6 +95,16 @@ afterEach(() => {
     receipt: { receipt_id: 'offline-1', verdict: 'pass' },
   });
   doubles.resume.mockResolvedValue({ observation_id: 'observation-1', next_outcome: 'ready' });
+});
+
+afterEach(() => {
+  cleanups
+    .splice(0)
+    .reverse()
+    .forEach((cleanup) => cleanup());
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  process.exitCode = undefined;
 });
 
 function tempRoot(): string {
@@ -376,11 +384,12 @@ describe('release lifecycle command boundaries', () => {
     const certification = { certify: vi.fn() };
     const contentSource = { read: vi.fn() };
     const artifactSink = { write: vi.fn() };
+    const preflightProvider = vi.fn(() => provider);
     doubles.certificationProvider.mockReturnValue(provider);
     doubles.prepareProvider.mockReturnValue(provider);
     doubles.localProvider.mockReturnValue(provider);
     install({
-      preflight_provider: () => provider,
+      preflight_provider: preflightProvider,
       certification_provider: () => certification,
       prepare_content_source: () => contentSource,
       artifact_sink: () => artifactSink,
@@ -440,6 +449,14 @@ describe('release lifecycle command boundaries', () => {
       );
       expect('publication_controls' in input).toBe(definition === lifecycle.releasePublish);
     }
+    expect(preflightProvider).toHaveBeenCalledTimes(1);
+
+    doubles.storeConstructor.mockClear();
+    await capture(lifecycle.releasePreflight).handler({ request: requestPath, repoRoot: root });
+    expect(doubles.storeConstructor).toHaveBeenLastCalledWith(
+      join(root, '.devai/state/release-lifecycle'),
+      request,
+    );
 
     doubles.action.mockResolvedValueOnce({
       ok: false,
@@ -455,6 +472,74 @@ describe('release lifecycle command boundaries', () => {
     expect(stderr).toHaveBeenLastCalledWith(
       'devai release preflight: RELEASE_ACTION_REQUEST_INVALID: release-request-projection-invalid\n',
     );
+  });
+
+  it.each([
+    ['repository id', { repository: { ...resolution.repository, id: 'other/repository' } }],
+    ['repository commit', { repository: { ...resolution.repository, commit: 'c'.repeat(40) } }],
+    ['repository tree', { repository: { ...resolution.repository, tree: 'd'.repeat(40) } }],
+    ['release unit', { release_unit: '@fixture/other' }],
+  ])('rejects a policy resolution with a mismatched %s', async (_name, override) => {
+    const root = tempRoot();
+    const requestPath = put(root, 'request.json', request);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    doubles.validate.mockReturnValue(request);
+    install({
+      policy_resolution: () => ({
+        ...resolution,
+        ...override,
+      }),
+      preflight_provider: () => vi.fn(),
+    });
+
+    await capture(lifecycle.releasePreflight).handler({ request: requestPath, repoRoot: root });
+
+    expect(stderr).toHaveBeenCalledWith(
+      'devai release preflight: RELEASE_ACTION_REQUEST_INVALID: rpl-policy-resolution-mismatch\n',
+    );
+    expect(doubles.action).not.toHaveBeenCalled();
+  });
+
+  it('requires certified state before constructing the prepare provider', async () => {
+    const root = tempRoot();
+    const requestPath = put(root, 'request.json', request);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    doubles.validate.mockReturnValue(request);
+    doubles.storeStates.value = [{ state: 'preflight_passed' }];
+    install({
+      prepare_content_source: () => ({ read: vi.fn() }),
+      artifact_sink: () => ({ write: vi.fn() }),
+    });
+
+    await capture(lifecycle.releasePrepare).handler({ request: requestPath, repoRoot: root });
+
+    expect(stderr).toHaveBeenCalledWith(
+      'devai release prepare: RELEASE_ACTION_REQUEST_INVALID: release-request-projection-invalid\n',
+    );
+    expect(doubles.prepareProvider).not.toHaveBeenCalled();
+    expect(doubles.action).not.toHaveBeenCalled();
+  });
+
+  it('requires the offline receipt verifier for evidence publication', async () => {
+    const root = tempRoot();
+    const requestPath = put(root, 'request.json', request);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    doubles.validate.mockReturnValue(request);
+    install({
+      provider: () => vi.fn(),
+      authorization: () => vi.fn(),
+      artifact_reader: () => vi.fn(),
+    });
+
+    await capture(lifecycle.releaseEvidencePublish).handler({
+      request: requestPath,
+      repoRoot: root,
+    });
+
+    expect(stderr).toHaveBeenCalledWith(
+      'devai release evidence-publish: RELEASE_ACTION_PROVIDER_UNAVAILABLE: the exact lifecycle adapter set is not installed; no store or provider effect occurred\n',
+    );
+    expect(doubles.action).not.toHaveBeenCalled();
   });
 
   it('refuses incomplete protected adapter sets before execution', async () => {
@@ -481,14 +566,16 @@ describe('release lifecycle command boundaries', () => {
       ],
     ] as const;
     for (const [definition, adapters, code] of cases) {
+      stderr.mockClear();
+      doubles.action.mockClear();
       install(adapters);
       await capture(definition).handler({ request: requestPath, repoRoot: root });
       expect(stderr).toHaveBeenLastCalledWith(
         `devai ${definition.name}: ${code}: the exact lifecycle adapter set is not installed; no store or provider effect occurred\n`,
       );
+      expect(doubles.action).not.toHaveBeenCalled();
       cleanups.pop()?.();
     }
-    expect(doubles.action).not.toHaveBeenCalled();
   });
 
   it('contains built-in provider reads within regular repository directories', async () => {
@@ -496,11 +583,15 @@ describe('release lifecycle command boundaries', () => {
     const requestPath = put(root, 'request.json', request);
     mkdirSync(join(root, 'safe/nested'), { recursive: true });
     writeFileSync(join(root, 'safe/nested/input.bin'), 'safe');
+    writeFileSync(join(root, 'safe/not-directory'), 'not a directory');
     const outside = tempRoot();
     writeFileSync(join(outside, 'input.bin'), 'outside');
     symlinkSync(outside, join(root, 'linked'));
+    symlinkSync(outside, join(root, 'safe/linked'));
     const rootLink = join(tempRoot(), 'root-link');
     symlinkSync(root, rootLink);
+    const rootFile = join(tempRoot(), 'root-file');
+    writeFileSync(rootFile, 'not a directory');
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     doubles.validate.mockReturnValue(request);
@@ -510,8 +601,13 @@ describe('release lifecycle command boundaries', () => {
       [root, 'safe/nested/input.bin', true],
       [root, '../input.bin', false],
       [root, 'linked/input.bin', false],
+      [root, 'safe/linked/input.bin', false],
+      [root, 'safe/not-directory/input.bin', false],
       [rootLink, 'safe/nested/input.bin', false],
+      [rootFile, 'input.bin', false],
     ] as const) {
+      stderr.mockClear();
+      doubles.action.mockClear();
       doubles.localProvider.mockImplementationOnce((input: Record<string, unknown>) => {
         const read = input['read_contained_bytes'];
         if (typeof read !== 'function') throw new Error('contained reader missing');
@@ -522,10 +618,12 @@ describe('release lifecycle command boundaries', () => {
       await capture(lifecycle.releasePreflight).handler({ request: requestPath, repoRoot });
       if (succeeds) {
         expect(doubles.action).toHaveBeenCalled();
+        expect(stderr).not.toHaveBeenCalled();
       } else {
         expect(stderr).toHaveBeenLastCalledWith(
           'devai release preflight: RELEASE_ACTION_REQUEST_INVALID: release-receipt-path-unsafe\n',
         );
+        expect(doubles.action).not.toHaveBeenCalled();
       }
       cleanups.pop()?.();
       doubles.action.mockClear();
@@ -550,25 +648,34 @@ describe('release lifecycle command boundaries', () => {
       'devai release offline-verify: RELEASE_OFFLINE_VERIFY_USAGE: --request and --exported-state are required for semantic verification\n',
     );
     install();
+    stderr.mockClear();
+    doubles.offline.mockClear();
     await handler({ request: requestPath, exportedState: statePath });
     expect(stderr).toHaveBeenLastCalledWith(
       'devai release offline-verify: OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE: the trusted offline verifier adapter is not installed; no receipt was emitted\n',
     );
+    expect(doubles.offline).not.toHaveBeenCalled();
     cleanups.pop()?.();
     const provider = vi.fn();
     const reader = vi.fn();
 
     install({ offline_verification_provider: () => provider });
+    stderr.mockClear();
+    doubles.offline.mockClear();
     await handler({ request: requestPath, exportedState: statePath });
     expect(stderr).toHaveBeenLastCalledWith(
       'devai release offline-verify: OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE: the trusted offline verifier adapter is not installed; no receipt was emitted\n',
     );
+    expect(doubles.offline).not.toHaveBeenCalled();
     cleanups.pop()?.();
     install({ artifact_reader: () => reader });
+    stderr.mockClear();
+    doubles.offline.mockClear();
     await handler({ request: requestPath, exportedState: statePath });
     expect(stderr).toHaveBeenLastCalledWith(
       'devai release offline-verify: OFFLINE_VERIFIER_PROVIDER_UNAVAILABLE: the trusted offline verifier adapter is not installed; no receipt was emitted\n',
     );
+    expect(doubles.offline).not.toHaveBeenCalled();
     cleanups.pop()?.();
 
     const closures = { policy: true };
@@ -648,10 +755,12 @@ describe('release lifecycle command boundaries', () => {
       release_units: request.candidate_locator.release_units,
     });
     const verifier = vi.fn();
+    const offlineVerifier = vi.fn();
     install({
-      offline_receipt_verifier: () => vi.fn(),
+      offline_receipt_verifier: () => offlineVerifier,
       publication_signature_verifier: () => verifier,
     });
+    doubles.storeConstructor.mockClear();
     await handler({
       request: requestPath,
       repoRoot: root,
@@ -673,8 +782,10 @@ describe('release lifecycle command boundaries', () => {
         receipt_documents: [],
         publication_receipt: { fixture: 'publication' },
         verify_signature: verifier,
+        offline_receipt_verifier: offlineVerifier,
       }),
     );
+    expect(doubles.storeConstructor).not.toHaveBeenCalled();
 
     doubles.storeStates.value = [{ fixture: 'stored-state' }];
     doubles.storeRecords.value = [{ fixture: 'stored-record' }];
@@ -692,10 +803,22 @@ describe('release lifecycle command boundaries', () => {
         states: [{ fixture: 'stored-state' }],
         store_records: [{ fixture: 'stored-record' }],
         store_head: { fixture: 'stored-head' },
+        receipt_documents: [],
+        offline_receipt_verifier: offlineVerifier,
       }),
+    );
+    expect(doubles.storeConstructor).toHaveBeenLastCalledWith(
+      join(root, '.devai/state/release-lifecycle'),
+      request,
     );
 
     doubles.resume.mockClear();
+    doubles.storeConstructor.mockClear();
+    await handler({ request: requestPath, repoRoot: root, storeHead: headPath });
+    expect(doubles.storeConstructor).not.toHaveBeenCalled();
+    expect(doubles.resume).toHaveBeenLastCalledWith(
+      expect.objectContaining({ states: [], store_head: { fixture: 'head' } }),
+    );
     await handler({ request: requestPath, repoRoot: root, storeRecords: recordsPath });
     expect(doubles.resume).toHaveBeenLastCalledWith(
       expect.objectContaining({ states: [], store_records: [{ fixture: 'record' }] }),
@@ -729,6 +852,39 @@ describe('release lifecycle command boundaries', () => {
       receipts: currentReceiptsPath,
     });
     expect(doubles.planResolver).toHaveBeenCalledWith([resolution]);
+
+    for (const [name, receipt] of [
+      ['null-receipt.json', null],
+      ['primitive-receipt.json', 'not-a-receipt'],
+      [
+        'wrong-kind-receipt.json',
+        { receipt_kind: 'offline-verification-receipt', schemaVersion: '2.0.0' },
+      ],
+      [
+        'wrong-schema-receipt.json',
+        { receipt_kind: 'release-plan-receipt', schemaVersion: '1.0.0' },
+      ],
+    ] as const) {
+      const path = put(root, name, [receipt]);
+      doubles.planResolver.mockClear();
+      doubles.resume.mockImplementationOnce(async (input: Record<string, unknown>) => {
+        const resolvePlanInput = input['resolve_plan_input'];
+        expect(typeof resolvePlanInput).toBe('function');
+        expect(() => Reflect.apply(resolvePlanInput as () => unknown, undefined, [])).toThrow(
+          'rpl-policy-source-unresolved',
+        );
+        return { observation_id: name, next_outcome: 'blocked' };
+      });
+
+      await handler({
+        request: requestPath,
+        repoRoot: root,
+        stateChain: statesPath,
+        receipts: path,
+      });
+
+      expect(doubles.planResolver).not.toHaveBeenCalled();
+    }
 
     doubles.planResolver.mockClear();
     doubles.verifyState.mockReturnValueOnce({
@@ -777,5 +933,66 @@ describe('release lifecycle command boundaries', () => {
     expect(stderr).toHaveBeenLastCalledWith(
       'devai release resume: RELEASE_RESUME_FAILED: release-request-projection-invalid\n',
     );
+  });
+
+  it('keeps an unresolved resume plan resolver fail closed', async () => {
+    const root = tempRoot();
+    const requestPath = put(root, 'request.json', request);
+    const statesPath = put(root, 'states.json', [{ fixture: 'state' }]);
+    doubles.validate.mockReturnValue(request);
+    doubles.verifyState.mockReturnValue({
+      repository: request.repository_locator,
+      candidate: {
+        release_unit: '@fixture/package',
+        version: '1.0.0',
+        commit: request.candidate_locator.commit,
+        tree: request.candidate_locator.tree,
+      },
+    });
+    let resolverError: string | undefined;
+    doubles.resume.mockImplementationOnce(async (input: Record<string, unknown>) => {
+      const resolvePlanInput = input['resolve_plan_input'];
+      try {
+        Reflect.apply(resolvePlanInput as () => unknown, undefined, []);
+      } catch (error) {
+        resolverError = error instanceof Error ? error.message : String(error);
+      }
+      return { observation_id: 'unresolved', next_outcome: 'blocked' };
+    });
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    install();
+
+    await capture(lifecycle.releaseResume).handler({
+      request: requestPath,
+      repoRoot: root,
+      stateChain: statesPath,
+    });
+
+    expect(doubles.resume).toHaveBeenCalledOnce();
+    expect(doubles.planResolver).not.toHaveBeenCalled();
+    expect(resolverError).toBe('rpl-policy-source-unresolved');
+  });
+
+  it('resumes from an explicit state chain without reading a request', async () => {
+    const root = tempRoot();
+    const statesPath = put(root, 'states.json', [{ fixture: 'state' }]);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    doubles.verifyState.mockReturnValue({
+      repository: request.repository_locator,
+      candidate: {
+        release_unit: '@fixture/package',
+        version: '1.0.0',
+        commit: request.candidate_locator.commit,
+        tree: request.candidate_locator.tree,
+      },
+    });
+    install();
+
+    await capture(lifecycle.releaseResume).handler({ stateChain: statesPath, repoRoot: root });
+
+    expect(stderr).not.toHaveBeenCalled();
+    expect(doubles.validate).not.toHaveBeenCalled();
+    expect(doubles.resume).toHaveBeenCalledOnce();
   });
 });
