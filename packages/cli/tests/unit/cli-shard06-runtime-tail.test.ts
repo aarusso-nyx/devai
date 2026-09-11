@@ -322,7 +322,7 @@ describe('S06-B public runtime tail', () => {
   });
 
   it('routes rejected handler promises back through the handler-dispatch stage', async () => {
-    harness.runMatched.mockReturnValue(Promise.reject(new Error('async-handler-failed')));
+    harness.runMatched.mockImplementation(() => Promise.reject(new Error('async-handler-failed')));
     const { invokeDevaiCli } = await runtime();
     await expect(invokeDevaiCli(['catalog', 'actions'])).resolves.toEqual({
       exit_code: 6,
