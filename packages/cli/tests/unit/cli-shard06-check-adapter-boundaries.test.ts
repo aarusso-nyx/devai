@@ -18,9 +18,13 @@ import {
   runCheckPlan,
   suggestCheckMembers,
   type CheckMemberResult,
+  type ResolvedCheckMember,
 } from '../../src/commands/check/contracts.js';
+import { executeCheckMember } from '../../src/commands/check/adapters.js';
+import { checkActionEffectsCmd } from '../../src/commands/check/action-effects.js';
 import { checkDependencies } from '../../src/commands/check/dependencies.js';
 import { checkSchemasForRepository } from '../../src/commands/check/schemas.js';
+import { checkSensorIntegrityCmd } from '../../src/commands/check/sensor-integrity.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const roots: string[] = [];
@@ -160,11 +164,38 @@ describe('S06-A check contract selection and policy boundaries', () => {
 
   it('returns the complete known selector population and deterministic typo suggestions', () => {
     const known = knownCheckMembers(ROOT);
-    expect(known).toEqual([...known].sort());
-    expect(known).toEqual(
-      expect.arrayContaining(['ledger-local', 'ledger-rc', 'schema', 'schemas']),
-    );
+    expect(known).toEqual([
+      'action-coverage',
+      'action-effects',
+      'adrs',
+      'blueprint',
+      'ci-economy',
+      'cli-reference',
+      'dependencies',
+      'docs-governance',
+      'docs-links',
+      'forbidden-actions',
+      'glob-guards',
+      'glossary',
+      'invariant-strategies',
+      'invariants',
+      'journeys',
+      'ledger-local',
+      'ledger-rc',
+      'mutation',
+      'overrides',
+      'pr-compliance',
+      'prompt-overlays',
+      'schema',
+      'schemas',
+      'sensor-integrity',
+      'test-trace',
+      'trace',
+      'translation',
+    ]);
     expect(suggestCheckMembers(ROOT, 'schem')).toEqual(['schema', 'schemas']);
+    expect(suggestCheckMembers(ROOT, 'schemaa')).toEqual(['schema', 'schemas']);
+    expect(suggestCheckMembers(ROOT, 'schemass')).toEqual(['schemas', 'schema']);
     expect(suggestCheckMembers(ROOT, 'zzzzzz')).toEqual([]);
   });
 
@@ -282,6 +313,93 @@ describe('S06-A check contract selection and policy boundaries', () => {
 function processResult(status: number, stdout = '', stderr = '') {
   return { status, signal: null, stdout, stderr, error: undefined };
 }
+
+function subprocessMember(serviceId: string): ResolvedCheckMember {
+  return {
+    id: serviceId,
+    source: 'current-selector',
+    service_id: serviceId,
+    binding: { kind: 'literal-argv', argv: ['pnpm', 'vitest', 'run'] },
+    effect: 'read',
+    cost: 'medium',
+    output: 'action-envelope',
+  };
+}
+
+function recordingCli(): {
+  readonly cli: { command: (name: string, description: string) => unknown };
+  readonly commands: Array<{ name: string; description: string; options: string[] }>;
+} {
+  const commands: Array<{ name: string; description: string; options: string[] }> = [];
+  const cli = {
+    command(name: string, description: string) {
+      const entry = { name, description, options: [] as string[] };
+      commands.push(entry);
+      const builder = {
+        option(option: string) {
+          entry.options.push(option);
+          return builder;
+        },
+        action() {
+          return builder;
+        },
+      };
+      return builder;
+    },
+  };
+  return { cli, commands };
+}
+
+describe('S06-A check command registration contracts', () => {
+  it('preserves the action-effects command identity and registration spelling', () => {
+    const { cli, commands } = recordingCli();
+    checkActionEffectsCmd.register(cli as never);
+    expect(checkActionEffectsCmd).toMatchObject({
+      name: 'check action-effects',
+      authority: 'policy_firewall',
+    });
+    expect(commands).toEqual([
+      {
+        name: 'check-action-effects',
+        description: 'Run the shadow action-effect analyzer',
+        options: ['--repo-root <path>', '--tsconfig <path>', '--registry <path>', '--human'],
+      },
+    ]);
+  });
+
+  it('preserves the sensor-integrity command identity and registration defaults', () => {
+    const { cli, commands } = recordingCli();
+    checkSensorIntegrityCmd.register(cli as never);
+    expect(checkSensorIntegrityCmd).toMatchObject({
+      name: 'check sensor-integrity',
+      description:
+        'Flag SensorReadings that share a command_hash across distinct sensor.kind values (relabeled, not independently measured). Advisory: exits REVIEW on findings, never FAIL.',
+    });
+    expect(commands).toEqual([
+      {
+        name: 'check-sensor-integrity',
+        description: 'Flag relabeled SensorReadings (shared command_hash, distinct kinds)',
+        options: ['--repo-root <path>', '--readings-dir <path>', '--human'],
+      },
+    ]);
+  });
+});
+
+describe('S06-A subprocess adapter status boundaries', () => {
+  it('fails closed when a subprocess returns malformed JSON with a failing exit code', async () => {
+    dependencyBoundary.spawnSync.mockReturnValue(processResult(1, 'not-json', 'stderr-text'));
+
+    const result = await executeCheckMember(subprocessMember('full-tests'), { repoRoot: ROOT });
+    expect(result).toMatchObject({
+      id: 'full-tests',
+      status: 'fail',
+      stdout: 'not-json',
+      stderr: 'stderr-text',
+      exit_code: 1,
+    });
+    expect(result).not.toHaveProperty('value');
+  });
+});
 
 function dependencyRoot(): string {
   const root = temporaryRoot('devai-s06-dependencies-');
@@ -479,6 +597,72 @@ describe('S06-A dependency normalization and aggregate boundaries', () => {
     ).toMatchObject({
       status: 'unknown',
       universes: [{ status: 'pass' }, { status: 'unknown' }],
+    });
+  });
+
+  it('marks a universe unknown when the pinned package-manager version drifts', () => {
+    const root = dependencyRoot();
+    dependencyBoundary.spawnSync.mockImplementation(
+      (executable?: string, args?: readonly string[]) => {
+        if (args?.[0] === '--version')
+          return processResult(0, executable === 'pnpm' ? '9.9.9\n' : '11.14.1\n');
+        return processResult(1, JSON.stringify(cleanModernAudit()));
+      },
+    );
+
+    const result = checkDependencies({
+      repoRoot: root,
+      now: '2026-09-10T00:00:00.000Z',
+      environment: {},
+    });
+
+    expect(result).toMatchObject({
+      status: 'unknown',
+      universes: [
+        {
+          status: 'unknown',
+          findings: [
+            {
+              code: 'DEPENDENCY_SCANNER_UNAVAILABLE',
+              message: 'expected pnpm@10.0.0; received 9.9.9',
+            },
+          ],
+        },
+        { status: 'pass' },
+      ],
+    });
+  });
+
+  it('marks a universe unknown when audit exits before a trustworthy result', () => {
+    const root = dependencyRoot();
+    dependencyBoundary.spawnSync.mockImplementation(
+      (executable?: string, args?: readonly string[]) => {
+        if (args?.[0] === '--version')
+          return processResult(0, executable === 'pnpm' ? '10.0.0\n' : '11.14.1\n');
+        return processResult(executable === 'pnpm' ? 2 : 1, JSON.stringify(cleanModernAudit()));
+      },
+    );
+
+    const result = checkDependencies({
+      repoRoot: root,
+      now: '2026-09-10T00:00:00.000Z',
+      environment: {},
+    });
+
+    expect(result).toMatchObject({
+      status: 'unknown',
+      universes: [
+        {
+          status: 'unknown',
+          findings: [
+            {
+              code: 'DEPENDENCY_SCANNER_UNAVAILABLE',
+              message: 'pnpm audit failed before producing a trustworthy result',
+            },
+          ],
+        },
+        { status: 'pass' },
+      ],
     });
   });
 });
