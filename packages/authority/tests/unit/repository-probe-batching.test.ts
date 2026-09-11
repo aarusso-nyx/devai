@@ -15,6 +15,8 @@ type OutputMutation =
   | 'non-utf8'
   | 'short'
   | 'extra'
+  | 'extra-object-id'
+  | 'trailing-sentinel'
   | 'transpose';
 
 const probe = vi.hoisted(() => ({
@@ -27,23 +29,27 @@ function mutatedOutput(stdout: Buffer, output: OutputMutation): Buffer {
   if (output === 'non-utf8') return Buffer.from([0xff, 0xfe, 0x0a]);
   const fields = stdout.toString('utf8').slice(0, -1).split('\n');
   const value =
-    output === 'short'
-      ? `${fields.slice(0, -1).join('\n')}\n`
-      : output === 'extra'
-        ? `${fields.join('\n')}\nunexpected\n`
-        : output === 'empty-first'
-          ? `\n${fields.slice(1).join('\n')}\n`
-          : output === 'empty-second'
-            ? `${fields[0] ?? ''}\n\n${fields.slice(2).join('\n')}${fields.length > 2 ? '\n' : ''}`
-            : output === 'malformed-first'
-              ? `not-an-object-id\n${fields.slice(1).join('\n')}\n`
-              : output === 'missing-newline'
-                ? fields.join('\n')
-                : output === 'carriage-return'
-                  ? `${fields.join('\r\n')}\r\n`
-                  : output === 'transpose'
-                    ? `${[...fields].reverse().join('\n')}\n`
-                    : `${fields[0] ?? ''}\0${fields.slice(1).join('\n')}\n`;
+    output === 'trailing-sentinel'
+      ? `${fields.join('\n')}!`
+      : output === 'extra-object-id'
+        ? `${fields.join('\n')}\n${'0'.repeat(fields[0]?.length ?? 40)}\n`
+        : output === 'short'
+          ? `${fields.slice(0, -1).join('\n')}\n`
+          : output === 'extra'
+            ? `${fields.join('\n')}\nunexpected\n`
+            : output === 'empty-first'
+              ? `\n${fields.slice(1).join('\n')}\n`
+              : output === 'empty-second'
+                ? `${fields[0] ?? ''}\n\n${fields.slice(2).join('\n')}${fields.length > 2 ? '\n' : ''}`
+                : output === 'malformed-first'
+                  ? `not-an-object-id\n${fields.slice(1).join('\n')}\n`
+                  : output === 'missing-newline'
+                    ? fields.join('\n')
+                    : output === 'carriage-return'
+                      ? `${fields.join('\r\n')}\r\n`
+                      : output === 'transpose'
+                        ? `${[...fields].reverse().join('\n')}\n`
+                        : `${fields[0] ?? ''}\0${fields.slice(1).join('\n')}\n`;
   return Buffer.from(value);
 }
 
@@ -105,13 +111,31 @@ function controls(root: string) {
   };
 }
 
-function fixture() {
+function fixture(objectFormat?: 'sha256') {
   const root = temporaryDirectory('repository probe batch ç ');
-  git(root, ['init', '-q']);
+  git(root, [
+    'init',
+    '-q',
+    ...(objectFormat === undefined ? [] : [`--object-format=${objectFormat}`]),
+  ]);
   git(root, ['config', 'user.name', 'Repository Probe Batch']);
   git(root, ['config', 'user.email', 'repository-probe@example.invalid']);
   git(root, ['remote', 'add', 'origin', ORIGIN]);
   writeFileSync(join(root, 'README.md'), 'repository probe batching\n');
+  git(root, ['add', 'README.md']);
+  git(root, ['commit', '-qm', 'initial']);
+  return { root, controls: controls(root) };
+}
+
+function separateGitDirectoryFixture() {
+  const parent = temporaryDirectory('repository probe separate git ç ');
+  const root = join(parent, 'checkout');
+  const gitDirectory = join(parent, 'git\tstore');
+  execFileSync(GIT, ['init', '-q', `--separate-git-dir=${gitDirectory}`, root]);
+  git(root, ['config', 'user.name', 'Repository Probe Batch']);
+  git(root, ['config', 'user.email', 'repository-probe@example.invalid']);
+  git(root, ['remote', 'add', 'origin', ORIGIN]);
+  writeFileSync(join(root, 'README.md'), 'repository probe separate Git directory\n');
   git(root, ['add', 'README.md']);
   git(root, ['commit', '-qm', 'initial']);
   return { root, controls: controls(root) };
@@ -149,6 +173,49 @@ afterEach(() => {
 });
 
 describe('protected repository Git probe batching', () => {
+  it('rejects a sentinel appended after the common-directory path without a final newline', () => {
+    const value = fixture();
+    probe.mutation = { target: 'paths', output: 'trailing-sentinel' };
+    expect(() => createProtectedReleaseRepositoryContext(value.controls)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+  });
+
+  it('rejects a sentinel appended after the real tree object without a final newline', () => {
+    const value = fixture();
+    probe.mutation = { target: 'objects', output: 'trailing-sentinel' };
+    expect(() => createProtectedReleaseRepositoryContext(value.controls)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+  });
+
+  it('rejects one tab-bearing canonical path from a separate Git directory fixture', () => {
+    const value = separateGitDirectoryFixture();
+    expect(() => createProtectedReleaseRepositoryContext(value.controls)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+  });
+
+  it('rejects one isolated extra SHA-shaped object field', () => {
+    const value = fixture();
+    probe.mutation = { target: 'objects', output: 'extra-object-id' };
+    expect(() => createProtectedReleaseRepositoryContext(value.controls)).toThrow(
+      'AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID',
+    );
+  });
+
+  it('accepts a real SHA-256 Git repository identity', async () => {
+    const value = fixture('sha256');
+    expect(value.controls.repository.commit).toMatch(/^[a-f0-9]{64}$/u);
+    expect(value.controls.repository.tree).toMatch(/^[a-f0-9]{64}$/u);
+    const context = createProtectedReleaseRepositoryContext(value.controls);
+    await withProtectedReleaseRepositoryContext(context, () => {
+      expect(readProtectedReleaseRepositoryIdentity().repository).toEqual(
+        value.controls.repository,
+      );
+    });
+  });
+
   it('uses three exact Git calls per probe and brackets the object read with pins', async () => {
     const value = fixture();
     const context = createProtectedReleaseRepositoryContext(value.controls);
