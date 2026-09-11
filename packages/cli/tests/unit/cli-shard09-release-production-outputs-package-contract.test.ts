@@ -215,6 +215,22 @@ describe('CLI shard 09 release production outputs package contract', () => {
       });
     }
 
+    const renamedRoot = 'packages/demo-extra';
+    const renamedSource = packageSource().map((current) => ({
+      ...current,
+      path: current.path.replace('packages/demo', renamedRoot),
+    }));
+    const [renamedPackage] = resolveProtectedGeneratedNamespaces(
+      descriptor(
+        declaration({
+          prefix: `${renamedRoot}/dist`,
+          package_manifest: `${renamedRoot}/package.json`,
+        }),
+      ),
+      renamedSource,
+    );
+    expect(renamedPackage?.package_id).toBe('@scope/demo');
+
     const [privatePackage] = resolveProtectedGeneratedNamespaces(
       descriptor(declaration()),
       packageSource('tsc -b', {}, { private: true }),
