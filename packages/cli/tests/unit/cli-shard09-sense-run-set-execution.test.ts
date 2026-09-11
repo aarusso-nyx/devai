@@ -1,6 +1,7 @@
 import type { CAC } from 'cac';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
+import type { SensorKind } from '@devai-nyx/sensors';
 import { canonicalRegistry } from '../../src/define-command.js';
 import type { ResolvedSenseSelection } from '../../src/commands/sense/facade.js';
 
@@ -101,7 +102,9 @@ describe('CLI shard 09 sense run set execution', () => {
         vi.fn(async () => ({ sensor: { kind }, status, findings: [] })),
       ]),
     );
-    mocks.sensorAdapter.mockImplementation((kind: string) => adapters.get(kind));
+    mocks.sensorAdapter.mockImplementation((kind: SensorKind) =>
+      adapters.get(kind as (typeof statuses)[number][0]),
+    );
     const resolved = {
       selection: { type: 'preset', value: 'fixture' },
       members: statuses.map(([kind]) => member(kind)),
@@ -136,7 +139,7 @@ describe('CLI shard 09 sense run set execution', () => {
       });
     }
 
-    const withoutInputs = vi.fn(async () => ({
+    const withoutInputs = vi.fn(async (_request: unknown) => ({
       sensor: { kind: 'type_check' },
       status: 'pass',
     }));
@@ -146,6 +149,55 @@ describe('CLI shard 09 sense run set execution', () => {
       { repoRoot: '/repo' },
     );
     expect(withoutInputs).toHaveBeenCalledWith({ repoRoot: '/repo' });
+    expect(Object.keys(withoutInputs.mock.calls[0]?.[0] ?? {})).toEqual(['repoRoot']);
+
+    mocks.sensorAdapter.mockReturnValue(
+      vi.fn(async () => ({ sensor: { kind: 'lint' }, status: 'pass' })),
+    );
+    await expect(
+      executeResolvedSenseSelection(
+        { ...resolved, members: [member('type_check')], executed: ['type_check'] },
+        { repoRoot: '/repo' },
+      ),
+    ).resolves.toEqual([
+      {
+        command: 'devai sense run type_check',
+        processStatus: null,
+        stdout: '',
+        stderr: 'SENSE_ADAPTER_KIND_MISMATCH:type_check:lint',
+      },
+    ]);
+
+    for (const token of ['pkg', '@scope/pkg-._']) {
+      const refusal = new Error(`OPTIONAL_DEPENDENCY_MISSING:${token}`);
+      mocks.sensorAdapter.mockReturnValue(vi.fn(async () => Promise.reject(refusal)));
+      await expect(
+        executeResolvedSenseSelection(
+          { ...resolved, members: [member('type_check')], executed: ['type_check'] },
+          { repoRoot: '/repo' },
+        ),
+      ).rejects.toBe(refusal);
+    }
+
+    for (const diagnostic of [
+      'prefixOPTIONAL_DEPENDENCY_MISSING:pkg',
+      'OPTIONAL_DEPENDENCY_MISSING:pkg!',
+    ]) {
+      mocks.sensorAdapter.mockReturnValue(vi.fn(async () => Promise.reject(new Error(diagnostic))));
+      await expect(
+        executeResolvedSenseSelection(
+          { ...resolved, members: [member('type_check')], executed: ['type_check'] },
+          { repoRoot: '/repo' },
+        ),
+      ).resolves.toEqual([
+        {
+          command: 'devai sense run type_check',
+          processStatus: null,
+          stdout: '',
+          stderr: diagnostic,
+        },
+      ]);
+    }
   });
 
   it('preserves registered paths and suffix arguments and rejects every invalid input shape', async () => {
@@ -157,6 +209,12 @@ describe('CLI shard 09 sense run set execution', () => {
         '1.5.0',
       ),
     ).toEqual(['sense', 'run', 'type_check', '--repo-root', '/repo']);
+    expect(() =>
+      routeSensorChildArgv(['sense', 'run', 'unknown'], '/cli.js', canonicalRegistry(), '1.5.0'),
+    ).toThrow('SENSE_RUN_CHILD_ROUTE_INVALID');
+    expect(() =>
+      routeSensorChildArgv(['--version'], '/cli.js', canonicalRegistry(), '1.5.0'),
+    ).toThrow('SENSE_RUN_CHILD_ACTION_UNKNOWN');
 
     for (const input of ['null', '[]', '"text"', '1', 'true', '{']) {
       const result = await run('type_check', { input });
