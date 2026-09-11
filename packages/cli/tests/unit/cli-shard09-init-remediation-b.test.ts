@@ -332,14 +332,14 @@ describe('cli shard09 init remediation lane B', () => {
     expect(repeat.stdout).toContain('2 included component(s)');
   });
 
-  it('rolls back core bootstrap writes when introspection persistence fails', async () => {
+  it('refuses a directory rollback target before writing core bootstrap files', async () => {
     const { initApplyHarness } = commands;
     const root = repository('devai-init-b-rollback-');
     const blocked = join(root, '.devai/state/init-introspection.json');
     mkdirSync(blocked, { recursive: true });
     await expect(
       invoke(initApplyHarness, ['init-apply-harness', '--target', root, '--introspect']),
-    ).rejects.toThrow();
+    ).rejects.toThrow(`AUTHORITY_ROLLBACK_FILE_TARGET_REQUIRED:${blocked}`);
     expect(existsSync(join(root, '.gitignore'))).toBe(false);
     expect(existsSync(join(root, 'record/proofs/chain.json'))).toBe(false);
     expect(statSync(blocked).isDirectory()).toBe(true);
