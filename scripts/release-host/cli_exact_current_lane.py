@@ -14,6 +14,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -40,6 +41,39 @@ EXPECTED_NODE_VERSION = "v24.15.0"
 EXPECTED_DEPENDENCY_INPUTS = 13
 EXPECTED_DEPENDENCY_WORKSPACES = 10
 BOUND_EXECUTABLES: dict[str, dict[str, str]] = {}
+RAW_POPULATION_FIELDS = [
+    "id",
+    "fileName",
+    "location.start.line",
+    "location.start.column",
+    "location.end.line",
+    "location.end.column",
+    "mutatorName",
+    "replacement",
+]
+CENSUS_V7_COMPACTION = {
+    "digestAlgorithm": "sha256-canonical-json",
+    "mutantFields": [
+        "fileName",
+        "id",
+        "location",
+        "mutatorName",
+        "replacement",
+        "static",
+        "status?",
+    ],
+    "preserves": [
+        "structural-mutant",
+        "plan-kind",
+        "covered-by-count",
+        "covered-by-sha256",
+        "test-filter-kind",
+        "test-filter-count",
+        "test-filter-sha256",
+        "dynamic-filter-equals-covered-by",
+        "static-filter-package-relative-paths-v1",
+    ],
+}
 
 
 class Refusal(RuntimeError):
@@ -52,6 +86,12 @@ def canonical(value: object) -> bytes:
 
 def sha_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def compact_json(value: object) -> bytes:
+    return json.dumps(
+        value, sort_keys=False, separators=(",", ":"), ensure_ascii=False
+    ).encode()
 
 
 def sha_file(path: Path) -> str:
@@ -1030,6 +1070,321 @@ def plan_population(value: object, code: str = "CURRENT_PLAN_POPULATION_INVALID"
             raise Refusal("CURRENT_PLAN_STRUCTURAL_DUPLICATE")
         ids.add(mutant_id)
         structures.add(key)
+    return plans
+
+
+def exact_keys(value: object, expected: set[str], code: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != expected:
+        raise Refusal(code)
+    return value
+
+
+def nonnegative_integer(value: object, code: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise Refusal(code)
+    return value
+
+
+def sha256_value(value: object, code: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[a-f0-9]{64}", value) is None:
+        raise Refusal(code)
+    return value
+
+
+def census_v7_mutant(mutant: object) -> tuple[list[object], tuple[object, ...], str, bool, str]:
+    value = exact_keys(
+        mutant,
+        {"fileName", "id", "location", "mutatorName", "replacement", "static"}
+        | ({"status"} if isinstance(mutant, dict) and "status" in mutant else set()),
+        "PLANREADY_CENSUS_MUTANT_SHAPE_INVALID",
+    )
+    mutant_id = value["id"]
+    if not isinstance(mutant_id, str) or not mutant_id.isdigit():
+        raise Refusal("PLANREADY_CENSUS_MUTANT_ID_INVALID")
+    file_name = value["fileName"]
+    path = relative_file_name(file_name)
+    location = exact_keys(
+        value["location"], {"start", "end"}, "PLANREADY_CENSUS_LOCATION_INVALID"
+    )
+    start = exact_keys(
+        location["start"], {"line", "column"}, "PLANREADY_CENSUS_LOCATION_INVALID"
+    )
+    end = exact_keys(
+        location["end"], {"line", "column"}, "PLANREADY_CENSUS_LOCATION_INVALID"
+    )
+    bounds: list[int] = []
+    for position_value in (start["line"], start["column"], end["line"], end["column"]):
+        bounds.append(nonnegative_integer(position_value, "PLANREADY_CENSUS_LOCATION_INVALID"))
+    if tuple(bounds[:2]) > tuple(bounds[2:]):
+        raise Refusal("PLANREADY_CENSUS_LOCATION_INVALID")
+    if not isinstance(file_name, str):
+        raise Refusal("PLANREADY_CENSUS_MUTANT_FILE_INVALID")
+    mutator = value["mutatorName"]
+    replacement = value["replacement"]
+    if not isinstance(mutator, str) or not mutator or not isinstance(replacement, str):
+        raise Refusal("PLANREADY_CENSUS_MUTANT_SHAPE_INVALID")
+    static = value["static"]
+    if not isinstance(static, bool):
+        raise Refusal("PLANREADY_CENSUS_MUTANT_STATIC_INVALID")
+    if "status" in value and not isinstance(value["status"], str):
+        raise Refusal("PLANREADY_CENSUS_MUTANT_STATUS_INVALID")
+    identity = [mutant_id, file_name, *bounds, mutator, replacement]
+    structural_key = (file_name, *bounds, mutator, replacement)
+    status = value.get("status", "Unknown")
+    return identity, structural_key, path, static, status
+
+
+def validate_census_v7_plan(
+    plan: object,
+    summary: object,
+    plan_sha256: str,
+    expected_source_paths: set[str],
+) -> list[dict[str, Any]]:
+    document = exact_keys(
+        plan,
+        {"schemaVersion", "compaction", "rawPopulationBinding", "mutantPlans"},
+        "PLANREADY_CENSUS_PLAN_SHAPE_INVALID",
+    )
+    if document["schemaVersion"] != "devai.diagnostic.cli-census-plan.compact.v7":
+        raise Refusal("PLANREADY_CENSUS_SCHEMA_INVALID")
+    if document["compaction"] != CENSUS_V7_COMPACTION:
+        raise Refusal("PLANREADY_CENSUS_COMPACTION_INVALID")
+    plans = document["mutantPlans"]
+    if not isinstance(plans, list) or not plans:
+        raise Refusal("PLANREADY_CENSUS_PLAN_POPULATION_INVALID")
+
+    identities: list[list[object]] = []
+    ids: set[str] = set()
+    structural_keys: set[tuple[object, ...]] = set()
+    if not expected_source_paths:
+        raise Refusal("PLANREADY_CENSUS_SOURCE_POPULATION_INVALID")
+    per_file: dict[str, dict[str, Any]] = {}
+    for path in sorted(expected_source_paths):
+        if relative_file_name(path) != path:
+            raise Refusal("PLANREADY_CENSUS_SOURCE_POPULATION_INVALID")
+        per_file[path] = {
+            "path": path,
+            "planned": 0,
+            "covered": 0,
+            "uncovered": 0,
+            "earlyResult": 0,
+            "earlyResultStatuses": {},
+            "static": 0,
+        }
+    for item in plans:
+        if not isinstance(item, dict):
+            raise Refusal("PLANREADY_CENSUS_PLAN_ENTRY_INVALID")
+        plan_kind = item.get("plan")
+        if plan_kind == "EarlyResult":
+            expected_item_keys = {"plan", "mutant", "coverageBinding"}
+        elif plan_kind == "Run":
+            expected_item_keys = {"plan", "mutant", "coverageBinding", "runOptions"}
+        else:
+            raise Refusal("PLANREADY_CENSUS_PLAN_KIND_INVALID")
+        entry = exact_keys(item, expected_item_keys, "PLANREADY_CENSUS_PLAN_ENTRY_INVALID")
+        identity, structural_key, path, is_static, status = census_v7_mutant(
+            entry["mutant"]
+        )
+        mutant_id = str(identity[0])
+        if mutant_id in ids:
+            raise Refusal("PLANREADY_CENSUS_MUTANT_ID_DUPLICATE")
+        if structural_key in structural_keys:
+            raise Refusal("PLANREADY_CENSUS_MUTANT_STRUCTURAL_DUPLICATE")
+        ids.add(mutant_id)
+        structural_keys.add(structural_key)
+        identities.append(identity)
+
+        coverage = exact_keys(
+            entry["coverageBinding"],
+            {"coveredByCount", "coveredBySha256", "coveredByDigestAlgorithm"},
+            "PLANREADY_CENSUS_COVERAGE_BINDING_INVALID",
+        )
+        coverage_count = nonnegative_integer(
+            coverage["coveredByCount"], "PLANREADY_CENSUS_COVERAGE_BINDING_INVALID"
+        )
+        coverage_sha = sha256_value(
+            coverage["coveredBySha256"], "PLANREADY_CENSUS_COVERAGE_BINDING_INVALID"
+        )
+        if coverage["coveredByDigestAlgorithm"] != "sha256-canonical-json":
+            raise Refusal("PLANREADY_CENSUS_COVERAGE_BINDING_INVALID")
+
+        counts = per_file.get(path)
+        if counts is None:
+            raise Refusal("PLANREADY_CENSUS_SOURCE_POPULATION_INVALID")
+        counts["planned"] += 1
+        if is_static:
+            counts["static"] += 1
+        if plan_kind == "EarlyResult":
+            counts["earlyResult"] += 1
+            statuses = counts["earlyResultStatuses"]
+            statuses[status] = statuses.get(status, 0) + 1
+            continue
+
+        options = entry["runOptions"]
+        option_keys = {
+            "testFilterKind",
+            "testFilterCoverage",
+            "testFilterCount",
+            "testFilterSha256",
+            "testFilterDigestAlgorithm",
+        } | ({"staticFilterPathNormalization"} if is_static else set())
+        run = exact_keys(options, option_keys, "PLANREADY_CENSUS_TEST_FILTER_INVALID")
+        filter_count = nonnegative_integer(
+            run["testFilterCount"], "PLANREADY_CENSUS_TEST_FILTER_INVALID"
+        )
+        filter_sha = sha256_value(
+            run["testFilterSha256"], "PLANREADY_CENSUS_TEST_FILTER_INVALID"
+        )
+        if run["testFilterDigestAlgorithm"] != "sha256-canonical-json":
+            raise Refusal("PLANREADY_CENSUS_TEST_FILTER_INVALID")
+        if is_static:
+            if (
+                run["testFilterKind"] != "global-static-files"
+                or run["testFilterCoverage"] != "covered"
+                or filter_count == 0
+                or run["staticFilterPathNormalization"]
+                != "packages/cli/tests-relative-v1"
+            ):
+                raise Refusal("PLANREADY_CENSUS_STATIC_FILTER_INVALID")
+            counts["covered"] += 1
+        else:
+            expected_kind = "uncovered" if coverage_count == 0 else "covered-by-test-ids"
+            expected_coverage = "uncovered" if coverage_count == 0 else "covered"
+            if (
+                run["testFilterKind"] != expected_kind
+                or run["testFilterCoverage"] != expected_coverage
+                or filter_count != coverage_count
+                or filter_sha != coverage_sha
+            ):
+                raise Refusal("PLANREADY_CENSUS_DYNAMIC_FILTER_INVALID")
+            counts[expected_coverage] += 1
+
+    ordered_identities = sorted(identities, key=compact_json)
+    raw = exact_keys(
+        document["rawPopulationBinding"],
+        {"count", "sha256", "digestAlgorithm", "fields"},
+        "PLANREADY_CENSUS_RAW_POPULATION_INVALID",
+    )
+    if (
+        nonnegative_integer(raw["count"], "PLANREADY_CENSUS_RAW_POPULATION_INVALID")
+        != len(identities)
+        or sha256_value(raw["sha256"], "PLANREADY_CENSUS_RAW_POPULATION_INVALID")
+        != sha_bytes(compact_json(ordered_identities))
+        or raw["digestAlgorithm"] != "sha256-canonical-json"
+        or raw["fields"] != RAW_POPULATION_FIELDS
+    ):
+        raise Refusal("PLANREADY_CENSUS_RAW_POPULATION_INVALID")
+
+    summary_value = exact_keys(
+        summary,
+        {
+            "version",
+            "diagnosticOnly",
+            "mutantExecutionStarted",
+            "files",
+            "totals",
+            "scoreDenominator",
+            "maximumPossibleScore",
+            "planSha256",
+        },
+        "PLANREADY_CENSUS_SUMMARY_INVALID",
+    )
+    if (
+        type(summary_value["version"]) is not int
+        or summary_value["version"] != 1
+        or summary_value["diagnosticOnly"] is not True
+        or summary_value["mutantExecutionStarted"] is not False
+        or summary_value["planSha256"] != plan_sha256
+    ):
+        raise Refusal("PLANREADY_CENSUS_SUMMARY_INVALID")
+    summary_files = summary_value["files"]
+    if not isinstance(summary_files, list):
+        raise Refusal("PLANREADY_CENSUS_SOURCE_TOTALS_INVALID")
+    count_keys = ("planned", "covered", "uncovered", "earlyResult", "static")
+    for file_summary in summary_files:
+        value = exact_keys(
+            file_summary,
+            {"path", *count_keys, "earlyResultStatuses"},
+            "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID",
+        )
+        if not isinstance(value["path"], str):
+            raise Refusal("PLANREADY_CENSUS_SOURCE_TOTALS_INVALID")
+        for key in count_keys:
+            nonnegative_integer(value[key], "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID")
+        statuses = value["earlyResultStatuses"]
+        if not isinstance(statuses, dict) or any(
+            not isinstance(status, str)
+            or not status
+            or nonnegative_integer(count, "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID") == 0
+            for status, count in statuses.items()
+        ):
+            raise Refusal("PLANREADY_CENSUS_SOURCE_TOTALS_INVALID")
+    expected_files = [per_file[path] for path in sorted(per_file)]
+    if summary_files != expected_files:
+        raise Refusal("PLANREADY_CENSUS_SOURCE_TOTALS_INVALID")
+    expected_totals = {
+        key: sum(int(file[key]) for file in expected_files)
+        for key in ("planned", "covered", "uncovered", "earlyResult", "static")
+    }
+    status_names = sorted(
+        {status for file in expected_files for status in file["earlyResultStatuses"]}
+    )
+    expected_totals["earlyResultStatuses"] = {
+        status: sum(file["earlyResultStatuses"].get(status, 0) for file in expected_files)
+        for status in status_names
+    }
+    totals_value = exact_keys(
+        summary_value["totals"],
+        {*count_keys, "earlyResultStatuses"},
+        "PLANREADY_CENSUS_TOTALS_INVALID",
+    )
+    for key in count_keys:
+        nonnegative_integer(totals_value[key], "PLANREADY_CENSUS_TOTALS_INVALID")
+    total_statuses = totals_value["earlyResultStatuses"]
+    if not isinstance(total_statuses, dict) or any(
+        not isinstance(status, str)
+        or not status
+        or nonnegative_integer(count, "PLANREADY_CENSUS_TOTALS_INVALID") == 0
+        for status, count in total_statuses.items()
+    ):
+        raise Refusal("PLANREADY_CENSUS_TOTALS_INVALID")
+    if totals_value != expected_totals:
+        raise Refusal("PLANREADY_CENSUS_TOTALS_INVALID")
+    if expected_totals["planned"] != (
+        expected_totals["covered"]
+        + expected_totals["uncovered"]
+        + expected_totals["earlyResult"]
+    ):
+        raise Refusal("PLANREADY_CENSUS_TOTALS_INVALID")
+    scored_early = sum(
+        expected_totals["earlyResultStatuses"].get(status, 0)
+        for status in ("Killed", "Timeout", "Survived", "NoCoverage")
+    )
+    successful_early = sum(
+        expected_totals["earlyResultStatuses"].get(status, 0)
+        for status in ("Killed", "Timeout")
+    )
+    denominator = expected_totals["covered"] + expected_totals["uncovered"] + scored_early
+    maximum = (
+        None
+        if denominator == 0
+        else 100 * (expected_totals["covered"] + successful_early) / denominator
+    )
+    if (
+        isinstance(summary_value["scoreDenominator"], bool)
+        or not isinstance(summary_value["scoreDenominator"], int)
+        or summary_value["scoreDenominator"] != denominator
+        or isinstance(summary_value["maximumPossibleScore"], bool)
+        or (
+            summary_value["maximumPossibleScore"] is not None
+            and (
+                not isinstance(summary_value["maximumPossibleScore"], (int, float))
+                or not math.isfinite(summary_value["maximumPossibleScore"])
+            )
+        )
+        or summary_value["maximumPossibleScore"] != maximum
+    ):
+        raise Refusal("PLANREADY_CENSUS_SCORE_SUMMARY_INVALID")
     return plans
 
 
@@ -2143,16 +2498,12 @@ def execute_planready(
     summary_path = case / "results/census-summary.json"
     summary = load_json(summary_path, "PLANREADY_OUTPUT_MISSING")
     plan = load_json(plan_path, "PLANREADY_OUTPUT_MISSING")
-    plans = plan_population(plan)
-    if summary.get("diagnosticOnly") is not True or summary.get("mutantExecutionStarted") is not False:
-        raise Refusal("PLANREADY_EXECUTION_BOUNDARY_INVALID")
-    if summary.get("planSha256") != sha_file(plan_path) or summary.get("totals", {}).get("planned") != len(plans):
-        raise Refusal("PLANREADY_POPULATION_BINDING_INVALID")
-    summary_files = summary.get("files")
-    if not isinstance(summary_files, list) or any(not isinstance(item, dict) for item in summary_files):
-        raise Refusal("PLANREADY_SOURCE_POPULATION_INVALID")
-    if {item.get("path") for item in summary_files} != {item["path"] for item in identity["targets"]}:
-        raise Refusal("PLANREADY_SOURCE_POPULATION_INVALID")
+    plans = validate_census_v7_plan(
+        plan,
+        summary,
+        sha_file(plan_path),
+        {item["path"] for item in identity["targets"]},
+    )
     completion = {
         "kind": "diagnostic-cli-exact-current-planready-completion",
         "version": 1,

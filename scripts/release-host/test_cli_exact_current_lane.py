@@ -55,6 +55,160 @@ def mapped(value: dict, frozen_id: str | None = None) -> dict:
     }
 
 
+def census_v7_fixture() -> tuple[dict, dict, str]:
+    def coverage(test_ids: list[str]) -> dict:
+        return {
+            "coveredByCount": len(test_ids),
+            "coveredBySha256": harness.sha_bytes(harness.compact_json(test_ids)),
+            "coveredByDigestAlgorithm": "sha256-canonical-json",
+        }
+
+    def bounded(value: dict, *, static: bool = False, status: str | None = None) -> dict:
+        result = {
+            **value,
+            "fileName": value["fileName"],
+            "static": static,
+        }
+        result.pop("status", None)
+        if status is not None:
+            result["status"] = status
+        return result
+
+    first = mutant("1")
+    first["fileName"] = "/workspace/candidate/packages/cli/src/a.ts"
+    second = mutant("2", replacement="true")
+    second["fileName"] = first["fileName"]
+    third = mutant("3", replacement="null")
+    third["fileName"] = "/workspace/candidate/packages/cli/src/b.ts"
+    fourth = mutant("4", replacement="undefined")
+    fourth["fileName"] = third["fileName"]
+    covered_ids = ["a.test.ts#first", "b.test.ts#second"]
+    static_filter = [
+        "packages/cli/tests/unit/a.test.ts",
+        "packages/cli/tests/unit/b.test.ts",
+    ]
+    plans = [
+        {
+            "plan": "Run",
+            "mutant": bounded(first),
+            "coverageBinding": coverage(covered_ids),
+            "runOptions": {
+                "testFilterKind": "covered-by-test-ids",
+                "testFilterCoverage": "covered",
+                "testFilterCount": len(covered_ids),
+                "testFilterSha256": harness.sha_bytes(harness.compact_json(covered_ids)),
+                "testFilterDigestAlgorithm": "sha256-canonical-json",
+            },
+        },
+        {
+            "plan": "Run",
+            "mutant": bounded(second),
+            "coverageBinding": coverage([]),
+            "runOptions": {
+                "testFilterKind": "uncovered",
+                "testFilterCoverage": "uncovered",
+                "testFilterCount": 0,
+                "testFilterSha256": harness.sha_bytes(harness.compact_json([])),
+                "testFilterDigestAlgorithm": "sha256-canonical-json",
+            },
+        },
+        {
+            "plan": "Run",
+            "mutant": bounded(third, static=True),
+            "coverageBinding": coverage(["static-origin"]),
+            "runOptions": {
+                "testFilterKind": "global-static-files",
+                "testFilterCoverage": "covered",
+                "testFilterCount": len(static_filter),
+                "testFilterSha256": harness.sha_bytes(harness.compact_json(static_filter)),
+                "testFilterDigestAlgorithm": "sha256-canonical-json",
+                "staticFilterPathNormalization": "packages/cli/tests-relative-v1",
+            },
+        },
+        {
+            "plan": "EarlyResult",
+            "mutant": bounded(fourth, status="Killed"),
+            "coverageBinding": coverage([]),
+        },
+    ]
+    identities = []
+    for entry in plans:
+        value = entry["mutant"]
+        location = value["location"]
+        identities.append(
+            [
+                value["id"],
+                value["fileName"],
+                location["start"]["line"],
+                location["start"]["column"],
+                location["end"]["line"],
+                location["end"]["column"],
+                value["mutatorName"],
+                value["replacement"],
+            ]
+        )
+    plan = {
+        "schemaVersion": "devai.diagnostic.cli-census-plan.compact.v7",
+        "compaction": harness.CENSUS_V7_COMPACTION,
+        "rawPopulationBinding": {
+            "count": len(identities),
+            "sha256": harness.sha_bytes(
+                harness.compact_json(sorted(identities, key=harness.compact_json))
+            ),
+            "digestAlgorithm": "sha256-canonical-json",
+            "fields": harness.RAW_POPULATION_FIELDS,
+        },
+        "mutantPlans": plans,
+    }
+    plan_sha = harness.sha_bytes(harness.compact_json(plan))
+    summary = {
+        "version": 1,
+        "diagnosticOnly": True,
+        "mutantExecutionStarted": False,
+        "files": [
+            {
+                "path": "packages/cli/src/a.ts",
+                "planned": 2,
+                "covered": 1,
+                "uncovered": 1,
+                "earlyResult": 0,
+                "earlyResultStatuses": {},
+                "static": 0,
+            },
+            {
+                "path": "packages/cli/src/b.ts",
+                "planned": 2,
+                "covered": 1,
+                "uncovered": 0,
+                "earlyResult": 1,
+                "earlyResultStatuses": {"Killed": 1},
+                "static": 1,
+            },
+        ],
+        "totals": {
+            "planned": 4,
+            "covered": 2,
+            "uncovered": 1,
+            "earlyResult": 1,
+            "earlyResultStatuses": {"Killed": 1},
+            "static": 1,
+        },
+        "scoreDenominator": 4,
+        "maximumPossibleScore": 75,
+        "planSha256": plan_sha,
+    }
+    return plan, summary, plan_sha
+
+
+def validate_census_v7_fixture(plan: object, summary: object, plan_sha: str) -> list[dict]:
+    return harness.validate_census_v7_plan(
+        plan,
+        summary,
+        plan_sha,
+        {"packages/cli/src/a.ts", "packages/cli/src/b.ts"},
+    )
+
+
 def write_frozen_retention(root: Path) -> tuple[dict[str, str], str]:
     campaign = {"commit": "a" * 40, "tree": "b" * 40, "id": "campaign-1"}
     lane = "shard-10"
@@ -386,6 +540,276 @@ def recovery_inspection(root: Path, name: str, container_id: str, state: str) ->
 
 
 class HarnessRefusalTests(unittest.TestCase):
+    def test_census_v7_accepts_exact_dynamic_static_and_early_result_bindings(self) -> None:
+        plan, summary, plan_sha = census_v7_fixture()
+        self.assertEqual(
+            validate_census_v7_fixture(plan, summary, plan_sha),
+            plan["mutantPlans"],
+        )
+
+    def test_census_v7_binds_zero_mutant_sources_and_refuses_undeclared_sources(self) -> None:
+        plan, summary, plan_sha = census_v7_fixture()
+        zero_path = "packages/cli/src/c.ts"
+        summary["files"].append(
+            {
+                "path": zero_path,
+                "planned": 0,
+                "covered": 0,
+                "uncovered": 0,
+                "earlyResult": 0,
+                "earlyResultStatuses": {},
+                "static": 0,
+            }
+        )
+        expected = {
+            "packages/cli/src/a.ts",
+            "packages/cli/src/b.ts",
+            zero_path,
+        }
+        self.assertEqual(
+            harness.validate_census_v7_plan(plan, summary, plan_sha, expected),
+            plan["mutantPlans"],
+        )
+        with self.assertRaisesRegex(
+            harness.Refusal, "PLANREADY_CENSUS_SOURCE_POPULATION_INVALID"
+        ):
+            harness.validate_census_v7_plan(
+                plan,
+                summary,
+                plan_sha,
+                {"packages/cli/src/a.ts", zero_path},
+            )
+        summary["files"].pop()
+        with self.assertRaisesRegex(
+            harness.Refusal, "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID"
+        ):
+            harness.validate_census_v7_plan(plan, summary, plan_sha, expected)
+
+    def test_census_v7_refuses_schema_compaction_and_raw_population_drift(self) -> None:
+        def changed() -> tuple[dict, dict, str]:
+            plan, summary, plan_sha = census_v7_fixture()
+            return json.loads(json.dumps(plan)), json.loads(json.dumps(summary)), plan_sha
+
+        plan, summary, plan_sha = changed()
+        plan["schemaVersion"] = "devai.diagnostic.cli-census-plan.compact.v6"
+        with self.assertRaisesRegex(harness.Refusal, "PLANREADY_CENSUS_SCHEMA_INVALID"):
+            validate_census_v7_fixture(plan, summary, plan_sha)
+
+        for label, mutate, code in (
+            (
+                "root extra",
+                lambda value: value.update({"extra": True}),
+                "PLANREADY_CENSUS_PLAN_SHAPE_INVALID",
+            ),
+            (
+                "compaction",
+                lambda value: value["compaction"].update({"digestAlgorithm": "sha256"}),
+                "PLANREADY_CENSUS_COMPACTION_INVALID",
+            ),
+            (
+                "raw count",
+                lambda value: value["rawPopulationBinding"].update({"count": 3}),
+                "PLANREADY_CENSUS_RAW_POPULATION_INVALID",
+            ),
+            (
+                "raw digest",
+                lambda value: value["rawPopulationBinding"].update({"sha256": "0" * 64}),
+                "PLANREADY_CENSUS_RAW_POPULATION_INVALID",
+            ),
+            (
+                "raw fields",
+                lambda value: value["rawPopulationBinding"]["fields"].reverse(),
+                "PLANREADY_CENSUS_RAW_POPULATION_INVALID",
+            ),
+            (
+                "duplicate id",
+                lambda value: value["mutantPlans"][1]["mutant"].update({"id": "1"}),
+                "PLANREADY_CENSUS_MUTANT_ID_DUPLICATE",
+            ),
+            (
+                "duplicate structure",
+                lambda value: value["mutantPlans"][1]["mutant"].update(
+                    {
+                        "location": value["mutantPlans"][0]["mutant"]["location"],
+                        "mutatorName": value["mutantPlans"][0]["mutant"]["mutatorName"],
+                        "replacement": value["mutantPlans"][0]["mutant"]["replacement"],
+                    }
+                ),
+                "PLANREADY_CENSUS_MUTANT_STRUCTURAL_DUPLICATE",
+            ),
+            (
+                "location extra",
+                lambda value: value["mutantPlans"][0]["mutant"]["location"].update(
+                    {"extra": 1}
+                ),
+                "PLANREADY_CENSUS_LOCATION_INVALID",
+            ),
+        ):
+            with self.subTest(label=label):
+                plan, summary, plan_sha = changed()
+                mutate(plan)
+                with self.assertRaisesRegex(harness.Refusal, code):
+                    validate_census_v7_fixture(plan, summary, plan_sha)
+
+    def test_census_v7_refuses_coverage_and_plan_kind_shape_drift(self) -> None:
+        def changed() -> tuple[dict, dict, str]:
+            plan, summary, plan_sha = census_v7_fixture()
+            return json.loads(json.dumps(plan)), json.loads(json.dumps(summary)), plan_sha
+
+        for label, mutate, code in (
+            (
+                "coverage extra",
+                lambda value: value["mutantPlans"][0]["coverageBinding"].update(
+                    {"extra": True}
+                ),
+                "PLANREADY_CENSUS_COVERAGE_BINDING_INVALID",
+            ),
+            (
+                "coverage bool count",
+                lambda value: value["mutantPlans"][0]["coverageBinding"].update(
+                    {"coveredByCount": True}
+                ),
+                "PLANREADY_CENSUS_COVERAGE_BINDING_INVALID",
+            ),
+            (
+                "coverage digest",
+                lambda value: value["mutantPlans"][0]["coverageBinding"].update(
+                    {"coveredBySha256": "not-a-digest"}
+                ),
+                "PLANREADY_CENSUS_COVERAGE_BINDING_INVALID",
+            ),
+            (
+                "early run options",
+                lambda value: value["mutantPlans"][3].update({"runOptions": {}}),
+                "PLANREADY_CENSUS_PLAN_ENTRY_INVALID",
+            ),
+            (
+                "run missing options",
+                lambda value: value["mutantPlans"][0].pop("runOptions"),
+                "PLANREADY_CENSUS_PLAN_ENTRY_INVALID",
+            ),
+            (
+                "unknown kind",
+                lambda value: value["mutantPlans"][0].update({"plan": "Unknown"}),
+                "PLANREADY_CENSUS_PLAN_KIND_INVALID",
+            ),
+        ):
+            with self.subTest(label=label):
+                plan, summary, plan_sha = changed()
+                mutate(plan)
+                with self.assertRaisesRegex(harness.Refusal, code):
+                    validate_census_v7_fixture(plan, summary, plan_sha)
+
+    def test_census_v7_refuses_dynamic_and_static_filter_drift(self) -> None:
+        def changed() -> tuple[dict, dict, str]:
+            plan, summary, plan_sha = census_v7_fixture()
+            return json.loads(json.dumps(plan)), json.loads(json.dumps(summary)), plan_sha
+
+        for label, plan_index, patch, code in (
+            (
+                "dynamic kind",
+                0,
+                {"testFilterKind": "uncovered"},
+                "PLANREADY_CENSUS_DYNAMIC_FILTER_INVALID",
+            ),
+            (
+                "dynamic coverage",
+                0,
+                {"testFilterCoverage": "uncovered"},
+                "PLANREADY_CENSUS_DYNAMIC_FILTER_INVALID",
+            ),
+            (
+                "dynamic count",
+                0,
+                {"testFilterCount": 1},
+                "PLANREADY_CENSUS_DYNAMIC_FILTER_INVALID",
+            ),
+            (
+                "dynamic digest",
+                0,
+                {"testFilterSha256": "0" * 64},
+                "PLANREADY_CENSUS_DYNAMIC_FILTER_INVALID",
+            ),
+            (
+                "static kind",
+                2,
+                {"testFilterKind": "covered-by-test-ids"},
+                "PLANREADY_CENSUS_STATIC_FILTER_INVALID",
+            ),
+            (
+                "static empty",
+                2,
+                {"testFilterCount": 0},
+                "PLANREADY_CENSUS_STATIC_FILTER_INVALID",
+            ),
+            (
+                "static marker",
+                2,
+                {"staticFilterPathNormalization": "ambient-paths"},
+                "PLANREADY_CENSUS_STATIC_FILTER_INVALID",
+            ),
+        ):
+            with self.subTest(label=label):
+                plan, summary, plan_sha = changed()
+                plan["mutantPlans"][plan_index]["runOptions"].update(patch)
+                with self.assertRaisesRegex(harness.Refusal, code):
+                    validate_census_v7_fixture(plan, summary, plan_sha)
+
+    def test_census_v7_refuses_summary_file_status_total_score_and_hash_drift(self) -> None:
+        def changed() -> tuple[dict, dict, str]:
+            plan, summary, plan_sha = census_v7_fixture()
+            return json.loads(json.dumps(plan)), json.loads(json.dumps(summary)), plan_sha
+
+        for label, mutate, code in (
+            (
+                "summary extra",
+                lambda value: value.update({"extra": True}),
+                "PLANREADY_CENSUS_SUMMARY_INVALID",
+            ),
+            (
+                "plan hash",
+                lambda value: value.update({"planSha256": "0" * 64}),
+                "PLANREADY_CENSUS_SUMMARY_INVALID",
+            ),
+            (
+                "file filter total",
+                lambda value: value["files"][0].update({"covered": 2}),
+                "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID",
+            ),
+            (
+                "file static total",
+                lambda value: value["files"][1].update({"static": 0}),
+                "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID",
+            ),
+            (
+                "file status total",
+                lambda value: value["files"][1]["earlyResultStatuses"].update(
+                    {"Killed": 2}
+                ),
+                "PLANREADY_CENSUS_SOURCE_TOTALS_INVALID",
+            ),
+            (
+                "aggregate total",
+                lambda value: value["totals"].update({"planned": 3}),
+                "PLANREADY_CENSUS_TOTALS_INVALID",
+            ),
+            (
+                "denominator",
+                lambda value: value.update({"scoreDenominator": 3}),
+                "PLANREADY_CENSUS_SCORE_SUMMARY_INVALID",
+            ),
+            (
+                "maximum score",
+                lambda value: value.update({"maximumPossibleScore": 100}),
+                "PLANREADY_CENSUS_SCORE_SUMMARY_INVALID",
+            ),
+        ):
+            with self.subTest(label=label):
+                plan, summary, plan_sha = changed()
+                mutate(summary)
+                with self.assertRaisesRegex(harness.Refusal, code):
+                    validate_census_v7_fixture(plan, summary, plan_sha)
+
     def test_dependency_control_requires_exact_declared_archive_population(self) -> None:
         for mutation in ("missing", "extra", "unsafe"):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
