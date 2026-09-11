@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { ProtectedCertificationContainer } from '../../src/services/release-certification-container.js';
 import {
@@ -122,8 +123,66 @@ async function captureRunnerOptions(
 }
 
 describe('protected certification provider boundaries', () => {
-  it('rejects malformed construction controls before exposing a provider', () => {
+  it('rejects malformed construction controls before exposing a provider', async () => {
     const value = providerFixture();
+    const repository = value.value.candidate.repository;
+    const proof = value.value.candidate.readProof(value.value.candidate.paths);
+    const commit = proof.get(repository.commit);
+    const blob = [...proof].find(([, object]) => object.type === 'blob');
+    if (commit?.type !== 'commit' || blob === undefined)
+      throw new Error('fixture proof population unavailable');
+    const [blobId, blobObject] = blob;
+    const objectRequest = {
+      repository,
+      object_format: 'sha1' as const,
+      object_id: repository.commit,
+      type: 'commit' as const,
+    };
+    const first = await value.options.content_source.readGitObject(objectRequest);
+    expect(first).toEqual(commit.bytes);
+    first.fill(0);
+    expect(await value.options.content_source.readGitObject(objectRequest)).toEqual(commit.bytes);
+    for (const invalid of [
+      { ...objectRequest, type: 'tree' as const },
+      { ...objectRequest, object_id: '0'.repeat(40) },
+      { ...objectRequest, repository: { ...repository, tree: '0'.repeat(40) } },
+    ]) {
+      expect(() => value.options.content_source.readGitObject(invalid)).toThrow(
+        'fixture proof object unavailable',
+      );
+    }
+    const blobRequest = {
+      repository,
+      candidate: value.request.candidate_locator,
+      object_id: blobId,
+      locator: {
+        kind: 'git-object' as const,
+        repository: repository.id,
+        commit: repository.commit,
+        tree: repository.tree,
+        object_format: 'sha1' as const,
+        path: 'fixture-proof-object',
+        mode: '100644' as const,
+        object_id: blobId,
+        size_bytes: blobObject.bytes.length,
+        content_digest_sha256: createHash('sha256').update(blobObject.bytes).digest('hex'),
+      },
+    };
+    expect(await value.options.content_source.readGitBlob(blobRequest)).toEqual(blobObject.bytes);
+    expect(() =>
+      value.options.content_source.readGitBlob({
+        ...blobRequest,
+        candidate: { ...blobRequest.candidate, tree: '0'.repeat(40) },
+      }),
+    ).toThrow('fixture proof object unavailable');
+    expect(() =>
+      value.options.content_source.readGitBlob({
+        ...blobRequest,
+        locator: { ...blobRequest.locator, object_format: 'sha256' },
+      }),
+    ).toThrow('fixture proof object unavailable');
+    expect(await value.gitContentSource.readGitObject(objectRequest)).toEqual(commit.bytes);
+    expect(await value.gitContentSource.readGitBlob(blobRequest)).toEqual(blobObject.bytes);
     const invalidDiagnostics: readonly unknown[] = [
       null,
       [null],

@@ -553,6 +553,43 @@ function providerFixture(production?: {
     installed: production?.installed,
     productionResolution: production?.resolution,
   });
+  const proof = [...value.candidate.readProof(value.candidate.paths)];
+  const objectFormat = value.candidate.repository.commit.length === 40 ? 'sha1' : 'sha256';
+  const proofKey = (input: {
+    readonly repository: typeof value.candidate.repository;
+    readonly object_format: 'sha1' | 'sha256';
+    readonly type: ReleaseGitObject['type'];
+    readonly object_id: string;
+  }): string =>
+    canonicalJson({
+      repository: input.repository.id,
+      commit: input.repository.commit,
+      tree: input.repository.tree,
+      object_format: input.object_format,
+      type: input.type,
+      object_id: input.object_id,
+    });
+  const proofObjects: ReadonlyMap<string, Buffer> = new Map(
+    proof.map(([object_id, object]) => [
+      proofKey({
+        repository: value.candidate.repository,
+        object_format: objectFormat,
+        type: object.type,
+        object_id,
+      }),
+      Buffer.from(object.bytes),
+    ]),
+  );
+  const readProofObject = (input: {
+    readonly repository: typeof value.candidate.repository;
+    readonly object_format: 'sha1' | 'sha256';
+    readonly type: ReleaseGitObject['type'];
+    readonly object_id: string;
+  }): Buffer => {
+    const object = proofObjects.get(proofKey(input));
+    if (object === undefined) throw new Error('fixture proof object unavailable');
+    return Buffer.from(object);
+  };
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-toolchain-provider-')));
   temporaryRoots.push(root);
   const git = (args: readonly string[]): Buffer => {
@@ -565,7 +602,7 @@ function providerFixture(production?: {
     return result.stdout;
   };
   git(['init', '-q']);
-  for (const [id, object] of value.candidate.readProof(value.candidate.paths)) {
+  for (const [id, object] of proof) {
     // A combined-suite run stalled inside Git reading its stdin pipe. Materialize
     // the same proof bytes as a private file so hashing has a definite EOF; keep
     // the exact object-id assertion and never place fixture inputs in the tree.
@@ -588,6 +625,11 @@ function providerFixture(production?: {
     git(['rev-parse', 'HEAD^{tree}']).toString().trim(),
     value.candidate.repository.tree,
   );
+  const gitContentSource = {
+    readGitObject: ({ type, object_id }: { type: 'commit' | 'tree'; object_id: string }) =>
+      git(['cat-file', type, object_id]),
+    readGitBlob: ({ object_id }: { object_id: string }) => git(['cat-file', 'blob', object_id]),
+  };
   const intent = {
     schemaVersion: '1.0.0',
     release_unit: '@devai-toolchain/diagnostic',
@@ -694,8 +736,18 @@ function providerFixture(production?: {
       production_resolution: value.productionResolution,
     },
     content_source: {
-      readGitObject: ({ type, object_id }) => git(['cat-file', type, object_id]),
-      readGitBlob: ({ object_id }) => git(['cat-file', 'blob', object_id]),
+      readGitObject: ({ repository, object_format, type, object_id }) =>
+        readProofObject({ repository, object_format, type, object_id }),
+      readGitBlob: ({ repository, candidate, locator, object_id }) => {
+        if (candidate.commit !== repository.commit || candidate.tree !== repository.tree)
+          throw new Error('fixture proof object unavailable');
+        return readProofObject({
+          repository,
+          object_format: locator.object_format,
+          type: 'blob',
+          object_id,
+        });
+      },
     },
     evidence_sink: {
       kind: 'certification-evidence-sink-v3',
@@ -771,7 +823,7 @@ function providerFixture(production?: {
     toolchain: options.toolchain,
     environment: {},
   };
-  return { value, options, request: boundRequest, raw, expected };
+  return { value, options, gitContentSource, request: boundRequest, raw, expected };
 }
 
 export { ROOT, DYNAMIC, PACKAGE, fixture, context, request, providerFixture, resolutionFor };
