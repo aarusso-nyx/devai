@@ -211,15 +211,23 @@ function repositoryProbe(configuredRoot: string) {
     }
   }
   if (origin.length !== 1) return repositoryIdentityFailure();
-  const line = (args: readonly string[]): string => {
-    const value = repositoryGit(root, args);
-    if (!value.endsWith('\n') || /[\p{Cc}\p{Cs}]/u.test(value.slice(0, -1)))
-      return repositoryIdentityFailure();
-    return value.slice(0, -1);
-  };
-  if (line(['rev-parse', '--show-toplevel']) !== root) return repositoryIdentityFailure();
-  const gitDirectory = line(['rev-parse', '--absolute-git-dir']);
-  const commonDirectory = line(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  const pathOutput = repositoryGit(root, [
+    'rev-parse',
+    '--show-toplevel',
+    '--absolute-git-dir',
+    '--path-format=absolute',
+    '--git-common-dir',
+  ]);
+  if (!pathOutput.endsWith('\n')) return repositoryIdentityFailure();
+  const pathFields = pathOutput.slice(0, -1).split('\n');
+  if (
+    pathFields.length !== 3 ||
+    pathFields.some((value) => value.length === 0 || /[\p{Cc}\p{Cs}]/u.test(value))
+  )
+    return repositoryIdentityFailure();
+  const [observedRoot, gitDirectory, commonDirectory] = pathFields;
+  if (observedRoot !== root || gitDirectory === undefined || commonDirectory === undefined)
+    return repositoryIdentityFailure();
   if (
     realpathSync(gitDirectory) !== gitDirectory ||
     realpathSync(commonDirectory) !== commonDirectory
@@ -231,8 +239,22 @@ function repositoryProbe(configuredRoot: string) {
     repositoryPin(commonDirectory),
     repositoryPin(resolve(commonDirectory, 'config')),
   ];
-  const commit = line(['rev-parse', '--verify', 'HEAD']);
-  const tree = line(['rev-parse', '--verify', 'HEAD^{tree}']);
+  const objectOutput = repositoryGit(root, ['rev-parse', 'HEAD^{commit}', 'HEAD^{tree}']);
+  if (!objectOutput.endsWith('\n')) return repositoryIdentityFailure();
+  const objectFields = objectOutput.slice(0, -1).split('\n');
+  if (
+    objectFields.length !== 2 ||
+    objectFields.some(
+      (value) =>
+        value.length === 0 ||
+        /[\p{Cc}\p{Cs}]/u.test(value) ||
+        !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value),
+    )
+  )
+    return repositoryIdentityFailure();
+  const [commit, tree] = objectFields;
+  if (commit === undefined || tree === undefined || commit.length !== tree.length)
+    return repositoryIdentityFailure();
   for (const pin of pins) {
     const current = repositoryPin(pin.path);
     if (current.dev !== pin.dev || current.ino !== pin.ino) return repositoryIdentityFailure();
