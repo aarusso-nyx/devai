@@ -100,6 +100,50 @@ function replaceJson(
 }
 
 describe('CLI shard 09 release production outputs package contract', () => {
+  it('rejects package paths and prefixes that only resemble the closed namespace contract', () => {
+    const sourceAt = (root: string, manifestPath = `${root}/package.json`) => [
+      entry('tsconfig.base.json', baseConfig()),
+      entry(`${root}/src/index.ts`, Buffer.from('export const demo = true;')),
+      entry(`${root}/tsconfig.json`, {
+        extends: '../../tsconfig.base.json',
+        compilerOptions: { rootDir: './src', outDir: './dist' },
+        include: ['src/**/*'],
+      }),
+      entry(manifestPath, {
+        name: '@scope/demo',
+        private: false,
+        scripts: { build: 'tsc -b' },
+        main: './dist/index.js',
+      }),
+    ];
+
+    const prefixLookalikeRoot = 'xpackages/demo';
+    const suffixLookalikeRoot = 'packages/demo/package.json';
+    const suffixLookalikeManifest = `${suffixLookalikeRoot}ABCDEFGHIJKLM`;
+    const cases: readonly (readonly [unknown, readonly ContainerArchiveEntry[]])[] = [
+      [
+        declaration({
+          package_manifest: `${prefixLookalikeRoot}/package.json`,
+          prefix: `${prefixLookalikeRoot}/dist`,
+        }),
+        sourceAt(prefixLookalikeRoot),
+      ],
+      [
+        declaration({
+          package_manifest: suffixLookalikeManifest,
+          prefix: `${suffixLookalikeRoot}/dist`,
+        }),
+        sourceAt(suffixLookalikeRoot, suffixLookalikeManifest),
+      ],
+      [declaration({ prefix: 'packages/other/dist' }), packageSource()],
+    ];
+
+    for (const [candidateDeclaration, candidateSource] of cases) {
+      expect(() =>
+        resolveProtectedGeneratedNamespaces(descriptor(candidateDeclaration), candidateSource),
+      ).toThrow(INVALID);
+    }
+  });
   it('refuses malformed package identity and each incompatible compiler layout', () => {
     const source = packageSource();
     const cases: readonly (readonly [unknown, readonly ContainerArchiveEntry[]])[] = [
