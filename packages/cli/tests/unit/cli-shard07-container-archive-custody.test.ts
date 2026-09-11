@@ -83,15 +83,27 @@ function overdeclareFirstEntry(archive: Buffer): Buffer {
   throw new Error('entry header not found');
 }
 
-function headerOfType(archive: Buffer, type: number): Buffer {
+function headerOfType(archive: Buffer, type: number, occurrence = 0): Buffer {
   let offset = 0;
+  let observed = 0;
   while (offset + 512 <= archive.length) {
     const block = archive.subarray(offset, offset + 512);
-    if (block[156] === type) return block;
+    if (block[156] === type && observed++ === occurrence) return block;
     const size = Number.parseInt(block.subarray(124, 136).toString('ascii').trim() || '0', 8);
     offset += 512 + Math.ceil(size / 512) * 512;
   }
   throw new Error(`header type ${type} not found`);
+}
+
+function singleHeaderArchive(header: Buffer, payload = Buffer.alloc(0)): Buffer {
+  const selected = Buffer.from(header);
+  sizeField(selected, payload.length);
+  return Buffer.concat([
+    selected,
+    payload,
+    Buffer.alloc((512 - (payload.length % 512)) % 512),
+    Buffer.alloc(1024),
+  ]);
 }
 
 function bareEntryArchive(source: Buffer): Buffer {
@@ -277,6 +289,82 @@ describe('container archive security boundaries', () => {
     expect(() => decodeContainerArchive(valid.subarray(0, -1), valid.length)).toThrow(INVALID);
     const dangling = valid.subarray(0, 1024 + 512);
     expect(() => decodeContainerArchive(dangling, dangling.length)).toThrow(INVALID);
+  });
+
+  it('covers distinct PAX, checksum, header, directory, and symlink refusal states', () => {
+    const ordinary = encodeContainerArchive([file('dir/payload', Buffer.from('x'))]);
+    const pax = headerOfType(ordinary, 0x78);
+    const paxOffset = ordinary.indexOf(pax);
+    const paxSize = Number.parseInt(pax.subarray(124, 136).toString('ascii').trim(), 8);
+    const paxEnd = paxOffset + 512 + Math.ceil(paxSize / 512) * 512;
+
+    const malformedPax = replaceFirstPax(ordinary, Buffer.from('missing-space'));
+    expect(() => decodeContainerArchive(malformedPax, malformedPax.length)).toThrow(INVALID);
+
+    const duplicatePax = Buffer.concat([
+      ordinary.subarray(0, paxEnd),
+      ordinary.subarray(paxOffset, paxEnd),
+      ordinary.subarray(paxEnd),
+    ]);
+    expect(() => decodeContainerArchive(duplicatePax, duplicatePax.length)).toThrow(INVALID);
+
+    const danglingPax = Buffer.concat([ordinary.subarray(0, paxEnd), Buffer.alloc(1024)]);
+    expect(() => decodeContainerArchive(danglingPax, danglingPax.length)).toThrow(INVALID);
+
+    const badChecksum = Buffer.from(ordinary);
+    badChecksum[0] = (badChecksum[0] ?? 0) ^ 1;
+    expect(() => decodeContainerArchive(badChecksum, badChecksum.length)).toThrow(INVALID);
+
+    const prefixed = Buffer.from(headerOfType(ordinary, 0x30));
+    prefixed.fill(0, 0, 100);
+    prefixed.write('payload', 0, 'ascii');
+    prefixed.fill(0, 345, 500);
+    prefixed.write('dir', 345, 'ascii');
+    checksum(prefixed);
+    expect(decodeContainerArchive(singleHeaderArchive(prefixed, Buffer.from('x')), 2048)).toEqual([
+      file('dir/payload', Buffer.from('x')),
+    ]);
+
+    const dotted = Buffer.from(prefixed);
+    dotted.fill(0, 0, 100);
+    dotted.fill(0, 345, 500);
+    dotted.write('./payload', 0, 'ascii');
+    checksum(dotted);
+    expect(decodeContainerArchive(singleHeaderArchive(dotted, Buffer.from('x')), 2048)).toEqual([
+      file('payload', Buffer.from('x')),
+    ]);
+
+    const invalidDirectory = Buffer.from(headerOfType(ordinary, 0x35, 1));
+    expect(() =>
+      decodeContainerArchive(singleHeaderArchive(invalidDirectory, Buffer.from('x')), 2048),
+    ).toThrow(INVALID);
+
+    const invalidType = Buffer.from(prefixed);
+    invalidType[156] = 0x31;
+    checksum(invalidType);
+    expect(() => decodeContainerArchive(singleHeaderArchive(invalidType), 2048)).toThrow(INVALID);
+
+    const dependency = encodeContainerDependencyArchive([
+      { path: 'node_modules/tool', mode: '120000', target: '../tool-real' },
+    ]);
+    const invalidLink = Buffer.from(headerOfType(dependency, 0x32));
+    invalidLink.fill(0, 157, 257);
+    checksum(invalidLink);
+    expect(() => decodeContainerDependencyArchive(singleHeaderArchive(invalidLink), 2048)).toThrow(
+      INVALID,
+    );
+
+    const duplicateLink = replaceFirstPax(
+      dependency,
+      Buffer.concat([
+        paxRecord('path', 'node_modules/tool'),
+        paxRecord('linkpath', '../tool-real'),
+        paxRecord('linkpath', '../tool-other'),
+      ]),
+    );
+    expect(() => decodeContainerDependencyArchive(duplicateLink, duplicateLink.length)).toThrow(
+      INVALID,
+    );
   });
 
   it.each([

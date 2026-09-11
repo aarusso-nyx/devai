@@ -52,6 +52,7 @@ const mocks = vi.hoisted(() => ({
   reverifyMutation: vi.fn(),
   reverifyCertification: vi.fn(),
   verifyProviderSetV3: vi.fn(),
+  invokeSink: vi.fn((operation: () => unknown) => operation()),
 }));
 
 vi.mock('@devai-nyx/authority', async (importOriginal) => {
@@ -59,7 +60,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
   return {
     ...actual,
     createProtectedExportSinkAdapter: () => ({
-      invokeSink: <T>(operation: () => T) => operation(),
+      invokeSink: <T>(operation: () => T) => mocks.invokeSink(operation) as T,
     }),
     createProtectedReleaseSinkOwner: () => ({}),
     readProtectedReleaseExportCapacity: (...args: unknown[]) => mocks.capacity(...args),
@@ -1022,6 +1023,38 @@ describe('release export artifact store depth', () => {
       await refusal(() => value.transaction.abort());
       expect(() => value.transaction.preserve()).toThrow(ERROR);
     }
+  });
+
+  it('distinguishes pre-dispatch commit refusal from unknown post-dispatch failure', async () => {
+    const beforeDispatch = await transactionFixture();
+    const beforeManifest = await beforeDispatch.transaction.readCommitManifest();
+    const beforeReceipt = await beforeDispatch.transaction.put(
+      object('committed-manifest', null, beforeManifest),
+    );
+    mocks.invokeSink.mockImplementationOnce(() => {
+      throw new Error('AUTHORITY_PRE_DISPATCH_REFUSAL');
+    });
+    await expect(beforeDispatch.transaction.commit(beforeReceipt)).rejects.toThrow(
+      'AUTHORITY_PRE_DISPATCH_REFUSAL',
+    );
+    await refusal(() => beforeDispatch.transaction.readCommitManifest());
+
+    const afterDispatch = await transactionFixture();
+    const afterManifest = await afterDispatch.transaction.readCommitManifest();
+    const afterReceipt = await afterDispatch.transaction.put(
+      object('committed-manifest', null, afterManifest),
+    );
+    mkdirSync(
+      join(
+        afterDispatch.options.root,
+        'exports',
+        afterDispatch.transaction.transaction_handle,
+        'commit.json',
+      ),
+    );
+    await expect(afterDispatch.transaction.commit(afterReceipt)).rejects.toThrow(
+      'release-export-artifact-sink-commit-unknown',
+    );
   });
 
   it('refuses overlapping operations while protected revalidation is outstanding', async () => {
