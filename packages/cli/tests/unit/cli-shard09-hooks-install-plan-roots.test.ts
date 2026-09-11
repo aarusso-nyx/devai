@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { HOOK_NAMES, buildHooksInstallPlan } from '../../src/services/hooks-install/index.js';
 
@@ -122,6 +122,19 @@ describe('CLI shard 09 hooks install plan and repository roots', () => {
     writeFileSync(join(ordinary, '.git/commondir'), '  \n');
     expect(buildHooksInstallPlan({ targetRoot: ordinary }).path).toBe(
       join(ordinary, '.git/hooks/pre-push'),
+    );
+
+    const relativeOrdinary = relative(process.cwd(), ordinary);
+    expect(buildHooksInstallPlan({ targetRoot: relativeOrdinary }).path).toBe(
+      join(relativeOrdinary, '.git/hooks/pre-push'),
+    );
+
+    const literal = join(container, 'literal');
+    const literalCommon = join(literal, '.git/Stryker was here!');
+    mkdirSync(join(literalCommon, 'hooks'), { recursive: true });
+    writeFileSync(join(literal, '.git/commondir'), 'Stryker was here!\n');
+    expect(buildHooksInstallPlan({ targetRoot: literal }).path).toBe(
+      join(literalCommon, 'hooks/pre-push'),
     );
   });
 });

@@ -82,6 +82,11 @@ describe('CLI shard 09 hooks install HEAD and validation boundaries', () => {
   });
 
   it('selects the exact symbolic ref from a multi-entry packed refs file', async () => {
+    const looseRoot = repository();
+    put(looseRoot, '.git/HEAD', 'ref:   refs/heads/main\n');
+    put(looseRoot, '.git/refs/heads/main', `${'b'.repeat(40)}\n`);
+    expect((await install(looseRoot))['installed_at_head']).toBe('b'.repeat(40));
+
     const root = repository();
     put(root, '.git/HEAD', 'ref: refs/heads/main\n');
     put(
