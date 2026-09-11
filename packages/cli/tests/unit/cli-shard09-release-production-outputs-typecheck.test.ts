@@ -65,6 +65,7 @@ function typecheckSource(): ContainerArchiveEntry[] {
     entry('packages/cli/src/index.ts', Buffer.from('export const cli = true;')),
     entry('packages/cli/src/commands/run.ts', Buffer.from('export const run = true;')),
     entry('packages/cli/src/contracts.d.ts', Buffer.from('export type Contract = string;')),
+    entry('packages/cli/src/generated/.gitkeep', Buffer.alloc(0)),
     entry('packages/other/src/ignored.ts', Buffer.from('export const ignored = true;')),
   ];
 }
@@ -121,6 +122,16 @@ describe('CLI shard 09 release production outputs typecheck contract', () => {
       resolveProtectedGeneratedNamespaces(descriptor(declaration), changedSource)[0]
         ?.input_digest_sha256,
     ).not.toBe(resolved?.input_digest_sha256);
+
+    const changedIgnoredSource = source.map((current) =>
+      current.path === 'packages/other/src/ignored.ts'
+        ? { ...current, bytes: Buffer.from('export const ignored = false;') }
+        : current,
+    );
+    expect(
+      resolveProtectedGeneratedNamespaces(descriptor(declaration), changedIgnoredSource)[0]
+        ?.input_digest_sha256,
+    ).toBe(resolved?.input_digest_sha256);
   });
 
   it('refuses every malformed CLI typecheck layout boundary', () => {

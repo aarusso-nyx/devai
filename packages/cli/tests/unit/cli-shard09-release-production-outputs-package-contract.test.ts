@@ -120,6 +120,15 @@ describe('CLI shard 09 release production outputs package contract', () => {
     const prefixLookalikeRoot = 'xpackages/demo';
     const suffixLookalikeRoot = 'packages/demo/package.json';
     const suffixLookalikeManifest = `${suffixLookalikeRoot}ABCDEFGHIJKLM`;
+    const prefixMismatchSource = replaceJson(
+      packageSource(),
+      'packages/demo/package.json',
+      (manifest) => {
+        const copy = { ...manifest };
+        delete copy.main;
+        return copy;
+      },
+    );
     const cases: readonly (readonly [unknown, readonly ContainerArchiveEntry[]])[] = [
       [
         declaration({
@@ -135,7 +144,7 @@ describe('CLI shard 09 release production outputs package contract', () => {
         }),
         sourceAt(suffixLookalikeRoot, suffixLookalikeManifest),
       ],
-      [declaration({ prefix: 'packages/other/dist' }), packageSource()],
+      [declaration({ prefix: 'packages/other/dist' }), prefixMismatchSource],
     ];
 
     for (const [candidateDeclaration, candidateSource] of cases) {
