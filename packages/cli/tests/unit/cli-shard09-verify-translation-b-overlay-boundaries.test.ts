@@ -183,8 +183,8 @@ function writeJson(path: string, value: unknown): void {
   writeText(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function witness(): Record<string, unknown> {
-  return {
+function witness(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const base = {
     schemaVersion: '1.0.0',
     id: 'TW-00b0b0b0b0b0b0b0',
     trust: 'untrusted-claim',
@@ -224,10 +224,17 @@ function witness(): Record<string, unknown> {
       effects_claimed: ['fs:plant'],
     },
   };
+  return {
+    ...base,
+    ...overrides,
+    frame: {
+      ...base.frame,
+      ...((overrides['frame'] as Record<string, unknown> | undefined) ?? {}),
+    },
+  };
 }
 
-async function validate(): Promise<Record<string, unknown>> {
-  const value = witness();
+async function validate(value = witness()): Promise<Record<string, unknown>> {
   writeJson(WITNESS_PATH, value);
   writeJson(RECIPE_PATH, {
     recipe_name: 'devai-fix',
@@ -257,6 +264,37 @@ function executionsOf(result: Record<string, unknown>): readonly Record<string, 
   return result['executions'] as readonly Record<string, unknown>[];
 }
 
+function frameOf(result: Record<string, unknown>, name: string): Record<string, unknown> {
+  const frames = result['frames'] as readonly Record<string, unknown>[];
+  const frame = frames.find((candidate) => candidate['name'] === name);
+  if (frame === undefined) throw new Error(`frame ${name} missing`);
+  return frame;
+}
+
+function structuralWitness(
+  invariantId: string,
+  demonstratedBy: readonly Record<string, unknown>[] = [
+    { kind: 'structural', validator: 'check --only schema' },
+  ],
+): Record<string, unknown> {
+  return witness({
+    strategy: 'structural',
+    test_overlay_sha: undefined,
+    red_green: undefined,
+    implements: [
+      {
+        invariant_id: invariantId,
+        criteria: [
+          {
+            claim: 'A structural validator demonstrates the boundary.',
+            demonstrated_by: demonstratedBy,
+          },
+        ],
+      },
+    ],
+  });
+}
+
 beforeAll(() => {
   // A quoted and backslashed repository root makes the sandbox profile's
   // path escaping observable; both characters are legal POSIX path bytes.
@@ -266,9 +304,13 @@ beforeAll(() => {
   git(['config', 'user.email', 'translation-test@example.invalid']);
   git(['config', 'commit.gpgSign', 'false']);
 
-  writeJson('law/invariants/INV-DEMO-004.json', {
+  const invariant = (
+    id: string,
+    strategy: string,
+    overrides: Record<string, unknown> = {},
+  ): Record<string, unknown> => ({
     schemaVersion: '1.0.0',
-    id: 'INV-DEMO-004',
+    id,
     domain: 'DEMO',
     lifecycle: 'supported',
     severity: 'gate',
@@ -280,9 +322,12 @@ beforeAll(() => {
       required_suites: ['unit'],
       oracle: 'tests',
       strategy: {
-        primary: 'feature-overlay',
+        primary: strategy,
         deterministic_check_available: true,
         rationale: 'The registered overlay test is deterministic.',
+        ...(strategy === 'semantic-review'
+          ? { semantic_review_justification: 'The review rubric is the declared oracle.' }
+          : {}),
       },
     },
     authority_docs: { docs: [{ doc: 'README.md', anchor: 'testing' }] },
@@ -292,15 +337,35 @@ beforeAll(() => {
       test_weakening_allowed: false,
       human_approval_required: false,
     },
+    ...overrides,
   });
+  writeJson('law/invariants/INV-DEMO-004.json', invariant('INV-DEMO-004', 'feature-overlay'));
+  writeJson('law/invariants/INV-DEMO-005.json', {});
+  writeJson('law/invariants/INV-DEMO-006.json', invariant('INV-DEMO-007', 'structural'));
+  writeJson(
+    'law/invariants/INV-DEMO-008.json',
+    invariant('INV-DEMO-008', 'structural', { lifecycle: 'experimental' }),
+  );
+  writeJson(
+    'law/invariants/INV-DEMO-009.json',
+    invariant('INV-DEMO-009', 'structural', { status: 'draft' }),
+  );
+  writeJson('law/invariants/INV-DEMO-010.json', invariant('INV-DEMO-010', 'semantic-review'));
+  writeJson('law/invariants/INV-DEMO-011.json', invariant('INV-DEMO-011', 'structural'));
   writeJson('law/trace.json', {
     schemaVersion: '1.0.0',
     version: '1.0.0',
-    invariants: [{ id: 'INV-DEMO-004', tests: [TEST_REF], code_areas: [SOURCE_PATH] }],
+    invariants: [
+      {
+        id: 'INV-DEMO-004',
+        tests: [{ suite: 'unit', path: TEST_PATH, names: ['decoy overlay behavior'] }, TEST_REF],
+        code_areas: [SOURCE_PATH],
+      },
+    ],
     test_corpus: [],
   });
   writeText(SOURCE_PATH, 'export const overlayBoundary = false;\n');
-  git(['add', '--force', '--', 'law/invariants/INV-DEMO-004.json', 'law/trace.json', SOURCE_PATH]);
+  git(['add', '--force', '--', 'law/invariants', 'law/trace.json', SOURCE_PATH]);
   git(['commit', '--quiet', '-m', 'establish overlay boundary baseline']);
   baseCommit = git(['rev-parse', 'HEAD']);
 
@@ -479,6 +544,153 @@ describe('verify translation isolation boundaries', () => {
     ]);
   });
 
+  it('normalizes null sandbox output while retaining a spawn error for classification', async () => {
+    const asserted = new Error('AssertionError [ERR_ASSERTION]: normalized spawn failure');
+    controls.sandbox = {
+      status: 1,
+      signal: null,
+      stdout: null,
+      stderr: null,
+      error: asserted,
+    };
+
+    const result = await validate();
+
+    expect(executionsOf(result)).toEqual([
+      expect.objectContaining({
+        phase: 'test-overlay',
+        outcome: 'fail',
+        failure_mode: 'assertion',
+      }),
+      expect.objectContaining({ phase: 'candidate', outcome: 'fail', failure_mode: 'assertion' }),
+    ]);
+  });
+
+  it('requires an exact registered suite, path, and test-name tuple', async () => {
+    const mismatches = [
+      { suite: 'int', path: TEST_PATH, names: [TEST_NAME] },
+      { suite: 'unit', path: `${TEST_PATH}.other`, names: [TEST_NAME] },
+      { suite: 'unit', path: TEST_PATH, names: [`${TEST_NAME} changed`] },
+    ];
+
+    for (const testRef of mismatches) {
+      await expect(
+        validate(
+          witness({
+            red_green: [
+              {
+                test_ref: testRef,
+                expected_at_base: 'assertion-fail',
+                expected_at_candidate: 'pass',
+              },
+            ],
+          }),
+        ),
+      ).rejects.toThrow(
+        `TRANSLATION_TEST_REF_UNREGISTERED: ${testRef.suite}:${testRef.path}:${testRef.names.join(' > ')}`,
+      );
+    }
+  });
+
+  it('rejects zero and reports missing, invalid, and ineligible strategy populations exactly', async () => {
+    await expect(
+      validate(
+        witness({
+          strategy: 'structural',
+          test_overlay_sha: undefined,
+          red_green: undefined,
+          implements: [],
+        }),
+      ),
+    ).rejects.toThrow('TRANSLATION_WITNESS_INVALID');
+
+    const cases = [
+      {
+        value: structuralWitness('INV-ABSENT-012'),
+        finding: 'INV-ABSENT-012: STRATEGY_INVARIANT_MISSING',
+      },
+      {
+        value: structuralWitness('INV-DEMO-005'),
+        finding: 'INV-DEMO-005: STRATEGY_INVARIANT_INVALID',
+      },
+      {
+        value: structuralWitness('INV-DEMO-006'),
+        finding: 'INV-DEMO-006: STRATEGY_INVARIANT_INELIGIBLE',
+      },
+      {
+        value: structuralWitness('INV-DEMO-008'),
+        finding: 'INV-DEMO-008: STRATEGY_INVARIANT_INELIGIBLE',
+      },
+      {
+        value: structuralWitness('INV-DEMO-009'),
+        finding: 'INV-DEMO-009: STRATEGY_INVARIANT_INELIGIBLE',
+      },
+    ];
+
+    for (const entry of cases) {
+      const result = await validate(entry.value);
+      expect(frameOf(result, 'strategy-coverage')).toEqual(
+        expect.objectContaining({
+          name: 'strategy-coverage',
+          status: 'FAIL',
+          finding: entry.finding,
+        }),
+      );
+    }
+  });
+
+  it('distinguishes primary-strategy, demonstration-kind, and cited-test failures', async () => {
+    const primary = await validate(structuralWitness('INV-DEMO-010'));
+    expect(frameOf(primary, 'strategy-coverage')['finding']).toBe(
+      'INV-DEMO-010: STRATEGY_PRIMARY_MISMATCH',
+    );
+
+    const demonstration = await validate(
+      structuralWitness('INV-DEMO-011', [
+        { kind: 'semantic-review', rubric_ref: 'work/audit/translation-review.md' },
+      ]),
+    );
+    expect(frameOf(demonstration, 'strategy-coverage')['finding']).toBe(
+      'INV-DEMO-011: STRATEGY_DEMONSTRATION_MISSING',
+    );
+
+    const uncitedRef = { suite: 'unit', path: TEST_PATH, names: ['decoy overlay behavior'] };
+    const uncited = await validate(
+      witness({
+        implements: [
+          {
+            invariant_id: 'INV-DEMO-004',
+            criteria: [
+              {
+                claim: 'The candidate preserves another registered behavior.',
+                demonstrated_by: [{ kind: 'test', test_ref: uncitedRef }],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(frameOf(uncited, 'strategy-coverage')['finding']).toBe(
+      'INV-DEMO-004: STRATEGY_TEST_UNREGISTERED',
+    );
+  });
+
+  it('preserves valid structural coverage and the full inferred-effects set', async () => {
+    const structural = await validate(structuralWitness('INV-DEMO-011'));
+    expect(frameOf(structural, 'strategy-coverage')).toEqual(
+      expect.objectContaining({ name: 'strategy-coverage', status: 'PASS' }),
+    );
+
+    const overlay = await validate(witness({ frame: { effects_claimed: ['fs:tests'] } }));
+    expect(frameOf(overlay, 'strategy-coverage')['status']).toBe('PASS');
+    expect(frameOf(overlay, 'effects')).toEqual(
+      expect.objectContaining({
+        status: 'FAIL',
+        finding: 'Inferred effects exceed the witness claim.',
+      }),
+    );
+  });
+
   it('hands the Linux runner the worktree, the pinned image, and recursive mount adapters', async () => {
     controls.platform = 'linux';
     controls.probeDependencyMount = true;
@@ -567,6 +779,9 @@ describe('verify translation isolation boundaries', () => {
           finding: expect.stringContaining('REGISTERED_EXECUTION_INFRASTRUCTURE_FAILURE'),
         }),
       ]),
+    );
+    expect(frameOf(result, 'network-egress')['finding']).toBe(
+      'Native isolation is best-effort; network denial is not proven.',
     );
   });
 });
