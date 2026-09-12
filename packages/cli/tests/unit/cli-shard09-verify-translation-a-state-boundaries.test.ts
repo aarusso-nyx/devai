@@ -21,9 +21,11 @@ type GitFault =
   | 'none'
   | 'ls-files-stderr'
   | 'ls-files-stdout'
+  | 'ls-files-null-output'
   | 'remove-state-root'
   | 'trace-missing'
-  | 'trace-invalid';
+  | 'trace-invalid'
+  | 'trace-null-stderr';
 type StateMutation = 'none' | 'mixed' | 'tracked-boundaries';
 
 const controls = vi.hoisted(() => ({
@@ -41,6 +43,19 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
     args: readonly string[],
     options: Parameters<typeof nodeSpawnSync>[2],
   ) {
+    if (
+      command === 'git' &&
+      args[0] === 'ls-files' &&
+      controls.gitFault === 'ls-files-null-output'
+    ) {
+      return {
+        status: null,
+        signal: null,
+        stdout: null,
+        stderr: null,
+        error: new Error('spawn failed'),
+      };
+    }
     if (command === 'git' && args[0] === 'ls-files' && controls.gitFault.startsWith('ls-files')) {
       return controls.gitFault === 'ls-files-stderr'
         ? { status: 1, signal: null, stdout: '', stderr: ' sentinel ls stderr \n' }
@@ -66,6 +81,15 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
           signal: null,
           stdout: Buffer.from('{invalid'),
           stderr: Buffer.alloc(0),
+        };
+      }
+      if (controls.gitFault === 'trace-null-stderr') {
+        return {
+          status: null,
+          signal: null,
+          stdout: null,
+          stderr: null,
+          error: new Error('spawn failed'),
         };
       }
     }
@@ -361,11 +385,25 @@ describe('verify translation A state and Git boundaries', () => {
     },
   );
 
+  it('normalizes null stdout and stderr from a failed tracked-state Git spawn', async () => {
+    controls.gitFault = 'ls-files-null-output';
+    await expect(validate()).rejects.toMatchObject({
+      message: 'VALIDATION_TRACKED_STATE_SNAPSHOT_FAILED: ',
+    });
+  });
+
   it('preserves the exact commit-blob error and its stderr normalization', async () => {
     controls.gitFault = 'trace-missing';
     await expect(validate()).rejects.toThrow(
       'TRANSLATION_TRACE_OBJECT_INVALID: sentinel trace stderr',
     );
+  });
+
+  it('normalizes null stderr from a failed commit-blob Git spawn', async () => {
+    controls.gitFault = 'trace-null-stderr';
+    await expect(validate()).rejects.toMatchObject({
+      message: 'TRANSLATION_TRACE_OBJECT_INVALID: ',
+    });
   });
 
   it('normalizes malformed commit JSON without swallowing the requested error code', async () => {

@@ -10,6 +10,8 @@ const observations = vi.hoisted(() => ({
   isolatedArgv: [] as string[][],
   macSandboxArgs: [] as string[][],
   linuxDockerCalls: [] as { readonly args: string[]; readonly options: Record<string, unknown> }[],
+  overlayPath: '',
+  overlayBytes: [] as string[],
 }));
 
 function isolatedResult(argv: readonly string[], linux: boolean) {
@@ -37,11 +39,20 @@ function isolatedResult(argv: readonly string[], linux: boolean) {
 vi.mock('@devai-nyx/authority', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@devai-nyx/authority')>();
   const childProcess = await import('node:child_process');
+  const fs = await import('node:fs');
+  const path = await import('node:path');
   return {
     ...actual,
     spawnSync(command: string, args: readonly string[], options: Record<string, unknown>) {
       if (command === 'sandbox-exec') {
         const argv = args.slice(2);
+        if (observations.overlayPath.length > 0) {
+          observations.overlayBytes.push(
+            fs
+              .readFileSync(path.resolve(String(options['cwd']), observations.overlayPath))
+              .toString('hex'),
+          );
+        }
         observations.macSandboxArgs.push([...args]);
         observations.isolatedArgv.push(argv);
         return isolatedResult(argv, false);
@@ -50,6 +61,14 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
         const delimiter = args.indexOf('devai-translation-isolation');
         if (delimiter < 0) throw new Error('LINUX_ISOLATION_DELIMITER_MISSING');
         const argv = args.slice(delimiter + 1);
+        if (observations.overlayPath.length > 0) {
+          const mount = args.find((value) => value.endsWith(',dst=/workspace,readonly'));
+          if (mount === undefined) throw new Error('LINUX_ISOLATION_WORKTREE_MOUNT_MISSING');
+          const source = mount.slice('type=bind,src='.length, -',dst=/workspace,readonly'.length);
+          observations.overlayBytes.push(
+            fs.readFileSync(path.resolve(source, observations.overlayPath)).toString('hex'),
+          );
+        }
         observations.linuxDockerCalls.push({ args: [...args], options });
         observations.isolatedArgv.push(argv);
         return isolatedResult(argv, true);
@@ -86,6 +105,7 @@ const TEST_PATHS = [
   'packages/cli/tests/unit/translation-execution-fixture.tsx',
   'packages/cli/tests/unit/translation-execution-fixture.mts',
 ] as const;
+const BINARY_OVERLAY_BYTES = Uint8Array.from([0xff, 0xfe, 0x00, 0x80, 0x41, 0x0a]);
 const REFS = TEST_PATHS.map((path) => ({
   suite: 'unit',
   path,
@@ -119,7 +139,7 @@ interface Harness {
   ) => Promise<Record<string, unknown>>;
 }
 
-function createHarness(): Harness {
+function createHarness(featureOverlay = false): Harness {
   const root = mkdtempSync(join(tmpdir(), 'devai-translation-execution-'));
   const git = (args: readonly string[]): string => {
     const result = nodeSpawnSync('git', [...args], { cwd: root, encoding: 'utf8' });
@@ -152,7 +172,7 @@ function createHarness(): Harness {
       required_suites: ['unit'],
       oracle: 'tests',
       strategy: {
-        primary: 'regression',
+        primary: featureOverlay ? 'feature-overlay' : 'regression',
         deterministic_check_available: true,
         rationale: 'The registered processes have deterministic outcomes.',
       },
@@ -178,6 +198,13 @@ function createHarness(): Harness {
   git(['add', '--force', '--', 'law', 'packages']);
   git(['commit', '--quiet', '-m', 'establish translation baseline']);
   const base = git(['rev-parse', 'HEAD']);
+  let overlay: string | undefined;
+  if (featureOverlay) {
+    writeFileSync(resolve(root, TEST_PATHS[0]), BINARY_OVERLAY_BYTES);
+    git(['add', '--force', '--', TEST_PATHS[0]]);
+    git(['commit', '--quiet', '-m', 'add byte-exact test overlay']);
+    overlay = git(['rev-parse', 'HEAD']);
+  }
   writeText(SOURCE_PATH, 'export const translated = true;\n');
   git(['add', '--force', '--', SOURCE_PATH]);
   git(['commit', '--quiet', '-m', 'implement translated behavior']);
@@ -231,7 +258,8 @@ function createHarness(): Harness {
       base_sha: base,
       candidate_sha: candidate,
       emitted_at: '2026-09-11T00:00:00.000Z',
-      strategy: 'regression',
+      strategy: featureOverlay ? 'feature-overlay' : 'regression',
+      ...(overlay === undefined ? {} : { test_overlay_sha: overlay }),
       implements: [
         {
           invariant_id: 'INV-DEMO-009',
@@ -252,7 +280,7 @@ function createHarness(): Harness {
       frame: {
         authority_role: 'engineer',
         spec_edits: 'none',
-        test_edits: 'none',
+        test_edits: featureOverlay ? 'declared' : 'none',
         inventory_delta_confined_to: ['MOD-CLI'],
         effects_claimed: ['fs:plant'],
       },
@@ -287,6 +315,8 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
     observations.isolatedArgv.length = 0;
     observations.macSandboxArgs.length = 0;
     observations.linuxDockerCalls.length = 0;
+    observations.overlayPath = '';
+    observations.overlayBytes.length = 0;
   });
 
   it('rejects a registered name prefix with an additional unregistered segment', async () => {
@@ -391,6 +421,21 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
         ),
       ]),
     ]);
+  });
+
+  it('materializes non-UTF-8 overlay bytes without a text round trip', async () => {
+    const binaryHarness = createHarness(true);
+    observations.overlayPath = TEST_PATHS[0];
+    try {
+      await binaryHarness.validate([REFS[0]]);
+      expect(observations.overlayBytes).toEqual([
+        Buffer.from(BINARY_OVERLAY_BYTES).toString('hex'),
+        Buffer.from(BINARY_OVERLAY_BYTES).toString('hex'),
+      ]);
+    } finally {
+      binaryHarness.cleanup();
+      observations.overlayPath = '';
+    }
   });
 
   it('rejects backslash paths and unsupported registered runner extensions before execution', async () => {
