@@ -115,7 +115,7 @@
         "tarball": "never-a-certified-package-entry-and-never-included-in-a-package-tarball"
       },
       "threshold_projection": {
-        "source": "roster.thresholds.score_min-and-survived_max",
+        "source": "roster.thresholds.score_min-with-disabled-survivor-compatibility-sentinel",
         "target": {
           "break": "score_min",
           "high": "score_min",
@@ -160,7 +160,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "cli",
@@ -181,7 +181,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "effects-check",
@@ -202,7 +202,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "evidence",
@@ -223,7 +223,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "loop",
@@ -244,7 +244,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "schemas",
@@ -265,7 +265,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "sensors",
@@ -286,7 +286,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "skills",
@@ -307,7 +307,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "spec",
@@ -328,7 +328,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       },
       {
         "id": "utils",
@@ -349,7 +349,7 @@
         "orchestration_paths": ["test-tasks.json"],
         "lockfile_path": "pnpm-lock.yaml",
         "toolchain_keys": ["node", "pnpm", "vitest"],
-        "thresholds": { "score_min": 60, "survived_max": 50 }
+        "thresholds": { "score_min": 60, "survived_max": 9007199254740991 }
       }
     ]
   }

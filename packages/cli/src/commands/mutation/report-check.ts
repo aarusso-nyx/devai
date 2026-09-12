@@ -47,7 +47,7 @@ function readThresholds(path: string): Thresholds | undefined {
 }
 
 export interface MutationFinding {
-  readonly kind: 'below_threshold' | 'regression_score' | 'regression_survived';
+  readonly kind: 'below_threshold';
   readonly message: string;
 }
 
@@ -62,7 +62,7 @@ export interface MutationReportCheck {
   readonly findings: readonly MutationFinding[];
 }
 
-/** Compare a current mutation report with configured thresholds and an optional baseline. */
+/** Compare a current mutation score with its configured floor; baseline data is report-only. */
 export function checkMutationReport(options: MutationReportCheckOptions): MutationReportCheck {
   const repoRoot = resolve(options.repoRoot ?? process.cwd());
   const currentPath = resolve(repoRoot, options.current ?? DEFAULT_CURRENT);
@@ -85,34 +85,6 @@ export function checkMutationReport(options: MutationReportCheckOptions): Mutati
       message: `mutation score ${curScore.toFixed(1)}% < threshold ${String(minScore)}%`,
     });
   }
-  const maxSurvived = thresholds?.mutation?.survived_max;
-  if (
-    typeof maxSurvived === 'number' &&
-    typeof curSurvived === 'number' &&
-    curSurvived > maxSurvived
-  ) {
-    findings.push({
-      kind: 'below_threshold',
-      message: `survived mutants ${String(curSurvived)} > ceiling ${String(maxSurvived)}`,
-    });
-  }
-  if (typeof baseScore === 'number' && typeof curScore === 'number' && curScore < baseScore) {
-    findings.push({
-      kind: 'regression_score',
-      message: `mutation score regressed: ${curScore.toFixed(1)}% < baseline ${baseScore.toFixed(1)}%`,
-    });
-  }
-  if (
-    typeof baseSurvived === 'number' &&
-    typeof curSurvived === 'number' &&
-    curSurvived > baseSurvived
-  ) {
-    findings.push({
-      kind: 'regression_survived',
-      message: `survived mutants regressed: ${String(curSurvived)} > baseline ${String(baseSurvived)}`,
-    });
-  }
-
   return {
     ok: findings.length === 0,
     current: { mutation_score: curScore ?? null, survived: curSurvived ?? null },

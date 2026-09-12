@@ -630,6 +630,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-MUT-0008',
       'ADR-MUT-0009',
       'ADR-MUT-0010',
+      'ADR-MUT-0011',
       'ADR-REL-0001',
       'ADR-REL-0002',
       'ADR-REL-0003',
@@ -657,13 +658,13 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0025',
       'ADR-REL-0026',
     ]);
-    expect(records).toHaveLength(54);
+    expect(records).toHaveLength(55);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(55);
-    expect(result.subject_authorities).toHaveLength(110);
+    expect(result.files_scanned).toBe(56);
+    expect(result.subject_authorities).toHaveLength(114);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -681,6 +682,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-MUT-0008',
       'ADR-MUT-0009',
       'ADR-MUT-0010',
+      'ADR-MUT-0011',
       'ADR-REL-0002',
       'ADR-REL-0004',
       'ADR-REL-0005',

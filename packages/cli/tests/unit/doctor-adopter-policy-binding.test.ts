@@ -235,7 +235,7 @@ describe('Doctor adopter-policy binding regression', () => {
     expect(await policyCheck(repo)).toMatchObject({ ok: true });
     expect(readJson(repo, `${CONFIG}/thresholds.json`)).toMatchObject({
       coverage: { lines: 91, branches: 60, functions: 70, statements: 70 },
-      mutation: { score_min: 88, survived_max: 50 },
+      mutation: { score_min: 88, survived_max: Number.MAX_SAFE_INTEGER },
     });
     expect(readJson(repo, `${CONFIG}/scorecard-na.json`)).toMatchObject({
       cells: [{ cell: 'F4:T5' }],

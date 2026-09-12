@@ -27,7 +27,13 @@ const roster = [
   'spec',
   'utils',
 ];
-const limits = { break: 60, high: 60, low: 60, scoreMin: 60, survivedMax: 50 };
+const limits = {
+  break: 60,
+  high: 60,
+  low: 60,
+  scoreMin: 60,
+  survivedMax: Number.MAX_SAFE_INTEGER,
+};
 
 /** Inspect an operator-selected installed-host input plan before execution.
  * The protected digest must be established independently of candidate evidence.

@@ -176,7 +176,13 @@ function driverFixture(): DriverFixture {
       packageName: '@fixture/package',
       workspace: 'packages/package',
     },
-    thresholds: { break: 60, high: 60, low: 60, scoreMin: 60, survivedMax: 50 },
+    thresholds: {
+      break: 60,
+      high: 60,
+      low: 60,
+      scoreMin: 60,
+      survivedMax: Number.MAX_SAFE_INTEGER,
+    },
     toolVersions: {
       ...pkg.expected.toolVersions,
       stryker: coreVersion,

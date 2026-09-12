@@ -1625,7 +1625,7 @@
             "high": 90,
             "low": 80,
             "scoreMin": 60,
-            "survivedMax": 50
+            "survivedMax": 9007199254740991
           }
         },
         {

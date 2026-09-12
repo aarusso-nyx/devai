@@ -604,7 +604,7 @@ export const mutationRun = defineCommand({
     '}',
     '```',
     '',
-    'The canonical mutation check compares `mutation_score` and `survived` with thresholds and an optional baseline.',
+    'The canonical mutation check reports survivor and baseline data but accepts only by the configured `mutation_score` threshold.',
     '',
     '### Exit codes',
     '',

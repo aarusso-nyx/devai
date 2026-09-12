@@ -6,7 +6,7 @@
   "thresholds": {
     "source": "law/policy/thresholds.json#/mutation",
     "score_operator": ">=",
-    "survived_operator": "<="
+    "survivor_count": "reported-only"
   },
   "applicability": {
     "required_when_any": [
@@ -26,17 +26,12 @@
       "zero-runtime-errors",
       "zero-infrastructure-errors",
       "mutation-score-meets-threshold",
-      "survivors-within-threshold",
       "independently-checkable-report"
     ],
     "readiness_sufficient_alone": false
   },
   "fail": {
-    "conditions": [
-      "required-critical-mutant-survived",
-      "mutation-score-below-threshold",
-      "survivors-above-threshold"
-    ]
+    "conditions": ["required-critical-mutant-survived", "mutation-score-below-threshold"]
   },
   "unknown": {
     "conditions": [

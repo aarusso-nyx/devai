@@ -8,7 +8,13 @@ const { inspectMutationInputPlan, assertMutationContractBindings } = await impor
 );
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 function fixture() {
-  const limits = { break: 60, high: 60, low: 60, scoreMin: 60, survivedMax: 50 };
+  const limits = {
+    break: 60,
+    high: 60,
+    low: 60,
+    scoreMin: 60,
+    survivedMax: Number.MAX_SAFE_INTEGER,
+  };
   const plan = {
     repository: { id: 'aarusso-nyx/devai', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
     release_unit: '@aarusso-nyx/devai',

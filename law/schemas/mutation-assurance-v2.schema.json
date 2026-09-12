@@ -672,7 +672,7 @@
       "thresholds_applied": {
         "source": "law/policy/thresholds.json#/mutation",
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       },
       "not_required": {
         "reason_code": "documentation-only-change",

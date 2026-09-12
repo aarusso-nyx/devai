@@ -100,7 +100,13 @@ export async function fixture(
         ]),
       ),
     },
-    thresholds: { break: 60, high: 60, low: 60, scoreMin: 60, survivedMax: 50 },
+    thresholds: {
+      break: 60,
+      high: 60,
+      low: 60,
+      scoreMin: 60,
+      survivedMax: Number.MAX_SAFE_INTEGER,
+    },
     toolVersions: { stryker: '9.6.1', node: '24.20.0', vitest: '4.1.10' },
   }));
   const source = 'export const value = true;\n';

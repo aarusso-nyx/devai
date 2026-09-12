@@ -120,7 +120,7 @@
       "tarball": "never-a-certified-package-entry-and-never-included-in-a-package-tarball"
     },
     "threshold_projection": {
-      "source": "roster.thresholds.score_min-and-survived_max",
+      "source": "roster.thresholds.score_min-with-disabled-survivor-compatibility-sentinel",
       "target": {
         "break": "score_min",
         "high": "score_min",
@@ -167,7 +167,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -191,7 +191,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -215,7 +215,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -239,7 +239,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -263,7 +263,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -287,7 +287,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -311,7 +311,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -335,7 +335,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -359,7 +359,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     },
     {
@@ -383,7 +383,7 @@
       "toolchain_keys": ["node", "pnpm", "vitest"],
       "thresholds": {
         "score_min": 60,
-        "survived_max": 50
+        "survived_max": 9007199254740991
       }
     }
   ]

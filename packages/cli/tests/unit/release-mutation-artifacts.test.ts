@@ -92,7 +92,13 @@ const EXPECTED: ReleaseMutationPackageInputsV21 = {
       ]),
     ),
   },
-  thresholds: { break: 60, high: 60, low: 60, scoreMin: 60, survivedMax: 50 },
+  thresholds: {
+    break: 60,
+    high: 60,
+    low: 60,
+    scoreMin: 60,
+    survivedMax: Number.MAX_SAFE_INTEGER,
+  },
   toolVersions: { stryker: '9.6.1', node: '24.20.0', vitest: '4.1.10' },
 };
 
@@ -364,6 +370,31 @@ describe('release mutation artifact normalization v2.1', () => {
       ).result.bytes,
     );
     expect(result.passed).toBe(passed);
+  });
+
+  it('keeps survivor counts reportable but non-blocking under the current compatibility sentinel', () => {
+    const statuses = [
+      ...Array.from({ length: 90 }, () => 'Killed' as const),
+      ...Array.from({ length: 60 }, () => 'Survived' as const),
+    ];
+    const ids = statuses.map((_, index) => String(index));
+    const result = json(
+      normalized(
+        rawReport(statuses),
+        {
+          limits: {
+            maximum_raw_report_bytes: 100_000,
+            maximum_document_bytes: 100_000,
+            maximum_files: 10,
+            maximum_mutants: 200,
+          },
+        },
+        ids,
+      ).result.bytes,
+    );
+
+    expect(result).toMatchObject({ score: 60, passed: true });
+    expect(result.statusTotals).toMatchObject({ Survived: 60 });
   });
 
   it.each([

@@ -76,6 +76,20 @@ describe('protected release mutation input derivation', () => {
     ).toEqual(['@devai-nyx/schemas', '@devai-nyx/utils']);
   });
 
+  it('projects the current disabled survivor ceiling as a compatibility sentinel', () => {
+    const value = build(currentFixture());
+
+    for (const entry of value.plan.packages) {
+      expect(entry.expected.thresholds).toEqual({
+        break: 60,
+        high: 60,
+        low: 60,
+        scoreMin: 60,
+        survivedMax: Number.MAX_SAFE_INTEGER,
+      });
+    }
+  });
+
   it('preserves roster refusal identity for verified blocked receipts and duplicate roster ids', () => {
     const base = currentFixture();
     const current = build(base);

@@ -135,7 +135,7 @@ function evidencePackage({
     high: 60,
     low: 60,
     scoreMin: 60,
-    survivedMax: 50,
+    survivedMax: Number.MAX_SAFE_INTEGER,
   };
   const projection = inputProjection(packageName, workspace);
   const inputDigest = framedDigest(INPUT_DOMAIN, projection);
