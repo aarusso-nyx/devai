@@ -301,9 +301,8 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
   it.runIf(platform() === 'linux')(
     'binds a fresh module instance to the pinned Linux image',
     async () => {
-      const fresh = await import(
-        `../../src/commands/verify/translation.js?a-static-image=${Date.now()}`
-      );
+      vi.resetModules();
+      const fresh = await import('../../src/commands/verify/translation.js');
       await harness.validate([REFS[0]], fresh.executeTranslationValidation);
 
       expect(observations.linuxDockerCalls).toHaveLength(2);
