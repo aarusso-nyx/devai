@@ -115,6 +115,7 @@ interface Harness {
       readonly path: string;
       readonly names: readonly string[];
     }[],
+    executor?: typeof executeTranslationValidation,
   ) => Promise<Record<string, unknown>>;
 }
 
@@ -217,6 +218,7 @@ function createHarness(): Harness {
       readonly path: string;
       readonly names: readonly string[];
     }[] = REFS,
+    executor: typeof executeTranslationValidation = executeTranslationValidation,
   ): Promise<Record<string, unknown>> => {
     const witness = {
       schemaVersion: '1.0.0',
@@ -263,7 +265,7 @@ function createHarness(): Harness {
       evidence: { translation_witness: witness },
     });
     return withAuthorityHostTestScope(() =>
-      executeTranslationValidation({
+      executor({
         witness: WITNESS_PATH,
         repoRoot: root,
         databaseUrl: 'postgres://unused',
@@ -286,6 +288,32 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
     observations.macSandboxArgs.length = 0;
     observations.linuxDockerCalls.length = 0;
   });
+
+  it('rejects a registered name prefix with an additional unregistered segment', async () => {
+    const ref = REFS[0];
+    await expect(
+      harness.validate([{ ...ref, names: [...ref.names, 'unregistered nested case'] }]),
+    ).rejects.toThrow(
+      `TRANSLATION_TEST_REF_UNREGISTERED: ${ref.suite}:${ref.path}:${ref.names[0]} > unregistered nested case`,
+    );
+  });
+
+  it.runIf(platform() === 'linux')(
+    'binds a fresh module instance to the pinned Linux image',
+    async () => {
+      const fresh = await import(
+        `../../src/commands/verify/translation.js?a-static-image=${Date.now()}`
+      );
+      await harness.validate([REFS[0]], fresh.executeTranslationValidation);
+
+      expect(observations.linuxDockerCalls).toHaveLength(2);
+      for (const call of observations.linuxDockerCalls) {
+        expect(call.args[10]).toBe(
+          'node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd',
+        );
+      }
+    },
+  );
 
   it('preserves exact runner argv and distinguishes every process failure class', async () => {
     const result = await harness.validate();
