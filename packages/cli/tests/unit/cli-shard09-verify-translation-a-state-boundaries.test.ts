@@ -26,7 +26,7 @@ type GitFault =
   | 'trace-missing'
   | 'trace-invalid'
   | 'trace-null-stderr';
-type StateMutation = 'none' | 'mixed' | 'tracked-boundaries';
+type StateMutation = 'none' | 'mixed' | 'tracked-boundaries' | 'escaping-tracked-path';
 
 const controls = vi.hoisted(() => ({
   gitFault: 'none' as GitFault,
@@ -108,11 +108,16 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
     if (
       command === 'git' &&
       args[0] === 'ls-files' &&
-      controls.stateMutation === 'tracked-boundaries'
+      (controls.stateMutation === 'tracked-boundaries' ||
+        controls.stateMutation === 'escaping-tracked-path')
     ) {
+      const injectedPath =
+        controls.stateMutation === 'escaping-tracked-path'
+          ? `../${controls.unsafeTrackedPath}`
+          : controls.unsafeTrackedPath;
       return {
         ...result,
-        stdout: `${String(result.stdout)}${controls.unsafeTrackedPath}\0`,
+        stdout: `${String(result.stdout)}${injectedPath}\0`,
       };
     }
     return result;
@@ -143,6 +148,8 @@ vi.mock('#runtime-core', async (importOriginal) => {
         );
         chmodSync(resolve(controls.repository, SPECIAL_PATH), 0o755);
         writeFileSync(resolve(controls.repository, MISSING_PATH), 'created after snapshot\n');
+        writeFileSync(resolve(controls.repository, '..', controls.unsafeTrackedPath), 'outside\n');
+      } else if (controls.stateMutation === 'escaping-tracked-path') {
         writeFileSync(resolve(controls.repository, '..', controls.unsafeTrackedPath), 'outside\n');
       }
       return { ok: true, id: 'EV-aabbccddeeff0011' };
@@ -448,6 +455,20 @@ describe('verify translation A state and Git boundaries', () => {
       ]),
     );
     expect(observed).not.toContainEqual({
+      path: `../${controls.unsafeTrackedPath}`,
+      operation: 'create',
+    });
+  });
+
+  it('excludes an escaping tracked path from both state snapshots', async () => {
+    controls.stateMutation = 'escaping-tracked-path';
+
+    const result = await validate('TW-ffffffffffffffff');
+    const expectedDiff = result['expected_diff'] as {
+      readonly observed: readonly { readonly path: string; readonly operation: string }[];
+    };
+
+    expect(expectedDiff.observed).not.toContainEqual({
       path: `../${controls.unsafeTrackedPath}`,
       operation: 'create',
     });
