@@ -374,6 +374,11 @@ beforeAll(() => {
   );
   writeJson('law/invariants/INV-DEMO-010.json', invariant('INV-DEMO-010', 'semantic-review'));
   writeJson('law/invariants/INV-DEMO-011.json', invariant('INV-DEMO-011', 'structural'));
+  writeJson('law/invariants/INV-DEMO-012.json', invariant('INV-DEMO-012', 'regression'));
+  writeJson(
+    'law/invariants/INV-DEMO-013.json',
+    invariant('INV-DEMO-013', 'structural', { lifecycle: undefined }),
+  );
   writeJson('law/trace.json', {
     schemaVersion: '1.0.0',
     version: '1.0.0',
@@ -381,6 +386,11 @@ beforeAll(() => {
       {
         id: 'INV-DEMO-004',
         tests: [{ suite: 'unit', path: TEST_PATH, names: ['decoy overlay behavior'] }, TEST_REF],
+        code_areas: [SOURCE_PATH],
+      },
+      {
+        id: 'INV-DEMO-012',
+        tests: [TEST_REF],
         code_areas: [SOURCE_PATH],
       },
     ],
@@ -697,6 +707,38 @@ describe('verify translation isolation boundaries', () => {
     expect(frameOf(uncited, 'strategy-coverage')['finding']).toBe(
       'INV-DEMO-004: STRATEGY_TEST_UNREGISTERED',
     );
+  });
+
+  it('accepts regression test evidence and an active invariant without lifecycle metadata', async () => {
+    const regression = await validate(
+      witness({
+        strategy: 'regression',
+        test_overlay_sha: undefined,
+        implements: [
+          {
+            invariant_id: 'INV-DEMO-012',
+            criteria: [
+              {
+                claim: 'The regression test demonstrates the registered behavior.',
+                demonstrated_by: [{ kind: 'test', test_ref: TEST_REF }],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(frameOf(regression, 'strategy-coverage')).toEqual({
+      name: 'strategy-coverage',
+      status: 'PASS',
+      evidence_refs: [expect.stringMatching(/^EV-[a-f0-9]{16}$/u)],
+    });
+
+    const optionalLifecycle = await validate(structuralWitness('INV-DEMO-013'));
+    expect(frameOf(optionalLifecycle, 'strategy-coverage')).toEqual({
+      name: 'strategy-coverage',
+      status: 'PASS',
+      evidence_refs: [expect.stringMatching(/^EV-[a-f0-9]{16}$/u)],
+    });
   });
 
   it('preserves valid structural coverage and the full inferred-effects set', async () => {
