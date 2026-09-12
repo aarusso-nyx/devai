@@ -26,8 +26,13 @@ const controls = vi.hoisted(() => ({
   frameInputs: [] as Record<string, unknown>[],
   gitWorktreeAdds: [] as string[],
   worktreeAddFailures: 0,
+  worktreeAddFailureStderr: 'sentinel add failure',
   gitWorktreeRemoves: [] as string[],
   removeFailures: 0,
+  removeAfterSuccessFailures: 0,
+  pruneFailures: 0,
+  overlayDiffTargetSha: null as string | null,
+  overlayDiffExtraPath: null as string | null,
   leaseWrites: [] as { readonly path: string; readonly value: Record<string, unknown> }[],
   rmCalls: [] as { readonly path: string; readonly options: unknown }[],
 }));
@@ -73,7 +78,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
       controls.gitWorktreeAdds.push(String(args.at(-1)));
       if (controls.worktreeAddFailures > 0) {
         controls.worktreeAddFailures -= 1;
-        return { status: 1, signal: null, stdout: '', stderr: 'sentinel add failure' };
+        return { status: 1, signal: null, stdout: '', stderr: controls.worktreeAddFailureStderr };
       }
     }
     if (command === 'git' && args[0] === 'worktree' && args[1] === 'remove') {
@@ -82,6 +87,53 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
         controls.removeFailures -= 1;
         return { status: 1, signal: null, stdout: '', stderr: 'sentinel removal failure' };
       }
+      const result = nodeSpawnSync(command, [...args], options);
+      if (controls.removeAfterSuccessFailures > 0) {
+        controls.removeAfterSuccessFailures -= 1;
+        return {
+          status: 1,
+          signal: result.signal,
+          stdout: result.stdout,
+          stderr: 'sentinel post-removal failure',
+        };
+      }
+      return result;
+    }
+    if (command === 'git' && args[0] === 'worktree' && args[1] === 'prune') {
+      if (controls.pruneFailures > 0) {
+        controls.pruneFailures -= 1;
+        return { status: 1, signal: null, stdout: '', stderr: 'sentinel prune failure' };
+      }
+    }
+    if (command === 'git' && args[0] === 'diff' && args[1] === '--name-only') {
+      const result = nodeSpawnSync(command, [...args], options);
+      if (
+        controls.overlayDiffExtraPath !== null &&
+        controls.overlayDiffTargetSha !== null &&
+        args[3] === controls.overlayDiffTargetSha
+      ) {
+        return {
+          ...result,
+          stdout: `${String(result.stdout).trimEnd()}\n${controls.overlayDiffExtraPath}\n`,
+        };
+      }
+      return result;
+    }
+    if (
+      command === 'git' &&
+      args[0] === 'cat-file' &&
+      args[1] === 'blob' &&
+      controls.overlayDiffExtraPath !== null &&
+      String(args[2]).endsWith(`:${controls.overlayDiffExtraPath}`)
+    ) {
+      return {
+        status: 0,
+        signal: null,
+        stdout: Buffer.from(
+          "import { test } from 'node:test';\ntest('unsafe overlay', () => {});\n",
+        ),
+        stderr: Buffer.alloc(0),
+      };
     }
     return nodeSpawnSync(command, [...args], options);
   },
@@ -116,7 +168,7 @@ vi.mock('#runtime-core', async (importOriginal) => {
       return { exit_code: 0, stdout: 'ok', stderr: '', isolation_applied: true };
     },
     evaluateTranslationFrames(input: Parameters<typeof actual.evaluateTranslationFrames>[0]) {
-      controls.frameInputs.push(structuredClone(input));
+      controls.frameInputs.push(structuredClone(input) as unknown as Record<string, unknown>);
       return actual.evaluateTranslationFrames(input);
     },
   };
@@ -128,6 +180,7 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 const WITNESS_PATH = 'scratch/translation-d-lifecycle-p1-witness.json';
 const RECIPE_PATH = 'record/proofs/work/recipe-runs/devai-fix/test/2026-09-12T00-00-00-000Z.json';
 const TEST_PATH = 'packages/cli/tests/unit/translation-d-lifecycle-p1-fixture.test.js';
+const UNSAFE_OVERLAY_PATH = 'packages/cli/tests/unit/unsafe\\fixture.test.js';
 const SOURCE_PATH = 'packages/cli/src/translation-d-lifecycle-p1-fixture.ts';
 const TEST_REF = { suite: 'unit', path: TEST_PATH, names: ['translation D lifecycle'] } as const;
 const D_P1_FINGERPRINTS = [
@@ -137,6 +190,7 @@ const D_P1_FINGERPRINTS = [
 const D_P2_FINGERPRINTS = [
   1008, 1010, 1011, 1012, 1013, 1019, 1023, 1024, 1027, 1029, 1032, 1037, 1070,
 ] as const;
+const D_RESIDUAL_KILL_TARGETS = [1012, 1013, 1024, 1070, 1093, 1100, 1107] as const;
 
 let fixture: ReturnType<typeof createSelfContainedRepositoryFixture>;
 let repository: string;
@@ -268,7 +322,13 @@ beforeAll(() => {
   writeJson('law/trace.json', {
     schemaVersion: '1.0.0',
     version: '1.0.0',
-    invariants: [{ id: 'INV-DEMO-012', tests: [TEST_REF], code_areas: [SOURCE_PATH] }],
+    invariants: [
+      {
+        id: 'INV-DEMO-012',
+        tests: [TEST_REF, { suite: 'unit', path: UNSAFE_OVERLAY_PATH, names: ['unsafe overlay'] }],
+        code_areas: [SOURCE_PATH],
+      },
+    ],
     test_corpus: [],
   });
   writeText(SOURCE_PATH, 'export const translationDLifecycle = false;\n');
@@ -323,8 +383,13 @@ beforeEach(() => {
   controls.frameInputs = [];
   controls.gitWorktreeAdds = [];
   controls.worktreeAddFailures = 0;
+  controls.worktreeAddFailureStderr = 'sentinel add failure';
   controls.gitWorktreeRemoves = [];
   controls.removeFailures = 0;
+  controls.removeAfterSuccessFailures = 0;
+  controls.pruneFailures = 0;
+  controls.overlayDiffTargetSha = null;
+  controls.overlayDiffExtraPath = null;
   controls.leaseWrites = [];
   controls.rmCalls = [];
   vi.useFakeTimers();
@@ -347,6 +412,24 @@ describe('verify translation D lifecycle P1 and P2', () => {
     expect(D_P1_FINGERPRINTS).toHaveLength(22);
     expect(D_P2_FINGERPRINTS).toHaveLength(13);
     expect(new Set(targets).size).toBe(35);
+    expect(D_RESIDUAL_KILL_TARGETS).toHaveLength(7);
+    expect(D_RESIDUAL_KILL_TARGETS.every((target) => targets.includes(target))).toBe(true);
+  });
+
+  it('proves clean isolated executions produce passing infrastructure and network frames', async () => {
+    const result = await validate('regression');
+    const frames = result['frames'] as Record<string, unknown>[];
+
+    expect(frames.find((frame) => frame['name'] === 'infrastructure')).toEqual({
+      name: 'infrastructure',
+      status: 'PASS',
+      evidence_refs: ['EV-0123456789abcdef'],
+    });
+    expect(frames.find((frame) => frame['name'] === 'network-egress')).toEqual({
+      name: 'network-egress',
+      status: 'PASS',
+      evidence_refs: ['EV-0123456789abcdef'],
+    });
   });
 
   it('derives one linked validation identity and writes the complete lease contract', async () => {
@@ -493,6 +576,24 @@ describe('verify translation D lifecycle P1 and P2', () => {
     );
   });
 
+  it('normalizes worktree-add diagnostics before projecting the infrastructure finding', async () => {
+    controls.worktreeAddFailures = 1;
+    controls.worktreeAddFailureStderr = '  sentinel padded add failure  \n';
+
+    const result = await validate('regression');
+    const infrastructure = (result['frames'] as Record<string, unknown>[]).find(
+      (frame) => frame['name'] === 'infrastructure',
+    );
+
+    expect(infrastructure).toEqual(
+      expect.objectContaining({
+        status: 'FAIL',
+        finding:
+          'Validation infrastructure failed: VALIDATION_WORKTREE_ADD_FAILED: sentinel padded add failure',
+      }),
+    );
+  });
+
   it('materializes the feature overlay test into the base phase and labels it exactly', async () => {
     const result = await validate('feature-overlay');
 
@@ -505,6 +606,14 @@ describe('verify translation D lifecycle P1 and P2', () => {
       'test-overlay',
       'candidate',
     ]);
+  });
+
+  it('rejects an unsafe registered overlay path before any test execution', async () => {
+    controls.overlayDiffTargetSha = overlay;
+    controls.overlayDiffExtraPath = UNSAFE_OVERLAY_PATH;
+
+    await expect(validate('feature-overlay')).rejects.toThrow('VALIDATION_RESULT_INVALID');
+    expect(controls.isolatedCalls).toEqual([]);
   });
 
   it.each([
@@ -552,6 +661,29 @@ describe('verify translation D lifecycle P1 and P2', () => {
         status: 'FAIL',
         finding:
           'Validation infrastructure failed: VALIDATION_WORKTREE_REMOVE_FAILED: sentinel removal failure',
+      }),
+    );
+  });
+
+  it('does not claim cleanup when removal succeeds but its authority result reports failure', async () => {
+    controls.removeAfterSuccessFailures = 1;
+    controls.pruneFailures = 1;
+
+    const result = await validate('regression');
+
+    expect(controls.gitWorktreeRemoves).toHaveLength(1);
+    expect(result['cleanup']).toEqual(
+      expect.objectContaining({ worktree: 'orphan-fail', database: 'removed' }),
+    );
+    expect(
+      (result['frames'] as Record<string, unknown>[]).find(
+        (frame) => frame['name'] === 'infrastructure',
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'FAIL',
+        finding:
+          'Validation infrastructure failed: VALIDATION_WORKTREE_REMOVE_FAILED: sentinel post-removal failure',
       }),
     );
   });
