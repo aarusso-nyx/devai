@@ -234,7 +234,10 @@ function makeWitness(strategy: 'regression' | 'structural'): Record<string, unkn
 async function validate(
   strategy: 'regression' | 'structural' = 'regression',
 ): Promise<Record<string, unknown>> {
-  const witness = makeWitness(strategy);
+  return validateWitness(makeWitness(strategy));
+}
+
+async function validateWitness(witness: Record<string, unknown>): Promise<Record<string, unknown>> {
   writeJson(WITNESS_PATH, witness);
   writeJson(RECIPE_PATH, {
     recipe_name: 'devai-fix',
@@ -419,6 +422,33 @@ describe('translation validation E state and frame boundaries', () => {
       evidence_refs: ['EV-eeeeeeeeeeeeeeee'],
       finding: 'Validation infrastructure failed: LINUX_ISOLATION_NOT_APPLIED',
     });
+  });
+
+  it('withholds network proof when successful and failed Linux receipts are mixed', async () => {
+    controls.linuxResults = [
+      { exit_code: 0, stdout: 'isolated', stderr: '', isolation_applied: true },
+      { exit_code: 0, stdout: 'unverified', stderr: '', isolation_applied: false },
+      { exit_code: 0, stdout: 'isolated', stderr: '', isolation_applied: true },
+      { exit_code: 0, stdout: 'unverified', stderr: '', isolation_applied: false },
+    ];
+
+    const mixed = await validate();
+
+    expect(frame(mixed, 'infrastructure')).toEqual({
+      name: 'infrastructure',
+      status: 'FAIL',
+      evidence_refs: ['EV-eeeeeeeeeeeeeeee'],
+      finding: 'Validation infrastructure failed: LINUX_ISOLATION_NOT_APPLIED',
+    });
+    expect(frame(mixed, 'network-egress')).toEqual({
+      name: 'network-egress',
+      status: 'REVIEW',
+      evidence_refs: ['EV-eeeeeeeeeeeeeeee'],
+      finding: 'Linux isolation proof is unavailable because validation infrastructure failed.',
+    });
+    expect(mixed['isolation']).toEqual(
+      expect.objectContaining({ network_egress: 'not-proven', readiness_eligible: false }),
+    );
   });
 
   it('distinguishes native best effort from Linux zero-attempt infrastructure failure', async () => {
@@ -622,5 +652,31 @@ describe('translation validation E state and frame boundaries', () => {
       recovery_scan: 'recovered',
       recovered_lease_ids: [priorLeaseId],
     });
+  });
+
+  it('passes an empty module inventory to both frame evaluations for a no-op diff', async () => {
+    const noOpWitness = {
+      ...makeWitness('structural'),
+      candidate_sha: baseCommit,
+    };
+
+    const result = await validateWitness(noOpWitness);
+
+    expect(controls.evaluations).toHaveLength(2);
+    expect(controls.evaluations.map((evaluation) => evaluation['inventory_delta_modules'])).toEqual(
+      [[], []],
+    );
+    expect(result['executions']).toEqual([]);
+    expect(result['cleanup']).toEqual(
+      expect.objectContaining({ worktree: 'not-created', database: 'removed' }),
+    );
+  });
+
+  it('requires both a successful evidence append and a concrete evidence identity', async () => {
+    controls.append.mockReturnValueOnce({ ok: false, id: 'EV-partial', error: 'append rejected' });
+    await expect(validate('structural')).rejects.toThrow('append rejected');
+
+    controls.append.mockReturnValueOnce({ ok: true });
+    await expect(validate('structural')).rejects.toThrow('VALIDATION_EVIDENCE_APPEND_FAILED');
   });
 });

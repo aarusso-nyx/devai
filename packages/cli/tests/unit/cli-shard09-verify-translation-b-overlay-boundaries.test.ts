@@ -61,6 +61,8 @@ const controls = vi.hoisted(() => ({
     isolation_applied: true,
   } as LinuxResult,
   probeDependencyMount: false,
+  worktreeRemoveFailures: 0,
+  worktreePruneFailures: 0,
 }));
 
 const records = vi.hoisted(() => ({
@@ -92,6 +94,26 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
     if (command === 'sandbox-exec') {
       records.sandboxCalls.push({ command, args: [...args], options: { ...options } });
       return { ...controls.sandbox };
+    }
+    if (command === 'git' && args[0] === 'worktree' && args[1] === 'remove') {
+      if (controls.worktreeRemoveFailures > 0) {
+        controls.worktreeRemoveFailures -= 1;
+        return {
+          status: 1,
+          signal: null,
+          stdout: '',
+          stderr: 'controlled B removal refusal  ',
+        };
+      }
+    }
+    if (
+      command === 'git' &&
+      args[0] === 'worktree' &&
+      args[1] === 'prune' &&
+      controls.worktreePruneFailures > 0
+    ) {
+      controls.worktreePruneFailures -= 1;
+      return { status: 1, signal: null, stdout: '', stderr: 'controlled B prune refusal' };
     }
     const withHostPath = { ...options, env: { ...process.env, PATH: hostPath } };
     // Reaching the isolation runner needs a real worktree, and these three Git
@@ -427,6 +449,8 @@ afterEach(() => {
   controls.sandbox = { status: 0, signal: null, stdout: '', stderr: '' };
   controls.linux = { exit_code: 0, stdout: '', stderr: '', isolation_applied: true };
   controls.probeDependencyMount = false;
+  controls.worktreeRemoveFailures = 0;
+  controls.worktreePruneFailures = 0;
   records.sandboxCalls.length = 0;
   records.linuxInputs.length = 0;
   records.mountEvents.length = 0;
@@ -783,5 +807,89 @@ describe('verify translation isolation boundaries', () => {
     expect(frameOf(result, 'network-egress')['finding']).toBe(
       'Native isolation is best-effort; network denial is not proven.',
     );
+  });
+
+  it('preserves exact worktree removal and prune failures during lease recovery', async () => {
+    const writeRecoverableLease = (suffix: string): string => {
+      const relativeWorktree = `.devai/worktrees/WT-TV-${suffix}`;
+      const absoluteWorktree = resolve(root, relativeWorktree);
+      git(['worktree', 'add', '--detach', absoluteWorktree, baseCommit]);
+      writeJson(`.devai/state/translation-validation/leases/lease-${suffix}.json`, {
+        schemaVersion: '1.0.0',
+        id: `TVL-${suffix}`,
+        task_id: 'TASK-9004',
+        worktree_id: `WT-TV-${suffix}`,
+        worktree_path: relativeWorktree,
+        database: `devai_task_TV_${suffix}`,
+        base_sha: baseCommit,
+        created_at: '2026-09-12T00:00:00.000Z',
+      });
+      return absoluteWorktree;
+    };
+
+    const removalSuffix = 'cccccccccccccccc';
+    const removalWorktree = writeRecoverableLease(removalSuffix);
+    controls.worktreeRemoveFailures = 1;
+    await expect(validate(structuralWitness('INV-DEMO-011'))).rejects.toThrow(
+      'VALIDATION_RECOVERY_FAILED: TVL-cccccccccccccccc: RECOVERY_FAILED: VALIDATION_WORKTREE_REMOVE_FAILED: controlled B removal refusal',
+    );
+    controls.worktreeRemoveFailures = 0;
+    git(['worktree', 'remove', '--force', removalWorktree]);
+    rmSync(
+      resolve(root, `.devai/state/translation-validation/leases/lease-${removalSuffix}.json`),
+      {
+        force: true,
+      },
+    );
+
+    const pruneSuffix = 'dddddddddddddddd';
+    writeRecoverableLease(pruneSuffix);
+    controls.worktreePruneFailures = 1;
+    await expect(validate(structuralWitness('INV-DEMO-011'))).rejects.toThrow(
+      'VALIDATION_RECOVERY_FAILED: TVL-dddddddddddddddd: RECOVERY_FAILED: VALIDATION_WORKTREE_PRUNE_FAILED: controlled B prune refusal',
+    );
+    controls.worktreePruneFailures = 0;
+    rmSync(resolve(root, `.devai/state/translation-validation/leases/lease-${pruneSuffix}.json`), {
+      force: true,
+    });
+  });
+
+  it('reads only JSON leases and recovers them in deterministic file order', async () => {
+    const writeLease = (fileName: string, suffix: string): void => {
+      writeJson(`.devai/state/translation-validation/leases/${fileName}`, {
+        schemaVersion: '1.0.0',
+        id: `TVL-${suffix}`,
+        task_id: 'TASK-9004',
+        worktree_id: `WT-TV-${suffix}`,
+        worktree_path: `.devai/worktrees/WT-TV-${suffix}`,
+        database: `devai_task_TV_${suffix}`,
+        base_sha: baseCommit,
+        created_at: '2026-09-12T00:00:00.000Z',
+      });
+    };
+    writeLease('z-last.json', 'bbbbbbbbbbbbbbbb');
+    writeLease('a-first.json', 'aaaaaaaaaaaaaaaa');
+    writeText('.devai/state/translation-validation/leases/ignored.txt', '{not-json');
+
+    const result = await validate(structuralWitness('INV-DEMO-011'));
+
+    expect(result['cleanup']).toEqual(
+      expect.objectContaining({
+        recovery_scan: 'recovered',
+        recovered_lease_ids: ['TVL-aaaaaaaaaaaaaaaa', 'TVL-bbbbbbbbbbbbbbbb'],
+      }),
+    );
+    expect(
+      existsSync(resolve(root, '.devai/state/translation-validation/leases/a-first.json')),
+    ).toBe(false);
+    expect(
+      existsSync(resolve(root, '.devai/state/translation-validation/leases/z-last.json')),
+    ).toBe(false);
+    expect(
+      existsSync(resolve(root, '.devai/state/translation-validation/leases/ignored.txt')),
+    ).toBe(true);
+    rmSync(resolve(root, '.devai/state/translation-validation/leases/ignored.txt'), {
+      force: true,
+    });
   });
 });
