@@ -33,6 +33,10 @@ const controls = vi.hoisted(() => ({
   pruneFailures: 0,
   overlayDiffTargetSha: null as string | null,
   overlayDiffExtraPath: null as string | null,
+  overlayBlobFailurePath: null as string | null,
+  overlayBlobFailureStderr: 'sentinel overlay blob failure',
+  gitBlobRequests: [] as string[],
+  validationResults: [] as Record<string, unknown>[],
   leaseWrites: [] as { readonly path: string; readonly value: Record<string, unknown> }[],
   rmCalls: [] as { readonly path: string; readonly options: unknown }[],
 }));
@@ -74,6 +78,9 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
     args: readonly string[],
     options: Parameters<typeof nodeSpawnSync>[2],
   ) {
+    if (command === 'git' && args[0] === 'cat-file' && args[1] === 'blob') {
+      controls.gitBlobRequests.push(String(args[2]));
+    }
     if (command === 'git' && args[0] === 'worktree' && args[1] === 'add') {
       controls.gitWorktreeAdds.push(String(args.at(-1)));
       if (controls.worktreeAddFailures > 0) {
@@ -123,6 +130,20 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
       command === 'git' &&
       args[0] === 'cat-file' &&
       args[1] === 'blob' &&
+      controls.overlayBlobFailurePath !== null &&
+      String(args[2]).endsWith(`:${controls.overlayBlobFailurePath}`)
+    ) {
+      return {
+        status: 1,
+        signal: null,
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.from(controls.overlayBlobFailureStderr),
+      };
+    }
+    if (
+      command === 'git' &&
+      args[0] === 'cat-file' &&
+      args[1] === 'blob' &&
       controls.overlayDiffExtraPath !== null &&
       String(args[2]).endsWith(`:${controls.overlayDiffExtraPath}`)
     ) {
@@ -138,6 +159,21 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
     return nodeSpawnSync(command, [...args], options);
   },
 }));
+
+vi.mock('@devai-nyx/schemas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@devai-nyx/schemas')>();
+  const validationResult = (value: unknown): boolean => {
+    controls.validationResults.push(structuredClone(value) as Record<string, unknown>);
+    return actual.validators.validationResult(value);
+  };
+  Object.defineProperty(validationResult, 'errors', {
+    get: () => actual.validators.validationResult.errors,
+  });
+  return {
+    ...actual,
+    validators: { ...actual.validators, validationResult },
+  };
+});
 
 vi.mock('#runtime-core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/runtime-core.js')>();
@@ -390,6 +426,10 @@ beforeEach(() => {
   controls.pruneFailures = 0;
   controls.overlayDiffTargetSha = null;
   controls.overlayDiffExtraPath = null;
+  controls.overlayBlobFailurePath = null;
+  controls.overlayBlobFailureStderr = 'sentinel overlay blob failure';
+  controls.gitBlobRequests = [];
+  controls.validationResults = [];
   controls.leaseWrites = [];
   controls.rmCalls = [];
   vi.useFakeTimers();
@@ -608,12 +648,41 @@ describe('verify translation D lifecycle P1 and P2', () => {
     ]);
   });
 
+  it('projects the exact feature-overlay blob-read diagnostic and retains cleanup custody', async () => {
+    controls.overlayBlobFailurePath = TEST_PATH;
+    controls.overlayBlobFailureStderr = '  sentinel overlay blob failure  \n';
+
+    await expect(validate('feature-overlay')).rejects.toThrow('VALIDATION_RESULT_INVALID');
+    const result = controls.validationResults.at(-1);
+    expect(result).toBeDefined();
+    const infrastructure = (result?.['frames'] as Record<string, unknown>[]).find(
+      (frame) => frame['name'] === 'infrastructure',
+    );
+
+    expect(controls.gitWorktreeAdds).toEqual([base]);
+    expect(controls.isolatedCalls).toEqual([]);
+    expect(infrastructure).toEqual(
+      expect.objectContaining({
+        status: 'FAIL',
+        finding:
+          'Validation infrastructure failed: TEST_OVERLAY_BLOB_READ_FAILED: sentinel overlay blob failure',
+      }),
+    );
+    expect(controls.dropCalls).toHaveLength(1);
+    expect(result?.['cleanup']).toEqual(
+      expect.objectContaining({ worktree: 'removed', database: 'removed' }),
+    );
+  });
+
   it('rejects an unsafe registered overlay path before any test execution', async () => {
     controls.overlayDiffTargetSha = overlay;
     controls.overlayDiffExtraPath = UNSAFE_OVERLAY_PATH;
 
     await expect(validate('feature-overlay')).rejects.toThrow('VALIDATION_RESULT_INVALID');
     expect(controls.isolatedCalls).toEqual([]);
+    expect(
+      controls.gitBlobRequests.filter((request) => request.endsWith(`:${UNSAFE_OVERLAY_PATH}`)),
+    ).toEqual([]);
   });
 
   it.each([
