@@ -39,7 +39,11 @@ export const RC_ONLY = [
 
 export default defineConfig({
   resolve: {
-    alias: { '#runtime-core': resolve('packages/cli/src/runtime-core.ts') },
+    alias: {
+      '#runtime-core': resolve('packages/cli/src/runtime-core.ts'),
+      '@devai-nyx/authority': resolve('packages/authority/src/index.ts'),
+    },
+    conditions: ['development'],
   },
   test: {
     name: 'local',

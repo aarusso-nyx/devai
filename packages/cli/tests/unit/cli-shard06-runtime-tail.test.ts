@@ -1,4 +1,4 @@
-import { chdir, cwd, stderr, stdout } from 'node:process';
+import { stderr, stdout } from 'node:process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -180,7 +180,6 @@ vi.mock('../../src/commands/triage/classify.js', () => ({
   triageClassify: harness.command('triageClassify'),
 }));
 
-const initialCwd = cwd();
 const temporaryRoots: string[] = [];
 const restoreStreamHandles: Array<() => void> = [];
 
@@ -199,7 +198,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (cwd() !== initialCwd) chdir(initialCwd);
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
   vi.restoreAllMocks();
   for (const restore of restoreStreamHandles.splice(0)) restore();
@@ -346,7 +344,7 @@ describe('S06-B public runtime tail', () => {
     await expect(invokeDevaiCli(['catalog', 'actions'])).resolves.toMatchObject({ exit_code: 0 });
     const other = mkdtempSync(join(tmpdir(), 'devai-cli-s06b-runtime-tail-'));
     temporaryRoots.push(other);
-    chdir(other);
+    vi.spyOn(process, 'cwd').mockReturnValue(other);
     await expect(invokeDevaiCli(['catalog', 'actions'])).rejects.toThrow(
       'release-host-working-directory-changed',
     );
