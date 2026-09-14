@@ -1112,7 +1112,14 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
             resolve: registeredHooks.resolve,
             load(url, context, nextLoad) {
               if (url.includes('/.verified-mutation-')) loadedUrls.push(url);
-              return registeredHooks.load(url, context, nextLoad);
+              const result = registeredHooks.load(url, context, nextLoad);
+              if (
+                url.includes('/.verified-mutation-') &&
+                (result as { format?: string }).format !== 'module'
+              ) {
+                throw new Error('verified loader returned an invalid module format');
+              }
+              return result;
             },
           });
           return {

@@ -357,6 +357,9 @@ function crc32(bytes: Buffer): number {
 function storedDeflate(bytes: Buffer): Buffer {
   const blocks: Buffer[] = [];
   const fullBlocks = Math.floor(bytes.byteLength / 65_535);
+  if (fullBlocks > bytes.byteLength) {
+    throw new Error('release-prepare-invalid-deflate-block-count');
+  }
   for (let index = 0; index < fullBlocks; index += 1) {
     const header = Buffer.alloc(5);
     header[0] = 0x00;
