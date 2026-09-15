@@ -198,6 +198,19 @@ it('blocks a pending publication for another version', async () => {
   await expect(publishPages(f.args)).rejects.toThrow('OTHER_PUBLICATION_UNRESOLVED');
   expect(f.options.getOidcToken).not.toHaveBeenCalled();
 });
+it('treats a verified prior rehearsal for the same release as history when live bytes match', async () => {
+  const f = fixture();
+  await publishPages(f.args);
+  const priorDeployment = f.deployments[0];
+  if (priorDeployment === undefined) throw new Error('fixture deployment missing');
+  (priorDeployment.payload as { identity: typeof identity }).identity = {
+    ...identity,
+    rehearsalRun: '999',
+  };
+  f.setLive();
+  await expect(publishPages(f.args)).resolves.toMatchObject({ outcome: 'no-op' });
+  expect(f.options.getOidcToken).toHaveBeenCalledTimes(1);
+});
 it('checks the externally approved audit digest and exact tag', () => {
   const f = fixture();
   expect(() => inspectPagesMigrationAudit(f.options.auditBytes, 'f'.repeat(64), identity)).toThrow(
