@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0.0",
+  "baseline_release": "v1.4.5",
+  "lockfile": "docs/site/package-lock.json",
+  "lockfile_sha256": "ee26a061f0432ed9f407639e0ff4331eba1c0b608f58697697626223641b9e39",
+  "waivers": [
+    {
+      "advisory_id": "GHSA-2883-xcg3-v3hh",
+      "package": "js-yaml",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-2wm5-q62r-hmrv",
+      "package": "colord",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-4mjr-xmp4-gh2g",
+      "package": "qs",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-4vpr-x523-8j87",
+      "package": "svgo",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-5jgf-p345-68v8",
+      "package": "fast-uri",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-73wf-gq98-2v4g",
+      "package": "browserslist",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-c83g-rgw3-j3cx",
+      "package": "browserslist",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-f65p-4m7j-42xc",
+      "package": "fast-uri",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-fph4-wmhf-6fwf",
+      "package": "fast-uri",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-jqff-g426-hqxp",
+      "package": "fast-uri",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-w27v-7q3p-w38r",
+      "package": "svgo",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-x5fp-wj9c-mxmx",
+      "package": "qs",
+      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    }
+  ]
+}

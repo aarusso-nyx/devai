@@ -16,7 +16,7 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc --noEmit",
-    "security:check": "node scripts/check-image-size-patch.mjs && npm audit --audit-level=moderate"
+    "security:check": "node scripts/check-image-size-patch.mjs && node scripts/check-dependency-audit.mjs"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",

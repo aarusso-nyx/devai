@@ -142,6 +142,12 @@ the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no p
 the provenance is recorded beside the vendored package. Replace the vendor with the first upstream
 release containing both fixes, after the docs audit and build remain green.
 
+The docs dependency audit has a single Owner-authorized non-regression baseline in
+`docs/site/dependency-audit-waivers.json`. It is bound to the unchanged `v1.4.5` site lockfile,
+lists every currently observed moderate or high advisory by exact advisory and package, expires on
+2026-10-15, rejects critical advisories, and rejects any changed or additional advisory. A dependency
+or lockfile change must remove the applicable waiver or obtain a new explicitly recorded decision.
+
 Repository settings are separate Owner-authorized effects: enable immutable Releases,
 prohibit update/deletion of `v*` tags, require signed annotated release tags, protect the
 release and Pages environments, and select GitHub Actions as the Pages source. None of those
