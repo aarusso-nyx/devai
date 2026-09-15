@@ -765,7 +765,8 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     linuxAdopter['runs-on'] !== 'ubuntu-latest' ||
     JSON.stringify(linuxAdopter.needs) !== JSON.stringify('build-release') ||
     JSON.stringify(object(linuxAdopter.permissions)) !== JSON.stringify({ contents: 'read' }) ||
-    JSON.stringify(finalize.needs) !== JSON.stringify(['verify-ledger', 'promote-assets'])
+    JSON.stringify(finalize.needs) !== JSON.stringify(['verify-ledger', 'promote-assets']) ||
+    JSON.stringify(pages.needs) !== JSON.stringify(['finalize-release', 'promote-assets'])
   ) {
     findings.push(
       finding(
@@ -777,11 +778,19 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   }
 
   const promotion = object(jobs['promote-assets']);
+  const promotionOutputs = object(promotion.outputs);
+  const finalizeSteps = Array.isArray(finalize.steps) ? finalize.steps : [];
+  const finalizeAssets = finalizeSteps.find(
+    (step) => step.name === 'Download exact release assets',
+  );
   if (
     build.if !== rehearsalCondition ||
     linuxAdopter.if !== rehearsalCondition ||
     promotion.if !== publishCondition ||
-    promotion.needs !== 'verify-ledger'
+    promotion.needs !== 'verify-ledger' ||
+    promotionOutputs.release_asset_id !== '${{ steps.retain.outputs.artifact-id }}' ||
+    finalizeAssets?.with?.['artifact-ids'] !==
+      '${{ needs.promote-assets.outputs.release_asset_id }}'
   ) {
     findings.push(
       finding(
@@ -815,6 +824,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const pagesSteps = Array.isArray(pages.steps) ? pages.steps : [];
   const pagesController = pagesSteps.filter((step) => step.id === 'deployment');
   const pagesArtifact = pagesSteps.find((step) => step.id === 'pages-artifact');
+  const pagesAssets = pagesSteps.find((step) => step.name === 'Download canonical release assets');
   const pagesRecord = pagesSteps.find(
     (step) => step.name === 'Retain Pages reconciliation identifiers',
   );
@@ -840,6 +850,8 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     ) ||
     pagesArtifact?.with?.['retention-days'] !== 30 ||
     pagesArtifact?.with?.name !== 'github-pages-${{ github.run_attempt }}' ||
+    pagesAssets?.with?.['artifact-ids'] !==
+      '${{ needs.promote-assets.outputs.release_asset_id }}' ||
     pagesRecord?.if !== '${{ always() }}' ||
     pagesRecord?.with?.['retention-days'] !== 30 ||
     pagesRecord?.with?.path !== 'pages-publication-record/*' ||
