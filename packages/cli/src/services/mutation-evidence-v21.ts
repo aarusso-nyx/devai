@@ -357,7 +357,9 @@ function loadVerifiedSnapshot(
       if (!url.startsWith(scope)) return nextLoad(url, context);
       const source = sources.get(url);
       if (source === undefined) refuse();
-      return { format: 'module', source: Buffer.from(source), shortCircuit: true };
+      const format: string = 'module';
+      if (format !== 'module') refuse();
+      return { format, source: Buffer.from(source), shortCircuit: true };
     },
   });
   try {
