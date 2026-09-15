@@ -277,6 +277,76 @@ export function assertFresh(prior, current) {
   );
 }
 
+/** Runtime values remain private; only their preapproved identities enter evidence. */
+export function certificationEnvironment(config, descriptor) {
+  requireValue(typeof config.runtimeEnvironment === 'string', 'RUNTIME_ENVIRONMENT_REQUIRED');
+  external(realpathSync(config.repo), config.runtimeEnvironment);
+  requireValue(
+    realpathSync(config.runtimeEnvironment) !== realpathSync(config.environment),
+    'RUNTIME_ENVIRONMENT_SEPARATE_FILE_REQUIRED',
+  );
+  const stat = lstatSync(config.runtimeEnvironment);
+  requireValue(
+    stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o077) === 0,
+    'RUNTIME_ENVIRONMENT_FILE_INVALID',
+  );
+  let values, identities;
+  try {
+    values = read(config.runtimeEnvironment);
+    identities = read(config.environment);
+  } catch {
+    throw new Error('RUNTIME_ENVIRONMENT_MAP_INVALID');
+  }
+  for (const map of [values, identities])
+    requireValue(
+      map !== null && typeof map === 'object' && !Array.isArray(map),
+      'RUNTIME_ENVIRONMENT_MAP_INVALID',
+    );
+  const profiles = descriptor.profiles.filter((profile) => profile.profileId === 'rc');
+  requireValue(profiles.length === 1 && profiles[0].mode === 'fixed', 'RC_PROFILE_INVALID');
+  const tasks = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
+  requireValue(tasks.size === descriptor.tasks.length, 'RC_TASK_POPULATION_INVALID');
+  const selected = new Set();
+  const visiting = new Set();
+  const keys = new Set();
+  function visit(id) {
+    requireValue(!visiting.has(id) && tasks.has(id), 'RC_TASK_DEPENDENCY_INVALID');
+    if (selected.has(id)) return;
+    visiting.add(id);
+    const task = tasks.get(id);
+    for (const dependency of task.dependencies) visit(dependency);
+    for (const key of task.allowlistedEnv) keys.add(key);
+    visiting.delete(id);
+    selected.add(id);
+  }
+  for (const id of profiles[0].requiredNodes) visit(id);
+  const environment = minimalEnvironment();
+  for (const key of keys) {
+    requireValue(
+      typeof key === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/u.test(key),
+      'RUNTIME_ENVIRONMENT_KEY_INVALID',
+    );
+    const present = Object.hasOwn(values, key);
+    const identity = Object.hasOwn(identities, key) ? identities[key] : undefined;
+    requireValue(
+      identity === null ||
+        (typeof identity === 'string' && /^sha256:[a-f0-9]{64}$/u.test(identity)),
+      'RUNTIME_ENVIRONMENT_IDENTITY_INVALID',
+    );
+    requireValue(
+      identity === null
+        ? !present
+        : present &&
+            typeof values[key] === 'string' &&
+            identity === `sha256:${sha(Buffer.from(values[key], 'utf8'))}`,
+      'RUNTIME_ENVIRONMENT_IDENTITY_MISMATCH',
+    );
+    if (present) environment[key] = values[key];
+    else Reflect.deleteProperty(environment, key);
+  }
+  return environment;
+}
+
 function run() {
   const [phase, configPath, receiptPath] = process.argv.slice(2);
   requireValue(
@@ -295,10 +365,7 @@ function run() {
   assertFresh(read(receiptPath), report);
   let candidateReceipt = config.receipt;
   if (phase === 'certify') {
-    const allowed = new Set(descriptor.tasks.flatMap((task) => task.allowlistedEnv));
-    const environment = minimalEnvironment();
-    for (const [key, value] of Object.entries(read(config.environment)))
-      if (allowed.has(key) && value !== null) environment[key] = value;
+    const environment = certificationEnvironment(config, descriptor);
     const cli = resolve(config.packageRoot, 'dist/runtime/index/bin.js');
     const output = command(
       [

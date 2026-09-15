@@ -277,6 +277,7 @@ async function withProtectedPreflightScope<T>(
 }
 
 describe('release lifecycle command adapter composition', () => {
+  // This integration scenario drives the complete lifecycle under subprocess coverage.
   it('wires only the protected preflight factory before continuing the public lifecycle', async () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-release-command-')));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
@@ -1603,5 +1604,5 @@ describe('release lifecycle command adapter composition', () => {
     expect(errorOutput).toHaveBeenCalledWith(
       expect.stringContaining('release-receipt-path-unsafe'),
     );
-  });
+  }, 60_000);
 });

@@ -13,7 +13,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   createAuthorityDecisionIssuer,
   runWithAuthorityHostEffects,
@@ -1089,6 +1089,87 @@ describe('content-addressed check runner', () => {
       ['createdAt', 'profile', 'repository', 'schemaVersion', 'taskPolicyDigest', 'tasks'].sort(),
     );
     expect(receiptBytes).not.toContain('signature');
+  });
+
+  it('emits an ordinary RC receipt without claiming protected namespace capture', async () => {
+    const state = repository();
+    const tasks = descriptor();
+    const generated = tasks.tasks[0];
+    if (generated === undefined) throw new Error('missing generator fixture');
+    Object.assign(generated.outputContract, {
+      generated_namespaces: [{ prefix: 'generated/', derivation: 'example-v1' }],
+    });
+    commit(state.root, 'test-tasks.json', `${JSON.stringify(tasks)}\n`);
+    const report = run(state.root, { target: 'rc' });
+    expect(report.execution?.every((task) => task.outcome === 'PASS')).toBe(true);
+    expect(report.receiptRefusal).toBeUndefined();
+    expect(report.receipt?.value.profile).toBe('rc');
+    expect(report.plan.taskPolicy.schemaVersion).toBe('1.1.0');
+    expect(() => readProtectedCompletedTaskResults(report)).toThrow(
+      'release-certification-task-results-unavailable',
+    );
+    const artifacts = join(state.root, '.devai/state/export-artifacts');
+    mkdirSync(artifacts, { recursive: true });
+    file(artifacts, 'generated.txt', 'generated\n');
+    const { verifyCandidateReceiptEvidence } = await import(
+      pathToFileURL(
+        join(REPOSITORY_ROOT, 'packages/cli/vendor/evidence-verification/src/verify.js'),
+      ).href
+    );
+    const evidence = {
+      receipt: report.receipt?.value,
+      resultsDir: join(state.root, '.devai/state/check-cache/v1/results'),
+      artifactsDir: artifacts,
+      taskPolicy: report.plan.taskPolicy,
+      expectedRepository: report.plan.repository.id,
+      expectedCommit: report.plan.repository.commit,
+      expectedTree: report.plan.repository.tree,
+      expectedPolicyDigest: report.plan.taskPolicyDigest,
+    };
+    expect(verifyCandidateReceiptEvidence(evidence).ok).toBe(true);
+    file(artifacts, 'generated.txt', 'tampered\n');
+    expect(() => verifyCandidateReceiptEvidence(evidence)).toThrow();
+    const protectedReport = run(state.root, {
+      target: 'rc',
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+    });
+    expect(protectedReport.receipt).toBeUndefined();
+    expect(protectedReport.receiptRefusal).toBe('protected-namespace-closure-unproven');
+  });
+
+  it('requires namespace capture for release preflight even when ordinary tasks pass', () => {
+    const state = repository();
+    const tasks = descriptor();
+    const generated = tasks.tasks[0];
+    if (generated === undefined) throw new Error('missing generator fixture');
+    Object.assign(generated.outputContract, {
+      generated_namespaces: [{ prefix: 'generated/', derivation: 'example-v1' }],
+    });
+    commitRelease(state.root, 'test-tasks.json', `${JSON.stringify(tasks)}\n`);
+    const report = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent: {
+        schemaVersion: '1.0.0',
+        release_unit: 'example/repo',
+        current_version: '1.0.0',
+        target_version: '1.0.1',
+        support: 'current',
+        changed_paths: ['package.json', 'test-tasks.json'],
+        changed_packages: [],
+        candidate: {
+          commit: git(state.root, ['rev-parse', 'HEAD']),
+          tree: git(state.root, ['rev-parse', 'HEAD^{tree}']),
+        },
+        base: { commit: state.base, tree: git(state.root, ['rev-parse', `${state.base}^{tree}`]) },
+      },
+      releaseProfile: releaseProfile(),
+    });
+    expect(report.execution?.every((task) => task.outcome === 'PASS')).toBe(true);
+    expect(report.plan.taskPolicy.schemaVersion).toBe('1.2.0');
+    expect(report.receipt).toBeUndefined();
+    expect(report.preflightReceipt).toBeUndefined();
+    expect(report.receiptRefusal).toBe('protected-namespace-closure-unproven');
   });
 
   it('retains the complete protected candidate result population in planned order', () => {

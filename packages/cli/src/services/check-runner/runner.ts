@@ -574,6 +574,11 @@ function* runCheckTaskSteps(
     options.protectedExecutionIdentity !== undefined &&
     options.readTaskOutput !== undefined &&
     options.capturedTaskOutputPaths !== undefined;
+  // Ordinary policy 1.1 receipts attest task outcomes and explicit output paths.
+  // Namespace sealing belongs to the protected policy 1.2 execution boundary;
+  // an ordinary receipt never grants access to protected completed results.
+  const requiresProtectedOutputCapture =
+    options.target === 'release' || options.protectedExecutionIdentity !== undefined;
   const requiredEnvironment = requiredEnvironmentKeys(options);
   // Protected execution binds the complete selected DAG, including dependencies, but does
   // not require credentials or tools belonging only to unselected task nodes. Refuse before
@@ -854,7 +859,9 @@ function* runCheckTaskSteps(
       disposition: 'executed',
       outcome: 'PASS',
       reason:
-        task.outputContract.generated_namespaces !== undefined && !protectedOutputCapture
+        requiresProtectedOutputCapture &&
+        task.outputContract.generated_namespaces !== undefined &&
+        !protectedOutputCapture
           ? 'executed;protected-namespace-closure-unproven'
           : cached.reason,
       durationMs,
@@ -869,6 +876,7 @@ function* runCheckTaskSteps(
   const allPass = execution.every((task) => task.outcome === 'PASS');
   const finalState = repositoryState();
   if (
+    requiresProtectedOutputCapture &&
     !protectedOutputCapture &&
     plan.tasks.some((task) => task.outputContract.generated_namespaces !== undefined)
   )

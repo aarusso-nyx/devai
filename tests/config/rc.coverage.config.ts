@@ -50,7 +50,8 @@ export default defineConfig({
       'tests/regression/xref-resolver-performance.regression.test.ts',
     ],
     passWithNoTests: false,
-    maxWorkers: MAX_TEST_WORKERS,
+    // Coverage instruments child processes too; bound fixture and compiler contention.
+    maxWorkers: Math.min(2, MAX_TEST_WORKERS),
     coverage: {
       provider: 'custom',
       customProviderModule: resolve('tests/config/subprocess-v8-coverage-provider.ts'),

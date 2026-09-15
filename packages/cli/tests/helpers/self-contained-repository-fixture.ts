@@ -34,9 +34,9 @@ export function createSelfContainedRepositoryFixture(
   let disposed = false;
   const cleanup = () => {
     if (disposed) return;
-    disposed = true;
     // This helper removes only its own newly created temporary parent.
-    rmSync(parent, { recursive: true, force: true });
+    rmSync(parent, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    disposed = true;
   };
   const environment = {
     PATH: process.env['PATH'],
