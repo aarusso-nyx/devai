@@ -149,7 +149,7 @@ describe('release certification public capability boundaries', () => {
     'readUnitMutationEvidenceReceipt',
     'readUnitMutationEvidenceBlob',
     'unit_mutation_maximum_bytes',
-  ] as const)('requires the independent %s capability before certification', async (property) => {
+  ] as const)('allows ordinary certification without retired %s capability', async (property) => {
     const value = createLifecyclePolicyFixture(
       ADOPTION.release_verification.mutation_roster,
       ADOPTION.release_verification,
@@ -169,13 +169,13 @@ describe('release certification public capability boundaries', () => {
 
     await expect(provider(selected.request)).resolves.toStrictEqual({
       outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
+      code: 'provider-declined',
     });
-    expect(selected.certify).not.toHaveBeenCalled();
+    expect(selected.certify).toHaveBeenCalledOnce();
   });
 
   it.each([0, 1.5, Number.MAX_SAFE_INTEGER + 1] as const)(
-    'refuses the exact unsafe unit evidence byte limit %s before certification',
+    'ignores retired unit evidence byte limit %s during ordinary certification',
     async (maximum) => {
       const value = createLifecyclePolicyFixture(
         ADOPTION.release_verification.mutation_roster,
@@ -195,13 +195,13 @@ describe('release certification public capability boundaries', () => {
 
       await expect(provider(selected.request)).resolves.toStrictEqual({
         outcome: 'failure',
-        code: 'release-certification-generated-output-untrusted',
+        code: 'provider-declined',
       });
-      expect(selected.certify).not.toHaveBeenCalled();
+      expect(selected.certify).toHaveBeenCalledOnce();
     },
   );
 
-  it('admits the exact one-byte lower bound when every required reader is present', async () => {
+  it('ignores optional historical readers during ordinary certification', async () => {
     const value = createLifecyclePolicyFixture(
       ADOPTION.release_verification.mutation_roster,
       ADOPTION.release_verification,
@@ -321,13 +321,11 @@ describe('release mutation requirement and local-provider public projections', (
     expect(Object.isFrozen(requirements[0])).toBe(true);
   });
 
-  it('returns every exact immutable field for a verified required mutation plan', () => {
+  it('returns no required mutation binding for the DEVAI release profile', () => {
     const value = createLifecyclePolicyFixture(
       ADOPTION.release_verification.mutation_roster,
       ADOPTION.release_verification,
     );
-    const profile = value.resolution.readInput('release-verification-profile');
-    const policy = value.resolution.tools.readJson('dist/law/policy/mutation-evidence-v2.json');
     const requirements = resolveReleaseMutationRequirements(requestFor(value), {
       resolve_receipt: () => value.receipt,
       resolve_plan_input: value.resolve_plan_input,
@@ -335,18 +333,10 @@ describe('release mutation requirement and local-provider public projections', (
     expect(requirements).toStrictEqual([
       {
         release_unit: value.resolution.release_unit,
-        binding: {
-          repository_id: value.candidate.repository.id,
-          candidate_commit: value.candidate.repository.commit,
-          candidate_tree: value.candidate.repository.tree,
-          release_unit: value.resolution.release_unit,
-          release_plan_receipt_digest_sha256: value.receipt.receipt_digest_sha256,
-          release_profile_digest_sha256: canonicalSha256(profile),
-          mutation_policy_digest_sha256: canonicalSha256(policy),
-        },
+        binding: null,
       },
     ]);
-    expect(Object.isFrozen(requirements[0]?.binding)).toBe(true);
+    expect(Object.isFrozen(requirements[0])).toBe(true);
   });
 
   it('exposes only the preflight local provider and returns the exact refusal', async () => {

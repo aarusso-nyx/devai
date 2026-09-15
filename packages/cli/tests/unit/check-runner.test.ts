@@ -354,7 +354,7 @@ describe('content-addressed check runner', () => {
     expect(report.execution).toMatchObject([{ nodeId: 'test:project', outcome: 'PASS' }]);
   });
 
-  it('derives mutation outputs from the exact workspace roster', () => {
+  it('omits retired mutation tasks from an adopter workspace roster', () => {
     const state = repository();
     file(
       state.root,
@@ -409,17 +409,7 @@ describe('content-addressed check runner', () => {
         cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
       }),
     );
-    expect(report.tasks[0]?.outputContract).toMatchObject({
-      kind: 'mutation-report-set-v1',
-      expectedPackageCount: 1,
-      packages: [
-        {
-          packageName: '@stynx/core',
-          workspace: 'packages/core',
-          thresholds: { break: 70, high: 70, low: 60 },
-        },
-      ],
-    });
+    expect(report.tasks).toEqual([]);
   });
 
   it('binds environment identities without exposing local values', () => {
@@ -1308,7 +1298,7 @@ describe('content-addressed check runner', () => {
     expect(report.releaseVerification?.every((entry) => entry.status !== 'unknown')).toBe(true);
   });
 
-  it('refuses required mutation certification before executing ordinary check callbacks', () => {
+  it('certifies ordinary tasks without consulting a legacy mutation producer', () => {
     const state = repository();
     commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
     const releaseIntent = {
@@ -1356,45 +1346,6 @@ describe('content-addressed check runner', () => {
     expect(preflight.preflightReceipt?.value.verdict).toBe('pass');
 
     let callbacks = 0;
-    expect(() =>
-      run(state.root, {
-        target: 'affected',
-        baseCommit: state.base,
-        releaseIntent,
-        releaseProfile: profile,
-        releaseStage: 'certify',
-        preflightReceipt: preflight.preflightReceipt?.value,
-        executeTask: () => {
-          callbacks += 1;
-          return PASS;
-        },
-      }),
-    ).toThrow('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
-    expect(callbacks).toBe(0);
-
-    // A wrong or absent declaration is not a producer: only the exact protected
-    // host token lets required mutation be planned for execution.
-    for (const declaration of [() => 'protected-mutation-producer-v20', () => '', () => 'true']) {
-      expect(() =>
-        run(state.root, {
-          target: 'affected',
-          baseCommit: state.base,
-          releaseIntent,
-          releaseProfile: profile,
-          releaseStage: 'certify',
-          preflightReceipt: preflight.preflightReceipt?.value,
-          resolveProtectedMutationProducer: declaration,
-          executeTask: () => {
-            callbacks += 1;
-            return PASS;
-          },
-        }),
-      ).toThrow('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
-    }
-    expect(callbacks).toBe(0);
-
-    // With the protected producer declared, the same plan reaches execution and
-    // binds the roster entry to its task node.
     const certified = run(state.root, {
       target: 'affected',
       baseCommit: state.base,
@@ -1402,14 +1353,17 @@ describe('content-addressed check runner', () => {
       releaseProfile: profile,
       releaseStage: 'certify',
       preflightReceipt: preflight.preflightReceipt?.value,
-      resolveProtectedMutationProducer: () => 'protected-mutation-producer-v21',
+      resolveProtectedMutationProducer: () => {
+        throw new Error('retired producer must not be read');
+      },
       executeTask: () => {
         callbacks += 1;
         return PASS;
       },
     });
     expect(callbacks).toBeGreaterThan(0);
-    expect(certified.plan.releaseDecision?.mutation).not.toBe('none');
+    expect(certified.exitCode).toBe(0);
+    expect(certified.plan.releaseDecision?.mutation).toBe('none');
   });
 
   it('uses the exact release candidate without resolving HEAD and refuses tracked mutation', () => {

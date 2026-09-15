@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { prFailureDiagnostics } from './pr-failure-diagnostics.mjs';
 import { projectChangedPaths } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
 
 const root = resolve(import.meta.dirname, '..');
@@ -90,6 +91,11 @@ function run(options) {
   process.stdout.write(
     `${JSON.stringify({ nonAttesting: true, tasks: report.execution, exitCode: report.exitCode })}\n`,
   );
+  if (report.exitCode || status) {
+    process.stdout.write(
+      `${JSON.stringify({ nonAttesting: true, failures: prFailureDiagnostics(root, report.execution) })}\n`,
+    );
+  }
   return report.exitCode || status;
 }
 if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));

@@ -140,9 +140,16 @@ it('rejects score below 60 using the real verifier rather than trusting a pass f
   const f = fixture(['Killed', 'Survived']);
   await expect(verifyMutationSemantics(f.args)).rejects.toThrow(/threshold/i);
 });
-it('rejects 51 survivors even when score exceeds 60', async () => {
+it('reports 51 survivors without inventing a ceiling absent from the bound contract', async () => {
   const f = fixture([...Array<string>(100).fill('Killed'), ...Array<string>(51).fill('Survived')]);
-  await expect(verifyMutationSemantics(f.args)).rejects.toThrow(/threshold/i);
+  expect(f.data.contract.packages[0].thresholds.survivedMax).toBe(Number.MAX_SAFE_INTEGER);
+  const result = await verifyMutationSemantics(f.args);
+  expect(result.verification).toMatchObject({
+    complete: true,
+    passed: true,
+    statusTotals: { Survived: 510 },
+  });
+  expect(result.verification.score).toBeGreaterThan(60);
 });
 
 it('rejects changed report contents even when the replacement JSON is canonical', async () => {

@@ -35,7 +35,11 @@ describe('adopter mutation-policy bootstrap contract', () => {
     expect(result.created).toContain('law/policy/mutation-strength.json');
     expect(
       JSON.parse(readFileSync(join(root, 'law/policy/mutation-strength.json'), 'utf8')),
-    ).toMatchObject({ schemaVersion: '1.0.0', id: 'mutation-strength', status: 'active' });
+    ).toMatchObject({
+      schemaVersion: '1.0.0',
+      id: 'mutation-strength',
+      status: 'deprecated-external-hardening',
+    });
   });
 
   it('preserves explicit adopter policy bytes and repeats without policy or lockfile writes', () => {

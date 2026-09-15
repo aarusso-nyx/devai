@@ -617,7 +617,7 @@ describe('adopter-safe check and binding contracts', () => {
     expect(readFileSync(join(repo, 'law/glossary/README.md'), 'utf8')).not.toBe('');
   }, 30_000);
 
-  it('checks mutation from adopter-owned policy and thresholds without rewriting overrides', async () => {
+  it('marks mutation unnecessary without rewriting adopter-owned overrides', async () => {
     const repo = root();
     const policy = {
       schemaVersion: '1.0.0',
@@ -638,7 +638,7 @@ describe('adopter-safe check and binding contracts', () => {
     const result = await withAuthorityHostTestScope(() =>
       executeCheckMember(checkMember('mutation'), { repoRoot: repo }),
     );
-    expect(result.status).toBe('pass');
+    expect(result.status).toBe('na');
     expect(readFileSync(join(repo, 'law/policy/mutation-strength.json'))).toEqual(before);
   });
 
@@ -962,10 +962,12 @@ describe('targeted dependency security floor', () => {
     expect(resolvedPackages).toMatch(/^ {2}js-yaml@4\.3\.1:/mu);
     expect(resolvedPackages).toMatch(/^ {2}nanoid@3\.3\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}postcss@8\.5\.23:/mu);
-    expect(resolvedPackages).toMatch(/^ {2}qs@6\.16\.0:/mu);
+    // qs belonged to the removed mutation engine; retain its security override only.
+    expect(lock).toContain('qs@6.15.1: 6.16.0');
+    expect(resolvedPackages).not.toMatch(/^ {2}qs@/mu);
   });
 
-  it('keeps the fixed Stryker diagnostic toolchain as root development-only inputs', () => {
+  it('excludes the retired Stryker toolchain from root dependencies', () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
       readonly dependencies?: Readonly<Record<string, string>>;
       readonly devDependencies?: Readonly<Record<string, string>>;
@@ -975,8 +977,8 @@ describe('targeted dependency security floor', () => {
       '@stryker-mutator/typescript-checker': '9.6.1',
       '@stryker-mutator/vitest-runner': '9.6.1',
     };
-    expect(manifest.devDependencies).toMatchObject(stryker);
     for (const name of Object.keys(stryker)) {
+      expect(manifest.devDependencies?.[name]).toBeUndefined();
       expect(manifest.dependencies?.[name]).toBeUndefined();
     }
   });

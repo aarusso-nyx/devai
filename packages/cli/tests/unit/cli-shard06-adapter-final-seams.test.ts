@@ -352,7 +352,7 @@ describe('S06-A final direct-service seams', () => {
     expect(boundaries.regenerateInventory).toHaveBeenCalledTimes(2);
   });
 
-  it('routes mutation policy through the report verifier after proving applicability', async () => {
+  it('deprecates mutation policy checks even when historical invariants declare applicability', async () => {
     const root = temporaryRoot('devai-s06-final-mutation-');
     put(root, 'law/policy/mutation-strength.json', {
       schemaVersion: '1.0.0',
@@ -371,10 +371,10 @@ describe('S06-A final direct-service seams', () => {
         mutationThresholds: 'must-not-reach-policy-thresholds.json',
       }),
     ).resolves.toMatchObject({
-      status: 'pass',
-      value: { ok: true, marker: 'verified' },
+      status: 'na',
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
     });
-    expect(boundaries.checkMutationReport).toHaveBeenCalledWith({ repoRoot: root });
+    expect(boundaries.checkMutationReport).not.toHaveBeenCalled();
   });
 
   it('returns the exact not-applicable mutation result without invoking evidence validation', async () => {
@@ -387,12 +387,7 @@ describe('S06-A final direct-service seams', () => {
     put(root, 'law/invariants/INV-NO-MUTATION.json', { verification: { strategy: 'tests' } });
     await expect(execute('mutation', { repoRoot: root })).resolves.toMatchObject({
       status: 'na',
-      value: {
-        status: 'na',
-        applicable: false,
-        reason: 'no invariant verification strategy declares mutation',
-        policy: join(root, 'law/policy/mutation-strength.json'),
-      },
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
     });
     expect(boundaries.checkMutationReport).not.toHaveBeenCalled();
   });
@@ -507,7 +502,7 @@ describe('S06-A final report population seams', () => {
     ).resolves.toMatchObject({ status: 'pass', value: { ok: true, errors: [] } });
   });
 
-  it('forwards every explicit mutation-verification path', async () => {
+  it('ignores explicit retired mutation paths without invoking evidence validation', async () => {
     boundaries.checkMutationReport.mockReturnValue({ ok: true, marker: 'current' });
     const options = {
       repoRoot: ROOT,
@@ -516,15 +511,10 @@ describe('S06-A final report population seams', () => {
       mutationThresholds: 'thresholds.json',
     };
     await expect(execute('mutation-verification', options)).resolves.toMatchObject({
-      status: 'pass',
-      value: { ok: true, marker: 'current' },
+      status: 'na',
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
     });
-    expect(boundaries.checkMutationReport).toHaveBeenCalledWith({
-      repoRoot: ROOT,
-      baseline: 'baseline.json',
-      current: 'current.json',
-      thresholds: 'thresholds.json',
-    });
+    expect(boundaries.checkMutationReport).not.toHaveBeenCalled();
   });
 
   it('measures elapsed adapter time with subtraction and a nonnegative clamp', async () => {
