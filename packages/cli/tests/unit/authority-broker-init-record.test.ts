@@ -153,13 +153,16 @@ describe('authority broker init-record boundary', () => {
         string,
         unknown
       >;
+      const firstHead = firstGit['head_sha'];
+      if (firstHead !== null && typeof firstHead !== 'string')
+        throw new Error('invalid fixture head');
       const firstIdentity = {
         timestamp: '2031-02-03T04:05:06.000Z',
         actor: 'devai-cli',
         actor_role: 'harness',
         action: 'init.apply-harness',
         status: 'completed',
-        git_head_sha: firstGit['head_sha'],
+        git_head_sha: firstHead,
         artifact_sha256s: [],
         previous_run_hash: null,
       };
@@ -184,13 +187,16 @@ describe('authority broker init-record boundary', () => {
         string,
         unknown
       >;
+      const secondHead = secondGit['head_sha'];
+      if (secondHead !== null && typeof secondHead !== 'string')
+        throw new Error('invalid fixture head');
       const secondIdentity = {
         timestamp: '2031-02-03T04:06:07.000Z',
         actor: 'devai-cli',
         actor_role: 'harness',
         action: 'init.apply-owner',
         status: 'completed',
-        git_head_sha: secondGit['head_sha'],
+        git_head_sha: secondHead,
         artifact_sha256s: [],
         previous_run_hash: first.head,
       };

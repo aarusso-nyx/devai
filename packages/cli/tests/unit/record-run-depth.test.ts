@@ -161,6 +161,7 @@ describe('record run command boundaries', () => {
     const record = JSON.parse(result.stdout) as Record<string, unknown>;
     expect(record).toMatchObject({ status: 'fail', tier: 'api', exit_code: 1, signal: null });
     const generatedDir = readdirSync(join(repoRoot, '.devai/state/test-results'))[0];
+    if (generatedDir === undefined) throw new Error('generated result directory missing');
     expect(generatedDir).toMatch(/^devai-record-run-depth-/u);
     expect(
       readFileSync(join(repoRoot, '.devai/state/test-results', generatedDir, 'api.log'), 'utf8'),

@@ -275,7 +275,6 @@ export function createLifecyclePolicyResolutionSetFixture(
       schemaVersion: '1.0.0',
       policy_id: 'fixture.multi-unit-profile',
       policy_version: '1.0.0',
-      release_unit: '@fixture/unit-one',
       version_source: 'package.json',
       default_support: 'current',
       capability_tasks: { lint: ['lint'] },

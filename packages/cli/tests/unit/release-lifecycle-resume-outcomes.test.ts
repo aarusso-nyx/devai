@@ -26,7 +26,7 @@ const CANDIDATE_LOCATOR = {
       package_roster: [{ package_id: '@aarusso-nyx/devai' }],
     },
   ],
-} as const;
+} as unknown as ReleaseLifecycleRequest['candidate_locator'];
 const PLAN_DERIVATION = {
   state: 'planned',
   receipt_kind: 'release-plan-receipt',
@@ -180,8 +180,7 @@ function stateSequence(): readonly ReleaseLifecycleStateV2[] {
         actor: { kind: 'human', role, declaration_source: 'cli-flag' },
         consent: {
           write: true,
-          allow_publish:
-            action_id === 'release evidence-publish' || action_id === 'release publish',
+          allow_publish: false,
           experimental: false,
         },
         storage: {

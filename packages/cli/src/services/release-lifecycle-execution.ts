@@ -509,23 +509,12 @@ function unitMutationOfflineCheck(
       (entry) => object(entry['candidate'])['release_unit'] === unit.release_unit,
     );
     if (plan === undefined) throw new Error('release-offline-receipt-binding-invalid');
-    const determination = object(plan['determination']);
-    const disposition = object(determination['mutation_disposition']);
-    const none = determination['mutation'] === 'none' && disposition['status'] === 'not-required';
-    if (
-      !none &&
-      (!['affected', 'targeted', 'full-roster'].includes(String(determination['mutation'])) ||
-        disposition['status'] !== 'required' ||
-        unit.mutation_evidence == null)
-    ) {
-      throw new Error('release-offline-receipt-binding-invalid');
-    }
     return {
       release_unit: unit.release_unit,
       version: unit.version,
       plan_receipt_digest_sha256: plan['receipt_digest_sha256'],
-      requirement: none ? 'none' : 'required',
-      mutation_evidence: none ? null : unit.mutation_evidence,
+      requirement: 'none',
+      mutation_evidence: null,
     };
   });
   const projection = {
@@ -940,39 +929,7 @@ export function resolveReleaseMutationRequirements(
         (entry) => object(entry.value['candidate'])['release_unit'] === unit.release_unit,
       )?.value;
       if (receipt === undefined) throw new Error('release-receipt-identity-mismatch');
-      const determination = object(receipt['determination']);
-      const disposition = object(determination['mutation_disposition']);
-      if (determination['mutation'] === 'none' && disposition['status'] === 'not-required')
-        return Object.freeze({ release_unit: unit.release_unit, binding: null });
-      if (
-        !['affected', 'targeted', 'full-roster'].includes(String(determination['mutation'])) ||
-        disposition['status'] !== 'required'
-      )
-        throw new Error('release-certification-generated-output-untrusted');
-      const resolution = resolutionForReleasePlanInputResolver(input.resolve_plan_input, receipt);
-      if (resolution === undefined) throw new Error('rpl-semantic-verification-not-performed');
-      const profile = object(resolution.readInput('release-verification-profile'));
-      const template = object(profile['mutation_execution']);
-      if (
-        profile['schemaVersion'] !== '1.2.0' ||
-        template['schemaVersion'] !== '1.2.0' ||
-        template['template_id'] !== 'devai.protected-mutation-stryker.v1'
-      )
-        throw new Error('release-certification-generated-output-untrusted');
-      const policy = resolution.tools.readJson('dist/law/policy/mutation-evidence-v2.json');
-      resolution.tools.parse('mutation-evidence-policy-v2.schema.json', policy);
-      return Object.freeze({
-        release_unit: unit.release_unit,
-        binding: Object.freeze({
-          repository_id: request.repository_locator.id,
-          candidate_commit: request.candidate_locator.commit,
-          candidate_tree: request.candidate_locator.tree,
-          release_unit: unit.release_unit,
-          release_plan_receipt_digest_sha256: String(receipt['receipt_digest_sha256']),
-          release_profile_digest_sha256: canonicalSha256(profile),
-          mutation_policy_digest_sha256: canonicalSha256(policy),
-        }),
-      });
+      return Object.freeze({ release_unit: unit.release_unit, binding: null });
     }),
   );
 }

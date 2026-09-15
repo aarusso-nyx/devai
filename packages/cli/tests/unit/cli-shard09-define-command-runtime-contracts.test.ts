@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 describe('define-command runtime contract boundaries', () => {
   it('attaches exact arguments and public options for every effect class', async () => {
     const { attachRuntimeContracts, canonicalRegistry, defineCommand, getFullRegistry } =
-      await import('../../src/define-command.js?cli-shard09-runtime-contracts');
+      await (import('../../src/define-command.js' + '?cli-shard09-runtime-contracts') as Promise<
+        typeof import('../../src/define-command.js')
+      >);
     const canonical = canonicalRegistry();
 
     for (const entry of canonical) {

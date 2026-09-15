@@ -81,7 +81,7 @@ class Controls(unittest.TestCase):
             actual = c.prepare_config(json.dumps(config), *paths, repo['id'], repo['commit'], repo['tree'])
             self.assertEqual(actual['verification']['expected']['trustStore'], {'external': True})
             self.assertEqual(actual['seed']['members'], {'approved': 'pin'})
-            self.assertEqual(actual['verification']['directory'], str(paths[1].resolve()) + '/mutation-export')
+            self.assertEqual(actual['verification']['directory'], str(paths[1].resolve()) + '/release-export')
 
 
 if __name__ == '__main__':

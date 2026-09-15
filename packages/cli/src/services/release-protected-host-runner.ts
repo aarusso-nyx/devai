@@ -51,9 +51,7 @@ import {
 } from './release-certification-provider.js';
 import type { ProtectedMutationPackageObserver } from './release-mutation-observation.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
-import type { ProtectedMutationPrerequisiteClosure } from './release-certification-provider.js';
 import {
-  buildReleaseMutationInputPlanV21,
   type ReleaseMutationInputControlsV21,
   type ReleaseMutationInputPlanV21,
 } from './release-mutation-inputs.js';
@@ -517,6 +515,8 @@ export function createProtectedReleaseHostRunner(
       'observe_mutation_package',
     ],
   );
+  if ([input.toolchain_fixture].some((value) => value !== undefined))
+    return fail('MUTATION_OFFLOADED_TO_BEDEL: use bedel');
   assertBoundReleaseHostPackageSnapshot(input.installed_package);
   closed(input.later_stages, ['export', 'offline_verify'], ['evidence_publish', 'publish']);
   function publicationStage<T extends object>(
@@ -593,34 +593,6 @@ export function createProtectedReleaseHostRunner(
     )
       fail();
   }
-  const observeMutationPackage = input.observe_mutation_package;
-  if (observeMutationPackage !== undefined && typeof observeMutationPackage !== 'function') fail();
-  const mutationInputs =
-    input.mutation_inputs === undefined ? undefined : copy(input.mutation_inputs);
-  const mutationLimits =
-    input.mutation_limits === undefined ? undefined : copy(input.mutation_limits);
-  if (mutationLimits !== undefined) {
-    closed(mutationLimits, [
-      'maximum_raw_report_bytes',
-      'maximum_document_bytes',
-      'maximum_files',
-      'maximum_mutants',
-    ]);
-    if (
-      Object.values(mutationLimits as unknown as Readonly<Record<string, number>>).some(
-        (value) => !Number.isSafeInteger(value) || value < 1 || value > 0x7fffffff,
-      )
-    )
-      fail();
-  }
-  if (Object.hasOwn(input, 'mutation_inputs')) {
-    closed(mutationInputs, [
-      'execution_coverage',
-      'maximum_source_bytes',
-      'maximum_source_entries',
-    ]);
-    if (fixture === undefined) fail();
-  }
   const fixtureProvider =
     fixture === undefined
       ? undefined
@@ -677,18 +649,6 @@ export function createProtectedReleaseHostRunner(
     plans: [material],
     content_source: git,
     evidence_sink: evidence,
-    // Required mutation is certifiable only when the host owns measured bounds and
-    // the installed producer sources. Absent either, the provider keeps refusing.
-    ...(mutationInputs === undefined || mutationLimits === undefined
-      ? {}
-      : {
-          mutation_driver: {
-            package_snapshot: input.installed_package,
-            limits: mutationLimits,
-            observe_package: observeMutationPackage,
-            buildInputPlan: (prerequisites) => mutationPlan(prerequisites),
-          },
-        }),
   });
   const content: ImmutableReleaseContentSource = {
     ...git,
@@ -760,7 +720,6 @@ export function createProtectedReleaseHostRunner(
     exportControls === 'unavailable' ? undefined : copy(exportControls.transcript_limits);
   let pinnedRequest: ReleaseLifecycleRequest | undefined;
   let activeLane = production;
-  let fixtureSucceeded = false;
   const assertRequest = (request: ReleaseLifecycleRequest) => {
     if (pinnedRequest !== undefined && !same(request, pinnedRequest)) fail(INPUT_INVALID);
     if (
@@ -799,28 +758,6 @@ export function createProtectedReleaseHostRunner(
     if (activeLane !== production) fail('release-host-stage-unavailable');
     assertRequest(request);
   };
-  const mutationPlan = (prerequisites?: ProtectedMutationPrerequisiteClosure) => {
-    if (mutationInputs === undefined)
-      return fail('release-host-mutation-input-controls-unavailable');
-    return buildReleaseMutationInputPlanV21({
-      candidate: production.candidate,
-      resolution,
-      plan_receipt: receipt,
-      controls: {
-        ...mutationInputs,
-        container: production.execution.controls,
-        dependencies: production.execution.dependencies ?? [],
-        environment: production.execution.environment,
-        toolchain: production.execution.toolchain,
-        ...(prerequisites === undefined ? {} : { prerequisite_closure: prerequisites }),
-        ...(fixtureSucceeded && fixtureProvider !== undefined
-          ? { fixture_provider: fixtureProvider }
-          : {}),
-      },
-    });
-  };
-  // Reject stale coverage receipts or invalid production inputs before a diagnostic can run.
-  if (mutationInputs !== undefined) mutationPlan();
   // Deliberately retain no disposer. One host process owns one immutable binding.
   installed = true;
   installReleaseLifecycleCommandAdapters({
@@ -924,9 +861,7 @@ export function createProtectedReleaseHostRunner(
     readMutationInputPlan: () => {
       assertCliInvocationIdle();
       if (active) fail('release-host-invocation-in-progress');
-      const { readProof, ...document } = mutationPlan();
-      void readProof;
-      return copy(document);
+      return fail('mutation-offloaded-to-bedel');
     },
     async invoke(value: ProtectedReleaseHostInvocation) {
       assertCliInvocationIdle();
@@ -993,7 +928,6 @@ export function createProtectedReleaseHostRunner(
               : fail(INPUT_INVALID);
           // Reapply the selected lane's input bound; the approved digest must still match.
           regularInput(invocation.request, activeLane.maximum);
-          if (activeLane === fixture) fixtureSucceeded = false;
           assertRequest(request);
           pinnedRequest = copy(request);
         }
@@ -1034,18 +968,6 @@ export function createProtectedReleaseHostRunner(
           : withProtectedReleaseRepositoryContext(activeLane.repositoryContext, () =>
               invokeDevaiCli(args),
             ));
-        if (activeLane === fixture && result.exit_code === 0) {
-          fixtureSucceeded = true;
-          // A CLI exit code is not compatibility evidence: the planner checks the private brand.
-          if (mutationInputs !== undefined) {
-            try {
-              mutationPlan();
-            } catch (error) {
-              fixtureSucceeded = false;
-              throw error;
-            }
-          }
-        }
         return result;
       } finally {
         pinnedRequest = undefined;

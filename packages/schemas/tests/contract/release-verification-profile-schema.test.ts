@@ -55,3 +55,22 @@ describe('release-verification-profile schema', () => {
     },
   );
 });
+
+describe('mutationless release profile 1.4', () => {
+  const current = {
+    ...profile,
+    schemaVersion: '1.4.0',
+    policy_version: '1.4.0',
+    mutation_roster: [],
+  };
+  it('accepts current and LTS releases without an execution template or roster', () => {
+    const validate = getValidator('release-verification-profile.schema.json');
+    expect(validate(current)).toBe(true);
+    expect(validate({ ...current, default_support: 'lts' })).toBe(true);
+  });
+  it('rejects mutation roster and execution template injection in current profiles', () => {
+    const validate = getValidator('release-verification-profile.schema.json');
+    expect(validate({ ...current, mutation_roster: profile.mutation_roster })).toBe(false);
+    expect(validate({ ...current, mutation_execution: {} })).toBe(false);
+  });
+});

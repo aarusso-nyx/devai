@@ -2163,7 +2163,7 @@
         "support": {
           "source": "release-intent.support",
           "values": ["preview", "current", "lts"],
-          "lts_requires_nonempty_mutation_roster": true
+          "lts_requires_nonempty_mutation_roster": false
         },
         "impact": {
           "source": "release-intent.change_kind",
@@ -2297,11 +2297,9 @@
         "capability_selection": "sorted-unique-union-of-unconditional-floor-transition-support-risk-profile-risk-and-owner-escalation-capabilities",
         "missing_capability_or_unknown_task_behavior": "block",
         "mutation_selection": [
-          "lts-selects-full-roster",
-          "otherwise-any-risk-or-major-or-minor-selects-targeted",
-          "otherwise-behavioral-selects-affected",
-          "otherwise-selects-none",
-          "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"
+          "always-selects-none",
+          "always-not-required-reason-mutation-external-hardening",
+          "no-transition-support-risk-or-owner-escalation-may-require-mutation-testing"
         ],
         "policy_resolution": {
           "resolver_id": "devai.release-policy-resolution.v1",
@@ -3514,7 +3512,7 @@
         "support": {
           "source": "release-intent.support",
           "values": ["preview", "current", "lts"],
-          "lts_requires_nonempty_mutation_roster": true
+          "lts_requires_nonempty_mutation_roster": false
         },
         "impact": {
           "source": "release-intent.change_kind",
@@ -3648,11 +3646,9 @@
         "capability_selection": "sorted-unique-union-of-unconditional-floor-transition-support-risk-profile-risk-and-owner-escalation-capabilities",
         "missing_capability_or_unknown_task_behavior": "block",
         "mutation_selection": [
-          "lts-selects-full-roster",
-          "otherwise-any-risk-or-major-or-minor-selects-targeted",
-          "otherwise-behavioral-selects-affected",
-          "otherwise-selects-none",
-          "non-lts-empty-mutation-roster-remains-ready-with-mutation-none-and-not-required-reason-mutation-roster-empty-when-selected-mutation-is-not-none"
+          "always-selects-none",
+          "always-not-required-reason-mutation-external-hardening",
+          "no-transition-support-risk-or-owner-escalation-may-require-mutation-testing"
         ],
         "policy_resolution": {
           "resolver_id": "devai.release-policy-resolution.v1",

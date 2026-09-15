@@ -26,6 +26,7 @@ import {
   RELEASE_EXPORT_SPEC_ID,
   type ProtectedReleaseExportBinding,
   type ReleaseExportArtifactObject,
+  type ReleaseExportArtifactObjectReceipt,
   type ReleaseExportArtifactStoreOptions,
 } from '../../src/services/release-export-artifact-store.js';
 import { encodeReleaseExportProviderResult } from '../../src/services/release-export-transcript.js';

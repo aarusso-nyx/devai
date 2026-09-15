@@ -74,15 +74,9 @@ describe('historical mutation inputs without ambient Git history (ADR-MUT-0008)'
     expect(historicalFixture.installed.identity.version).toBe('1.4.5');
   });
 
-  it('derives historical and current plans while Git subprocesses and .git reads are unavailable', () => {
-    const old = build(fixture());
-    const current = build(currentFixture());
-    expect(old.plan.execution_template_version).toBe('1.1.0');
-    expect(current.plan.execution_template_version).toBe('1.2.0');
-    expect(old.plan.packages).toHaveLength(10);
-    expect(current.plan.packages).toHaveLength(10);
-    expect(old.plan.grants).toEqual({ execution: false, certification: false, reuse: false });
-    expect(current.plan.grants).toEqual(old.plan.grants);
+  it('deprecates historical and current plan creation without Git or subprocess effects', () => {
+    expect(() => build(fixture())).toThrow('MUTATION_OFFLOADED_TO_BEDEL');
+    expect(() => build(currentFixture())).toThrow('MUTATION_OFFLOADED_TO_BEDEL');
     expect(guard.subprocess).not.toHaveBeenCalled();
     expect(guard.reads.some((path) => path.split(/[\\/]/u).includes('.git'))).toBe(false);
     for (const [name] of historical) expect(guard.reads).toContain(resolve(ROOT, name));
@@ -97,11 +91,11 @@ describe('historical mutation inputs without ambient Git history (ADR-MUT-0008)'
     },
   );
 
-  it('keeps the current v1.2 opt-in independent of historical fixtures', () => {
+  it('deprecates current plan creation independently of historical fixtures', () => {
     guard.corrupt = 'devai-adoption.json';
     const current = currentFixture();
     expect(current.installed.identity.version).toBe('1.5.0');
-    expect(build(current).plan.execution_template_version).toBe('1.2.0');
+    expect(() => build(current)).toThrow('MUTATION_OFFLOADED_TO_BEDEL');
     expect(guard.reads.some((path) => path.includes('/historical-mutation-inputs/'))).toBe(false);
     expect(guard.subprocess).not.toHaveBeenCalled();
   });

@@ -133,7 +133,7 @@ function seededStore() {
   const releaseUnits = material['release_units'] as readonly {
     readonly packages: readonly Readonly<Record<string, unknown>>[];
   }[];
-  const releasePackage = {
+  const releasePackage: Record<string, unknown> = {
     ...object(releaseUnits[0]?.packages[0]),
     manifest: {
       ...object(object(releaseUnits[0]?.packages[0])['manifest']),

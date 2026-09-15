@@ -177,7 +177,9 @@ describe('protected candidate Git metadata', () => {
     );
     expect(byPath.get('.git/shallow')).toEqual(Buffer.from(`${commit}\n`, 'utf8'));
     expect(
-      inflateSync(byPath.get(`.git/objects/${blob.slice(0, 2)}/${blob.slice(2)}`) ?? []),
+      inflateSync(
+        byPath.get(`.git/objects/${blob.slice(0, 2)}/${blob.slice(2)}`) ?? Buffer.alloc(0),
+      ),
     ).toEqual(gitObject('blob', FILE_BYTES));
   });
 

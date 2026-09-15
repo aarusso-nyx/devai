@@ -16,7 +16,7 @@ import {
 import { tmpdir } from 'node:os';
 import { isBuiltin } from 'node:module';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { rolldown } from 'rolldown';
 import ts from 'typescript';
 import { ROSTER as schemaRoots } from '../../schemas/dist/roster.js';
@@ -221,12 +221,6 @@ function stageHostDeclarations() {
 
 try {
   const verifierProvenance = validateVerifierAssets();
-  // One code-owned source mapping and one canonical driver. This read-only
-  // build loader refuses incomplete/linked fixture populations before packaging.
-  const { loadSourceReleaseToolchainFixtureDefinition } = await import(
-    pathToFileURL(join(distRoot, 'services/release-toolchain-fixture-definition.js')).href
-  );
-  const toolchainFixture = loadSourceReleaseToolchainFixtureDefinition();
   const packagedSchemas = schemaClosure(schemaRoots);
   const codeBoundAssets = Object.fromEntries([
     ...packagedSchemas.map((name) => [
@@ -366,29 +360,6 @@ const __dirname = __devaiDirname(__filename);`,
     join(packageRoot, 'scripts/release-host/provision-package.mjs'),
     join(runtimeRoot, 'host/provision-package.mjs'),
   );
-  for (const name of [
-    'mutation-production.mjs',
-    'mutation-typescript-plugin.mjs',
-    'mutation-vitest-plugin.mjs',
-    'mutation-workspace-aliases.mjs',
-  ]) {
-    const target = join(runtimeRoot, 'host', name);
-    copyFileSync(join(repositoryRoot, 'scripts/release-host', name), target);
-    chmodSync(target, 0o644);
-  }
-  const fixtureRoot = join(runtimeRoot, 'fixtures/mutation-toolchain');
-  mkdirSync(fixtureRoot, { recursive: true });
-  const fixtureManifest = join(fixtureRoot, 'manifest.json');
-  writeFileSync(fixtureManifest, JSON.stringify(toolchainFixture, null, 2) + '\n');
-  chmodSync(fixtureManifest, 0o644);
-  for (const entry of toolchainFixture.manifest) {
-    // Treat package.json, .gitignore and executable sources as inert data; npm's
-    // packlist must not reinterpret or omit any member of this exact population.
-    const target = join(fixtureRoot, 'files', `${entry.path}.fixture`);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, toolchainFixture.read(entry.path));
-    chmodSync(target, entry.mode);
-  }
   cpSync(declarationsRoot, join(runtimeRoot, 'types/cli'), { recursive: true });
   chmodSync(join(runtimeIndex, 'bin.js'), 0o755);
 
@@ -479,10 +450,6 @@ const __dirname = __devaiDirname(__filename);`,
     join(runtimeIndex, 'release-host.js'),
     join(runtimeIndex, 'release-host-bootstrap.js'),
     join(runtimeRoot, 'host/provision-package.mjs'),
-    fixtureManifest,
-    ...toolchainFixture.manifest.map((entry) =>
-      join(fixtureRoot, 'files', `${entry.path}.fixture`),
-    ),
     join(runtimeRoot, 'types/cli/release-host-bootstrap.d.ts'),
     join(runtimeIndex, 'lib.d.ts'),
     join(runtimeIndex, 'typescript-libraries.json'),

@@ -322,6 +322,7 @@ describe('S06-B source-derived documentation reports', () => {
       unknown
     >;
     const sensorEntries = sensor['entries'] as Array<Record<string, unknown>>;
+    if (!sensorEntries[0]) throw new Error('sensor fixture missing');
     sensorEntries[0]['kind'] = 7;
     writeJson(sensorPath, sensor);
     expect(() => descriptorReport()).toThrow('CHECK_DESCRIPTOR_SENSOR_KINDS_INVALID:0');
@@ -333,6 +334,7 @@ describe('S06-B source-derived documentation reports', () => {
       unknown
     >;
     const runtimes = runtime['runtimes'] as Array<Record<string, unknown>>;
+    if (!runtimes[0]) throw new Error('runtime fixture missing');
     runtimes[0]['id'] = 7;
     writeJson(runtimePath, runtime);
     expect(() => descriptorReport()).toThrow('CHECK_DESCRIPTOR_RUNTIMES_INVALID:0');
@@ -343,6 +345,7 @@ describe('S06-B source-derived documentation reports', () => {
       unknown
     >;
     const effortRuntimes = effortsRuntime['runtimes'] as Array<Record<string, unknown>>;
+    if (!effortRuntimes[0]) throw new Error('effort fixture missing');
     effortRuntimes[0]['efforts'] = [7];
     writeJson(runtimePath, effortsRuntime);
     expect(() => descriptorReport()).toThrow(

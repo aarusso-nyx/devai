@@ -132,7 +132,7 @@ function checkInstalledExportWorkflow(file, workflow, findings) {
   const invalid =
     materialize.length !== 1 ||
     verify.length !== 1 ||
-    object(transport?.env).BUNDLE_SCHEMA_VERSION !== '2.0.0' ||
+    object(transport?.env).BUNDLE_SCHEMA_VERSION !== '3.0.0' ||
     job['continue-on-error'] !== undefined ||
     [...materialize, ...verify].some(
       (step) =>
@@ -151,9 +151,9 @@ function checkInstalledExportWorkflow(file, workflow, findings) {
   if (invalid)
     findings.push(
       finding(
-        'CI_INSTALLED_MUTATION_EXPORT_REQUIRED',
+        'CI_INSTALLED_RELEASE_EXPORT_REQUIRED',
         file,
-        'protected verification requires v2 evidence, approved controls, and unconditional installed export verification',
+        'protected verification requires v3 mutation-free evidence, approved controls, and unconditional installed export verification',
       ),
     );
 }

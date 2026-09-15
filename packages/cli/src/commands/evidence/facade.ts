@@ -284,22 +284,7 @@ async function recordService(
         },
       ]);
     case 'mutation':
-      if (options.run !== true) throw new Error('--run is required for --kind mutation');
-      if (options.scenarios === undefined) {
-        throw new Error('--scenarios is required for --kind mutation --run');
-      }
-      return invokeCommandService(mutationRun, [
-        {
-          repoRoot,
-          scenarios: options.scenarios,
-          ...(options.out !== undefined && { out: options.out }),
-          ...(options.mutator !== undefined && { mutator: options.mutator }),
-          ...(options.external !== undefined && { external: options.external }),
-          ...(options.reportPath !== undefined && { reportPath: options.reportPath }),
-          ...(options.failOnSurvivors === true && { failOnSurvivors: true }),
-          human: false,
-        },
-      ]);
+      return invokeCommandService(mutationRun, [{}]);
     case 'rtd':
       return invokeCommandService(rtdBundle, [
         {
@@ -365,6 +350,12 @@ export const evidenceRecord = defineCommand({
       .action(async (options: RecordOptions) => {
         if (options.kind === undefined || !RECORD_KINDS.has(options.kind)) {
           usage('evidence record', '--kind must be generic, coverage, test, mutation, or rtd');
+          return;
+        }
+        if (options.kind === 'mutation') {
+          const result = await invokeCommandService(mutationRun, [{}]);
+          process.stdout.write(result.stdout);
+          process.exitCode = EXIT_PASS;
           return;
         }
         if (options.round === undefined) {

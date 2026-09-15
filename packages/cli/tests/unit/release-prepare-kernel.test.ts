@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -12,13 +10,6 @@ import {
 } from '@devai-nyx/authority';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
-import { fixture as unitMutationFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
-import {
-  finalizeUnitMutationEvidenceClosure,
-  verifyUnitMutationEvidenceDocuments,
-  type UnitMutationEvidenceBinding,
-} from '../../src/services/release-unit-mutation-evidence.js';
-import { resolveReleaseMutationRequirements } from '../../src/services/release-lifecycle-execution.js';
 import {
   createReleasePrepareProvider as createKernelReleasePrepareProvider,
   finalizeCertificationManifest,
@@ -397,66 +388,6 @@ function fixtureWithGeneratedPath(path: string) {
       }),
     },
   };
-}
-
-async function mutationFixture(rosterFault?: 'omitted-package' | 'substituted-package') {
-  const adoption = JSON.parse(
-    readFileSync(
-      resolve(import.meta.dirname, '../../../../law/policy/devai-adoption.json'),
-      'utf8',
-    ),
-  ) as {
-    release_verification: Record<string, unknown> & {
-      mutation_roster: Array<{ package: string; manifest_path: string }>;
-    };
-  };
-  const profile = adoption.release_verification;
-  const value = fixture(undefined, 'sha1', profile);
-  const required = resolveReleaseMutationRequirements(value.request, value.resolvers)[0];
-  if (required?.binding === null || required?.binding === undefined)
-    throw new Error('fixture requires mutation');
-  const binding: UnitMutationEvidenceBinding = {
-    ...required.binding,
-    task_policy_digests_sha256: [TASK_POLICY],
-  };
-  const packages = profile.mutation_roster.map((row) => ({
-    packageName: row.package,
-    workspace: dirname(row.manifest_path),
-  }));
-  if (rosterFault === 'omitted-package') packages.pop();
-  if (rosterFault === 'substituted-package')
-    packages[0] = { packageName: '@fixture/substituted', workspace: 'packages/substituted' };
-  const evidence = await unitMutationFixture({ binding, packages });
-  const unit = value.state.release_units[0];
-  if (unit === undefined) throw new Error('fixture release unit missing');
-  Object.assign(unit, { mutation_evidence: structuredClone(evidence.closure) });
-  const source = {
-    ...value.source,
-    unit_mutation_maximum_bytes: 1_000_000,
-    readUnitMutationEvidenceClosure: vi.fn((selected: UnitMutationEvidenceBinding) => {
-      expect(selected).toEqual(binding);
-      return structuredClone(evidence.closure);
-    }),
-    readUnitMutationEvidenceReceipt: vi.fn(
-      (selected: { evidence_sink_id: string; receipt_digest_sha256: string }) => {
-        expect(selected).toEqual({
-          evidence_sink_id: evidence.closure.output_contract.evidence_sink_id,
-          receipt_digest_sha256: evidence.closure.receipt.receipt_digest_sha256,
-        });
-        return structuredClone(evidence.closure.receipt);
-      },
-    ),
-    readUnitMutationEvidenceBlob: vi.fn(
-      (selected: {
-        binding: UnitMutationEvidenceBinding;
-        identity: Parameters<typeof evidence.read>[0];
-      }) => {
-        expect(selected.binding).toEqual(binding);
-        return evidence.read(selected.identity);
-      },
-    ),
-  } satisfies ImmutableReleaseContentSource;
-  return { value, source, evidence, binding, profile };
 }
 
 function preparedTarball(
@@ -1204,217 +1135,33 @@ describe('pure release prepare kernel', () => {
   );
 });
 
-describe('verified mutation continuity through prepare (ADR-MUT-0008 IA-001 through IA-004)', () => {
-  it.each(['omitted-package', 'substituted-package'] as const)(
-    'refuses semantically valid %s census against the genuine ten-package profile',
-    async (rosterFault) => {
-      const { value, source, evidence, binding, profile } = await mutationFixture(rosterFault);
-      expect(profile.mutation_roster).toHaveLength(10);
-      expect(evidence.closure.receipt.referent.release_profile_digest_sha256).toBe(
-        resolveReleaseMutationRequirements(value.request, value.resolvers)[0]?.binding
-          ?.release_profile_digest_sha256,
-      );
-      expect(
-        evidence.closure.members.filter(
-          (member) => member.document_kind === 'mutation-package-result-v2',
-        ),
-      ).toHaveLength(rosterFault === 'omitted-package' ? 9 : 10);
-      await expect(
-        verifyUnitMutationEvidenceDocuments({
-          closure: evidence.closure,
-          expected: binding,
-          read: evidence.read,
-          maximum_bytes: 1_000_000,
-        }),
-      ).resolves.toBeUndefined();
-      const target = memorySink();
-      const result = await createReleasePrepareProvider({
-        ...value.resolvers,
-        certified_state: value.state,
-        content_source: source,
-        artifact_sink: target.sink,
-      })(value.request);
-      expect(result).toMatchObject({
-        outcome: 'failure',
-        code: 'release-certification-generated-output-untrusted',
-      });
-      expect(target.begin).not.toHaveBeenCalled();
-    },
-  );
-
-  it('retains all ten internal package pairs on one unit while preserving the exact one-package tarball', async () => {
-    const { value, source, evidence, profile } = await mutationFixture();
+describe('mutation-free preparation', () => {
+  it('prepares ordinary archives without consulting optional mutation readers or retaining reports', async () => {
+    const value = fixture();
+    Object.assign(value.state.release_units[0] ?? {}, { mutation_evidence: { invalid: true } });
+    const reader = vi.fn(() => {
+      throw new Error('optional mutation reader was called');
+    });
     const target = memorySink();
     const result = await createReleasePrepareProvider({
       ...value.resolvers,
       certified_state: value.state,
-      content_source: source,
+      content_source: {
+        ...value.source,
+        unit_mutation_maximum_bytes: -1,
+        readUnitMutationEvidenceClosure: reader,
+        readUnitMutationEvidenceReceipt: reader,
+        readUnitMutationEvidenceBlob: reader,
+      },
       artifact_sink: target.sink,
     })(value.request);
     expect(result.outcome).toBe('success');
-    expect(result.material?.release_units).toHaveLength(1);
-    expect(result.material?.release_units[0]?.packages).toHaveLength(1);
-    expect(result.material?.release_units[0]?.mutation_evidence).toEqual(evidence.closure);
-    expect(result.material?.release_units[0]?.mutation_evidence?.members).toHaveLength(22);
-    const labels = evidence.closure.members
-      .filter((member) => member.document_kind === 'mutation-package-result-v2')
-      .map((member) => member.package_name)
-      .sort();
-    expect(labels).toEqual(profile.mutation_roster.map((row) => row.package).sort());
-    expect(labels).toHaveLength(10);
-    expect(source.readUnitMutationEvidenceClosure).toHaveBeenCalledOnce();
-    expect(source.readUnitMutationEvidenceReceipt).toHaveBeenCalledOnce();
-    expect(source.readUnitMutationEvidenceBlob).toHaveBeenCalledTimes(23);
-    const tarball = preparedTarball(result, target);
-    expect(sha256(tarball)).toBe(
-      '6dde079d83213ddaa496e9d130ccc9839285efe792e0b098596393ec6a109d0e',
-    );
-    expect(tarEntries(tarball)).toEqual([
+    expect(result.material?.release_units[0]).not.toHaveProperty('mutation_evidence');
+    expect(reader).not.toHaveBeenCalled();
+    expect(tarEntries(preparedTarball(result, target))).toEqual([
       { path: 'package/dist/index.js', mode: 0o755, bytes: value.generated },
       { path: 'package/package.json', mode: 0o644, bytes: value.packageJson },
     ]);
-    expect(result.material?.artifacts.map((artifact) => artifact.kind).sort()).toEqual([
-      'package-manifest',
-      'package-sbom',
-      'package-tarball',
-    ]);
-    expect(result.material?.release_units[0]?.packages[0]?.certification_manifest?.entries).toEqual(
-      value.certificationManifest.entries,
-    );
     await result.transaction?.commit();
-  });
-
-  it('forbids a mutation carrier for a genuinely verified none plan without calling its readers', async () => {
-    const required = await mutationFixture();
-    const value = fixture();
-    expect(
-      resolveReleaseMutationRequirements(value.request, value.resolvers)[0]?.binding,
-    ).toBeNull();
-    Object.assign(value.state.release_units[0] ?? {}, {
-      mutation_evidence: required.evidence.closure,
-    });
-    const target = memorySink();
-    const result = await createReleasePrepareProvider({
-      ...value.resolvers,
-      certified_state: value.state,
-      content_source: { ...required.source, ...value.source },
-      artifact_sink: target.sink,
-    })(value.request);
-    expect(result).toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
-    });
-    expect(target.begin).not.toHaveBeenCalled();
-    expect(required.source.readUnitMutationEvidenceClosure).not.toHaveBeenCalled();
-    expect(required.source.readUnitMutationEvidenceReceipt).not.toHaveBeenCalled();
-    expect(required.source.readUnitMutationEvidenceBlob).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    'carrier',
-    'closure-reader',
-    'receipt-reader',
-    'blob-reader',
-    'bound',
-    'invalid-bound',
-  ] as const)(
-    'refuses missing or invalid required %s before ArtifactSink effects',
-    async (missing) => {
-      const { value, source } = await mutationFixture();
-      if (missing === 'carrier')
-        Object.assign(value.state.release_units[0] ?? {}, { mutation_evidence: null });
-      else if (missing === 'closure-reader')
-        Object.assign(source, { readUnitMutationEvidenceClosure: undefined });
-      else if (missing === 'receipt-reader')
-        Object.assign(source, { readUnitMutationEvidenceReceipt: undefined });
-      else if (missing === 'blob-reader')
-        Object.assign(source, { readUnitMutationEvidenceBlob: undefined });
-      else
-        Object.assign(source, { unit_mutation_maximum_bytes: missing === 'bound' ? undefined : 0 });
-      const target = memorySink();
-      const result = await createReleasePrepareProvider({
-        ...value.resolvers,
-        certified_state: value.state,
-        content_source: source,
-        artifact_sink: target.sink,
-      })(value.request);
-      expect(result).toMatchObject({
-        outcome: 'failure',
-        code: 'release-certification-generated-output-untrusted',
-      });
-      expect(target.begin).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each([
-    'missing-bytes',
-    'corrupt-bytes',
-    'stale-binding',
-    'wrong-receipt',
-    'sink-substitute',
-  ] as const)('refuses required %s before ArtifactSink effects', async (fault) => {
-    const { value, source, evidence, binding } = await mutationFixture();
-    if (fault === 'missing-bytes') evidence.objects.delete(evidence.closure.output_contract.sha256);
-    else if (fault === 'corrupt-bytes') {
-      const original = evidence.objects.get(evidence.closure.output_contract.sha256);
-      if (original === undefined) throw new Error('fixture contract missing');
-      const corrupt = Buffer.from(original);
-      corrupt[0] = 0;
-      evidence.objects.set(evidence.closure.output_contract.sha256, corrupt);
-    } else if (fault === 'stale-binding') {
-      source.readUnitMutationEvidenceClosure.mockImplementation(() =>
-        finalizeUnitMutationEvidenceClosure(
-          { ...binding, candidate_commit: '0'.repeat(40) },
-          evidence.projection,
-        ),
-      );
-    } else if (fault === 'wrong-receipt') {
-      source.readUnitMutationEvidenceReceipt.mockImplementation(() => ({
-        ...evidence.closure.receipt,
-        receipt_digest_sha256: '0'.repeat(64),
-      }));
-    } else {
-      const projection = {
-        ...evidence.projection,
-        output_contract: {
-          ...evidence.projection.output_contract,
-          evidence_sink_id: 'foreign-sink',
-        },
-        members: evidence.projection.members.map((member) => ({
-          ...member,
-          evidence_sink_id: 'foreign-sink',
-        })),
-      };
-      source.readUnitMutationEvidenceClosure.mockImplementation(() =>
-        finalizeUnitMutationEvidenceClosure(binding, projection),
-      );
-    }
-    const target = memorySink();
-    const result = await createReleasePrepareProvider({
-      ...value.resolvers,
-      certified_state: value.state,
-      content_source: source,
-      artifact_sink: target.sink,
-    })(value.request);
-    expect(result).toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
-    });
-    expect(target.begin).not.toHaveBeenCalled();
-  });
-
-  it('refuses missing plan resolvers even when the fixture plan requires no mutation', async () => {
-    const value = fixture();
-    const target = memorySink();
-    const result = await createReleasePrepareProvider({
-      certified_state: value.state,
-      content_source: value.source,
-      artifact_sink: target.sink,
-    })(value.request);
-    expect(result).toMatchObject({
-      outcome: 'failure',
-      code: 'release-receipt-provider-unavailable',
-    });
-    expect(target.begin).not.toHaveBeenCalled();
   });
 });

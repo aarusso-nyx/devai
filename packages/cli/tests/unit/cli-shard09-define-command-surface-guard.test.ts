@@ -3,8 +3,9 @@ import type { RegistryEntry } from '../../src/define-command.js';
 
 describe('define-command action surface guard', () => {
   it('rejects count, path, tier, and each ordered identity drift exactly', async () => {
-    const { canonicalRegistry, validateActionSurface } =
-      await import('../../src/define-command.js?cli-shard09-surface-guard');
+    const { canonicalRegistry, validateActionSurface } = await (import(
+      '../../src/define-command.js' + '?cli-shard09-surface-guard'
+    ) as Promise<typeof import('../../src/define-command.js')>);
     const canonical = canonicalRegistry();
     const [first, second] = canonical;
     if (first === undefined || second === undefined)

@@ -5,7 +5,6 @@ import { createProtectedReleaseHostAdapter, readExactGitTreeSync } from '@devai-
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { parseTaskDescriptor } from './check-runner/policy.js';
 import {
-  PROTECTED_MUTATION_PRODUCER,
   readProtectedCompletedTaskResults,
   runCheckTasks,
   runCheckTasksAsync,
@@ -14,14 +13,9 @@ import {
   createCertifiedEvidenceCarrier,
   finalizeCertifiedEvidenceNamespaceCensus,
 } from './release-certified-evidence-carrier.js';
-import { produceUnitMutationEvidenceV21 } from './release-mutation-driver.js';
 import type { ProtectedMutationPackageObserver } from './release-mutation-observation.js';
 import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
 import type { ReleaseMutationInputPlanV21 } from './release-mutation-inputs.js';
-import type {
-  ReleaseUnitMutationEvidenceClosure,
-  UnitMutationEvidenceSink,
-} from './release-unit-mutation-evidence.js';
 import type {
   CheckRunnerOptions,
   CheckRunnerReport,
@@ -118,9 +112,7 @@ export interface ContainerReleaseCertificationOptions {
   readonly content_source: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'>;
   readonly evidence_sink: TrustedCertificationEvidenceSink;
   /**
-   * Protected semantic mutation production. The host owns the candidate snapshot,
-   * verified resolution and measured bounds; this provider owns only the container
-   * scope. Absent controls keep required mutation refusing rather than passing.
+   * @deprecated Ignored. Mutation execution has moved to bedel.
    */
   readonly mutation_driver?: {
     readonly package_snapshot: ReleasePackageSnapshot;
@@ -420,6 +412,9 @@ function createContainerReleaseAdapters(
     readonly evidence_sink?: TrustedCertificationEvidenceSink;
   },
 ): ContainerReleaseCertificationAdapters {
+  if ([input.toolchain_fixture, input.fixture_context].some((value) => value !== undefined)) {
+    throw new Error('MUTATION_OFFLOADED_TO_BEDEL: mutation toolchain fixtures moved to bedel');
+  }
   const root = realpathSync(input.repository_root);
   // Keep the opaque resolution from this runtime. JSON copying would erase its
   // provenance brand; all ordinary caller-owned plan data is still snapshotted.
@@ -740,11 +735,6 @@ function createContainerReleaseAdapters(
     const executionOptions: CheckRunnerOptions = {
       ...options,
       operation: 'run',
-      // Only a certify run with the protected producer installed may plan required
-      // mutation. Preflight and any driverless certify keep the existing refusal.
-      ...(request.action_id === 'release certify' && input.mutation_driver !== undefined
-        ? { resolveProtectedMutationProducer: () => PROTECTED_MUTATION_PRODUCER }
-        : {}),
       executeTask: (argv, cwd, timeout, taskEnvironment, taskIdentity) => {
         if (
           fixtureContext !== undefined &&
@@ -1160,15 +1150,6 @@ function createContainerReleaseAdapters(
       if (input.evidence_sink === undefined)
         throw new Error('release-certification-evidence-sink-unavailable');
       bindRequest(request);
-      // A task's PASS and hashed output paths are never semantic mutation evidence.
-      // Required mutation is certifiable only through the protected producer below;
-      // without its host controls this still refuses before any task, container or
-      // sink effect rather than certifying ordinary Vitest nodes.
-      if (
-        input.mutation_driver === undefined &&
-        selected.some((entry) => object(entry.receipt.determination).mutation !== 'none')
-      )
-        throw new Error('release-certification-mutation-evidence-unavailable');
       const { options, policies, task_policies } = planCertification(request);
       return {
         content_source: input.content_source,
@@ -1315,74 +1296,6 @@ function createContainerReleaseAdapters(
               if (first === undefined)
                 throw new Error('release-certification-plan-binding-invalid');
               const sinkHost = createProtectedReleaseHostAdapter(first.binding);
-              // Produce semantic mutation evidence before opening the certification
-              // transaction: a failed or incomplete production must leave no committed
-              // certification behind, and it is never replaced by a task exit code.
-              const mutationClosures = new Map<number, ReleaseUnitMutationEvidenceClosure>();
-              for (const [unitIndex, entry] of selected.entries()) {
-                if (object(entry.receipt.determination).mutation === 'none') continue;
-                const driver = input.mutation_driver;
-                const run = runs[unitIndex];
-                if (driver === undefined || run === undefined)
-                  throw new Error('release-certification-mutation-evidence-unavailable');
-                const prerequisites = run.mutation_prerequisites;
-                if (prerequisites === undefined)
-                  throw new Error('release-certification-prerequisite-proof-invalid');
-                const authorityOwner = call.evidence_sink.authority_owner;
-                const nodeExecutable = input.controls.executables.node;
-                if (
-                  authorityOwner === undefined ||
-                  nodeExecutable === undefined ||
-                  typeof call.evidence_sink.beginUnitMutationEvidence !== 'function'
-                )
-                  throw new Error('release-certification-mutation-evidence-unavailable');
-                const unitSink = call.evidence_sink as unknown as UnitMutationEvidenceSink;
-                const inputPlan = driver.buildInputPlan(prerequisites);
-                mutationClosures.set(
-                  unitIndex,
-                  await produceUnitMutationEvidenceV21({
-                    input_plan: inputPlan,
-                    observe_package: driver.observe_package,
-                    package_snapshot: driver.package_snapshot,
-                    limits: driver.limits,
-                    task_policy_digests_sha256: [run.report.plan.taskPolicyDigest],
-                    evidence_sink: unitSink,
-                    authority_owner: authorityOwner,
-                    sink_host: sinkHost,
-                    executable: nodeExecutable,
-                    execute: (produced) => {
-                      const prior = new Map<string, ContainerArchiveEntry>();
-                      for (const member of produced.prerequisite_members) {
-                        const output = run.outputs.get(member.path);
-                        if (output === undefined)
-                          throw new Error('release-certification-prerequisite-proof-invalid');
-                        prior.set(member.path, output);
-                      }
-                      return container.runBound(run.binding, () =>
-                        container.execute({
-                          task: produced.task,
-                          timeout_ms: input.timeout_ms,
-                          environment,
-                          source: source.source,
-                          prior_outputs: prior,
-                          // The prerequisite closure transports its producers' generated
-                          // outputs into this container, and the output closure accepts a
-                          // captured path only as a source, a declared output or a declared
-                          // namespace member. Declaring exactly what was transported is what
-                          // every other task does; leaving it empty rejected the container's
-                          // own predecessor material. A namespace is not the alternative
-                          // here: prior outputs inside one are refused outright, and this
-                          // region belongs to the producing task, not to the mutation
-                          // program, so the predecessor byte check below must still hold it
-                          // unchanged.
-                          declared_outputs: [...prior.keys()],
-                          mutation_program: produced.program,
-                        }),
-                      );
-                    },
-                  }),
-                );
-              }
               const transaction = await sinkHost.invokeSink(
                 () => call.evidence_sink.begin(prepared.map((pkg) => pkg.binding)),
                 call.evidence_sink.authority_owner,
@@ -1517,11 +1430,6 @@ function createContainerReleaseAdapters(
               );
               const release_units = result.release_units.map((unit, unitIndex) => ({
                 ...unit,
-                // Present only where the plan actually required mutation; the kernel
-                // refuses a closure on a not-required unit and a missing one otherwise.
-                ...(mutationClosures.has(unitIndex)
-                  ? { mutation_evidence: mutationClosures.get(unitIndex) }
-                  : {}),
                 packages: unit.packages.map((pkg, pkgIndex) => {
                   const draft = prepared.find(
                     (entry) => entry.unitIndex === unitIndex && entry.pkgIndex === pkgIndex,

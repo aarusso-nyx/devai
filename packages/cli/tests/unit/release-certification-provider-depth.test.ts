@@ -20,7 +20,6 @@ import type {
 import type { CheckRunnerOptions } from '../../src/services/check-runner/types.js';
 import {
   cleanupFixtures,
-  context,
   fixtureRuntime,
   providerFixture,
 } from '../helpers/release-toolchain-provider-fixture.js';
@@ -254,12 +253,17 @@ describe('protected certification provider boundaries', () => {
     expect(() =>
       createContainerReleaseCertificationAdapters({
         ...value.options,
-        fixture_context: context(value.value),
+        fixture_context: {} as NonNullable<ContainerReleaseCertificationOptions['fixture_context']>,
       }),
-    ).toThrow('release-toolchain-fixture-compatibility-invalid');
-    expect(() =>
-      createContainerReleaseCertificationAdapters({ ...value.options, plans: [] }),
-    ).toThrow('release-toolchain-fixture-compatibility-invalid');
+    ).toThrow('MUTATION_OFFLOADED_TO_BEDEL');
+    const withoutPlans = createContainerReleaseCertificationAdapters({
+      ...value.options,
+      plans: [],
+    });
+    await expect(withoutPlans.preflight_provider(value.request)).resolves.toMatchObject({
+      outcome: 'failure',
+      code: 'release-certification-plan-binding-invalid',
+    });
   });
 
   it('validates each diagnostic control member before exposing the provider', () => {
@@ -493,12 +497,9 @@ describe('protected certification provider runner option custody', () => {
     expect(Object.hasOwn(captured.options, 'preflightReceipt')).toBe(true);
   });
 
-  it('exposes the protected mutation producer only to certification with a driver', async () => {
+  it('ignores retired mutation drivers without exposing a producer', async () => {
     const captured = await captureRunnerOptions('release certify', true);
-    expect(typeof captured.options.resolveProtectedMutationProducer).toBe('function');
-    expect(captured.options.resolveProtectedMutationProducer?.()).toBe(
-      'protected-mutation-producer-v21',
-    );
+    expect(captured.options.resolveProtectedMutationProducer).toBeUndefined();
   });
 });
 
@@ -510,7 +511,10 @@ describe('protected certification provider plan object binding', () => {
       const original = fixtureRuntime.runCheckTasks;
       if (original === undefined) throw new Error('fixture runner missing');
       fixtureRuntime.runCheckTasks = (options) => {
-        const report = original(options);
+        const report = original(options) as {
+          preflightReceipt: Record<string, unknown>;
+          [key: string]: unknown;
+        };
         return {
           ...report,
           preflightReceipt: {

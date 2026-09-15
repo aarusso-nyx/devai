@@ -564,8 +564,12 @@ describe('sense inventory direct contract', () => {
   it('activates both command modules freshly without changing output identity', async () => {
     vi.resetModules();
     const [freshMigrate, freshInventory] = await Promise.all([
-      import('../../src/commands/sense/migrate.js?fresh-migrate-depth'),
-      import('../../src/commands/sense/inventory.js?fresh-inventory-depth'),
+      import('../../src/commands/sense/migrate.js' + '?fresh-migrate-depth') as Promise<
+        typeof import('../../src/commands/sense/migrate.js')
+      >,
+      import('../../src/commands/sense/inventory.js' + '?fresh-inventory-depth') as Promise<
+        typeof import('../../src/commands/sense/inventory.js')
+      >,
     ]);
     expect(freshMigrate.executeSenseMigration({ databaseUrl: 'postgres://fixture' })).toEqual(
       reading('pass'),

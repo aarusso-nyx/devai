@@ -57,10 +57,9 @@ def prepare_config(template, controls, evidence_root, work, candidate, repositor
     config['provision']['destination_parent'] = work + '/installed'
     config['verification']['dagControl']['root'] = controls + '/dag'
     config['verification']['dagControl']['candidateRoot'] = candidate
-    config['verification']['directory'] = evidence_root + '/mutation-export'
+    config['verification']['directory'] = evidence_root + '/release-export'
     config['verification']['workDirectory'] = work + '/verification'
     config['verification']['expected']['verificationRoot'] = controls + '/verification-root'
-    config['mutationInputPlanPath'] = evidence_root + '/mutation-input-plan.json'
     # Existing provisioner checks the exact supplied tar identity. No PATH lookup
     # or executable selection is delegated to candidate evidence.
     for name in ('installed', 'verification'):

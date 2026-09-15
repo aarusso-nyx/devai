@@ -2,9 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstatSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { inspectApprovedMutationVerifier } from './approved-mutation-verifier.mjs';
-import { inspectMutationInputPlan } from './mutation-evidence-bindings.mjs';
-import { assertDevaiMutationExportBindings } from './devai-mutation-export-bindings.mjs';
+import { inspectApprovedReleaseVerifier } from './approved-mutation-verifier.mjs';
 
 const loaded = new Map();
 const requireValue = (value, code) => {
@@ -24,7 +22,7 @@ export async function verifyInstalledExport({
   request,
   expected,
 }) {
-  const identity = inspectApprovedMutationVerifier(dagControl);
+  const identity = inspectApprovedReleaseVerifier(dagControl);
   requireValue(
     !loaded.has(identity.packageRoot) ||
       loaded.get(identity.packageRoot) === identity.approvalSha256,
@@ -41,21 +39,13 @@ export async function verifyInstalledExport({
       expected.sinkId,
     'INSTALLED_OFFLINE_EXPECTATIONS_REQUIRED',
   );
-  const mutationPlan =
-    expected.repository?.id === 'aarusso-nyx/devai'
-      ? inspectMutationInputPlan(expected.mutationInputPlanBytes, {
-          sha256: expected.mutationPlanSha256,
-          commit: expected.repository.commit,
-          tree: expected.repository.tree,
-        })
-      : undefined;
   const module = (name) => import(pathToFileURL(join(identity.packageRoot, 'src', name)).href);
   const [canonical, paths, dag] = await Promise.all([
     module('canonical.js'),
     module('safe-path.js'),
     module('verify.js'),
   ]);
-  inspectApprovedMutationVerifier(dagControl);
+  inspectApprovedReleaseVerifier(dagControl);
   requireValue(
     sha(canonical.canonicalBytes(host.installed_package.identity)) === expected.hostIdentitySha256,
     'INSTALLED_OFFLINE_HOST_IDENTITY_MISMATCH',
@@ -205,13 +195,6 @@ export async function verifyInstalledExport({
     receipt.receipt_kind === 'release-offline-verification-receipt' && receipt.verdict === 'pass',
     'INSTALLED_OFFLINE_RECEIPT_INVALID',
   );
-  if (mutationPlan !== undefined)
-    assertDevaiMutationExportBindings({
-      receipt,
-      state: JSON.parse(documents['exported-state.json'].toString('utf8')),
-      objects,
-      plan: mutationPlan,
-    });
-  inspectApprovedMutationVerifier(dagControl);
+  inspectApprovedReleaseVerifier(dagControl);
   return { receipt, control: identity, metadataSha256: expected.metadataSha256 };
 }

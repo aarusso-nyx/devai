@@ -1,5 +1,10 @@
 # Process simplification rollout
 
+> Historical prerelease campaign procedure. Its mandatory mutation evidence,
+> execution and certification requirements are superseded for DEVAI 1.5.0 by
+> [mutation-free delivery](devai-1.5-mutation-free-delivery.md). Preserve historical
+> evidence; do not use the procedures below to prepare a current release.
+
 This is DEVAI's own repository process. It preserves the public CLI, constitution,
 adopter workflows and role boundaries. Source implementation does not create a private
 repository, install credentials, change GitHub settings, push, merge, tag or publish.

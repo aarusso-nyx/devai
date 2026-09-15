@@ -426,7 +426,7 @@ function expectActivationRefusal(action: () => unknown): void {
 }
 
 type FsModule = typeof import('node:fs');
-type FsStat = ReturnType<FsModule['lstatSync']>;
+type FsStat = NonNullable<ReturnType<FsModule['lstatSync']>>;
 
 function alteredStat(
   stat: FsStat,
@@ -436,8 +436,10 @@ function alteredStat(
     get(target, property) {
       if (property === 'isSymbolicLink' && alteration === 'symlink') return () => true;
       if (property === 'isFile' && alteration === 'not-file') return () => false;
-      if (property === 'dev' && alteration === 'device') return target.dev + 1;
-      if (property === 'ino' && alteration === 'inode') return target.ino + 1;
+      if (property === 'dev' && alteration === 'device')
+        return typeof target.dev === 'bigint' ? target.dev + 1n : target.dev + 1;
+      if (property === 'ino' && alteration === 'inode')
+        return typeof target.ino === 'bigint' ? target.ino + 1n : target.ino + 1;
       const value = Reflect.get(target, property, target) as unknown;
       return typeof value === 'function' ? value.bind(target) : value;
     },
@@ -1033,7 +1035,7 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
       readdirSync: ((...args: Parameters<FsModule['readdirSync']>) => {
         const entries = actual.readdirSync(...args);
         if (String(args[0]) !== testRoot || !Array.isArray(entries)) return entries;
-        return entries.filter((entry) => entry.name !== 'verifier.test.js');
+        return entries.filter((entry) => String(entry.name) !== 'verifier.test.js');
       }) as FsModule['readdirSync'],
     }));
   });
@@ -1109,10 +1111,12 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
         registerHooks: (registeredHooks: HookSet) => {
           hooks = registeredHooks;
           const registration = actual.registerHooks({
-            resolve: registeredHooks.resolve,
+            resolve: registeredHooks.resolve as import('node:module').ResolveHookSync,
             load(url, context, nextLoad) {
               if (url.includes('/.verified-mutation-')) loadedUrls.push(url);
-              const result = registeredHooks.load(url, context, nextLoad);
+              const result = registeredHooks.load(url, context, nextLoad) as ReturnType<
+                import('node:module').LoadHookSync
+              >;
               if (
                 url.includes('/.verified-mutation-') &&
                 (result as { format?: string }).format !== 'module'
@@ -1472,7 +1476,12 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
             candidateCommit: CANDIDATE.commit,
             candidateTree: CANDIDATE.tree,
             mutationVerificationMode: 'offline',
-            ...(resolveReuseOrigin === undefined ? {} : { resolveReuseOrigin }),
+            ...(resolveReuseOrigin === undefined
+              ? {}
+              : {
+                  resolveReuseOrigin:
+                    resolveReuseOrigin as unknown as import('../../src/services/mutation-evidence-v21.js').MutationVerificationOptionsV21['resolveReuseOrigin'],
+                }),
           },
         );
 
@@ -1656,7 +1665,9 @@ describe('source-pinned mutation evidence v2.1 activation', () => {
     forgedProvenance.source.commit = '0'.repeat(40);
     resolveReuseOrigin.mockReturnValue({
       composition: evidence.originComposition,
-      semanticReceipt: withSemanticReceiptDigest(forgedOriginReceipt),
+      semanticReceipt: withSemanticReceiptDigest(
+        forgedOriginReceipt,
+      ) as typeof evidence.originReceipt,
     });
     await expect(
       verifyMutationEvidenceV21(

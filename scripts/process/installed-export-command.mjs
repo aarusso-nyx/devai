@@ -4,7 +4,6 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { verifyInstalledExport } from './verify-installed-export.mjs';
-import { inspectMutationInputPlan } from './mutation-evidence-bindings.mjs';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const requireValue = (value, code) => {
@@ -88,21 +87,6 @@ export async function runInstalledExportCommand(config) {
     'INSTALLED_HOST_CANDIDATE_ROOT_MISMATCH',
   );
   const expected = { ...config.verification.expected };
-  if (expected.repository?.id === 'aarusso-nyx/devai') {
-    const plan = config.mutationInputPlanPath;
-    requireValue(
-      typeof plan === 'string' &&
-        lstatSync(plan).isFile() &&
-        lstatSync(plan).size <= 16 * 1024 * 1024,
-      'INSTALLED_OFFLINE_PLAN_FILE_INVALID',
-    );
-    expected.mutationInputPlanBytes = readFileSync(plan);
-    inspectMutationInputPlan(expected.mutationInputPlanBytes, {
-      sha256: expected.mutationPlanSha256,
-      commit: expected.repository.commit,
-      tree: expected.repository.tree,
-    });
-  }
   const { provisionReleaseHostPackage } = await import(pathToFileURL(provisioner).href);
   inspectInstalledHostSeed(config.seed);
   const { host } = await provisionReleaseHostPackage(config.provision);

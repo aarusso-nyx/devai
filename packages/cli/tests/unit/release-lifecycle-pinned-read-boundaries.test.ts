@@ -5,7 +5,7 @@ const fs = vi.hoisted(() => ({
   close: vi.fn(),
   fstat: vi.fn(),
   lstat: vi.fn(),
-  open: vi.fn(() => 17),
+  open: vi.fn<(path: string, directory?: boolean) => number>(() => 17),
   read: vi.fn(),
 }));
 
@@ -200,7 +200,8 @@ describe('release lifecycle pinned receipt reads', () => {
       readInput: vi.fn(),
     };
     const uninstall = lifecycle.installReleaseLifecycleCommandAdapters({
-      policy_resolution: () => resolution,
+      policy_resolution: () =>
+        resolution as unknown as import('../../src/services/release-policy-resolution.js').VerifiedReleasePolicyResolution,
       provider: () => undefined,
       offline_verification_provider: () => undefined,
       authorization: () => undefined,

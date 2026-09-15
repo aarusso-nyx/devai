@@ -14,8 +14,9 @@ describe('CLI shard 09 sense adapters population guard', () => {
     const sensors =
       await vi.importActual<typeof import('@devai-nyx/sensors')>('@devai-nyx/sensors');
 
-    const control =
-      await import('../../src/commands/sense/adapters.js?shard-09-population-control');
+    const control = await (import(
+      '../../src/commands/sense/adapters.js' + '?shard-09-population-control'
+    ) as Promise<typeof import('../../src/commands/sense/adapters.js')>);
     expect(Object.keys(control.SENSE_SENSOR_ADAPTERS).sort()).toEqual(
       [...sensors.SENSOR_READING_KINDS].sort(),
     );
@@ -30,7 +31,9 @@ describe('CLI shard 09 sense adapters population guard', () => {
     }));
 
     await expect(
-      import('../../src/commands/sense/adapters.js?shard-09-population-drift'),
+      import('../../src/commands/sense/adapters.js' + '?shard-09-population-drift') as Promise<
+        typeof import('../../src/commands/sense/adapters.js')
+      >,
     ).rejects.toThrowError('SENSE_ADAPTER_POPULATION_DIVERGENCE');
   });
 });

@@ -25,7 +25,12 @@ import {
   createLifecyclePolicyFixture,
   createLifecyclePolicyResolutionSetFixture,
 } from '../helpers/release-policy-resolution-fixture.js';
-import { fixture as unitMutationEvidenceFixture } from '../helpers/release-unit-mutation-evidence-fixture.js';
+import {
+  finalizeUnitMutationEvidenceClosure,
+  type UnitMutationEvidenceBinding,
+  type UnitMutationEvidenceObject,
+  type UnitMutationEvidenceMember,
+} from '../../src/services/release-unit-mutation-evidence.js';
 import { withReleasePrepareAuthorityFixture } from '../helpers/release-prepare-authority-fixture.js';
 import { createReleasePolicyClosure } from '../../src/services/release-policy-closure.js';
 import { buildResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
@@ -673,8 +678,8 @@ async function requiredExportFixture(template: ReleaseLifecycleStateV2) {
   });
   const mutationUnit = required(mutation.mutation_units[0], 'missing required mutation unit');
   const portable = required(mutation.portable_units[0], 'missing portable mutation unit');
-  if (mutationUnit.mutation_evidence === null || portable.mutation_evidence === null)
-    throw new Error('required mutation evidence unexpectedly absent');
+  expect(mutationUnit.mutation_evidence).toBeNull();
+  expect(portable.mutation_evidence).toBeNull();
 
   const releaseUnit = required(
     mutationRequest.candidate_locator.release_units[0],
@@ -908,12 +913,12 @@ async function requiredExportFixture(template: ReleaseLifecycleStateV2) {
         release_unit: releaseUnit.release_unit,
         version: releaseUnit.version,
         packages: [exportedPackage],
-        mutation_evidence: requiredInput.evidence.closure,
+        mutation_evidence: null,
       },
     ],
     inputs: requiredInput.material.inputs,
     evidence: {
-      ...template.evidence,
+      ...objectValue(template.evidence),
       receipt_digests: [String(requiredInput.fixture.receipt['receipt_digest_sha256'])],
     },
     artifacts,
@@ -988,7 +993,9 @@ function providerFor(action: ReleaseLifecycleRequest['action_id']) {
 }
 
 function certificationProviderBoundaryInput(
-  certify = vi.fn(() => ({
+  certify: ReturnType<
+    typeof vi.fn<Parameters<typeof createReleaseCertificationProvider>[0]['provider']['certify']>
+  > = vi.fn(() => ({
     outcome: 'success' as const,
     material: materialFor('release certify'),
   })),
@@ -1072,6 +1079,56 @@ function requiredMutationRequest(): ReleaseLifecycleRequest {
   };
 }
 
+/** Metadata-only historical continuity fixture; never semantic certification evidence. */
+function unitMutationEvidenceFixture(
+  options: {
+    binding?: Partial<UnitMutationEvidenceBinding>;
+    packages?: readonly { packageName: string; workspace: string }[];
+  } = {},
+) {
+  const binding: UnitMutationEvidenceBinding = {
+    repository_id: '@fixture/history',
+    candidate_commit: 'a'.repeat(40),
+    candidate_tree: 'b'.repeat(40),
+    release_unit: '@aarusso-nyx/devai',
+    release_plan_receipt_digest_sha256: 'c'.repeat(64),
+    release_profile_digest_sha256: 'd'.repeat(64),
+    mutation_policy_digest_sha256: 'e'.repeat(64),
+    task_policy_digests_sha256: [TASK_POLICY_DIGEST],
+    ...options.binding,
+  };
+  const identity = (path: string): UnitMutationEvidenceObject => ({
+    path,
+    sha256: 'f'.repeat(64),
+    size_bytes: 2,
+    evidence_sink_id: 'historical-fixture',
+    opaque_handle: `sha256:${'f'.repeat(64)}`,
+  });
+  const members: UnitMutationEvidenceMember[] = [
+    {
+      ...identity('mutation/semantic.json'),
+      document_kind: 'mutation-semantic-verification-receipt-v2',
+      package_name: null,
+    },
+    {
+      ...identity('mutation/summary.json'),
+      document_kind: 'mutation-composed-report-set-v2',
+      package_name: null,
+    },
+  ];
+  const closure = finalizeUnitMutationEvidenceClosure(binding, {
+    summary_path: 'mutation/summary.json',
+    semantic_receipt_path: 'mutation/semantic.json',
+    output_contract: identity('mutation/contract.json'),
+    members,
+  });
+  return {
+    binding,
+    closure,
+    read: vi.fn((_identity: UnitMutationEvidenceObject) => Buffer.from('{}')),
+  };
+}
+
 async function requiredMutationCertificationFixture() {
   const request = requiredMutationRequest();
   const fixture = REQUIRED_POLICY_FIXTURE;
@@ -1082,7 +1139,7 @@ async function requiredMutationCertificationFixture() {
     })[0],
     'missing required mutation requirement',
   );
-  if (requirement.binding === null) throw new Error('fixture mutation must be required');
+  expect(requirement.binding).toBeNull();
   const packageJson = fixture.package_json;
   const packageDigest = createHash('sha256').update(packageJson).digest('hex');
   const blob = required(
@@ -1206,7 +1263,7 @@ async function mixedMutationCertificationFixture() {
   const packageJson = fixture.candidate.read('package.json');
   const packageDigest = createHash('sha256').update(packageJson).digest('hex');
   const releaseUnits = fixture.receipts.map((receipt) => {
-    const candidate = receipt['candidate'] as Readonly<Record<string, unknown>>;
+    const candidate = objectValue(receipt['candidate']);
     return {
       release_unit: String(candidate['release_unit']),
       version: String(candidate['version']),
@@ -1244,7 +1301,8 @@ async function mixedMutationCertificationFixture() {
     resolve_receipt: resolveReceipt,
     resolve_plan_input: fixture.resolve_plan_input,
   });
-  const binding = required(requirements[0]?.binding, 'first mixed unit must require mutation');
+  const binding = requirements[0]?.binding ?? {};
+  expect(requirements.every((unit) => unit.binding === null)).toBe(true);
   if (requirements[1]?.binding !== null) throw new Error('second mixed unit must omit mutation');
   const evidence = await unitMutationEvidenceFixture({
     binding: { ...binding, task_policy_digests_sha256: [TASK_POLICY_DIGEST] },
@@ -2475,7 +2533,7 @@ describe('release lifecycle execution kernel', () => {
     expect(result.material?.release_units[0]?.mutation_evidence).toBeUndefined();
   });
 
-  it('retains and semantically verifies the exact composed ten-package unit mutation closure', async () => {
+  it('retains optional historical metadata without semantic mutation verification', async () => {
     const input = await requiredMutationCertificationFixture();
     const { provider, certify } = requiredMutationProvider(input);
 
@@ -2484,11 +2542,11 @@ describe('release lifecycle execution kernel', () => {
     expect(result).toMatchObject({ outcome: 'success' });
     expect(certify).toHaveBeenCalledOnce();
     expect(result.material?.release_units[0]?.mutation_evidence).toEqual(input.evidence.closure);
-    expect(input.evidence.closure.members).toHaveLength(22);
-    expect(input.evidence.read).toHaveBeenCalledTimes(23);
+    expect(input.evidence.closure.members).toHaveLength(2);
+    expect(input.evidence.read).not.toHaveBeenCalled();
   });
 
-  it('refuses required mutation material without each trusted unit evidence prerequisite', async () => {
+  it('certifies without optional mutation readers or byte limits', async () => {
     const input = await requiredMutationCertificationFixture();
     const missingRequirements = [
       { omit_unit_readers: true },
@@ -2504,27 +2562,25 @@ describe('release lifecycle execution kernel', () => {
       const { provider, certify } = requiredMutationProvider(input, undefined, options);
 
       await expect(provider(input.request)).resolves.toMatchObject({
-        outcome: 'failure',
-        code: 'release-certification-generated-output-untrusted',
+        outcome: 'success',
       });
-      expect(certify).not.toHaveBeenCalled();
+      expect(certify).toHaveBeenCalledOnce();
     }
   });
 
-  it('accepts one byte as the minimum trusted unit evidence limit', async () => {
+  it('ignores the retired mutation byte limit', async () => {
     const input = await requiredMutationCertificationFixture();
     const { provider, certify } = requiredMutationProvider(input, undefined, {
       unit_maximum_bytes: 1,
     });
 
     await expect(provider(input.request)).resolves.toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
+      outcome: 'success',
     });
     expect(certify).toHaveBeenCalledOnce();
   });
 
-  it('requires mutation readers when any unit in a mixed certification is bound', async () => {
+  it('requires independent ordinary plans for every unit without mutation readers', async () => {
     const fixture = createLifecyclePolicyResolutionSetFixture({
       mutation_roster: DEVAI_ADOPTION.release_verification.mutation_roster,
       profile_overrides: DEVAI_ADOPTION.release_verification,
@@ -2534,7 +2590,7 @@ describe('release lifecycle execution kernel', () => {
     const packageBytes = fixture.candidate.read('package.json');
     const packageDigest = createHash('sha256').update(packageBytes).digest('hex');
     const releaseUnits = fixture.receipts.map((receipt) => {
-      const candidate = receipt['candidate'] as Readonly<Record<string, unknown>>;
+      const candidate = objectValue(receipt['candidate']);
       return {
         release_unit: String(candidate['release_unit']),
         version: String(candidate['version']),
@@ -2571,7 +2627,7 @@ describe('release lifecycle execution kernel', () => {
         ),
       resolve_plan_input: fixture.resolve_plan_input,
     });
-    expect(requirements.map((requirement) => requirement.binding === null)).toEqual([false, true]);
+    expect(requirements.map((requirement) => requirement.binding === null)).toEqual([true, true]);
 
     const duplicate = buildResolvedReleasePlanReceipt({
       intent: {
@@ -2602,7 +2658,10 @@ describe('release lifecycle execution kernel', () => {
       ),
     ).toThrow('release-receipt-identity-mismatch');
 
-    const certify = vi.fn();
+    const certify = vi.fn(() => ({
+      outcome: 'failure' as const,
+      code: 'release-certification-generated-output-untrusted' as const,
+    }));
     const provider = createReleaseCertificationProvider({
       provider: { kind: 'protected-certification-provider-v3', certify },
       evidence_sink: {
@@ -2644,47 +2703,25 @@ describe('release lifecycle execution kernel', () => {
       outcome: 'failure',
       code: 'release-certification-generated-output-untrusted',
     });
-    expect(certify).not.toHaveBeenCalled();
+    expect(certify).toHaveBeenCalledOnce();
   });
 
-  it('derives exact immutable mutation requirements from genuine required and optional plans', () => {
-    const requiredRequest = requiredMutationRequest();
-    const profile = REQUIRED_POLICY_FIXTURE.resolution.readInput('release-verification-profile');
-    const policy = REQUIRED_POLICY_FIXTURE.resolution.tools.readJson(
-      'dist/law/policy/mutation-evidence-v2.json',
-    );
-    const required = resolveReleaseMutationRequirements(requiredRequest, {
-      resolve_receipt: () => REQUIRED_POLICY_FIXTURE.receipt,
-      resolve_plan_input: REQUIRED_POLICY_FIXTURE.resolve_plan_input,
-    });
-    expect(required).toEqual([
-      {
-        release_unit: '@aarusso-nyx/devai',
-        binding: {
-          repository_id: requiredRequest.repository_locator.id,
-          candidate_commit: requiredRequest.candidate_locator.commit,
-          candidate_tree: requiredRequest.candidate_locator.tree,
-          release_unit: '@aarusso-nyx/devai',
-          release_plan_receipt_digest_sha256: REQUIRED_POLICY_FIXTURE.receipt.receipt_digest_sha256,
-          release_profile_digest_sha256: canonicalSha256(profile),
-          mutation_policy_digest_sha256: canonicalSha256(policy),
-        },
-      },
-    ]);
-    expect(Object.isFrozen(required)).toBe(true);
-    expect(Object.isFrozen(required[0])).toBe(true);
-    expect(Object.isFrozen(required[0]?.binding)).toBe(true);
-
-    const optionalRequest = request('release preflight');
-    expect(
-      resolveReleaseMutationRequirements(optionalRequest, {
-        resolve_receipt: () => POLICY_FIXTURE.receipt,
-        resolve_plan_input: POLICY_FIXTURE.resolve_plan_input,
-      }),
-    ).toEqual([{ release_unit: '@aarusso-nyx/devai', binding: null }]);
+  it('derives immutable not-required mutation dispositions from ordinary verified plans', () => {
+    for (const [selected, fixture] of [
+      [requiredMutationRequest(), REQUIRED_POLICY_FIXTURE],
+      [request('release preflight'), POLICY_FIXTURE],
+    ] as const) {
+      const requirements = resolveReleaseMutationRequirements(selected, {
+        resolve_receipt: () => fixture.receipt,
+        resolve_plan_input: fixture.resolve_plan_input,
+      });
+      expect(requirements).toEqual([{ release_unit: '@aarusso-nyx/devai', binding: null }]);
+      expect(Object.isFrozen(requirements)).toBe(true);
+      expect(Object.isFrozen(requirements[0])).toBe(true);
+    }
   });
 
-  it('requires every unit mutation reader and a positive safe byte limit independently', async () => {
+  it('ignores missing readers and invalid mutation byte limits', async () => {
     const input = await requiredMutationCertificationFixture();
     const validSink = requiredMutationEvidenceSink(input.evidence);
     const invalidSinks = [
@@ -2716,14 +2753,13 @@ describe('release lifecycle execution kernel', () => {
       });
 
       await expect(provider(input.request)).resolves.toMatchObject({
-        outcome: 'failure',
-        code: 'release-certification-generated-output-untrusted',
+        outcome: 'success',
       });
-      expect(certify).not.toHaveBeenCalled();
+      expect(certify).toHaveBeenCalledOnce();
     }
   });
 
-  it('refuses missing, corrupted, or wrong-bound required unit mutation evidence', async () => {
+  it('ignores absent corrupted and foreign optional mutation reports', async () => {
     const input = await requiredMutationCertificationFixture();
     const missing: ReleaseStateMaterial = {
       ...input.material,
@@ -2735,8 +2771,7 @@ describe('release lifecycle execution kernel', () => {
     const missingCertify = vi.fn(() => ({ outcome: 'success' as const, material: missing }));
     const missingProvider = requiredMutationProvider(input, missingCertify).provider;
     await expect(missingProvider(input.request)).resolves.toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
+      outcome: 'success',
     });
     expect(missingCertify).toHaveBeenCalledOnce();
 
@@ -2749,8 +2784,7 @@ describe('release lifecycle execution kernel', () => {
       },
     });
     await expect(corrupt.provider(input.request)).resolves.toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
+      outcome: 'success',
     });
     expect(corrupt.certify).toHaveBeenCalledOnce();
 
@@ -2763,10 +2797,26 @@ describe('release lifecycle execution kernel', () => {
     });
     const wrongBound = requiredMutationProvider(input, undefined, { closure: wrong.closure });
     await expect(wrongBound.provider(input.request)).resolves.toMatchObject({
-      outcome: 'failure',
-      code: 'release-certification-generated-output-untrusted',
+      outcome: 'success',
     });
     expect(wrongBound.certify).toHaveBeenCalledOnce();
+  });
+
+  it('ignores malformed optional mutation reports while retaining ordinary certification', async () => {
+    const input = await requiredMutationCertificationFixture();
+    Object.assign(input.material.release_units[0] ?? {}, {
+      mutation_evidence: { invalid: true, outcome: 'failure' },
+    });
+    const read = vi.fn(() => {
+      throw new Error('optional mutation reader must not run');
+    });
+    const { provider, certify } = requiredMutationProvider(input, undefined, {
+      read_blob: read,
+      unit_maximum_bytes: -1,
+    });
+    await expect(provider(input.request)).resolves.toMatchObject({ outcome: 'success' });
+    expect(certify).toHaveBeenCalledOnce();
+    expect(read).not.toHaveBeenCalled();
   });
 
   it('refuses missing or stale required plans before protected certification runs', async () => {
@@ -3269,14 +3319,15 @@ describe('release lifecycle execution kernel', () => {
       const unit = required(prior.release_units[0], 'missing exported release unit');
       const pkg = required(unit.packages[0], 'missing exported package');
       const trust = required(pkg.trust, 'missing exported package trust');
-      const input = required(prior['inputs'][0], 'missing exported input');
-      const artifact = required(prior['artifacts'][0], 'missing exported artifact');
+      const priorMaterial = prior as unknown as ReleaseStateMaterial;
+      const input = required(priorMaterial.inputs[0], 'missing exported input');
+      const artifact = required(priorMaterial.artifacts[0], 'missing exported artifact');
       const sink = required(prior.artifact_sink, 'missing exported artifact sink');
       const exact: ReleaseStateMaterial = {
         release_units: prior.release_units,
-        inputs: prior['inputs'],
-        evidence: prior['evidence'],
-        artifacts: prior['artifacts'],
+        inputs: priorMaterial.inputs,
+        evidence: priorMaterial.evidence,
+        artifacts: priorMaterial.artifacts,
         artifact_sink: sink,
       };
       const changed: ReleaseStateMaterial = {
@@ -3294,13 +3345,18 @@ describe('release lifecycle execution kernel', () => {
             }
           : {}),
         ...(field === 'inputs'
-          ? { inputs: [{ ...input, sha256: 'f'.repeat(64) }, ...prior['inputs'].slice(1)] }
+          ? { inputs: [{ ...input, sha256: 'f'.repeat(64) }, ...priorMaterial.inputs.slice(1)] }
           : {}),
         ...(field === 'evidence'
-          ? { evidence: { ...prior['evidence'], manifest_digest_sha256: 'f'.repeat(64) } }
+          ? { evidence: { ...priorMaterial.evidence, manifest_digest_sha256: 'f'.repeat(64) } }
           : {}),
         ...(field === 'artifacts'
-          ? { artifacts: [{ ...artifact, sha256: 'f'.repeat(64) }, ...prior['artifacts'].slice(1)] }
+          ? {
+              artifacts: [
+                { ...artifact, sha256: 'f'.repeat(64) },
+                ...priorMaterial.artifacts.slice(1),
+              ],
+            }
           : {}),
         ...(field === 'artifact_sink'
           ? { artifact_sink: { ...sink, transaction_handle: 'changed-transaction' } }
@@ -4512,7 +4568,9 @@ describe('release lifecycle execution kernel', () => {
       [],
     );
 
-    const plan = required(certified.bound_receipts[0], 'missing certified plan binding');
+    const planBindings = certified.bound_receipts;
+    if (!Array.isArray(planBindings)) throw new Error('missing certified plan bindings');
+    const plan = objectValue(required(planBindings[0], 'missing certified plan binding'));
     const driftedPlan = refinalize(certified, {
       bound_receipts: [{ ...plan, receipt_digest_sha256: 'f'.repeat(64) }],
     });
@@ -6164,7 +6222,7 @@ describe('release lifecycle execution kernel', () => {
     ).toThrow('release-export-artifact-sink-protocol-invalid');
   });
 
-  it('binds required mutation evidence into a verified current export check', async () => {
+  it('records mutation as not-applicable in verified current exports', async () => {
     const store = new ReleaseLifecycleFileStore(root(), request('release export'));
     await advanceToExported(store);
     const template = required(store.readStateRecords().at(-1), 'missing exported template');
@@ -6181,11 +6239,11 @@ describe('release lifecycle execution kernel', () => {
         expect(check).toMatchObject({
           check_id: 'mutation-semantics',
           evidence_kind: 'devai.release-unit-mutation-check.v1',
-          status: 'pass',
+          status: 'not-applicable',
           units: [
             {
               release_unit: '@aarusso-nyx/devai',
-              requirement: 'required',
+              requirement: 'none',
             },
           ],
         });
@@ -6537,7 +6595,7 @@ describe('release lifecycle execution kernel', () => {
       resolve: async (binding) => {
         const resolution = await valid.resolve(binding);
         if (!resolution.ok) return resolution;
-        const grant = required(resolution.events[0], 'missing authorization grant');
+        const grant = objectValue(required(resolution.events[0], 'missing authorization grant'));
         const consumed = await valid.consume({
           ...binding,
           grant_event_id: String(grant['event_id']),

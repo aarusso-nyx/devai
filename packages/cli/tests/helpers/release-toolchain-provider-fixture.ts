@@ -107,11 +107,11 @@ function fixedDefinition(): {
     ['packages/fixture/vitest.config.cjs', bytes('packages/fixture/vitest.config.cjs')],
     [
       'host/mutation-typescript-plugin.mjs',
-      readFileSync(join(ROOT, 'scripts/release-host/mutation-typescript-plugin.mjs')),
+      Buffer.from('// Inert historical fixture member; no mutation engine.\n'),
     ],
     [
       'host/run-diagnostic.mjs',
-      readFileSync(join(ROOT, 'scripts/release-host/mutation-diagnostic.mjs')),
+      Buffer.from('// Inert historical fixture member; no mutation engine.\n'),
     ],
   ]);
   const manifest = [...source]
@@ -730,11 +730,6 @@ function providerFixture(production?: {
         ],
       },
     ],
-    toolchain_fixture: {
-      candidate: value.candidate,
-      installed_package: value.installed,
-      production_resolution: value.productionResolution,
-    },
     content_source: {
       readGitObject: ({ repository, object_format, type, object_id }) =>
         readProofObject({ repository, object_format, type, object_id }),

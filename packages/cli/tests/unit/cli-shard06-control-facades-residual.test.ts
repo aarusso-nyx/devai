@@ -14,17 +14,23 @@ const controls = vi.hoisted(() => {
     errors?: readonly unknown[];
   };
   return {
-    append: vi.fn(() => ({ ok: true as const, id: 'EV-NEW' })),
-    classify: vi.fn(() => ({
+    append: vi.fn<(...args: unknown[]) => { ok: boolean; id?: string; error?: string }>(() => ({
+      ok: true,
+      id: 'EV-NEW',
+    })),
+    classify: vi.fn((..._args: unknown[]) => ({
       schemaVersion: '1.0.0',
       id: 'TRG-0123456789abcdef',
       subject_evidence_ref: 'EV-89f7974460e256a3',
       classification: 'plant_bug',
       confidence: { score: 0.45, method: 'rule-based-mvp' },
-      recommended_route: { discipline: 'engineer', action: 'feedback_iteration' },
+      recommended_route: { discipline: 'engineer', action: 'feedback_iteration' } as {
+        discipline: string;
+        action?: string;
+      },
     })),
     declaredRole: vi.fn<() => string | undefined>(() => 'inspector'),
-    load: vi.fn(() => ({ records: [] as unknown[] })),
+    load: vi.fn((..._args: unknown[]) => ({ records: [] as unknown[] })),
     sensorReading,
     track: vi.fn(),
     triageVerdict,
@@ -524,7 +530,7 @@ async function runCoverage(options: CoverageOptions) {
     if (error instanceof ExitSignal) exit = error.code;
     else throw error;
   } finally {
-    exit = process.exitCode ?? exit;
+    exit = process.exitCode === undefined ? exit : Number(process.exitCode);
     process.exit = original.exit;
     process.stdout.write = original.stdout;
     process.stderr.write = original.stderr;

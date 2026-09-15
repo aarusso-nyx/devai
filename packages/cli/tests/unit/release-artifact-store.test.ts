@@ -896,7 +896,11 @@ describe('durable external release artifact store', () => {
       );
       const valid = object('package-manifest', 'manifest', Buffer.from('manifest'));
       await refusal(() =>
-        invokePrepare(value.binding, () => transaction.put({ ...valid, ...mutation })),
+        invokePrepare(value.binding, () =>
+          transaction.put({ ...valid, ...mutation } as unknown as Parameters<
+            typeof transaction.put
+          >[0]),
+        ),
       );
     }
   });
@@ -973,7 +977,10 @@ describe('durable external release artifact store', () => {
 
   it('revalidates every issued receipt against disk before the commit becomes terminal', async () => {
     const value = await preparedFixture();
-    const path = receiptPath(value as Awaited<ReturnType<typeof committedFixture>>, value.artifact);
+    const path = receiptPath(
+      value as unknown as Awaited<ReturnType<typeof committedFixture>>,
+      value.artifact,
+    );
     writeRecord(path, { ...readRecord(path), logical_name: 'changed-manifest-name' });
     await refusal(() =>
       invokePrepare(value.binding, () => value.transaction.commit(value.committedManifest)),

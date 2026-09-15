@@ -83,39 +83,19 @@ it('requires complete external pins before reading seed code', () => {
   ).toThrow('INSTALLED_HOST_SEED_PINS_REQUIRED');
 });
 
-it.each([
-  ['missing path', 'INSTALLED_OFFLINE_PLAN_FILE_INVALID'],
-  ['wrong digest', 'MUTATION_INPUT_PLAN_DIGEST_MISMATCH'],
-  ['wrong candidate', 'MUTATION_INPUT_PLAN_CANDIDATE_MISMATCH'],
-  ['incomplete roster', 'MUTATION_INPUT_PLAN_ROSTER_MISMATCH'],
-])('rejects %s before executing any host bootstrap module', async (kind, error) => {
-  const seed = fixture();
-  const repository = { id: 'aarusso-nyx/devai', commit: 'a'.repeat(40), tree: 'b'.repeat(40) };
-  const plan = {
-    repository: kind === 'wrong candidate' ? { ...repository, commit: 'c'.repeat(40) } : repository,
-    release_unit: '@aarusso-nyx/devai',
-    mutation_policy_digest: 'd'.repeat(64),
-    release_plan_receipt_digest: 'e'.repeat(64),
-    release_profile_digest: 'f'.repeat(64),
-    packages: [],
-  };
-  const path = join(seed.candidateRoot, 'plan.json');
-  const bytes = Buffer.from(JSON.stringify(plan));
-  writeFileSync(path, bytes);
-  await expect(
-    runInstalledExportCommand({
-      seed,
-      mutationInputPlanPath: kind === 'missing path' ? undefined : path,
-      verification: {
-        dagControl: { candidateRoot: seed.candidateRoot },
-        expected: {
-          repository,
-          mutationPlanSha256:
-            kind === 'wrong digest'
-              ? '0'.repeat(64)
-              : createHash('sha256').update(bytes).digest('hex'),
+it.each(['absent', 'invalid'])(
+  'does not read %s mutation input before approved bootstrap',
+  async (kind) => {
+    const seed = fixture();
+    await expect(
+      runInstalledExportCommand({
+        seed,
+        mutationInputPlanPath: kind === 'absent' ? undefined : '/not-a-mutation-input',
+        verification: {
+          dagControl: { candidateRoot: seed.candidateRoot },
+          expected: { repository: { id: 'aarusso-nyx/devai' }, mutationPlanSha256: 'invalid' },
         },
-      },
-    }),
-  ).rejects.toThrow(error);
-});
+      }),
+    ).rejects.toThrow('inspection must never execute this module');
+  },
+);

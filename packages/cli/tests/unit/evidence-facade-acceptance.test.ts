@@ -29,7 +29,7 @@ import {
   evidenceRender,
   evidenceVerify,
 } from '../../src/commands/evidence/facade.js';
-import { _resetScenarioValidator, mutationRun } from '../../src/commands/mutation/run.js';
+import { mutationRun } from '../../src/commands/mutation/run.js';
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
   cac: (name?: string) => CAC;
@@ -82,32 +82,6 @@ function finalCoverage(path: string, covered: number): string {
       b: {},
     },
   });
-}
-
-function mutationFixture(repo: string, status: 'Killed' | 'Survived'): void {
-  put(
-    repo,
-    'law/schemas/mutation-scenario.schema.json',
-    readFileSync(join(ROOT, 'law/schemas/mutation-scenario.schema.json'), 'utf8'),
-  );
-  put(
-    repo,
-    'scenarios/current.json',
-    JSON.stringify({
-      schema_version: '1.0.0',
-      id: 'current-contract',
-      kind: 'mutation',
-      target: { file: 'src/current.ts', symbol: 'currentContract' },
-      mutations: [{ type: 'string-replace', find: 'true', replace: 'false' }],
-      expectations: [{ assertion: 'tests-detect', specs: ['tests/current.test.ts'] }],
-    }),
-  );
-  put(
-    repo,
-    'reports/current.json',
-    JSON.stringify([{ id: 'current-contract', status, duration_ms: 12 }]),
-  );
-  _resetScenarioValidator();
 }
 
 function git(repo: string, args: readonly string[]): string {
@@ -326,7 +300,6 @@ async function invokeRegisteredAction(
 }
 
 afterEach(() => {
-  _resetScenarioValidator();
   for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 
@@ -506,8 +479,8 @@ describe('evidence collect acceptance', () => {
 describe('evidence record and errata acceptance', () => {
   it('reports mutation usage through the public evidence action', async () => {
     const result = await invoke(mutationRun, ['mutation-run']);
-    expect(result.exit).toBe(2);
-    expect(result.stderr).toContain('devai evidence record --kind mutation');
+    expect(result.exit).toBe(0);
+    expect(result.stdout).toContain('MUTATION_OFFLOADED_TO_BEDEL');
   });
 
   it('appends generic payload and input records with both receipt formats', async () => {
@@ -599,8 +572,6 @@ describe('evidence record and errata acceptance', () => {
         '--tier',
         'unit',
       ],
-      ['evidence-record', '--kind', 'mutation', '--round', 'R-0007', '--repo-root', repo],
-      ['evidence-record', '--kind', 'mutation', '--round', 'R-0007', '--repo-root', repo, '--run'],
     ] as const;
     for (const argv of cases) {
       const result = await invoke(evidenceRecord, argv);
@@ -626,57 +597,23 @@ describe('evidence record and errata acceptance', () => {
     );
   });
 
-  it('records a validated mutation result and its governed proof', async () => {
+  it('records a validated mutation result and its governed proof (retired mutation service)', async () => {
     const repo = root();
-    mutationFixture(repo, 'Killed');
-
     const result = await invoke(evidenceRecord, [
       'evidence-record',
       '--kind',
       'mutation',
-      '--round',
-      'R-1000',
       '--repo-root',
       repo,
-      '--run',
-      '--scenarios',
-      'scenarios/current.json',
-      '--external',
-      'reports/current.json',
-      '--out',
-      '.devai/state/mutation/current.json',
+      '--mutator',
+      'missing-adapter.mjs',
     ]);
-
-    expect(result).toMatchObject({ exit: 0, stderr: '' });
+    expect(result.exit).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({
-      kind: 'mutation',
-      round_id: 'R-1000',
-      result: {
-        ok: true,
-        scenarios_loaded: 1,
-        killed: 1,
-        survived: 0,
-        mutation_score: 100,
-      },
+      status: 'not-required',
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
     });
-    expect(
-      JSON.parse(readFileSync(join(repo, '.devai/state/mutation/current.json'), 'utf8')),
-    ).toMatchObject({
-      mutation_score: 100,
-      killed: 1,
-      survived: 0,
-      scenarios: [{ id: 'current-contract', status: 'Killed', ok: true }],
-    });
-    expect(
-      JSON.parse(
-        readFileSync(join(repo, 'record/proofs/work/mutation/R-1000.jsonl'), 'utf8').trim(),
-      ),
-    ).toMatchObject({
-      line_type: 'record',
-      kind: 'mutation',
-      sequence: 1,
-      payload: { service_exit_code: 0, result: { mutation_score: 100 } },
-    });
+    expect(existsSync(join(repo, 'record'))).toBe(false);
   });
 
   it('forwards every declared coverage option into the aggregate service', async () => {
@@ -757,87 +694,23 @@ describe('evidence record and errata acceptance', () => {
     );
   });
 
-  it('forwards mutation adapter, report path, and survivor policy into the recorder', async () => {
+  it('forwards mutation adapter, report path, and survivor policy into the recorder (retired mutation service)', async () => {
     const repo = root();
-    mutationFixture(repo, 'Killed');
-    const recorded = await invoke(evidenceRecord, [
+    const result = await invoke(evidenceRecord, [
       'evidence-record',
       '--kind',
       'mutation',
-      '--round',
-      'R-0110',
       '--repo-root',
       repo,
-      '--run',
-      '--scenarios',
-      'scenarios/current.json',
-      '--external',
-      'reports/current.json',
-      '--out',
-      '.devai/state/mutation/alt.json',
-      '--report-path',
-      'reports/rich.json',
-    ]);
-    expect(recorded).toMatchObject({ exit: 0, stderr: '' });
-    expect(
-      JSON.parse(readFileSync(join(repo, '.devai/state/mutation/alt.json'), 'utf8')),
-    ).toMatchObject({ report_path: 'reports/rich.json' });
-
-    const exclusive = await invoke(evidenceRecord, [
-      'evidence-record',
-      '--kind',
-      'mutation',
-      '--round',
-      'R-0111',
-      '--repo-root',
-      repo,
-      '--run',
-      '--scenarios',
-      'scenarios/current.json',
       '--mutator',
-      './adapter.js',
-      '--external',
-      'reports/current.json',
+      'missing-adapter.mjs',
     ]);
-    expect(exclusive.exit).toBe(2);
-    expect(exclusive.stderr).toContain('--mutator and --external are mutually exclusive');
-
-    mutationFixture(repo, 'Survived');
-    const allowed = await invoke(evidenceRecord, [
-      'evidence-record',
-      '--kind',
-      'mutation',
-      '--round',
-      'R-0112',
-      '--repo-root',
-      repo,
-      '--run',
-      '--scenarios',
-      'scenarios/current.json',
-      '--external',
-      'reports/current.json',
-      '--out',
-      '.devai/state/mutation/survived-allowed.json',
-    ]);
-    expect(allowed).toMatchObject({ exit: 0, stderr: '' });
-    const refused = await invoke(evidenceRecord, [
-      'evidence-record',
-      '--kind',
-      'mutation',
-      '--round',
-      'R-0113',
-      '--repo-root',
-      repo,
-      '--run',
-      '--scenarios',
-      'scenarios/current.json',
-      '--external',
-      'reports/current.json',
-      '--out',
-      '.devai/state/mutation/survived-refused.json',
-      '--fail-on-survivors',
-    ]);
-    expect(refused.exit).toBe(2);
+    expect(result.exit).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      status: 'not-required',
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
+    });
+    expect(existsSync(join(repo, 'record'))).toBe(false);
   });
 
   it('executes the rtd bundle kind and forwards output, strict, and git bindings', async () => {
@@ -892,37 +765,23 @@ describe('evidence record and errata acceptance', () => {
     });
   });
 
-  it("binds a failing service's diagnostics into the proof and forwards its exit code", async () => {
+  it("binds a failing service's diagnostics into the proof and forwards its exit code (retired mutation service)", async () => {
     const repo = root();
-    put(repo, 'scenarios/x.json', '{}');
-    _resetScenarioValidator();
-    const schemaPath = join(repo, 'law/schemas/mutation-scenario.schema.json');
-    const serviceError = `devai evidence record --kind mutation: mutation-scenario schema not found at ${schemaPath} (also tried ${schemaPath})`;
     const result = await invoke(evidenceRecord, [
       'evidence-record',
       '--kind',
       'mutation',
-      '--round',
-      'R-0300',
       '--repo-root',
       repo,
-      '--run',
-      '--scenarios',
-      'scenarios/x.json',
+      '--mutator',
+      'missing-adapter.mjs',
     ]);
-    expect(result).toEqual({
-      exit: 65,
-      stdout: '',
-      stderr: `devai evidence record: mutation exited 65; governed proof sequence 1: ${serviceError}\n`,
+    expect(result.exit).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      status: 'not-required',
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
     });
-    const proof = JSON.parse(
-      readFileSync(join(repo, 'record/proofs/work/mutation/R-0300.jsonl'), 'utf8').trim(),
-    ) as { payload: Record<string, unknown> };
-    expect(proof.payload).toEqual({
-      result: { kind: 'mutation', service_exit_code: 65, error: serviceError },
-      service_exit_code: 65,
-      service_error: serviceError,
-    });
+    expect(existsSync(join(repo, 'record'))).toBe(false);
   });
 
   it('appends forward-only field and pattern redactions and rejects invalid targets', async () => {
@@ -1219,14 +1078,6 @@ describe('evidence record public decision table', () => {
         argv: ['--kind', 'test', '--tier', 'unit'],
         diagnostic: '--cmd is required for --kind test',
       },
-      {
-        argv: ['--kind', 'mutation'],
-        diagnostic: '--run is required for --kind mutation',
-      },
-      {
-        argv: ['--kind', 'mutation', '--run'],
-        diagnostic: '--scenarios is required for --kind mutation --run',
-      },
     ] as const;
 
     for (const { argv, diagnostic } of cases) {
@@ -1298,29 +1149,23 @@ describe('evidence record public decision table', () => {
     });
   });
 
-  it('preserves a failing service diagnostic in the exact public failure receipt', async () => {
+  it('preserves a failing service diagnostic in the exact public failure receipt (retired mutation service)', async () => {
     const repo = root();
-    put(repo, 'scenarios/failure.json', '{}');
-    _resetScenarioValidator();
-    const schemaPath = join(repo, 'law/schemas/mutation-scenario.schema.json');
-    const serviceError = `devai evidence record --kind mutation: mutation-scenario schema not found at ${schemaPath} (also tried ${schemaPath})`;
     const result = await invoke(evidenceRecord, [
       'evidence-record',
       '--kind',
       'mutation',
-      '--round',
-      'R-1703',
       '--repo-root',
       repo,
-      '--run',
-      '--scenarios',
-      'scenarios/failure.json',
+      '--mutator',
+      'missing-adapter.mjs',
     ]);
-    expect(result).toEqual({
-      exit: 65,
-      stdout: '',
-      stderr: `devai evidence record: mutation exited 65; governed proof sequence 1: ${serviceError}\n`,
+    expect(result.exit).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      status: 'not-required',
+      code: 'MUTATION_OFFLOADED_TO_BEDEL',
     });
+    expect(existsSync(join(repo, 'record'))).toBe(false);
   });
 
   it('omits a fabricated suffix when a failed service emits no diagnostic', async () => {

@@ -8,8 +8,11 @@ import { resolveCliVersion } from '../../src/version.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const entries = canonicalRegistry();
-const senseRun = entries.find((entry) => entry.name === 'sense run');
-if (senseRun === undefined) throw new Error('missing action sense run');
+const senseRun = (() => {
+  const entry = entries.find((entry) => entry.name === 'sense run');
+  if (entry === undefined) throw new Error('missing action sense run');
+  return entry;
+})();
 
 function effect(executable: unknown, args: unknown): AuthorityHostEffectRequest {
   return { kind: 'process', symbol: 'spawnSync', arguments: [executable, args] };

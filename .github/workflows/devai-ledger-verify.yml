@@ -121,7 +121,7 @@ jobs:
           TRUST_STORE_B64: ${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
           TOOLCHAIN_B64: ${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
           ENVIRONMENT_B64: ${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 }}
-          BUNDLE_SCHEMA_VERSION: '2.0.0'
+          BUNDLE_SCHEMA_VERSION: '3.0.0'
           LEDGER_TRANSPORT: ${{ vars.DEVAI_LEDGER_TRANSPORT }}
           BUNDLE_SHA256: ${{ vars.DEVAI_LEDGER_BUNDLE_SHA256 }}
           EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN }}
@@ -144,7 +144,7 @@ jobs:
             --candidate "$GITHUB_WORKSPACE/candidate" \
             --commit "$(git -C candidate rev-parse HEAD)" \
             --tree "$(git -C candidate rev-parse HEAD^{tree})"
-      - name: Verify mandatory installed mutation export
+      - name: Verify installed release export
         id: installed-offline
         shell: bash
         env:

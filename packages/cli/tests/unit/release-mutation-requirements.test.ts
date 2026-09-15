@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -13,25 +11,8 @@ import {
   type LifecyclePolicyFixture,
 } from '../helpers/release-policy-resolution-fixture.js';
 
-const ROOT = resolve(import.meta.dirname, '../../../..');
-const ADOPTION = JSON.parse(
-  readFileSync(resolve(ROOT, 'law/policy/devai-adoption.json'), 'utf8'),
-) as {
-  readonly release_verification: {
-    readonly schemaVersion: string;
-    readonly mutation_roster: readonly Record<string, unknown>[];
-    readonly mutation_execution: Readonly<Record<string, unknown>>;
-  };
-};
-
-function fixture(version: '1.1.0' | '1.2.0' = '1.2.0') {
-  return createLifecyclePolicyFixture(ADOPTION.release_verification.mutation_roster, {
-    schemaVersion: version,
-    mutation_execution: {
-      ...ADOPTION.release_verification.mutation_execution,
-      schemaVersion: version,
-    },
-  });
+function fixture() {
+  return createLifecyclePolicyFixture();
 }
 
 function request(value: LifecyclePolicyFixture, receipt = value.receipt): ReleaseLifecycleRequest {
@@ -74,51 +55,6 @@ function resolvers(value: LifecyclePolicyFixture) {
 }
 
 describe('verified release mutation requirement derivation (ADR-MUT-0008)', () => {
-  it('derives one exact required binding from a genuine receipt and the complete ten-row v1.2 profile', () => {
-    const value = fixture();
-    expect(
-      verifyResolvedReleasePlanReceipt({ receipt: value.receipt, resolution: value.resolution }),
-    ).toBe(true);
-    expect(value.receipt.determination).toMatchObject({
-      mutation: 'targeted',
-      mutation_disposition: { status: 'required' },
-    });
-    const profile = value.resolution.readInput('release-verification-profile') as Record<
-      string,
-      unknown
-    >;
-    expect(profile['mutation_roster']).toEqual(ADOPTION.release_verification.mutation_roster);
-    expect(profile['mutation_roster']).toHaveLength(10);
-    const requirements = resolveReleaseMutationRequirements(request(value), resolvers(value));
-    expect(requirements).toEqual([
-      {
-        release_unit: value.resolution.release_unit,
-        binding: {
-          repository_id: value.candidate.repository.id,
-          candidate_commit: value.candidate.repository.commit,
-          candidate_tree: value.candidate.repository.tree,
-          release_unit: value.resolution.release_unit,
-          release_plan_receipt_digest_sha256: value.receipt.receipt_digest_sha256,
-          release_profile_digest_sha256: canonicalSha256(profile),
-          mutation_policy_digest_sha256: canonicalSha256(
-            value.resolution.tools.readJson('dist/law/policy/mutation-evidence-v2.json'),
-          ),
-        },
-      },
-    ]);
-    expect(requirements[0]?.binding?.release_profile_digest_sha256).not.toBe(
-      canonicalSha256({
-        ...profile,
-        mutation_roster: ADOPTION.release_verification.mutation_roster.slice(0, 9),
-      }),
-    );
-    expect(Object.isFrozen(requirements)).toBe(true);
-    expect(Object.isFrozen(requirements[0])).toBe(true);
-    expect(Object.isFrozen(requirements[0]?.binding)).toBe(true);
-    expect(requirements[0]?.binding).not.toHaveProperty('task_policy_digests_sha256');
-    expect(requirements[0]).not.toHaveProperty('mutation_granted');
-  });
-
   it('returns null only for a genuinely verified not-required plan', () => {
     const value = createLifecyclePolicyFixture();
     expect(
@@ -128,7 +64,7 @@ describe('verified release mutation requirement derivation (ADR-MUT-0008)', () =
       mutation: 'none',
       mutation_disposition: {
         status: 'not-required',
-        reason: 'mutation-roster-empty',
+        reason: 'mutation-external-hardening',
       },
     });
     expect(resolveReleaseMutationRequirements(request(value), resolvers(value))).toEqual([
@@ -172,11 +108,9 @@ describe('verified release mutation requirement derivation (ADR-MUT-0008)', () =
   it('refuses a genuine but stale resolution from a different profile and candidate', () => {
     const value = fixture();
     const stale = createLifecyclePolicyFixture(
-      ADOPTION.release_verification.mutation_roster.slice(0, 9),
-      {
-        schemaVersion: '1.2.0',
-        mutation_execution: ADOPTION.release_verification.mutation_execution,
-      },
+      [],
+      {},
+      { files: new Map([['extra.txt', Buffer.from('different source')]]) },
     );
     expect(stale.candidate.repository.commit).not.toBe(value.candidate.repository.commit);
     expect(() =>
@@ -187,24 +121,14 @@ describe('verified release mutation requirement derivation (ADR-MUT-0008)', () =
     ).toThrow('rpl-semantic-verification-not-performed');
   });
 
-  it('refuses a valid historical v1.1 required plan as promoting mutation evidence authority', () => {
-    const value = fixture('1.1.0');
-    expect(
-      verifyResolvedReleasePlanReceipt({ receipt: value.receipt, resolution: value.resolution }),
-    ).toBe(true);
-    expect(value.receipt.determination).toMatchObject({
-      mutation_disposition: { status: 'required' },
-    });
-    expect(() => resolveReleaseMutationRequirements(request(value), resolvers(value))).toThrow(
-      'release-certification-generated-output-untrusted',
-    );
-  });
-
   it('refuses a resealed none determination copied over the genuine required receipt', () => {
     const value = fixture();
     const none = createLifecyclePolicyFixture();
     const { receipt_id: _id, receipt_digest_sha256: _digest, ...projection } = value.receipt;
-    const altered = { ...projection, determination: none.receipt.determination };
+    const altered = {
+      ...projection,
+      determination: { ...(none.receipt.determination as object), mutation: 'targeted' },
+    };
     const digest = canonicalSha256(altered);
     const forged = {
       ...altered,
@@ -242,12 +166,7 @@ describe('verified release mutation requirement derivation (ADR-MUT-0008)', () =
     expect(resolve_receipt).toHaveBeenCalledWith(original.receipt_locators?.[0]);
     expect(result[0]).toMatchObject({
       release_unit: value.resolution.release_unit,
-      binding: {
-        repository_id: original.repository_locator.id,
-        candidate_commit: original.candidate_locator.commit,
-        candidate_tree: original.candidate_locator.tree,
-        release_unit: value.resolution.release_unit,
-      },
+      binding: null,
     });
     expect(selected).not.toEqual(original);
   });

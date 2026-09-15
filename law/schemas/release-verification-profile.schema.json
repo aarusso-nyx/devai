@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-verification-profile.schema.json",
   "title": "Release verification profile",
-  "description": "Adopter-owned mapping from generic release risks and capabilities to repository task nodes and mutation evidence selectors.",
+  "description": "Release capability mapping. Version 1.4 removes mutation execution and requires an empty compatibility roster. Older branches are historical configuration readers.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,16 +17,30 @@
     "mutation_roster"
   ],
   "properties": {
-    "schemaVersion": { "enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"] },
-    "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
-    "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-    "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "schemaVersion": {
+      "enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"]
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]+$"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "release_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
     "version_source": {
       "type": "string",
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$",
       "maxLength": 500
     },
-    "default_support": { "enum": ["preview", "current", "lts"] },
+    "default_support": {
+      "enum": ["preview", "current", "lts"]
+    },
     "required_check": {
       "type": "string",
       "minLength": 1,
@@ -40,7 +54,10 @@
         "type": "array",
         "minItems": 1,
         "uniqueItems": true,
-        "items": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" }
+        "items": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
+        }
       }
     },
     "risk_capabilities": {
@@ -49,7 +66,10 @@
         "type": "array",
         "minItems": 1,
         "uniqueItems": true,
-        "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
       }
     },
     "mutation_roster": {
@@ -73,8 +93,15 @@
           "thresholds"
         ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
-          "package": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "task_node": {
             "type": "string",
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
@@ -82,15 +109,24 @@
           "risk_classes": {
             "type": "array",
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
           },
-          "source_selectors": { "$ref": "#/$defs/pathList" },
-          "test_selectors": { "$ref": "#/$defs/pathList" },
+          "source_selectors": {
+            "$ref": "#/$defs/pathList"
+          },
+          "test_selectors": {
+            "$ref": "#/$defs/pathList"
+          },
           "manifest_path": {
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
           },
-          "config_paths": { "$ref": "#/$defs/pathList" },
+          "config_paths": {
+            "$ref": "#/$defs/pathList"
+          },
           "vitest_config_path": {
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
@@ -99,8 +135,12 @@
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
           },
-          "sanitizer_paths": { "$ref": "#/$defs/pathList" },
-          "orchestration_paths": { "$ref": "#/$defs/pathList" },
+          "sanitizer_paths": {
+            "$ref": "#/$defs/pathList"
+          },
+          "orchestration_paths": {
+            "$ref": "#/$defs/pathList"
+          },
           "lockfile_path": {
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
@@ -109,7 +149,10 @@
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
           },
           "thresholds": {
             "type": "object",
@@ -130,19 +173,31 @@
   "allOf": [
     {
       "if": {
-        "properties": { "schemaVersion": { "enum": ["1.1.0", "1.2.0", "1.3.0"] } },
+        "properties": {
+          "schemaVersion": {
+            "enum": ["1.1.0", "1.2.0", "1.3.0"]
+          }
+        },
         "required": ["schemaVersion"]
       },
-      "then": { "required": ["mutation_execution"] }
+      "then": {
+        "required": ["mutation_execution"]
+      }
     },
     {
       "if": {
         "properties": {
-          "schemaVersion": { "const": "1.2.0" },
+          "schemaVersion": {
+            "const": "1.2.0"
+          },
           "mutation_execution": {
             "properties": {
-              "template_id": { "const": "devai.protected-mutation-stryker.v1" },
-              "schemaVersion": { "const": "1.2.0" }
+              "template_id": {
+                "const": "devai.protected-mutation-stryker.v1"
+              },
+              "schemaVersion": {
+                "const": "1.2.0"
+              }
             },
             "required": ["template_id", "schemaVersion"]
           }
@@ -160,7 +215,11 @@
                   "additionalProperties": false,
                   "required": ["score_min", "survived_max"],
                   "properties": {
-                    "score_min": { "type": "number", "minimum": 0, "maximum": 100 },
+                    "score_min": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
                     "survived_max": {
                       "const": 9007199254740991,
                       "description": "Compatibility sentinel that disables survivor-count rejection; survivor counts remain reportable evidence."
@@ -172,7 +231,13 @@
                 {
                   "properties": {
                     "config_paths": {
-                      "allOf": [{ "contains": { "const": "tests/config/local.config.ts" } }]
+                      "allOf": [
+                        {
+                          "contains": {
+                            "const": "tests/config/local.config.ts"
+                          }
+                        }
+                      ]
                     }
                   },
                   "required": ["config_paths"]
@@ -186,14 +251,20 @@
     {
       "if": {
         "properties": {
-          "schemaVersion": { "const": "1.3.0" }
+          "schemaVersion": {
+            "const": "1.3.0"
+          }
         },
         "required": ["schemaVersion"]
       },
       "then": {
         "properties": {
           "mutation_execution": {
-            "properties": { "schemaVersion": { "const": "1.3.0" } },
+            "properties": {
+              "schemaVersion": {
+                "const": "1.3.0"
+              }
+            },
             "required": ["schemaVersion"]
           },
           "mutation_roster": {
@@ -207,17 +278,45 @@
     },
     {
       "if": {
-        "properties": { "schemaVersion": { "enum": ["1.0.0", "1.1.0", "1.2.0"] } },
+        "properties": {
+          "schemaVersion": {
+            "enum": ["1.0.0", "1.1.0", "1.2.0"]
+          }
+        },
         "required": ["schemaVersion"]
       },
       "then": {
         "properties": {
           "mutation_execution": {
             "not": {
-              "properties": { "schemaVersion": { "const": "1.3.0" } },
+              "properties": {
+                "schemaVersion": {
+                  "const": "1.3.0"
+                }
+              },
               "required": ["schemaVersion"]
             }
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.4.0"
+          }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "mutation_roster": {
+            "maxItems": 0
+          }
+        },
+        "not": {
+          "required": ["mutation_execution"]
         }
       }
     }
@@ -238,23 +337,42 @@
         "toolchain_fixture_validation"
       ],
       "properties": {
-        "schemaVersion": { "enum": ["1.1.0", "1.2.0", "1.3.0"] },
-        "template_id": { "const": "devai.protected-mutation-stryker.v1" },
+        "schemaVersion": {
+          "enum": ["1.1.0", "1.2.0", "1.3.0"]
+        },
+        "template_id": {
+          "const": "devai.protected-mutation-stryker.v1"
+        },
         "runner": {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "package_manager", "packages", "vitest_peer_range"],
           "properties": {
-            "kind": { "const": "stryker-vitest-typescript" },
-            "package_manager": { "const": "pnpm" },
+            "kind": {
+              "const": "stryker-vitest-typescript"
+            },
+            "package_manager": {
+              "const": "pnpm"
+            },
             "packages": {
               "const": [
-                { "name": "@stryker-mutator/core", "version": "9.6.1" },
-                { "name": "@stryker-mutator/typescript-checker", "version": "9.6.1" },
-                { "name": "@stryker-mutator/vitest-runner", "version": "9.6.1" }
+                {
+                  "name": "@stryker-mutator/core",
+                  "version": "9.6.1"
+                },
+                {
+                  "name": "@stryker-mutator/typescript-checker",
+                  "version": "9.6.1"
+                },
+                {
+                  "name": "@stryker-mutator/vitest-runner",
+                  "version": "9.6.1"
+                }
               ]
             },
-            "vitest_peer_range": { "const": ">=2" }
+            "vitest_peer_range": {
+              "const": ">=2"
+            }
           }
         },
         "selection": {
@@ -269,12 +387,24 @@
             "invocation"
           ],
           "properties": {
-            "package_root": { "const": "parent-of-roster.manifest_path" },
-            "source": { "const": "roster.source_selectors" },
-            "tests": { "const": "roster.test_selectors" },
-            "lockfile": { "const": "roster.lockfile_path" },
-            "configuration": { "const": "host-derived-ephemeral-from-roster-only" },
-            "invocation": { "const": "fixed-host-template-not-profile-or-candidate-script" }
+            "package_root": {
+              "const": "parent-of-roster.manifest_path"
+            },
+            "source": {
+              "const": "roster.source_selectors"
+            },
+            "tests": {
+              "const": "roster.test_selectors"
+            },
+            "lockfile": {
+              "const": "roster.lockfile_path"
+            },
+            "configuration": {
+              "const": "host-derived-ephemeral-from-roster-only"
+            },
+            "invocation": {
+              "const": "fixed-host-template-not-profile-or-candidate-script"
+            }
           }
         },
         "runner_mapping": {
@@ -290,9 +420,15 @@
             "effective_options"
           ],
           "properties": {
-            "task_node": { "const": "roster.task_node" },
-            "vitest_config": { "const": "roster.vitest_config_path" },
-            "typescript_config": { "const": "roster.typescript_config_path" },
+            "task_node": {
+              "const": "roster.task_node"
+            },
+            "vitest_config": {
+              "const": "roster.vitest_config_path"
+            },
+            "typescript_config": {
+              "const": "roster.typescript_config_path"
+            },
             "typescript_config_closure": {
               "const": "protected-no-follow-extends-and-project-references-closure-from-roster.typescript_config_path;missing-or-out-of-bound-reference-refuses"
             },
@@ -321,7 +457,9 @@
             "binding"
           ],
           "properties": {
-            "root": { "const": "parent-of-roster.manifest_path/src" },
+            "root": {
+              "const": "parent-of-roster.manifest_path/src"
+            },
             "include_extensions": {
               "const": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]
             },
@@ -349,24 +487,40 @@
                 ".spec.cjs"
               ]
             },
-            "exclude_path_segments": { "const": ["__tests__", "test", "tests"] },
-            "entry_type": { "const": "regular-file" },
-            "order": { "const": "utf8-lexicographic-relative-package-path" },
-            "empty": { "const": "refuse-production-mutation" },
+            "exclude_path_segments": {
+              "const": ["__tests__", "test", "tests"]
+            },
+            "entry_type": {
+              "const": "regular-file"
+            },
+            "order": {
+              "const": "utf8-lexicographic-relative-package-path"
+            },
+            "empty": {
+              "const": "refuse-production-mutation"
+            },
             "binding": {
               "const": "separate-actual-target-population-and-projection-rule-digest-in-mutationConfiguration;never-replace-full-roster-input-identity"
             }
           }
         },
-        "roster_order": { "const": "id-lexicographic" },
+        "roster_order": {
+          "const": "id-lexicographic"
+        },
         "output": {
           "type": "object",
           "additionalProperties": false,
           "required": ["raw", "normalized_report", "package_result", "finalization"],
           "properties": {
-            "raw": { "const": "protected-container-only" },
-            "normalized_report": { "const": "mutation-normalized-stryker-report-v2" },
-            "package_result": { "const": "mutation-package-result-v2" },
+            "raw": {
+              "const": "protected-container-only"
+            },
+            "normalized_report": {
+              "const": "mutation-normalized-stryker-report-v2"
+            },
+            "package_result": {
+              "const": "mutation-package-result-v2"
+            },
             "finalization": {
               "const": "verify-mutation-evidence-v21-before-certification-evidence-retention"
             }
@@ -457,7 +611,9 @@
                 "scope": {
                   "const": "fixed-host-owned-diagnostic-fixture-candidate-and-frozen-dependency-identities-only"
                 },
-                "result": { "const": "bounded-toolchain-compatibility-observation-only" },
+                "result": {
+                  "const": "bounded-toolchain-compatibility-observation-only"
+                },
                 "prohibitions": {
                   "const": [
                     "production-candidate-or-production-certification",
@@ -475,27 +631,47 @@
       "allOf": [
         {
           "if": {
-            "properties": { "schemaVersion": { "const": "1.2.0" } },
+            "properties": {
+              "schemaVersion": {
+                "const": "1.2.0"
+              }
+            },
             "required": ["schemaVersion"]
           },
           "then": {
             "required": ["runner_mapping", "retention"],
-            "not": { "required": ["resume"] }
+            "not": {
+              "required": ["resume"]
+            }
           }
         },
         {
           "if": {
-            "properties": { "schemaVersion": { "const": "1.3.0" } },
+            "properties": {
+              "schemaVersion": {
+                "const": "1.3.0"
+              }
+            },
             "required": ["schemaVersion"]
           },
-          "then": { "required": ["runner_mapping", "retention", "resume"] }
+          "then": {
+            "required": ["runner_mapping", "retention", "resume"]
+          }
         },
         {
           "if": {
-            "properties": { "schemaVersion": { "const": "1.1.0" } },
+            "properties": {
+              "schemaVersion": {
+                "const": "1.1.0"
+              }
+            },
             "required": ["schemaVersion"]
           },
-          "then": { "not": { "required": ["resume"] } }
+          "then": {
+            "not": {
+              "required": ["resume"]
+            }
+          }
         }
       ]
     },
@@ -512,9 +688,9 @@
   "schema_version": "1.3.0",
   "examples": [
     {
-      "schemaVersion": "1.2.0",
+      "schemaVersion": "1.4.0",
       "policy_id": "devai.release-verification",
-      "policy_version": "1.2.0",
+      "policy_version": "1.4.0",
       "release_unit": "@aarusso-nyx/devai",
       "version_source": "packages/cli/package.json",
       "default_support": "current",
@@ -547,359 +723,7 @@
         "operational-matrix": ["test:local-full"]
       },
       "risk_capabilities": {},
-      "mutation_execution": {
-        "schemaVersion": "1.2.0",
-        "template_id": "devai.protected-mutation-stryker.v1",
-        "runner": {
-          "kind": "stryker-vitest-typescript",
-          "package_manager": "pnpm",
-          "packages": [
-            {
-              "name": "@stryker-mutator/core",
-              "version": "9.6.1"
-            },
-            {
-              "name": "@stryker-mutator/typescript-checker",
-              "version": "9.6.1"
-            },
-            {
-              "name": "@stryker-mutator/vitest-runner",
-              "version": "9.6.1"
-            }
-          ],
-          "vitest_peer_range": ">=2"
-        },
-        "selection": {
-          "package_root": "parent-of-roster.manifest_path",
-          "source": "roster.source_selectors",
-          "tests": "roster.test_selectors",
-          "lockfile": "roster.lockfile_path",
-          "configuration": "host-derived-ephemeral-from-roster-only",
-          "invocation": "fixed-host-template-not-profile-or-candidate-script"
-        },
-        "runner_mapping": {
-          "task_node": "roster.task_node",
-          "vitest_config": "roster.vitest_config_path",
-          "typescript_config": "roster.typescript_config_path",
-          "typescript_config_closure": "protected-no-follow-extends-and-project-references-closure-from-roster.typescript_config_path;missing-or-out-of-bound-reference-refuses",
-          "test_population": "complete-roster.test_selectors-without-runner-config-exclusions",
-          "security_population": "complete-roster.source_selectors-and-test_selectors-without-runner-config-exclusions",
-          "effective_options": "protected-resolved-effective-options-from-the-exact-vitest-and-typescript-config-bytes"
-        },
-        "mutation_targets": {
-          "root": "parent-of-roster.manifest_path/src",
-          "include_extensions": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
-          "exclude_suffixes": [
-            ".d.ts",
-            ".d.tsx",
-            ".d.mts",
-            ".d.cts",
-            ".test.ts",
-            ".test.tsx",
-            ".test.mts",
-            ".test.cts",
-            ".test.js",
-            ".test.jsx",
-            ".test.mjs",
-            ".test.cjs",
-            ".spec.ts",
-            ".spec.tsx",
-            ".spec.mts",
-            ".spec.cts",
-            ".spec.js",
-            ".spec.jsx",
-            ".spec.mjs",
-            ".spec.cjs"
-          ],
-          "exclude_path_segments": ["__tests__", "test", "tests"],
-          "entry_type": "regular-file",
-          "order": "utf8-lexicographic-relative-package-path",
-          "empty": "refuse-production-mutation",
-          "binding": "separate-actual-target-population-and-projection-rule-digest-in-mutationConfiguration;never-replace-full-roster-input-identity"
-        },
-        "roster_order": "id-lexicographic",
-        "output": {
-          "raw": "protected-container-only",
-          "normalized_report": "mutation-normalized-stryker-report-v2",
-          "package_result": "mutation-package-result-v2",
-          "finalization": "verify-mutation-evidence-v21-before-certification-evidence-retention"
-        },
-        "retention": {
-          "carrier": "certification-evidence-sink-v3-unit-mutation-closure-v1",
-          "scope": "exactly-one-closure-per-release-unit-not-per-mutation-roster-package",
-          "members": "two-canonical-members-per-required-mutation-package-plus-exactly-one-summary-and-one-semantic-receipt;not-required-packages-have-no-report-or-result-member",
-          "binding": "externally-finalized-unit-receipt-binds-repository-candidate-release-unit-plan-profile-mutation-policy-task-policy-digests-the-exact-canonical-output-contract-and-the-complete-sorted-member-handle-digest-size-projection",
-          "continuity": "certify-and-prepare-reread-rehash-and-semantic-verify-the-sink-closure;export-rehydrates-the-exact-closure-into-the-existing-provider-result-and-the-signed-export-transcript-binds-its-receipt-and-member-projection-digests;offline-rehashes-and-semantic-verifies-only-that-portable-provider-result-copy",
-          "tarball": "never-a-certified-package-entry-and-never-included-in-a-package-tarball"
-        },
-        "threshold_projection": {
-          "source": "roster.thresholds.score_min-with-disabled-survivor-compatibility-sentinel",
-          "target": {
-            "break": "score_min",
-            "high": "score_min",
-            "low": "score_min",
-            "scoreMin": "score_min",
-            "survivedMax": "survived_max"
-          }
-        },
-        "toolchain_fixture_validation": {
-          "production_gate": "pending-engineer-pinned-toolchain-fixture-validation-before-production-certification-invocation",
-          "diagnostic_fixture_exception": {
-            "execution": "existing-protected-preflight-provider-broker-on-the-fixed-host-template",
-            "scope": "fixed-host-owned-diagnostic-fixture-candidate-and-frozen-dependency-identities-only",
-            "result": "bounded-toolchain-compatibility-observation-only",
-            "prohibitions": [
-              "production-candidate-or-production-certification",
-              "pass-or-certification-projection",
-              "certification-evidence-semantic-receipt-or-reusable-artifact",
-              "production-lifecycle-state-or-artifact-sink",
-              "signing-publication-or-production-credential"
-            ]
-          }
-        }
-      },
-      "mutation_roster": [
-        {
-          "id": "authority",
-          "package": "@devai-nyx/authority",
-          "task_node": "test:authority",
-          "source_selectors": ["packages/authority/"],
-          "test_selectors": ["packages/authority/tests/"],
-          "manifest_path": "packages/authority/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/authority/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/authority/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "cli",
-          "package": "@aarusso-nyx/devai",
-          "task_node": "test:cli",
-          "source_selectors": ["packages/cli/"],
-          "test_selectors": ["packages/cli/tests/"],
-          "manifest_path": "packages/cli/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/cli/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/cli/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "effects-check",
-          "package": "@devai-nyx/effects-check",
-          "task_node": "test:effects",
-          "source_selectors": ["packages/effects-check/"],
-          "test_selectors": ["packages/effects-check/tests/"],
-          "manifest_path": "packages/effects-check/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/effects-check/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/effects-check/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "evidence",
-          "package": "@devai-nyx/evidence",
-          "task_node": "test:evidence",
-          "source_selectors": ["packages/evidence/"],
-          "test_selectors": ["packages/evidence/tests/"],
-          "manifest_path": "packages/evidence/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/evidence/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/evidence/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "loop",
-          "package": "@devai-nyx/loop",
-          "task_node": "test:loop",
-          "source_selectors": ["packages/loop/"],
-          "test_selectors": ["packages/loop/tests/"],
-          "manifest_path": "packages/loop/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/loop/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/loop/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "schemas",
-          "package": "@devai-nyx/schemas",
-          "task_node": "test:schemas",
-          "source_selectors": ["packages/schemas/", "law/schemas/"],
-          "test_selectors": ["packages/schemas/tests/"],
-          "manifest_path": "packages/schemas/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/schemas/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/schemas/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "sensors",
-          "package": "@devai-nyx/sensors",
-          "task_node": "test:sensors",
-          "source_selectors": ["packages/sensors/"],
-          "test_selectors": ["packages/sensors/tests/"],
-          "manifest_path": "packages/sensors/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/sensors/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/sensors/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "skills",
-          "package": "@devai-nyx/skills",
-          "task_node": "test:skills",
-          "source_selectors": ["packages/skills/"],
-          "test_selectors": ["packages/skills/tests/"],
-          "manifest_path": "packages/skills/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/skills/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/skills/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "spec",
-          "package": "@devai-nyx/spec",
-          "task_node": "test:spec",
-          "source_selectors": ["packages/spec/"],
-          "test_selectors": ["packages/spec/tests/"],
-          "manifest_path": "packages/spec/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/spec/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/spec/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        },
-        {
-          "id": "utils",
-          "package": "@devai-nyx/utils",
-          "task_node": "test:utils",
-          "source_selectors": ["packages/utils/"],
-          "test_selectors": ["packages/utils/tests/"],
-          "manifest_path": "packages/utils/package.json",
-          "config_paths": [
-            "test-tasks.json",
-            "tests/config/local.config.ts",
-            "vitest.config.ts",
-            "packages/utils/tsconfig.json"
-          ],
-          "vitest_config_path": "tests/config/local.config.ts",
-          "typescript_config_path": "packages/utils/tsconfig.json",
-          "sanitizer_paths": ["packages/cli/vendor/evidence-verification/src/mutation-v21.js"],
-          "orchestration_paths": ["test-tasks.json"],
-          "lockfile_path": "pnpm-lock.yaml",
-          "toolchain_keys": ["node", "pnpm", "vitest"],
-          "thresholds": {
-            "score_min": 60,
-            "survived_max": 9007199254740991
-          }
-        }
-      ]
+      "mutation_roster": []
     }
   ]
 }

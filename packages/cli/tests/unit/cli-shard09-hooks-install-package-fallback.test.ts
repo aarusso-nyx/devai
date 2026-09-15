@@ -36,7 +36,9 @@ const roots: string[] = [];
 
 afterAll(() => {
   for (const path of roots) rmSync(path, { recursive: true, force: true });
-  rmSync(moduleLocation.split('/dist/services/')[0], { recursive: true, force: true });
+  const [moduleRoot] = moduleLocation.split('/dist/services/');
+  if (!moduleRoot) throw new Error('module fixture root missing');
+  rmSync(moduleRoot, { recursive: true, force: true });
 });
 
 function put(root: string, path: string, value: string): string {

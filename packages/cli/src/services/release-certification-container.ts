@@ -2,10 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { createProtectedReleaseHostAdapter } from '@devai-nyx/authority';
-import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalJson } from '@devai-nyx/utils';
 import {
   canonicalContainerPath,
-  decodeContainerArchive,
   decodeContainerDependencyArchive,
   encodeContainerArchive,
   encodeContainerDependencyArchive,
@@ -17,11 +16,7 @@ import {
   type ProtectedDependencyInputs,
   type ProtectedDependencyTransport,
 } from './release-dependency-transport.js';
-import {
-  captureProtectedMutationProgram,
-  assertProtectedMutationProgramExecution,
-  type ProtectedMutationProgram,
-} from './release-mutation-program.js';
+import type { ProtectedMutationProgram } from './release-mutation-program.js';
 import type { PlannedTask, TaskExecutionResult } from './check-runner/types.js';
 
 export interface CapturedProtectedMutationExecution {
@@ -30,33 +25,12 @@ export interface CapturedProtectedMutationExecution {
   readonly mutation_observation?: Buffer;
   readonly mutation_report?: Buffer;
 }
-const mutationExecutions = new WeakMap<
-  object,
-  {
-    readonly program: ProtectedMutationProgram;
-    readonly captured: CapturedProtectedMutationExecution;
-  }
->();
-
-/** Same invocation only. Returned caller buffers/status are never evidence custody. */
+/** @deprecated Mutation execution belongs to bedel. */
 export function captureProtectedMutationExecution(
-  result: unknown,
-  program: ProtectedMutationProgram,
+  _result: unknown,
+  _program: ProtectedMutationProgram,
 ): CapturedProtectedMutationExecution {
-  const entry =
-    typeof result === 'object' && result !== null ? mutationExecutions.get(result) : undefined;
-  if (entry === undefined || entry.program !== program)
-    throw new Error('release-certification-mutation-program-invalid');
-  return {
-    ...entry.captured,
-    result: { ...entry.captured.result },
-    ...(entry.captured.mutation_observation === undefined
-      ? {}
-      : { mutation_observation: Buffer.from(entry.captured.mutation_observation) }),
-    ...(entry.captured.mutation_report === undefined
-      ? {}
-      : { mutation_report: Buffer.from(entry.captured.mutation_report) }),
-  };
+  throw new Error('mutation-offloaded-to-bedel');
 }
 
 export interface ProtectedContainerControls {
@@ -119,19 +93,6 @@ function freezeIdentity<T>(value: T): T {
 // Exiting PID 1 tears down the complete PID namespace, including detached descendants.
 const TASK_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){process.stderr.write('protected-container-toolchain-mismatch');process.exit(125)}const gi='/workspace/candidate/.git/index',gt='/tmp/devai-protected-git-index';if(fs.existsSync(gi)){fs.copyFileSync(gi,gt);p.environment.GIT_INDEX_FILE=gt}const r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:'inherit',timeout:p.timeout_ms,shell:false});if(r.error||r.signal||r.status===null){process.stderr.write('protected-container-task-abnormal');process.exit(124)}process.exit(r.status);`;
 
-// The host owns this PID 1 and the mounted driver. Worker stdout/stderr never become a
-// task result: fd 3/4 are the sole bounded observation/report channels.
-// The worker's stderr is nevertheless forwarded to PID 1's own stderr before the envelope
-// is emitted. Without it a worker that dies before it can send fd 4 is indistinguishable
-// from one that produced an empty report, and the host can only refuse with
-// release-certification-mutation-program-invalid and no cause. The forwarded bytes are
-// already bounded by the spawn's maxBuffer, and the mutation task result forces stderr to
-// the empty string below, so this reaches the host's diagnostic stream and nothing else.
-// The envelope is written with synchronous fd writes rather than process.stdout.write:
-// an async pipe write larger than the pipe buffer loses its unflushed remainder when
-// process.exit() follows, which silently truncated every envelope over 64 KiB.
-const MUTATION_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');const p=JSON.parse(process.argv[1]);const hash=x=>crypto.createHash('sha256').update(fs.readFileSync(x)).digest('hex');const emit=(r,errorAbsent)=>{const b=Buffer.from(JSON.stringify({kind:'devai.protected-mutation-program-result.v1',observation_base64:Buffer.from(r?.output?.[3]??'').toString('base64'),process:{error_absent:errorAbsent,signal:r?.signal??null,status:r?.status??null},report_base64:Buffer.from(r?.output?.[4]??'').toString('base64'),schemaVersion:'1.0.0'}),'utf8');let o=0;while(o<b.length){try{o+=fs.writeSync(1,b,o,b.length-o)}catch(e){if(e.code!=='EAGAIN')throw e}}};if(process.version!==p.node_version||hash(p.executable.path)!==p.executable.sha256){emit(undefined,false);process.exit(125)}const gi='/workspace/candidate/.git/index',gt='/tmp/devai-protected-git-index';if(fs.existsSync(gi)){fs.copyFileSync(gi,gt);p.environment.GIT_INDEX_FILE=gt}let r;try{r=cp.spawnSync(p.executable.path,p.argv,{cwd:p.cwd,env:p.environment,stdio:['ignore','pipe','pipe','pipe','pipe'],timeout:p.timeout_ms,maxBuffer:p.maximum_buffer_bytes,shell:false})}catch{emit(undefined,false);process.exit(124)}try{const se=Buffer.from(r?.output?.[2]??'');if(se.length)fs.writeSync(2,se)}catch{}emit(r,!r.error);if(r.error||r.signal||r.status===null)process.exit(124);process.exit(r.status);`;
-
 // Orphaned descendants are reparented onto PID 1, and a Node PID 1 blocked in spawnSync
 // cannot reap them: libuv waits only on handles it owns, so they accumulate as zombies
 // until the cgroup pid limit is full and every further fork fails with EAGAIN. Stryker
@@ -145,121 +106,6 @@ const MUTATION_BOOTSTRAP = `const fs=require('node:fs'),crypto=require('node:cry
 // did not already carry. Docker's --init would also reap, but it bind-mounts an init from
 // the host into a rootfs whose identity is pinned, which this deliberately avoids.
 const REAPING_PID1 = '/usr/local/bin/node -e "$1" "$2" & p=$!; wait "$p"; exit $?';
-
-const MUTATION_PROGRAM_ARGV = ['node', '/devai-host/run.mjs'] as const;
-const MUTATION_ENVELOPE_KIND = 'devai.protected-mutation-program-result.v1';
-
-// A grouped repetition spanning the whole subject, as in (?:[A-Za-z0-9+/]{4})*, recurses
-// once per iteration in V8 and overflows the stack before any real check runs: a complete
-// mutation report for one package is ~19.6 million base64 characters. A single
-// character-class loop stays linear, and the explicit length test restores the
-// multiple-of-four shape the grouped form encoded. The round trip below is unchanged and
-// remains the authority on canonical encoding.
-function base64(value: unknown, maximum: number): Buffer {
-  if (typeof value !== 'string' || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(value))
-    throw new Error('release-certification-mutation-program-invalid');
-  const decoded = Buffer.from(value, 'base64');
-  if (decoded.byteLength > maximum || decoded.toString('base64') !== value)
-    throw new Error('release-certification-mutation-program-invalid');
-  return decoded;
-}
-
-function mutationEnvelopeLimit(observation: number, report: number): number {
-  const encoded = (value: number) => 4 * Math.ceil(value / 3);
-  const limit = encoded(observation) + encoded(report) + 1024;
-  if (!Number.isSafeInteger(limit) || limit < 1) {
-    throw new Error('release-certification-mutation-program-invalid');
-  }
-  return limit;
-}
-
-function mutationProgramManifest(files: readonly ContainerArchiveEntry[], maximum: number): string {
-  let total = 0;
-  let previous: string | undefined;
-  const manifest = files.map((entry) => {
-    if (
-      entry.mode !== '100644' ||
-      !canonicalContainerPath(entry.path) ||
-      entry.bytes.byteLength === 0 ||
-      entry.bytes.byteLength > maximum ||
-      (previous !== undefined &&
-        Buffer.compare(Buffer.from(previous), Buffer.from(entry.path)) >= 0)
-    )
-      throw new Error('release-certification-mutation-program-invalid');
-    previous = entry.path;
-    total += entry.bytes.byteLength;
-    if (!Number.isSafeInteger(total) || total > maximum)
-      throw new Error('release-certification-mutation-program-invalid');
-    return {
-      path: entry.path,
-      mode: entry.mode,
-      size_bytes: entry.bytes.byteLength,
-      sha256: digest(entry.bytes),
-    };
-  });
-  if (manifest.length === 0) throw new Error('release-certification-mutation-program-invalid');
-  return canonicalSha256(manifest);
-}
-
-function mutationEnvelope(
-  bytes: Buffer,
-  observationLimit: number,
-  reportLimit: number,
-): {
-  readonly observation: Buffer;
-  readonly report: Buffer;
-  readonly process: {
-    readonly error_absent: boolean;
-    readonly signal: string | null;
-    readonly status: number | null;
-  };
-} {
-  if (bytes.byteLength > mutationEnvelopeLimit(observationLimit, reportLimit))
-    throw new Error('release-certification-mutation-program-invalid');
-  let value: Record<string, unknown>;
-  try {
-    value = object(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown);
-  } catch {
-    throw new Error('release-certification-mutation-program-invalid');
-  }
-  const fields = ['kind', 'observation_base64', 'process', 'report_base64', 'schemaVersion'];
-  if (
-    Object.keys(value).length !== fields.length ||
-    fields.some((field) => !Object.hasOwn(value, field)) ||
-    value.kind !== MUTATION_ENVELOPE_KIND ||
-    value.schemaVersion !== '1.0.0'
-  )
-    throw new Error('release-certification-mutation-program-invalid');
-  const process = object(value.process);
-  const signal = process.signal;
-  const status = process.status;
-  if (
-    Object.keys(process).length !== 3 ||
-    !Object.hasOwn(process, 'error_absent') ||
-    !Object.hasOwn(process, 'signal') ||
-    !Object.hasOwn(process, 'status') ||
-    typeof process.error_absent !== 'boolean' ||
-    (signal !== null && (typeof signal !== 'string' || !/^SIG[A-Z0-9]+$/u.test(signal))) ||
-    (status !== null &&
-      (typeof status !== 'number' ||
-        !Number.isSafeInteger(status) ||
-        status < 0 ||
-        status > 255)) ||
-    (status !== null && signal !== null) ||
-    (status === null && signal === null && process.error_absent) ||
-    !bytes.equals(Buffer.from(canonicalJson(value), 'utf8'))
-  )
-    throw new Error('release-certification-mutation-program-invalid');
-  return {
-    observation: base64(value.observation_base64, observationLimit),
-    report: base64(value.report_base64, reportLimit),
-    process: {
-      error_absent: process.error_absent as boolean,
-      signal: signal as string | null,
-      status: status as number | null,
-    },
-  };
-}
 
 /** Exact non-inherited task environment shared by execution and private identity binding. */
 export function protectedContainerTaskEnvironment(
@@ -589,101 +435,11 @@ export class ProtectedCertificationContainer {
     readonly mutation_report?: Buffer;
   } {
     const c = this.#controls;
-    // Select the execution path once. A changing accessor must not bypass the
-    // mutation snapshot and then supply a protected program on a later read.
-    const mutationProgram = input.mutation_program;
-    const diagnosticOutputPaths = input.diagnostic_output_paths;
-    const declaredNamespaces = input.declared_namespaces;
-    input = {
-      task: input.task,
-      timeout_ms: input.timeout_ms,
-      environment: input.environment,
-      source: input.source,
-      prior_outputs: input.prior_outputs,
-      declared_outputs: input.declared_outputs,
-      ...(mutationProgram === undefined ? {} : { mutation_program: mutationProgram }),
-      ...(diagnosticOutputPaths === undefined
-        ? {}
-        : { diagnostic_output_paths: diagnosticOutputPaths }),
-      ...(declaredNamespaces === undefined ? {} : { declared_namespaces: declaredNamespaces }),
-    };
-    if (input.mutation_program !== undefined) {
-      // The bytes validated below are the bytes transported later. A host
-      // callback or shared caller buffer cannot swap candidate inputs between
-      // context validation and the Docker copy/start operations.
-      const copy = (entry: ContainerArchiveEntry): ContainerArchiveEntry => ({
-        path: entry.path,
-        mode: entry.mode,
-        bytes: Buffer.from(entry.bytes),
-      });
-      input = {
-        ...input,
-        task: JSON.parse(canonicalJson(input.task)) as PlannedTask,
-        environment: JSON.parse(canonicalJson(input.environment)) as Readonly<
-          Record<string, string>
-        >,
-        source: Array.from(input.source, copy),
-        prior_outputs: new Map(
-          Array.from(input.prior_outputs, ([path, entry]) => [path, copy(entry)] as const),
-        ),
-        declared_outputs: [...input.declared_outputs],
-        ...(input.diagnostic_output_paths === undefined
-          ? {}
-          : { diagnostic_output_paths: [...input.diagnostic_output_paths] }),
-        ...(input.declared_namespaces === undefined
-          ? {}
-          : {
-              declared_namespaces: Array.from(input.declared_namespaces, (entry) => ({
-                prefix: entry.prefix,
-                required_paths: [...entry.required_paths],
-              })),
-            }),
-      };
-    }
-    const mutation =
-      input.mutation_program === undefined
-        ? undefined
-        : captureProtectedMutationProgram(input.mutation_program);
-    const mutationManifest =
-      mutation === undefined
-        ? undefined
-        : mutationProgramManifest(mutation.files, c.maximum_archive_bytes);
-    if (input.mutation_program !== undefined)
-      assertProtectedMutationProgramExecution(input.mutation_program, {
-        container_identity: this.#identity,
-        environment: protectedContainerTaskEnvironment(input.environment),
-        source: input.source,
-        prior_outputs: input.prior_outputs,
-      });
-    const retain = <
-      T extends {
-        readonly result: TaskExecutionResult;
-        readonly mutation_observation?: Buffer;
-        readonly mutation_report?: Buffer;
-      },
-    >(
-      value: T,
-    ): T => {
-      if (input.mutation_program !== undefined && mutation !== undefined)
-        mutationExecutions.set(value, {
-          program: input.mutation_program,
-          captured: {
-            program_identity_sha256: mutation.identity_sha256,
-            result: { ...value.result },
-            ...(value.mutation_observation === undefined
-              ? {}
-              : { mutation_observation: Buffer.from(value.mutation_observation) }),
-            ...(value.mutation_report === undefined
-              ? {}
-              : { mutation_report: Buffer.from(value.mutation_report) }),
-          },
-        });
-      return value;
-    };
+    if (input.mutation_program !== undefined) throw new Error('mutation-offloaded-to-bedel');
+    const retain = <T>(value: T): T => value;
     const id = `devai-certify-${randomUUID()}`;
     const volume = `${id}-workspace`;
     const dependencyVolumes: string[] = [];
-    let mutationProgramVolume: string | undefined;
     const loaders: string[] = [];
     let created = false;
     let volumeCreated = false;
@@ -733,19 +489,6 @@ export class ProtectedCertificationContainer {
       canonicalJson(executable) !== canonicalJson(input.task.executable)
     )
       throw new Error('release-certification-container-toolchain-mismatch');
-    if (
-      mutation !== undefined &&
-      (!/^[a-f0-9]{64}$/u.test(mutation.identity_sha256) ||
-        input.task.cwd !== '.' ||
-        canonicalJson(input.task.argv) !== canonicalJson(MUTATION_PROGRAM_ARGV) ||
-        canonicalJson(input.task.executable) !== canonicalJson(c.executables.node) ||
-        canonicalJson(mutation.argv) !== canonicalJson(MUTATION_PROGRAM_ARGV) ||
-        mutationEnvelopeLimit(
-          mutation.maximum_observation_bytes,
-          mutation.maximum_raw_report_bytes,
-        ) > c.maximum_archive_bytes)
-    )
-      throw new Error('release-certification-mutation-program-invalid');
     const sources = new Map(input.source.map((entry) => [entry.path, entry]));
     verifyProtectedDependencyInputs(this.#dependencyTransport, input.source);
     if (
@@ -804,57 +547,13 @@ export class ProtectedCertificationContainer {
           ),
         );
       }
-      if (mutation !== undefined) {
-        mutationProgramVolume = `${id}-mutation-program`;
-        this.#checked([
-          'volume',
-          'create',
-          '--label',
-          `devai.certification=${id}`,
-          mutationProgramVolume,
-        ]);
-        const loader = `${id}-mutation-program-loader`;
-        this.#checked([
-          'create',
-          '--name',
-          loader,
-          ...this.#restrictions(),
-          '--mount',
-          `type=volume,source=${mutationProgramVolume},target=/devai-host`,
-          c.image,
-          '/usr/local/bin/node',
-          '--version',
-        ]);
-        loaders.push(loader);
-        this.#checked(
-          ['cp', '-a', '-', `${loader}:/devai-host`],
-          encodeContainerArchive(mutation.files),
-        );
-        const readback = decodeContainerArchive(
-          this.#checked(['cp', `${loader}:/devai-host/.`, '-']),
-          c.maximum_archive_bytes,
-        );
-        if (
-          mutationManifest === undefined ||
-          mutationProgramManifest(readback, c.maximum_archive_bytes) !== mutationManifest
-        )
-          throw new Error('release-certification-mutation-program-invalid');
-      }
       const launch = {
         node_version: c.node_version,
         executable,
-        argv: mutation === undefined ? input.task.argv.slice(1) : mutation.argv.slice(1),
+        argv: input.task.argv.slice(1),
         cwd: `/workspace/candidate${input.task.cwd === '.' ? '' : `/${input.task.cwd}`}`,
         timeout_ms: input.timeout_ms,
         environment: protectedContainerTaskEnvironment(input.environment),
-        ...(mutation === undefined
-          ? {}
-          : {
-              maximum_buffer_bytes: mutationEnvelopeLimit(
-                mutation.maximum_observation_bytes,
-                mutation.maximum_raw_report_bytes,
-              ),
-            }),
       };
       this.#checked([
         'create',
@@ -869,9 +568,6 @@ export class ProtectedCertificationContainer {
           '--mount',
           `type=volume,source=${dependencyVolumes[index]},target=/workspace/candidate/${dependency.mount_path},readonly`,
         ]),
-        ...(mutationProgramVolume === undefined
-          ? []
-          : ['--mount', `type=volume,source=${mutationProgramVolume},target=/devai-host,readonly`]),
         '--workdir',
         '/workspace/candidate',
         c.image,
@@ -879,7 +575,7 @@ export class ProtectedCertificationContainer {
         '-c',
         REAPING_PID1,
         'devai-protected-pid1',
-        mutation === undefined ? TASK_BOOTSTRAP : MUTATION_BOOTSTRAP,
+        TASK_BOOTSTRAP,
         JSON.stringify(launch),
       ]);
       created = true;
@@ -892,12 +588,7 @@ export class ProtectedCertificationContainer {
         ['start', '--attach', id],
         undefined,
         input.timeout_ms + 10_000,
-        mutation === undefined
-          ? c.maximum_archive_bytes
-          : mutationEnvelopeLimit(
-              mutation.maximum_observation_bytes,
-              mutation.maximum_raw_report_bytes,
-            ),
+        c.maximum_archive_bytes,
       );
       // An attach timeout can leave the container running. Preserve only bounded host
       // metadata before shutdown verification refuses; task streams remain confidential.
@@ -945,16 +636,6 @@ export class ProtectedCertificationContainer {
           Destination: `/workspace/candidate/${dependency.mount_path}`,
           RW: false,
         })),
-        ...(mutationProgramVolume === undefined
-          ? []
-          : [
-              {
-                Type: 'volume',
-                Name: mutationProgramVolume,
-                Destination: '/devai-host',
-                RW: false,
-              },
-            ]),
       ].sort((left, right) => left.Destination.localeCompare(right.Destination));
       const mounts = Array.isArray(inspected.Mounts)
         ? inspected.Mounts.map((value: unknown) => {
@@ -986,11 +667,11 @@ export class ProtectedCertificationContainer {
       ) {
         throw new Error('release-certification-container-isolation-mismatch');
       }
-      let result: TaskExecutionResult = {
+      const result: TaskExecutionResult = {
         status: Number.isInteger(state.ExitCode) ? (state.ExitCode as number) : null,
         signal: execution.signal,
-        stdout: mutation === undefined ? Buffer.from(execution.stdout ?? '').toString('utf8') : '',
-        stderr: mutation === undefined ? Buffer.from(execution.stderr ?? '').toString('utf8') : '',
+        stdout: Buffer.from(execution.stdout ?? '').toString('utf8'),
+        stderr: Buffer.from(execution.stderr ?? '').toString('utf8'),
         ...(execution.error === undefined && state.OOMKilled === false && state.Error === ''
           ? {}
           : { errorCode: 'PROTECTED_CONTAINER_ABNORMAL' }),
@@ -999,41 +680,6 @@ export class ProtectedCertificationContainer {
       // deliberately carries neither channel, so without this it is read and dropped and the
       // refusal that follows has no account of itself. The result stays empty; the host's own
       // diagnostic stream is not the task result and not evidence.
-      if (mutation !== undefined) {
-        const workerStderr = Buffer.from(execution.stderr ?? '').toString('utf8');
-        if (workerStderr.length > 0)
-          process.stderr.write(`release certify: mutation worker stderr: ${workerStderr}\n`);
-      }
-      const envelope = Buffer.from(execution.stdout ?? '');
-      // A broken PID 1 is already an outer failure. It cannot offer a result envelope,
-      // but if it did emit one before failing we retain the bounded diagnostic bytes.
-      const mutationResult =
-        mutation === undefined
-          ? undefined
-          : envelope.byteLength === 0 &&
-              (result.status !== 0 || result.signal !== null || result.errorCode !== undefined)
-            ? undefined
-            : mutationEnvelope(
-                envelope,
-                mutation.maximum_observation_bytes,
-                mutation.maximum_raw_report_bytes,
-              );
-      const workerFailed =
-        mutationResult !== undefined &&
-        (!mutationResult.process.error_absent ||
-          mutationResult.process.signal !== null ||
-          mutationResult.process.status !== 0);
-      // The outer container state remains authoritative. An envelope can preserve failed
-      // worker bytes, but neither its contents nor a forged inner success can promote a task.
-      if (workerFailed && result.errorCode === undefined)
-        result = { ...result, errorCode: 'PROTECTED_CONTAINER_ABNORMAL' };
-      if (
-        mutationResult !== undefined &&
-        result.status === 0 &&
-        result.errorCode === undefined &&
-        (mutationResult.observation.byteLength === 0 || mutationResult.report.byteLength === 0)
-      )
-        throw new Error('release-certification-mutation-program-invalid');
       const failed =
         result.status !== 0 || result.signal !== null || result.errorCode !== undefined;
       if (failed && requestedDiagnostics === undefined) {
@@ -1041,12 +687,6 @@ export class ProtectedCertificationContainer {
         return retain({
           result,
           outputs: [],
-          ...(mutationResult === undefined
-            ? {}
-            : {
-                mutation_observation: Buffer.from(mutationResult.observation),
-                mutation_report: Buffer.from(mutationResult.report),
-              }),
         });
       }
       const captured = decodeContainerDependencyArchive(
@@ -1107,12 +747,6 @@ export class ProtectedCertificationContainer {
         return retain({
           result,
           outputs,
-          ...(mutationResult === undefined
-            ? {}
-            : {
-                mutation_observation: Buffer.from(mutationResult.observation),
-                mutation_report: Buffer.from(mutationResult.report),
-              }),
         });
       const outputsByPath = new Map(outputs.map((entry) => [entry.path, entry]));
       // Failed task bytes remain diagnostic-only. Capture still proves the complete
@@ -1129,12 +763,6 @@ export class ProtectedCertificationContainer {
               : [Object.freeze({ ...entry, bytes: Buffer.from(entry.bytes) })];
           }),
         ),
-        ...(mutationResult === undefined
-          ? {}
-          : {
-              mutation_observation: Buffer.from(mutationResult.observation),
-              mutation_report: Buffer.from(mutationResult.report),
-            }),
       });
     } finally {
       // Unproved namespace shutdown preserves resources for diagnosis, never accepts bytes.
@@ -1168,8 +796,6 @@ export class ProtectedCertificationContainer {
         for (const loader of loaders) this.#checked(['rm', loader]);
         for (const dependencyVolume of dependencyVolumes)
           this.#checked(['volume', 'rm', dependencyVolume]);
-        if (mutationProgramVolume !== undefined)
-          this.#checked(['volume', 'rm', mutationProgramVolume]);
         if (volumeCreated) this.#checked(['volume', 'rm', volume]);
       }
       if (!completed && created && !stopped)

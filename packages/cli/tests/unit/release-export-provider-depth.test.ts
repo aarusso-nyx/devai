@@ -297,7 +297,7 @@ function request(): ReleaseLifecycleRequest {
         path: 'receipts/plan.json',
       },
     ],
-  } as ReleaseLifecycleRequest;
+  } as unknown as ReleaseLifecycleRequest;
 }
 
 function context() {
@@ -415,8 +415,12 @@ describe('release export provider depth', () => {
     expect(
       material.release_units[0]?.packages.map((pkg) => [
         pkg.package_id,
-        pkg.evidence_manifest?.opaque_handle,
-        pkg.provider_result?.opaque_handle,
+        pkg.evidence_manifest && 'opaque_handle' in pkg.evidence_manifest
+          ? pkg.evidence_manifest.opaque_handle
+          : undefined,
+        pkg.provider_result && 'opaque_handle' in pkg.provider_result
+          ? pkg.provider_result.opaque_handle
+          : undefined,
       ]),
     ).toEqual([
       ['@fixture/b', 'object-02', 'object-04'],
@@ -801,8 +805,9 @@ describe('release export provider depth', () => {
 
   it('retains hashing, ordering, equality, and refusal behavior in a freshly evaluated module', async () => {
     vi.resetModules();
-    const fresh =
-      await import('../../src/services/release-export-provider.js?fresh-provider-depth');
+    const fresh = await (import(
+      '../../src/services/release-export-provider.js' + '?fresh-provider-depth'
+    ) as Promise<typeof import('../../src/services/release-export-provider.js')>);
     const invalid = options() as any;
     invalid.store.max_blob_bytes = 0;
     expect(() => fresh.createReleaseExportProvider(invalid)).toThrow(INVALID);

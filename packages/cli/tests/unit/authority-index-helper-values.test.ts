@@ -122,8 +122,12 @@ describe('authority index helper values', () => {
     ).toBe('init apply owner');
     expect(entryForArgv([process.execPath, 'devai', 'missing', 'action'], entries)).toBeUndefined();
     expect(owner === undefined ? [] : routeRoles(owner, [])).toEqual(['owner']);
-    expect(owner === undefined ? [] : allowedRoles(owner.authority_contract)).toEqual(['owner']);
+    expect(owner === undefined ? [] : allowedRoles({ ...owner.authority_contract })).toEqual([
+      'owner',
+    ]);
     expect(binding === undefined ? [] : routeRoles(binding, [])).toEqual(['architect']);
-    expect(catalog === undefined ? [] : allowedRoles(catalog.authority_contract)).toEqual([]);
+    expect(catalog === undefined ? [] : allowedRoles({ ...catalog.authority_contract })).toEqual(
+      [],
+    );
   });
 });

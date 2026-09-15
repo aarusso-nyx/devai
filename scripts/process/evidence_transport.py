@@ -17,7 +17,8 @@ REPOSITORY = 'aarusso-nyx/devai-evidence'
 MEMBERS = ('artifacts.tgz', 'envelope.json', 'environment.json', 'results.tgz',
            'task-policy.json', 'toolchain.json')
 MUTATION_MEMBERS = ('mutation-export.tgz', 'mutation-input-plan.json')
-VERSIONS = ('1.0.0', '2.0.0')
+RELEASE_MEMBERS = ('release-export.tgz',)
+VERSIONS = ('1.0.0', '2.0.0', '3.0.0')
 LIMIT = 1024 * 1024 * 1024
 MAX_MEMBERS = 100000
 
@@ -103,20 +104,28 @@ def directory_files(root):
     return files
 
 
-def verify_mutation_export(data):
+def verify_release_export(data):
     """Transport checks only; installed offline verification must authenticate custody."""
     files = read_archive(data)
     metadata = {'exported-state.json', 'policy-closure.json', 'task-policies.json'}
-    require(metadata <= set(files), 'MUTATION_EXPORT_POPULATION_INVALID')
+    require(metadata <= set(files), 'RELEASE_EXPORT_POPULATION_INVALID')
     objects = set(files) - metadata
     require(bool(objects) and all(re.fullmatch(r'objects/[a-f0-9]{64}', name)
-                                 for name in objects), 'MUTATION_EXPORT_POPULATION_INVALID')
+                                 for name in objects), 'RELEASE_EXPORT_POPULATION_INVALID')
     for name in objects:
-        require(digest(files[name]) == name.split('/')[1], 'MUTATION_EXPORT_OBJECT_MISMATCH')
+        require(digest(files[name]) == name.split('/')[1], 'RELEASE_EXPORT_OBJECT_MISMATCH')
     for name in ('exported-state.json', 'policy-closure.json'):
-        require(isinstance(json.loads(files[name]), dict), 'MUTATION_EXPORT_JSON_INVALID')
-    require(isinstance(json.loads(files['task-policies.json']), list), 'MUTATION_EXPORT_JSON_INVALID')
+        require(isinstance(json.loads(files[name]), dict), 'RELEASE_EXPORT_JSON_INVALID')
+    require(isinstance(json.loads(files['task-policies.json']), list), 'RELEASE_EXPORT_JSON_INVALID')
     return files
+
+
+def verify_mutation_export(data):
+    """Read historical v2 transports with their historical diagnostic vocabulary."""
+    try:
+        return verify_release_export(data)
+    except ValueError as error:
+        raise ValueError(str(error).replace('RELEASE_EXPORT_', 'MUTATION_EXPORT_')) from error
 
 
 def verify_bundle(data, expected, schema_version='1.0.0'):
@@ -124,7 +133,8 @@ def verify_bundle(data, expected, schema_version='1.0.0'):
     require(digest(data) == expected, 'BUNDLE_DIGEST_MISMATCH')
     require(schema_version in VERSIONS, 'BUNDLE_VERSION_REQUIRED')
     files = read_archive(data)
-    members = MEMBERS + (MUTATION_MEMBERS if schema_version == '2.0.0' else ())
+    members = MEMBERS + (MUTATION_MEMBERS if schema_version == '2.0.0' else
+                         RELEASE_MEMBERS if schema_version == '3.0.0' else ())
     require(set(files) == set(members) | {'manifest.json'}, 'BUNDLE_POPULATION_INVALID')
     manifest = json.loads(files.pop('manifest.json'))
     require(set(manifest) == {'schemaVersion', 'members'} and
@@ -140,6 +150,8 @@ def verify_bundle(data, expected, schema_version='1.0.0'):
     if schema_version == '2.0.0':
         verify_mutation_export(files['mutation-export.tgz'])
         require(isinstance(json.loads(files['mutation-input-plan.json']), dict), 'BUNDLE_JSON_INVALID')
+    if schema_version == '3.0.0':
+        verify_release_export(files['release-export.tgz'])
     return files
 
 
@@ -191,6 +203,8 @@ def materialize(destination):
     nested = {name: read_archive(files[name + '.tgz']) for name in ('results', 'artifacts')}
     if schema_version == '2.0.0':
         nested['mutation-export'] = verify_mutation_export(files['mutation-export.tgz'])
+    if schema_version == '3.0.0':
+        nested['release-export'] = verify_release_export(files['release-export.tgz'])
     write_files(destination, files)
     for name, contents in nested.items():
         write_files(Path(destination) / name, contents)
@@ -203,6 +217,7 @@ def main():
     for key in ('export', 'toolchain', 'environment', 'output'):
         pack.add_argument('--' + key, required=True)
     pack.add_argument('--schema-version', choices=VERSIONS, default='1.0.0')
+    pack.add_argument('--release-export')
     pack.add_argument('--mutation-export')
     pack.add_argument('--mutation-input-plan')
     verify = sub.add_parser('verify')
@@ -223,6 +238,10 @@ def main():
             files[name + '.tgz'] = archive(directory_files(source / name))
         for name in ('toolchain', 'environment'):
             files[name + '.json'] = Path(getattr(args, name)).read_bytes()
+        require(args.schema_version == '3.0.0' or args.release_export is None, 'RELEASE_BUNDLE_VERSION_REQUIRED')
+        if args.schema_version == '3.0.0':
+            require(bool(args.release_export), 'RELEASE_BUNDLE_INPUT_REQUIRED')
+            files['release-export.tgz'] = archive(directory_files(args.release_export))
         if args.schema_version == '2.0.0':
             require(bool(args.mutation_export) and bool(args.mutation_input_plan), 'MUTATION_BUNDLE_INPUT_REQUIRED')
             files['mutation-export.tgz'] = archive(directory_files(args.mutation_export))

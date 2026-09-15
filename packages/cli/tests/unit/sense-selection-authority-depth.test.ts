@@ -398,9 +398,10 @@ describe('sense invocation authority boundaries', () => {
       return {
         ...actual,
         resolveCheckPlan: (): ReturnType<typeof actual.resolveCheckPlan> =>
-          ({ maximum_effect: 'remote-write', selection: { kind: 'fixture' } }) as ReturnType<
-            typeof actual.resolveCheckPlan
-          >,
+          ({
+            maximum_effect: 'remote-write',
+            selection: { kind: 'fixture' },
+          }) as unknown as ReturnType<typeof actual.resolveCheckPlan>,
       };
     });
     try {
@@ -425,9 +426,10 @@ describe('sense invocation authority boundaries', () => {
       return {
         ...actual,
         resolveCheckPlan: (): ReturnType<typeof actual.resolveCheckPlan> =>
-          ({ maximum_effect: 'harness-write', selection: { kind: 'fixture' } }) as ReturnType<
-            typeof actual.resolveCheckPlan
-          >,
+          ({
+            maximum_effect: 'harness-write',
+            selection: { kind: 'fixture' },
+          }) as unknown as ReturnType<typeof actual.resolveCheckPlan>,
       };
     });
     try {

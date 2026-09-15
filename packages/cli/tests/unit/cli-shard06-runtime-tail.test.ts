@@ -226,6 +226,8 @@ function setBlockingSpies() {
       else Object.defineProperty(stream, '_handle', descriptor);
     });
   }
+  if (!stdoutHandle._handle || !stderrHandle._handle)
+    throw new Error('stream fixture handles missing');
   return [
     vi.spyOn(stdoutHandle._handle, 'setBlocking').mockImplementation(() => undefined),
     vi.spyOn(stderrHandle._handle, 'setBlocking').mockImplementation(() => undefined),

@@ -368,9 +368,11 @@ describe('durable certified evidence retention', () => {
     );
 
     expect(
-      createReleaseCertificationEvidenceStore(fixture.input)
-        .readCertifiedEvidenceCarrier?.({ ...derivation, release_unit: UNIT })
-        .equals(bytes),
+      (
+        await createReleaseCertificationEvidenceStore(fixture.input).readCertifiedEvidenceCarrier?.(
+          { ...derivation, release_unit: UNIT },
+        )
+      )?.equals(bytes),
     ).toBe(true);
   });
 
@@ -472,29 +474,29 @@ describe('durable certified evidence retention', () => {
   it.each([
     [
       'an extra member',
-      (carrier: StoredCarrierIdentity) => Object.assign(carrier, { extra: true }),
+      (carrier: StoredCarrierIdentity): unknown => Object.assign(carrier, { extra: true }),
     ],
     [
       'a coercible non-string release unit',
-      (carrier: StoredCarrierIdentity) => (carrier.release_unit = [UNIT]),
+      (carrier: StoredCarrierIdentity): unknown => (carrier.release_unit = [UNIT]),
     ],
     [
       'an invalid release unit',
-      (carrier: StoredCarrierIdentity) => (carrier.release_unit = '!invalid'),
+      (carrier: StoredCarrierIdentity): unknown => (carrier.release_unit = '!invalid'),
     ],
     [
       'a malformed digest',
-      (carrier: StoredCarrierIdentity) => {
+      (carrier: StoredCarrierIdentity): void => {
         const malformed = 'g'.repeat(64);
         carrier.sha256 = malformed;
         carrier.opaque_handle = `sha256:${malformed}`;
       },
     ],
-    ['a fractional size', (carrier: StoredCarrierIdentity) => (carrier.size_bytes = 1.5)],
-    ['a zero size', (carrier: StoredCarrierIdentity) => (carrier.size_bytes = 0)],
+    ['a fractional size', (carrier: StoredCarrierIdentity): unknown => (carrier.size_bytes = 1.5)],
+    ['a zero size', (carrier: StoredCarrierIdentity): unknown => (carrier.size_bytes = 0)],
     [
       'a foreign derivation',
-      (carrier: StoredCarrierIdentity) =>
+      (carrier: StoredCarrierIdentity): unknown =>
         Object.assign(carrier.derivation, { task_policy_digest_sha256: '0'.repeat(64) }),
     ],
   ] as const)(
@@ -633,9 +635,12 @@ describe('durable certified evidence retention', () => {
 
     for (const carrier of carriers) {
       expect(
-        fixture.store
-          .readCertifiedEvidenceCarrier?.({ ...derivation, release_unit: carrier.unit })
-          .equals(carrier.bytes),
+        (
+          await fixture.store.readCertifiedEvidenceCarrier?.({
+            ...derivation,
+            release_unit: carrier.unit,
+          })
+        )?.equals(carrier.bytes),
       ).toBe(true);
     }
   });

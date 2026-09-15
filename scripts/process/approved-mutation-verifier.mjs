@@ -20,7 +20,7 @@ function regular(path, maximum) {
 /** The approval digest must come from protected operator configuration, never the bundle.
  * This checks an immutable control identity; it does not approve a pending proposal,
  * execute its modules, or establish mutation acceptance. */
-export function inspectApprovedMutationVerifier({ root, candidateRoot, approvalSha256 }) {
+function inspectApprovedVerifier({ root, candidateRoot, approvalSha256 }, kernels) {
   requireValue(hash(approvalSha256), 'MUTATION_CONTROL_APPROVAL_REQUIRED');
   const directory = realpathSync(root);
   requireValue(directory === resolve(root), 'MUTATION_CONTROL_LINK');
@@ -101,13 +101,7 @@ export function inspectApprovedMutationVerifier({ root, candidateRoot, approvalS
   }
   visit(unpacked);
   requireValue(seen.size === expected.size, 'MUTATION_CONTROL_POPULATION_MISMATCH');
-  for (const name of [
-    'package.json',
-    'src/mutation-v21.js',
-    'src/mutation-v22.js',
-    'src/trust.js',
-    'src/artifact-safety.js',
-  ])
+  for (const name of ['package.json', ...kernels, 'src/trust.js', 'src/artifact-safety.js'])
     requireValue(seen.has(`package/${name}`), 'MUTATION_CONTROL_KERNEL_MISSING');
   const manifest = JSON.parse(
     regular(join(unpacked, 'package/package.json'), 1024 * 1024).toString('utf8'),
@@ -133,4 +127,18 @@ export function inspectApprovedMutationVerifier({ root, candidateRoot, approvalS
     sourceTree: approval.source_tree,
     files: seen.size,
   });
+}
+
+/** Historical mutation controls retain their original required kernels. */
+export function inspectApprovedMutationVerifier(options) {
+  return inspectApprovedVerifier(options, ['src/mutation-v21.js', 'src/mutation-v22.js']);
+}
+
+/** Current delivery verifies release integrity without requiring mutation kernels. */
+export function inspectApprovedReleaseVerifier(options) {
+  return inspectApprovedVerifier(options, [
+    'src/canonical.js',
+    'src/safe-path.js',
+    'src/verify.js',
+  ]);
 }

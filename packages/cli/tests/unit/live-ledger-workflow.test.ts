@@ -1107,13 +1107,13 @@ describe('mandatory installed mutation export workflow binding', () => {
           'id: installed-offline\n        continue-on-error: true',
         ),
         source.replace('id: installed-offline', 'id: missing-installed-offline'),
-        source.replace("BUNDLE_SCHEMA_VERSION: '2.0.0'", "BUNDLE_SCHEMA_VERSION: '1.0.0'"),
+        source.replace("BUNDLE_SCHEMA_VERSION: '3.0.0'", "BUNDLE_SCHEMA_VERSION: '1.0.0'"),
         source.replace('vars.DEVAI_INSTALLED_CONTROL_SHA256', 'vars.UNAPPROVED_CONTROL'),
       ]) {
         const directory = fixture(changed, file);
         const result = spawnSync(process.execPath, [CHECKER], { cwd: directory, encoding: 'utf8' });
         expect(result.status).not.toBe(0);
-        expect(result.stdout + result.stderr).toContain('CI_INSTALLED_MUTATION_EXPORT_REQUIRED');
+        expect(result.stdout + result.stderr).toContain('CI_INSTALLED_RELEASE_EXPORT_REQUIRED');
       }
     },
   );

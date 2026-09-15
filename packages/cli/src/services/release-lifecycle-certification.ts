@@ -147,19 +147,6 @@ export function createReleaseCertificationProvider(
   const policies = JSON.parse(
     canonicalJson(input.task_policies),
   ) as readonly ImmutableCertificationTaskPolicy[];
-  const readUnitClosure =
-    typeof sink.readUnitMutationEvidenceClosure === 'function'
-      ? sink.readUnitMutationEvidenceClosure.bind(sink)
-      : undefined;
-  const readUnitReceipt =
-    typeof sink.readUnitMutationEvidenceReceipt === 'function'
-      ? sink.readUnitMutationEvidenceReceipt.bind(sink)
-      : undefined;
-  const readUnitBlob =
-    typeof sink.readUnitMutationEvidenceBlob === 'function'
-      ? sink.readUnitMutationEvidenceBlob.bind(sink)
-      : undefined;
-  const maximumUnitBytes = sink.unit_mutation_maximum_bytes;
   const provider: ReleaseProvider = async (requestInput) => {
     try {
       const request = JSON.parse(canonicalJson(requestInput)) as ReleaseLifecycleRequest;
@@ -174,17 +161,7 @@ export function createReleaseCertificationProvider(
         throw new Error('release-task-policy-identity-mismatch');
       }
       // Resolve before any producer work; a missing/stale plan is not permission to run.
-      const requirements = resolveReleaseMutationRequirements(request, input);
-      if (
-        requirements.some((unit) => unit.binding !== null) &&
-        (typeof readUnitClosure !== 'function' ||
-          typeof readUnitReceipt !== 'function' ||
-          typeof readUnitBlob !== 'function' ||
-          maximumUnitBytes === undefined ||
-          !Number.isSafeInteger(maximumUnitBytes) ||
-          maximumUnitBytes < 1)
-      )
-        throw new Error('release-certification-generated-output-untrusted');
+      resolveReleaseMutationRequirements(request, input);
       const result = await input.provider.certify({
         request: JSON.parse(canonicalJson(request)) as ReleaseLifecycleRequest,
         task_policies: JSON.parse(
@@ -219,26 +196,6 @@ export function createReleaseCertificationProvider(
           readCertificationEvidenceReceipt: (value) => sink.readCertificationEvidenceReceipt(value),
           readCertificationOutputClosure: (value) => sink.readCertificationOutputClosure(value),
           readGeneratedBlob: (value) => sink.readGeneratedBlob(value),
-          ...(maximumUnitBytes === undefined
-            ? {}
-            : {
-                unit_mutation_maximum_bytes: maximumUnitBytes,
-              }),
-          ...(readUnitClosure === undefined
-            ? {}
-            : {
-                readUnitMutationEvidenceClosure: readUnitClosure,
-              }),
-          ...(readUnitReceipt === undefined
-            ? {}
-            : {
-                readUnitMutationEvidenceReceipt: readUnitReceipt,
-              }),
-          ...(readUnitBlob === undefined
-            ? {}
-            : {
-                readUnitMutationEvidenceBlob: readUnitBlob,
-              }),
         },
         input,
       );

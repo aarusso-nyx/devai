@@ -23,7 +23,7 @@ const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-com
 type Definition = {
   readonly name: string;
   readonly description: string;
-  readonly authority: string;
+  readonly authority?: string;
   register(cli: CAC): void;
 };
 
@@ -186,7 +186,7 @@ describe('cli shard09 init remediation lane B', () => {
       expect(result.stderr).toBe('');
       const payload = JSON.parse(result.stdout) as {
         plan: { target_root: string; devai_version: string; entries: Array<{ path: string }> };
-        result: Record<string, string[]>;
+        result: Record<'created' | 'overwritten' | 'preserved' | 'skipped', string[]>;
         included: unknown[];
       };
       expect(payload.plan.target_root).toBe(root);

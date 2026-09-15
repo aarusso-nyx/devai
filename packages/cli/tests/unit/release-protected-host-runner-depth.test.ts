@@ -106,7 +106,7 @@ vi.mock('../../src/services/release-lifecycle-execution.js', () => ({
 }));
 
 import { createProtectedReleaseHostRunner } from '../../src/services/release-protected-host-runner.js';
-import type { ImmutableReleaseContentSource } from '../../src/services/release-lifecycle-execution.js';
+import type { ImmutableReleaseContentSource } from '../../src/services/release-prepare-kernel.js';
 
 const roots: string[] = [];
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -396,9 +396,7 @@ describe('protected release host runner direct orchestration', () => {
     expect(runner.readPlan()).toMatchObject({ verdict: 'pass', candidate: { version: '1.5.0' } });
     expect(runner.readPolicyClosure()).toEqual({ schemaVersion: 'test-policy-closure' });
     expect(() => runner.readFixturePlan()).toThrow('release-host-fixture-unavailable');
-    expect(() => runner.readMutationInputPlan()).toThrow(
-      'release-host-mutation-input-controls-unavailable',
-    );
+    expect(() => runner.readMutationInputPlan()).toThrow('mutation-offloaded-to-bedel');
 
     const candidateLocator = {
       commit: repository.commit,
@@ -475,11 +473,13 @@ describe('protected release host runner direct orchestration', () => {
     ).toEqual(Buffer.from('commit'));
     const blobRequest = {
       repository,
-      candidate: { commit: repository.commit, tree: repository.tree },
+      candidate: candidateLocator,
       object_format: 'sha1' as const,
       object_id: blobId,
       type: 'blob' as const,
       locator: {
+        kind: 'git-object' as const,
+        mode: '100644' as const,
         repository: repository.id,
         commit: repository.commit,
         tree: repository.tree,

@@ -326,7 +326,7 @@ describe('internal asynchronous check runner', () => {
     expect(asyncReuse.execution?.every((entry) => entry.disposition === 'reused')).toBe(true);
   });
 
-  it('keeps plan-only execution callback-free and preserves the mutation-required refusal', async () => {
+  it('keeps plan-only execution callback-free and preserves ordinary preflight requirements', async () => {
     const root = repository();
     let callbacks = 0;
     const plan = await withScope(() =>
@@ -414,7 +414,7 @@ describe('internal asynchronous check runner', () => {
           releaseProfile,
         }),
       ),
-    ).rejects.toThrow('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
+    ).rejects.toThrow('CHECK_RELEASE_PREFLIGHT_REQUIRED');
     expect(callbacks).toBe(0);
   });
 });

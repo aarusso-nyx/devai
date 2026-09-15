@@ -321,6 +321,7 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
 
   it('rejects a registered name prefix with an additional unregistered segment', async () => {
     const ref = REFS[0];
+    if (!ref) throw new Error('test reference missing');
     await expect(
       harness.validate([{ ...ref, names: [...ref.names, 'unregistered nested case'] }]),
     ).rejects.toThrow(
@@ -333,7 +334,7 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
     async () => {
       vi.resetModules();
       const fresh = await import('../../src/commands/verify/translation.js');
-      await harness.validate([REFS[0]], fresh.executeTranslationValidation);
+      await harness.validate([firstRef()], fresh.executeTranslationValidation);
 
       expect(observations.linuxDockerCalls).toHaveLength(2);
       for (const call of observations.linuxDockerCalls) {
@@ -427,7 +428,7 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
     const binaryHarness = createHarness(true);
     observations.overlayPath = TEST_PATHS[0];
     try {
-      await binaryHarness.validate([REFS[0]]);
+      await binaryHarness.validate([firstRef()]);
       expect(observations.overlayBytes).toEqual([
         Buffer.from(BINARY_OVERLAY_BYTES).toString('hex'),
         Buffer.from(BINARY_OVERLAY_BYTES).toString('hex'),
@@ -455,3 +456,9 @@ describe('CLI shard 09 verify translation execution boundaries', () => {
     expect(observations.isolatedArgv).toEqual([]);
   });
 });
+
+function firstRef() {
+  const ref = REFS[0];
+  if (!ref) throw new Error('test reference missing');
+  return ref;
+}

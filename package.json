@@ -24,7 +24,7 @@
     }
   },
   "scripts": {
-    "devai:prepare": "node scripts/check-policy-materialization.mjs && node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-error-code-reference.mjs --check && node scripts/generate-action-registry.mjs",
+    "devai:prepare": "node scripts/check-mutation-free-delivery.mjs && node scripts/check-policy-materialization.mjs && node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-error-code-reference.mjs --check && node scripts/generate-action-registry.mjs",
     "test-task-selectors:check": "node scripts/check-test-task-workspace-selectors.mjs --check",
     "action-registry:check": "node scripts/generate-action-registry.mjs --check",
     "error-codes:generate": "node scripts/generate-error-code-reference.mjs",
@@ -59,7 +59,8 @@
     "test:e2e:rc": "vitest run --config tests/config/rc.e2e.config.ts",
     "test:performance:rc": "vitest run --config tests/config/rc.performance.config.ts",
     "test:containment:rc": "vitest run --config tests/config/rc.containment.config.ts",
-    "release:bootstrap": "node scripts/process/bootstrap-check-runner.mjs"
+    "release:bootstrap": "node scripts/process/bootstrap-check-runner.mjs",
+    "mutation-free:check": "node scripts/check-mutation-free-delivery.mjs"
   },
   "devDependencies": {
     "@bcoe/v8-coverage": "1.0.2",
@@ -76,9 +77,6 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",
     "vitest": "^4.1.10",
-    "yaml": "^2.9.0",
-    "@stryker-mutator/core": "9.6.1",
-    "@stryker-mutator/vitest-runner": "9.6.1",
-    "@stryker-mutator/typescript-checker": "9.6.1"
+    "yaml": "^2.9.0"
   }
 }

@@ -1,15 +1,15 @@
 {
   "schemaVersion": "1.0.0",
   "policy_id": "devai.devai-adoption",
-  "policy_version": "1.1.0",
+  "policy_version": "1.2.0",
   "source_path": "law/policy/devai-adoption.json",
-  "source_digest_sha256": "7f58ab0f24b754013d183a82656bb89b5b9cdfe8d08a0c21eb9d4837ebe6b53d",
+  "source_digest_sha256": "28d6ef2b1a375871d0d1c39e9dd3cc8a4e46472591f5b5662884fb77a538aa90",
   "materialized": {
-    ".devai/config/project.json": "eb677f643820de0d9bf4574068581847ee42132d896e701ea90b1d7d3eb50fb7",
+    ".devai/config/project.json": "b6d1a3a5832adebe6c7179c875808fc6ae0c237c0fe954e304449fb13d762859",
     ".devai/config/domains.json": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd",
-    ".devai/config/thresholds.json": "19bff20b5d9531d15a30227fb958ea34be660d88655ef46e45888f1fc1559751",
+    ".devai/config/thresholds.json": "108c575a9b1c83683e97862faefc0058c2c45696d36603a59b26e8e644d7c8d5",
     ".devai/config/scorecard-na.json": "32cb9cf7c790a9b3824305de638c1c1598a60f7ac7a4caf46948c1c145003d20",
     ".devai/config/glob-guards.json": "a444e9fb4113e15e2810c4ac6e29fe4b967bf4951b78cd20f66658e9983da761",
-    ".devai/config/release-verification.json": "ebd594a7d47ad29ac2fa6cb9131fd2ff558e01cc77e0bb8d2dbbb57ecf5b1327"
+    ".devai/config/release-verification.json": "1c167d7f10c58228cc68805d55ab25a074dd03d71f5392c90e7feba9f3e6d332"
   }
 }

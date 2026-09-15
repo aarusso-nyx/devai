@@ -15,12 +15,12 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
 
-const { inspectApprovedMutationVerifier } = await import(
+const { inspectApprovedMutationVerifier, inspectApprovedReleaseVerifier } = await import(
   pathToFileURL(resolve('scripts/process/approved-mutation-verifier.mjs')).href
 );
 const roots: string[] = [];
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
-function fixture() {
+function fixture(kernels = ['mutation-v21.js', 'mutation-v22.js']) {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'devai verifier ação-')));
   roots.push(parent);
   const root = join(parent, 'control'),
@@ -30,8 +30,7 @@ function fixture() {
   mkdirSync(join(unpacked, 'package/src'), { recursive: true });
   const files = [
     'package/package.json',
-    'package/src/mutation-v21.js',
-    'package/src/mutation-v22.js',
+    ...kernels.map((name) => `package/src/${name}`),
     'package/src/trust.js',
     'package/src/artifact-safety.js',
   ];
@@ -180,9 +179,9 @@ it('rejects unsafe paths and duplicate members in an externally selected manifes
   }
 });
 
-it('binds the independent mutation control even when unrelated prerequisites fail', async () => {
+it('ignores legacy mutation controls while retaining ordinary prerequisite failures', async () => {
   const f = fixture();
-  const { inspectPrerequisites, assertFresh } = await import(
+  const { inspectPrerequisites } = await import(
     pathToFileURL(resolve('scripts/process/release-prerequisites.mjs')).href
   );
   const git = (args: string[]) => execFileSync('git', args, { cwd: f.candidateRoot });
@@ -214,18 +213,26 @@ it('binds the independent mutation control even when unrelated prerequisites fai
   writeFileSync(configPath, JSON.stringify(config));
   const before = inspectPrerequisites(config, configPath);
   expect(before.ok).toBe(false);
-  expect(before.checks.find((check: { id: string }) => check.id === 'mutation-control')).toEqual({
-    id: 'mutation-control',
-    status: 'pass',
-  });
-  expect(before.bindings.mutationVerifierApproval).toBe(f.controls.approvalSha256);
-  expect(before.bindings.mutationVerifierCommit).toBe('b'.repeat(40));
+  expect(before.checks.some((check: { id: string }) => check.id.startsWith('mutation-'))).toBe(
+    false,
+  );
+  expect(before.bindings.mutationVerifierApproval).toBeUndefined();
   const changed = inspectPrerequisites(
-    { ...config, mutationVerifierApprovalSha256: 'f'.repeat(64) },
+    {
+      ...config,
+      mutationVerifierRoot: '/missing-control',
+      mutationVerifierApprovalSha256: 'invalid',
+    },
     configPath,
   );
-  expect(
-    changed.checks.find((check: { id: string }) => check.id === 'mutation-control')?.status,
-  ).toBe('fail');
-  expect(() => assertFresh({ ...before, ok: true }, changed)).toThrow();
+  expect(changed.checks).toEqual(before.checks);
+  expect(changed.bindings).toEqual(before.bindings);
+});
+
+it('verifies ordinary release controls without installing mutation kernels', () => {
+  const f = fixture(['canonical.js', 'safe-path.js', 'verify.js']);
+  expect(inspectApprovedReleaseVerifier(f.controls).approvalSha256).toBe(f.controls.approvalSha256);
+  expect(() => inspectApprovedMutationVerifier(f.controls)).toThrow(
+    'MUTATION_CONTROL_KERNEL_MISSING',
+  );
 });

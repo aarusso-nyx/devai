@@ -56,7 +56,7 @@ const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-com
   cac: (name?: string) => CAC;
 };
 
-type Definition = { readonly name: string; readonly authority: string; register(cli: CAC): void };
+type Definition = { readonly name: string; readonly authority?: string; register(cli: CAC): void };
 type Module = typeof import('../../src/commands/task/index.js');
 let commands!: Module;
 

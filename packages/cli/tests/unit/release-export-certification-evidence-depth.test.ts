@@ -196,8 +196,9 @@ function refusal(run: () => unknown): void {
 describe('release export certification evidence capture', () => {
   it('exposes the stable refusal through a freshly evaluated module', async () => {
     vi.resetModules();
-    const fresh =
-      await import('../../src/services/release-export-certification-evidence.js?fresh-refusal');
+    const fresh = await (import(
+      '../../src/services/release-export-certification-evidence.js' + '?fresh-refusal'
+    ) as Promise<typeof import('../../src/services/release-export-certification-evidence.js')>);
     const value = fixture();
     await expect(
       fresh.createReleaseExportCertificationEvidence({
@@ -428,7 +429,7 @@ describe('release export certification evidence capture', () => {
           ...value.input,
           material: {
             release_units: [{ ...unit, packages }],
-          } as Pick<ReleaseStateMaterial, 'release_units'>,
+          } as unknown as Pick<ReleaseStateMaterial, 'release_units'>,
         }),
       ).rejects.toThrow(ERROR);
       expect(read).not.toHaveBeenCalled();
@@ -490,7 +491,7 @@ describe('release export certification evidence capture', () => {
       await expect(
         createReleaseExportCertificationEvidence({
           ...value.input,
-          material: { release_units } as Pick<ReleaseStateMaterial, 'release_units'>,
+          material: { release_units } as unknown as Pick<ReleaseStateMaterial, 'release_units'>,
         }),
       ).rejects.toThrow(ERROR);
     }

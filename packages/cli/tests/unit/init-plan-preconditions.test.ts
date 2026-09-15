@@ -18,7 +18,9 @@ async function invoke(target: string, introspect = false) {
   // module after a mutation candidate is activated so static command mutants
   // remain observable through the public CAC boundary.
   vi.resetModules();
-  const { initPlan } = await import('../../src/commands/init/index.js?init-plan-preconditions');
+  const { initPlan } = await (import(
+    '../../src/commands/init/index.js' + '?init-plan-preconditions'
+  ) as Promise<typeof import('../../src/commands/init/index.js')>);
   const cli = cac('devai-init-plan-preconditions');
   initPlan.register(cli);
   const originalArgv = process.argv;
@@ -58,7 +60,9 @@ async function invoke(target: string, introspect = false) {
 
 async function invokeBind(args: readonly string[]) {
   vi.resetModules();
-  const { initBind } = await import('../../src/commands/init/index.js?init-bind-depth');
+  const { initBind } = await (import(
+    '../../src/commands/init/index.js' + '?init-bind-depth'
+  ) as Promise<typeof import('../../src/commands/init/index.js')>);
   const cli = cac('devai-init-bind-depth');
   initBind.register(cli);
   const originalArgv = process.argv;

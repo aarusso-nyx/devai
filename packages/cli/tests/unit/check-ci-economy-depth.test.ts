@@ -289,7 +289,9 @@ schedule:
 
   it('activates strict profile and fail-closed evidence behavior in a fresh module', async () => {
     vi.resetModules();
-    const fresh = await import('../../src/commands/check/ci-economy.js?fresh-ci-economy');
+    const fresh = await (import(
+      '../../src/commands/check/ci-economy.js' + '?fresh-ci-economy'
+    ) as Promise<typeof import('../../src/commands/check/ci-economy.js')>);
     const root = temporary();
     const report = fresh.checkCiEconomy({ repoRoot: root });
     expect(report).toMatchObject({ verdict: 'fail', ci_economy_profile: 'full', fail_count: 1 });

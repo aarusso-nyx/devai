@@ -17,3 +17,6 @@ scratch/*
 
 # Repository-local process helper bytecode
 scripts/process/__pycache__/
+
+# Locally regenerated context graph; not release candidate inputs.
+graft/

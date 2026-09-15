@@ -793,15 +793,33 @@ try {
     join(projectRoot, 'law/invariants/INV-TEAT-001.json'),
     `${JSON.stringify({ id: 'INV-TEAT-001', verification: { strategy: 'mutation' } })}\n`,
   );
-  writeFileSync(
-    join(projectRoot, '.devai/state/mutation/current.json'),
-    `${JSON.stringify({ mutation_score: 100, survived: 0 })}\n`,
-  );
-  const mutationCheck = JSON.parse(
-    run(binary, ['check', '--only', 'mutation', '--repo-root', projectRoot, '--format', 'json']),
-  );
-  if (mutationCheck?.result?.value?.ok !== true) {
-    throw new Error('INSTALLED_MUTATION_CHECK_INVALID');
+  for (const report of [
+    undefined,
+    '{invalid',
+    JSON.stringify({ mutation_score: 0, survived: 100 }),
+  ]) {
+    const path = join(projectRoot, '.devai/state/mutation/current.json');
+    if (report !== undefined) writeFileSync(path, report);
+    const mutationCheck = JSON.parse(
+      run(binary, ['check', '--only', 'mutation', '--repo-root', projectRoot, '--format', 'json']),
+    );
+    const value = mutationCheck?.result?.value;
+    if (
+      value?.execution_status !== 'pass' ||
+      value?.readiness_status !== 'na' ||
+      value?.results?.[0]?.code !== 'MUTATION_OFFLOADED_TO_BEDEL'
+    ) {
+      throw new Error('INSTALLED_MUTATION_DEPRECATION_INVALID');
+    }
+  }
+  for (const name of [
+    'mutation-production.mjs',
+    'mutation-typescript-plugin.mjs',
+    'mutation-vitest-plugin.mjs',
+  ]) {
+    if (existsSync(join(installedPackage, 'dist/runtime/host', name))) {
+      throw new Error('INSTALLED_MUTATION_ENGINE_PRESENT');
+    }
   }
   run(binary, [
     'evidence',

@@ -34,7 +34,15 @@ describe('CLI shard 09 sense facade authority', () => {
         ...registry.SENSOR_REGISTRY,
         entries: registry.SENSOR_REGISTRY.entries.map((entry) =>
           entry.kind === 'build'
-            ? { ...entry, effect_basis: { ...entry.effect_basis, capabilities: [] } }
+            ? {
+                ...entry,
+                effect_basis: {
+                  source_paths: [],
+                  rationale: '',
+                  ...entry.effect_basis,
+                  capabilities: [],
+                },
+              }
             : entry,
         ),
       },

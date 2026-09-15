@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
-import { posix } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { decodeContainerArchive } from './container-archive.js';
-import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalJson } from '@devai-nyx/utils';
 import { readProtectedReleasePrepareCapacity } from '@devai-nyx/authority';
 import {
   RELEASE_EXPORT_SPEC_ID,
@@ -20,7 +19,6 @@ import {
   verifyReleaseExportProviderResultV2,
   verifyReleaseExportProviderResultSetV2,
   captureReleaseExportTranscriptLimits,
-  type ReleaseExportProviderResultV2,
 } from './release-export-transcript-v2.js';
 import {
   RELEASE_EXPORT_SPEC_V4_ID,
@@ -33,12 +31,7 @@ import {
 import type { ReleaseExportMutationUnitProjection } from './release-export-mutation-contract.js';
 import type { ReleaseExportArtifactCommitManifest } from './release-export-artifact-store.js';
 import { resolveReleaseMutationRequirements } from './release-lifecycle-execution.js';
-import { resolutionForReleasePlanInputResolver } from './release-policy-resolution.js';
-import {
-  verifyUnitMutationEvidenceClosure,
-  verifyUnitMutationEvidenceDocuments,
-  type UnitMutationEvidenceSink,
-} from './release-unit-mutation-evidence.js';
+import { type UnitMutationEvidenceSink } from './release-unit-mutation-evidence.js';
 import type {
   ArtifactSinkCommitIdentity,
   CertificationOutputBlobHandle,
@@ -808,156 +801,19 @@ export async function verifyCertificationMutationEvidence(
   source: ReleaseUnitMutationEvidenceReader,
   plan: ReleaseMutationPlanReaders,
 ): Promise<void> {
-  const requirements = resolveReleaseMutationRequirements(request, plan);
-  const inputs = JSON.parse(canonicalJson(material.inputs)) as ReleaseStateMaterial['inputs'];
-  const units = JSON.parse(
-    canonicalJson(material.release_units),
-  ) as ReleaseStateMaterial['release_units'];
+  void source;
+  resolveReleaseMutationRequirements(request, plan);
   const expected = request.candidate_locator.release_units.map((unit) => ({
     release_unit: unit.release_unit,
     version: unit.version,
     packages: unit.package_roster.map((pkg) => pkg.package_id),
   }));
-  const observed = units.map((unit) => ({
+  const observed = material.release_units.map((unit) => ({
     release_unit: unit.release_unit,
     version: unit.version,
     packages: unit.packages.map((pkg) => pkg.package_id),
   }));
   if (!same(expected, observed)) throw new Error('release-certification-output-closure-invalid');
-  if (
-    !same(
-      requirements.map((unit) => unit.release_unit),
-      units.map((unit) => unit.release_unit),
-    )
-  )
-    throw new Error('release-certification-output-closure-invalid');
-  for (const [index, requirement] of requirements.entries()) {
-    const unit = units[index];
-    if (unit === undefined) throw new Error('release-certification-output-closure-invalid');
-    const closure = unit.mutation_evidence;
-    if (requirement.binding === null) {
-      if (closure !== undefined && closure !== null)
-        throw new Error('release-certification-generated-output-untrusted');
-      continue;
-    }
-    const maximumBytes = source.unit_mutation_maximum_bytes;
-    const readClosure =
-      typeof source.readUnitMutationEvidenceClosure === 'function'
-        ? source.readUnitMutationEvidenceClosure.bind(source)
-        : undefined;
-    const readReceipt =
-      typeof source.readUnitMutationEvidenceReceipt === 'function'
-        ? source.readUnitMutationEvidenceReceipt.bind(source)
-        : undefined;
-    const readBlob =
-      typeof source.readUnitMutationEvidenceBlob === 'function'
-        ? source.readUnitMutationEvidenceBlob.bind(source)
-        : undefined;
-    if (
-      closure === undefined ||
-      closure === null ||
-      typeof readClosure !== 'function' ||
-      typeof readReceipt !== 'function' ||
-      typeof readBlob !== 'function' ||
-      maximumBytes === undefined ||
-      !Number.isSafeInteger(maximumBytes) ||
-      maximumBytes < 1
-    )
-      throw new Error('release-certification-generated-output-untrusted');
-    const taskDigests = unit.packages.map(
-      (pkg) => pkg.certification_manifest?.task_policy_digest_sha256,
-    );
-    if (
-      taskDigests.some(
-        (digest) =>
-          digest === undefined ||
-          !inputs.some((entry) => entry.kind === 'task-policy' && entry.sha256 === digest),
-      )
-    )
-      throw new Error('release-task-policy-identity-mismatch');
-    const binding = {
-      ...requirement.binding,
-      task_policy_digests_sha256: [...new Set(taskDigests as string[])].sort(),
-    };
-    const resolution = resolutionForReleasePlanInputResolver(plan.resolve_plan_input, {
-      candidate: { release_unit: requirement.release_unit },
-    });
-    const profile = record(resolution?.readInput('release-verification-profile'));
-    if (
-      profile === undefined ||
-      canonicalSha256(profile) !== binding.release_profile_digest_sha256 ||
-      !Array.isArray(profile['mutation_roster'])
-    )
-      throw new Error('release-certification-generated-output-untrusted');
-    const roster = profile['mutation_roster']
-      .map((entry: unknown) => {
-        const row = record(entry);
-        const thresholds = record(row?.['thresholds']);
-        if (
-          typeof row?.['package'] !== 'string' ||
-          typeof row['manifest_path'] !== 'string' ||
-          typeof thresholds?.['score_min'] !== 'number' ||
-          typeof thresholds['survived_max'] !== 'number'
-        )
-          throw new Error('release-certification-generated-output-untrusted');
-        return {
-          packageName: row['package'],
-          workspace: posix.dirname(row['manifest_path']),
-          scoreMin: thresholds['score_min'],
-          survivedMax: thresholds['survived_max'],
-        };
-      })
-      .sort((a, b) => utf8Compare(a.packageName, b.packageName));
-    verifyUnitMutationEvidenceClosure(closure, binding);
-    const retained = readClosure(binding);
-    verifyUnitMutationEvidenceClosure(retained, binding);
-    if (!same(retained, closure))
-      throw new Error('release-certification-generated-output-untrusted');
-    const receipt = readReceipt({
-      evidence_sink_id: closure.output_contract.evidence_sink_id,
-      receipt_digest_sha256: closure.receipt.receipt_digest_sha256,
-    });
-    if (!same(receipt, closure.receipt))
-      throw new Error('release-certification-generated-output-untrusted');
-    let contractBytes: Buffer | undefined;
-    await verifyUnitMutationEvidenceDocuments({
-      closure,
-      expected: binding,
-      maximum_bytes: maximumBytes,
-      read: (identity) => {
-        const bytes = readBlob({ binding, identity });
-        if (identity.path === closure.output_contract.path) contractBytes = Buffer.from(bytes);
-        return bytes;
-      },
-    });
-    if (contractBytes === undefined)
-      throw new Error('release-certification-generated-output-untrusted');
-    const contracts = record(JSON.parse(contractBytes.toString('utf8')))?.['packages'];
-    if (!Array.isArray(contracts))
-      throw new Error('release-certification-generated-output-untrusted');
-    const packages = contracts
-      .map((entry: unknown) => record(entry))
-      .sort((a, b) => utf8Compare(String(a?.['packageName']), String(b?.['packageName'])));
-    if (
-      !same(
-        packages.map((entry) => ({
-          packageName: entry?.['packageName'],
-          workspace: entry?.['workspace'],
-        })),
-        roster.map((entry) => ({ packageName: entry.packageName, workspace: entry.workspace })),
-      )
-    )
-      throw new Error('release-certification-generated-output-untrusted');
-    for (const [packageIndex, entry] of packages.entries()) {
-      if (entry?.['requirement'] !== 'required') continue;
-      const thresholds = record(entry['thresholds']);
-      if (
-        thresholds?.['scoreMin'] !== roster[packageIndex]?.scoreMin ||
-        thresholds?.['survivedMax'] !== roster[packageIndex]?.survivedMax
-      )
-        throw new Error('release-certification-generated-output-untrusted');
-    }
-  }
 }
 
 function sinkObject(
@@ -1415,14 +1271,9 @@ export function createReleasePrepareProvider(
         commit_protocol: COMMIT_PROTOCOL,
       };
       const byLogicalName = new Map(receipts.map((receipt) => [receipt.logical_name, receipt]));
-      const releaseUnits = request.candidate_locator.release_units.map((unit, index) => ({
+      const releaseUnits = request.candidate_locator.release_units.map((unit) => ({
         release_unit: unit.release_unit,
         version: unit.version,
-        ...(certifiedState.release_units[index]?.mutation_evidence === undefined
-          ? {}
-          : {
-              mutation_evidence: certifiedState.release_units[index]?.mutation_evidence,
-            }),
         packages: unit.package_roster.map((requestedPackage) => {
           const packageValue = packed.find(
             (candidate) =>
@@ -2002,129 +1853,8 @@ export async function verifyPortableReleaseMutationEvidence(
   plan: ReleaseMutationPlanReaders,
   exportLimits?: ReleaseExportTranscriptLimits,
 ): Promise<void> {
-  const fail = (): never => {
-    throw new Error('release-certification-generated-output-untrusted');
-  };
-  const material = {
-    release_units: state.release_units,
-    inputs: state['inputs'] as ReleaseStateMaterial['inputs'],
-  };
-  const requirements = resolveReleaseMutationRequirements(request, plan);
-  if (state.schemaVersion !== '2.1.0') {
-    if (requirements.some((unit) => unit.binding !== null)) fail();
-    return;
-  }
-  if (reader === undefined || state.artifact_sink == null) return fail();
-  const commit = state.artifact_sink;
-  const manifestBytes = await verifyReceiptBytes(
-    reader,
-    {
-      sink_id: commit.sink_id,
-      opaque_handle: commit.committed_manifest_handle,
-      sha256: commit.committed_manifest_sha256,
-      size_bytes: commit.committed_manifest_size_bytes,
-    },
-    'release-certification-generated-output-untrusted',
-  );
-  const manifest = object(
-    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes)),
-  );
-  if (
-    manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_ID &&
-    manifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_DIGEST
-  ) {
-    // Exact historical read branch: optional metadata continuity is not mutation verification.
-    if (requirements.some((unit) => unit.binding !== null)) fail();
-    return;
-  }
-  if (!(
-    (manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V3_ID &&
-      manifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V3_DIGEST) ||
-    (manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V4_ID &&
-      manifest['export_spec_digest_sha256'] === RELEASE_EXPORT_SPEC_V4_DIGEST)
-  ))
-    fail();
-  if (requirements.every((unit) => unit.binding === null)) {
-    await verifyCertificationMutationEvidence(request, material, {}, plan);
-    return;
-  }
-  if (reader === undefined || exportLimits === undefined) return fail();
-  const limits = captureReleaseExportTranscriptLimits(exportLimits);
-  const packages = state.release_units.flatMap((unit) => unit.packages);
-  if (packages.length === 0 || packages.length > limits.maximum_packages) return fail();
-  const raw: Buffer[] = [];
-  for (const pkg of packages) {
-    const identity = opaqueIdentity(pkg.provider_result);
-    if (identity.size_bytes > limits.maximum_provider_result_bytes) fail();
-    raw.push(
-      await verifyReceiptBytes(
-        reader,
-        identity,
-        'release-certification-generated-output-untrusted',
-      ),
-    );
-  }
-  const first = object(
-    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(raw[0] ?? fail())),
-  );
-  if (typeof first['transcript'] !== 'string' || typeof first['signature'] !== 'string')
-    return fail();
-  const results = (
-    manifest['export_spec_id'] === RELEASE_EXPORT_SPEC_V4_ID
-      ? verifyReleaseExportProviderResultSetV3
-      : verifyReleaseExportProviderResultSetV2
-  )(raw, { transcript: Buffer.from(first['transcript']), signature: first['signature'] }, limits);
-  const units = new Map<string, NonNullable<ReleaseExportProviderResultV2['mutation_evidence']>>();
-  for (const [index, result] of results.entries()) {
-    if (result.package_id !== packages[index]?.package_id) fail();
-    if (result.mutation_evidence === null) continue;
-    if (units.has(result.release_unit)) fail();
-    units.set(result.release_unit, result.mutation_evidence);
-  }
-  // Decoding follows strict codec validation of the complete set and its protected byte budgets.
-  // Paths/handles below are only map keys; no original mutation source is available here.
-  const decoded = new Map(
-    [...units].map(([unit, portable]) => [
-      unit,
-      {
-        closure: JSON.parse(
-          Buffer.from(portable.closure.bytes_base64, 'base64').toString('utf8'),
-        ) as import('./release-unit-mutation-evidence.js').ReleaseUnitMutationEvidenceClosure,
-        receipt: JSON.parse(
-          Buffer.from(portable.receipt.bytes_base64, 'base64').toString('utf8'),
-        ) as import('./release-unit-mutation-evidence.js').UnitMutationEvidenceReceipt,
-        documents: new Map(
-          [portable.output_contract, ...portable.members].map((doc) => [
-            doc.path,
-            Buffer.from(doc.bytes_base64, 'base64'),
-          ]),
-        ),
-      },
-    ]),
-  );
-  await verifyCertificationMutationEvidence(
-    request,
-    material,
-    {
-      unit_mutation_maximum_bytes: limits.maximum_provider_result_bytes,
-      readUnitMutationEvidenceClosure(binding) {
-        return decoded.get(binding.release_unit)?.closure ?? fail();
-      },
-      readUnitMutationEvidenceReceipt(identity) {
-        const matches = [...decoded.values()].filter(
-          (unit) =>
-            unit.closure.output_contract.evidence_sink_id === identity.evidence_sink_id &&
-            unit.receipt.receipt_digest_sha256 === identity.receipt_digest_sha256,
-        );
-        if (matches.length !== 1) return fail();
-        return matches[0]?.receipt ?? fail();
-      },
-      readUnitMutationEvidenceBlob(input) {
-        return Buffer.from(
-          decoded.get(input.binding.release_unit)?.documents.get(input.identity.path) ?? fail(),
-        );
-      },
-    },
-    plan,
-  );
+  void state;
+  void reader;
+  void exportLimits;
+  resolveReleaseMutationRequirements(request, plan);
 }

@@ -253,8 +253,8 @@ describe('render matrix public command boundaries', () => {
     ]);
 
     expect(exact.exit).toBe(2);
-    expect(exact.stderr).toContain('strict mode — 3 violation(s)');
-    expect(exact.stderr).toContain('[alpha/mutation] missing: no test-result record found');
+    expect(exact.stderr).toContain('strict mode — 2 violation(s)');
+    expect(exact.stderr).not.toContain('[alpha/mutation] missing: no test-result record found');
     expect(exact.stderr).not.toContain('[alpha/coverage]');
     expect(exact.stderr).toContain('[decoy/unit] missing: no test-result record found');
     expect(exact.stderr).toContain('[decoy/coverage] missing: no test-result record found');
@@ -312,7 +312,7 @@ describe('render matrix public command boundaries', () => {
     expect(result.stderr).toContain('[errored-scope/unit] status: error');
   });
 
-  it('enforces mutation thresholds below but not at or above the exact minimum', async () => {
+  it('keeps mutation thresholds informational at every score', async () => {
     const root = repository();
     for (const [name, score] of [
       ['below', 79.9],
@@ -340,11 +340,8 @@ describe('render matrix public command boundaries', () => {
       '--strict',
     ]);
 
-    expect(result.exit).toBe(2);
-    expect(result.stderr).toContain('strict mode — 1 violation(s)');
-    expect(result.stderr).toContain(
-      '[below-scope/mutation] below threshold: mutation score 79.9% < required 80.0%',
-    );
+    expect(result.exit).toBe(0);
+    expect(result.stderr).toBe('');
     expect(result.stderr).not.toContain('[equal-scope/mutation]');
     expect(result.stderr).not.toContain('[above-scope/mutation]');
   });

@@ -259,9 +259,64 @@ function validateDescriptor(value: unknown): TaskDescriptor {
   return descriptor;
 }
 
+/** Recognize execution tokens, never infer execution from an arbitrary task name. */
+function invokesMutationTesting(argv: readonly string[]): boolean {
+  return argv.some((arg, index) => {
+    const executable = arg.replaceAll('\\', '/').split('/').at(-1) ?? arg;
+    const command = argv[index + 1];
+    const stryker =
+      /^(?:stryker(?:\.cmd|\.js)?|stryker-cli(?:@[^/]+)?)$/u.test(executable) ||
+      /^@stryker-mutator\/core(?:@[^/]+)?$/u.test(arg);
+    const bedel = /^bedel(?:\.cmd|\.js)?$/u.test(executable);
+    return (
+      arg === 'test:mutation' ||
+      (stryker && (command === 'run' || command === undefined)) ||
+      (bedel && (command === 'run' || command === 'resume'))
+    );
+  });
+}
+
+/** Strip only identified mutation-testing tasks; source-write authority is unrelated. */
+export function withoutMutationTestTasks(descriptor: TaskDescriptor): TaskDescriptor {
+  const retired = new Set(
+    descriptor.tasks
+      .filter(
+        (task) =>
+          ['mutation-report-set-discovery-v1', 'mutation-report-set-v1'].includes(
+            String(task.outputContract['kind']),
+          ) ||
+          task.runner === 'stryker' ||
+          task.toolchainKeys.some(
+            (key) => key === 'stryker' || key.startsWith('@stryker-mutator/'),
+          ) ||
+          invokesMutationTesting(task.argv),
+      )
+      .map((task) => task.nodeId),
+  );
+  if (retired.size === 0) return descriptor;
+  const keep = (node: string) => !retired.has(node);
+  return {
+    ...descriptor,
+    fallbackNodeId:
+      descriptor.fallbackNodeId !== null && retired.has(descriptor.fallbackNodeId)
+        ? null
+        : descriptor.fallbackNodeId,
+    tasks: descriptor.tasks
+      .filter((task) => keep(task.nodeId))
+      .map((task) => ({ ...task, dependencies: task.dependencies.filter(keep) })),
+    profiles: descriptor.profiles.map((profile) => ({
+      ...profile,
+      requiredNodes: profile.requiredNodes.filter(keep),
+      ...(profile.eligibleNodes === undefined
+        ? {}
+        : { eligibleNodes: profile.eligibleNodes.filter(keep) }),
+    })),
+  };
+}
+
 export function parseTaskDescriptor(value: unknown): TaskDescriptor {
   try {
-    return validateDescriptor(value);
+    return withoutMutationTestTasks(validateDescriptor(value));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('CHECK_RUNNER_DESCRIPTOR:')) throw error;
     throw new Error(
@@ -573,7 +628,8 @@ function selectedNodeIds(
 }
 
 export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
-  const { repoRoot, descriptor, target, toolchain, environment } = options;
+  const { repoRoot, target, toolchain, environment } = options;
+  const descriptor = withoutMutationTestTasks(options.descriptor);
   const repositoryState =
     options.releaseCandidate === undefined
       ? currentRepositoryState(repoRoot)
@@ -606,7 +662,11 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     descriptor,
     target,
     changes,
-    options.releaseRequiredNodes,
+    options.releaseRequiredNodes?.filter(
+      (node) =>
+        !options.descriptor.tasks.some((task) => task.nodeId === node) ||
+        descriptor.tasks.some((task) => task.nodeId === node),
+    ),
     options.releaseAffectedSelection,
   );
   const descriptorDigest = sha256Hex(descriptor);

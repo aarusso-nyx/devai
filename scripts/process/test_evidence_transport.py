@@ -222,5 +222,45 @@ class MutationTransportTests(unittest.TestCase):
             self.assertFalse(target.exists())
 
 
+class ReleaseTransportTests(unittest.TestCase):
+    def release_bundle(self, change=None):
+        files = e.read_archive(bundle())
+        del files['manifest.json']
+        files['release-export.tgz'] = mutation_export()
+        if change:
+            change(files)
+        files['manifest.json'] = e.canonical({'schemaVersion': '3.0.0', 'members': {
+            name: {'sha256': e.digest(data), 'size': len(data)} for name, data in files.items()}})
+        return e.archive(files)
+
+    def test_current_release_requires_no_mutation_plan_or_parser(self):
+        data = self.release_bundle()
+        with patch.object(e, 'verify_mutation_export') as mutation_parser:
+            files = e.verify_bundle(data, e.digest(data), '3.0.0')
+            mutation_parser.assert_not_called()
+        self.assertEqual(set(files), set(e.MEMBERS + e.RELEASE_MEMBERS))
+
+    def test_release_integrity_still_required(self):
+        for change in [lambda f: f.pop('release-export.tgz'),
+                       lambda f: f.update({'release-export.tgz': malicious('../outside')}),
+                       lambda f: f.update({'mutation-input-plan.json': b'{}'})]:
+            data = self.release_bundle(change)
+            with self.assertRaises(ValueError):
+                e.verify_bundle(data, e.digest(data), '3.0.0')
+
+    def test_materialize_current_release_without_mutation_files(self):
+        import base64
+        data = self.release_bundle()
+        env = {'LEDGER_TRANSPORT': 'bundle', 'BUNDLE_SCHEMA_VERSION': '3.0.0',
+               'BUNDLE_SHA256': e.digest(data), 'TRUST_STORE_B64': base64.b64encode(b'{}').decode(),
+               'EVIDENCE_READ_TOKEN': 'fixture'}
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, env, clear=True), patch.object(e, 'gh', return_value=data):
+            target = Path(root) / 'verified'
+            e.materialize(target)
+            self.assertEqual((target / 'release-export/task-policies.json').read_bytes(), b'[]')
+            self.assertFalse((target / 'mutation-input-plan.json').exists())
+            self.assertFalse((target / 'mutation-export').exists())
+
+
 if __name__ == '__main__':
     unittest.main()

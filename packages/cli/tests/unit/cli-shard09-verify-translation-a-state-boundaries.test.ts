@@ -161,7 +161,7 @@ vi.mock('#runtime-core', async (importOriginal) => {
       return { ok: true };
     },
     evaluateTranslationFrames(input: Parameters<typeof actual.evaluateTranslationFrames>[0]) {
-      controls.frameInputs.push(structuredClone(input));
+      controls.frameInputs.push({ ...structuredClone(input) });
       return actual.evaluateTranslationFrames(input);
     },
   };

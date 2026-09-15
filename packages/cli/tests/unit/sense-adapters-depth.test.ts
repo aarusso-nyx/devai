@@ -93,7 +93,7 @@ vi.mock('@devai-nyx/sensors', async (importOriginal) => ({
 }));
 
 vi.mock('#runtime-core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#runtime-core')>()),
+  ...(await importOriginal<typeof import('../../src/runtime-core.js')>()),
   ...runtime,
 }));
 
@@ -140,7 +140,9 @@ beforeEach(async () => {
   // a mutation runner activates its candidate so every static adapter remains
   // observable through the public dispatch boundary.
   vi.resetModules();
-  freshAdapters = await import('../../src/commands/sense/adapters.js?fresh-adapters');
+  freshAdapters = await (import(
+    '../../src/commands/sense/adapters.js' + '?fresh-adapters'
+  ) as Promise<typeof import('../../src/commands/sense/adapters.js')>);
 });
 
 afterEach(() => {
@@ -296,7 +298,7 @@ describe('sense adapter deterministic boundaries', () => {
 
     put(root, '.devai/state/inventory/inventory.json', { modules: [] });
     const missingTrace = await sensorAdapter('inventory_adherence')({ repoRoot: root });
-    expect(missingTrace.findings[0]?.message).toContain(join(root, 'law/trace.json'));
+    expect(missingTrace.findings?.[0]?.message).toContain(join(root, 'law/trace.json'));
 
     put(root, 'law/trace.json', { links: [] });
     const report = { ok: true, matches: [] };
@@ -360,7 +362,7 @@ describe('sense adapter deterministic boundaries', () => {
         { code: 'DOMAINS_FILE_NOT_FOUND', message: expect.stringContaining('domains.json') },
       ],
     });
-    expect(absent.findings[0]?.message).toContain(
+    expect(absent.findings?.[0]?.message).toContain(
       `${join(root, 'law/glossary/domains.json')}, ${join(root, '.devai/config/domains.json')}`,
     );
 
@@ -444,7 +446,7 @@ describe('sense adapter deterministic boundaries', () => {
         { severity: 'error', code: 'DECISION_MISSING' },
       ],
     });
-    expect(failed.findings[1]).toStrictEqual({
+    expect(failed.findings?.[1]).toStrictEqual({
       severity: 'error',
       code: 'DECISION_MISSING',
       message: 'missing decision',
