@@ -12,12 +12,6 @@ const required = (name) => {
   return value;
 };
 
-const requiredDigest = (name) => {
-  const value = required(name);
-  if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error(`RELEASE_MANIFEST_DIGEST_INVALID:${name}`);
-  return value;
-};
-
 const digest = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 const artifact = (path) => ({ file: basename(path), sha256: digest(path) });
 
@@ -68,8 +62,6 @@ const manifest = {
     verifier_provenance_sha256: verifierProvenanceSha256,
     verifier_source_commit: verifierProvenance.sourceCommit,
     policy_digest: required('LEDGER_POLICY_DIGEST'),
-    installed_control_sha256: requiredDigest('LEDGER_INSTALLED_CONTROL_SHA256'),
-    installed_offline_receipt_sha256: requiredDigest('LEDGER_INSTALLED_OFFLINE_RECEIPT_SHA256'),
     envelope_sha256: required('LEDGER_ENVELOPE_SHA256'),
     results_archive_sha256: required('LEDGER_RESULTS_SHA256'),
     artifacts_archive_sha256: required('LEDGER_ARTIFACTS_SHA256'),

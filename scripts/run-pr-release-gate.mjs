@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { projectChangedPaths } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
 
 const root = resolve(import.meta.dirname, '..');
 const base = process.argv.slice(2).find((argument) => argument !== '--');
@@ -38,7 +39,7 @@ function changedPathsBetween(baseCommit, candidateCommit) {
       paths.add(after);
     }
   }
-  return [...paths].sort();
+  return projectChangedPaths([...paths]);
 }
 
 const candidateCommit = git(['rev-parse', 'HEAD^{commit}']);

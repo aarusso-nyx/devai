@@ -57,8 +57,6 @@ jobs:
       verifier_package_version: ${{ steps.verifier-package.outputs.version }}
       verifier_provenance_sha256: ${{ steps.verifier-package.outputs.provenance_sha256 }}
       ledger_json: ${{ steps.bindings.outputs.ledger_json }}
-      installed_control_sha256: ${{ steps.installed-offline.outputs.control_sha256 }}
-      installed_offline_receipt_sha256: ${{ steps.installed-offline.outputs.receipt_sha256 }}
     steps:
       - name: Check out exact release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -163,50 +161,18 @@ jobs:
           TOOLCHAIN_B64: ${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
           ENVIRONMENT_B64: ${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 }}
           RELEASE_SIGNERS_B64: ${{ secrets.DEVAI_RELEASE_SIGNERS_B64 }}
-          BUNDLE_SCHEMA_VERSION: '3.0.0'
-          LEDGER_TRANSPORT: ${{ vars.DEVAI_LEDGER_TRANSPORT }}
+          BUNDLE_SCHEMA_VERSION: '1.0.0'
+          LEDGER_TRANSPORT: ${{ vars.DEVAI_LEDGER_TRANSPORT || 'legacy' }}
           BUNDLE_SHA256: ${{ vars.DEVAI_LEDGER_BUNDLE_SHA256 }}
           EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN }}
         run: |-
           set -euo pipefail
           umask 077
           python3 release-control/scripts/process/evidence_transport.py materialize --output "$RUNNER_TEMP/devai-ledger-control"
-      - name: Materialize approved installed controls
-        shell: bash
-        env:
-          INSTALLED_CONTROL_SHA256: ${{ vars.DEVAI_INSTALLED_CONTROL_SHA256 }}
-          INSTALLED_OFFLINE_CONFIG_B64: ${{ secrets.DEVAI_INSTALLED_OFFLINE_CONFIG_B64 }}
-          EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN }}
-        run: |-
-          set -euo pipefail
-          umask 077
-          python3 release-control/scripts/process/installed_control_transport.py \
-            --output "$RUNNER_TEMP/devai-installed-control" \
-            --evidence "$RUNNER_TEMP/devai-ledger-control" \
-            --candidate "$GITHUB_WORKSPACE/candidate" \
-            --commit "$(git -C candidate rev-parse HEAD)" \
-            --tree "$(git -C candidate rev-parse HEAD^{tree})"
-      - name: Verify installed release export
-        id: installed-offline
-        shell: bash
-        env:
-          INSTALLED_CONTROL_SHA256: ${{ vars.DEVAI_INSTALLED_CONTROL_SHA256 }}
-        run: |-
-          set -euo pipefail
-          umask 077
-          node release-control/scripts/process/installed-export-command.mjs \
-            "$RUNNER_TEMP/devai-installed-control/config.json" \
-            > "$RUNNER_TEMP/devai-installed-control/receipt-summary.json"
-          digest="$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).receipt_digest_sha256" "$RUNNER_TEMP/devai-installed-control/receipt-summary.json")"
-          [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
-          echo "receipt_sha256=$digest" >> "$GITHUB_OUTPUT"
-          echo "control_sha256=$INSTALLED_CONTROL_SHA256" >> "$GITHUB_OUTPUT"
       - name: Bind and verify exact release evidence
         id: bindings
         shell: bash
         env:
-          INSTALLED_CONTROL_SHA256: ${{ steps.installed-offline.outputs.control_sha256 }}
-          INSTALLED_OFFLINE_RECEIPT_SHA256: ${{ steps.installed-offline.outputs.receipt_sha256 }}
           POLICY_DIGEST: ${{ vars.DEVAI_LEDGER_POLICY_DIGEST }}
           REQUIRE_TAG: ${{ github.event_name == 'push' || inputs.publish }}
           CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
@@ -275,8 +241,6 @@ jobs:
           ledger.verifier_package_version=process.env.VERIFIER_PACKAGE_VERSION;
           ledger.verifier_source_commit='9f849f117fe1e460b5e3c647515f5ccbe783cbfb';
           ledger.policy_digest=process.env.POLICY_DIGEST;
-          ledger.installed_control_sha256=process.env.INSTALLED_CONTROL_SHA256;
-          ledger.installed_offline_receipt_sha256=process.env.INSTALLED_OFFLINE_RECEIPT_SHA256;
           ledger.verifier_provenance_sha256=process.env.VERIFIER_PROVENANCE;
           console.log('ledger_json='+JSON.stringify(ledger));
           NODE
@@ -349,8 +313,6 @@ jobs:
           LEDGER_TOOLCHAIN_SHA256: ${{ needs.verify-ledger.outputs.toolchain_sha256 }}
           LEDGER_ENVIRONMENT_SHA256: ${{ needs.verify-ledger.outputs.environment_sha256 }}
           LEDGER_RELEASE_SIGNERS_SHA256: ${{ needs.verify-ledger.outputs.release_signers_sha256 }}
-          LEDGER_INSTALLED_CONTROL_SHA256: ${{ needs.verify-ledger.outputs.installed_control_sha256 }}
-          LEDGER_INSTALLED_OFFLINE_RECEIPT_SHA256: ${{ needs.verify-ledger.outputs.installed_offline_receipt_sha256 }}
           LEDGER_POLICY_DIGEST: ${{ needs.verify-ledger.outputs.policy_digest }}
           LEDGER_VERIFIER_PACKAGE_VERSION: ${{ needs.verify-ledger.outputs.verifier_package_version }}
           LEDGER_VERIFIER_PROVENANCE_SHA256: ${{ needs.verify-ledger.outputs.verifier_provenance_sha256 }}

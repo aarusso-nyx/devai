@@ -26,35 +26,30 @@ metadata into Bedel's provenance archive; their executable successors belong to
 Bedel's ordinary orchestration tests or explicitly invoked engine qualification.
 An archived test is not claimed as passing executable coverage.
 
-## Current CI and export transport
+## Current CI and ordinary ledger transport
 
-The workflows continue to verify the ordinary ledger and the installed release
-export. They use transport schema `3.0.0`: the existing envelope, result, artifact,
-toolchain and environment population, plus `release-export.tgz`. The release
-export still contains signed exported state, policy closure, task policies and
-content-addressed objects. Its ordinary integrity and trust validation is retained.
+CI verifies the ordinary signed ledger using transport schema `1.0.0`, which
+contains the existing envelope, results, artifacts, task policy and execution
+identity maps. Existing protected base64 secrets remain the default transport.
+An explicitly configured ordinary bundle remains supported. A private evidence
+repository, installed-control carrier and installed release export are not
+prerequisites for delivery.
 
-Current transports contain neither `mutation-input-plan.json` nor
-`mutation-export.tgz`. Historical transport versions 1 and 2 remain readable only
-when explicitly selected for historical operations; current workflows select 3.
-The control verifier checks ordinary DAG, canonicalization, path safety and trust
-modules without requiring mutation kernels.
+The workflows no longer materialize or verify the installed export ceremony
+introduced for mutation testing. Release manifests no longer require its control
+or offline-receipt digests. Ordinary ledger signatures, candidate identity,
+artifact hashes, exact rehearsal and publication controls remain mandatory.
 
-Pack the current release transport using the existing private operator tool:
+The standalone export readers and transport versions 2 and 3 remain available
+for explicit historical or optional operations. They are isolated from the
+current CI and release readiness paths; absent or invalid optional exports
+cannot block publication.
 
-```sh
-python3 scripts/process/evidence_transport.py pack \
-  --schema-version 3.0.0 --export <ordinary-ledger-export> \
-  --release-export <installed-release-export> \
-  --toolchain <toolchain.json> --environment <environment.json> \
-  --output <evidence.tgz>
-```
-
-Retain separately approved control identities and protected signing/trust inputs.
-Before dispatching the new workflow, update its approved process-control commit
-and protected transport/configuration references to the exact reviewed current
-controls and evidence. Old mutation-required controls cannot certify this release.
-No private signing material or protected configuration belongs in public logs.
+Retain separately approved process-control identities and protected signing/trust
+inputs. Before dispatching the new release workflow, pin the reviewed ordinary
+process-control commit and update ordinary ledger evidence for the exact
+candidate. No private signing material or protected configuration belongs in
+public logs.
 
 ## Adopter migration
 

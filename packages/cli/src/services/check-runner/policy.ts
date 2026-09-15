@@ -504,6 +504,11 @@ function isHarnessMutatedPath(path: string): boolean {
   return HARNESS_MUTATED_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
+/** Canonical changed-path population shared by intent producers and task planning. */
+export function projectChangedPaths(paths: readonly string[]): readonly string[] {
+  return [...new Set(paths)].filter((path) => !isHarnessMutatedPath(path)).sort();
+}
+
 function selectedNodeIds(
   descriptor: TaskDescriptor,
   target: TaskTarget,
@@ -654,7 +659,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   } else if (!clean) {
     changes = changedPaths(repoRoot, commit, commit, false);
   }
-  changes = changes.filter((path) => !isHarnessMutatedPath(path));
+  changes = projectChangedPaths(changes);
   const entries = (clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot)).filter(
     (entry) => !isHarnessMutatedPath(entry.path),
   );

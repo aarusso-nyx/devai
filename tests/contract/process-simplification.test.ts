@@ -98,8 +98,10 @@ function assets() {
 }
 
 describe('rehearsal promotion', () => {
-  it('promotes unchanged bytes without any build or packaging dependency', () => {
+  it('promotes unchanged ordinary evidence without installed mutation control bindings', () => {
     const fixture = assets();
+    expect(fixture.record.ledger).not.toHaveProperty('installed_control_sha256');
+    expect(fixture.record.ledger).not.toHaveProperty('installed_offline_receipt_sha256');
     expect(
       rehearsal.validatePromotion(
         fixture.record,

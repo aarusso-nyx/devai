@@ -119,43 +119,28 @@ export function checkWorkflowTree(root = process.cwd()) {
   return { ok: findings.length === 0, files, findings };
 }
 
-function checkInstalledExportWorkflow(file, workflow, findings) {
+function checkOrdinaryLedgerWorkflow(file, workflow, findings) {
   const job = object(object(workflow.jobs)['verify-ledger']);
   const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
-  const materialize = steps.filter((step) =>
-    String(step.run ?? '').includes('scripts/process/installed_control_transport.py'),
-  );
-  const verify = steps.filter((step) => step.id === 'installed-offline');
   const transport = steps.find((step) =>
     String(step.run ?? '').includes('scripts/process/evidence_transport.py materialize'),
   );
-  const invalid =
-    materialize.length !== 1 ||
-    verify.length !== 1 ||
-    object(transport?.env).BUNDLE_SCHEMA_VERSION !== '3.0.0' ||
-    job['continue-on-error'] !== undefined ||
-    [...materialize, ...verify].some(
-      (step) =>
-        step.if !== undefined ||
-        step['continue-on-error'] !== undefined ||
-        !String(step.run ?? '').includes('set -euo pipefail'),
-    ) ||
-    !String(verify[0]?.run ?? '').includes(
-      'node release-control/scripts/process/installed-export-command.mjs',
-    ) ||
-    object(materialize[0]?.env).INSTALLED_CONTROL_SHA256 !==
-      '${{ vars.DEVAI_INSTALLED_CONTROL_SHA256 }}' ||
-    object(materialize[0]?.env).INSTALLED_OFFLINE_CONFIG_B64 !==
-      '${{ secrets.DEVAI_INSTALLED_OFFLINE_CONFIG_B64 }}' ||
-    steps.indexOf(materialize[0]) >= steps.indexOf(verify[0]);
-  if (invalid)
+  const retiredCeremony = steps.some((step) =>
+    /installed_control_transport\.py|installed-export-command\.mjs/u.test(String(step.run ?? '')),
+  );
+  if (
+    retiredCeremony ||
+    object(transport?.env).BUNDLE_SCHEMA_VERSION !== '1.0.0' ||
+    object(transport?.env).LEDGER_TRANSPORT !== "${{ vars.DEVAI_LEDGER_TRANSPORT || 'legacy' }}"
+  ) {
     findings.push(
       finding(
-        'CI_INSTALLED_RELEASE_EXPORT_REQUIRED',
+        'CI_MUTATION_CEREMONY_FORBIDDEN',
         file,
-        'protected verification requires v3 mutation-free evidence, approved controls, and unconditional installed export verification',
+        'delivery uses ordinary ledger transport and must not require the retired installed mutation export ceremony',
       ),
     );
+  }
 }
 
 function checkWorkflow(file, source, findings) {
@@ -174,7 +159,7 @@ function checkWorkflow(file, source, findings) {
   }
   const workflow = object(document.toJS());
   if ([RELEASE_WORKFLOW_FILE, LEDGER_WORKFLOW_FILE].includes(file))
-    checkInstalledExportWorkflow(file, workflow, findings);
+    checkOrdinaryLedgerWorkflow(file, workflow, findings);
 
   if (file === RELEASE_WORKFLOW_FILE) {
     checkReleaseWorkflow(file, workflow, source, findings);

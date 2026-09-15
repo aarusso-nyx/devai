@@ -56,18 +56,16 @@ approvals continue to apply to integration and publication.
 
 ## CI transport migration
 
-Current DEVAI protected workflows select evidence transport **3.0.0**. It
-contains the ordinary ledger population plus `release-export.tgz`; it excludes
-`mutation-input-plan.json` and `mutation-export.tgz`. Ordinary installed export,
-trust, signature and artifact checks continue to run.
+Protected workflows use the ordinary signed ledger with transport schema
+**1.0.0** and the existing protected secrets by default. An explicitly configured
+ordinary evidence bundle is also supported. The installed-control carrier,
+mutation export, input plan and extra offline-receipt bindings are removed from
+the mandatory workflow and release manifest.
 
-Before dispatching an updated workflow, prepare and review the exact compatible
-process-control commit, installed host and v3 bundle. Update their protected
-references together: workflows execute the separately pinned process-control
-checkout, so changing candidate code alone does not update the active control.
-Historical transport versions 1 and 2 remain explicitly readable for historical
-operations and are not substitutes for a current v3 bundle.
+Pin the reviewed process-control commit and prepare ordinary ledger evidence for
+the exact candidate before dispatch. Signature, artifact, trust and exact-candidate
+rehearsal checks remain required. Standalone historical/export readers remain
+available without making their results delivery prerequisites.
 
 See [mutation-free delivery and transport operations](devai-1.5-mutation-free-delivery.md)
-for the packing command and operational boundaries, and
-[adopter release profiles](../../adopters/release-profiles.md) for profile migration.
+and [adopter release profiles](../../adopters/release-profiles.md).

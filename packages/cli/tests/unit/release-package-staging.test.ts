@@ -53,8 +53,6 @@ function manifestEnvironment(input: {
     LEDGER_TRUST_STORE_SHA256: digest,
     LEDGER_TOOLCHAIN_SHA256: digest,
     LEDGER_ENVIRONMENT_SHA256: digest,
-    LEDGER_INSTALLED_CONTROL_SHA256: digest,
-    LEDGER_INSTALLED_OFFLINE_RECEIPT_SHA256: digest,
     LEDGER_RELEASE_SIGNERS_SHA256: digest,
   };
 }
@@ -149,26 +147,25 @@ describe('normalized release package staging', () => {
       verifier_package_version: SELECTED_RELEASE_VERSION,
       verifier_provenance_sha256: VENDORED_VERIFIER_PROVENANCE_SHA256,
       verifier_source_commit: VENDORED_VERIFIER_SOURCE_COMMIT,
-      installed_control_sha256: 'a'.repeat(64),
-      installed_offline_receipt_sha256: 'a'.repeat(64),
     });
   });
 
   it.each(['LEDGER_INSTALLED_CONTROL_SHA256', 'LEDGER_INSTALLED_OFFLINE_RECEIPT_SHA256'])(
-    'requires an exact installed verification identity: %s',
+    'ignores retired installed verification input: %s',
     (name) => {
       for (const value of ['', 'not-a-digest']) {
         const manifest = join(output, `missing-${name}-${value}.json`);
-        expect(() =>
-          execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
-            cwd: root,
-            env: { ...manifestEnvironment({ workspace: output, output: manifest }), [name]: value },
-            stdio: 'pipe',
-          }),
-        ).toThrow(
-          value === '' ? 'RELEASE_MANIFEST_INPUT_MISSING' : 'RELEASE_MANIFEST_DIGEST_INVALID',
-        );
-        expect(existsSync(manifest)).toBe(false);
+        execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
+          cwd: root,
+          env: { ...manifestEnvironment({ workspace: output, output: manifest }), [name]: value },
+          stdio: 'pipe',
+        });
+        const result = JSON.parse(readFileSync(manifest, 'utf8')) as {
+          ledger: Record<string, unknown>;
+        };
+        expect(result.ledger).not.toHaveProperty('installed_control_sha256');
+        expect(result.ledger).not.toHaveProperty('installed_offline_receipt_sha256');
+        expect(result.ledger).toHaveProperty('release_signers_sha256', 'a'.repeat(64));
       }
     },
   );

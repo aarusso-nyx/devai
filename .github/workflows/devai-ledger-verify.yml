@@ -121,44 +121,14 @@ jobs:
           TRUST_STORE_B64: ${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 }}
           TOOLCHAIN_B64: ${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 }}
           ENVIRONMENT_B64: ${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 }}
-          BUNDLE_SCHEMA_VERSION: '3.0.0'
-          LEDGER_TRANSPORT: ${{ vars.DEVAI_LEDGER_TRANSPORT }}
+          BUNDLE_SCHEMA_VERSION: '1.0.0'
+          LEDGER_TRANSPORT: ${{ vars.DEVAI_LEDGER_TRANSPORT || 'legacy' }}
           BUNDLE_SHA256: ${{ vars.DEVAI_LEDGER_BUNDLE_SHA256 }}
           EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN }}
         run: |-
           set -euo pipefail
           umask 077
           python3 release-control/scripts/process/evidence_transport.py materialize --output "$RUNNER_TEMP/devai-ledger-control"
-      - name: Materialize approved installed controls
-        shell: bash
-        env:
-          INSTALLED_CONTROL_SHA256: ${{ vars.DEVAI_INSTALLED_CONTROL_SHA256 }}
-          INSTALLED_OFFLINE_CONFIG_B64: ${{ secrets.DEVAI_INSTALLED_OFFLINE_CONFIG_B64 }}
-          EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN }}
-        run: |-
-          set -euo pipefail
-          umask 077
-          python3 release-control/scripts/process/installed_control_transport.py \
-            --output "$RUNNER_TEMP/devai-installed-control" \
-            --evidence "$RUNNER_TEMP/devai-ledger-control" \
-            --candidate "$GITHUB_WORKSPACE/candidate" \
-            --commit "$(git -C candidate rev-parse HEAD)" \
-            --tree "$(git -C candidate rev-parse HEAD^{tree})"
-      - name: Verify installed release export
-        id: installed-offline
-        shell: bash
-        env:
-          INSTALLED_CONTROL_SHA256: ${{ vars.DEVAI_INSTALLED_CONTROL_SHA256 }}
-        run: |-
-          set -euo pipefail
-          umask 077
-          node release-control/scripts/process/installed-export-command.mjs \
-            "$RUNNER_TEMP/devai-installed-control/config.json" \
-            > "$RUNNER_TEMP/devai-installed-control/receipt-summary.json"
-          digest="$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).receipt_digest_sha256" "$RUNNER_TEMP/devai-installed-control/receipt-summary.json")"
-          [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
-          echo "receipt_sha256=$digest" >> "$GITHUB_OUTPUT"
-          echo "control_sha256=$INSTALLED_CONTROL_SHA256" >> "$GITHUB_OUTPUT"
       - name: Bind exact candidate identity
         id: candidate
         shell: bash

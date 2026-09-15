@@ -1095,25 +1095,26 @@ describe('ci-economy concurrency-cancel rule', () => {
   });
 });
 
-describe('mandatory installed mutation export workflow binding', () => {
+describe('ordinary ledger without mutation ceremony', () => {
   it.each(['devai-ledger-verify.yml', 'release.yml'])(
-    'refuses optional or missing installed verification in %s',
+    'rejects reintroduced mutation export prerequisites in %s',
     (file) => {
       const source = readFileSync(join(ROOT, '.github/workflows', file), 'utf8');
+      expect(source).not.toContain('installed-offline');
+      expect(source).not.toContain('DEVAI_INSTALLED_CONTROL_SHA256');
       for (const changed of [
-        source.replace('id: installed-offline', 'id: installed-offline\n        if: false'),
+        source.replace("BUNDLE_SCHEMA_VERSION: '1.0.0'", "BUNDLE_SCHEMA_VERSION: '2.0.0'"),
+        source.replace("BUNDLE_SCHEMA_VERSION: '1.0.0'", "BUNDLE_SCHEMA_VERSION: '3.0.0'"),
+        source.replace("vars.DEVAI_LEDGER_TRANSPORT || 'legacy'", 'vars.DEVAI_LEDGER_TRANSPORT'),
         source.replace(
-          'id: installed-offline',
-          'id: installed-offline\n        continue-on-error: true',
+          'python3 release-control/scripts/process/evidence_transport.py materialize',
+          'python3 release-control/scripts/process/installed_control_transport.py',
         ),
-        source.replace('id: installed-offline', 'id: missing-installed-offline'),
-        source.replace("BUNDLE_SCHEMA_VERSION: '3.0.0'", "BUNDLE_SCHEMA_VERSION: '1.0.0'"),
-        source.replace('vars.DEVAI_INSTALLED_CONTROL_SHA256', 'vars.UNAPPROVED_CONTROL'),
       ]) {
         const directory = fixture(changed, file);
         const result = spawnSync(process.execPath, [CHECKER], { cwd: directory, encoding: 'utf8' });
         expect(result.status).not.toBe(0);
-        expect(result.stdout + result.stderr).toContain('CI_INSTALLED_RELEASE_EXPORT_REQUIRED');
+        expect(result.stdout + result.stderr).toContain('CI_MUTATION_CEREMONY_FORBIDDEN');
       }
     },
   );
