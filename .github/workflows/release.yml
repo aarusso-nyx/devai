@@ -496,7 +496,7 @@ jobs:
       - name: Download exact release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: devai-release-assets-${{ github.run_attempt }}
+          artifact-ids: ${{ needs.promote-assets.outputs.release_asset_id }}
           path: release-assets
       - name: Verify canonical asset set
         shell: bash
@@ -578,7 +578,9 @@ jobs:
           test "$(npm view "$PACKAGE_NAME" "dist-tags.$PACKAGE_DIST_TAG" --registry https://npm.pkg.github.com)" = "$PACKAGE_VERSION"
   deploy-pages:
     name: Deploy and verify GitHub Pages
-    needs: finalize-release
+    needs:
+      - finalize-release
+      - promote-assets
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     environment:
@@ -615,7 +617,7 @@ jobs:
       - name: Download canonical release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: devai-release-assets-${{ github.run_attempt }}
+          artifact-ids: ${{ needs.promote-assets.outputs.release_asset_id }}
           path: release-assets
       - name: Materialize the manifest-bound site archive
         shell: bash
@@ -745,6 +747,8 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      release_asset_id: ${{ steps.retain.outputs.artifact-id }}
     steps:
       - name: Check out approved process controls
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -784,6 +788,7 @@ jobs:
           NODE
           node release-control/scripts/process/rehearsal.mjs promote release-assets "$RUNNER_TEMP/promotion.json"
       - name: Retain verified promotion assets
+        id: retain
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: devai-release-assets-${{ github.run_attempt }}
