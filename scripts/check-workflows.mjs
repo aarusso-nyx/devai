@@ -790,7 +790,8 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     promotion.needs !== 'verify-ledger' ||
     promotionOutputs.release_asset_id !== '${{ steps.retain.outputs.artifact-id }}' ||
     finalizeAssets?.with?.['artifact-ids'] !==
-      '${{ needs.promote-assets.outputs.release_asset_id }}'
+      '${{ needs.promote-assets.outputs.release_asset_id }}' ||
+    finalizeAssets?.with?.['merge-multiple'] !== true
   ) {
     findings.push(
       finding(
@@ -852,6 +853,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     pagesArtifact?.with?.name !== 'github-pages-${{ github.run_attempt }}' ||
     pagesAssets?.with?.['artifact-ids'] !==
       '${{ needs.promote-assets.outputs.release_asset_id }}' ||
+    pagesAssets?.with?.['merge-multiple'] !== true ||
     pagesRecord?.if !== '${{ always() }}' ||
     pagesRecord?.with?.['retention-days'] !== 30 ||
     pagesRecord?.with?.path !== 'pages-publication-record/*' ||
