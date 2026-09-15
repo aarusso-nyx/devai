@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/release-verification-profile.schema.json",
   "title": "Release verification profile",
-  "description": "Adopter-owned mapping from generic release risks and capabilities to repository task nodes and mutation evidence selectors.",
+  "description": "Release capability mapping. Version 1.4 removes mutation execution and requires an empty compatibility roster. Older branches are historical configuration readers.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,16 +17,30 @@
     "mutation_roster"
   ],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
-    "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
-    "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-    "release_unit": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "schemaVersion": {
+      "enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"]
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]+$"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "release_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
     "version_source": {
       "type": "string",
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$",
       "maxLength": 500
     },
-    "default_support": { "enum": ["preview", "current", "lts"] },
+    "default_support": {
+      "enum": ["preview", "current", "lts"]
+    },
     "required_check": {
       "type": "string",
       "minLength": 1,
@@ -40,7 +54,10 @@
         "type": "array",
         "minItems": 1,
         "uniqueItems": true,
-        "items": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" }
+        "items": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
+        }
       }
     },
     "risk_capabilities": {
@@ -49,7 +66,10 @@
         "type": "array",
         "minItems": 1,
         "uniqueItems": true,
-        "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
       }
     },
     "mutation_roster": {
@@ -73,8 +93,15 @@
           "thresholds"
         ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$" },
-          "package": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "task_node": {
             "type": "string",
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$"
@@ -82,17 +109,38 @@
           "risk_classes": {
             "type": "array",
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
           },
-          "source_selectors": { "$ref": "#/$defs/pathList" },
-          "test_selectors": { "$ref": "#/$defs/pathList" },
+          "source_selectors": {
+            "$ref": "#/$defs/pathList"
+          },
+          "test_selectors": {
+            "$ref": "#/$defs/pathList"
+          },
           "manifest_path": {
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
           },
-          "config_paths": { "$ref": "#/$defs/pathList" },
-          "sanitizer_paths": { "$ref": "#/$defs/pathList" },
-          "orchestration_paths": { "$ref": "#/$defs/pathList" },
+          "config_paths": {
+            "$ref": "#/$defs/pathList"
+          },
+          "vitest_config_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "typescript_config_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "sanitizer_paths": {
+            "$ref": "#/$defs/pathList"
+          },
+          "orchestration_paths": {
+            "$ref": "#/$defs/pathList"
+          },
           "lockfile_path": {
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
@@ -101,18 +149,532 @@
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
           },
           "thresholds": {
             "type": "object",
             "minProperties": 1,
-            "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 }
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
           }
         }
       }
+    },
+    "mutation_execution": {
+      "$ref": "#/$defs/devaiProtectedMutationExecution"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": ["1.1.0", "1.2.0", "1.3.0"]
+          }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "required": ["mutation_execution"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.2.0"
+          },
+          "mutation_execution": {
+            "properties": {
+              "template_id": {
+                "const": "devai.protected-mutation-stryker.v1"
+              },
+              "schemaVersion": {
+                "const": "1.2.0"
+              }
+            },
+            "required": ["template_id", "schemaVersion"]
+          }
+        },
+        "required": ["schemaVersion", "mutation_execution"]
+      },
+      "then": {
+        "properties": {
+          "mutation_roster": {
+            "items": {
+              "required": ["vitest_config_path", "typescript_config_path"],
+              "properties": {
+                "thresholds": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["score_min", "survived_max"],
+                  "properties": {
+                    "score_min": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "survived_max": {
+                      "const": 9007199254740991,
+                      "description": "Compatibility sentinel that disables survivor-count rejection; survivor counts remain reportable evidence."
+                    }
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "properties": {
+                    "config_paths": {
+                      "allOf": [
+                        {
+                          "contains": {
+                            "const": "tests/config/local.config.ts"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["config_paths"]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.3.0"
+          }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "mutation_execution": {
+            "properties": {
+              "schemaVersion": {
+                "const": "1.3.0"
+              }
+            },
+            "required": ["schemaVersion"]
+          },
+          "mutation_roster": {
+            "items": {
+              "required": ["vitest_config_path", "typescript_config_path"]
+            }
+          }
+        },
+        "required": ["mutation_execution"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": ["1.0.0", "1.1.0", "1.2.0"]
+          }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "mutation_execution": {
+            "not": {
+              "properties": {
+                "schemaVersion": {
+                  "const": "1.3.0"
+                }
+              },
+              "required": ["schemaVersion"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.4.0"
+          }
+        },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "mutation_roster": {
+            "maxItems": 0
+          }
+        },
+        "not": {
+          "required": ["mutation_execution"]
+        }
+      }
+    }
+  ],
   "$defs": {
+    "devaiProtectedMutationExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "template_id",
+        "runner",
+        "selection",
+        "mutation_targets",
+        "roster_order",
+        "output",
+        "threshold_projection",
+        "toolchain_fixture_validation"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "enum": ["1.1.0", "1.2.0", "1.3.0"]
+        },
+        "template_id": {
+          "const": "devai.protected-mutation-stryker.v1"
+        },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "package_manager", "packages", "vitest_peer_range"],
+          "properties": {
+            "kind": {
+              "const": "stryker-vitest-typescript"
+            },
+            "package_manager": {
+              "const": "pnpm"
+            },
+            "packages": {
+              "const": [
+                {
+                  "name": "@stryker-mutator/core",
+                  "version": "9.6.1"
+                },
+                {
+                  "name": "@stryker-mutator/typescript-checker",
+                  "version": "9.6.1"
+                },
+                {
+                  "name": "@stryker-mutator/vitest-runner",
+                  "version": "9.6.1"
+                }
+              ]
+            },
+            "vitest_peer_range": {
+              "const": ">=2"
+            }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "package_root",
+            "source",
+            "tests",
+            "lockfile",
+            "configuration",
+            "invocation"
+          ],
+          "properties": {
+            "package_root": {
+              "const": "parent-of-roster.manifest_path"
+            },
+            "source": {
+              "const": "roster.source_selectors"
+            },
+            "tests": {
+              "const": "roster.test_selectors"
+            },
+            "lockfile": {
+              "const": "roster.lockfile_path"
+            },
+            "configuration": {
+              "const": "host-derived-ephemeral-from-roster-only"
+            },
+            "invocation": {
+              "const": "fixed-host-template-not-profile-or-candidate-script"
+            }
+          }
+        },
+        "runner_mapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task_node",
+            "vitest_config",
+            "typescript_config",
+            "typescript_config_closure",
+            "test_population",
+            "security_population",
+            "effective_options"
+          ],
+          "properties": {
+            "task_node": {
+              "const": "roster.task_node"
+            },
+            "vitest_config": {
+              "const": "roster.vitest_config_path"
+            },
+            "typescript_config": {
+              "const": "roster.typescript_config_path"
+            },
+            "typescript_config_closure": {
+              "const": "protected-no-follow-extends-and-project-references-closure-from-roster.typescript_config_path;missing-or-out-of-bound-reference-refuses"
+            },
+            "test_population": {
+              "const": "complete-roster.test_selectors-without-runner-config-exclusions"
+            },
+            "security_population": {
+              "const": "complete-roster.source_selectors-and-test_selectors-without-runner-config-exclusions"
+            },
+            "effective_options": {
+              "const": "protected-resolved-effective-options-from-the-exact-vitest-and-typescript-config-bytes"
+            }
+          }
+        },
+        "mutation_targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "include_extensions",
+            "exclude_suffixes",
+            "exclude_path_segments",
+            "entry_type",
+            "order",
+            "empty",
+            "binding"
+          ],
+          "properties": {
+            "root": {
+              "const": "parent-of-roster.manifest_path/src"
+            },
+            "include_extensions": {
+              "const": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]
+            },
+            "exclude_suffixes": {
+              "const": [
+                ".d.ts",
+                ".d.tsx",
+                ".d.mts",
+                ".d.cts",
+                ".test.ts",
+                ".test.tsx",
+                ".test.mts",
+                ".test.cts",
+                ".test.js",
+                ".test.jsx",
+                ".test.mjs",
+                ".test.cjs",
+                ".spec.ts",
+                ".spec.tsx",
+                ".spec.mts",
+                ".spec.cts",
+                ".spec.js",
+                ".spec.jsx",
+                ".spec.mjs",
+                ".spec.cjs"
+              ]
+            },
+            "exclude_path_segments": {
+              "const": ["__tests__", "test", "tests"]
+            },
+            "entry_type": {
+              "const": "regular-file"
+            },
+            "order": {
+              "const": "utf8-lexicographic-relative-package-path"
+            },
+            "empty": {
+              "const": "refuse-production-mutation"
+            },
+            "binding": {
+              "const": "separate-actual-target-population-and-projection-rule-digest-in-mutationConfiguration;never-replace-full-roster-input-identity"
+            }
+          }
+        },
+        "roster_order": {
+          "const": "id-lexicographic"
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["raw", "normalized_report", "package_result", "finalization"],
+          "properties": {
+            "raw": {
+              "const": "protected-container-only"
+            },
+            "normalized_report": {
+              "const": "mutation-normalized-stryker-report-v2"
+            },
+            "package_result": {
+              "const": "mutation-package-result-v2"
+            },
+            "finalization": {
+              "const": "verify-mutation-evidence-v21-before-certification-evidence-retention"
+            }
+          }
+        },
+        "retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["carrier", "scope", "members", "binding", "continuity", "tarball"],
+          "properties": {
+            "carrier": {
+              "const": "certification-evidence-sink-v3-unit-mutation-closure-v1"
+            },
+            "scope": {
+              "const": "exactly-one-closure-per-release-unit-not-per-mutation-roster-package"
+            },
+            "members": {
+              "const": "two-canonical-members-per-required-mutation-package-plus-exactly-one-summary-and-one-semantic-receipt;not-required-packages-have-no-report-or-result-member"
+            },
+            "binding": {
+              "const": "externally-finalized-unit-receipt-binds-repository-candidate-release-unit-plan-profile-mutation-policy-task-policy-digests-the-exact-canonical-output-contract-and-the-complete-sorted-member-handle-digest-size-projection"
+            },
+            "continuity": {
+              "const": "certify-and-prepare-reread-rehash-and-semantic-verify-the-sink-closure;export-rehydrates-the-exact-closure-into-the-existing-provider-result-and-the-signed-export-transcript-binds-its-receipt-and-member-projection-digests;offline-rehashes-and-semantic-verifies-only-that-portable-provider-result-copy"
+            },
+            "tarball": {
+              "const": "never-a-certified-package-entry-and-never-included-in-a-package-tarball"
+            }
+          }
+        },
+        "resume": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["record", "origin", "reconciliation", "verification", "activation"],
+          "properties": {
+            "record": {
+              "const": "existing-certification-evidence-sink-v3-private-package-execution-record"
+            },
+            "origin": {
+              "const": "embedded-mutation-package-execution-origin-v1-with-complete-mpe1-receipt-only"
+            },
+            "reconciliation": {
+              "const": "exact-reader-once-committed-reuse-absent-execute-under-durable-attempt-ledger-ambiguous-refuse"
+            },
+            "verification": {
+              "const": "source-first-v22-package-pair-and-mpe1-verifier-with-portable-closure-only-offline-comparison"
+            },
+            "activation": {
+              "const": "forward-source-provenance-pin-required-before-emission-or-verification"
+            }
+          }
+        },
+        "threshold_projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "target"],
+          "properties": {
+            "source": {
+              "const": "roster.thresholds.score_min-with-disabled-survivor-compatibility-sentinel"
+            },
+            "target": {
+              "const": {
+                "break": "score_min",
+                "high": "score_min",
+                "low": "score_min",
+                "scoreMin": "score_min",
+                "survivedMax": "survived_max"
+              }
+            }
+          }
+        },
+        "toolchain_fixture_validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["production_gate", "diagnostic_fixture_exception"],
+          "properties": {
+            "production_gate": {
+              "const": "pending-engineer-pinned-toolchain-fixture-validation-before-production-certification-invocation"
+            },
+            "diagnostic_fixture_exception": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["execution", "scope", "result", "prohibitions"],
+              "properties": {
+                "execution": {
+                  "const": "existing-protected-preflight-provider-broker-on-the-fixed-host-template"
+                },
+                "scope": {
+                  "const": "fixed-host-owned-diagnostic-fixture-candidate-and-frozen-dependency-identities-only"
+                },
+                "result": {
+                  "const": "bounded-toolchain-compatibility-observation-only"
+                },
+                "prohibitions": {
+                  "const": [
+                    "production-candidate-or-production-certification",
+                    "pass-or-certification-projection",
+                    "certification-evidence-semantic-receipt-or-reusable-artifact",
+                    "production-lifecycle-state-or-artifact-sink",
+                    "signing-publication-or-production-credential"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "schemaVersion": {
+                "const": "1.2.0"
+              }
+            },
+            "required": ["schemaVersion"]
+          },
+          "then": {
+            "required": ["runner_mapping", "retention"],
+            "not": {
+              "required": ["resume"]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "schemaVersion": {
+                "const": "1.3.0"
+              }
+            },
+            "required": ["schemaVersion"]
+          },
+          "then": {
+            "required": ["runner_mapping", "retention", "resume"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "schemaVersion": {
+                "const": "1.1.0"
+              }
+            },
+            "required": ["schemaVersion"]
+          },
+          "then": {
+            "not": {
+              "required": ["resume"]
+            }
+          }
+        }
+      ]
+    },
     "pathList": {
       "type": "array",
       "minItems": 1,
@@ -122,5 +684,46 @@
         "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
       }
     }
-  }
+  },
+  "schema_version": "1.3.0",
+  "examples": [
+    {
+      "schemaVersion": "1.4.0",
+      "policy_id": "devai.release-verification",
+      "policy_version": "1.4.0",
+      "release_unit": "@aarusso-nyx/devai",
+      "version_source": "packages/cli/package.json",
+      "default_support": "current",
+      "required_check": "devai-release-gate",
+      "capability_tasks": {
+        "formatting-hygiene": ["format"],
+        "lint": ["lint"],
+        "type-integrity": ["typecheck"],
+        "schema-consistency": ["generate", "test:schemas"],
+        "secret-scan": ["release:static-integrity"],
+        "path-portability": ["release:static-integrity"],
+        "package-integrity": ["release:closure"],
+        "exact-candidate": ["release:static-integrity"],
+        "affected-checks": ["release:affected-anchor"],
+        "dependent-checks": ["release:affected-anchor"],
+        "build-integrity": ["build"],
+        "unit": ["test:local-full"],
+        "integration": ["test:root", "test:cli"],
+        "e2e": ["test:cli"],
+        "consumer": ["test:skills", "test:cli"],
+        "api-compatibility": ["test:cli"],
+        "migration": ["test:cli"],
+        "rollback": ["test:cli"],
+        "adopter-materialization": ["test:cli"],
+        "security": ["test:authority", "test:evidence"],
+        "database": ["test:root"],
+        "tenancy": ["test:authority"],
+        "provenance": ["test:evidence", "release:closure"],
+        "reproducibility": ["release:closure"],
+        "operational-matrix": ["test:local-full"]
+      },
+      "risk_capabilities": {},
+      "mutation_roster": []
+    }
+  ]
 }

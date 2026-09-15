@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
+import { canonicalSha256 } from '../../packages/utils/src/index.js';
 import * as translationValidation from '../../packages/spec/src/translation-validation/index.js';
 import { withAuthorityHostTestScope } from '../../packages/authority/tests/unit/authority-host-test-scope.js';
 
@@ -204,7 +205,7 @@ function writeAttributionState(
     });
     paths.push(duplicatePath);
   }
-  writeJson(join(repo, agentRunPath), {
+  const agentManifest = {
     schemaVersion: '1.0.0',
     run_id: 'AR-01234567-89ab-7cde-8fab-0123456789ab',
     started_at: '2026-07-21T12:01:00.000Z',
@@ -219,7 +220,10 @@ function writeAttributionState(
     compliance: { invariant_ids: ['INV-DEVAI-021'] },
     outcome: { status: 'pass' },
     prev_hash: 'GENESIS',
-    manifest_hash: 'a'.repeat(64),
+  };
+  writeJson(join(repo, agentRunPath), {
+    ...agentManifest,
+    manifest_hash: canonicalSha256(agentManifest),
   });
   return paths;
 }

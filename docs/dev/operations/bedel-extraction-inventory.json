@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "1.0.0",
+  "sourceCommit": "18fc6cf01645648dfe3b6d5c256a926c3c75ef47",
+  "sourceTree": "3f61e156fae024b8828e6c2cb151577485e935d0",
+  "scope": "Initial source classification; shared files require caller review before removal. Original tests are retained at source SHA and extraction custody is recorded in Bedel.",
+  "groups": {
+    "exclusive_execution": [
+      "packages/cli/src/services/release-mutation-artifacts.ts",
+      "packages/cli/src/services/release-mutation-driver.ts",
+      "packages/cli/src/services/release-mutation-inputs.ts",
+      "packages/cli/src/services/release-mutation-observation.ts",
+      "packages/cli/src/services/release-mutation-production.ts",
+      "packages/cli/src/services/release-mutation-program.ts",
+      "packages/cli/src/services/release-mutation-retention.ts",
+      "packages/cli/tests/fixtures/mutation-toolchain/diagnostic-adoption.json",
+      "packages/cli/tests/fixtures/mutation-toolchain/fixture-root-gitignore",
+      "packages/cli/tests/fixtures/mutation-toolchain/fixture-root-readme.md",
+      "packages/cli/tests/fixtures/mutation-toolchain/packages/fixture/package.json",
+      "packages/cli/tests/fixtures/mutation-toolchain/packages/fixture/src/zero.ts",
+      "packages/cli/tests/fixtures/mutation-toolchain/packages/fixture/stryker.config.json",
+      "packages/cli/tests/fixtures/mutation-toolchain/packages/fixture/tests/subject.test.ts.fixture",
+      "packages/cli/tests/fixtures/mutation-toolchain/packages/fixture/tsconfig.json",
+      "packages/cli/tests/fixtures/mutation-toolchain/packages/fixture/vitest.config.cjs",
+      "packages/cli/tests/fixtures/mutation-toolchain/root-package.json",
+      "packages/cli/tests/fixtures/mutation-toolchain/root-pnpm-workspace.yaml",
+      "packages/cli/tests/fixtures/mutation-toolchain/subject.ts",
+      "packages/cli/tests/fixtures/mutation-toolchain/test-tasks.json",
+      "packages/cli/tests/unit/mutation-toolchain-fixture.test.ts",
+      "packages/cli/tests/unit/release-mutation-artifacts.test.ts",
+      "packages/cli/tests/unit/release-mutation-container.test.ts",
+      "packages/cli/tests/unit/release-mutation-diagnostic.test.ts",
+      "packages/cli/tests/unit/release-mutation-driver.test.ts",
+      "packages/cli/tests/unit/release-mutation-inputs.test.ts",
+      "packages/cli/tests/unit/release-mutation-prerequisites.test.ts",
+      "packages/cli/tests/unit/release-mutation-production-driver.test.ts",
+      "packages/cli/tests/unit/release-mutation-production.test.ts",
+      "packages/cli/tests/unit/release-mutation-program.test.ts",
+      "packages/cli/tests/unit/release-mutation-requirements.test.ts",
+      "packages/cli/tests/unit/release-mutation-retention.test.ts",
+      "packages/cli/tests/unit/release-mutation-runner-phases.test.ts",
+      "packages/cli/tests/unit/release-mutation-typescript-plugin.test.ts",
+      "scripts/release-host/mutation-diagnostic.mjs",
+      "scripts/release-host/mutation-production.mjs",
+      "scripts/release-host/mutation-typescript-plugin.mjs",
+      "scripts/release-host/mutation-vitest-plugin.mjs",
+      "scripts/release-host/mutation-workspace-aliases.mjs"
+    ],
+    "historical_reports_and_contracts": [
+      "law/adr/ADR-GOV-0005-binary64-mutation-score-semantics.md",
+      "law/adr/ADR-MUT-0001-mutation-assurance-v2.md",
+      "law/adr/ADR-MUT-0003-complete-mutation-evidence-v2-contract.md",
+      "law/adr/ADR-MUT-0004-complete-verifiable-mutation-evidence-v2.md",
+      "law/adr/ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+      "law/adr/ADR-MUT-0007-activate-source-pinned-mutation-v21.md",
+      "law/adr/ADR-MUT-0008-unit-mutation-evidence-closure.md",
+      "law/adr/ADR-REL-0026-current-offline-mutation-check.md",
+      "law/policy/mutation-assurance-v2.json",
+      "law/policy/mutation-evidence-v2.json",
+      "law/policy/mutation-strength.json",
+      "law/schemas/mutation-assurance-policy-v2.schema.json",
+      "law/schemas/mutation-assurance-v2.schema.json",
+      "law/schemas/mutation-evidence-policy-v2.schema.json",
+      "law/schemas/mutation-intent.schema.json",
+      "law/schemas/mutation-report-set-v2.schema.json",
+      "law/schemas/mutation-scenario.schema.json",
+      "packages/cli/src/commands/mutation/report-check.ts",
+      "packages/cli/src/services/mutation-evidence-v21.ts",
+      "packages/cli/src/services/release-export-mutation-evidence.ts",
+      "packages/cli/src/services/release-unit-mutation-evidence.ts",
+      "packages/cli/tests/helpers/release-unit-mutation-evidence-fixture.ts",
+      "packages/cli/tests/unit/mutation-evidence-v21.test.ts",
+      "packages/cli/tests/unit/mutation-report-check.test.ts",
+      "packages/cli/tests/unit/release-export-mutation-evidence.test.ts",
+      "packages/cli/tests/unit/release-unit-mutation-evidence.test.ts",
+      "packages/cli/vendor/evidence-verification/src/mutation-v21.js",
+      "packages/cli/vendor/evidence-verification/src/mutation-v22.js",
+      "packages/cli/vendor/evidence-verification/src/mutation.js",
+      "packages/cli/vendor/evidence-verification/test/mutation-v21-contract.test.js",
+      "packages/cli/vendor/evidence-verification/test/mutation-v22-contract.test.js",
+      "packages/cli/vendor/evidence-verification/test/mutation.test.js",
+      "scripts/process/approved-mutation-verifier.mjs",
+      "scripts/process/devai-mutation-export-bindings.mjs",
+      "scripts/process/mutation-checkpoints.mjs",
+      "scripts/process/mutation-evidence-bindings.mjs",
+      "scripts/process/verify-mutation-semantics.mjs",
+      "tests/contract/mutation-evidence-bindings.test.ts"
+    ],
+    "shared_release_and_authority": [
+      "packages/authority/src/boundaries/release-export-binding.ts",
+      "packages/authority/src/boundaries/release-export-certification.ts",
+      "packages/authority/src/boundaries/release-export-mutation.ts",
+      "packages/authority/src/boundaries/release-repository-identity.ts",
+      "packages/authority/tests/unit/protected-release-adapter-routing.test.ts",
+      "packages/authority/tests/unit/release-capacity-validation.test.ts",
+      "packages/authority/tests/unit/release-export-boundary.test.ts",
+      "packages/authority/tests/unit/release-export-capacity.test.ts",
+      "packages/authority/tests/unit/release-export-certification.test.ts",
+      "packages/authority/tests/unit/release-export-mutation.test.ts",
+      "packages/authority/tests/unit/release-prepare-capacity.test.ts",
+      "packages/authority/tests/unit/release-repository-context.test.ts",
+      "packages/authority/tests/unit/release-repository-identity.test.ts",
+      "packages/authority/tests/unit/release-repository-probe-failures.test.ts",
+      "packages/authority/tests/unit/release-repository-test-fixture.ts",
+      "packages/cli/src/services/release-artifact-store.ts",
+      "packages/cli/src/services/release-candidate-snapshot.ts",
+      "packages/cli/src/services/release-certification-container.ts",
+      "packages/cli/src/services/release-certification-git.ts",
+      "packages/cli/src/services/release-certification-provider.ts",
+      "packages/cli/src/services/release-certified-evidence-carrier.ts",
+      "packages/cli/src/services/release-content-store.ts",
+      "packages/cli/src/services/release-dependency-transport.ts",
+      "packages/cli/src/services/release-evidence-store.ts",
+      "packages/cli/src/services/release-export-artifact-store.ts",
+      "packages/cli/src/services/release-export-certification-evidence.ts",
+      "packages/cli/src/services/release-export-mutation-contract.ts",
+      "packages/cli/src/services/release-export-provider.ts",
+      "packages/cli/src/services/release-export-transcript-v2.ts",
+      "packages/cli/src/services/release-export-transcript-v3.ts",
+      "packages/cli/src/services/release-export-transcript.ts",
+      "packages/cli/src/services/release-host-package-binding.ts",
+      "packages/cli/src/services/release-lifecycle-certification.ts",
+      "packages/cli/src/services/release-lifecycle-execution.ts",
+      "packages/cli/src/services/release-lifecycle-local-adapters.ts",
+      "packages/cli/src/services/release-lifecycle.ts",
+      "packages/cli/src/services/release-offline-provider.ts",
+      "packages/cli/src/services/release-package-snapshot.ts",
+      "packages/cli/src/services/release-policy-closure-transport.ts",
+      "packages/cli/src/services/release-policy-closure.ts",
+      "packages/cli/src/services/release-policy-host-snapshot.ts",
+      "packages/cli/src/services/release-policy-lockfiles.ts",
+      "packages/cli/src/services/release-policy-package.ts",
+      "packages/cli/src/services/release-policy-resolution.ts",
+      "packages/cli/src/services/release-preflight.ts",
+      "packages/cli/src/services/release-prepare-kernel.ts",
+      "packages/cli/src/services/release-production-outputs.ts",
+      "packages/cli/src/services/release-profile.ts",
+      "packages/cli/src/services/release-protected-host-runner.ts",
+      "packages/cli/src/services/release-toolchain-fixture-compatibility.ts",
+      "packages/cli/src/services/release-toolchain-fixture-definition.ts"
+    ],
+    "ordinary_regressions": [
+      "packages/loop/tests/unit/mutation-wave1-release-lifecycle.test.ts",
+      "packages/loop/tests/unit/mutation-wave1-round-runner.test.ts",
+      "packages/loop/tests/unit/mutation-wave1-task-services.test.ts",
+      "packages/loop/tests/unit/mutation-wave2-governance-ledger.test.ts",
+      "packages/sensors/tests/unit/mutation-wave2-alignment.test.ts",
+      "packages/sensors/tests/unit/mutation-wave2-data-model.test.ts",
+      "packages/sensors/tests/unit/mutation-wave3-data-model.test.ts",
+      "packages/sensors/tests/unit/mutation-wave3-workflow-parser.test.ts",
+      "packages/sensors/tests/unit/mutation-wave4-harness-coherence.test.ts",
+      "packages/sensors/tests/unit/mutation-wave4-plant-coherence.test.ts",
+      "packages/sensors/tests/unit/mutation-wave5-reading-walker.test.ts",
+      "packages/sensors/tests/unit/mutation-wave6-harness-semantics.test.ts",
+      "packages/sensors/tests/unit/mutation-wave7-spec-freshness.test.ts",
+      "packages/sensors/tests/unit/mutation-wave7-test-pattern-walker.test.ts",
+      "packages/sensors/tests/unit/mutation-wave8-perf-test.test.ts",
+      "packages/sensors/tests/unit/mutation-wave8-security-scan.test.ts"
+    ]
+  },
+  "verifiedRemovedFiles": [
+    {
+      "path": "packages/cli/tests/unit/mutation-run-depth.test.ts",
+      "sha256": "116ba14c0ee64e5d1594a67f310e55358863cef394f1f488b62e91e7c1904477",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/mutation-run-depth.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/mutation-toolchain-fixture.test.ts",
+      "sha256": "385e58b53d8dada21fdf34fd197f42d4c9d5b8e1e124b61cfecff6fb5120bd6a",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/mutation-toolchain-fixture.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-host-two-lane-bundled.test.ts",
+      "sha256": "1afeead1776214e04de9fa824a9bd482096bd95a9aca336647c44248fbf1592d",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-host-two-lane-bundled.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-artifacts.test.ts",
+      "sha256": "f7505b76dbe1abc20d2c59ea7131c08f84b2bc0ceefe3d6efd40b80c358cfa8a",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-artifacts.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-container.test.ts",
+      "sha256": "88a13f24dabe9b90442cf10a205abee462f43428a5b30f4005b906b15bfa3c6e",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-container.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-diagnostic.test.ts",
+      "sha256": "e4b7c0d7a4d5f6a932515b919b69be63a04c038c09ef1d27a66d43ffc1b42420",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-diagnostic.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-driver.test.ts",
+      "sha256": "5ee18654a796a5474ab4f79dde016b4d4a2fd87296e5fc7977d89f273fd8a7a4",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-driver.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-inputs.test.ts",
+      "sha256": "234005bcb36b1e24c64a56f49c97644825dcfeb204ae1f95bc51ab49ed29003a",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-inputs.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-prerequisites.test.ts",
+      "sha256": "929ce3e297bd57ee387364663fda4b885a7bf58e3b6728dc8197feb82b873a95",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-prerequisites.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-production-driver.test.ts",
+      "sha256": "65c0d2897026d14c77e77754e51bd40dc2d5c5f2f168d9f5f0158cc3dd006bc8",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-production-driver.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-production.test.ts",
+      "sha256": "cf19b05a6d23d0dd89a4aef83233bc3ab635d37927456d8b6164d94c72fa1d62",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-production.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-program.test.ts",
+      "sha256": "8de288fe60997c392ae18459eb69c6846769494d61327691e4d5db0efd44c4f7",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-program.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-retention.test.ts",
+      "sha256": "d9ffe7d133be6df11d9b0a6963376d9013bd2c751c55fdbef0f61417a08b40d5",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-retention.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-runner-phases.test.ts",
+      "sha256": "9d9a60376b6f2cdbf1d252b4d50ed53310089e60ddfe455c27fae910c0afaa2f",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-runner-phases.test.ts"
+    },
+    {
+      "path": "packages/cli/tests/unit/release-mutation-typescript-plugin.test.ts",
+      "sha256": "3fa4a3e668d68bebf7aa4c65dcdee3471625c547ebd77403ecb1fbc23a89ab03",
+      "bedelPath": "docs/provenance/devai/packages/cli/tests/unit/release-mutation-typescript-plugin.test.ts"
+    },
+    {
+      "path": "scripts/release-host/mutation-diagnostic.mjs",
+      "sha256": "b3f85f5390b59114af306827ea563080b631b60ab0aab65ae7d395eee22f6e96",
+      "bedelPath": "docs/provenance/devai/scripts/release-host/mutation-diagnostic.mjs"
+    },
+    {
+      "path": "scripts/release-host/mutation-production.mjs",
+      "sha256": "55685f689a3102f647397e15ab64a0678dd04f385ef11f395fdb250b63de5570",
+      "bedelPath": "docs/provenance/devai/scripts/release-host/mutation-production.mjs"
+    },
+    {
+      "path": "scripts/release-host/mutation-typescript-plugin.mjs",
+      "sha256": "ecae7baf28535d754761a54d9cf7ad0fe26f909d48b8d0021a605532c753a154",
+      "bedelPath": "docs/provenance/devai/scripts/release-host/mutation-typescript-plugin.mjs"
+    },
+    {
+      "path": "scripts/release-host/mutation-vitest-plugin.mjs",
+      "sha256": "42d6e66c8265ae976399e8dffc4fdb40867a97259e24987f6429b1ce14b767a7",
+      "bedelPath": "docs/provenance/devai/scripts/release-host/mutation-vitest-plugin.mjs"
+    },
+    {
+      "path": "scripts/release-host/mutation-workspace-aliases.mjs",
+      "sha256": "9786787d3b5d5b51e1fb0db72e06093ec6223e5d4692e1334038d69eeb52a023",
+      "bedelPath": "docs/provenance/devai/scripts/release-host/mutation-workspace-aliases.mjs"
+    },
+    {
+      "path": "tests/contract/mutation-verifier-byte-preservation.test.ts",
+      "sha256": "60c226d037a130df25f0658499f03d508a9413533789643892ecd5c92f4799a3",
+      "bedelPath": "docs/provenance/devai/tests/contract/mutation-verifier-byte-preservation.test.ts"
+    },
+    {
+      "path": "tests/contract/mutation-workspace-aliases.test.ts",
+      "sha256": "d18404a2348edcae0f48996eb0882d18a056e99da68bf12c93d7ce4554843ce4",
+      "bedelPath": "docs/provenance/devai/tests/contract/mutation-workspace-aliases.test.ts"
+    },
+    {
+      "path": "tests/integration/mutation-static-activation.integration.test.ts",
+      "sha256": "001ae8d2be8bddd3f5b853f015399462a43321680d811bb372d169a42fd23543",
+      "bedelPath": "docs/provenance/devai/tests/integration/mutation-static-activation.integration.test.ts"
+    }
+  ],
+  "mixedSuitesPreserved": [
+    "packages/cli/tests/unit/release-evidence-store.test.ts",
+    "packages/cli/tests/unit/release-lifecycle-execution.test.ts",
+    "packages/cli/tests/unit/release-prepare-kernel.test.ts"
+  ]
+}

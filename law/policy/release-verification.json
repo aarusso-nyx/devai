@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.4.0",
   "policy_id": "devai.release-verification",
-  "policy_version": "1.0.0",
+  "policy_version": "1.4.0",
   "release_unit": "@aarusso-nyx/devai",
   "version_source": "packages/cli/package.json",
   "default_support": "current",

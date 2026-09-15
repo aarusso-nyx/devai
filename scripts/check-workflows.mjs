@@ -7,12 +7,12 @@ import { parseDocument } from 'yaml';
 
 export const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
 export const RELEASE_WORKFLOW_FILE = 'release.yml';
-// Optional non-attesting preflight lane. Contract:
+// Required own-repository non-attesting preflight lane. Contract:
 // docs/dev/operations/remote-preflight-contract.md
 export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
 export const VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
-export const NEXT_VERIFIER_SOURCE_COMMIT = '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '9f849f117fe1e460b5e3c647515f5ccbe783cbfb';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -66,6 +66,7 @@ const PREFLIGHT_FORBIDDEN_SCRIPTS = [
 // The cheap local closure, plus the install and build it needs.
 const PREFLIGHT_ALLOWED_SCRIPTS = [
   'build',
+  'release:bootstrap',
   'format:check',
   'lint',
   'typecheck',
@@ -97,8 +98,8 @@ function finding(code, file, detail) {
 export function checkWorkflowTree(root = process.cwd()) {
   const findings = [];
   const files = workflowFiles(root);
-  const required = [LEDGER_WORKFLOW_FILE, RELEASE_WORKFLOW_FILE].sort();
-  const permitted = [...required, PREFLIGHT_WORKFLOW_FILE].sort();
+  const required = [LEDGER_WORKFLOW_FILE, RELEASE_WORKFLOW_FILE, PREFLIGHT_WORKFLOW_FILE].sort();
+  const permitted = required;
   const missing = required.filter((name) => !files.includes(name));
   const unexpected = files.filter((name) => !permitted.includes(name));
   if (missing.length > 0 || unexpected.length > 0) {
@@ -118,6 +119,30 @@ export function checkWorkflowTree(root = process.cwd()) {
   return { ok: findings.length === 0, files, findings };
 }
 
+function checkOrdinaryLedgerWorkflow(file, workflow, findings) {
+  const job = object(object(workflow.jobs)['verify-ledger']);
+  const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+  const transport = steps.find((step) =>
+    String(step.run ?? '').includes('scripts/process/evidence_transport.py materialize'),
+  );
+  const retiredCeremony = steps.some((step) =>
+    /installed_control_transport\.py|installed-export-command\.mjs/u.test(String(step.run ?? '')),
+  );
+  if (
+    retiredCeremony ||
+    object(transport?.env).BUNDLE_SCHEMA_VERSION !== '1.0.0' ||
+    object(transport?.env).LEDGER_TRANSPORT !== "${{ vars.DEVAI_LEDGER_TRANSPORT || 'legacy' }}"
+  ) {
+    findings.push(
+      finding(
+        'CI_MUTATION_CEREMONY_FORBIDDEN',
+        file,
+        'delivery uses ordinary ledger transport and must not require the retired installed mutation export ceremony',
+      ),
+    );
+  }
+}
+
 function checkWorkflow(file, source, findings) {
   for (const marker of OLD_WORKFLOW_MARKERS) {
     if (file.includes(marker) || source.includes(marker)) {
@@ -133,6 +158,8 @@ function checkWorkflow(file, source, findings) {
     return;
   }
   const workflow = object(document.toJS());
+  if ([RELEASE_WORKFLOW_FILE, LEDGER_WORKFLOW_FILE].includes(file))
+    checkOrdinaryLedgerWorkflow(file, workflow, findings);
 
   if (file === RELEASE_WORKFLOW_FILE) {
     checkReleaseWorkflow(file, workflow, source, findings);
@@ -149,7 +176,7 @@ function checkWorkflow(file, source, findings) {
 
   const triggers = object(workflow.on);
   const triggerNames = Object.keys(triggers).sort();
-  const expectedTriggers = ['pull_request', 'push', 'workflow_dispatch'];
+  const expectedTriggers = ['push', 'workflow_dispatch'];
   if (
     triggerNames.length !== expectedTriggers.length ||
     triggerNames.some((name, index) => name !== expectedTriggers[index])
@@ -169,7 +196,7 @@ function checkWorkflow(file, source, findings) {
       finding('CI_WORKFLOW_PERMISSIONS_INVALID', file, 'only contents: read is permitted'),
     );
   }
-  if (object(workflow.env).CANDIDATE_SHA !== CANDIDATE_SHA_EXPRESSION) {
+  if (object(workflow.env).CANDIDATE_SHA !== '${{ github.sha }}') {
     findings.push(
       finding(
         'CI_CANDIDATE_SHA_UNBOUND',
@@ -180,10 +207,7 @@ function checkWorkflow(file, source, findings) {
   }
 
   const jobs = object(workflow.jobs);
-  if (
-    JSON.stringify(Object.keys(jobs).sort()) !==
-    JSON.stringify(['candidate-preflight', 'verify-ledger'])
-  ) {
+  if (JSON.stringify(Object.keys(jobs).sort()) !== JSON.stringify(['verify-ledger'])) {
     findings.push(
       finding(
         'CI_LEDGER_JOB_SET_INVALID',
@@ -192,22 +216,7 @@ function checkWorkflow(file, source, findings) {
       ),
     );
   }
-  const preflight = object(jobs['candidate-preflight']);
   const job = object(jobs['verify-ledger']);
-  if (
-    preflight.if !== "${{ github.event_name == 'pull_request' }}" ||
-    preflight.environment !== undefined ||
-    JSON.stringify(preflight).includes('secrets.') ||
-    JSON.stringify(preflight).includes('vars.')
-  ) {
-    findings.push(
-      finding(
-        'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
-        file,
-        'pull-request candidate preflight must have no environment, secrets, or variables',
-      ),
-    );
-  }
   if (job.if !== "${{ github.event_name != 'pull_request' }}") {
     findings.push(
       finding(
@@ -227,8 +236,7 @@ function checkWorkflow(file, source, findings) {
     );
   }
   const privilegedSteps = Array.isArray(job.steps) ? job.steps.map(object) : [];
-  const preflightSteps = Array.isArray(preflight.steps) ? preflight.steps.map(object) : [];
-  const steps = [...preflightSteps, ...privilegedSteps];
+  const steps = privilegedSteps;
   if (steps.length === 0) {
     findings.push(finding('CI_LEDGER_STEPS_MISSING', file, 'verify-ledger has no steps'));
     return;
@@ -268,7 +276,7 @@ function checkWorkflow(file, source, findings) {
   );
   const candidateCheckouts = checkouts.filter((step) => object(step.with).path === 'candidate');
   if (
-    candidateCheckouts.length !== 2 ||
+    candidateCheckouts.length !== 1 ||
     candidateCheckouts.some(
       (candidateCheckout) =>
         object(candidateCheckout.with).ref !== '${{ env.CANDIDATE_SHA }}' ||
@@ -290,6 +298,21 @@ function checkWorkflow(file, source, findings) {
     );
   }
 
+  const controls = checkouts.filter((step) => object(step.with).path === 'release-control');
+  if (
+    controls.length !== 1 ||
+    object(controls[0].with).ref !== '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}' ||
+    object(controls[0].with)['persist-credentials'] !== false ||
+    !source.includes('[[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]')
+  ) {
+    findings.push(
+      finding(
+        'CI_PROCESS_CONTROL_UNBOUND',
+        file,
+        'transport requires approved exact control revision',
+      ),
+    );
+  }
   const serialized = JSON.stringify(workflow);
   const externalInputs = [
     'secrets.DEVAI_LEDGER_ENVELOPE_B64',
@@ -301,6 +324,10 @@ function checkWorkflow(file, source, findings) {
     'secrets.DEVAI_LEDGER_ENVIRONMENT_B64',
     'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
     'vars.DEVAI_LEDGER_POLICY_DIGEST',
+    'vars.DEVAI_LEDGER_TRANSPORT',
+    'vars.DEVAI_LEDGER_BUNDLE_SHA256',
+    'secrets.DEVAI_EVIDENCE_READ_TOKEN',
+    'vars.DEVAI_PROCESS_CONTROL_COMMIT',
   ];
   for (const input of externalInputs) {
     if (!serialized.includes(input)) {
@@ -433,7 +460,10 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
   }
 
   const concurrency = object(workflow.concurrency);
-  if (concurrency['cancel-in-progress'] !== true) {
+  if (
+    concurrency['cancel-in-progress'] !== true ||
+    concurrency.group !== '${{ github.workflow }}-pr-${{ github.event.pull_request.number }}'
+  ) {
     findings.push(
       finding(
         'CI_PREFLIGHT_CONCURRENCY_INVALID',
@@ -443,7 +473,12 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
     );
   }
 
-  if (/\bsecrets\./u.test(source)) {
+  // GitHub contexts also support bracket access and whole-context expressions.
+  // Dotted-name matching alone permits e.g. toJSON(secrets) to bypass this guard.
+  const protectedExpression = [...source.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].some((match) =>
+    /\b(?:secrets|vars)\b/u.test(match[1] ?? ''),
+  );
+  if (/\b(?:secrets|vars)\s*(?:\.|\[)/u.test(source) || protectedExpression) {
     findings.push(
       finding('CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN', file, 'preflight must reference no secret'),
     );
@@ -455,8 +490,64 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
     return;
   }
 
+  const materializer = Object.values(jobs)
+    .flatMap((job) => object(job).steps ?? [])
+    .find((step) => step.id === 'verifier-package');
+  for (const marker of [
+    'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
+    'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
+    'DEVAI_VERIFIER_PACKAGE_FILE_DIGEST_INVALID',
+    'manifest.name',
+    'provenance.sourceCommit',
+  ]) {
+    if (!materializer?.run?.includes(marker))
+      findings.push(finding('CI_PREFLIGHT_VERIFIER_MISSING', file, marker));
+  }
+  if (
+    materializer &&
+    /node\s+["']?\$DEVAI_EVIDENCE_(?:VERIFY|EXPORT|POLICY|BUNDLE_VERIFY)/u.test(materializer.run)
+  ) {
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_NON_ATTESTING_VIOLATION',
+        file,
+        'materialization cannot execute evidence verification',
+      ),
+    );
+  }
+  if (
+    JSON.stringify(Object.keys(jobs)) !== JSON.stringify(['preflight']) ||
+    jobs.preflight?.name !== 'devai-release-gate' ||
+    jobs.preflight?.if !== undefined ||
+    (jobs.preflight?.['continue-on-error'] !== undefined &&
+      jobs.preflight['continue-on-error'] !== false)
+  )
+    findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, 'one required result'));
+  const gate = jobs.preflight?.steps?.find(
+    (step) => step.name === 'Require every preflight result',
+  );
+  if (
+    !gate ||
+    gate.if !== '${{ !cancelled() }}' ||
+    gate['continue-on-error'] === true ||
+    !gate.run?.includes("outcome !== 'success'") ||
+    !gate.run?.includes('process.exit(1)')
+  )
+    findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, 'missing fail-closed aggregate'));
+  for (const required of ['install', 'verifier-package', 'bootstrap', 'product']) {
+    if (
+      !gate?.run?.includes(`'${required}'`) ||
+      !jobs.preflight?.steps?.some((step) => step.id === required)
+    )
+      findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, required));
+  }
   for (const [name, rawJob] of Object.entries(jobs)) {
     const job = object(rawJob);
+    if (
+      job.permissions !== undefined &&
+      JSON.stringify(job.permissions) !== JSON.stringify({ contents: 'read' })
+    )
+      findings.push(finding('CI_WORKFLOW_PERMISSIONS_INVALID', file, name));
     if (job.environment !== undefined) {
       findings.push(
         finding(
@@ -530,7 +621,12 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
           );
         }
       }
-      if (PREFLIGHT_EVIDENCE_TOKENS.test(executed)) {
+      if (
+        PREFLIGHT_EVIDENCE_TOKENS.test(
+          executed.replaceAll("'verifier-package'", "'package-check'"),
+        ) &&
+        step.id !== 'verifier-package'
+      ) {
         findings.push(
           finding(
             'CI_PREFLIGHT_NON_ATTESTING_VIOLATION',
@@ -568,7 +664,13 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     push.tags.length !== 1 ||
     push.tags[0] !== 'v*' ||
     JSON.stringify(Object.keys(dispatchInputs).sort()) !==
-      JSON.stringify(['publish', 'release_tag']) ||
+      JSON.stringify([
+        'candidate_commit',
+        'publish',
+        'rehearsal_attempt',
+        'rehearsal_run_id',
+        'release_tag',
+      ]) ||
     releaseTagInput.required !== true ||
     releaseTagInput.type !== 'string' ||
     publishInput.required !== false ||
@@ -592,7 +694,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
-    environment.EXPECTED_ACTION_COUNT !== 48 ||
+    environment.EXPECTED_ACTION_COUNT !== 57 ||
     environment.PACKAGE_VERSION !== undefined ||
     environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION
   ) {
@@ -606,6 +708,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'build-release',
     'deploy-pages',
     'finalize-release',
+    'promote-assets',
     'rehearsal-summary',
     'verify-ledger',
     'verify-linux-adopter',
@@ -634,8 +737,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     findings.push(finding('RELEASE_PAGES_ENVIRONMENT_INVALID', file, 'github-pages'));
   }
   const publishCondition = "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
-  const rehearsalCondition =
-    "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
+  const rehearsalCondition = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
   if (finalize.if !== publishCondition || pages.if !== publishCondition) {
     findings.push(
       finding(
@@ -647,7 +749,8 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   }
   if (
     rehearsal.if !== rehearsalCondition ||
-    JSON.stringify(rehearsal.needs) !== JSON.stringify(['verify-ledger', 'build-release']) ||
+    JSON.stringify(rehearsal.needs) !==
+      JSON.stringify(['verify-ledger', 'build-release', 'verify-linux-adopter']) ||
     JSON.stringify(object(rehearsal.permissions)) !== JSON.stringify({ contents: 'read' })
   ) {
     findings.push(
@@ -662,8 +765,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     linuxAdopter['runs-on'] !== 'ubuntu-latest' ||
     JSON.stringify(linuxAdopter.needs) !== JSON.stringify('build-release') ||
     JSON.stringify(object(linuxAdopter.permissions)) !== JSON.stringify({ contents: 'read' }) ||
-    JSON.stringify(finalize.needs) !==
-      JSON.stringify(['verify-ledger', 'build-release', 'verify-linux-adopter'])
+    JSON.stringify(finalize.needs) !== JSON.stringify(['verify-ledger', 'promote-assets'])
   ) {
     findings.push(
       finding(
@@ -674,6 +776,84 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     );
   }
 
+  const promotion = object(jobs['promote-assets']);
+  if (
+    build.if !== rehearsalCondition ||
+    linuxAdopter.if !== rehearsalCondition ||
+    promotion.if !== publishCondition ||
+    promotion.needs !== 'verify-ledger'
+  ) {
+    findings.push(
+      finding(
+        'RELEASE_PROMOTION_BOUNDARY_INVALID',
+        file,
+        'build and consumer are rehearsal-only; promotion requires protected verification',
+      ),
+    );
+  }
+  for (const name of ['promote-assets', 'finalize-release', 'deploy-pages']) {
+    const body = JSON.stringify(jobs[name]);
+    if (/pnpm (?:run )?build|stage-release-package|double-pack|npm (?:run )?build/u.test(body))
+      findings.push(finding('RELEASE_PROMOTION_REBUILD_FORBIDDEN', file, name));
+  }
+  for (const name of [
+    'verify-ledger',
+    'rehearsal-summary',
+    'promote-assets',
+    'finalize-release',
+    'deploy-pages',
+  ]) {
+    const jobSteps = jobs[name]?.steps ?? [];
+    const checkout = jobSteps.find((step) => step.with?.path === 'release-control');
+    if (
+      checkout?.with?.ref !== '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}' ||
+      checkout?.with?.['persist-credentials'] !== false ||
+      !jobSteps.some((step) => step.run?.includes('[[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]'))
+    )
+      findings.push(finding('RELEASE_PROCESS_CONTROL_UNBOUND', file, name));
+  }
+  const pagesSteps = Array.isArray(pages.steps) ? pages.steps : [];
+  const pagesController = pagesSteps.filter((step) => step.id === 'deployment');
+  const pagesArtifact = pagesSteps.find((step) => step.id === 'pages-artifact');
+  const pagesRecord = pagesSteps.find(
+    (step) => step.name === 'Retain Pages reconciliation identifiers',
+  );
+  const expectedPagesEnvironment = {
+    GH_TOKEN: '${{ github.token }}',
+    PAGES_ARTIFACT_ID: '${{ steps.pages-artifact.outputs.artifact_id }}',
+    REHEARSAL_RUN: '${{ inputs.rehearsal_run_id }}',
+    REHEARSAL_ATTEMPT: '${{ inputs.rehearsal_attempt }}',
+    CONTROL_COMMIT: '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}',
+    PAGES_MIGRATION_AUDIT_JSON: '${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_JSON }}',
+    PAGES_MIGRATION_AUDIT_SHA256: '${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_SHA256 }}',
+  };
+  if (
+    pages.concurrency?.group !== 'devai-pages-publication' ||
+    pages.concurrency?.['cancel-in-progress'] !== false ||
+    pages.permissions?.deployments !== 'write' ||
+    pagesController.length !== 1 ||
+    pagesController[0].run !==
+      'node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record' ||
+    pagesController[0].if !== undefined ||
+    !Object.entries(expectedPagesEnvironment).every(
+      ([key, value]) => pagesController[0].env?.[key] === value,
+    ) ||
+    pagesArtifact?.with?.['retention-days'] !== 30 ||
+    pagesArtifact?.with?.name !== 'github-pages-${{ github.run_attempt }}' ||
+    pagesRecord?.if !== '${{ always() }}' ||
+    pagesRecord?.with?.['retention-days'] !== 30 ||
+    pagesRecord?.with?.path !== 'pages-publication-record/*' ||
+    pagesSteps.some(
+      (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/deploy-pages@'),
+    )
+  )
+    findings.push(
+      finding(
+        'RELEASE_PAGES_RECOVERY_UNBOUND',
+        file,
+        'Pages requires serialized durable intent, exact artifact controls and retained recovery records',
+      ),
+    );
   const immutablePins = new Map([
     ['actions/checkout', CHECKOUT_COMMIT],
     ['actions/setup-node', SETUP_NODE_COMMIT],
@@ -729,7 +909,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'pnpm install --frozen-lockfile',
     'pnpm run build',
     'pnpm run release:closure',
-    'run pack:smoke',
+    'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball" --sha256 "$package_sha256"',
     'stage-release-package.mjs',
     'release-channel.mjs',
     'RELEASE_IS_PRERELEASE',
@@ -745,9 +925,13 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'gh release create',
     'git -C candidate verify-tag',
     '--binding exact-tree',
-    'actions/deploy-pages@',
+    'node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record',
     'https://aarusso-nyx.github.io/devai/',
-    'The exact release build and artifact assembly completed without publication.',
+    'All required rehearsal checks passed. No publication occurred.',
+    'rehearsal.mjs promote',
+    'rehearsal.mjs complete',
+    'inputs.rehearsal_run_id',
+    'inputs.rehearsal_attempt',
   ];
   for (const marker of requiredMarkers) {
     if (!source.includes(marker)) findings.push(finding('RELEASE_CONTROL_MISSING', file, marker));
@@ -775,7 +959,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
       ),
     );
   }
-  if (!source.includes('test "$(git cat-file -t "$RELEASE_TAG")" = tag')) {
+  if (!source.includes('test "$(git -C candidate cat-file -t "$RELEASE_TAG")" = tag')) {
     findings.push(finding('RELEASE_ANNOTATED_TAG_CHECK_MISSING', file, 'git cat-file -t'));
   }
   if (
@@ -807,7 +991,10 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   if (source.includes('--clobber')) {
     findings.push(finding('RELEASE_ASSET_CLOBBER_FORBIDDEN', file, '--clobber'));
   }
-  if (!source.includes('if npm view "$PACKAGE_NAME@$PACKAGE_VERSION"')) {
+  if (
+    !source.includes('publication-state.mjs registry "$PACKAGE_VERSION"') ||
+    !source.includes('publication-state.mjs release "$RELEASE_TAG"')
+  ) {
     findings.push(finding('RELEASE_IDEMPOTENT_PUBLISH_MISSING', file, 'npm view exact version'));
   }
 }

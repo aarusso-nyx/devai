@@ -9,7 +9,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { runWithAuthorityHostEffects, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import type { RoundTrackingActivation } from '@devai-nyx/loop';
 import {
@@ -23,6 +24,7 @@ import {
   trackingWorkflowDigest,
 } from '../../src/services/github-issues-tracking/workflow.js';
 import {
+  createTrackingReconcileScope,
   reconcileEffectPermitted,
   TrackingAuthorityError,
   verifyReconcileAuthorization,
@@ -108,13 +110,21 @@ function verify(root: string, observedRepository = REPOSITORY) {
   return verifyReconcileAuthorization({ repoRoot: root, round: ROUND, observedRepository });
 }
 
+function activationPath(root: string): string {
+  return join(root, '.devai/state/tracking', ROUND, 'activation.json');
+}
+
 function expectRefusal(fn: () => unknown, code: string, label: string): void {
   try {
     fn();
     expect.unreachable(`${label} must refuse`);
   } catch (error) {
     expect(error, label).toBeInstanceOf(TrackingAuthorityError);
-    expect((error as TrackingAuthorityError).code, label).toBe(code);
+    expect(error, label).toMatchObject({
+      name: 'TrackingAuthorityError',
+      message: code,
+      code,
+    });
   }
 }
 
@@ -124,12 +134,13 @@ describe('replaying a recorded Owner authorization', () => {
     activate(root);
     const authorization = verify(root);
 
-    expect(authorization.round).toBe(ROUND);
-    expect(authorization.repository).toBe(REPOSITORY);
-    expect(authorization.issue).toBe(123);
-    // The authority is the Owner's recorded decision, not a live declaration.
-    expect(authorization.activation.authorization.role).toBe('owner');
-    expect(authorization.activation.authorization.publish_flag).toBe(true);
+    // The authority is the Owner's complete recorded decision, not a live declaration.
+    expect(authorization).toEqual({
+      round: ROUND,
+      repository: REPOSITORY,
+      issue: 123,
+      activation: activation(),
+    });
   });
 
   it('refuses a round that was never activated instead of assuming consent', () => {
@@ -143,11 +154,7 @@ describe('replaying a recorded Owner authorization', () => {
     ] as const) {
       const root = bound();
       activate(root, { state });
-      expectRefusal(
-        () => verify(root),
-        'TRACKING_RECONCILE_ACTIVATION_INACTIVE',
-        label,
-      );
+      expectRefusal(() => verify(root), 'TRACKING_RECONCILE_ACTIVATION_INACTIVE', label);
     }
   });
 
@@ -173,6 +180,24 @@ describe('replaying a recorded Owner authorization', () => {
       'publish flag cleared',
     );
   });
+
+  it.each(['extra-member', 'malformed-json'] as const)(
+    'normalizes a stored activation with %s into the stable invalid-activation refusal',
+    (fault) => {
+      const root = bound();
+      activate(root);
+      const path = activationPath(root);
+      if (fault === 'extra-member') {
+        const record = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+        record['untrusted'] = true;
+        writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+      } else {
+        writeFileSync(path, '{');
+      }
+
+      expectRefusal(() => verify(root), 'TRACKING_RECONCILE_ACTIVATION_INVALID', fault);
+    },
+  );
 });
 
 describe('the recorded authorization cannot outlive its bindings', () => {
@@ -185,6 +210,17 @@ describe('the recorded authorization cannot outlive its bindings', () => {
       },
     });
     expectRefusal(() => verify(root), 'TRACKING_RECONCILE_BINDING_STALE', 'stale config digest');
+  });
+
+  it('refuses when the activation retains an older generated-workflow digest', () => {
+    const root = bound();
+    activate(root, {
+      adapter: {
+        ...activation().adapter,
+        workflow_digest_sha256: 'f'.repeat(64),
+      },
+    });
+    expectRefusal(() => verify(root), 'TRACKING_RECONCILE_BINDING_STALE', 'stale workflow digest');
   });
 
   it('refuses when the generated workflow has drifted', () => {
@@ -203,6 +239,24 @@ describe('the recorded authorization cannot outlive its bindings', () => {
       'TRACKING_RECONCILE_REPOSITORY_MISMATCH',
       'foreign repository',
     );
+  });
+
+  it('refuses when the activation targets a repository other than its live binding', () => {
+    const root = bound();
+    activate(root, { target: { repository: 'someone-else/fork', issue_number: 123 } });
+    expectRefusal(
+      () => verify(root),
+      'TRACKING_RECONCILE_REPOSITORY_MISMATCH',
+      'foreign activation target',
+    );
+  });
+
+  it('accepts an omitted observed repository without weakening the persisted repository binding', () => {
+    const root = bound();
+    activate(root);
+    const authorization = verifyReconcileAuthorization({ repoRoot: root, round: ROUND });
+    expect(authorization.repository).toBe(REPOSITORY);
+    expect(authorization.activation.target?.repository).toBe(REPOSITORY);
   });
 
   it('refuses when the activation names a different round than the one requested', () => {
@@ -264,5 +318,106 @@ describe('the derived effect scope is narrower than an Owner session', () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it.each([
+    ['an outbox member', '/repo/.devai/state/tracking/R-0042/outbox/batch.json', true],
+    ['the outbox directory itself', '/repo/.devai/state/tracking/R-0042/outbox', false],
+    ['another nested member', '/repo/.devai/state/tracking/R-0042/other/batch.json', false],
+  ] as const)(
+    'classifies %s by the exact mutable round-state path',
+    (_label, target, permitted) => {
+      expect(
+        reconcileEffectPermitted({
+          repoRoot: '/repo',
+          round: ROUND,
+          request: { kind: 'filesystem', target },
+        }),
+      ).toBe(permitted);
+    },
+  );
+
+  it('requires both the gh executable and api subcommand', () => {
+    expect(
+      reconcileEffectPermitted({
+        repoRoot: '/repo',
+        round: ROUND,
+        request: { kind: 'process', executable: 'git', args: ['api', 'repos/example/adopter'] },
+      }),
+    ).toBe(false);
+  });
+
+  it('routes filesystem and process requests through the same bounded apply gate', () => {
+    const { scope, dispose } = createTrackingReconcileScope('/repo', ROUND);
+    const apply = vi.fn(() => 'applied');
+    const requests: AuthorityHostEffectRequest[] = [
+      {
+        kind: 'filesystem',
+        symbol: 'writeFileSync',
+        arguments: ['/repo/.devai/state/tracking/R-0042/delivery.json', '{}\n'],
+      },
+      {
+        kind: 'process',
+        symbol: 'spawnSync',
+        arguments: ['gh', ['api', 'repos/example/adopter/issues/123']],
+      },
+      {
+        kind: 'filesystem',
+        symbol: 'renameSync',
+        arguments: [
+          '/outside/staged-delivery.json',
+          '/repo/.devai/state/tracking/R-0042/outbox/batch.json',
+        ],
+      },
+    ];
+    for (const request of requests) expect(scope.apply_effect(request, apply)).toBe('applied');
+    expect(apply).toHaveBeenCalledTimes(3);
+    expect(scope).toMatchObject({
+      action_id: 'round tracking sync',
+      invocation_id: expect.stringMatching(
+        /^tracking-reconcile-R-0042-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+      ),
+      effect: 'remote-write',
+      receipt_store: {
+        issuer_id: 'devai-tracking-reconcile-adapter',
+        issuer_version: '1.0.0',
+      },
+      apply_effect: expect.any(Function),
+    });
+    dispose();
+  });
+
+  it.each([
+    [
+      'filesystem',
+      {
+        kind: 'filesystem',
+        symbol: 'writeFileSync',
+        arguments: ['/repo/.devai/state/tracking/R-0042/events.jsonl', '{}\n'],
+      },
+      'TRACKING_RECONCILE_EFFECT_OUT_OF_SCOPE',
+    ],
+    [
+      'process',
+      { kind: 'process', symbol: 'spawnSync', arguments: ['git', ['api', 'status']] },
+      'TRACKING_RECONCILE_PROCESS_FORBIDDEN',
+    ],
+  ] as const)(
+    'refuses a forbidden %s request before invoking its effect',
+    (_kind, request, code) => {
+      const { scope, dispose } = createTrackingReconcileScope('/repo', ROUND);
+      const apply = vi.fn(() => 'forbidden');
+      expect(() => scope.apply_effect(request as AuthorityHostEffectRequest, apply)).toThrow(code);
+      expect(apply).not.toHaveBeenCalled();
+      dispose();
+    },
+  );
+
+  it('invalidates the host scope when reconciliation finishes', () => {
+    const { scope, dispose } = createTrackingReconcileScope('/repo', ROUND);
+    dispose();
+    expect(() => runWithAuthorityHostEffects(scope, () => undefined)).toThrow(
+      'AUTHORITY_HOST_SCOPE_INVALID',
+    );
   });
 });

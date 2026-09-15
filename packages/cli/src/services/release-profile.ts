@@ -93,6 +93,8 @@ export interface MutationRosterEntry {
   readonly test_selectors?: readonly string[];
   readonly manifest_path?: string;
   readonly config_paths?: readonly string[];
+  readonly vitest_config_path?: string;
+  readonly typescript_config_path?: string;
   readonly sanitizer_paths?: readonly string[];
   readonly orchestration_paths?: readonly string[];
   readonly lockfile_path?: string;
@@ -302,8 +304,6 @@ export function resolveReleaseVerification(
   if (transition === undefined) return blocked(input, 'same-version-without-support-promotion');
   if (transition === 'support-promotion' && input.support !== 'lts')
     return blocked(input, 'support-promotion-requires-lts');
-  if (input.support === 'lts' && input.mutationRosterSize === 0)
-    return blocked(input, 'lts-mutation-roster-empty');
   const declaredRiskClasses = new Set(Object.keys(input.riskCapabilities ?? {}));
   const unknownRisks = (input.risks ?? []).filter(
     (risk) => !KNOWN_RISKS.has(risk as KnownRiskClass) && !declaredRiskClasses.has(risk),
@@ -323,35 +323,14 @@ export function resolveReleaseVerification(
     for (const capability of input.riskCapabilities?.[risk] ?? []) capabilities.add(capability);
   }
   for (const escalation of input.ownerEscalations ?? []) capabilities.add(escalation);
-  const changeKind = input.changeKind ?? 'behavioral';
-  const selectedMutation: MutationRequirement =
-    input.support === 'lts'
-      ? 'full-roster'
-      : risks.length > 0 || transition === 'major' || transition === 'minor'
-        ? 'targeted'
-        : changeKind === 'behavioral'
-          ? 'affected'
-          : 'none';
-  const mutation = input.mutationRosterSize === 0 ? 'none' : selectedMutation;
   return {
     schemaVersion: '1.0.0',
     verdict: 'ready',
     transition,
     support: input.support,
     capabilities: [...capabilities].sort(),
-    mutation,
-    mutationDisposition:
-      mutation === 'none'
-        ? {
-            status: 'not-required',
-            reason:
-              input.mutationRosterSize === 0 && selectedMutation !== 'none'
-                ? 'mutation-roster-empty'
-                : changeKind === 'documentation'
-                  ? 'documentation-only'
-                  : 'metadata-only',
-          }
-        : { status: 'required', reason: mutation },
+    mutation: 'none',
+    mutationDisposition: { status: 'not-required', reason: 'mutation-external-hardening' },
     blockingReasons: [],
   };
 }
@@ -384,57 +363,12 @@ export function resolveReleaseTaskNodes(
 
 export function resolveReleaseMutationTaskNodes(
   decision: ReleaseVerificationDecision,
-  roster: readonly MutationRosterEntry[],
-  changedPackages: readonly string[],
-  changedPaths: readonly string[],
-  risks: readonly string[],
-  knownTaskNodes: readonly string[],
+  _roster: readonly MutationRosterEntry[],
+  _changedPackages: readonly string[],
+  _changedPaths: readonly string[],
+  _risks: readonly string[],
+  _knownTaskNodes: readonly string[],
 ): Readonly<{ taskNodes: readonly string[]; rosterEntryIds: readonly string[] }> {
   if (decision.verdict !== 'ready') throw new Error('CHECK_RELEASE_DECISION_BLOCKED');
-  if (decision.mutation === 'none') return { taskNodes: [], rosterEntryIds: [] };
-
-  const known = new Set(knownTaskNodes);
-  const changed = new Set(changedPackages);
-  const pathAffectsEntry = (entry: MutationRosterEntry): boolean => {
-    const selectors = [
-      ...(entry.source_selectors ?? []),
-      ...(entry.test_selectors ?? []),
-      ...(entry.config_paths ?? []),
-      ...(entry.sanitizer_paths ?? []),
-      ...(entry.orchestration_paths ?? []),
-      ...(entry.manifest_path === undefined ? [] : [entry.manifest_path]),
-      ...(entry.lockfile_path === undefined ? [] : [entry.lockfile_path]),
-    ];
-    return changedPaths.some((path) =>
-      selectors.some((selector) => {
-        const normalized = selector.replace(/\/$/u, '');
-        return path === normalized || path.startsWith(`${normalized}/`);
-      }),
-    );
-  };
-  const selected =
-    decision.mutation === 'full-roster'
-      ? [...roster]
-      : roster.filter(
-          (entry) =>
-            changed.has(entry.package) ||
-            pathAffectsEntry(entry) ||
-            (decision.mutation === 'targeted' &&
-              (entry.risk_classes ?? []).some((risk) => risks.includes(risk))),
-        );
-
-  // Targeted assurance fails safe to the declared roster when no narrower target
-  // can be proven. Affected assurance requires an explicit package match.
-  const effective =
-    decision.mutation === 'targeted' && selected.length === 0 ? [...roster] : selected;
-  if (effective.length === 0) throw new Error('CHECK_RELEASE_MUTATION_TARGET_UNRESOLVED');
-  for (const entry of effective) {
-    if (!known.has(entry.task_node)) {
-      throw new Error(`CHECK_RELEASE_PROFILE_UNKNOWN_TASK:${entry.task_node}`);
-    }
-  }
-  return {
-    taskNodes: [...new Set(effective.map((entry) => entry.task_node))].sort(),
-    rosterEntryIds: effective.map((entry) => entry.id).sort(),
-  };
+  return { taskNodes: [], rosterEntryIds: [] };
 }

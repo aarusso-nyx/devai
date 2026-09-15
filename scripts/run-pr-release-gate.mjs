@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { prFailureDiagnostics } from './pr-failure-diagnostics.mjs';
+import { projectChangedPaths } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
 
 const root = resolve(import.meta.dirname, '..');
 const base = process.argv.slice(2).find((argument) => argument !== '--');
@@ -39,7 +40,7 @@ function changedPathsBetween(baseCommit, candidateCommit) {
       paths.add(after);
     }
   }
-  return [...paths].sort();
+  return projectChangedPaths([...paths]);
 }
 
 const candidateCommit = git(['rev-parse', 'HEAD^{commit}']);
@@ -51,21 +52,53 @@ const targetVersion = JSON.parse(
 ).version;
 const changedPaths = changedPathsBetween(base, candidateCommit);
 
-const cli = join(root, 'packages/cli/dist/runtime/index/bin.js');
-const common = ['--repo-root', root, '--base', base, '--run', '--write', '--as-role', 'inspector'];
-const binding = spawnSync(
-  process.execPath,
-  [cli, 'init', 'bind', '--target', root, '--as-role', 'architect', '--write', '--format', 'json'],
-  { cwd: root, stdio: 'inherit' },
-);
-if (binding.status !== 0) process.exit(binding.status ?? 1);
-if (currentVersion === targetVersion) {
-  const result = spawnSync(process.execPath, [cli, 'check', '--affected', ...common], {
+const cli = join(root, '.devai/state/pr-bootstrap/cli/bin.js');
+function invoke(args) {
+  const result = spawnSync(process.execPath, [cli, ...args, '--format', 'json'], {
     cwd: root,
-    stdio: 'inherit',
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, DEVAI_FORMAT_BASE: base },
   });
-  process.exit(result.status ?? 1);
+  let output;
+  try {
+    output = JSON.parse(result.stdout);
+  } catch {
+    /* reported below */
+  }
+  if (!output?.result?.value)
+    throw new Error(`PR_GATE_CLI_FAILED:${result.status}:${result.stderr}:${result.stdout}`);
+  return { report: output.result.value, status: result.status };
 }
+// Materialize the existing local authority binding through its approved boundary.
+invoke(['init', 'bind', '--target', root, '--as-role', 'architect', '--write']);
+function run(options) {
+  const args = ['check', '--run', '--as-role', 'inspector', '--write', '--base', base];
+  if (options.target === 'affected') args.push('--affected');
+  else {
+    const intentPath = join(root, '.devai/state/pr-bootstrap/release-intent.json');
+    writeFileSync(intentPath, JSON.stringify(options.releaseIntent));
+    args.push(
+      '--release-intent',
+      intentPath,
+      '--release-profile',
+      join(root, 'law/policy/release-verification.json'),
+      '--release-stage',
+      'preflight',
+    );
+  }
+  const { report, status } = invoke(args);
+  process.stdout.write(
+    `${JSON.stringify({ nonAttesting: true, tasks: report.execution, exitCode: report.exitCode })}\n`,
+  );
+  if (report.exitCode || status) {
+    process.stdout.write(
+      `${JSON.stringify({ nonAttesting: true, failures: prFailureDiagnostics(root, report.execution) })}\n`,
+    );
+  }
+  return report.exitCode || status;
+}
+if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));
 
 const risks = new Set();
 for (const path of changedPaths) {
@@ -106,26 +139,15 @@ const intent = {
   candidate: { commit: candidateCommit, tree: candidateTree },
   base: { commit: base, tree: baseTree },
 };
-const temporary = mkdtempSync(join(tmpdir(), 'devai-release-intent-'));
-const intentPath = join(temporary, 'release-intent.json');
-try {
-  writeFileSync(intentPath, `${JSON.stringify(intent, null, 2)}\n`, { mode: 0o600 });
-  const result = spawnSync(
-    process.execPath,
-    [
-      cli,
-      'check',
-      '--release-intent',
-      intentPath,
-      '--release-profile',
-      '.devai/config/release-verification.json',
-      '--release-stage',
-      'preflight',
-      ...common,
-    ],
-    { cwd: root, stdio: 'inherit' },
-  );
-  process.exitCode = result.status ?? 1;
-} finally {
-  rmSync(temporary, { recursive: true, force: true });
-}
+const preflight = run({
+  target: 'release',
+  releaseIntent: intent,
+  releaseProfile: JSON.parse(
+    readFileSync(join(root, 'law/policy/release-verification.json'), 'utf8'),
+  ),
+  releaseStage: 'preflight',
+});
+// Profile preflight establishes the floor; affected selection runs afterwards
+// against the same cache and reuses only exact matching keys.
+const affected = run({ target: 'affected' });
+process.exitCode = preflight || affected;

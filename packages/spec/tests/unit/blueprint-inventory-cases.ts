@@ -137,7 +137,12 @@ describe('blueprint behavior', () => {
       ],
     });
     write(repo, '.devai/state/sensors/inventory_api/api-map.json', {
-      endpoints: [{ path: '/api/orders' }, { path: '/api/audit-logs/:id' }],
+      endpoints: [
+        { method: 'GET', path: '/api/orders' },
+        { method: 'GET', path: '/api/orders/:id' },
+        { method: 'POST', path: '/api/orders' },
+        { method: 'GET', path: '/api/audit-logs/:id' },
+      ],
     });
     write(repo, '.devai/state/sensors/inventory_rbac/rbac.json', {
       roles: [{ id: 'reader' }],
@@ -163,9 +168,10 @@ describe('blueprint behavior', () => {
     );
 
     write(repo, '.devai/state/sensors/inventory_data_model/data-model.json', '{bad');
-    expect(diffBlueprintAgainstInventory({ blueprint, inventoryRoot: repo }).status).toBe(
-      'aligned',
-    );
+    expect(diffBlueprintAgainstInventory({ blueprint, inventoryRoot: repo })).toMatchObject({
+      status: 'has_deltas',
+      summary: { missing_entities: 2 },
+    });
   });
 });
 
@@ -244,7 +250,175 @@ describe('inventory invariant candidates', () => {
       now: NOW,
     });
     expect(result.summary.total).toBe(0);
-    expect(result.summary.unread_inputs).toHaveLength(3);
+    expect(result.summary.unread_inputs).toEqual([
+      'bad.json',
+      'missing-a.json',
+      'missing-b.json',
+      'missing-c.json',
+    ]);
+  });
+
+  it.each([
+    ['basis', '', 'P1Y', 'legal_basis'],
+    ['retention', 'consent', '', 'retention'],
+    ['both', '', '', 'legal_basis + retention'],
+  ])(
+    'identifies missing PII %s without flagging complete or non-PII columns',
+    (_name, legal_basis, retention, missing) => {
+      const repo = root();
+      prepareInputs(repo);
+      write(repo, 'handling.json', {
+        tables: [
+          {
+            name: 'users',
+            columns: [
+              { name: 'email', pii_class: 'contact', legal_basis, retention },
+              { name: 'id' },
+              { name: 'public', pii_class: '' },
+              { name: 'complete', pii_class: 'contact', legal_basis: 'consent', retention: 'P1Y' },
+            ],
+          },
+        ],
+      });
+      const result = suggestInvariants({
+        repoRoot: repo,
+        dryRun: true,
+        now: NOW,
+        dataHandlingBodyPath: join(repo, 'handling.json'),
+      });
+      expect(result.summary.by_category.unlabeled_pii_column).toBe(1);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toMatchObject({
+        schemaVersion: '1.0.0',
+        generated_at: NOW,
+        category: 'unlabeled_pii_column',
+        source_sensor: 'inventory_data_handling',
+        confidence: 'high',
+        target: { kind: 'column', identifier: 'users.email' },
+        suggested_invariant: {
+          title: `Column users.email (contact) must have ${missing}`,
+          severity_suggestion: 'hard-fail',
+          domain_suggestion: 'INVENTORY',
+          measurable_via_suggestion: ['sense data-handling', 'sense data-model'],
+        },
+        related_invariants: ['INV-INVENTORY-002'],
+        status: 'proposed',
+        tags: ['phase-17-E', 'brownfield', 'pii', 'contact'],
+      });
+      expect(result.candidates[0]?.target).not.toHaveProperty('evidence');
+    },
+  );
+
+  it.each(['internal', '_internal', 'private', 'lib/internal'])(
+    'flags cross-package %s edges while allowing same-package and public access',
+    (segment) => {
+      const repo = root();
+      const from = 'apps/web/src/page.ts';
+      const to = `packages/api/${segment}/secret.ts`;
+      write(repo, 'graph.json', {
+        graph: {
+          [from]: [to, `apps/web/${segment}/own.ts`, 'packages/api/public.ts'],
+          'unknown/file.ts': [to],
+          'src/main.ts': ['src/internal/own.ts'],
+        },
+      });
+      const result = suggestInvariants({
+        repoRoot: repo,
+        dryRun: true,
+        now: NOW,
+        depGraphBodyPath: join(repo, 'graph.json'),
+      });
+      expect(result.summary.by_category.forbidden_edge).toBe(1);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toMatchObject({
+        generated_at: NOW,
+        category: 'forbidden_edge',
+        source_sensor: 'inventory_dep_graph',
+        confidence: 'high',
+        status: 'proposed',
+        target: {
+          kind: 'edge',
+          identifier: `${from} -> ${to}`,
+          evidence: [{ path: from, startLine: 1, endLine: 1 }],
+        },
+        suggested_invariant: {
+          severity_suggestion: 'hard-fail',
+          title: 'Cross-package internal import: apps/web → packages/api/internal',
+          measurable_via_suggestion: ['sense dep-graph'],
+        },
+        related_invariants: ['INV-INVENTORY-004'],
+        tags: ['phase-17-E', 'brownfield', 'layering'],
+      });
+    },
+  );
+
+  it('keeps every candidate while the original sensor findings remain present', () => {
+    const repo = root();
+    prepareInputs(repo);
+    const options = {
+      repoRoot: repo,
+      coverageBodyPath: join(repo, 'coverage.json'),
+      dataHandlingBodyPath: join(repo, 'handling.json'),
+      depGraphBodyPath: join(repo, 'graph.json'),
+      rbacBodyPath: join(repo, 'rbac.json'),
+      now: NOW,
+      outDir: join(repo, 'candidates'),
+      dryRun: true,
+    };
+    const suggested = suggestInvariants(options);
+    for (const candidate of suggested.candidates)
+      write(repo, `candidates/${candidate.id}.json`, candidate);
+    expect(gcStaleInvariantCandidates(options)).toEqual({
+      scanned: 5,
+      stale: 0,
+      kept: 5,
+      evidence: [],
+      evidence_log_path: null,
+    });
+    write(repo, 'rbac.json', { unmapped: { endpointsWithoutRole: [] } });
+    write(repo, 'handling.json', {
+      tables: [
+        {
+          name: 'users',
+          columns: [
+            { name: 'email', pii_class: 'contact', legal_basis: 'consent', retention: 'P1Y' },
+          ],
+        },
+      ],
+    });
+    write(repo, 'graph.json', {
+      graph: { 'packages/a/src/a.ts': ['packages/a/internal/allowed.ts', 'packages/b/public.ts'] },
+    });
+    const resolved = gcStaleInvariantCandidates(options);
+    expect(resolved).toMatchObject({ scanned: 5, stale: 3, kept: 2, evidence_log_path: null });
+    expect(resolved.evidence.map((item) => item.category).sort()).toEqual([
+      'forbidden_edge',
+      'unbound_endpoint',
+      'unlabeled_pii_column',
+    ]);
+  });
+
+  it('preserves schema-invalid candidate records even when their claimed target disappeared', () => {
+    const repo = root();
+    write(repo, 'coverage.json', { unmapped: { routes: [], endpoints: [] } });
+    write(repo, 'candidates/INV-CANDIDATE-corrupt.json', {
+      category: 'unmapped_route',
+      target: { identifier: 'gone-route' },
+    });
+    const result = gcStaleInvariantCandidates({
+      repoRoot: repo,
+      outDir: join(repo, 'candidates'),
+      coverageBodyPath: join(repo, 'coverage.json'),
+      dryRun: true,
+      now: NOW,
+    });
+    expect(result).toEqual({
+      scanned: 1,
+      stale: 0,
+      kept: 1,
+      evidence: [],
+      evidence_log_path: null,
+    });
   });
 
   it('classifies stale, live, malformed, and unavailable candidates during GC', () => {
@@ -281,11 +455,7 @@ describe('inventory invariant candidates', () => {
     };
     const dry = gcStaleInvariantCandidates({ ...options, dryRun: true });
     expect(dry).toMatchObject({ scanned: 7, stale: 4, kept: 3, evidence_log_path: null });
-    expect(gcStaleInvariantCandidates(options)).toMatchObject({
-      scanned: 7,
-      stale: 4,
-      kept: 3,
-    });
+    expect(() => gcStaleInvariantCandidates(options)).toThrow('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
 
     expect(
       gcStaleInvariantCandidates({
@@ -301,4 +471,66 @@ describe('inventory invariant candidates', () => {
       evidence_log_path: null,
     });
   });
+});
+
+it.each([
+  ['data', 'missing', 'missing_entities', 2],
+  ['data', 'malformed', 'missing_entities', 2],
+  ['api', 'missing', 'missing_routes', 4],
+  ['api', 'malformed', 'missing_routes', 4],
+  ['rbac', 'missing', 'missing_permissions', 2],
+  ['rbac', 'malformed', 'missing_permissions', 2],
+] as const)(
+  'does not call a blueprint aligned when its %s inventory is %s',
+  (leg, state, counter, count) => {
+    const repo = root();
+    const bodies = {
+      data: {
+        path: 'inventory_data_model/data-model.json',
+        value: {
+          tables: [
+            { name: 'orders', columns: [{ name: 'id' }, { name: 'email' }] },
+            { name: 'sales__order_flow_audit_log', columns: [{ name: 'id' }] },
+          ],
+        },
+      },
+      api: {
+        path: 'inventory_api/api-map.json',
+        value: {
+          endpoints: [
+            { method: 'GET', path: '/api/orders' },
+            { method: 'GET', path: '/api/orders/:id' },
+            { method: 'POST', path: '/api/orders' },
+            { method: 'GET', path: '/api/audit-logs/:id' },
+          ],
+        },
+      },
+      rbac: {
+        path: 'inventory_rbac/rbac.json',
+        value: { roles: [{ id: 'reader' }, { id: 'writer' }] },
+      },
+    };
+    for (const [name, body] of Object.entries(bodies)) {
+      if (name !== leg) write(repo, `.devai/state/sensors/${body.path}`, body.value);
+      else if (state === 'malformed') write(repo, `.devai/state/sensors/${body.path}`, '{bad');
+    }
+    const result = diffBlueprintAgainstInventory({ blueprint, inventoryRoot: repo });
+    expect(result.status).toBe('has_deltas');
+    expect(result.summary[counter]).toBe(count);
+    expect(result.deltas).toHaveLength(count);
+  },
+);
+
+it('includes declared role gaps when no inventory exists at all', () => {
+  const result = diffBlueprintAgainstInventory({ blueprint, inventoryRoot: root() });
+  expect(result.status).toBe('no_inventory');
+  expect(result.summary).toEqual({
+    missing_entities: 2,
+    missing_fields: 0,
+    missing_routes: 4,
+    missing_permissions: 2,
+  });
+  expect(result.deltas.filter((d) => d.kind === 'missing_permission').map((d) => d.target)).toEqual(
+    ['reader', 'writer'],
+  );
 });

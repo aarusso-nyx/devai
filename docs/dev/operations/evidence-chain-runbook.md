@@ -24,3 +24,11 @@ devai evidence redact <sequence> --round R-1000 --kind generic \
 
 Stop on malformed records, digest divergence, unknown sequence, or partial output. Preserve the
 candidate and diagnostic material until a human chooses the repair.
+
+Agent-run receipts under `record/proofs/work/agent-runs/` follow their verified
+`prev_hash` links. UUID filename order cannot determine execution order when records
+share a millisecond. The agent-run writer validates the stored population and extends
+its unique chain tip. Malformed records, missing predecessors, multiple genesis records,
+or forks block further emission; they must not silently start a new genesis. Preserve
+the complete directory for human reconciliation. A filename collision also refuses
+replacement of the existing record.

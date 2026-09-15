@@ -1,6 +1,6 @@
 ---
 id: CONSTITUTION
-title: DEVAI Constitution 1.0.0
+title: DEVAI Constitution 1.0.1
 type: constitution
 status: active
 date: 2026-07-25
@@ -9,11 +9,11 @@ supersedes: null
 superseded_by: null
 ---
 
-# DEVAI Constitution — 1.0.0
+# DEVAI Constitution — 1.0.1
 
 ## Status and scope
 
-**Version:** 1.0.0
+**Version:** 1.0.1
 **Status:** active
 
 This is the immutable axiom set for DEVAI. Every other artifact in the framework — contracts, charters, skills, bootstrap layout, scorecard — derives from these axioms and may not contradict them.
@@ -210,7 +210,7 @@ A merge requires the hard gate fully green. The hard gate is non-negotiable.
 
 ### Article 18. Soft gate
 
-The soft gate is the stochastic component of Error(0). It comprises LLM-judged scorings against documented rubrics for: spec coherence, plant idiomaticity not covered by linters, test depth and non-triviality, spec-to-test traceability quality, and mutation-testing kill rate where applicable.
+The soft gate is the stochastic component of Error(0). It comprises LLM-judged scorings against documented rubrics for: spec coherence, plant idiomaticity not covered by linters, test depth and non-triviality, and spec-to-test traceability quality. Mutation testing is optional external hardening, provided independently by Bedel. It must never execute in CI or gate verification, certification, preparation, export, publication, or adopter governance. Missing, invalid, incomplete, or failing mutation evidence has no effect on delivery eligibility; its disposition is not-required, never a synthetic pass.
 
 Every gate verdict is tri-state: **PASS**, **REVIEW**, or **FAIL**. PASS allows merge; FAIL blocks merge; REVIEW triggers the tie-breaker ladder (Article 23) before resolution. The hard gate emits only PASS or FAIL; the soft gate may emit any of the three.
 

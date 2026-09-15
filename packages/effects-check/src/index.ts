@@ -436,6 +436,8 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
       'The authority seam is the audited implementation boundary for wrapped host functions.',
     'packages/cli/src/commands/mutation/run.ts':
       'Mutation adapter loads the previously resolved local runner URL; runtime charter and authority checks precede execution.',
+    'packages/cli/src/release-host-bootstrap.ts':
+      'Native import of the verified installed host entry is required: a loader hook denies every other importer, and require(ESM) can return stale exports past a load denial.',
   };
   for (const sourceFile of sourceFiles) {
     const packageSuffix = sourceFile.fileName.split('/packages/')[1];
@@ -490,7 +492,7 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
     const capabilities = new Set<EffectCapability>();
     const dispositions = new Map<string, EffectDisposition>();
     const visited = new Set<string>();
-    const queue: ts.Node[] = [...handlers];
+    const queue: ts.Node[] = handlers.map(unwrapExpression);
 
     const enqueueSymbol = (node: ts.Node): boolean => {
       const symbol = symbolAt(checker, node);
@@ -510,6 +512,10 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
       const key = `${node.getSourceFile().fileName}:${String(node.pos)}:${String(node.end)}`;
       if (visited.has(key)) continue;
       visited.add(key);
+      // Command registrations may name a handler rather than embed its body.
+      // Visiting an identifier alone finds no calls; follow its declaration with
+      // the same symbol resolution used for calls and callback arguments.
+      if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) enqueueSymbol(node);
       const walk = (child: ts.Node): void => {
         if (child !== node && ts.isFunctionLike(child)) return;
         if (ts.isReturnStatement(child) && child.expression !== undefined) {
@@ -537,16 +543,21 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
           const nodeProc = declarationFiles.some((file) =>
             file.includes('@types/node/child_process'),
           );
+          // Imports can rename a host operation. Classify its resolved symbol,
+          // while retaining the local spelling for diagnostics and other calls.
+          const hostCallName =
+            seam || nodeFs || nodeProc ? (symbol?.getName() ?? callName) : callName;
           const pg = declarationFiles.some(
             (file) => file.includes('/pg/') || file.includes('@types/pg'),
           );
-          if ((seam || nodeFs) && FS_MUTATORS.has(callName)) capabilities.add('fs:unknown-write');
+          if ((seam || nodeFs) && FS_MUTATORS.has(hostCallName))
+            capabilities.add('fs:unknown-write');
           if (pg && ['connect', 'end', 'query', 'Pool', 'Client'].includes(callName)) {
             capabilities.add('db:unclassified');
           }
           if (
-            PROCESS_CALLS.has(callName) &&
-            (nodeProc || seam || UNAMBIGUOUS_PROCESS_CALLS.has(callName))
+            PROCESS_CALLS.has(hostCallName) &&
+            (nodeProc || seam || UNAMBIGUOUS_PROCESS_CALLS.has(hostCallName))
           ) {
             const executable = literalText(argumentsList[0]);
             const shape = argvShape(argumentsList[1]);

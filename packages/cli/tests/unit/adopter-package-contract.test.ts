@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { buildBootstrapPlan, executeBootstrapPlan } from '../../../skills/src/bootstrap/index.js';
 import { getValidator } from '../../../schemas/src/index.js';
@@ -15,6 +16,14 @@ import { evidenceRecord } from '../../src/commands/evidence/facade.js';
 import { initBind } from '../../src/commands/init/index.js';
 import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
 import { runWithAuthorityPolicyMaterialization } from '../../src/authority/command-capabilities.js';
+import {
+  authorizeCliArgv,
+  declaredInvocationAuthority,
+  disposeCliInvocationAuthority,
+} from '../../src/authority/index.js';
+import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
+import { canonicalRegistry } from '../../src/define-command.js';
+import { resolveCliVersion } from '../../src/version.js';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { createRequire } from 'node:module';
 
@@ -460,6 +469,127 @@ describe('adopter-safe check and binding contracts', () => {
     });
   }, 30_000);
 
+  it('materializes the exact host enforcement selected by supported declarations', async () => {
+    const repo = root('devai-adopter-host-enforcement-');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/example/host-enforcement.git'],
+      { cwd: repo },
+    );
+    execFileSync('git', ['config', 'user.name', 'Host Enforcement Fixture'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: repo });
+    await establishTier3Binding(repo);
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'bind fixture'], { cwd: repo });
+    const policyPath = join(repo, '.devai/config/authority-policy.json');
+    const hostEnforcement = () =>
+      (
+        JSON.parse(readFileSync(policyPath, 'utf8')) as {
+          host_enforcement: unknown;
+        }
+      ).host_enforcement;
+
+    expect(hostEnforcement()).toEqual({ mode: 'cli-only' });
+
+    await expectCliPass([
+      'init',
+      'bind',
+      '--host-adapter',
+      'github-actions',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    expect(hostEnforcement()).toEqual({
+      mode: 'host-integrated',
+      adapter: {
+        adapter_id: 'github-actions-main-observation',
+        adapter_version: '1.5.0',
+      },
+    });
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'bind github actions adapter'], { cwd: repo });
+
+    const projectPath = join(repo, '.devai/config/project.json');
+    const project = JSON.parse(readFileSync(projectPath, 'utf8')) as Record<string, unknown>;
+    put(repo, '.devai/config/project.json', {
+      ...project,
+      authority_enforcement: {
+        mode: 'host-integrated',
+        adapter_config: '.devai/config/post-merge-host-adapter.json',
+      },
+    });
+    await expectCliPass(['init', 'bind', '--target', repo, '--as-role', 'architect', '--write']);
+    expect(hostEnforcement()).toEqual({
+      mode: 'host-integrated',
+      adapter: {
+        adapter_id: 'post-merge-host-adapter',
+        adapter_version: '1.5.0',
+      },
+    });
+  }, 30_000);
+
+  it('retains a validated authority session as the invocation declaration source', async () => {
+    const repo = root('devai-adopter-session-authority-');
+    await establishTier3Binding(repo);
+    const entries = canonicalRegistry();
+    const sources = buildTrustedAuthoritySources(entries, repo, resolveCliVersion());
+    const sessionId = 'AUTH-SESSION-0123456789abcdef0123';
+    const unsigned = {
+      schemaVersion: '1.0.0',
+      session_id: sessionId,
+      repository_id: sources.repository_id,
+      role: 'architect',
+      declaration_source: 'cli-flag',
+      status: 'active',
+      created_at: '2026-09-10T00:00:00.000Z',
+      expires_at: '2099-01-01T00:00:00.000Z',
+      created_by_invocation_id: 'cli-session-fixture',
+      policy_binding: {
+        policy_id: sources.provenance.policy_id,
+        policy_version: sources.provenance.policy_version,
+        resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+      },
+      constitution_binding: sources.constitution_binding,
+      package_binding: sources.package_binding,
+    };
+    put(repo, `.devai/state/authority-sessions/${sessionId}.json`, {
+      ...unsigned,
+      session_digest_sha256: canonicalSha256(unsigned),
+    });
+
+    try {
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'round',
+            'plan',
+            '--repo-root',
+            repo,
+            '--authority-session',
+            sessionId,
+            '--write',
+          ],
+          entries,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toMatchObject({
+        actor: {
+          kind: 'human',
+          role: 'architect',
+          declaration_source: 'session-state',
+        },
+      });
+    } finally {
+      disposeCliInvocationAuthority();
+    }
+  }, 30_000);
+
   it('executes the declared tier3 plan and role-separated apply sequence after binding', async () => {
     const repo = root('devai-tier3-role-sequence-');
     execFileSync('git', ['init', '-q'], { cwd: repo });
@@ -487,7 +617,7 @@ describe('adopter-safe check and binding contracts', () => {
     expect(readFileSync(join(repo, 'law/glossary/README.md'), 'utf8')).not.toBe('');
   }, 30_000);
 
-  it('checks mutation from adopter-owned policy and thresholds without rewriting overrides', async () => {
+  it('marks mutation unnecessary without rewriting adopter-owned overrides', async () => {
     const repo = root();
     const policy = {
       schemaVersion: '1.0.0',
@@ -508,7 +638,7 @@ describe('adopter-safe check and binding contracts', () => {
     const result = await withAuthorityHostTestScope(() =>
       executeCheckMember(checkMember('mutation'), { repoRoot: repo }),
     );
-    expect(result.status).toBe('pass');
+    expect(result.status).toBe('na');
     expect(readFileSync(join(repo, 'law/policy/mutation-strength.json'))).toEqual(before);
   });
 
@@ -822,14 +952,34 @@ describe('targeted dependency security floor', () => {
   it('resolves reviewed compatible transitive versions', () => {
     const lock = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8');
     const resolvedPackages = lock.slice(lock.indexOf('\npackages:\n'));
-    expect(resolvedPackages).not.toMatch(/^ {2}fast-uri@3\.1\.[0-4]:/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}fast-uri@3\.1\.[0-5]:/mu);
     expect(resolvedPackages).not.toMatch(/^ {2}brace-expansion@2\.1\.[0-3]:/mu);
-    expect(resolvedPackages).toMatch(/^ {2}fast-uri@3\.1\.5:/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}qs@6\.(?:[0-9]|1[0-5])\.\d+:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}fast-uri@3\.1\.6:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@1\.1\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@2\.1\.4:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@5\.0\.9:/mu);
     expect(resolvedPackages).toMatch(/^ {2}js-yaml@4\.3\.1:/mu);
     expect(resolvedPackages).toMatch(/^ {2}nanoid@3\.3\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}postcss@8\.5\.23:/mu);
+    // qs belonged to the removed mutation engine; retain its security override only.
+    expect(lock).toContain('qs@6.15.1: 6.16.0');
+    expect(resolvedPackages).not.toMatch(/^ {2}qs@/mu);
+  });
+
+  it('excludes the retired Stryker toolchain from root dependencies', () => {
+    const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      readonly dependencies?: Readonly<Record<string, string>>;
+      readonly devDependencies?: Readonly<Record<string, string>>;
+    };
+    const stryker = {
+      '@stryker-mutator/core': '9.6.1',
+      '@stryker-mutator/typescript-checker': '9.6.1',
+      '@stryker-mutator/vitest-runner': '9.6.1',
+    };
+    for (const name of Object.keys(stryker)) {
+      expect(manifest.devDependencies?.[name]).toBeUndefined();
+      expect(manifest.dependencies?.[name]).toBeUndefined();
+    }
   });
 });

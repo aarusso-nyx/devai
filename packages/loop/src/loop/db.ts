@@ -288,7 +288,7 @@ export function rebuildTemplate(opts: DbOptions): DbResult {
   if (!DB_IDENTIFIER_PATTERN.test(name)) {
     return invalidIdentifier('rebuild-template', 'template name', name);
   }
-  const dropRes = psql(opts.databaseUrl, `DROP DATABASE IF EXISTS ${name}`);
+  const dropRes = psql(opts.databaseUrl, `DROP DATABASE IF EXISTS "${name}"`);
   if (!dropRes.ok) {
     return {
       ok: false,
@@ -297,7 +297,7 @@ export function rebuildTemplate(opts: DbOptions): DbResult {
       ...(dropRes.error !== undefined && { error: dropRes.error }),
     };
   }
-  const createRes = psql(opts.databaseUrl, `CREATE DATABASE ${name}`);
+  const createRes = psql(opts.databaseUrl, `CREATE DATABASE "${name}"`);
   if (!createRes.ok) {
     return {
       ok: false,
@@ -321,8 +321,9 @@ export function provisionTask(opts: DbOptions & { taskId: string }): DbResult {
   if (!DB_IDENTIFIER_PATTERN.test(prefix)) {
     return invalidIdentifier('provision', 'task-db prefix', prefix);
   }
+  // Validation excludes quote characters; quoting preserves case and the required TASK hyphen.
   const dbName = `${prefix}${opts.taskId}`;
-  const res = psql(opts.databaseUrl, `CREATE DATABASE ${dbName} TEMPLATE ${template}`);
+  const res = psql(opts.databaseUrl, `CREATE DATABASE "${dbName}" TEMPLATE "${template}"`);
   return {
     ok: res.ok,
     action: 'provision',
@@ -346,7 +347,7 @@ export function dropTask(opts: DbOptions & { taskId: string }): DbResult {
     `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${dbName}' AND pid <> pg_backend_pid()`,
   );
   void terminate;
-  const res = psql(opts.databaseUrl, `DROP DATABASE IF EXISTS ${dbName}`);
+  const res = psql(opts.databaseUrl, `DROP DATABASE IF EXISTS "${dbName}"`);
   return {
     ok: res.ok,
     action: 'drop',

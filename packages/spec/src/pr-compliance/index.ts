@@ -13,7 +13,7 @@
  *      git diff integration.
  */
 
-const TRAILER_RE = /^[Ii]nv-[Cc]ompliance:\s*(.+?)\s*$/m;
+const TRAILER_RE = /^[Ii]nv-[Cc]ompliance:[^\S\r\n]*([^\r\n]*)$/m;
 const ID_RE = /^INV-[A-Z][A-Z0-9]{1,15}-[0-9]{3}$/;
 
 export interface PrComplianceFinding {

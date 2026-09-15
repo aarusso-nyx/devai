@@ -154,8 +154,9 @@ export function createModelBridge(options: ModelBridgeOptions) {
       if (options.provider === 'claude') {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) throw new Error('MODEL_BRIDGE_ANTHROPIC_KEY_REQUIRED');
-        const { default: Anthropic } = await optionalModule('@anthropic-ai/sdk', () =>
-          import('@anthropic-ai/sdk'),
+        const { default: Anthropic } = await optionalModule(
+          '@anthropic-ai/sdk',
+          () => import('@anthropic-ai/sdk'),
         );
         const response = await new Anthropic({ apiKey }).messages.create(
           {

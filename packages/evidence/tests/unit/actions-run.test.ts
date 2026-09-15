@@ -1,0 +1,980 @@
+import { validators } from '@devai-nyx/schemas';
+import { expect, it } from 'vitest';
+import {
+  ACTIONS_FRESHNESS_JOBS,
+  ACTIONS_REUSABLE_JOBS,
+  aggregateActionsEvidenceRequiredCheck,
+  selectActionsEvidenceJobs,
+  verifyActionsRunEvidence,
+  validateActionsEvidenceShadowTuple,
+  evaluateActionsEvidenceWindow,
+  type ActionsEvidenceWindowObservation,
+  type VerifyActionsRunEvidenceInputs,
+} from '../../src/local-evidence/actions-run.js';
+
+function windowRows(count: number, hits: number): ActionsEvidenceWindowObservation[] {
+  return Array.from({ length: count }, (_, index) => ({
+    mergeSha: (index + 1).toString(16).padStart(40, '0'),
+    disposition: index < hits ? 'promotion-hit' : 'fallback-no-evidence',
+    shadowFullEquivalent: true,
+    durable: true,
+  }));
+}
+
+it.each([
+  [0, 0, false],
+  [4, 4, false],
+  [5, 2, false],
+  [5, 3, true],
+  [6, 3, true],
+  [7, 3, false],
+  [8, 4, true],
+] as const)(
+  'requires every graduation threshold with %i merges and %i hits',
+  (count, hits, qualifies) => {
+    expect(evaluateActionsEvidenceWindow(windowRows(count, hits))).toMatchObject({
+      qualifies,
+      consecutiveMerges: count,
+      promotionHits: hits,
+    });
+  },
+);
+
+it.each([
+  ['UNKNOWN', { disposition: 'UNKNOWN' }],
+  ['invalid claim', { disposition: 'invalid-claim' }],
+  ['disagreement', { shadowFullEquivalent: false }],
+  ['undurable', { durable: false }],
+  ['mechanism defect', { mechanismDefect: true }],
+] as const)(
+  'resets both counters after %s and counts only the new complete window',
+  (_name, change) => {
+    const before = windowRows(5, 5);
+    const failed: ActionsEvidenceWindowObservation = {
+      mergeSha: 'a'.repeat(40),
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      durable: true,
+      ...change,
+    };
+    const result = evaluateActionsEvidenceWindow([...before, failed]);
+    expect(result).toMatchObject({
+      qualifies: false,
+      consecutiveMerges: 0,
+      promotionHits: 0,
+      resetAfterMerge: failed.mergeSha,
+    });
+    const after = windowRows(5, 3).map((row, index) => ({
+      ...row,
+      mergeSha: (index + 20).toString(16).padStart(40, '0'),
+    }));
+    expect(evaluateActionsEvidenceWindow([...before, failed, ...after])).toMatchObject({
+      qualifies: true,
+      consecutiveMerges: 5,
+      promotionHits: 3,
+      resetAfterMerge: failed.mergeSha,
+    });
+  },
+);
+
+// Invariants: INV-DEVAI-020. Reuse must preserve current authorization and exact evidence inputs.
+function fixture() {
+  const tree = { algorithm: 'sha1' as const, value: 'a'.repeat(40) };
+  const sourceHash = { algorithm: 'sha256' as const, value: 'b'.repeat(64), fileCount: 12 };
+  const digests = {
+    workflowPolicySha256: '1'.repeat(64),
+    lockfileSha256: '2'.repeat(64),
+    toolchainContractSha256: '3'.repeat(64),
+    testContractSha256: '4'.repeat(64),
+    serviceContractSha256: '5'.repeat(64),
+  };
+  const identity = {
+    repository: 'example/adopter',
+    workflowRef: 'example/adopter/.github/workflows/ci.yml@refs/pull/1/merge',
+    eventName: 'pull_request' as const,
+    runId: '123',
+    runAttempt: 2,
+    actor: 'inspector',
+    headSha: 'c'.repeat(40),
+    baseSha: 'd'.repeat(40),
+    mergeBaseSha: 'e'.repeat(40),
+    testedCommitSha: 'f'.repeat(40),
+    testedTree: tree,
+    digests,
+  };
+  const manifest = {
+    schemaVersion: 1 as const,
+    origin: 'actions-run' as const,
+    generatedAt: '2026-09-07T00:00:00.000Z',
+    expiresAt: '2026-09-08T00:00:00.000Z',
+    subject: { repository: identity.repository, commitSha: identity.testedCommitSha, tree },
+    sourceHash,
+    policy: {
+      maxAgeHours: 24,
+      requiredJobs: [...ACTIONS_REUSABLE_JOBS],
+      allowedPlatforms: ['linux/amd64'],
+    },
+    tools: {},
+    platforms: ['linux/amd64'],
+    jobs: Object.fromEntries(
+      ACTIONS_REUSABLE_JOBS.map((job) => [
+        job,
+        {
+          result: 'success' as const,
+          metadata: { job, platform: 'linux/amd64' },
+          artifactChecksum: { algorithm: 'sha256', value: '6'.repeat(64), fileCount: 1 },
+        },
+      ]),
+    ),
+    actionsRun: identity,
+  };
+  return {
+    mode: 'gate' as const,
+    gateAuthorization: {
+      authorized: true,
+      status: 'active' as const,
+      source: 'base-parent' as const,
+      reason: 'approved',
+    },
+    manifest,
+    current: {
+      ...identity,
+      basePolicySatisfied: true,
+      headIsMergeInput: true,
+      mergedTree: tree,
+      recomputedSourceHash: sourceHash,
+      successfulJobs: [...ACTIONS_REUSABLE_JOBS],
+    },
+  };
+}
+
+function tuple() {
+  const { manifest } = fixture();
+  const run = manifest.actionsRun;
+  return {
+    manifest,
+    fullResult: {
+      schemaVersion: 1,
+      kind: 'actions-run-full-result',
+      result: 'success',
+      fullCiAuthoritative: true,
+      repository: run.repository,
+      workflowRef: run.workflowRef,
+      runId: run.runId,
+      runAttempt: run.runAttempt,
+      testedCommitSha: run.testedCommitSha,
+      testedTree: run.testedTree,
+      jobs: Object.fromEntries(ACTIONS_REUSABLE_JOBS.map((job) => [job, 'success'])),
+    },
+    decision: {
+      schemaVersion: 1,
+      kind: 'actions-evidence-shadow-decision',
+      mainRunId: '456',
+      mainRunAttempt: 1,
+      mergedCommitSha: '7'.repeat(40),
+      fullCiResult: 'success',
+      executeFullCi: true,
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      reason: 'exact tested tree',
+      reusableJobs: [...ACTIONS_REUSABLE_JOBS],
+      freshnessJobs: [...ACTIONS_FRESHNESS_JOBS],
+    },
+    mergeParents: [run.baseSha, run.headSha],
+  };
+}
+
+it.each([40, 64])('accepts an exact shadow tuple with a %i-character Git identity', (length) => {
+  const input = tuple();
+  input.decision.mergedCommitSha = '7'.repeat(length);
+  expect(validateActionsEvidenceShadowTuple(input)).toEqual({
+    mergeSha: '7'.repeat(length),
+    disposition: 'promotion-hit',
+    shadowFullEquivalent: true,
+    durable: true,
+  });
+});
+
+it.each([39, 41, 48, 63, 65])('rejects a %i-character non-Git merge identity', (length) => {
+  const input = tuple();
+  input.decision.mergedCommitSha = '7'.repeat(length);
+  expect(() => validateActionsEvidenceShadowTuple(input)).toThrow(
+    'shadow decision merge SHA is invalid',
+  );
+});
+
+it.each([
+  ['repository', 'wrong/repository', 'full result repository does not match the manifest'],
+  ['workflowRef', 'wrong/workflow', 'full result workflowRef does not match the manifest'],
+  ['runId', '999', 'full result runId does not match the manifest'],
+  ['runAttempt', 1, 'full result runAttempt does not match the manifest'],
+  ['testedCommitSha', '8'.repeat(40), 'full result testedCommitSha does not match the manifest'],
+  ['schemaVersion', 2, 'full result schemaVersion is invalid'],
+  ['kind', 'other', 'full result kind is invalid'],
+  ['result', 'failure', 'full result is not successful'],
+  ['fullCiAuthoritative', false, 'full result is not authoritative'],
+  [
+    'testedTree',
+    { algorithm: 'sha1', value: '9'.repeat(40) },
+    'full result tested tree does not match the manifest',
+  ],
+] as const)('rejects substituted full-result %s', (field, value, reason) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      fullResult: { ...input.fullResult, [field]: value },
+    }),
+  ).toThrow(`actions evidence tuple: ${reason}`);
+});
+
+it.each(ACTIONS_REUSABLE_JOBS)(
+  'requires authoritative success for %s in the full result',
+  (job) => {
+    const input = tuple();
+    input.fullResult.jobs = Object.fromEntries(
+      Object.entries(input.fullResult.jobs).filter(([name]) => name !== job),
+    );
+    expect(() => validateActionsEvidenceShadowTuple(input)).toThrow(
+      `full result is missing successful job ${job}`,
+    );
+  },
+);
+
+it.each([
+  ['schemaVersion', 2, 'shadow decision schemaVersion is invalid'],
+  ['kind', 'other', 'shadow decision kind is invalid'],
+  ['mainRunId', '', 'shadow decision main run id is invalid'],
+  ['mainRunAttempt', 0, 'shadow decision main run attempt is invalid'],
+  ['mainRunAttempt', 1.5, 'shadow decision main run attempt is invalid'],
+  ['fullCiResult', 'failure', 'shadow decision full CI is not successful'],
+  ['executeFullCi', false, 'shadow decision did not execute full CI'],
+  ['reason', '', 'shadow reason is missing'],
+  ['disposition', 'invented', 'shadow disposition is invalid'],
+  ['shadowFullEquivalent', false, 'promotion-hit must record shadow/full equivalence'],
+  ['reusableJobs', [], 'shadow reusable-job set does not match the current contract'],
+  ['freshnessJobs', [], 'shadow freshness-job set does not match the current contract'],
+] as const)('rejects invalid shadow-decision %s=%s', (field, value, reason) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      decision: { ...input.decision, [field]: value },
+    }),
+  ).toThrow(`actions evidence tuple: ${reason}`);
+});
+
+it.each(['reversed', 'missing', 'extra'] as const)('rejects %s merge-parent identity', (kind) => {
+  const input = tuple();
+  const mergeParents =
+    kind === 'reversed'
+      ? input.mergeParents.toReversed()
+      : kind === 'missing'
+        ? input.mergeParents.slice(0, 1)
+        : [...input.mergeParents, '8'.repeat(40)];
+  expect(() => validateActionsEvidenceShadowTuple({ ...input, mergeParents })).toThrow(
+    'exact tested base and head merge inputs',
+  );
+});
+
+it.each(['UNKNOWN', 'invalid-claim'])(
+  'retains %s as a non-equivalent observation',
+  (disposition) => {
+    const input = tuple();
+    expect(() =>
+      validateActionsEvidenceShadowTuple({
+        ...input,
+        decision: { ...input.decision, disposition },
+      }),
+    ).toThrow('cannot claim shadow/full equivalence');
+    expect(
+      validateActionsEvidenceShadowTuple({
+        ...input,
+        decision: { ...input.decision, disposition, shadowFullEquivalent: false },
+      }),
+    ).toMatchObject({ disposition, shadowFullEquivalent: false, durable: true });
+  },
+);
+
+it('reuses only the heavy jobs while retaining every freshness job', () => {
+  const result = verifyActionsRunEvidence(fixture());
+  expect(result).toEqual({
+    disposition: 'promotion-hit',
+    reason: 'exact tested value is eligible for promotion',
+    executeFullCi: false,
+    hardFailure: false,
+    reusableJobs: ACTIONS_REUSABLE_JOBS,
+    freshnessJobs: ACTIONS_FRESHNESS_JOBS,
+  });
+  expect(selectActionsEvidenceJobs(result)).toEqual({
+    runJobs: ACTIONS_FRESHNESS_JOBS,
+    skippedJobs: ACTIONS_REUSABLE_JOBS,
+  });
+});
+
+it('executes full CI during shadow observation even for an exact hit', () => {
+  const result = verifyActionsRunEvidence({ ...fixture(), mode: 'shadow' });
+  expect(result).toMatchObject({
+    disposition: 'promotion-hit',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+  expect(selectActionsEvidenceJobs(result)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
+
+it.each(['revoked', 'unavailable'] as const)(
+  'does not promote under %s authorization',
+  (status) => {
+    const input = fixture();
+    expect(
+      verifyActionsRunEvidence({
+        ...input,
+        gateAuthorization: { ...input.gateAuthorization, status },
+      }),
+    ).toMatchObject({
+      disposition: 'fallback-no-evidence',
+      reason: 'active graduation authorization from the base parent is unavailable',
+      executeFullCi: true,
+      hardFailure: false,
+    });
+  },
+);
+
+it.each([
+  ['repository', 'other/repository', 'repository identity does not match the claim'],
+  ['workflowRef', 'other/workflow', 'workflow identity does not match the claim'],
+  ['runId', '124', 'run id does not match the selected evidence run'],
+  ['runAttempt', 3, 'run attempt does not match the selected evidence run'],
+  ['headSha', '1'.repeat(40), 'PR head is not the claimed merge input'],
+  ['mergeBaseSha', '2'.repeat(40), 'merge-base identity does not match the claim'],
+  ['headIsMergeInput', false, 'PR head is not an input to the configured merge method'],
+] as const)('rejects substituted %s', (field, value, reason) => {
+  const input = fixture();
+  const result = verifyActionsRunEvidence({
+    ...input,
+    current: { ...input.current, [field]: value },
+  });
+  expect(result).toMatchObject({
+    disposition: 'invalid-claim',
+    reason,
+    executeFullCi: true,
+    hardFailure: true,
+  });
+});
+
+it.each(ACTIONS_REUSABLE_JOBS)(
+  'will not skip missing mandatory job %s even if the claim omits it',
+  (job) => {
+    const input = fixture();
+    input.current.successfulJobs = input.current.successfulJobs.filter((name) => name !== job);
+    input.manifest.policy.requiredJobs = input.manifest.policy.requiredJobs.filter(
+      (name) => name !== job,
+    );
+    expect(verifyActionsRunEvidence(input)).toMatchObject({
+      disposition: 'fallback-job-incomplete',
+      executeFullCi: true,
+    });
+  },
+);
+
+it.each(['preflight', 'evidenceGate', 'freshness', 'reusable'] as const)(
+  'fails the required result when %s fails',
+  (field) => {
+    const inputs = {
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'success',
+      decision: verifyActionsRunEvidence(fixture()),
+    } as const;
+    expect(aggregateActionsEvidenceRequiredCheck({ ...inputs, [field]: 'failure' })).toBe(
+      'failure',
+    );
+  },
+);
+
+it('accepts skipped heavy jobs only for authorized promotion, never shadow execution', () => {
+  const common = {
+    preflight: 'success',
+    evidenceGate: 'success',
+    freshness: 'success',
+    reusable: 'skipped',
+  } as const;
+  expect(
+    aggregateActionsEvidenceRequiredCheck({
+      ...common,
+      decision: verifyActionsRunEvidence(fixture()),
+    }),
+  ).toBe('success');
+  expect(
+    aggregateActionsEvidenceRequiredCheck({
+      ...common,
+      decision: verifyActionsRunEvidence({ ...fixture(), mode: 'shadow' }),
+    }),
+  ).toBe('failure');
+});
+
+it('refuses an authorization from a caller-selected source', () => {
+  const input = fixture();
+  const altered = {
+    ...input,
+    gateAuthorization: { ...input.gateAuthorization, source: 'candidate' },
+  };
+  expect(
+    verifyActionsRunEvidence(altered as unknown as VerifyActionsRunEvidenceInputs),
+  ).toMatchObject({ disposition: 'fallback-no-evidence', executeFullCi: true });
+});
+
+it.each([
+  {
+    name: 'expiry interval',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.expiresAt = '2026-09-08T00:00:00.001Z';
+    },
+  },
+  {
+    name: 'policy age binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.policy.maxAgeHours = 23;
+    },
+  },
+  {
+    name: 'repository binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.subject = { ...m.subject, repository: 'example/different' };
+    },
+  },
+  {
+    name: 'commit binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.subject = { ...m.subject, commitSha: '0'.repeat(40) };
+    },
+  },
+  {
+    name: 'tree binding',
+    change: (m: ReturnType<typeof fixture>['manifest']) => {
+      m.subject = { ...m.subject, tree: { ...m.subject.tree, value: '0'.repeat(40) } };
+    },
+  },
+])(
+  'rejects internally inconsistent manifest $name before granting reuse or durable shadow evidence',
+  ({ change }) => {
+    const input = fixture();
+    change(input.manifest);
+    expect(verifyActionsRunEvidence(input)).toMatchObject({
+      disposition: 'invalid-claim',
+      executeFullCi: true,
+      hardFailure: true,
+    });
+    const observation = tuple();
+    observation.manifest = input.manifest;
+    expect(() => validateActionsEvidenceShadowTuple(observation)).toThrow(
+      'manifest is not a valid actions-run claim',
+    );
+  },
+);
+
+it.each([
+  { value: '0'.repeat(64), fileCount: 12 },
+  { value: 'b'.repeat(64), fileCount: 13 },
+])('refuses reuse when independently recomputed source hash differs: %j', (source) => {
+  const input = fixture();
+  input.current.recomputedSourceHash = { algorithm: 'sha256', ...source };
+  const result = verifyActionsRunEvidence(input);
+  expect(result.executeFullCi).toBe(true);
+  expect(result).toMatchObject({
+    disposition: 'fallback-tree-mismatch',
+    reason: 'merged-checkout sourceHash or source file count differs from the claim',
+    hardFailure: false,
+  });
+});
+
+it.each(['preflight', 'evidenceGate', 'freshness'] as const)(
+  'fails the required result when mandatory %s could not run',
+  (field) => {
+    const input = {
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'success',
+      decision: verifyActionsRunEvidence(fixture()),
+    } as const;
+    expect(aggregateActionsEvidenceRequiredCheck({ ...input, [field]: 'skipped' })).toBe('failure');
+  },
+);
+
+it('cannot mask an invalid evidence claim with successful CI jobs', () => {
+  const input = fixture();
+  input.current.headSha = '0'.repeat(40);
+  const decision = verifyActionsRunEvidence(input);
+  expect(decision.hardFailure).toBe(true);
+  expect(
+    aggregateActionsEvidenceRequiredCheck({
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'success',
+      decision,
+    }),
+  ).toBe('failure');
+  expect(selectActionsEvidenceJobs(decision)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
+
+it('requires and accepts actual full execution after a legitimate evidence miss', () => {
+  const decision = verifyActionsRunEvidence({ ...fixture(), manifest: null });
+  expect(decision).toMatchObject({
+    executeFullCi: true,
+    hardFailure: false,
+    disposition: 'fallback-no-evidence',
+    reason: 'no Actions-run evidence claim exists',
+  });
+  const base = {
+    preflight: 'success',
+    evidenceGate: 'success',
+    freshness: 'success',
+    decision,
+  } as const;
+  expect(aggregateActionsEvidenceRequiredCheck({ ...base, reusable: 'success' })).toBe('success');
+  expect(aggregateActionsEvidenceRequiredCheck({ ...base, reusable: 'skipped' })).toBe('failure');
+  expect(selectActionsEvidenceJobs(decision)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
+
+it.each([
+  ['lockfileSha256', 'fallback-lockfile-changed', 'lockfile digest changed'],
+  ['toolchainContractSha256', 'fallback-toolchain-changed', 'toolchain contract digest changed'],
+  ['workflowPolicySha256', 'fallback-policy-changed', 'workflow policy digest changed'],
+  ['testContractSha256', 'fallback-policy-changed', 'test contract digest changed'],
+  ['serviceContractSha256', 'fallback-policy-changed', 'service contract digest changed'],
+] as const)(
+  'requires full execution after independently changed %s',
+  (field, disposition, reason) => {
+    const input = fixture();
+    input.current.digests = { ...input.current.digests, [field]: '0'.repeat(64) };
+    expect(verifyActionsRunEvidence(input)).toEqual({
+      disposition,
+      reason,
+      executeFullCi: true,
+      hardFailure: false,
+      reusableJobs: ACTIONS_REUSABLE_JOBS,
+      freshnessJobs: ACTIONS_FRESHNESS_JOBS,
+    });
+  },
+);
+
+it.each([{ baseSha: '0'.repeat(40) }, { basePolicySatisfied: false }])(
+  'requires full execution after changed base condition %j',
+  (change) => {
+    const input = fixture();
+    expect(
+      verifyActionsRunEvidence({ ...input, current: { ...input.current, ...change } }),
+    ).toMatchObject({
+      disposition: 'fallback-base-moved',
+      reason: 'protected base moved or required up-to-date/merge-queue policy was not satisfied',
+      executeFullCi: true,
+      hardFailure: false,
+    });
+  },
+);
+
+it('refuses to reuse a different actual merged tree while preserving fallback rather than invalid-claim classification', () => {
+  const input = fixture();
+  input.current.mergedTree = { ...input.current.mergedTree, value: '0'.repeat(40) };
+  expect(verifyActionsRunEvidence(input)).toMatchObject({
+    disposition: 'fallback-tree-mismatch',
+    reason: 'actual merged tree differs from tested tree',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+});
+
+it('honors additional jobs required by the claim without subtracting the built-in floor', () => {
+  const base = fixture();
+  const input = {
+    ...base,
+    manifest: {
+      ...base.manifest,
+      policy: {
+        ...base.manifest.policy,
+        requiredJobs: [...base.manifest.policy.requiredJobs, 'extra-verification'],
+      },
+    },
+  };
+  expect(verifyActionsRunEvidence(input)).toMatchObject({
+    disposition: 'fallback-job-incomplete',
+    reason: 'required heavy job is incomplete: extra-verification',
+    executeFullCi: true,
+  });
+  expect(
+    verifyActionsRunEvidence({
+      ...input,
+      current: {
+        ...input.current,
+        successfulJobs: [...input.current.successfulJobs, 'extra-verification'],
+      },
+    }).disposition,
+  ).toBe('promotion-hit');
+});
+
+it.each([
+  ['fullResult', null, 'full result is not an object'],
+  ['fullResult', [], 'full result is not an object'],
+  ['fullResult', 'success', 'full result is not an object'],
+  ['decision', null, 'shadow decision is not an object'],
+  ['decision', [], 'shadow decision is not an object'],
+  ['decision', true, 'shadow decision is not an object'],
+] as const)('rejects non-record %s without losing the refusal reason', (field, value, reason) => {
+  expect(() => validateActionsEvidenceShadowTuple({ ...tuple(), [field]: value })).toThrow(
+    `actions evidence tuple: ${reason}`,
+  );
+});
+
+it.each([
+  ['fallback-no-evidence'],
+  ['fallback-tree-mismatch'],
+  ['fallback-base-moved'],
+  ['fallback-policy-changed'],
+  ['fallback-lockfile-changed'],
+  ['fallback-toolchain-changed'],
+  ['fallback-job-incomplete'],
+] as const)('retains a verified full-CI fallback observation: %s', (disposition) => {
+  const input = tuple();
+  // A fallback runs full CI on the current merge; it does not assert reuse of
+  // the source run's exact parents, but still binds the transported full result.
+  const result = validateActionsEvidenceShadowTuple({
+    ...input,
+    decision: { ...input.decision, disposition },
+    mergeParents: ['8'.repeat(40), '9'.repeat(40)],
+  });
+  expect(result).toEqual({
+    mergeSha: input.decision.mergedCommitSha,
+    disposition,
+    shadowFullEquivalent: true,
+    durable: true,
+  });
+});
+
+it.each([
+  [
+    'UNKNOWN',
+    { disposition: 'UNKNOWN' },
+    'UNKNOWN observation is non-skippable and resets the candidate window',
+  ],
+  [
+    'mechanism defect',
+    { mechanismDefect: true },
+    'promotion mechanism defect resets the candidate window',
+  ],
+  ['undurable', { durable: false }, 'undurable observation resets the candidate window'],
+  [
+    'disagreement',
+    { shadowFullEquivalent: false },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+  [
+    'invalid claim',
+    { disposition: 'invalid-claim' },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+] as const)(
+  'explains the %s reset until a complete new window qualifies',
+  (_name, change, reason) => {
+    const failed: ActionsEvidenceWindowObservation = {
+      mergeSha: 'a'.repeat(40),
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      durable: true,
+      ...change,
+    };
+    expect(
+      evaluateActionsEvidenceWindow([...windowRows(5, 5), failed, ...windowRows(4, 3)]),
+    ).toEqual({
+      qualifies: false,
+      consecutiveMerges: 4,
+      promotionHits: 3,
+      resetAfterMerge: failed.mergeSha,
+      reason,
+    });
+    expect(evaluateActionsEvidenceWindow([failed, ...windowRows(5, 3)])).toMatchObject({
+      qualifies: true,
+      reason:
+        'candidate window satisfies consecutive merge, promotion-hit, and hit-rate thresholds',
+    });
+  },
+);
+
+it('compares transported Git tree identity independently of JSON property order', () => {
+  const input = tuple();
+  const { algorithm, value } = input.fullResult.testedTree;
+  const transported = JSON.parse(
+    JSON.stringify({ ...input.fullResult, testedTree: { value, algorithm } }),
+  );
+  expect(validateActionsEvidenceShadowTuple({ ...input, fullResult: transported })).toEqual({
+    mergeSha: input.decision.mergedCommitSha,
+    disposition: 'promotion-hit',
+    shadowFullEquivalent: true,
+    durable: true,
+  });
+});
+
+it.each([
+  ['missing', undefined],
+  ['null', null],
+  ['array', []],
+  ['algorithm only', { algorithm: 'sha1' }],
+  ['value only', { value: 'a'.repeat(40) }],
+  ['extra field', { algorithm: 'sha1', value: 'a'.repeat(40), extra: true }],
+  ['wrong algorithm', { algorithm: 'sha256', value: 'a'.repeat(40) }],
+  ['wrong value', { algorithm: 'sha1', value: 'b'.repeat(40) }],
+] as const)('refuses a %s transported Git tree identity', (_name, testedTree) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      fullResult: { ...input.fullResult, testedTree },
+    }),
+  ).toThrow('full result tested tree does not match the manifest');
+});
+
+it.each([0, 1])('rejects a promotion when only merge parent %i differs', (index) => {
+  const input = tuple();
+  const mergeParents = [...input.mergeParents];
+  mergeParents[index] = '8'.repeat(40);
+  expect(() => validateActionsEvidenceShadowTuple({ ...input, mergeParents })).toThrow(
+    'exact tested base and head merge inputs',
+  );
+});
+
+it('records an exact shadow hit without graduation authorization and still executes every CI job', () => {
+  const input = fixture();
+  const result = verifyActionsRunEvidence({
+    mode: 'shadow',
+    manifest: input.manifest,
+    current: input.current,
+  });
+  expect(result).toMatchObject({
+    disposition: 'promotion-hit',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+  expect(selectActionsEvidenceJobs(result)).toEqual({
+    runJobs: [...ACTIONS_FRESHNESS_JOBS, ...ACTIONS_REUSABLE_JOBS],
+    skippedJobs: [],
+  });
+});
+
+it('does not let an inconsistent fallback decision justify skipped required tests', () => {
+  const decision = {
+    ...verifyActionsRunEvidence(fixture()),
+    disposition: 'fallback-no-evidence' as const,
+    executeFullCi: false,
+  };
+  expect(
+    aggregateActionsEvidenceRequiredCheck({
+      preflight: 'success',
+      evidenceGate: 'success',
+      freshness: 'success',
+      reusable: 'skipped',
+      decision,
+    }),
+  ).toBe('failure');
+});
+
+it.each([
+  [
+    'negative source population',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      m.sourceHash = { ...m.sourceHash, fileCount: -1 };
+    },
+  ],
+  [
+    'invalid source digest',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      m.sourceHash = { ...m.sourceHash, value: 'not-a-digest' };
+    },
+  ],
+  [
+    'invalid artifact digest',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      const job = Object.values(m.jobs)[0];
+      if (job === undefined) throw new Error('fixture job missing');
+      job.artifactChecksum.value = 'not-a-digest';
+    },
+  ],
+  [
+    'negative artifact population',
+    (m: ReturnType<typeof fixture>['manifest']) => {
+      const job = Object.values(m.jobs)[0];
+      if (job === undefined) throw new Error('fixture job missing');
+      job.artifactChecksum.fileCount = -1;
+    },
+  ],
+] as const)('rejects %s at the manifest schema boundary', (_name, change) => {
+  for (const mode of ['gate', 'shadow'] as const) {
+    const input = fixture();
+    expect(verifyActionsRunEvidence({ ...input, mode }).disposition).toBe('promotion-hit');
+    change(input.manifest);
+    const result = verifyActionsRunEvidence({ ...input, mode });
+    expect(result).toMatchObject({
+      disposition: 'invalid-claim',
+      hardFailure: true,
+      executeFullCi: true,
+      reason: 'Actions-run evidence manifest or schema claim is invalid',
+    });
+    expect(selectActionsEvidenceJobs(result).skippedJobs).toEqual([]);
+  }
+  const input = tuple();
+  change(input.manifest);
+  let caught: unknown;
+  try {
+    validateActionsEvidenceShadowTuple(input);
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toMatchObject({
+    actionsEvidenceFailure: true,
+    message: 'actions evidence tuple: manifest is not a valid actions-run claim',
+  });
+});
+
+it('rejects a schema-valid local claim at the Actions trust boundary', () => {
+  const input = fixture();
+  const local: Record<string, unknown> = { ...input.manifest, origin: 'local' };
+  delete local['actionsRun'];
+  expect(validators.localEvidenceManifest(local)).toBe(true);
+  expect(() => verifyActionsRunEvidence({ ...input, manifest: local })).not.toThrow();
+  expect(verifyActionsRunEvidence({ ...input, manifest: local })).toMatchObject({
+    disposition: 'invalid-claim',
+    reason: 'Actions-run evidence manifest or schema claim is invalid',
+    executeFullCi: true,
+    hardFailure: true,
+  });
+  const observation = tuple();
+  expect(() => validateActionsEvidenceShadowTuple({ ...observation, manifest: local })).toThrow(
+    'manifest is not a valid actions-run claim',
+  );
+});
+
+it.each([
+  [
+    'UNKNOWN',
+    { disposition: 'UNKNOWN' },
+    'UNKNOWN observation is non-skippable and resets the candidate window',
+  ],
+  [
+    'invalid claim',
+    { disposition: 'invalid-claim' },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+  [
+    'disagreement',
+    { shadowFullEquivalent: false },
+    'shadow/full disagreement or invalid claim resets the candidate window',
+  ],
+  ['undurable', { durable: false }, 'undurable observation resets the candidate window'],
+  [
+    'mechanism defect',
+    { mechanismDefect: true },
+    'promotion mechanism defect resets the candidate window',
+  ],
+] as const)(
+  'preserves the %s reset cause until a fresh complete window qualifies',
+  (_name, change, reason) => {
+    const failed: ActionsEvidenceWindowObservation = {
+      mergeSha: 'a'.repeat(40),
+      disposition: 'promotion-hit',
+      shadowFullEquivalent: true,
+      durable: true,
+      ...change,
+    };
+    const history = [...windowRows(5, 5), failed, ...windowRows(2, 2)];
+    expect(evaluateActionsEvidenceWindow(history)).toEqual({
+      qualifies: false,
+      consecutiveMerges: 2,
+      promotionHits: 2,
+      resetAfterMerge: failed.mergeSha,
+      reason,
+    });
+    expect(evaluateActionsEvidenceWindow([...history, ...windowRows(3, 1)])).toEqual({
+      qualifies: true,
+      consecutiveMerges: 5,
+      promotionHits: 3,
+      resetAfterMerge: failed.mergeSha,
+      reason:
+        'candidate window satisfies consecutive merge, promotion-hit, and hit-rate thresholds',
+    });
+  },
+);
+
+it('reports an incomplete initial window without inventing a reset observation', () => {
+  for (const rows of [[], windowRows(4, 4)]) {
+    expect(evaluateActionsEvidenceWindow(rows)).toEqual({
+      qualifies: false,
+      consecutiveMerges: rows.length,
+      promotionHits: rows.length,
+      reason: 'candidate window has not reached every graduation threshold',
+    });
+  }
+});
+
+it.each([
+  { label: 'missing', jobs: undefined },
+  { label: 'null', jobs: null },
+  { label: 'array', jobs: [] },
+  { label: 'string', jobs: 'success' },
+])('refuses $label full-result jobs before inspecting individual job results', ({ jobs }) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      fullResult: { ...input.fullResult, jobs },
+    }),
+  ).toThrow('actions evidence tuple: full result jobs are missing');
+});
+
+it.each([
+  { label: 'missing', equivalent: undefined },
+  { label: 'null', equivalent: null },
+  { label: 'truthy string', equivalent: 'true' },
+  { label: 'numeric zero', equivalent: 0 },
+])('refuses $label shadow equivalence before evaluating its disposition', ({ equivalent }) => {
+  const input = tuple();
+  expect(() =>
+    validateActionsEvidenceShadowTuple({
+      ...input,
+      decision: { ...input.decision, shadowFullEquivalent: equivalent },
+    }),
+  ).toThrow('actions evidence tuple: shadow/full equivalence is invalid');
+});
+
+it('does not reuse equal tree values under a different Git hash algorithm', () => {
+  const input = fixture();
+  expect(
+    verifyActionsRunEvidence({
+      ...input,
+      current: {
+        ...input.current,
+        mergedTree: { algorithm: 'sha256', value: input.current.mergedTree.value },
+      },
+    }),
+  ).toMatchObject({
+    disposition: 'fallback-tree-mismatch',
+    reason: 'actual merged tree differs from tested tree',
+    executeFullCi: true,
+    hardFailure: false,
+  });
+});
+
+it('omits a reset identity entirely when the observation window has never reset', () => {
+  for (const rows of [[], windowRows(4, 3), windowRows(5, 3)]) {
+    expect(Object.hasOwn(evaluateActionsEvidenceWindow(rows), 'resetAfterMerge')).toBe(false);
+  }
+});

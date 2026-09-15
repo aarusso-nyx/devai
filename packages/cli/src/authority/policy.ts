@@ -234,6 +234,105 @@ export function buildTrustedAuthoritySources(
   const human = (role: string) => [{ kind: 'human', roles: [role] }];
   const joint = [{ kind: 'human', roles: ['owner', 'architect'] }];
   const coreRules = defined([
+    ...[
+      {
+        kind: 'export-sink',
+        capability: 'artifact-sink:write',
+        system: 'trusted-export-artifact-sink-v1',
+        operation: 'write',
+      },
+      {
+        kind: 'export-signer',
+        capability: 'protected-export-signer-v1:sign',
+        system: 'protected-export-signer-v1',
+        operation: 'sign',
+      },
+    ].map((adapter) =>
+      rule({
+        id: `core-protected-release-${adapter.kind}`,
+        origin: 'immutable-core',
+        precedence: 750,
+        actionIds: actionIds(
+          entries,
+          (entry) =>
+            entry.name === 'release export' &&
+            entry.authority_contract.capabilities.some(
+              (capability) => capability === adapter.capability,
+            ),
+        ),
+        selector: {
+          kind: 'remote',
+          system_id: adapter.system,
+          endpoint_ids: ['host'],
+          operation_ids: [adapter.operation],
+          publication: false,
+        },
+        subjects: human('architect'),
+        rationale:
+          'Dedicated export-only capability; the live broker binds repository, candidate, plan, parent, destination, trust and one bounded export account. No prepare or generic remote authority transfers.',
+      }),
+    ),
+    rule({
+      id: 'core-protected-release-artifact-sink',
+      origin: 'immutable-core',
+      precedence: 750,
+      actionIds: actionIds(
+        entries,
+        (entry) =>
+          entry.name === 'release prepare' &&
+          entry.authority_contract.capabilities.includes('artifact-sink:write'),
+      ),
+      selector: {
+        kind: 'remote',
+        system_id: 'trusted-artifact-sink-v3',
+        endpoint_ids: ['host'],
+        operation_ids: ['write'],
+        publication: false,
+      },
+      subjects: human('architect'),
+      rationale:
+        'Pure prepare exposes bytes only through the exact host-bound opaque artifact sink; the final boundary rechecks candidate, plan and live prepare capability.',
+    }),
+    ...[
+      {
+        kind: 'provider',
+        capability: 'protected-certification-provider-v3:execute',
+        system: 'devai-protected-certification-provider-v3',
+        operation: 'execute',
+        actions: ['release preflight', 'release certify'],
+      },
+      {
+        kind: 'sink',
+        capability: 'certification-evidence-sink:write',
+        system: 'trusted-certification-evidence-sink-v1',
+        operation: 'write',
+        actions: ['release certify'],
+      },
+    ].map((adapter) =>
+      rule({
+        id: `core-protected-release-${adapter.kind}`,
+        origin: 'immutable-core',
+        precedence: 750,
+        actionIds: actionIds(
+          entries,
+          (entry) =>
+            adapter.actions.includes(entry.name) &&
+            entry.authority_contract.capabilities.some(
+              (capability) => capability === adapter.capability,
+            ),
+        ),
+        selector: {
+          kind: 'remote',
+          system_id: adapter.system,
+          endpoint_ids: ['host'],
+          operation_ids: [adapter.operation],
+          publication: false,
+        },
+        subjects: [harnessSubject(['inspector'])],
+        rationale:
+          'Frozen protected release adapter; exact host capability, candidate, task policy and stage are reverified by the final boundary.',
+      }),
+    ),
     rule({
       id: 'core-owner-product-root',
       origin: 'immutable-core',
@@ -393,6 +492,19 @@ export function buildTrustedAuthoritySources(
       subjects: [machineSubject('harness')],
       rationale: 'Article 6 verb-attributed harness state directory transition.',
     }),
+    ...['release prepare', 'release export'].flatMap((action) =>
+      ['.devai/state/release-lifecycle', '.devai/state/release-lifecycle/**'].map((path, index) =>
+        rule({
+          id: `core-architect-${action.replace(' ', '-')}-output-${String(index + 1)}`,
+          origin: 'immutable-core',
+          precedence: 900,
+          actionIds: groups.architect.includes(action) ? [action] : [],
+          selector: fsSelector(repositoryId, path),
+          subjects: human('architect'),
+          rationale: `${action} may append only lifecycle state; artifact bytes cross the dedicated trusted sink boundary.`,
+        }),
+      ),
+    ),
     rule({
       id: 'core-harness-worktrees',
       origin: 'immutable-core',

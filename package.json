@@ -1,9 +1,9 @@
 {
   "name": "devai",
   "private": true,
-  "version": "1.4.5",
+  "version": "1.5.0",
   "type": "module",
-  "description": "DEVAI 1.4 developer-acceleration CLI for focused automation and trustworthy evidence.",
+  "description": "DEVAI 1.5 developer-acceleration CLI for focused automation and trustworthy evidence.",
   "license": "Apache-2.0",
   "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
   "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c",
@@ -15,14 +15,16 @@
       "brace-expansion@1.1.16": "1.1.18",
       "brace-expansion@2.1.2": "2.1.4",
       "brace-expansion@5.0.8": "5.0.9",
-      "fast-uri@3.1.4": "3.1.5",
+      "fast-uri@3.1.4": "3.1.6",
       "js-yaml@4.3.0": "4.3.1",
       "nanoid@3.3.16": "3.3.18",
-      "postcss@8.5.22": "8.5.23"
+      "postcss@8.5.22": "8.5.23",
+      "fast-uri@3.1.5": "3.1.6",
+      "qs@6.15.1": "6.16.0"
     }
   },
   "scripts": {
-    "devai:prepare": "node scripts/check-policy-materialization.mjs && node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-error-code-reference.mjs --check && node scripts/generate-action-registry.mjs",
+    "devai:prepare": "node scripts/check-mutation-free-delivery.mjs && node scripts/check-policy-materialization.mjs && node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-error-code-reference.mjs --check && node scripts/generate-action-registry.mjs",
     "test-task-selectors:check": "node scripts/check-test-task-workspace-selectors.mjs --check",
     "action-registry:check": "node scripts/generate-action-registry.mjs --check",
     "error-codes:generate": "node scripts/generate-error-code-reference.mjs",
@@ -31,6 +33,7 @@
     "release:static-integrity": "node scripts/check-release-static-integrity.mjs",
     "release:pr-gate": "node scripts/run-pr-release-gate.mjs",
     "format:check": "node scripts/check-formatting.mjs",
+    "format:check:all": "node scripts/check-formatting.mjs --all-tracked",
     "hooks:install": "node scripts/install-repository-hooks.mjs",
     "authority:materialize": "node packages/cli/dist/runtime/index/bin.js init bind --target . --as-role architect --write --format json",
     "build": "pnpm run devai:prepare && pnpm -r build",
@@ -55,7 +58,9 @@
     "test:db:rc": "vitest run --config tests/config/rc.db.config.ts",
     "test:e2e:rc": "vitest run --config tests/config/rc.e2e.config.ts",
     "test:performance:rc": "vitest run --config tests/config/rc.performance.config.ts",
-    "test:containment:rc": "vitest run --config tests/config/rc.containment.config.ts"
+    "test:containment:rc": "vitest run --config tests/config/rc.containment.config.ts",
+    "release:bootstrap": "node scripts/process/bootstrap-check-runner.mjs",
+    "mutation-free:check": "node scripts/check-mutation-free-delivery.mjs"
   },
   "devDependencies": {
     "@bcoe/v8-coverage": "1.0.2",
@@ -67,6 +72,7 @@
     "ajv-formats": "^3.0.1",
     "eslint": "^9.0.0",
     "globals": "^17.4.0",
+    "lint-staged": "16.2.7",
     "prettier": "^3.9.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",

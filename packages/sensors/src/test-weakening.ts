@@ -48,14 +48,14 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
       // line that leaks through to the parent in some Node versions.
       const out = execFileSync(
         'git',
-        ['diff', '--name-only', baseRef, '--', '*.test.ts', '*.spec.ts'],
+        ['diff', '--name-only', '-z', baseRef, '--', '*.test.ts', '*.spec.ts'],
         {
           cwd: opts.cwd,
           encoding: 'utf8',
           stdio: ['pipe', 'pipe', 'ignore'],
         },
       );
-      changedFiles = out.split('\n').filter((f) => f.length > 0);
+      changedFiles = out.split('\0').filter((f) => f.length > 0);
     } catch (err) {
       return buildSensorReading({
         sensorName: 'test-weakening',
@@ -76,6 +76,8 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
 
   const findings: SensorFinding[] = [];
   let totalDrift = 0;
+  let filesChecked = 0;
+  let evidenceUnavailable = false;
   for (const file of changedFiles) {
     let baseText = '';
     try {
@@ -87,16 +89,49 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore'],
       });
-    } catch {
-      // New file: nothing to compare against; skip silently.
+    } catch (error) {
+      // A denied/failed read is not proof that the file is new. Confirm absence
+      // through the same guarded Git boundary before omitting a comparison.
+      let absentFromBase = false;
+      try {
+        absentFromBase =
+          execFileSync('git', ['ls-tree', '-z', '--name-only', baseRef, '--', file], {
+            cwd: opts.cwd,
+            encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'ignore'],
+          }) === '';
+      } catch {
+        // The independently unavailable tree observation cannot establish absence.
+      }
+      if (!absentFromBase) {
+        evidenceUnavailable = true;
+        findings.push({
+          severity: 'critical',
+          code: 'git_base_read_failed',
+          file,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
       continue;
     }
     let headText = '';
     try {
       headText = readFileSync(`${opts.cwd}/${file}`, 'utf8');
-    } catch {
-      continue;
+    } catch (error) {
+      // A deleted test loses every assertion. Other read failures leave its
+      // comparison unavailable and must not become a passing observation.
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        evidenceUnavailable = true;
+        findings.push({
+          severity: 'critical',
+          code: 'head_read_failed',
+          file,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
     }
+    filesChecked++;
     const before = countAssertions(baseText);
     const after = countAssertions(headText);
     const decrease = before.assertions - after.assertions;
@@ -116,7 +151,13 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
   const errorCount = findings.filter(
     (f) => f.severity === 'error' || f.severity === 'critical',
   ).length;
-  const status: SensorStatus = errorCount > 0 ? 'fail' : findings.length > 0 ? 'review' : 'pass';
+  const status: SensorStatus = evidenceUnavailable
+    ? 'error'
+    : errorCount > 0
+      ? 'fail'
+      : findings.length > 0
+        ? 'review'
+        : 'pass';
 
   return buildSensorReading({
     sensorName: 'test-weakening',
@@ -125,7 +166,7 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
     status,
     deterministic: true,
     findings,
-    metrics: { files_checked: changedFiles.length, drift_count: totalDrift },
+    metrics: { files_checked: filesChecked, drift_count: totalDrift },
     // Phase 30.D (closes W-2): include timestamp in id so every
     // invocation produces a distinct SR file. Stynx U5 reported
     // F3×T9 oscillating UNKNOWN/PASS — caused by content-addressed

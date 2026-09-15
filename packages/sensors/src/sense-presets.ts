@@ -21,6 +21,20 @@ export interface SensePresetPolicy {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+/** Assembly replaces only this fixed function with the package-owned asset bytes. */
+function bundledSensePresets(): string | undefined {
+  return undefined;
+}
+const CODE_BOUND_PRESETS = bundledSensePresets();
+
+/** Trusted host binder compares the already code-bound data with its approved archive. */
+export function assertBundledSensePresets(bytes: Uint8Array): void {
+  if (
+    CODE_BOUND_PRESETS === undefined ||
+    !Buffer.from(CODE_BOUND_PRESETS).equals(Buffer.from(bytes))
+  )
+    throw new Error('rpl-package-identity-mismatch');
+}
 const BUNDLED_POLICY_PATH = join(HERE, 'sense-presets.json');
 const DEVELOPMENT_POLICY_PATH = join(HERE, '..', '..', '..', 'law', 'policy', 'sense-presets.json');
 
@@ -39,10 +53,10 @@ function freeze<T>(value: T): T {
 }
 
 function loadPolicy(): SensePresetPolicy {
-  const path = policyPath();
+  const path = CODE_BOUND_PRESETS === undefined ? policyPath() : '<code-bound sense presets>';
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    parsed = JSON.parse(CODE_BOUND_PRESETS ?? readFileSync(path, 'utf8')) as unknown;
   } catch (error) {
     throw new Error(`canonical sense preset policy could not be read at ${path}`, {
       cause: error,

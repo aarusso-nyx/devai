@@ -38,9 +38,13 @@ function validateWritePolicy(
     return false;
   }
   const mode = value['mode'];
-  if (!['none', 'explicit-files', 'bounded-patterns'].includes(String(mode))) {
+  if (typeof mode !== 'string' || !['none', 'explicit-files', 'bounded-patterns'].includes(mode)) {
     errors.push(`${path}.mode is invalid`);
     return false;
+  }
+  const allowedFields = mode === 'none' ? ['mode'] : ['mode', 'scopes'];
+  for (const key of Object.keys(value)) {
+    if (!allowedFields.includes(key)) errors.push(`${path} has unsupported field: ${key}`);
   }
   const scopes = value['scopes'];
   if (mode === 'none') {
@@ -83,7 +87,7 @@ export function validateRecipeManifest(value: unknown): string[] {
   if (!RECIPE_NAMES.includes(value['name'] as (typeof RECIPE_NAMES)[number])) {
     errors.push('name is not one of the seven RC recipes');
   }
-  if (!['stable', 'preview'].includes(String(value['status']))) {
+  if (typeof value['status'] !== 'string' || !['stable', 'preview'].includes(value['status'])) {
     errors.push('status must be stable or preview');
   }
   if (typeof value['description'] !== 'string' || value['description'].trim().length === 0) {
@@ -109,7 +113,7 @@ export function validateRecipeManifest(value: unknown): string[] {
       errors.push(`${path}.description must be a non-empty string`);
     }
     const effect = variant['effect'];
-    if (!['read', 'local-write', 'runtime-write'].includes(String(effect))) {
+    if (typeof effect !== 'string' || !['read', 'local-write', 'runtime-write'].includes(effect)) {
       errors.push(`${path}.effect is invalid`);
     }
     validateWritePolicy(variant['write_policy'], effect, `${path}.write_policy`, errors);

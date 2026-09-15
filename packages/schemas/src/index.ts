@@ -12,18 +12,28 @@ import { ROSTER, type SchemaName } from './roster.js';
 export { ROSTER } from './roster.js';
 export type { SchemaName } from './roster.js';
 
+/** Assembly replaces only this fixed function with checked package asset literals. */
+function bundledPackageAssets(): Readonly<Record<string, string>> | undefined {
+  return undefined;
+}
+const CODE_BOUND_ASSETS = bundledPackageAssets();
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUNDLED_SCHEMAS_DIR = join(HERE, 'schemas');
-const SCHEMAS_DIR = existsSync(BUNDLED_SCHEMAS_DIR)
-  ? BUNDLED_SCHEMAS_DIR
-  : join(HERE, '..', '..', '..', 'law', 'schemas');
-const AVAILABLE_SCHEMA_NAMES = existsSync(BUNDLED_SCHEMAS_DIR)
-  ? (ROSTER as readonly SchemaName[])
-  : (readdirSync(SCHEMAS_DIR)
-      .filter((name) => name.endsWith('.schema.json'))
-      .sort() as SchemaName[]);
+const SCHEMAS_DIR =
+  CODE_BOUND_ASSETS !== undefined || existsSync(BUNDLED_SCHEMAS_DIR)
+    ? BUNDLED_SCHEMAS_DIR
+    : join(HERE, '..', '..', '..', 'law', 'schemas');
+const AVAILABLE_SCHEMA_NAMES =
+  CODE_BOUND_ASSETS !== undefined || existsSync(BUNDLED_SCHEMAS_DIR)
+    ? (ROSTER as readonly SchemaName[])
+    : (readdirSync(SCHEMAS_DIR)
+        .filter((name) => name.endsWith('.schema.json'))
+        .sort() as SchemaName[]);
 const SENSOR_REGISTRY_PATH = join(
-  existsSync(join(HERE, 'sensor-registry.json')) ? HERE : join(SCHEMAS_DIR, '..', 'policy'),
+  CODE_BOUND_ASSETS !== undefined || existsSync(join(HERE, 'sensor-registry.json'))
+    ? HERE
+    : join(SCHEMAS_DIR, '..', 'policy'),
   'sensor-registry.json',
 );
 
@@ -31,12 +41,74 @@ const ajv = new Ajv2020({ strict: false });
 addFormats(ajv);
 
 const rawCache = new Map<SchemaName, Record<string, unknown>>();
-export function loadSchema(name: SchemaName): Record<string, unknown> {
+let packageSnapshot:
+  | {
+      readonly schemas: ReadonlyMap<string, Buffer>;
+      readonly sensorRegistry: Buffer;
+    }
+  | undefined =
+  CODE_BOUND_ASSETS === undefined
+    ? undefined
+    : {
+        schemas: new Map(
+          Object.entries(CODE_BOUND_ASSETS)
+            .filter(([path]) => path.startsWith('schemas/'))
+            .map(([path, bytes]) => [path.slice('schemas/'.length), Buffer.from(bytes)]),
+        ),
+        sensorRegistry: Buffer.from(CODE_BOUND_ASSETS['sensor-registry.json'] ?? ''),
+      };
+let schemaAccessed = false;
+let hostSnapshotBound = false;
+
+/**
+ * Internal trusted-host seam. The CLI verifies the package snapshot brand before
+ * supplying its complete schema population. No callback, path or lazy fallback is
+ * accepted here. Eager package compilation is allowed only from code-bound
+ * literals, and this first host binding must prove their complete byte equality.
+ * Ambient source compilation cannot be retroactively bound.
+ */
+export function bindSchemaPackageSnapshot(input: {
+  readonly schemas: ReadonlyMap<string, Uint8Array>;
+  readonly sensor_registry: Uint8Array;
+}): void {
+  const invalid = (): never => {
+    throw new Error('rpl-package-identity-mismatch');
+  };
+  if (hostSnapshotBound || (schemaAccessed && CODE_BOUND_ASSETS === undefined)) invalid();
+  const schemas = new Map<string, Buffer>();
+  for (const [name, bytes] of input.schemas) {
+    if (!/^[a-z0-9][a-z0-9-]*\.schema\.json$/u.test(name) || schemas.has(name)) invalid();
+    schemas.set(name, Buffer.from(bytes));
+  }
+  if (ROSTER.some((name) => !schemas.has(name))) invalid();
+  if (
+    packageSnapshot !== undefined &&
+    (schemas.size !== packageSnapshot.schemas.size ||
+      [...schemas].some(([name, bytes]) => !packageSnapshot?.schemas.get(name)?.equals(bytes)) ||
+      !packageSnapshot.sensorRegistry.equals(Buffer.from(input.sensor_registry)))
+  )
+    invalid();
+  hostSnapshotBound = true;
+  packageSnapshot = Object.freeze({ schemas, sensorRegistry: Buffer.from(input.sensor_registry) });
+}
+
+function schemaDocument(name: SchemaName): Record<string, unknown> {
+  schemaAccessed = true;
   let s = rawCache.get(name);
   if (!s) {
-    s = JSON.parse(readFileSync(join(SCHEMAS_DIR, name), 'utf8')) as Record<string, unknown>;
+    const bytes =
+      packageSnapshot === undefined
+        ? readFileSync(join(SCHEMAS_DIR, name))
+        : packageSnapshot.schemas.get(name);
+    if (bytes === undefined) throw new Error('rpl-package-identity-mismatch');
+    s = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
     if (name === 'sensor-reading.schema.json') {
-      const registry = JSON.parse(readFileSync(SENSOR_REGISTRY_PATH, 'utf8')) as {
+      const registry = JSON.parse(
+        (packageSnapshot === undefined
+          ? readFileSync(SENSOR_REGISTRY_PATH)
+          : packageSnapshot.sensorRegistry
+        ).toString('utf8'),
+      ) as {
         entries?: ReadonlyArray<{ kind?: unknown }>;
       };
       const kinds = (registry.entries ?? []).map((entry) => entry.kind);
@@ -60,18 +132,23 @@ export function loadSchema(name: SchemaName): Record<string, unknown> {
   return s;
 }
 
+export function loadSchema(name: SchemaName): Record<string, unknown> {
+  const document = schemaDocument(name);
+  return packageSnapshot === undefined ? document : structuredClone(document);
+}
+
 let commonRegistered = false;
 function ensureCommon(): void {
   if (!commonRegistered) {
-    ajv.addSchema(loadSchema('common-defs.schema.json'), 'common-defs.schema.json');
-    ajv.addSchema(loadSchema('record-meta.schema.json'), 'record-meta.schema.json');
+    ajv.addSchema(schemaDocument('common-defs.schema.json'), 'common-defs.schema.json');
+    ajv.addSchema(schemaDocument('record-meta.schema.json'), 'record-meta.schema.json');
     commonRegistered = true;
   }
 }
 
 function ensureSchemaReferences(name: SchemaName): void {
   if (name === 'action-result.schema.json' && ajv.getSchema('error.schema.json') === undefined) {
-    ajv.addSchema(loadSchema('error.schema.json'), 'error.schema.json');
+    ajv.addSchema(schemaDocument('error.schema.json'), 'error.schema.json');
   }
   if (name === 'adopter-policy.schema.json') {
     for (const dependency of [
@@ -81,7 +158,7 @@ function ensureSchemaReferences(name: SchemaName): void {
       'release-verification-profile.schema.json',
     ] as const) {
       if (ajv.getSchema(dependency) === undefined) {
-        ajv.addSchema(loadSchema(dependency), dependency);
+        ajv.addSchema(schemaDocument(dependency), dependency);
       }
     }
   }
@@ -90,7 +167,7 @@ function ensureSchemaReferences(name: SchemaName): void {
     ajv.getSchema('github-issues-tracking-policy.schema.json') === undefined
   ) {
     ajv.addSchema(
-      loadSchema('github-issues-tracking-policy.schema.json'),
+      schemaDocument('github-issues-tracking-policy.schema.json'),
       'github-issues-tracking-policy.schema.json',
     );
   }
@@ -98,12 +175,47 @@ function ensureSchemaReferences(name: SchemaName): void {
     name === 'triage-classify-result.schema.json' &&
     ajv.getSchema('triage.schema.json') === undefined
   ) {
-    ajv.addSchema(loadSchema('triage.schema.json'), 'triage.schema.json');
+    ajv.addSchema(schemaDocument('triage.schema.json'), 'triage.schema.json');
+  }
+  if (
+    (name === 'release-plan-receipt.schema.json' ||
+      name === 'release-plan-receipt-v2.schema.json') &&
+    ajv.getSchema('release-intent.schema.json') === undefined
+  ) {
+    ajv.addSchema(schemaDocument('release-intent.schema.json'), 'release-intent.schema.json');
+  }
+  if (
+    name === 'release-plan-receipt-v2.schema.json' &&
+    ajv.getSchema('release-policy-resolution.schema.json') === undefined
+  ) {
+    ajv.addSchema(
+      schemaDocument('release-policy-resolution.schema.json'),
+      'release-policy-resolution.schema.json',
+    );
+  }
+  if (
+    name === 'release-lifecycle-store-record.schema.json' &&
+    ajv.getSchema('release-lifecycle-store-head.schema.json') === undefined
+  ) {
+    ajv.addSchema(
+      schemaDocument('release-lifecycle-store-head.schema.json'),
+      'release-lifecycle-store-head.schema.json',
+    );
+  }
+  if (
+    name === 'release-lifecycle-store-record.schema.json' &&
+    ajv.getSchema('release-lifecycle-state.schema.json') === undefined
+  ) {
+    ajv.addSchema(
+      schemaDocument('release-lifecycle-state.schema.json'),
+      'release-lifecycle-state.schema.json',
+    );
   }
 }
 
 const compiled = new Map<SchemaName, ReturnType<typeof ajv.compile>>();
 export function getValidator(name: SchemaName) {
+  schemaAccessed = true;
   let v = compiled.get(name);
   if (!v) {
     if (!(AVAILABLE_SCHEMA_NAMES as readonly string[]).includes(name))
@@ -112,8 +224,8 @@ export function getValidator(name: SchemaName) {
     ensureSchemaReferences(name);
     v =
       name === 'common-defs.schema.json' || name === 'record-meta.schema.json'
-        ? (ajv.getSchema(name) ?? ajv.compile(loadSchema(name)))
-        : ajv.compile(loadSchema(name));
+        ? (ajv.getSchema(name) ?? ajv.compile(schemaDocument(name)))
+        : ajv.compile(schemaDocument(name));
     compiled.set(name, v);
   }
   return v;
@@ -307,8 +419,8 @@ export function metaGate(): MetaGateReport {
 
 // --- check-schemas canon linter (improvement 6, recursive half — first slice) ---
 const VERDICT_SETS = [
-  JSON.stringify(['pass', 'review', 'fail']),
-  JSON.stringify(['PASS', 'REVIEW', 'FAIL']),
+  JSON.stringify(['pass', 'review', 'fail'].sort()),
+  JSON.stringify(['PASS', 'REVIEW', 'FAIL'].sort()),
 ];
 export interface CanonFinding {
   schema: string;
@@ -319,19 +431,136 @@ const PREDICATE_KEYWORDS = new Set(['if', 'then', 'else', 'contains', 'oneOf', '
 
 export function checkSchema(name: string, schema: unknown): CanonFinding[] {
   const findings: CanonFinding[] = [];
-  const walk = (node: unknown, path: string, predicateFragment: boolean): void => {
+  const localTarget = (
+    ref: unknown,
+    resource: unknown,
+  ): { node: unknown; resource: unknown } | undefined => {
+    if (typeof ref !== 'string' || !ref.startsWith('#')) return undefined;
+    let pointer: string;
+    try {
+      pointer = decodeURIComponent(ref.slice(1));
+    } catch {
+      return undefined;
+    }
+    if (pointer !== '' && !pointer.startsWith('/')) return undefined;
+    let node = resource;
+    let scope = resource;
+    for (const token of pointer === '' ? [] : pointer.slice(1).split('/')) {
+      if (/~(?:[^01]|$)/u.test(token)) return undefined;
+      const key = token.replace(/~1/gu, '/').replace(/~0/gu, '~');
+      if (node === null || typeof node !== 'object' || !Object.hasOwn(node, key)) return undefined;
+      node = (node as Record<string, unknown>)[key];
+      if (
+        node !== null &&
+        typeof node === 'object' &&
+        typeof (node as Record<string, unknown>)['$id'] === 'string'
+      )
+        scope = node;
+    }
+    return { node, resource: scope };
+  };
+  // Definitions inherit their actual use sites. A predicate-only definition is
+  // not a complete object shape; a mixed-use or unreferenced definition still is.
+  // Traverse schema-bearing keywords only, never annotation/example data.
+  const uses = new Map<object, Set<boolean>>();
+  const collectUses = (node: unknown, predicate: boolean, resource: unknown): void => {
     if (Array.isArray(node)) {
-      node.forEach((v, i) => walk(v, `${path}[${i}]`, predicateFragment));
+      for (const item of node) collectUses(item, predicate, resource);
+      return;
+    }
+    if (node === null || typeof node !== 'object') return;
+    const contexts = uses.get(node) ?? new Set<boolean>();
+    if (contexts.has(predicate)) return;
+    contexts.add(predicate);
+    uses.set(node, contexts);
+    const object = node as Record<string, unknown>;
+    const scope = typeof object['$id'] === 'string' ? node : resource;
+    const target = localTarget(object['$ref'], scope);
+    if (target !== undefined) collectUses(target.node, predicate, target.resource);
+    for (const key of ['properties', 'patternProperties', 'dependentSchemas']) {
+      const entries = object[key];
+      if (entries !== null && typeof entries === 'object' && !Array.isArray(entries))
+        for (const child of Object.values(entries)) collectUses(child, predicate, scope);
+    }
+    for (const key of [
+      'allOf',
+      'anyOf',
+      'oneOf',
+      'prefixItems',
+      'items',
+      'additionalProperties',
+      'unevaluatedProperties',
+      'unevaluatedItems',
+      'propertyNames',
+      'contains',
+      'if',
+      'then',
+      'else',
+      'not',
+      'contentSchema',
+    ])
+      // A combinator alone can describe a complete value, not just a predicate.
+      collectUses(
+        object[key],
+        predicate || ['if', 'then', 'else', 'contains', 'not'].includes(key),
+        scope,
+      );
+  };
+  collectUses(schema, false, schema);
+  // A $ref applies its referenced constraints alongside sibling keywords. Follow
+  // local pointers only; unresolved references never establish an object policy.
+  const declaresObjectPolicy = (
+    value: unknown,
+    resource: unknown,
+    seen = new Set<object>(),
+  ): boolean => {
+    let current = value;
+    let scope = resource;
+    while (current !== null && typeof current === 'object' && !Array.isArray(current)) {
+      if (seen.has(current)) return false;
+      seen.add(current);
+      const object = current as Record<string, unknown>;
+      if (typeof object['$id'] === 'string') scope = current;
+      if (
+        object['additionalProperties'] !== undefined ||
+        object['unevaluatedProperties'] !== undefined
+      )
+        return true;
+      // Every allOf branch applies, so one declared object policy constrains
+      // the composition. Merely having allOf (or an open branch) proves nothing.
+      if (
+        Array.isArray(object['allOf']) &&
+        object['allOf'].some((branch) => declaresObjectPolicy(branch, scope, new Set(seen)))
+      )
+        return true;
+      const target = localTarget(object['$ref'], scope);
+      if (target === undefined) return false;
+      current = target.node;
+      scope = target.resource;
+    }
+    return false;
+  };
+  const walk = (
+    node: unknown,
+    path: string,
+    predicateFragment: boolean,
+    resource: unknown,
+  ): void => {
+    if (Array.isArray(node)) {
+      node.forEach((v, i) => walk(v, `${path}[${i}]`, predicateFragment, resource));
       return;
     }
     if (node === null || typeof node !== 'object') return;
     const o = node as Record<string, unknown>;
+    const scope = typeof o['$id'] === 'string' ? node : resource;
+    const contexts = uses.get(node);
+    const isPredicate = predicateFragment || (contexts?.has(true) === true && !contexts.has(false));
     // Predicate fragments intentionally match part of a containing object. Only
     // complete object shapes must declare their additional-properties policy.
     if (
-      !predicateFragment &&
+      !isPredicate &&
       o['properties'] !== undefined &&
-      o['additionalProperties'] === undefined &&
+      !declaresObjectPolicy(o, scope) &&
       path !== '$root'
     ) {
       findings.push({ schema: name, rule: 'open-world-object', path });
@@ -343,10 +572,10 @@ export function checkSchema(name: string, schema: unknown): CanonFinding[] {
         findings.push({ schema: name, rule: 'restated-verdict-enum', path });
     }
     for (const [k, v] of Object.entries(o)) {
-      walk(v, `${path}/${k}`, predicateFragment || PREDICATE_KEYWORDS.has(k));
+      walk(v, `${path}/${k}`, isPredicate || PREDICATE_KEYWORDS.has(k), scope);
     }
   };
-  walk(schema, '$root', false);
+  walk(schema, '$root', false, schema);
   return findings;
 }
 

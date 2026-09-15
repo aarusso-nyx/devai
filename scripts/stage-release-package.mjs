@@ -17,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmPackOutput } from './npm-pack-output.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packageRoot = join(repositoryRoot, 'packages/cli');
@@ -90,16 +91,14 @@ function packOnce(ordinal, manifest) {
       encoding: 'utf8',
     }),
   );
-  const filename = result[0]?.filename;
-  if (typeof filename !== 'string' || filename.length === 0) {
-    throw new Error('RELEASE_PACK_OUTPUT_MISSING');
-  }
+  const entry = npmPackOutput(result, manifest);
+  const filename = entry.filename;
   const tarball = join(packed, basename(filename));
   if (!existsSync(tarball)) throw new Error('RELEASE_PACK_TARBALL_MISSING');
   return {
     tarball,
     sha256: digest(tarball),
-    files: (result[0]?.files ?? []).map((file) => file.path).sort(),
+    files: entry.files.map((file) => file.path).sort(),
   };
 }
 
@@ -124,10 +123,31 @@ try {
   mkdirSync(sbomRoot, { recursive: true });
   execFileSync('tar', ['-xzf', output, '-C', sbomRoot]);
   const sbomPackageRoot = join(sbomRoot, 'package');
-  execFileSync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
-    cwd: sbomPackageRoot,
-    stdio: 'pipe',
-  });
+  const cacheSeed = join(repositoryRoot, 'node_modules/.devai-npm-cache');
+  const cacheArguments = [];
+  if (existsSync(cacheSeed)) {
+    const writableCache = join(temporaryRoot, 'npm-cache');
+    cpSync(cacheSeed, writableCache, { recursive: true });
+    cacheArguments.push('--offline', '--cache', writableCache);
+  }
+  execFileSync(
+    'npm',
+    [
+      'install',
+      '--omit=dev',
+      '--ignore-scripts',
+      '--no-audit',
+      '--no-fund',
+      '--fetch-retries=0',
+      '--fetch-timeout=15000',
+      ...cacheArguments,
+    ],
+    {
+      cwd: sbomPackageRoot,
+      stdio: 'pipe',
+      timeout: 120_000,
+    },
+  );
   const sbom = join(outputRoot, `devai-${manifest.version}.cdx.json`);
   const npmExecPath = realpathSync(execFileSync('which', ['npm'], { encoding: 'utf8' }).trim());
   execFileSync(

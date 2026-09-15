@@ -1,7 +1,20 @@
 import { getValidator } from '@devai-nyx/schemas';
+import { canonicalJson } from '@devai-nyx/utils';
 import { resolveCanonicalPolicyContent, validateCanonicalPolicyContent } from '@devai-nyx/skills';
 
 export type JsonObject = Record<string, unknown>;
+
+export interface AdopterPolicyMaterializationSources {
+  readonly getValidator: typeof getValidator;
+  readonly readPolicy: (
+    file:
+      | 'domains.json'
+      | 'thresholds.json'
+      | 'scorecard-na.json'
+      | 'glob-guards.json'
+      | 'release-verification.json',
+  ) => string;
+}
 
 export const ADOPTER_POLICY_TARGETS = [
   '.devai/config/project.json',
@@ -33,19 +46,24 @@ export function jsonBytes(value: unknown): string {
  * Deterministically resolves adopter policy into the five bound config files.
  * This function has no filesystem effects and is shared by init bind and Doctor.
  */
-export function resolveAdopterPolicyMaterialization(input: {
-  readonly policy: unknown;
-  readonly currentProject: unknown;
-  readonly frameworkVersion: string;
-}): ReadonlyMap<(typeof ADOPTER_POLICY_TARGETS)[number], string> {
-  const validatePolicy = getValidator('adopter-policy.schema.json');
-  if (!validatePolicy(input.policy)) {
+export function resolveAdopterPolicyMaterialization(
+  input: {
+    readonly policy: unknown;
+    readonly currentProject: unknown;
+    readonly frameworkVersion: string;
+  },
+  sources?: AdopterPolicyMaterializationSources,
+): ReadonlyMap<(typeof ADOPTER_POLICY_TARGETS)[number], string> {
+  const validator = sources === undefined ? getValidator : sources.getValidator;
+  const readPolicy = sources === undefined ? resolveCanonicalPolicyContent : sources.readPolicy;
+  const validatePolicy = validator('adopter-policy.schema.json');
+  if (validatePolicy(input.policy) !== true) {
     throw new Error(`ADOPTER_POLICY_INVALID:${JSON.stringify(validatePolicy.errors)}`);
   }
   const document = input.policy as JsonObject;
   const defaults = (
     file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
-  ) => JSON.parse(resolveCanonicalPolicyContent(file)) as JsonObject;
+  ) => JSON.parse(validateCanonicalPolicyContent(file, readPolicy(file), validator)) as JsonObject;
   const domainDefaults = defaults('domains.json');
   const domainConfig = isJsonObject(document['domains']) ? document['domains'] : {};
   const requestedDomains = Array.isArray(domainConfig['client'])
@@ -69,10 +87,10 @@ export function resolveAdopterPolicyMaterialization(input: {
   const scorecardNa = document['scorecard_na'] ?? defaults('scorecard-na.json');
   const globGuards = document['glob_guards'] ?? defaults('glob-guards.json');
   const releaseVerification = document['release_verification'];
-  validateCanonicalPolicyContent('domains.json', jsonBytes(domains));
-  validateCanonicalPolicyContent('thresholds.json', jsonBytes(thresholds));
-  validateCanonicalPolicyContent('scorecard-na.json', jsonBytes(scorecardNa));
-  validateCanonicalPolicyContent('glob-guards.json', jsonBytes(globGuards));
+  validateCanonicalPolicyContent('domains.json', jsonBytes(domains), validator);
+  validateCanonicalPolicyContent('thresholds.json', jsonBytes(thresholds), validator);
+  validateCanonicalPolicyContent('scorecard-na.json', jsonBytes(scorecardNa), validator);
+  validateCanonicalPolicyContent('glob-guards.json', jsonBytes(globGuards), validator);
 
   const projectOverrides = isJsonObject(document['project']) ? { ...document['project'] } : {};
   if (isJsonObject(document['ci_economy'])) projectOverrides['ci_economy'] = document['ci_economy'];
@@ -83,20 +101,51 @@ export function resolveAdopterPolicyMaterialization(input: {
     ) as JsonObject),
     devai_version: input.frameworkVersion,
   };
-  const validateProject = getValidator('project-config.schema.json');
-  if (!validateProject(project)) {
+  const validateProject = validator('project-config.schema.json');
+  if (validateProject(project) !== true) {
     throw new Error(`ADOPTER_POLICY_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
   }
 
+  // A binding that does not override a policy must not rewrite its bytes. Re-serializing
+  // an unchanged document would fork the adopter copy from the installed canonical source
+  // and break byte-identity with the operational-law materialization of the same file.
+  const unchanged = (
+    file:
+      | 'domains.json'
+      | 'thresholds.json'
+      | 'scorecard-na.json'
+      | 'glob-guards.json'
+      | 'release-verification.json',
+    value: unknown,
+  ): string => {
+    // An installation that does not carry this canonical source cannot preserve its
+    // bytes; re-serializing is then the only deterministic result.
+    let canonical: string;
+    try {
+      canonical = (readPolicy as (name: string) => string)(file);
+    } catch {
+      return jsonBytes(value);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(canonical);
+    } catch {
+      return jsonBytes(value);
+    }
+    return canonicalJson(parsed) === canonicalJson(value) ? canonical : jsonBytes(value);
+  };
   const resolved = new Map<(typeof ADOPTER_POLICY_TARGETS)[number], string>([
     ['.devai/config/project.json', jsonBytes(project)],
-    ['.devai/config/domains.json', jsonBytes(domains)],
-    ['.devai/config/thresholds.json', jsonBytes(thresholds)],
-    ['.devai/config/scorecard-na.json', jsonBytes(scorecardNa)],
-    ['.devai/config/glob-guards.json', jsonBytes(globGuards)],
+    ['.devai/config/domains.json', unchanged('domains.json', domains)],
+    ['.devai/config/thresholds.json', unchanged('thresholds.json', thresholds)],
+    ['.devai/config/scorecard-na.json', unchanged('scorecard-na.json', scorecardNa)],
+    ['.devai/config/glob-guards.json', unchanged('glob-guards.json', globGuards)],
   ]);
   if (releaseVerification !== undefined) {
-    resolved.set('.devai/config/release-verification.json', jsonBytes(releaseVerification));
+    resolved.set(
+      '.devai/config/release-verification.json',
+      unchanged('release-verification.json', releaseVerification),
+    );
   }
   return resolved;
 }

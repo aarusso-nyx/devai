@@ -253,7 +253,12 @@ export function nextRoundQueueEntry(options: {
   const roundId = requireActiveTaskRound(options);
   const next = pickNextTask(options.repoRoot);
   if (next?.round_id === roundId) return next;
-  return listRoundQueue(options).find((entry) => entry.status === 'queued') ?? null;
+  // Older entries without a status are queued, as in the global picker.
+  return (
+    listRoundQueue(options).find(
+      (entry) => entry.status === 'queued' || entry.status === undefined,
+    ) ?? null
+  );
 }
 
 export function completeRoundQueueEntry(options: {
@@ -430,7 +435,11 @@ export function resumeRoundTask(options: {
   const { task } = roundBoundTask({ ...options, operation: 'resume' });
   if (task.status !== 'rgr_pending') fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   if (getPausedRgrId(task) !== options.gapId) fail('TASK_GAP_MISMATCH');
-  const updated = resumeTaskFromRgr({ repoRoot: options.repoRoot, rgrId: options.gapId });
+  const updated = resumeTaskFromRgr({
+    repoRoot: options.repoRoot,
+    rgrId: options.gapId,
+    taskId: options.taskId,
+  });
   if (updated.id !== options.taskId) fail('TASK_ID_MISMATCH');
   trackTaskTransition(
     options.repoRoot,

@@ -1,13 +1,61 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
-const SELECTED_RELEASE_VERSION = '1.4.5';
-const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.4.4';
+const SELECTED_RELEASE_VERSION = '1.5.0';
+const VENDORED_VERIFIER_SOURCE_COMMIT = '9f849f117fe1e460b5e3c647515f5ccbe783cbfb';
+const VENDORED_VERIFIER_PROVENANCE = readFileSync(
+  join(root, 'packages/cli/vendor/evidence-verification/provenance.json'),
+);
+const VENDORED_VERIFIER_PROVENANCE_SHA256 = createHash('sha256')
+  .update(VENDORED_VERIFIER_PROVENANCE)
+  .digest('hex');
+
+function manifestEnvironment(input: {
+  readonly workspace: string;
+  readonly output: string;
+  readonly provenance?: string;
+  readonly version?: string;
+}) {
+  const digest = 'a'.repeat(64);
+  return {
+    ...process.env,
+    PACKAGE_NAME: '@aarusso-nyx/devai',
+    RELEASE_TAG: `v${SELECTED_RELEASE_VERSION}`,
+    PACKAGE_TARBALL: join(input.workspace, 'package.tgz'),
+    SITE_ARCHIVE: join(input.workspace, 'site.tar.gz'),
+    SBOM_FILE: join(input.workspace, 'sbom.json'),
+    OUTPUT_FILE: input.output,
+    COMMIT_SHA: 'b'.repeat(40),
+    TREE_SHA: 'c'.repeat(40),
+    LEDGER_VERIFIER_PACKAGE_VERSION: input.version ?? SELECTED_RELEASE_VERSION,
+    LEDGER_VERIFIER_PROVENANCE_SHA256: input.provenance ?? VENDORED_VERIFIER_PROVENANCE_SHA256,
+    LEDGER_POLICY_DIGEST: digest,
+    LEDGER_ENVELOPE_SHA256: digest,
+    LEDGER_RESULTS_SHA256: digest,
+    LEDGER_ARTIFACTS_SHA256: digest,
+    LEDGER_TASK_POLICY_SHA256: digest,
+    LEDGER_TRUST_STORE_SHA256: digest,
+    LEDGER_TOOLCHAIN_SHA256: digest,
+    LEDGER_ENVIRONMENT_SHA256: digest,
+    LEDGER_RELEASE_SIGNERS_SHA256: digest,
+  };
+}
 
 afterAll(() => rmSync(output, { recursive: true, force: true }));
 
@@ -71,7 +119,7 @@ describe('normalized release package staging', () => {
     expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.4.5', () => {
+  it('records a stable release and latest dist-tag for version 1.5.0', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -79,31 +127,9 @@ describe('normalized release package staging', () => {
     writeFileSync(packageTarball, 'package');
     writeFileSync(siteArchive, 'site');
     writeFileSync(sbom, '{}');
-    const digest = 'a'.repeat(64);
     execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
       cwd: root,
-      env: {
-        ...process.env,
-        PACKAGE_NAME: '@aarusso-nyx/devai',
-        RELEASE_TAG: `v${SELECTED_RELEASE_VERSION}`,
-        PACKAGE_TARBALL: packageTarball,
-        SITE_ARCHIVE: siteArchive,
-        SBOM_FILE: sbom,
-        OUTPUT_FILE: manifest,
-        COMMIT_SHA: 'b'.repeat(40),
-        TREE_SHA: 'c'.repeat(40),
-        LEDGER_VERIFIER_PACKAGE_VERSION: TRUSTED_VERIFIER_PACKAGE_VERSION,
-        LEDGER_VERIFIER_PROVENANCE_SHA256: digest,
-        LEDGER_POLICY_DIGEST: digest,
-        LEDGER_ENVELOPE_SHA256: digest,
-        LEDGER_RESULTS_SHA256: digest,
-        LEDGER_ARTIFACTS_SHA256: digest,
-        LEDGER_TASK_POLICY_SHA256: digest,
-        LEDGER_TRUST_STORE_SHA256: digest,
-        LEDGER_TOOLCHAIN_SHA256: digest,
-        LEDGER_ENVIRONMENT_SHA256: digest,
-        LEDGER_RELEASE_SIGNERS_SHA256: digest,
-      },
+      env: manifestEnvironment({ workspace: output, output: manifest }),
     });
     const value = JSON.parse(readFileSync(manifest, 'utf8')) as {
       release: Record<string, unknown>;
@@ -118,10 +144,78 @@ describe('normalized release package staging', () => {
     });
     expect(value.ledger).toMatchObject({
       verifier_package: '@aarusso-nyx/devai',
-      verifier_package_version: TRUSTED_VERIFIER_PACKAGE_VERSION,
-      verifier_provenance_sha256: digest,
-      verifier_source_commit: '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de',
+      verifier_package_version: SELECTED_RELEASE_VERSION,
+      verifier_provenance_sha256: VENDORED_VERIFIER_PROVENANCE_SHA256,
+      verifier_source_commit: VENDORED_VERIFIER_SOURCE_COMMIT,
     });
+  });
+
+  it.each(['LEDGER_INSTALLED_CONTROL_SHA256', 'LEDGER_INSTALLED_OFFLINE_RECEIPT_SHA256'])(
+    'ignores retired installed verification input: %s',
+    (name) => {
+      for (const value of ['', 'not-a-digest']) {
+        const manifest = join(output, `missing-${name}-${value}.json`);
+        execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
+          cwd: root,
+          env: { ...manifestEnvironment({ workspace: output, output: manifest }), [name]: value },
+          stdio: 'pipe',
+        });
+        const result = JSON.parse(readFileSync(manifest, 'utf8')) as {
+          ledger: Record<string, unknown>;
+        };
+        expect(result.ledger).not.toHaveProperty('installed_control_sha256');
+        expect(result.ledger).not.toHaveProperty('installed_offline_receipt_sha256');
+        expect(result.ledger).toHaveProperty('release_signers_sha256', 'a'.repeat(64));
+      }
+    },
+  );
+
+  it.each([
+    ['wrong provenance', { provenance: 'f'.repeat(64) }],
+    ['wrong package version', { version: '1.4.4' }],
+  ])('refuses %s verifier identity before writing a release manifest', (_name, identity) => {
+    const manifest = join(output, `release-manifest-invalid-${_name.replaceAll(' ', '-')}.json`);
+    expect(() =>
+      execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
+        cwd: root,
+        env: manifestEnvironment({ workspace: output, output: manifest, ...identity }),
+        stdio: 'pipe',
+      }),
+    ).toThrow('RELEASE_MANIFEST_VERIFIER_IDENTITY_INVALID');
+    expect(existsSync(manifest)).toBe(false);
+  });
+
+  it('checks the real source archive without Git metadata and catches added stale documentation', () => {
+    const archive = join(output, 'source archive ç');
+    cpSync(root, archive, {
+      recursive: true,
+      filter: (path) => {
+        const name = relative(root, path);
+        return !name
+          .split('/')
+          .some((part) => ['.git', 'node_modules', 'scratch', 'worktrees'].includes(part));
+      },
+    });
+    symlinkSync(join(root, 'node_modules'), join(archive, 'node_modules'), 'dir');
+    for (const name of readdirSync(join(root, 'packages'))) {
+      const dependencies = join(root, 'packages', name, 'node_modules');
+      if (existsSync(dependencies))
+        symlinkSync(dependencies, join(archive, 'packages', name, 'node_modules'), 'dir');
+    }
+    expect(existsSync(join(archive, '.git'))).toBe(false);
+    const check = () =>
+      execFileSync(process.execPath, [join(archive, 'scripts/check-publishable-closure.mjs')], {
+        cwd: archive,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
+    expect(JSON.parse(check()).package).toBe(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
+    writeFileSync(join(archive, 'docs/stale-package.md'), '@devai-nyx/cli');
+    expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/stale-package.md');
+    rmSync(join(archive, 'docs/stale-package.md'));
+    mkdirSync(join(archive, 'docs/site/build'), { recursive: true });
+    writeFileSync(join(archive, 'docs/site/build/stale.html'), '@devai-nyx/cli');
+    expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/site/build/stale.html');
   });
 
   it('keeps release closure bound to the selected public package version', () => {

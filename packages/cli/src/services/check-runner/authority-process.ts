@@ -1,12 +1,55 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { readTaskDescriptor } from './policy.js';
+import { readExactGitTreeSync, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import { sha256Hex } from './canonical.js';
+import { parseTaskDescriptor, readTaskDescriptor } from './policy.js';
 import { resolveTaskExecutable } from './executable.js';
 
 export interface DeclaredCheckTaskProcess {
   readonly nodeId: string;
   readonly cwd: string;
+  readonly taskPolicyDigest?: string;
+}
+
+export interface ReleaseTaskProcessBinding {
+  readonly candidate: { readonly commit: string; readonly tree: string };
+  readonly descriptor_digest: string;
+  readonly task_policy_digest: string;
+  readonly node_id: string;
+  readonly executable: { readonly path: string; readonly sha256: string };
+  readonly argv: readonly string[];
+  readonly cwd: string;
+}
+
+const releaseTaskTokens = new WeakMap<object, ReleaseTaskProcessBinding>();
+const releaseTaskToken = Symbol('devai.release-task-process-binding');
+
+export function bindReleaseTaskProcessOptions<T extends object>(
+  options: T,
+  binding: ReleaseTaskProcessBinding,
+): T {
+  const token = Object.freeze({});
+  releaseTaskTokens.set(
+    token,
+    Object.freeze({
+      ...binding,
+      candidate: Object.freeze({ ...binding.candidate }),
+      executable: Object.freeze({ ...binding.executable }),
+      argv: Object.freeze([...binding.argv]),
+    }),
+  );
+  Object.defineProperty(options, releaseTaskToken, {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: token,
+  });
+  return options;
+}
+
+function trustedReleaseBinding(options: Readonly<Record<PropertyKey, unknown>>) {
+  const token = options[releaseTaskToken];
+  return token !== null && typeof token === 'object' ? releaseTaskTokens.get(token) : undefined;
 }
 
 export interface DeclaredCheckTaskRefusal {
@@ -48,26 +91,11 @@ function matchesDeclaredExecutable(root: string, declared: string, requested: st
   }
 }
 
-export function matchDeclaredCheckTaskProcess(
+function exactDeclaredTask(
   repoRoot: string,
-  invocationArgv: readonly string[],
   request: AuthorityHostEffectRequest,
 ): DeclaredCheckTaskProcess | undefined {
   if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
-  const targets = ['--affected', '--local', '--rc', '--release-intent'].filter((flag) =>
-    invocationArgv.includes(flag),
-  );
-  const suiteIndex = invocationArgv.indexOf('--suite');
-  const suite = suiteIndex < 0 ? undefined : invocationArgv[suiteIndex + 1];
-  const onlyIndex = invocationArgv.indexOf('--only');
-  const only = onlyIndex < 0 ? undefined : invocationArgv[onlyIndex + 1];
-  const suiteRun =
-    only === undefined &&
-    targets.length === 0 &&
-    (suite === undefined || ['quick', 'standard', 'full', 'release'].includes(suite));
-  const ledgerOnlyRun = ['ledger-local', 'ledger-rc'].includes(only ?? '');
-  const explicitTaskRun = invocationArgv.includes('--run') && targets.length === 1;
-  if (!explicitTaskRun && !suiteRun && !ledgerOnlyRun) return undefined;
   const executable = request.arguments[0];
   const argv = request.arguments[1];
   const rawOptions = request.arguments[2];
@@ -88,8 +116,7 @@ export function matchDeclaredCheckTaskProcess(
   if (!existsSync(resolve(options.cwd))) return undefined;
   const cwd = realpathSync(resolve(options.cwd));
   if (!within(root, cwd)) return undefined;
-  const descriptor = readTaskDescriptor(resolve(root, 'test-tasks.json'));
-  const task = descriptor.tasks.find(
+  const task = readTaskDescriptor(resolve(root, 'test-tasks.json')).tasks.find(
     (candidate) =>
       matchesDeclaredExecutable(root, candidate.argv[0] ?? '', executable) &&
       JSON.stringify(candidate.argv.slice(1)) === JSON.stringify(argv) &&
@@ -97,6 +124,91 @@ export function matchDeclaredCheckTaskProcess(
       realpathSync(resolve(root, candidate.cwd)) === cwd,
   );
   return task === undefined ? undefined : { nodeId: task.nodeId, cwd };
+}
+
+/** Exact descriptor-only matcher for lifecycle-owned check-runner execution. */
+export function matchDeclaredReleaseTaskProcess(
+  repoRoot: string,
+  request: AuthorityHostEffectRequest,
+): DeclaredCheckTaskProcess | undefined {
+  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  const executable = request.arguments[0];
+  const argv = request.arguments[1];
+  const rawOptions = request.arguments[2];
+  if (
+    typeof executable !== 'string' ||
+    !Array.isArray(argv) ||
+    argv.some((argument) => typeof argument !== 'string') ||
+    rawOptions === null ||
+    typeof rawOptions !== 'object' ||
+    Array.isArray(rawOptions)
+  ) {
+    return undefined;
+  }
+  const options = rawOptions as Readonly<Record<PropertyKey, unknown>>;
+  if (options.shell !== false || typeof options.cwd !== 'string') return undefined;
+  const binding = trustedReleaseBinding(options);
+  if (binding === undefined) return undefined;
+  let descriptor;
+  try {
+    const entries = readExactGitTreeSync(
+      repoRoot,
+      binding.candidate.commit,
+      binding.candidate.tree,
+      'test-tasks.json',
+    );
+    if (
+      entries.length !== 1 ||
+      entries[0]?.path !== 'test-tasks.json' ||
+      entries[0].mode === '120000'
+    ) {
+      return undefined;
+    }
+    descriptor = parseTaskDescriptor(JSON.parse(entries[0].bytes.toString('utf8')) as unknown);
+  } catch {
+    return undefined;
+  }
+  if (sha256Hex(descriptor) !== binding.descriptor_digest) return undefined;
+  const task = descriptor.tasks.find((candidate) => candidate.nodeId === binding.node_id);
+  if (task === undefined || JSON.stringify(task.argv) !== JSON.stringify(binding.argv)) {
+    return undefined;
+  }
+  const root = realpathSync(resolve(repoRoot));
+  const cwd = realpathSync(resolve(root, task.cwd));
+  if (options.cwd !== cwd || binding.cwd !== task.cwd) return undefined;
+  const identity = resolveTaskExecutable(root, task.argv[0] ?? '');
+  if (
+    executable !== identity.path ||
+    binding.executable.path !== identity.path ||
+    binding.executable.sha256 !== identity.sha256 ||
+    JSON.stringify(argv) !== JSON.stringify(task.argv.slice(1))
+  ) {
+    return undefined;
+  }
+  return { nodeId: task.nodeId, cwd, taskPolicyDigest: binding.task_policy_digest };
+}
+
+export function matchDeclaredCheckTaskProcess(
+  repoRoot: string,
+  invocationArgv: readonly string[],
+  request: AuthorityHostEffectRequest,
+): DeclaredCheckTaskProcess | undefined {
+  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  const targets = ['--affected', '--local', '--rc', '--release-intent'].filter((flag) =>
+    invocationArgv.includes(flag),
+  );
+  const suiteIndex = invocationArgv.indexOf('--suite');
+  const suite = suiteIndex < 0 ? undefined : invocationArgv[suiteIndex + 1];
+  const onlyIndex = invocationArgv.indexOf('--only');
+  const only = onlyIndex < 0 ? undefined : invocationArgv[onlyIndex + 1];
+  const suiteRun =
+    only === undefined &&
+    targets.length === 0 &&
+    (suite === undefined || ['quick', 'standard', 'full', 'release'].includes(suite));
+  const ledgerOnlyRun = ['ledger-local', 'ledger-rc'].includes(only ?? '');
+  const explicitTaskRun = invocationArgv.includes('--run') && targets.length === 1;
+  if (!explicitTaskRun && !suiteRun && !ledgerOnlyRun) return undefined;
+  return exactDeclaredTask(repoRoot, request);
 }
 
 export function describeDeclaredCheckTaskRefusal(

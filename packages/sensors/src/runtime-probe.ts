@@ -155,10 +155,10 @@ async function runHttpProbe(
       failed.push(`status: expected ${String(step.expect.status)}, got ${String(res.status)}`);
     }
     for (const sub of step.expect.contains ?? []) {
-      if (!bodyExcerpt.includes(sub)) failed.push(`contains: '${sub}' not found in response`);
+      if (!text.includes(sub)) failed.push(`contains: '${sub}' not found in response`);
     }
     for (const sub of step.expect.absent ?? []) {
-      if (bodyExcerpt.includes(sub)) failed.push(`absent: '${sub}' MUST NOT appear in response`);
+      if (text.includes(sub)) failed.push(`absent: '${sub}' MUST NOT appear in response`);
     }
   } catch (err) {
     return {

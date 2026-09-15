@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { __classEntity__Service } from './__kebabEntity__.service';
 
 @Component({
+  standalone: false,
   selector: '__kebabModule__-__kebabEntity__-detail',
   template: `
     <ng-container *ngIf="item; else loading">

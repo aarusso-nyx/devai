@@ -284,22 +284,7 @@ async function recordService(
         },
       ]);
     case 'mutation':
-      if (options.run !== true) throw new Error('--run is required for --kind mutation');
-      if (options.scenarios === undefined) {
-        throw new Error('--scenarios is required for --kind mutation --run');
-      }
-      return invokeCommandService(mutationRun, [
-        {
-          repoRoot,
-          scenarios: options.scenarios,
-          ...(options.out !== undefined && { out: options.out }),
-          ...(options.mutator !== undefined && { mutator: options.mutator }),
-          ...(options.external !== undefined && { external: options.external }),
-          ...(options.reportPath !== undefined && { reportPath: options.reportPath }),
-          ...(options.failOnSurvivors === true && { failOnSurvivors: true }),
-          human: false,
-        },
-      ]);
+      return invokeCommandService(mutationRun, [{}]);
     case 'rtd':
       return invokeCommandService(rtdBundle, [
         {
@@ -367,6 +352,12 @@ export const evidenceRecord = defineCommand({
           usage('evidence record', '--kind must be generic, coverage, test, mutation, or rtd');
           return;
         }
+        if (options.kind === 'mutation') {
+          const result = await invokeCommandService(mutationRun, [{}]);
+          process.stdout.write(result.stdout);
+          process.exitCode = EXIT_PASS;
+          return;
+        }
         if (options.round === undefined) {
           usage('evidence record', '--round R-NNNN is required');
           return;
@@ -385,10 +376,7 @@ export const evidenceRecord = defineCommand({
               repoRoot,
               action: 'evidence.record.generic',
               status: 'completed',
-              notes: [
-                `round_id=${options.round}`,
-                `proof_sequence=${String(proof.sequence)}`,
-              ],
+              notes: [`round_id=${options.round}`, `proof_sequence=${String(proof.sequence)}`],
             });
             if (!chain.ok) {
               throw new Error(`EVIDENCE_CHAIN_APPEND_FAILED:${chain.error ?? 'unknown error'}`);

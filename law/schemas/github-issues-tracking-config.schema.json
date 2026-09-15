@@ -5,13 +5,7 @@
   "description": "The adopter-local materialization written to .devai/config/github-issues-tracking.json by the registered init bind action. It embeds the canonical policy defaults verbatim and adds only the adopter's exact identity and the digests that make drift detectable. Presence of this file means the repository capability is bound; it does not activate tracking for any round and grants no publication authority on its own.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "id",
-    "binding",
-    "defaults",
-    "digests"
-  ],
+  "required": ["schemaVersion", "id", "binding", "defaults", "digests"],
   "properties": {
     "schemaVersion": {
       "const": "1.0.0"
@@ -22,13 +16,7 @@
     "binding": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "repository",
-        "repository_id",
-        "package_version",
-        "bound_at",
-        "bound_by_role"
-      ],
+      "required": ["repository", "repository_id", "package_version", "bound_at", "bound_by_role"],
       "properties": {
         "repository": {
           "type": "string",
@@ -59,10 +47,7 @@
     "digests": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "policy_defaults_sha256",
-        "workflow_sha256"
-      ],
+      "required": ["policy_defaults_sha256", "workflow_sha256"],
       "properties": {
         "policy_defaults_sha256": {
           "$ref": "#/$defs/sha256"
@@ -111,10 +96,7 @@
         },
         "workflow": {
           "file": "devai-issue-tracking.yml",
-          "triggers": [
-            "push",
-            "workflow_dispatch"
-          ],
+          "triggers": ["push", "workflow_dispatch"],
           "trusted_ref": "refs/heads/main",
           "permissions": {
             "contents": "read",
@@ -140,12 +122,7 @@
           "max_events_per_batch": 128,
           "max_batch_chars": 60000,
           "withheld_payload_digest": "sha256",
-          "neutralize": [
-            "mention",
-            "html",
-            "markdown-directive",
-            "control-characters"
-          ],
+          "neutralize": ["mention", "html", "markdown-directive", "control-characters"],
           "forbidden_content": [
             "raw-prompt",
             "command-output",

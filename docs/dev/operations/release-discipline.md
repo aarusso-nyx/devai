@@ -12,6 +12,12 @@ The [remote preflight lane](remote-preflight-contract.md) keeps the protected RC
 ledger and publication boundary unchanged. DEVAI 1.4 adds release-profile task
 nodes, so a 1.3.x task-policy attestation cannot certify a 1.4.0 candidate.
 
+Protected preflight runs `format:check:all` against the complete tracked candidate.
+Its shallow Git view needs no historical base or `DEVAI_FORMAT_BASE` value; a clean
+checkout cannot turn formatting into an empty check. Commit hooks still fix only
+staged files. Vendored dependencies and checksum-controlled fixtures retain their
+existing byte-verification contracts instead of being reformatted.
+
 ## Inspect
 
 ```bash
@@ -67,6 +73,26 @@ closure, and creates a normalized public manifest with development workspace dep
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
 that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
 
+The protected Linux toolchain includes checksum-verified Python 3.13.5 and its explicitly
+pinned Debian snapshot dependencies. Repository evidence-transport and adopter-migration
+checks require Python; its executable identity and the complete image digest must be
+revalidated before certification after any toolchain change.
+
+For network-isolated package-staging checks, the repository-local dependency provisioner
+accepts an explicit `npm_install_cache` control with external canonical `directory` and
+`manifest` paths plus `manifest_sha256`. The manifest lists every cache file's `path`,
+`size`, and `sha256`. The provisioner rejects links, population differences, changed bytes,
+and candidate-owned inputs, then includes the verified cache in both dependency rebuilds.
+The complete dependency archive identity binds these bytes. Missing package cache entries
+must be diagnosed before certification; installed pnpm dependencies alone do not supply
+npm's cache for the separate normalized package installation.
+
+Staging copies the transported `node_modules/.devai-npm-cache` seed to a temporary writable
+cache and installs offline. The seed remains unchanged. A cache miss fails without network
+fallback. Ordinary staging without a seed uses its existing npm installation path, with
+network retries disabled and a two-minute process limit. This does not remove the mandatory
+package-staging test or grant candidate commands network access in protected execution.
+
 The pull-request gate uses exact-commit binding. GitHub-created main merge commits and the signed
 release tag use explicit `exact-tree` binding, which accepts the PR receipt only when the checked
 tree is byte-identical. Commit mismatch without tree equality remains a hard failure.
@@ -91,17 +117,25 @@ without a SemVer prerelease component creates a normal GitHub Release and uses `
 manifest records the derived release type, prerelease boolean, and dist-tag; recovery verifies
 that the existing Release and registry tag match that identity.
 
-A signed annotated version-tag push is a non-publishing rehearsal trigger. It runs protected-ledger
-verification, frozen installation, build, publishable-closure checks, deterministic double-pack,
-SBOM creation, the npm adopter check, site creation, and manifest assembly. The publication and
-Pages jobs are structurally skipped for the tag-push event.
+A signed annotated version-tag push validates identity without rebuilding or publishing.
+Rehearsal is an explicit dispatch with `publish: false`, an exact `candidate_commit`
+on main, and an intended `release_tag` matching the package version. No tag need exist.
+Every required rehearsal job, including Linux adoption, must pass before a completion
+record binds the run/attempt, workflow commit, source identity and retained artifact digests.
+Artifacts and completion records are retained for 30 days.
 
-A manual dispatch with the exact existing `release_tag` and `publish: false` repeats the same
-non-publishing rehearsal. Only an explicit `workflow_dispatch` with `publish: true` may finalize
-the canonical Release, mirror the exact tarball to GitHub Packages, and deploy the manifest-bound
-Pages archive after a successful rehearsal and separate Owner authorization. Publication and
-recovery never move a tag or replace a mismatched asset; byte-identical existing effects are
-no-ops and any identity mismatch fails closed.
+Only an explicit `workflow_dispatch` with `publish: true` may finalize
+publication. Supply `release_tag`, `rehearsal_run_id` and `rehearsal_attempt` after
+separate Owner authorization. Create the signed annotated tag only after rehearsal;
+it must point to that exact candidate commit. Publication rechecks current protected
+trust, policy, evidence and tag identity and promotes the exact retained bytes. It
+never rebuilds, repacks or regenerates the site. Missing/expired artifacts or changed
+verification identities require another rehearsal. Existing immutable assets are never
+replaced. A failed remote read is unknown, not proof that a publication is absent.
+
+Protected jobs load repository-local process helpers from the separately approved
+`DEVAI_PROCESS_CONTROL_COMMIT`. Candidate files cannot select that revision.
+See [process simplification rollout](process-simplification-rollout.md) for staged setup.
 
 The release build also runs `npm --prefix docs/site run security:check`. DEVAI temporarily vendors
 the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no patched npm release;
@@ -112,3 +146,46 @@ Repository settings are separate Owner-authorized effects: enable immutable Rele
 prohibit update/deletion of `v*` tags, require signed annotated release tags, protect the
 release and Pages environments, and select GitHub Actions as the Pages source. None of those
 settings is changed by the source workflow itself.
+
+## Installed host publication controls
+
+The 1.5 installed host runner exposes the existing `release evidence-publish` and
+`release publish` actions only when the operator supplies their respective
+`later_stages.evidence_publish` or `later_stages.publish` controls. Omission or
+`'unavailable'` disables that stage. Each stage needs a provider and an authorization
+callback. Evidence publication also needs an independent offline-receipt verifier;
+package publication needs publication controls. These callbacks come from the installed
+control process, never request JSON. Supplying a callback does not establish approval:
+the lifecycle still validates its returned authorization, receipts, and current state.
+
+A remote invocation must explicitly provide `as_role`, `write`, and `allow_publish`.
+The runner forwards consent without supplying a default grant, binds the request to its
+exact production candidate, and refuses diagnostic-lane publication. Evidence publication
+binds its offline receipt; package publication binds its plan receipt. Missing controls,
+missing consent, stale authorization, or incompatible evidence remain refusals. This host
+interface does not change DEVAI's own rehearsal-and-promotion workflow described above.
+
+## Mutation baseline and interrupted execution
+
+The protected mutation program gives the complete unmutated baseline 15 minutes.
+This is separate from the unchanged per-mutant `timeoutMS: 10000` and
+`timeoutFactor: 2`. The CLI baseline includes offline package-staging checks and
+per-test coverage; the five-minute Stryker default can expire while those tests
+are still executing. A baseline timeout remains a failure and never permits
+mutation execution to start.
+
+An installed host may supply `observe_mutation_package` to retain each package
+before the driver advances. The callback receives the candidate identity, package
+name, exact program and input digests, task-policy digests, and defensive copies
+of the normalized report and result. The driver awaits the callback; a refusal
+prevents aggregate completion. Candidate requests cannot select this callback,
+and diagnostic preflight does not invoke it.
+
+Repository-local operators can write these observations through
+`scripts/process/mutation-checkpoints.mjs` using a private directory outside the
+candidate, finite byte bounds, exact bindings, and an independently approved
+verification callback. The store retains rejected attempts and refuses to replace
+an existing different record. Neither observing nor storing a report grants
+execution custody, a reuse origin, or candidate readiness. Restarted execution
+must independently establish those proofs; the installed driver still declares
+its own results as executed and does not replay these checkpoints.

@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from '@devai-nyx/authority';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 import { dirname, join } from 'node:path';
 
-const validateProofEpochLine = getValidator('proof-epoch.schema.json');
+const validateProofEpochLine = validators.proofEpoch;
 const EMPTY_EPOCH_HASH = createHash('sha256').update('DEVAI-PROOF-EPOCH-EMPTY').digest('hex');
 
 export type ProofEpochLineType = 'record' | 'errata' | 'terminal';
@@ -193,10 +193,14 @@ export function verifyProofEpoch(inputs: {
   }
   let previous: string | null = null;
   let terminalCount = 0;
+  let recordCount = 0;
   for (const [index, line] of lines.entries()) {
     const position = index + 1;
-    if (!validateProofEpochLine(line))
+    if (!validateProofEpochLine(line)) {
       errors.push(`line ${String(position)} fails schema validation`);
+      continue;
+    }
+    if (line.line_type !== 'terminal') recordCount += 1;
     if (line.round_id !== inputs.roundId) errors.push(`line ${String(position)} crosses round`);
     if (line.kind !== inputs.kind) errors.push(`line ${String(position)} crosses kind`);
     if (line.sequence !== position) errors.push(`line ${String(position)} has reordered sequence`);
@@ -229,7 +233,7 @@ export function verifyProofEpoch(inputs: {
     valid: errors.length === 0,
     closed: terminalCount === 1,
     head: previous,
-    recordCount: lines.filter((line) => line.line_type !== 'terminal').length,
+    recordCount,
     lines,
     errors,
   };

@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   buildSensorReading,
   type SensorFinding,
@@ -103,6 +103,22 @@ function countPerfUseCases(repoRoot: string, dirs: readonly string[]): number {
       } catch {
         continue;
       }
+      if (/\.json$/i.test(f)) {
+        try {
+          const record = JSON.parse(content) as {
+            acceptance?: unknown;
+            preconditions?: unknown;
+          } | null;
+          const criteria = [record?.acceptance, record?.preconditions].flatMap((value) =>
+            Array.isArray(value)
+              ? value.filter((item): item is string => typeof item === 'string')
+              : [],
+          );
+          content = criteria.join('\n');
+        } catch {
+          continue;
+        }
+      }
       if (PERF_KEYWORDS_RE.test(content)) n += 1;
     }
   }
@@ -113,9 +129,9 @@ function hasPerfRelevantCode(repoRoot: string, patterns: readonly string[]): boo
   const sink: string[] = [];
   walkPaths(repoRoot, sink);
   for (const f of sink) {
-    if (f.includes('node_modules/')) continue;
+    const repoPath = '/' + relative(resolve(repoRoot), f).split(sep).join('/');
     for (const p of patterns) {
-      if (f.includes(p)) return true;
+      if (repoPath.includes(p)) return true;
     }
   }
   return false;

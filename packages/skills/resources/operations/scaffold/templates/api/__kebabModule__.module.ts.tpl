@@ -1,7 +1,6 @@
 /* Generated for __NAMESPACE__/__MODULE__ — spec: __SPEC_VERSION__ sha: __SPEC_SHA__ */
 import { Module } from '@nestjs/common';
-import { __classEntity__Service } from './services/__kebabEntity__.service';
-import { __classEntity__Controller } from './controllers/__kebabEntity__.controller';
+__API_ENTITY_IMPORTS__
 import { __MODULE__PolicyGuard } from './guards/policy.guard';
 
 /*
@@ -17,8 +16,8 @@ import { __MODULE__PolicyGuard } from './guards/policy.guard';
  */
 @Module({
   imports: [],
-  controllers: [__classEntity__Controller],
-  providers: [__classEntity__Service, __MODULE__PolicyGuard],
-  exports: [__classEntity__Service],
+  controllers: [__API_CONTROLLERS__],
+  providers: [__API_SERVICES__, __MODULE__PolicyGuard],
+  exports: [__API_SERVICES__],
 })
 export class __MODULE__Module {}

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -85,6 +85,63 @@ function commitAll(root: string, message: string): void {
 }
 
 describe('governance record parsing and integrity', () => {
+  it('keeps prototype-shaped YAML keys as data rather than inherited governance fields', () => {
+    const root = fixtureRoot();
+    const path = writeRecord(
+      root,
+      'prototype.md',
+      [
+        '---',
+        '__proto__:',
+        '  status: accepted',
+        '  id: ADR-HIDDEN',
+        'items:',
+        '  - name: ordinary',
+        '    __proto__:',
+        '      authority: Owner',
+        '---',
+        '# Fixture',
+        '',
+      ].join('\n'),
+    );
+    const parsed = parseGovernanceRecord(path);
+    expect(parsed.frontmatter['status']).toBeUndefined();
+    expect(parsed.frontmatter['id']).toBeUndefined();
+    expect(Object.hasOwn(parsed.frontmatter, '__proto__')).toBe(true);
+    expect(parsed.frontmatter['__proto__']).toEqual({ status: 'accepted', id: 'ADR-HIDDEN' });
+    const items = parsed.frontmatter['items'] as Record<string, unknown>[];
+    expect(items[0]?.['authority']).toBeUndefined();
+    expect(Object.hasOwn(items[0] ?? {}, '__proto__')).toBe(true);
+    expect(items[0]?.['__proto__']).toEqual({ authority: 'Owner' });
+    expect(decisionRecordIntegrity({ repoRoot: root }).findings).toContainEqual(
+      expect.objectContaining({ code: 'DECISION_SCHEMA_INVALID', path: 'law/adr/prototype.md' }),
+    );
+  });
+
+  it.each([
+    { source: '[]', expected: [] },
+    { source: '{}', expected: {} },
+    { source: '[ ]', expected: [] },
+    { source: '[1; false; null]', expected: [1, false, null] },
+    { source: '[one, two]', expected: ['one', 'two'] },
+    { source: 'true', expected: true },
+    { source: 'false', expected: false },
+    { source: 'null', expected: null },
+    { source: '-24', expected: -24 },
+    { source: '"true"', expected: 'true' },
+    { source: "' false '", expected: ' false ' },
+    { source: 'unquoted text', expected: 'unquoted text' },
+  ])('preserves the supported scalar meaning of $source', ({ source, expected }) => {
+    const path = writeRecord(
+      fixtureRoot(),
+      'scalar.md',
+      `---\n# comment\nfield: ${source}\n---\n\nBody\n`,
+    );
+    const parsed = parseGovernanceRecord(path);
+    expect(parsed.frontmatter['field']).toEqual(expected);
+    expect(parsed.body).toBe('Body\n');
+  });
+
   it('parses the supported YAML subset and rejects missing frontmatter', () => {
     const root = fixtureRoot();
     const path = writeRecord(root, 'ADR-001.md');
@@ -154,6 +211,49 @@ describe('governance record parsing and integrity', () => {
     expect(decisionRecordIntegrity({ repoRoot: root }).findings).toContainEqual(
       expect.objectContaining({ code: 'DECISION_LOCKED_BODY_MUTATED' }),
     );
+  });
+
+  it.each([
+    { name: 'body', update: { status: 'active', body: '# Changed doctrine' } },
+    { name: 'title', update: { status: 'active', title: 'Changed title' } },
+    { name: 'lifecycle rollback', update: { status: 'draft' } },
+    { name: 'replacement while active', update: { status: 'active', supersededBy: 'ADR-002' } },
+  ])('rejects an uncommitted sealed $name mutation', ({ update }) => {
+    const root = fixtureRoot();
+    const path = writeRecord(root, 'ADR-001.md', recordSource({ status: 'active' }));
+    initGit(root);
+    commitAll(root, 'seal');
+    writeFileSync(path, recordSource(update));
+    expect(decisionRecordIntegrity({ repoRoot: root }).findings).toContainEqual(
+      expect.objectContaining({ code: 'DECISION_LOCKED_BODY_MUTATED' }),
+    );
+  });
+
+  it('accepts an uncommitted restoration and subsequent canonical supersession', () => {
+    const root = fixtureRoot();
+    const original = recordSource({ status: 'active' });
+    const path = writeRecord(root, 'ADR-001.md', original);
+    initGit(root);
+    commitAll(root, 'seal');
+    writeFileSync(path, recordSource({ status: 'active', body: '# Invalid edit' }));
+    commitAll(root, 'invalid edit');
+    writeFileSync(path, original);
+    expect(decisionRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+    writeFileSync(path, recordSource({ status: 'superseded', supersededBy: 'ADR-002' }));
+    writeRecord(root, 'ADR-002.md', recordSource({ id: 'ADR-002', supersedes: '[ADR-001]' }));
+    commitAll(root, 'restore and supersede');
+    expect(decisionRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+  });
+
+  it('accepts a valid supersession before commit when the successor already has history', () => {
+    const root = fixtureRoot();
+    const path = writeRecord(root, 'ADR-001.md', recordSource({ status: 'active' }));
+    const successor = writeRecord(root, 'ADR-002.md', recordSource({ id: 'ADR-002' }));
+    initGit(root);
+    commitAll(root, 'seal and successor draft');
+    writeFileSync(path, recordSource({ status: 'superseded', supersededBy: 'ADR-002' }));
+    writeFileSync(successor, recordSource({ id: 'ADR-002', supersedes: '[ADR-001]' }));
+    expect(decisionRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
   });
 
   it('fails sealed-history verification closed in a shallow clone', () => {
@@ -462,6 +562,81 @@ describe('citation and archive integrity', () => {
     );
 
     expect(archiveImmutability({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+  });
+
+  it.each([{ value: null }, { value: {} }, { value: { files: {} } }, { value: { files: [null] } }])(
+    'refuses malformed archive manifest shape $value without crashing',
+    ({ value }) => {
+      const root = fixtureRoot();
+      write(join(root, 'law/adr/archive/MANIFEST.json'), JSON.stringify(value));
+      expect(archiveImmutability({ repoRoot: root })).toMatchObject({
+        ok: false,
+        findings: expect.arrayContaining([
+          expect.objectContaining({ code: 'ARCHIVE_MANIFEST_INVALID' }),
+        ]),
+      });
+    },
+  );
+
+  it.each(['../outside.md', './frozen.md', 'nested/../frozen.md', 'nested//frozen.md'])(
+    'refuses a noncanonical or escaping archive member %s',
+    (path) => {
+      const root = fixtureRoot();
+      const archive = join(root, 'law/adr/archive');
+      write(join(archive, path), 'frozen\n');
+      write(
+        join(archive, 'MANIFEST.json'),
+        JSON.stringify({
+          files: [{ path, sha256: createHash('sha256').update('frozen\n').digest('hex') }],
+        }),
+      );
+      expect(archiveImmutability({ repoRoot: root }).ok).toBe(false);
+    },
+  );
+
+  it('accepts nested Unicode members and rejects duplicate declarations', () => {
+    const root = fixtureRoot();
+    const archive = join(root, 'law/adr/archive');
+    const path = 'nested/ação antiga.md';
+    write(join(archive, path), 'frozen\n');
+    const entry = { path, sha256: createHash('sha256').update('frozen\n').digest('hex') };
+    write(join(archive, 'MANIFEST.json'), JSON.stringify({ files: [entry] }));
+    expect(archiveImmutability({ repoRoot: root })).toEqual({ ok: true, findings: [] });
+    write(join(archive, 'MANIFEST.json'), JSON.stringify({ files: [entry, entry] }));
+    expect(archiveImmutability({ repoRoot: root })).toMatchObject({
+      ok: false,
+      findings: expect.arrayContaining([
+        expect.objectContaining({ code: 'ARCHIVE_MANIFEST_INVALID' }),
+      ]),
+    });
+  });
+
+  it('rejects a directory link cycle without traversing it', () => {
+    const root = fixtureRoot();
+    const archive = join(root, 'law/adr/archive');
+    write(join(archive, 'MANIFEST.json'), JSON.stringify({ files: [] }));
+    symlinkSync(archive, join(archive, 'cycle'));
+    expect(archiveImmutability({ repoRoot: root })).toMatchObject({
+      ok: false,
+      findings: [expect.objectContaining({ code: 'ARCHIVE_FILE_UNSAFE' })],
+    });
+  });
+
+  it('refuses a pinned symlink instead of following its target outside the archive', () => {
+    const root = fixtureRoot();
+    const archive = join(root, 'law/adr/archive');
+    mkdirSync(archive, { recursive: true });
+    write(join(root, 'outside.md'), 'frozen\n');
+    symlinkSync(join(root, 'outside.md'), join(archive, 'linked.md'));
+    write(
+      join(archive, 'MANIFEST.json'),
+      JSON.stringify({
+        files: [
+          { path: 'linked.md', sha256: createHash('sha256').update('frozen\n').digest('hex') },
+        ],
+      }),
+    );
+    expect(archiveImmutability({ repoRoot: root }).ok).toBe(false);
   });
 });
 

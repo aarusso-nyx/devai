@@ -7,6 +7,7 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
+import { foldWorkflowLines } from './harness/folded-lines.js';
 import { loadWorkflows } from './harness/workflow-parser.js';
 
 /**
@@ -105,9 +106,15 @@ function stripYamlComment(line: string): string {
   let double = false;
   for (let i = 0; i < line.length; i += 1) {
     const char = line[i];
+    if (double && char === '\\') {
+      // Consume escape pairs: an even run leaves the next quote unescaped.
+      i += 1;
+      continue;
+    }
     if (char === "'" && !double) single = !single;
-    else if (char === '"' && !single && line[i - 1] !== '\\') double = !double;
-    else if (char === '#' && !single && !double) return line.slice(0, i).trimEnd();
+    else if (char === '"' && !single) double = !double;
+    else if (char === '#' && !single && !double && (i === 0 || /\s/.test(line[i - 1] ?? '')))
+      return line.slice(0, i).trimEnd();
   }
   return line;
 }
@@ -157,9 +164,13 @@ function extractRunSteps(content: string): WorkflowRunStep[] {
       !/^\s*(?:-\s+)?continue-on-error\s*:\s*(?:false|['"]false['"])(?:\s|#|$)/i.test(
         continueOnErrorLine,
       );
-    const disabled = block.some((line) =>
-      /^\s*(?:-\s+)?if\s*:\s*(?:false|['"]false['"]|\$\{\{\s*false\s*\}\})(?:\s|#|$)/i.test(line),
-    );
+    const disabled = block.some((line) => {
+      const condition = stripYamlComment(line).match(/^\s*(?:-\s+)?if\s*:\s*(.*?)\s*$/)?.[1];
+      return (
+        condition !== undefined &&
+        /^(?:false|\$\{\{\s*false\s*\}\})(?:\s|#|$)/i.test(unquoteYamlScalar(condition))
+      );
+    });
     for (let offset = 0; offset < block.length; offset += 1) {
       const line = stripYamlComment(block[offset] ?? '');
       const runMatch = line.match(/^\s*(?:-\s+)?run\s*:\s*(.*)$/);
@@ -174,7 +185,11 @@ function extractRunSteps(content: string): WorkflowRunStep[] {
           if (bodyLine.trim() !== '' && indentation <= runIndent) break;
           body.push(bodyLine.slice(Math.min(bodyLine.length, runIndent + 2)));
         }
-        steps.push({ script: body.join('\n'), continueOnError, disabled });
+        steps.push({
+          script: raw.startsWith('>') ? foldWorkflowLines(body) : body.join('\n'),
+          continueOnError,
+          disabled,
+        });
       } else {
         steps.push({ script: unquoteYamlScalar(raw), continueOnError, disabled });
       }
@@ -199,10 +214,49 @@ function loadRunSteps(workflowFiles: readonly string[]): WorkflowRunStep[] {
 }
 
 function shellSegments(script: string): readonly string[] {
-  return script
-    .split(/\n|&&|;/)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment !== '');
+  const segments: string[] = [];
+  let start = 0;
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  let comment = false;
+  const emit = (end: number): void => {
+    const segment = script.slice(start, end).trim();
+    if (segment !== '') segments.push(segment);
+  };
+  for (let index = 0; index < script.length; index += 1) {
+    const char = script[index];
+    if (comment) {
+      if (char !== '\n') continue;
+      comment = false;
+    }
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '#' && (index === 0 || /[\s;&|()]/.test(script[index - 1] ?? ''))) {
+      comment = true;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (char === '\n' || char === ';' || (char === '&' && script[index + 1] === '&')) {
+      emit(index);
+      if (char === '&') index += 1;
+      start = index + 1;
+    }
+  }
+  emit(script.length);
+  return segments;
 }
 
 function hasNonBindingControlFlow(script: string): boolean {
@@ -211,6 +265,29 @@ function hasNonBindingControlFlow(script: string): boolean {
       stripYamlComment(segment).trim(),
     ),
   );
+}
+
+/**
+ * `set +e` drops errexit for everything the shell runs afterwards, so it makes
+ * the rest of the body non-binding however it is reached — its own line, after
+ * `;`, or after `&&`. Matching on segments rather than on line starts keeps the
+ * one-liner forms from slipping past the gate-masking guard.
+ */
+function disablesErrexit(segment: string): boolean {
+  const words = shellWords(stripYamlComment(segment).trim());
+  if (words?.[0] !== 'set') return false;
+  for (let index = 1; index < words.length; index += 1) {
+    const option = words[index] ?? '';
+    if (option === '--' || !/^[+-]/.test(option)) break;
+    if (option === '+o' || option === '-o') {
+      const name = words[index + 1];
+      if (option === '+o' && name === 'errexit') return true;
+      if (name !== undefined && !/^[+-]/.test(name)) index += 1;
+    } else if (/^\+[a-zA-Z]*e[a-zA-Z]*$/.test(option)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function shellWords(command: string): string[] | null {
@@ -234,7 +311,11 @@ function shellWords(command: string): string[] | null {
       } else if (char === '\\') {
         const next = command[index + 1];
         if (next === undefined) return null;
-        word += next;
+        // Inside double quotes, the shell only removes a backslash before
+        // dollar, backtick, double quote, backslash, or a continued newline.
+        if (next !== '\n') {
+          word += ['$', '`', '"', '\\'].includes(next) ? next : `\\${next}`;
+        }
         index += 1;
       } else {
         word += char;
@@ -349,7 +430,7 @@ function isFailClosedExecutableSegment(segment: string, candidate: string): bool
   // occurs in a `run:` body.
   if (/\|\|/.test(command)) return false;
   if (/(?:^|\s)(?:>|>>|1>|1>>|2>|2>>)\s*\/dev\/null(?:\s|$)/.test(command)) return false;
-  if (/^set\s+\+e(?:\s|$)/.test(command)) return false;
+  if (disablesErrexit(command)) return false;
 
   const firstToken = shellWords(command)?.[0];
   if (firstToken === undefined) return false;
@@ -385,7 +466,7 @@ function hasExecutableMeasurement(steps: readonly WorkflowRunStep[], candidate: 
     (step) =>
       !step.continueOnError &&
       !step.disabled &&
-      !/(?:^|\n)\s*set\s+\+e(?:\s|$)/.test(step.script) &&
+      !shellSegments(step.script).some(disablesErrexit) &&
       !hasNonBindingControlFlow(step.script) &&
       shellSegments(step.script).some((segment) =>
         isFailClosedExecutableSegment(segment, candidate),
@@ -590,6 +671,7 @@ function hasFreshCandidateEvidence(
     }
     const command = evidenceCommand(record.command);
     if (hasNonBindingControlFlow(command)) return false;
+    if (shellSegments(command).some(disablesErrexit)) return false;
     return shellSegments(command).some((segment) =>
       isFailClosedExecutableSegment(segment, candidate),
     );

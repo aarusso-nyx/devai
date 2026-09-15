@@ -496,7 +496,7 @@ function safePersistencePath(repoRoot: string, relativePath: string): string {
   const root = resolve(repoRoot);
   const target = resolve(root, normalized);
   requireSemantic(
-    relative(root, target) === normalized,
+    relative(root, target) === relativePath,
     'TASK_EXECUTION_EVIDENCE_PATH_INVALID',
     'persistence path must use one canonical relative spelling',
   );

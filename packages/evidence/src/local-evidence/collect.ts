@@ -7,13 +7,13 @@ import {
   statSync,
   writeFileSync,
 } from '@devai-nyx/authority';
-import { dirname, join, relative } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { dirname, isAbsolute, join, relative } from 'node:path';
+import { validators } from '@devai-nyx/schemas';
 import { computeSourceHash, type SourceHash } from './source-hash.js';
 import { resolveLocalEvidencePolicy, type LocalEvidencePolicy } from './config.js';
 import { deriveExactSubject, type LocalEvidenceSubject } from './subject.js';
 
-const validateLocalEvidenceManifest = getValidator('local-evidence-manifest.schema.json');
+const validateLocalEvidenceManifest = validators.localEvidenceManifest;
 
 /**
  * `devai evidence local collect` core (D-117): assemble a
@@ -67,7 +67,7 @@ function readMetadata(artifactDir: string): Record<string, string> {
   if (!existsSync(metadataPath)) {
     throw new Error(`missing local CI metadata: ${metadataPath}`);
   }
-  const metadata: Record<string, string> = {};
+  const metadata = Object.create(null) as Record<string, string>;
   for (const line of readFileSync(metadataPath, 'utf8').split(/\r?\n/u)) {
     if (line.trim().length === 0) continue;
     const separator = line.indexOf('=');
@@ -84,7 +84,8 @@ function collectFiles(root: string, current: string, files: string[]): string[] 
       collectFiles(root, fullPath, files);
       continue;
     }
-    if (entry.isFile()) files.push(fullPath);
+    if (!entry.isFile()) throw new Error(`unsupported local CI artifact member: ${fullPath}`);
+    files.push(fullPath);
   }
   return files;
 }
@@ -172,14 +173,14 @@ export function collectLocalEvidence(inputs: CollectInputs): CollectResult {
   }
 
   for (const job of policy.requiredJobs) {
-    if (inputs.jobDirs[job] === undefined) {
+    if (!Object.hasOwn(inputs.jobDirs, job) || inputs.jobDirs[job] === undefined) {
       throw new Error(`missing artifact directory for required job: ${job}`);
     }
   }
 
-  const jobs: Record<string, ManifestJobEntry> = {};
+  const jobs = Object.create(null) as Record<string, ManifestJobEntry>;
   for (const [job, dir] of Object.entries(inputs.jobDirs)) {
-    jobs[job] = jobEntry(job, join(inputs.repoRoot, dir));
+    jobs[job] = jobEntry(job, isAbsolute(dir) ? dir : join(inputs.repoRoot, dir));
   }
 
   const pm = declaredPackageManager(inputs.repoRoot);

@@ -11,7 +11,7 @@ export interface LocalEvidenceSubject {
   readonly tree: EvidenceTreeIdentity;
 }
 
-function git(repoRoot: string, args: readonly string[]): string {
+function git(repoRoot: string, args: readonly string[], trim = true): string {
   const result = spawnSync('git', [...args], {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -20,21 +20,24 @@ function git(repoRoot: string, args: readonly string[]): string {
   if (result.status !== 0) {
     throw new Error(result.stderr.trim() || `git ${args.join(' ')} failed`);
   }
-  return result.stdout.trim();
+  return trim ? result.stdout.trim() : result.stdout;
 }
 
 function repositoryFromRemote(remote: string): string {
   const withoutSuffix = remote.replace(/\.git$/u, '');
-  const scp = /^[^@]+@[^:]+:(.+)$/u.exec(withoutSuffix)?.[1];
+  // An explicit URL may contain both a username and a port. Its port colon
+  // is not the separator used by Git's scp-style remote syntax.
+  const scp = withoutSuffix.includes('://')
+    ? undefined
+    : /^[^@]+@[^:]+:(.+)$/u.exec(withoutSuffix)?.[1];
   if (scp !== undefined) return scp;
+  let url: URL | undefined;
   try {
-    const url = new URL(withoutSuffix);
-    const path = url.pathname.replace(/^\/+|\/+$/gu, '');
-    if (path.length > 0) return path;
+    url = new URL(withoutSuffix);
   } catch {
-    // Fall through to an exact path-shaped remote (for local test repositories).
+    // Exact path-shaped remotes remain supported for local repositories.
   }
-  const path = withoutSuffix.replace(/^\/+|\/+$/gu, '');
+  const path = (url?.pathname ?? withoutSuffix).replace(/^\/+|\/+$/gu, '');
   if (path.length === 0) throw new Error('cannot derive repository identity from origin');
   return path;
 }
@@ -59,8 +62,12 @@ export function deriveTrailerParentSubject(
   if (parents.length !== 2) {
     throw new Error('local evidence trailer commit must have exactly one parent');
   }
-  const changed = git(repoRoot, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])
-    .split('\n')
+  const changed = git(
+    repoRoot,
+    ['diff-tree', '--no-commit-id', '--name-only', '-z', '-r', 'HEAD'],
+    false,
+  )
+    .split('\0')
     .filter(Boolean);
   if (changed.length !== 1 || changed[0] !== manifestPath) {
     throw new Error('local evidence trailer commit must change only the declared manifest');

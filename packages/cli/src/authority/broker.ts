@@ -19,6 +19,17 @@ import {
   type AuthorityHostEffectRequest,
   type AuthorityHostEffectScope,
   type AtomicAuthorityHostEffect,
+  protectedReleaseHostEffect,
+  protectedArtifactSinkHostEffect,
+  protectedExportHostEffect,
+  protectedReleaseBoundaryAdapterId,
+  assertProtectedReleasePrepareCapacityEffect,
+  assertProtectedReleaseExportCapacityEffect,
+  readProtectedReleaseRepositoryIdentity,
+  assertProtectedReleaseRepositoryRoot,
+  type ProtectedReleasePrepareCapacityBinding,
+  type ProtectedReleasePrepareCapacity,
+  type ProtectedReleaseExportCapacityBinding,
 } from '@devai-nyx/authority';
 import {
   computeManifestHash,
@@ -33,6 +44,7 @@ import type { RegistryEntry } from '../define-command.js';
 import {
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
+  matchDeclaredReleaseTaskProcess,
 } from '../services/check-runner/authority-process.js';
 import { matchDeclaredRoundTaskProcess } from '../services/round-run/authority-process.js';
 import {
@@ -574,6 +586,21 @@ function processTarget(
     }
   }
 
+  if (actionName === 'release preflight' || actionName === 'release certify') {
+    const task = matchDeclaredReleaseTaskProcess(root, request);
+    if (task !== undefined) {
+      return {
+        kind: 'fs',
+        id: `fs:.devai/state/check-cache/v1:${safeLogical(task.nodeId, 'task')}:${String(
+          task.taskPolicyDigest,
+        ).slice(0, 16)}`,
+        repository_id: repositoryId,
+        canonical_relative_path: '.devai/state/check-cache/v1',
+        operation: 'update',
+      };
+    }
+  }
+
   if (actionName === 'round run') {
     const task = matchDeclaredRoundTaskProcess(root, invocationArgv, request);
     if (task !== undefined) {
@@ -799,6 +826,8 @@ function processTarget(
 }
 
 function adapterId(target: JsonRecord): string {
+  const protectedAdapter = protectedReleaseBoundaryAdapterId(target);
+  if (protectedAdapter !== undefined) return protectedAdapter;
   return `${String(target.kind)}-authority-boundary`;
 }
 
@@ -807,6 +836,57 @@ function targetOperation(target: JsonRecord): string {
 }
 
 function boundedSelectors(kind: string, repositoryId: string, actionName: string): JsonRecord[] {
+  if (
+    actionName === 'release export' &&
+    (kind === 'artifact-sink' || kind === 'protected-export-signer')
+  ) {
+    const signer = kind === 'protected-export-signer';
+    return [
+      {
+        kind: 'remote',
+        system_id: signer ? 'protected-export-signer-v1' : 'trusted-export-artifact-sink-v1',
+        endpoint_ids: ['host'],
+        operation_ids: [signer ? 'sign' : 'write'],
+        publication: false,
+      },
+    ];
+  }
+  if (actionName === 'release prepare' && kind === 'artifact-sink') {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'trusted-artifact-sink-v3',
+        endpoint_ids: ['host'],
+        operation_ids: ['write'],
+        publication: false,
+      },
+    ];
+  }
+  if (
+    (actionName === 'release certify' || actionName === 'release preflight') &&
+    kind === 'protected-certification-provider'
+  ) {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'devai-protected-certification-provider-v3',
+        endpoint_ids: ['host'],
+        operation_ids: ['execute'],
+        publication: false,
+      },
+    ];
+  }
+  if (actionName === 'release certify' && kind === 'certification-evidence-sink') {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'trusted-certification-evidence-sink-v1',
+        endpoint_ids: ['host'],
+        operation_ids: ['write'],
+        publication: false,
+      },
+    ];
+  }
   if (kind === 'fs') {
     return [
       {
@@ -959,6 +1039,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     now: () => new Date().toISOString(),
     receipt_ttl_ms: 30_000,
   }) as JsonRecord;
+  let disposed = false;
   let effectApply: (() => unknown) | undefined;
   let exactUnitApply: (() => unknown) | undefined;
   let effectResult: unknown;
@@ -1060,6 +1141,101 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             invocation_id: invocationId,
           }),
         );
+  const boundedPlanDigest = boundedPlan === undefined ? undefined : canonicalSha256(boundedPlan);
+  let releaseRequestDigest: string | undefined;
+  let exportBindingDigest: string | undefined;
+  const readReleaseCapacity = (
+    binding: ProtectedReleasePrepareCapacityBinding | ProtectedReleaseExportCapacityBinding,
+  ): ProtectedReleasePrepareCapacity => {
+    const isExport = binding.action_id === 'release export';
+    const action = isExport ? 'release export' : 'release prepare';
+    const unavailable = isExport
+      ? 'release-export-capacity-unavailable'
+      : 'release-prepare-capacity-unavailable';
+    const expectedPlanner = {
+      kind: 'bounded-batches',
+      planner_id: isExport ? 'release-export-bounded-plan' : 'release-prepare-bounded-plan',
+      target_kinds: isExport
+        ? ['fs', 'artifact-sink', 'protected-export-signer']
+        : ['fs', 'artifact-sink'],
+      bounds: {
+        max_batches: isExport ? 128 : 256,
+        max_targets_per_batch: 64,
+        max_total_targets: 8192,
+      },
+      recovery: 'preserve-and-report',
+    };
+    try {
+      assertProtectedReleaseRepositoryRoot(repositoryRoot);
+      const identity = readProtectedReleaseRepositoryIdentity();
+      if (
+        disposed ||
+        input.entry.name !== action ||
+        input.entry.effects !== 'local-write' ||
+        input.role !== 'architect' ||
+        !input.argv.includes('--write') ||
+        binding.action_id !== input.entry.name ||
+        identity.authority_repository_id !== sources.repository_id ||
+        binding.repository.id !== identity.expected_release_repository_id ||
+        binding.repository.commit !== identity.repository.commit ||
+        binding.repository.tree !== identity.repository.tree ||
+        boundedPlan === undefined ||
+        boundedPlanHandle === undefined ||
+        canonicalSha256(boundedPlan) !== boundedPlanDigest ||
+        canonicalSha256(actionPlanner) !== canonicalSha256(expectedPlanner)
+      )
+        throw new Error(unavailable);
+      const requestPath = flagValue(input.argv, '--request');
+      if (requestPath === undefined) throw new Error(unavailable);
+      const request = JSON.parse(readFileSync(resolve(requestPath), 'utf8')) as unknown;
+      if (
+        !isRecord(request) ||
+        request.action_id !== binding.action_id ||
+        canonicalSha256(request.repository_locator) !== canonicalSha256(binding.repository) ||
+        !isRecord(request.candidate_locator) ||
+        request.candidate_locator.commit !== binding.candidate.commit ||
+        request.candidate_locator.tree !== binding.candidate.tree ||
+        !Array.isArray(request.receipt_locators)
+      )
+        throw new Error(unavailable);
+      const planReceipts = request.receipt_locators.filter(
+        (locator: unknown): locator is JsonRecord =>
+          isRecord(locator) && locator.kind === 'release-plan-receipt',
+      );
+      const requestDigest = canonicalSha256(request);
+      if (
+        planReceipts.length !== 1 ||
+        planReceipts[0]?.receipt_digest_sha256 !== binding.plan_receipt_digest_sha256 ||
+        (releaseRequestDigest !== undefined && requestDigest !== releaseRequestDigest)
+      )
+        throw new Error(unavailable);
+      const recovery = expectSuccess<JsonRecord>(
+        (plannerRegistry.recovery as (value: unknown) => unknown)({
+          plan_handle: boundedPlanHandle,
+        }),
+      );
+      const batches = recovery.applied_batch_ids;
+      const targets = recovery.applied_target_count;
+      if (
+        !Array.isArray(batches) ||
+        batches.some((batch: unknown) => typeof batch !== 'string' || batch.length === 0) ||
+        new Set(batches).size !== batches.length ||
+        batches.length > boundedPlan.bounds.max_batches ||
+        typeof targets !== 'number' ||
+        !Number.isSafeInteger(targets) ||
+        targets < batches.length ||
+        targets > boundedPlan.bounds.max_total_targets
+      )
+        throw new Error(unavailable);
+      releaseRequestDigest = requestDigest;
+      return Object.freeze({
+        remaining_batches: boundedPlan.bounds.max_batches - batches.length,
+        remaining_targets: boundedPlan.bounds.max_total_targets - targets,
+      });
+    } catch {
+      throw new Error(unavailable);
+    }
+  };
   const exactEffects: CapturedFilesystemEffect[] = [];
   const descriptorTargets = new Map<number, JsonRecord>();
 
@@ -1073,6 +1249,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     target: JsonRecord,
     apply: () => unknown,
   ): unknown => {
+    assertProtectedReleasePrepareCapacityEffect(issuer);
+    assertProtectedReleaseExportCapacityEffect(issuer);
     effectCounter += 1;
     if (target.kind === 'fs') {
       const canonicalPath = String(target.canonical_relative_path ?? '');
@@ -1283,6 +1461,123 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   };
 
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
+    assertProtectedReleasePrepareCapacityEffect(issuer);
+    assertProtectedReleaseExportCapacityEffect(issuer);
+    if (request.kind === 'protected-release') {
+      const operation =
+        protectedReleaseHostEffect(request) ??
+        protectedArtifactSinkHostEffect(request) ??
+        protectedExportHostEffect(request);
+      const artifact = operation?.kind === 'artifact-sink';
+      const provider = operation?.kind === 'provider';
+      const exportSink = operation?.kind === 'export-sink';
+      const exportSigner = operation?.kind === 'export-signer';
+      const isExport = exportSink || exportSigner;
+      const requiredCapability = exportSigner
+        ? 'protected-export-signer-v1:sign'
+        : artifact || exportSink
+          ? 'artifact-sink:write'
+          : provider
+            ? 'protected-certification-provider-v3:execute'
+            : 'certification-evidence-sink:write';
+      const requiredKind = exportSigner
+        ? 'protected-export-signer'
+        : artifact || exportSink
+          ? 'artifact-sink'
+          : provider
+            ? 'protected-certification-provider'
+            : 'certification-evidence-sink';
+      const requiredAdapter = exportSigner
+        ? 'protected-export-signer-v1'
+        : exportSink
+          ? 'trusted-export-artifact-sink-v1'
+          : artifact
+            ? 'trusted-artifact-sink-v3'
+            : provider
+              ? 'protected-certification-provider-v3'
+              : 'trusted-certification-evidence-sink-v1';
+      if (
+        operation === undefined ||
+        input.entry.effects === 'read' ||
+        operation.binding.action_id !== input.entry.name ||
+        input.role !== (artifact || isExport ? 'architect' : 'inspector') ||
+        !input.argv.includes('--write') ||
+        !input.entry.authority_contract.capabilities.some(
+          (capability) => capability === requiredCapability,
+        ) ||
+        !('target_kinds' in actionPlanner) ||
+        !actionPlanner.target_kinds.includes(requiredKind) ||
+        input.entry.authority_contract.boundary.kind !== 'mutation-adapters' ||
+        !input.entry.authority_contract.boundary.adapter_ids.includes(requiredAdapter)
+      )
+        throw new Error('AUTHORITY_PROTECTED_RELEASE_ACTION_MISMATCH');
+      const requestPath = flagValue(input.argv, '--request');
+      if (requestPath === undefined) throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      const declaredRequest = JSON.parse(readFileSync(resolve(requestPath), 'utf8')) as JsonRecord;
+      assertProtectedReleaseRepositoryRoot(repositoryRoot);
+      if (
+        declaredRequest.action_id !== input.entry.name ||
+        canonicalSha256(declaredRequest.repository_locator) !==
+          canonicalSha256(operation.binding.repository) ||
+        operation.binding.authority_repository_id !== sources.repository_id ||
+        operation.binding.repository.id !== operation.binding.expected_release_repository_id ||
+        !isRecord(declaredRequest.candidate_locator) ||
+        declaredRequest.candidate_locator.commit !== operation.binding.repository.commit ||
+        declaredRequest.candidate_locator.tree !== operation.binding.repository.tree ||
+        !Array.isArray(declaredRequest.receipt_locators) ||
+        !declaredRequest.receipt_locators.some(
+          (locator: unknown) =>
+            isRecord(locator) &&
+            locator.kind === 'release-plan-receipt' &&
+            locator.receipt_digest_sha256 === operation.binding.plan_receipt_digest_sha256,
+        )
+      )
+        throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+      if (isExport) {
+        // The request selects a destination, never a sink/parent or key. Pin the
+        // entire externally supplied export control tuple for this live account.
+        const binding = operation.binding;
+        const destination = declaredRequest.destination;
+        if (
+          !('destination' in binding) ||
+          !isRecord(destination) ||
+          destination.kind !== binding.destination.kind ||
+          destination.exact_identifier !== binding.destination.exact_identifier ||
+          (Object.hasOwn(destination, 'trust') &&
+            canonicalSha256(destination.trust) !== canonicalSha256(binding.trust)) ||
+          (exportBindingDigest !== undefined && exportBindingDigest !== canonicalSha256(binding))
+        )
+          throw new Error('AUTHORITY_PROTECTED_RELEASE_BINDING_INVALID');
+        exportBindingDigest = canonicalSha256(binding);
+      }
+      const target: JsonRecord = {
+        kind: 'remote',
+        id: `protected-release:${operation.operation_id}`,
+        system_id: exportSigner
+          ? 'protected-export-signer-v1'
+          : exportSink
+            ? 'trusted-export-artifact-sink-v1'
+            : artifact
+              ? 'trusted-artifact-sink-v3'
+              : provider
+                ? 'devai-protected-certification-provider-v3'
+                : 'trusted-certification-evidence-sink-v1',
+        endpoint_id: 'host',
+        operation_id: exportSigner ? 'sign' : provider ? 'execute' : 'write',
+        publication: false,
+        protected_release_binding: operation.binding,
+        protected_operation_id: operation.operation_id,
+      };
+      return authorizeTarget(
+        {
+          name: input.entry.name,
+          effects: input.entry.effects,
+          authority_contract: input.entry.authority_contract,
+        },
+        target,
+        apply,
+      );
+    }
     if (request.kind === 'process') {
       if (readOnlyProcess(request, input.entry.name, input.entry.authority_contract.capabilities))
         return apply();
@@ -1762,6 +2057,12 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       effect: input.entry.effects,
       receipt_store: issuer,
       apply_effect: applyEffect,
+      ...(input.entry.name === 'release prepare'
+        ? { read_prepare_capacity: readReleaseCapacity }
+        : {}),
+      ...(input.entry.name === 'release export'
+        ? { read_export_capacity: readReleaseCapacity }
+        : {}),
     }),
     ...(sessionOperation === undefined ? {} : { session_operation: sessionOperation }),
     ...(policyMaterialization === undefined
@@ -1876,8 +2177,29 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       });
     },
     dispose: () => {
+      disposed = true;
       if (typeof runtime.dispose === 'function') runtime.dispose();
       else if (typeof issuer.dispose === 'function') issuer.dispose();
     },
   };
 }
+
+export {
+  actionContractRegistry,
+  authorityPolicySemantics,
+  boundedSelectors,
+  canonicalRelativePath,
+  existingRealpath,
+  expectSuccess,
+  flagValue,
+  gitMetadataLayout,
+  gitMetadataLogicalPath,
+  isRecord,
+  makeEnvelope,
+  physicalCanonicalPath,
+  processTarget,
+  readOnlyProcess,
+  unchangedAuthorityPolicy,
+  validatePolicySchema,
+  within,
+};

@@ -18,6 +18,10 @@ export type ActionCapability =
   | 'db:write'
   | 'db:unclassified'
   | 'host-cache:write'
+  | 'artifact-sink:write'
+  | 'protected-export-signer-v1:sign'
+  | 'protected-certification-provider-v3:execute'
+  | 'certification-evidence-sink:write'
   | `proc:${string}`
   | `net:${string}`;
 export type AdoptionProfile = 'tier1' | 'tier2' | 'tier3';
@@ -54,7 +58,15 @@ export interface CommandMetadata {
 }
 
 export type HumanRole = 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
-export type AuthorityTargetKind = 'fs' | 'git-ref' | 'db' | 'remote';
+export type AuthorityTargetKind =
+  | 'fs'
+  | 'git-ref'
+  | 'db'
+  | 'remote'
+  | 'artifact-sink'
+  | 'protected-export-signer'
+  | 'protected-certification-provider'
+  | 'certification-evidence-sink';
 
 export interface AuthorityActionContract {
   readonly schemaVersion: '1.0.0';
@@ -139,6 +151,8 @@ export function deriveActionEffectFromCapabilities(
         'db:write',
         'db:unclassified',
         'host-cache:write',
+        'artifact-sink:write',
+        'protected-export-signer-v1:sign',
       ].includes(capability),
     )
   ) {
@@ -146,7 +160,14 @@ export function deriveActionEffectFromCapabilities(
   }
   if (
     capabilities.some((capability) =>
-      ['fs:f5-state', 'fs:f4-inventory', 'fs:proofs', 'fs:worktree-admin'].includes(capability),
+      [
+        'fs:f5-state',
+        'fs:f4-inventory',
+        'fs:proofs',
+        'fs:worktree-admin',
+        'protected-certification-provider-v3:execute',
+        'certification-evidence-sink:write',
+      ].includes(capability),
     )
   ) {
     return 'harness-write';

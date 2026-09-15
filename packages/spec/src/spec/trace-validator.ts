@@ -75,11 +75,13 @@ export function validateTrace(opts: ValidateTraceOptions): TraceResult {
         continue;
       }
       const path = (rawTest as { path: string }).path;
-      if (!validateRepositoryTarget(repoRoot, path, 'test').ok) {
+      const targetType = (rawTest as { target_type?: unknown }).target_type;
+      const kind = targetType === 'config-attestation' || targetType === 'script' ? 'file' : 'test';
+      if (!validateRepositoryTarget(repoRoot, path, kind).ok) {
         errors.push({
           file,
           pointer: `/invariants/${String(i)}/tests/${String(j)}/path`,
-          message: `trace path '${path}' is not a contained executable test file`,
+          message: `trace path '${path}' is not a contained ${kind === 'test' ? 'executable test file' : 'regular file'}`,
         });
       }
     }

@@ -3,9 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { __classEntity__ListComponent } from './__kebabEntity__-list.component';
-import { __classEntity__DetailComponent } from './__kebabEntity__-detail.component';
-import { __classEntity__Service } from './__kebabEntity__.service';
+__UI_ENTITY_IMPORTS__
 import { CognitoGuard } from './guards/cognito.guard';
 import { __MODULE__PolicyGuard } from './policy.guard';
 
@@ -14,15 +12,14 @@ const routes: Routes = [
     path: '',
     canActivate: [CognitoGuard],
     children: [
-      { path: '', component: __classEntity__ListComponent, canActivate: [__MODULE__PolicyGuard], data: { resource: '__kebabEntity__', action: 'read' } },
-      { path: ':id', component: __classEntity__DetailComponent, canActivate: [__MODULE__PolicyGuard], data: { resource: '__kebabEntity__', action: 'read' } },
+__UI_ENTITY_ROUTES__
     ],
   },
 ];
 
 @NgModule({
-  declarations: [__classEntity__ListComponent, __classEntity__DetailComponent],
+  declarations: [__UI_COMPONENTS__],
   imports: [CommonModule, HttpClientModule, RouterModule.forChild(routes)],
-  providers: [__classEntity__Service, CognitoGuard],
+  providers: [__UI_SERVICES__, CognitoGuard, __MODULE__PolicyGuard],
 })
 export class __NsModulePascal__FeatureModule {}

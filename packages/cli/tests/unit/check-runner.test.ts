@@ -4,9 +4,11 @@ import {
   mkdirSync,
   chmodSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,16 +24,22 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { invocationIsNonMutating } from '../../src/command-router.js';
 import {
   buildTaskPlan,
+  bindReleaseTaskProcessOptions,
   describeDeclaredCheckTaskRefusal,
   matchDeclaredCheckTaskProcess,
+  matchDeclaredReleaseTaskProcess,
   readTaskDescriptor,
   runCheckTasks,
   sha256Hex,
   type CheckRunnerOptions,
   type TaskExecutionResult,
 } from '../../src/services/check-runner/index.js';
+import { readProtectedCompletedTaskResults } from '../../src/services/check-runner/runner.js';
+import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 const roots: string[] = [];
+const sourceFixtures: Array<ReturnType<typeof createSelfContainedRepositoryFixture>> = [];
 const TOOLCHAIN = { node: 'v-test' } as const;
 const REPOSITORY_ROOT = resolve(import.meta.dirname, '../../../..');
 const PASS: TaskExecutionResult = {
@@ -258,10 +266,65 @@ function run(root: string, overrides: Partial<CheckRunnerOptions> = {}) {
 }
 
 afterEach(() => {
+  for (const fixture of sourceFixtures.splice(0)) fixture.cleanup();
   while (roots.length > 0) rmSync(roots.pop() ?? '', { recursive: true, force: true });
 });
 
 describe('content-addressed check runner', () => {
+  it('snapshots a Git-free source without traversing excluded directories or directory symlinks', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'devai git-free source ç-'));
+    roots.push(parent);
+    const source = join(parent, 'source');
+    const outside = join(parent, 'outside');
+    file(
+      source,
+      '.gitignore',
+      'dist/\n.devai/state/*\n!.devai/state/.gitkeep\nscratch/*\n!scratch/README.md\n',
+    );
+    file(source, '.devai/state/.gitkeep', 'state placeholder\n');
+    file(source, '.devai/worktrees/.gitkeep', 'worktree placeholder\n');
+    file(source, 'scratch/README.md', 'scratch placeholder\n');
+    file(source, 'src/app.ts', 'export const value = 1;\n');
+    for (const path of [
+      'tmp/never.ts',
+      '.devai/worktrees/never/secret.ts',
+      'node_modules/never.ts',
+      'dist/never.ts',
+      '.devai/state/never.ts',
+      'scratch/never.ts',
+    ])
+      file(source, path, 'must not enter snapshot\n');
+    file(outside, 'never.ts', 'do not follow directory symlinks\n');
+    symlinkSync(outside, join(source, 'linked'));
+    const fixture = createSelfContainedRepositoryFixture(source);
+    sourceFixtures.push(fixture);
+    expect(fixture.paths).toEqual([
+      '.devai/state/.gitkeep',
+      '.devai/worktrees/.gitkeep',
+      '.gitignore',
+      'linked',
+      'scratch/README.md',
+      'src/app.ts',
+    ]);
+    expect(readFileSync(join(fixture.root, 'src/app.ts'))).toEqual(
+      readFileSync(join(source, 'src/app.ts')),
+    );
+    expect(readFileSync(join(fixture.root, '.devai/worktrees/.gitkeep'), 'utf8')).toBe(
+      'worktree placeholder\n',
+    );
+    expect(readlinkSync(join(fixture.root, 'linked'))).toBe(outside);
+    expect(fixture.git(['rev-list', '--count', 'HEAD'])).toBe('1');
+    expect(fixture.git(['remote'])).toBe('');
+    expect(fixture.git(['status', '--porcelain'])).toBe('');
+  });
+
+  it('refuses a full source snapshot when the exact worktree placeholder is absent', () => {
+    const source = mkdtempSync(join(tmpdir(), 'devai missing placeholder ç-'));
+    roots.push(source);
+    file(source, 'src/app.ts', 'export const value = 1;\n');
+    expect(() => createSelfContainedRepositoryFixture(source)).toThrow();
+  });
+
   it('runs the documented pnpm test descriptor shape in a fresh repository', () => {
     const state = repository();
     file(
@@ -291,7 +354,7 @@ describe('content-addressed check runner', () => {
     expect(report.execution).toMatchObject([{ nodeId: 'test:project', outcome: 'PASS' }]);
   });
 
-  it('derives mutation outputs from the exact workspace roster', () => {
+  it('omits retired mutation tasks from an adopter workspace roster', () => {
     const state = repository();
     file(
       state.root,
@@ -346,17 +409,7 @@ describe('content-addressed check runner', () => {
         cacheState: () => ({ cacheState: 'execute', reason: 'test' }),
       }),
     );
-    expect(report.tasks[0]?.outputContract).toMatchObject({
-      kind: 'mutation-report-set-v1',
-      expectedPackageCount: 1,
-      packages: [
-        {
-          packageName: '@stynx/core',
-          workspace: 'packages/core',
-          thresholds: { break: 70, high: 70, low: 60 },
-        },
-      ],
-    });
+    expect(report.tasks).toEqual([]);
   });
 
   it('binds environment identities without exposing local values', () => {
@@ -486,14 +539,24 @@ describe('content-addressed check runner', () => {
       expect(actual.tasks.find((task) => task.nodeId === nodeId)?.dependencies).toContain('build');
     }
     expect(actual.tasks.find((task) => task.nodeId === 'test:schemas')).toMatchObject({
-      argv: ['pnpm', 'run', 'test:schemas'],
+      argv: ['pnpm', 'run', 'test:schemas', '--configLoader', 'runner', '--no-cache'],
     });
     expect(actual.tasks.find((task) => task.nodeId === 'test:local-full')?.dependencies).toContain(
       'test:schemas',
     );
-    expect(actual.tasks.find((task) => task.nodeId === 'build')?.outputContract).toMatchObject({
-      paths: ['scratch/coverage/rc-reachable-sources.json'],
-    });
+    expect(actual.tasks.find((task) => task.nodeId === 'build')?.outputContract?.paths).toEqual([
+      'scratch/coverage/rc-reachable-sources.json',
+      'packages/authority/tsconfig.tsbuildinfo',
+      'packages/cli/tsconfig.tsbuildinfo',
+      'packages/effects-check/tsconfig.tsbuildinfo',
+      'packages/evidence/tsconfig.tsbuildinfo',
+      'packages/loop/tsconfig.tsbuildinfo',
+      'packages/schemas/tsconfig.tsbuildinfo',
+      'packages/sensors/tsconfig.tsbuildinfo',
+      'packages/skills/tsconfig.tsbuildinfo',
+      'packages/spec/tsconfig.tsbuildinfo',
+      'packages/utils/tsconfig.tsbuildinfo',
+    ]);
     expect(actual.tasks.find((task) => task.nodeId === 'test:coverage:rc')?.dependencies).toEqual([
       'build',
     ]);
@@ -531,21 +594,18 @@ describe('content-addressed check runner', () => {
   });
 
   it('selects authority after a committed utils change in a detached repository fixture', () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), 'devai-selector-parity-'));
-    roots.push(fixtureRoot);
-    const clone = join(fixtureRoot, 'candidate');
-    const cloned = spawnSync('git', ['clone', '--quiet', REPOSITORY_ROOT, clone], {
-      encoding: 'utf8',
-    });
-    if (cloned.status !== 0) throw new Error(String(cloned.stderr));
-    git(clone, ['config', 'user.name', 'Selector Test']);
-    git(clone, ['config', 'user.email', 'selector@example.invalid']);
-    const base = git(clone, ['rev-parse', 'HEAD']);
-    commit(
+    const fixture = createSelfContainedRepositoryFixture(REPOSITORY_ROOT);
+    sourceFixtures.push(fixture);
+    const clone = fixture.root;
+    const base = fixture.commit;
+    fixture.git(['checkout', '--detach', '--quiet', base]);
+    file(
       clone,
       'packages/utils/src/index.ts',
       `${readFileSync(join(clone, 'packages/utils/src/index.ts'), 'utf8')}\nexport const selectorFixture = true;\n`,
     );
+    fixture.git(['add', '--', 'packages/utils/src/index.ts']);
+    fixture.git(['commit', '--quiet', '-m', 'change packages/utils/src/index.ts']);
     const affected = withRunnerScope(() =>
       buildTaskPlan({
         repoRoot: clone,
@@ -559,6 +619,7 @@ describe('content-addressed check runner', () => {
           vitest: '4.1.10',
           typescript: '5.9.3',
           postgres: 'psql-test',
+          git: 'git-test',
         },
         environment: {},
         cacheState: () => ({ cacheState: 'execute', reason: 'fixture' }),
@@ -1030,6 +1091,101 @@ describe('content-addressed check runner', () => {
     expect(receiptBytes).not.toContain('signature');
   });
 
+  it('retains the complete protected candidate result population in planned order', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const report = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [],
+    });
+
+    expect(report.receipt).toBeDefined();
+    expect(report.execution?.every((task) => task.disposition === 'executed')).toBe(true);
+    const results = readProtectedCompletedTaskResults(report);
+    expect(results.map((result) => result.nodeId)).toEqual(
+      report.plan.tasks.map((task) => task.nodeId),
+    );
+    expect(results.map((result) => result.taskKey)).toEqual(
+      report.plan.tasks.map((task) => task.taskKey),
+    );
+    expect(results.map((result) => result.status)).toEqual(report.plan.tasks.map(() => 'PASS'));
+    expect(results.every((result) => result.schemaVersion === '1.0.0')).toBe(true);
+  });
+
+  it('retains reused protected task results as the complete planned population', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const protectedOptions = {
+      target: 'affected' as const,
+      baseCommit: state.base,
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path: string) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [] as const,
+    };
+    const first = run(state.root, protectedOptions);
+    const second = run(state.root, protectedOptions);
+
+    expect(second.receipt).toBeDefined();
+    expect(second.execution?.every((task) => task.disposition === 'reused')).toBe(true);
+    expect(readProtectedCompletedTaskResults(second)).toEqual(
+      readProtectedCompletedTaskResults(first),
+    );
+    expect(readProtectedCompletedTaskResults(second).map((result) => result.nodeId)).toEqual(
+      second.plan.tasks.map((task) => task.nodeId),
+    );
+  });
+
+  it('refuses ordinary and non-receipt reports at the protected result boundary', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const ordinary = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+    });
+    const nonReceipt = run(state.root, {
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [],
+    });
+
+    expect(ordinary.receipt).toBeDefined();
+    expect(nonReceipt.receipt).toBeUndefined();
+    expect(() => readProtectedCompletedTaskResults(ordinary)).toThrow(
+      'release-certification-task-results-unavailable',
+    );
+    expect(() => readProtectedCompletedTaskResults(nonReceipt)).toThrow(
+      'release-certification-task-results-unavailable',
+    );
+  });
+
+  it('returns defensive snapshots without exposing retained protected results', () => {
+    const state = repository();
+    commit(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const report = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      protectedExecutionIdentity: { kind: 'check-runner-test' },
+      readTaskOutput: (path) => readFileSync(join(state.root, path)),
+      capturedTaskOutputPaths: () => [],
+    });
+    const expected = readProtectedCompletedTaskResults(report);
+    // Deliberately widened: the test mutates the returned array itself to prove the
+    // reader hands back a defensive snapshot rather than the retained population.
+    const returned = readProtectedCompletedTaskResults(report) as unknown as Array<{
+      outputDigests: Record<string, string>;
+    }>;
+
+    returned.pop();
+    const firstReturned = returned.at(0);
+    if (firstReturned === undefined)
+      throw new Error('protected result population unexpectedly empty');
+    expect(Reflect.set(firstReturned.outputDigests, 'forged', 'f'.repeat(64))).toBe(false);
+    expect(readProtectedCompletedTaskResults(report)).toEqual(expected);
+  });
+
   it('keeps ordinary RC task keys identical to independent portable-policy reconstruction', () => {
     const state = repository();
     const report = run(state.root, { target: 'rc' });
@@ -1094,6 +1250,31 @@ describe('content-addressed check runner', () => {
       releaseProfile: releaseProfile(),
     });
     expect(preflight.plan.releaseIntentDigest).toBe(sha256Hex(releaseIntent));
+    expect(preflight.plan.taskPolicy.schemaVersion).toBe('1.2.0');
+    expect(preflight.plan.taskPolicy.inputProjection).toEqual({
+      schemaVersion: '1.0.0',
+      source: 'exact-candidate-tree',
+      excludedPrefixes: ['.devai/state/', 'record/', 'scratch/'],
+      digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    });
+    const releasePlan = run(state.root, {
+      target: 'release',
+      operation: 'plan',
+      baseCommit: state.base,
+      releaseCandidate: releaseIntent.candidate,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+    });
+    expect(Object.keys(releasePlan.plan.taskPolicy).sort()).toEqual(
+      ['inputProjection', 'repositoryId', 'requiredNodes', 'schemaVersion'].sort(),
+    );
+    expect(releasePlan.plan.taskPolicy.schemaVersion).toBe('1.2.0');
+    expect(releasePlan.plan.taskPolicy.inputProjection).toEqual({
+      schemaVersion: '1.0.0',
+      source: 'exact-candidate-tree',
+      excludedPrefixes: ['.devai/state/', 'record/', 'scratch/'],
+      digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    });
     expect(preflight.preflightReceipt?.value.verdict).toBe('pass');
     expect(preflight.receipt).toBeUndefined();
     expect(preflight.releaseVerification).toContainEqual({
@@ -1115,6 +1296,122 @@ describe('content-addressed check runner', () => {
       transition: 'patch',
     });
     expect(report.releaseVerification?.every((entry) => entry.status !== 'unknown')).toBe(true);
+  });
+
+  it('certifies ordinary tasks without consulting a legacy mutation producer', () => {
+    const state = repository();
+    commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const releaseIntent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.1',
+      support: 'current',
+      changed_paths: ['package.json', 'src/app.ts'],
+      changed_packages: [],
+      candidate: {
+        commit: git(state.root, ['rev-parse', 'HEAD']),
+        tree: git(state.root, ['show', '-s', '--format=%T', 'HEAD']),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    const profile = {
+      ...releaseProfile(),
+      mutation_roster: [
+        {
+          id: 'ordinary-unit-check',
+          package: 'example-repo',
+          task_node: 'test:unit',
+          source_selectors: ['src/'],
+          test_selectors: ['tests/'],
+          manifest_path: 'package.json',
+          config_paths: ['test-tasks.json'],
+          sanitizer_paths: ['tools/mutation-sanitizer.mjs'],
+          orchestration_paths: ['test-tasks.json'],
+          lockfile_path: 'lock.yaml',
+          toolchain_keys: ['node'],
+          thresholds: { score_min: 90 },
+        },
+      ],
+    } as const;
+    const preflight = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: profile,
+    });
+    expect(preflight.preflightReceipt?.value.verdict).toBe('pass');
+
+    let callbacks = 0;
+    const certified = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: profile,
+      releaseStage: 'certify',
+      preflightReceipt: preflight.preflightReceipt?.value,
+      resolveProtectedMutationProducer: () => {
+        throw new Error('retired producer must not be read');
+      },
+      executeTask: () => {
+        callbacks += 1;
+        return PASS;
+      },
+    });
+    expect(callbacks).toBeGreaterThan(0);
+    expect(certified.exitCode).toBe(0);
+    expect(certified.plan.releaseDecision?.mutation).toBe('none');
+  });
+
+  it('uses the exact release candidate without resolving HEAD and refuses tracked mutation', () => {
+    const state = repository();
+    const candidateCommit = commitRelease(state.root, 'src/app.ts', 'export const value = 2;\n');
+    const releaseIntent = {
+      schemaVersion: '1.0.0',
+      release_unit: 'example/repo',
+      current_version: '1.0.0',
+      target_version: '1.0.1',
+      support: 'current',
+      changed_paths: ['package.json', 'src/app.ts'],
+      changed_packages: [],
+      candidate: {
+        commit: candidateCommit,
+        tree: git(state.root, ['show', '-s', '--format=%T', candidateCommit]),
+      },
+      base: {
+        commit: state.base,
+        tree: git(state.root, ['show', '-s', '--format=%T', state.base]),
+      },
+    } as const;
+    git(state.root, ['symbolic-ref', 'HEAD', 'refs/heads/intentionally-missing']);
+    const detachedFromHead = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+    });
+    expect(detachedFromHead.preflightReceipt?.value.verdict).toBe('pass');
+    rmSync(join(state.root, '.devai/state'), { recursive: true, force: true });
+
+    let mutated = false;
+    const refused = run(state.root, {
+      target: 'affected',
+      baseCommit: state.base,
+      releaseIntent,
+      releaseProfile: releaseProfile(),
+      executeTask: () => {
+        if (!mutated) {
+          file(state.root, 'src/app.ts', 'export const value = 999;\n');
+          mutated = true;
+        }
+        return PASS;
+      },
+    });
+    expect(refused.preflightReceipt).toBeUndefined();
+    expect(refused.receiptRefusal).toBe('repository-changed-during-run');
   });
 
   it('refuses certification without the exact cheap-preflight receipt', () => {
@@ -1295,6 +1592,8 @@ describe('content-addressed check runner', () => {
     expect(Object.keys(first.plan.taskPolicy).sort()).toEqual(
       ['repositoryId', 'requiredNodes', 'schemaVersion'].sort(),
     );
+    expect(first.plan.taskPolicy.schemaVersion).toBe('1.1.0');
+    expect(first.plan.taskPolicy).not.toHaveProperty('inputProjection');
     expect(second.plan.tasks.at(-1)?.taskKey).not.toBe(first.plan.tasks.at(-1)?.taskKey);
     expect(second.plan.taskPolicyDigest).not.toBe(first.plan.taskPolicyDigest);
   });
@@ -1312,6 +1611,35 @@ describe('content-addressed check runner', () => {
       arguments: [executable, argv, { cwd, ...(shell !== undefined && { shell }) }],
     });
     const invocation = ['node', 'devai', 'check', '--local', '--run', '--write'];
+    const immutableDescriptor = readTaskDescriptor(join(state.root, 'test-tasks.json'));
+    const candidate = {
+      commit: git(state.root, ['rev-parse', 'HEAD']),
+      tree: git(state.root, ['rev-parse', 'HEAD^{tree}']),
+    };
+    const releaseRequest = (
+      argv: readonly string[],
+      shell = false,
+      identity = resolveTaskExecutable(state.root, 'node'),
+    ): AuthorityHostEffectRequest => ({
+      kind: 'process',
+      symbol: 'spawnSync',
+      arguments: [
+        identity.path,
+        argv.slice(1),
+        bindReleaseTaskProcessOptions(
+          { cwd: realpathSync(state.root), shell },
+          {
+            candidate,
+            descriptor_digest: sha256Hex(immutableDescriptor),
+            task_policy_digest: 'a'.repeat(64),
+            node_id: 'test:local-full',
+            executable: identity,
+            argv,
+            cwd: '.',
+          },
+        ),
+      ],
+    });
     expect(
       matchDeclaredCheckTaskProcess(
         state.root,
@@ -1324,6 +1652,36 @@ describe('content-addressed check runner', () => {
         ),
       ),
     ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest([
+          'node',
+          '-e',
+          "process.stdout.write('local test dependency closure complete\\n')",
+        ]),
+      ),
+    ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest([
+          'node',
+          '-e',
+          "process.stdout.write('local test dependency closure complete\\n')",
+          '--extra',
+        ]),
+      ),
+    ).toBeUndefined();
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest(
+          ['node', '-e', "process.stdout.write('local test dependency closure complete\\n')"],
+          true,
+        ),
+      ),
+    ).toBeUndefined();
     expect(
       matchDeclaredCheckTaskProcess(
         state.root,
@@ -1351,6 +1709,26 @@ describe('content-addressed check runner', () => {
     const declared = JSON.parse(readFileSync(join(state.root, 'test-tasks.json'), 'utf8')) as {
       tasks: Array<Record<string, unknown>>;
     };
+    const mutableReleaseTask = declared.tasks.find((task) => task['nodeId'] === 'test:local-full');
+    if (mutableReleaseTask === undefined) throw new Error('release task fixture missing');
+    mutableReleaseTask['argv'] = ['node', '-e', 'process.stdout.write("mutable attack")'];
+    writeFileSync(join(state.root, 'test-tasks.json'), `${JSON.stringify(declared, null, 2)}\n`);
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest([
+          'node',
+          '-e',
+          "process.stdout.write('local test dependency closure complete\\n')",
+        ]),
+      ),
+    ).toMatchObject({ nodeId: 'test:local-full', cwd: realpathSync(state.root) });
+    expect(
+      matchDeclaredReleaseTaskProcess(
+        state.root,
+        releaseRequest(['node', '-e', 'process.stdout.write("mutable attack")']),
+      ),
+    ).toBeUndefined();
     declared.tasks.push({
       nodeId: 'build',
       dependencies: [],

@@ -17,10 +17,7 @@ import {
 export function authorizePolicyMaterialization(input: unknown, deps: unknown) {
   if (!isRecord(input) || !isRecord(deps))
     return failure('refused', 'AUTHORITY_MATERIALIZATION_ACTION_INVALID');
-  if (
-    input.action_id !== 'init bind' ||
-    !['create', 'update'].includes(input.target_operation)
-  ) {
+  if (input.action_id !== 'init bind' || !['create', 'update'].includes(input.target_operation)) {
     return failure('refused', 'AUTHORITY_MATERIALIZATION_ACTION_INVALID');
   }
   if (!isRecord(input.consent) || input.consent.write !== true) {

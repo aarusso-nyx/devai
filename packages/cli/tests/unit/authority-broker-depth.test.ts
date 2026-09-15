@@ -1,19 +1,39 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createAuthorityHostBroker } from '../../src/authority/broker.js';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  authorizeCliArgv,
+  declaredInvocationAuthority,
+  disposeCliInvocationAuthority,
+} from '../../src/authority/index.js';
+import { createAuthorityHostBroker, processTarget } from '../../src/authority/broker.js';
+import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
+import { resolveInvocationEntry } from '../../src/authority/sense-selection.js';
 import { routeArgv } from '../../src/command-router.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
+import {
+  bindReleaseTaskProcessOptions,
+  matchDeclaredReleaseTaskProcess,
+  readTaskDescriptor,
+  sha256Hex,
+} from '../../src/services/check-runner/index.js';
+import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
+import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const originalArgv = [...process.argv];
 const originalStdout = process.stdout.write;
 let entries: readonly RegistryEntry[];
+const sourceFixtures: Array<ReturnType<typeof createSelfContainedRepositoryFixture>> = [];
+afterEach(() => {
+  for (const fixture of sourceFixtures.splice(0)) fixture.cleanup();
+});
 
 beforeAll(async () => {
   process.argv = [process.execPath, 'devai', '--help'];
@@ -67,6 +87,69 @@ function brokerAt(
   });
 }
 
+function exactEntry(name: 'init apply harness' | 'init apply owner'): RegistryEntry {
+  const entry = entries.find((candidate) => candidate.name === name);
+  if (entry === undefined) throw new Error(`missing action ${name}`);
+  return {
+    ...entry,
+    authority_contract: {
+      ...entry.authority_contract,
+      planner: {
+        kind: 'exact-plan',
+        planner_id: `${name.replaceAll(' ', '-')}-test-exact-plan`,
+        target_kinds: ['fs'],
+        atomicity: 'whole-plan',
+      },
+    },
+  } as RegistryEntry;
+}
+
+function exactBrokerAt(
+  root: string,
+  name: 'init apply harness' | 'init apply owner',
+  role: 'architect' | 'owner',
+  declaration: { readonly as_role: 'architect' | 'owner' } | { readonly authority_session: string },
+) {
+  const entry = exactEntry(name);
+  const exactEntries = entries.map((candidate) => (candidate.name === name ? entry : candidate));
+  return {
+    host: createAuthorityHostBroker({
+      entry,
+      entries: exactEntries,
+      argv: [
+        process.execPath,
+        'devai',
+        ...name.split(' '),
+        ...('as_role' in declaration
+          ? ['--as-role', declaration.as_role]
+          : ['--authority-session', declaration.authority_session]),
+        '--write',
+      ],
+      role,
+      declaration,
+      repository_root: root,
+      package_version: resolveCliVersion(),
+      bootstrap_policy: true,
+    }),
+  };
+}
+
+function resolvedBroker(name: string, role: Role, argv: readonly string[]) {
+  const registered = entries.find((candidate) => candidate.name === name);
+  if (registered === undefined) throw new Error(`missing action ${name}`);
+  const entry = resolveInvocationEntry(registered, argv);
+  return createAuthorityHostBroker({
+    entry,
+    entries,
+    argv,
+    role,
+    declaration: { as_role: role },
+    repository_root: ROOT,
+    package_version: resolveCliVersion(),
+    bootstrap_policy: true,
+  });
+}
+
 const TASK_INVOCATION = {
   id: 'TASK-7001',
   round_id: 'R-0007',
@@ -114,6 +197,374 @@ function effect(
 }
 
 describe('authority broker production boundary depth', () => {
+  it('exposes optional broker controls only for their owning actions', () => {
+    const catalog = broker('catalog actions', 'auditor', [
+      process.execPath,
+      'devai',
+      'catalog',
+      'actions',
+    ]);
+    const prepare = broker('release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    const exportHost = broker('release export', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'export',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    const binding = broker('init bind', 'architect', [
+      process.execPath,
+      'devai',
+      'init',
+      'bind',
+      '--constitution',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    try {
+      expect(Object.hasOwn(catalog.scope, 'read_prepare_capacity')).toBe(false);
+      expect(Object.hasOwn(catalog.scope, 'read_export_capacity')).toBe(false);
+      expect(Object.hasOwn(catalog, 'session_operation')).toBe(false);
+      expect(Object.hasOwn(catalog, 'policy_materialization')).toBe(false);
+      expect(typeof prepare.scope.read_prepare_capacity).toBe('function');
+      expect(Object.hasOwn(prepare.scope, 'read_export_capacity')).toBe(false);
+      expect(typeof exportHost.scope.read_export_capacity).toBe('function');
+      expect(Object.hasOwn(exportHost.scope, 'read_prepare_capacity')).toBe(false);
+      expect(typeof binding.policy_materialization).toBe('function');
+    } finally {
+      catalog.dispose();
+      prepare.dispose();
+      exportHost.dispose();
+      binding.dispose();
+    }
+  });
+
+  it('exposes only the exact consent admitted by the production authority boundary', () => {
+    const allowed = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'init',
+        'bind',
+        '--constitution',
+        '--as-role',
+        'architect',
+        '--write',
+      ],
+      entries,
+    );
+    expect(allowed).toBeUndefined();
+    expect(declaredInvocationAuthority()).toEqual({
+      actor: { kind: 'human', role: 'architect', declaration_source: 'cli-flag' },
+      consent: { write: true, allow_publish: false, experimental: false },
+    });
+
+    const refused = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'init',
+        'bind',
+        '--constitution',
+        '--as-role',
+        'engineer',
+        '--write',
+      ],
+      entries,
+    );
+    expect(refused).toMatchObject({ exit_code: 2 });
+    expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
+  it('distinguishes executable dry runs from plans and remote publish consent', () => {
+    const publish = [
+      process.execPath,
+      'devai',
+      'release',
+      'publish',
+      '--as-role',
+      'owner',
+      '--write',
+      '--format',
+      'json',
+    ] as const;
+    try {
+      const missingPublish = authorizeCliArgv(publish, entries);
+      expect(missingPublish).toMatchObject({ exit_code: 2 });
+      expect(JSON.parse(missingPublish?.stderr ?? 'null')).toMatchObject({
+        code: 'AUTHORITY_PUBLISH_CONSENT_REQUIRED',
+      });
+
+      const unsupportedDryRun = authorizeCliArgv([...publish, '--dry-run'], entries);
+      expect(unsupportedDryRun).toMatchObject({ exit_code: 0 });
+      expect(JSON.parse(unsupportedDryRun?.stdout ?? 'null')).toMatchObject({
+        authority: { code: 'POLICY_ALLOW', readiness_eligible: false },
+        applied: false,
+      });
+      expect(declaredInvocationAuthority()).toBeUndefined();
+
+      const plan = authorizeCliArgv(
+        [
+          process.execPath,
+          'devai',
+          'round',
+          'plan',
+          '--as-role',
+          'architect',
+          '--write',
+          '--plan',
+          '--format',
+          'json',
+        ],
+        entries,
+      );
+      expect(plan).toMatchObject({ exit_code: 0 });
+      expect(JSON.parse(plan?.stdout ?? 'null')).toMatchObject({
+        authority: { code: 'POLICY_ALLOW', readiness_eligible: false },
+        applied: false,
+      });
+
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'sense',
+            'run',
+            'runtime_probe_data',
+            '--as-role',
+            'auditor',
+            '--write',
+            '--dry-run',
+          ],
+          entries,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toMatchObject({
+        actor: { kind: 'human', role: 'auditor', declaration_source: 'cli-flag' },
+        consent: { write: true, allow_publish: false, experimental: false },
+      });
+    } finally {
+      disposeCliInvocationAuthority();
+    }
+  });
+
+  it('uses bootstrap authority only for a handler-supported dry run', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-supported-dry-run-'));
+    mkdirSync(join(root, '.devai/pin'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/pin/constitution.md'),
+      readFileSync(join(ROOT, '.devai/pin/constitution.md')),
+    );
+    try {
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'sense',
+            'run',
+            'runtime_probe_data',
+            '--repo-root',
+            root,
+            '--as-role',
+            'auditor',
+            '--write',
+            '--dry-run',
+          ],
+          entries,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toMatchObject({
+        actor: { role: 'auditor', declaration_source: 'cli-flag' },
+        consent: { write: true, allow_publish: false },
+      });
+    } finally {
+      disposeCliInvocationAuthority();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('admits exact declared check tasks only for check and verifying release actions', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['test-tasks.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const root = fixture.root;
+    const descriptorPath = join(root, 'test-tasks.json');
+    writeFileSync(
+      descriptorPath,
+      readFileSync(descriptorPath, 'utf8').replaceAll('"generate"', '":"'),
+    );
+    fixture.git(['add', '--', 'test-tasks.json']);
+    fixture.git(['commit', '--quiet', '-m', 'admit punctuation-only task identifier']);
+    const releaseArgv = (action: 'preflight' | 'certify') => [
+      process.execPath,
+      'devai',
+      'release',
+      action,
+      '--request',
+      'request.json',
+      '--as-role',
+      'inspector',
+      '--write',
+    ];
+    const checkArgv = [
+      process.execPath,
+      'devai',
+      'check',
+      '--suite',
+      'standard',
+      '--as-role',
+      'inspector',
+      '--write',
+    ];
+    const checkHost = brokerAt(root, 'check', 'inspector', checkArgv);
+    const preflightHost = brokerAt(
+      root,
+      'release preflight',
+      'inspector',
+      releaseArgv('preflight'),
+    );
+    const certifyHost = brokerAt(root, 'release certify', 'inspector', releaseArgv('certify'));
+    const prepareHost = brokerAt(root, 'release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    const descriptor = readTaskDescriptor(descriptorPath);
+    const task = descriptor.tasks.find(
+      (candidate) =>
+        JSON.stringify(candidate.argv) === JSON.stringify(['pnpm', 'run', 'devai:prepare']),
+    );
+    if (task === undefined) throw new Error('devai:prepare task fixture missing');
+    const identity = resolveTaskExecutable(root, 'pnpm');
+    const candidate = {
+      commit: fixture.git(['rev-parse', 'HEAD']),
+      tree: fixture.git(['rev-parse', 'HEAD^{tree}']),
+    };
+    const options = bindReleaseTaskProcessOptions(
+      { cwd: realpathSync(root), shell: false },
+      {
+        candidate,
+        descriptor_digest: sha256Hex(descriptor),
+        task_policy_digest: 'a'.repeat(64),
+        node_id: task.nodeId,
+        executable: identity,
+        argv: task.argv,
+        cwd: task.cwd,
+      },
+    );
+    const declaredRequest: AuthorityHostEffectRequest = {
+      kind: 'process',
+      symbol: 'spawnSync',
+      arguments: [identity.path, ['run', 'devai:prepare'], options],
+    };
+    try {
+      expect(matchDeclaredReleaseTaskProcess(root, declaredRequest)).toMatchObject({
+        nodeId: task.nodeId,
+      });
+      expect(
+        processTarget(declaredRequest, 'check', root, 'repo:declared-check', checkArgv),
+      ).toEqual({
+        kind: 'fs',
+        id: 'fs:.devai/state/check-cache/v1:task',
+        repository_id: 'repo:declared-check',
+        canonical_relative_path: '.devai/state/check-cache/v1',
+        operation: 'update',
+      });
+      for (const host of [checkHost, preflightHost, certifyHost]) {
+        expect(
+          host.scope.apply_effect(
+            effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
+            () => 'applied',
+          ),
+        ).toBe('applied');
+      }
+      expect(() =>
+        prepareHost.scope.apply_effect(
+          effect('spawnSync', [identity.path, ['run', 'devai:prepare'], options], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        preflightHost.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare', '--extra'], { cwd: root, shell: false }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        preflightHost.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['pnpm', ['run', 'devai:prepare'], { cwd: root, shell: true }],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      for (const host of [checkHost, preflightHost, certifyHost, prepareHost]) host.dispose();
+    }
+  });
+
+  it('admits no process execution for pure release preparation', () => {
+    const host = broker('release prepare', 'architect', [
+      process.execPath,
+      'devai',
+      'release',
+      'prepare',
+      '--request',
+      'request.json',
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    try {
+      expect(() =>
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            [
+              'npm',
+              ['pack', '--ignore-scripts'],
+              { cwd: join(ROOT, 'packages/cli'), shell: false },
+            ],
+            'process',
+          ),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('bootstraps only the exact installed-Constitution binding in an unbound adopter', () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-init-bind-bootstrap-'));
     const entry = entries.find((candidate) => candidate.name === 'init bind');
@@ -145,7 +596,11 @@ describe('authority broker production boundary depth', () => {
         expect(
           exact.scope.apply_effect(
             effect('writeFileSync', [join(root, '.devai/config/project.json'), '{}\n']),
-            () => 'allowed',
+            () => {
+              mkdirSync(join(root, '.devai/config'), { recursive: true });
+              writeFileSync(join(root, '.devai/config/project.json'), '{}\n');
+              return 'allowed';
+            },
           ),
         ).toBe('allowed');
         expect(() =>
@@ -358,6 +813,179 @@ describe('authority broker production boundary depth', () => {
       ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
     } finally {
       host.dispose();
+    }
+  });
+
+  it('commits empty and duplicate filesystem effects through one exact atomic boundary', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const { host } = exactBrokerAt(fixture.root, 'init apply owner', 'owner', {
+      as_role: 'owner',
+    });
+    try {
+      expect(host.commit_exact).toBeTypeOf('function');
+      expect(() => host.commit_exact?.()).not.toThrow();
+
+      const path = join(fixture.root, 'product/packet-74.json');
+      const applied: string[] = [];
+      host.scope.apply_effect(effect('writeFileSync', [path, 'first\n']), () => {
+        applied.push('first');
+      });
+      host.scope.apply_effect(effect('writeFileSync', [path, 'second\n']), () => {
+        applied.push('second');
+      });
+
+      expect(applied).toEqual([]);
+      host.commit_exact?.();
+      expect(applied).toEqual(['first', 'second']);
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('refuses conflicting duplicate exact targets before applying either effect', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const { host } = exactBrokerAt(fixture.root, 'init apply owner', 'owner', {
+      as_role: 'owner',
+    });
+    try {
+      const path = join(fixture.root, 'product/packet-74-conflict.json');
+      const applied: string[] = [];
+      host.scope.apply_effect(effect('writeFileSync', [path, 'created\n']), () => {
+        applied.push('create');
+      });
+      mkdirSync(join(fixture.root, 'product'), { recursive: true });
+      writeFileSync(path, 'ambient\n');
+      host.scope.apply_effect(effect('writeFileSync', [path, 'updated\n']), () => {
+        applied.push('update');
+      });
+
+      expect(() => host.commit_exact?.()).toThrow('AUTHORITY_EXACT_PLAN_TARGET_CONFLICT');
+      expect(applied).toEqual([]);
+      expect(readFileSync(path, 'utf8')).toBe('ambient\n');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('refuses an exact target outside the declared action policy without applying it', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const { host } = exactBrokerAt(fixture.root, 'init apply owner', 'owner', {
+      as_role: 'owner',
+    });
+    try {
+      const path = join(fixture.root, '.devai/state/packet-74-denied.json');
+      let applied = false;
+      host.scope.apply_effect(effect('writeFileSync', [path, '{}\n']), () => {
+        applied = true;
+      });
+
+      expect(() => host.commit_exact?.()).toThrow('AUTHORITY_ACTION_DENIED');
+      expect(applied).toBe(false);
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it('binds an exact machine action to its direct or session initiator', () => {
+    const fixture = createSelfContainedRepositoryFixture(ROOT, {
+      paths: ['.devai/config/project.json', '.devai/pin/constitution.md'],
+    });
+    sourceFixtures.push(fixture);
+    const sessionId = 'AUTH-SESSION-74abcdef01234567';
+    const entry = exactEntry('init apply harness');
+    const exactEntries = entries.map((candidate) =>
+      candidate.name === entry.name ? entry : candidate,
+    );
+    const sources = buildTrustedAuthoritySources(exactEntries, fixture.root, resolveCliVersion());
+    const unsigned = {
+      schemaVersion: '1.0.0',
+      session_id: sessionId,
+      repository_id: sources.repository_id,
+      role: 'architect',
+      declaration_source: 'cli-flag',
+      status: 'active',
+      created_at: '2029-01-01T00:00:00.000Z',
+      expires_at: '2099-01-01T00:00:00.000Z',
+      created_by_invocation_id: 'packet-74-session-creator',
+      policy_binding: {
+        policy_id: sources.provenance.policy_id,
+        policy_version: sources.provenance.policy_version,
+        resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+      },
+      constitution_binding: sources.constitution_binding,
+      package_binding: sources.package_binding,
+    };
+    mkdirSync(join(fixture.root, '.devai/state/authority-sessions'), { recursive: true });
+    const sessionPath = join(fixture.root, '.devai/state/authority-sessions', `${sessionId}.json`);
+    writeFileSync(
+      sessionPath,
+      `${JSON.stringify({ ...unsigned, session_digest_sha256: canonicalSha256(unsigned) })}\n`,
+    );
+    const { host: directHost } = exactBrokerAt(fixture.root, 'init apply harness', 'architect', {
+      as_role: 'architect',
+    });
+    let directApplied = false;
+    try {
+      directHost.scope.apply_effect(
+        effect('writeFileSync', [join(fixture.root, '.devai/state/packet-74-direct.json'), '{}\n']),
+        () => {
+          directApplied = true;
+        },
+      );
+      directHost.commit_exact?.();
+      expect(directApplied).toBe(true);
+    } finally {
+      directHost.dispose();
+    }
+
+    const { host } = exactBrokerAt(fixture.root, 'init apply harness', 'architect', {
+      authority_session: sessionId,
+    });
+    try {
+      let applied = false;
+      host.scope.apply_effect(
+        effect('writeFileSync', [
+          join(fixture.root, '.devai/state/packet-74-session.json'),
+          '{}\n',
+        ]),
+        () => {
+          applied = true;
+        },
+      );
+      host.commit_exact?.();
+      expect(applied).toBe(true);
+    } finally {
+      host.dispose();
+    }
+
+    writeFileSync(sessionPath, '{}\n');
+    const { host: malformedHost } = exactBrokerAt(fixture.root, 'init apply harness', 'architect', {
+      authority_session: sessionId,
+    });
+    let malformedApplied = false;
+    try {
+      malformedHost.scope.apply_effect(
+        effect('writeFileSync', [
+          join(fixture.root, '.devai/state/packet-74-malformed.json'),
+          '{}\n',
+        ]),
+        () => {
+          malformedApplied = true;
+        },
+      );
+      expect(() => malformedHost.commit_exact?.()).toThrow('AUTHORITY_SESSION_SCHEMA_INVALID');
+      expect(malformedApplied).toBe(false);
+    } finally {
+      malformedHost.dispose();
     }
   });
 
@@ -693,6 +1321,36 @@ describe('authority broker production boundary depth', () => {
     expect(classified).toBe(cases.length);
   });
 
+  it('authorizes only a complete repository-local Git move', () => {
+    const host = broker('round run', 'engineer', roundRunArgv());
+    try {
+      expect(
+        host.scope.apply_effect(
+          effect(
+            'spawnSync',
+            ['git', ['mv', '.devai/state/source.json', '.devai/state/destination.json']],
+            'process',
+          ),
+          () => 'applied',
+        ),
+      ).toBe('applied');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('spawnSync', ['git', ['mv', '.devai/state/source.json']], 'process'),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      expect(() =>
+        host.scope.apply_effect(
+          effect('renameSync', ['.devai/state/source.json', '.claude/settings.json']),
+          () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_PATH_DOMAIN_VIOLATION');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('authorizes only the exact test command declared by evidence record', () => {
     const argv = [
       process.execPath,
@@ -727,6 +1385,62 @@ describe('authority broker production boundary depth', () => {
         host.scope.apply_effect(
           effect('execSync', ['sh', ['-c', 'pnpm test'], { cwd: ROOT }], 'process'),
           () => 'forbidden',
+        ),
+      ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    } finally {
+      host.dispose();
+    }
+  });
+
+  it.each([
+    ['executable', 'test', 'bash', ['-c', 'pnpm test']],
+    ['evidence kind', 'mutation', 'sh', ['-c', 'pnpm test']],
+    ['shell flag', 'test', 'sh', ['-x', 'pnpm test']],
+    ['argument count', 'test', 'sh', ['-c', 'pnpm test', 'extra']],
+  ] as const)(
+    'refuses an evidence test command with a mismatched %s',
+    (_label, kind, executable, args) => {
+      const host = broker('evidence record', 'auditor', [
+        process.execPath,
+        'devai',
+        'evidence',
+        'record',
+        '--kind',
+        kind,
+        '--round',
+        'R-0007',
+        '--cmd',
+        'pnpm test',
+        '--as-role',
+        'auditor',
+        '--write',
+      ]);
+      try {
+        expect(() =>
+          host.scope.apply_effect(
+            effect('spawnSync', [executable, args], 'process'),
+            () => 'unexpected evidence process execution',
+          ),
+        ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      } finally {
+        host.dispose();
+      }
+    },
+  );
+
+  it('does not treat an evidence-shaped process as another action process', () => {
+    const host = broker('round run', 'engineer', [
+      ...roundRunArgv(),
+      '--kind',
+      'test',
+      '--cmd',
+      'pnpm test',
+    ]);
+    try {
+      expect(() =>
+        host.scope.apply_effect(
+          effect('spawnSync', ['sh', ['-c', 'pnpm test']], 'process'),
+          () => 'unexpected evidence process execution',
         ),
       ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
     } finally {
@@ -823,6 +1537,46 @@ describe('authority broker production boundary depth', () => {
     }
   });
 
+  it.each(['claude', 'codex'] as const)(
+    'classifies %s only for the public sense action before policy refusal',
+    (executable) => {
+      const senseArgv = [
+        process.execPath,
+        'devai',
+        'sense',
+        'run',
+        'llm_judge',
+        '--as-role',
+        'auditor',
+        '--write',
+        '--publish',
+      ] as const;
+      const sense = resolvedBroker('sense run', 'auditor', senseArgv);
+      try {
+        expect(() =>
+          sense.scope.apply_effect(
+            effect('spawnSync', [executable, ['exec', 'fixture']], 'process'),
+            () => 'sense-result',
+          ),
+        ).toThrow('UNCLASSIFIED_RESOURCE');
+      } finally {
+        sense.dispose();
+      }
+
+      const task = broker('task start', 'engineer', taskStartArgv());
+      try {
+        expect(() =>
+          task.scope.apply_effect(
+            effect('spawnSync', [executable, ['exec', 'fixture']], 'process'),
+            () => 'task-result',
+          ),
+        ).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      } finally {
+        task.dispose();
+      }
+    },
+  );
+
   it('fails closed for malformed filesystem targets, escapes, and descriptors', () => {
     const host = broker('round run', 'engineer', roundRunArgv());
     try {
@@ -851,6 +1605,23 @@ describe('authority broker production boundary depth', () => {
       host.dispose();
     }
   });
+
+  it.each(['copyFileSync', 'cpSync', 'symlinkSync'])(
+    'authorizes the destination of %s independently from its source',
+    (symbol) => {
+      const host = broker('round run', 'engineer', roundRunArgv());
+      try {
+        expect(() =>
+          host.scope.apply_effect(
+            effect(symbol, ['.devai/state/source', '.claude/settings.json']),
+            () => 'forbidden',
+          ),
+        ).toThrow('AUTHORITY_PATH_DOMAIN_VIOLATION');
+      } finally {
+        host.dispose();
+      }
+    },
+  );
 
   it('maps only exact linked-worktree Git metadata namespaces into authority paths', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'devai-authority-linked-worktree-'));
@@ -916,5 +1687,263 @@ describe('authority broker production boundary depth', () => {
       host.dispose();
       rmSync(fixture, { recursive: true, force: true });
     }
+  });
+});
+
+describe('authority broker database process targets', () => {
+  const target = (executable: string, args: readonly string[], actionName = 'task start') =>
+    processTarget(
+      effect('spawnSync', [executable, args], 'process'),
+      actionName,
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  it('classifies exact PostgreSQL operations, database identities, and refusal neighbors', () => {
+    const expected = (databaseId: string, actionName: string, operation: string) => ({
+      kind: 'db',
+      id: `db:devai-control:${databaseId}:${actionName.replace(' ', '-')}`,
+      connection_id: 'devai-control',
+      database_id: databaseId,
+      object_id: actionName.replace(' ', '-'),
+      operation,
+    });
+    const statements = [
+      ['   create table fixture(id int)', 'ddl'],
+      ['DROP TABLE fixture', 'ddl'],
+      ['ALTER TABLE fixture ADD COLUMN value text', 'ddl'],
+      ['TRUNCATE TABLE fixture', 'ddl'],
+      ['INSERT INTO fixture VALUES (1)', 'insert'],
+      ['UPDATE fixture SET id = 2', 'update'],
+      ['DELETE FROM fixture', 'delete'],
+      ['SELECT * FROM fixture', 'execute'],
+    ] as const;
+
+    for (const [sql, operation] of statements) {
+      expect(target('psql', ['postgres://host/tenant/team-db', '-c', sql])).toEqual(
+        expected('team-db', 'task start', operation),
+      );
+    }
+    expect(target('psql', ['-c', 'DELETE FROM fixture'])).toEqual(
+      expected('postgres', 'task start', 'delete'),
+    );
+    expect(target('psql', ['INSERT INTO fixture VALUES (1)'])).toEqual(
+      expected('postgres', 'task start', 'execute'),
+    );
+    expect(target('psql', ['postgres://host/tenant/trailing-db/', '-c', 'SELECT 1'])).toEqual(
+      expected('trailing-db', 'task start', 'execute'),
+    );
+    expect(target('psql', ['not-a-url', '-c', 'SELECT 1'], 'sense migrate')).toEqual(
+      expected('postgres', 'sense migrate', 'execute'),
+    );
+    expect(
+      target('psql', ['postgres://host/db', '-c', 'SELECT 1'], 'release preflight'),
+    ).toBeUndefined();
+    expect(target('mysql', ['postgres://host/db', '-c', 'SELECT 1'])).toBeUndefined();
+  });
+
+  it('classifies exact Docker database lifecycle targets and refusal neighbors', () => {
+    const expected = (container: string) => ({
+      kind: 'db',
+      id: `db:devai-control:cluster:${container}`,
+      connection_id: 'devai-control',
+      database_id: 'cluster',
+      object_id: container,
+      operation: 'execute',
+    });
+
+    expect(target('docker', ['run', '--name', 'fixture db'])).toEqual(expected('fixture-db'));
+    expect(target('docker', ['run'])).toEqual(expected('devai-shared-pg'));
+    expect(target('docker', ['start', 'started db'], 'task finish')).toEqual(
+      expected('started-db'),
+    );
+    expect(target('docker', ['stop', 'stopped db'], 'sense migrate')).toEqual(
+      expected('stopped-db'),
+    );
+    expect(target('docker', ['exec', 'fixture-db'])).toBeUndefined();
+    expect(target('docker', ['run', '--name', 'fixture-db'], 'check')).toEqual({
+      kind: 'fs',
+      id: 'fs:.devai/worktrees',
+      repository_id: 'repo:fixture',
+      canonical_relative_path: '.devai/worktrees',
+      operation: 'update',
+    });
+    expect(target('podman', ['run', '--name', 'fixture-db'])).toBeUndefined();
+  });
+
+  it('keeps database routing at the exact remaining public decision boundaries', () => {
+    expect(target('psql', ['postgres://host/db', '-c', 'SELECT 1'], 'check')).toMatchObject({
+      kind: 'db',
+      object_id: 'check',
+    });
+    expect(target('psql', ['postgres://host/db', '-c', 'SELECT 1'], 'task finish')).toMatchObject({
+      kind: 'db',
+      object_id: 'task-finish',
+    });
+    expect(target('psql', ['postgres://host/db', '-c', '!DELETE FROM fixture'])).toMatchObject({
+      kind: 'db',
+      operation: 'execute',
+    });
+    expect(
+      target('psql', ['postgres://host/tenant/intermediate/final-db', '-c', 'SELECT 1']),
+    ).toMatchObject({ kind: 'db', database_id: 'final-db' });
+    expect(target('psql', ['postgres://host', '-c', 'SELECT 1'])).toMatchObject({
+      kind: 'db',
+      database_id: 'postgres',
+    });
+  });
+
+  it('admits only the exact check sandbox process shapes into the worktree target', () => {
+    const expected = {
+      kind: 'fs',
+      id: 'fs:.devai/worktrees',
+      repository_id: 'repo:fixture',
+      canonical_relative_path: '.devai/worktrees',
+      operation: 'update',
+    };
+
+    expect(target('docker', ['run'], 'check')).toEqual(expected);
+    expect(target('sandbox-exec', ['-p', 'profile'], 'check')).toEqual(expected);
+    expect(target('docker', ['start'], 'check')).toBeUndefined();
+    expect(target('podman', ['run'], 'check')).toBeUndefined();
+    expect(target('sandbox-exec', ['profile'], 'check')).toBeUndefined();
+    expect(target('seatbelt', ['-p', 'profile'], 'check')).toBeUndefined();
+    expect(target('sandbox-exec', ['-p', 'profile'], 'task start')).toBeUndefined();
+  });
+});
+
+describe('authority broker Git reference process targets', () => {
+  const target = (executable: string, args: readonly string[]) =>
+    processTarget(
+      effect('spawnSync', [executable, args], 'process'),
+      'round run',
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  const expected = (ref: string, operation: string, remoteId?: string) => ({
+    kind: 'git-ref',
+    id: `git-ref:repo:fixture:${ref}`,
+    repository_id: 'repo:fixture',
+    ref,
+    ...(remoteId === undefined ? {} : { remote_id: remoteId }),
+    operation,
+    protected: false,
+  });
+
+  it('maps exact fetch arguments and fallback identities into one remote reference', () => {
+    expect(target('git', ['fetch', 'upstream remote!', 'topic/name'])).toEqual(
+      expected('refs/remotes/upstream-remote/topic-name', 'update', 'upstream-remote'),
+    );
+    expect(target('git', ['fetch', '', ''])).toEqual(
+      expected('refs/remotes/origin/remote', 'update', 'origin'),
+    );
+    expect(target('git', ['fetch', 'origin', 'main', 'extra'])).toEqual(
+      expected('refs/remotes/main/extra', 'update', 'main'),
+    );
+    expect(target('git', ['fetchx', 'origin', 'main'])).toBeUndefined();
+    expect(target('hg', ['fetch', 'origin', 'main'])).toBeUndefined();
+  });
+
+  it('maps only an exact orphan checkout into a local branch reference', () => {
+    expect(target('git', ['checkout', '--orphan', 'feature branch'])).toEqual(
+      expected('refs/heads/feature-branch', 'create'),
+    );
+    expect(target('git', ['checkout', '--orphan'])).toEqual(
+      expected('refs/heads/orphan', 'create'),
+    );
+    expect(target('git', ['checkout', '-b', 'feature'])).toBeUndefined();
+    expect(target('git', ['checkoutx', '--orphan', 'feature'])).toBeUndefined();
+    expect(target('hg', ['checkout', '--orphan', 'feature'])).toBeUndefined();
+  });
+});
+
+describe('authority broker local Git branch process targets', () => {
+  const target = (executable: string, args: readonly string[]) =>
+    processTarget(
+      effect('spawnSync', [executable, args], 'process'),
+      'round run',
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  const expected = (ref: string, operation: string) => ({
+    kind: 'git-ref',
+    id: `git-ref:repo:fixture:${ref}`,
+    repository_id: 'repo:fixture',
+    ref,
+    operation,
+    protected: false,
+  });
+
+  it('maps only exact forced branch deletion into a local branch reference', () => {
+    expect(target('git', ['branch', '-D', 'feature branch'])).toEqual(
+      expected('refs/heads/feature-branch', 'delete'),
+    );
+    expect(target('git', ['branch', '-D'])).toEqual(expected('refs/heads/temporary', 'delete'));
+    expect(target('git', ['branch', '-d', 'feature'])).toBeUndefined();
+    expect(target('git', ['branchx', '-D', 'feature'])).toBeUndefined();
+    expect(target('hg', ['branch', '-D', 'feature'])).toBeUndefined();
+  });
+
+  it('binds worktree creation and removal to exact branch and operation identities', () => {
+    expect(target('git', ['worktree', 'add', '-b', 'feature branch', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/feature-branch', 'create'),
+    );
+    expect(target('git', ['worktree', 'add', '-b', '', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/worktree', 'create'),
+    );
+    expect(target('git', ['worktree', 'add', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/detached', 'create'),
+    );
+    expect(target('git', ['worktree', 'remove', '/tmp/fixture'])).toEqual(
+      expected('refs/worktrees/detached', 'delete'),
+    );
+    expect(target('git', ['worktreex', 'add', '-b', 'feature'])).toBeUndefined();
+    expect(target('hg', ['worktree', 'add', '-b', 'feature'])).toBeUndefined();
+  });
+});
+
+describe('authority broker Git index and move process targets', () => {
+  const target = (args: readonly string[]) =>
+    processTarget(
+      effect('spawnSync', ['git', args], 'process'),
+      'round run',
+      ROOT,
+      'repo:fixture',
+      [],
+    );
+
+  const expectedRef = (ref: string) => ({
+    kind: 'git-ref',
+    id: `git-ref:repo:fixture:${ref}`,
+    repository_id: 'repo:fixture',
+    ref,
+    operation: 'update',
+    protected: false,
+  });
+
+  it('maps only add, remove, and commit into their exact repository references', () => {
+    expect(target(['add', 'packages/cli/src/bin.ts'])).toEqual(expectedRef('refs/devai/index'));
+    expect(target(['rm', 'packages/cli/src/bin.ts'])).toEqual(expectedRef('refs/devai/index'));
+    expect(target(['commit', '-m', 'fixture'])).toEqual(expectedRef('refs/heads/HEAD'));
+    expect(target(['stage', 'packages/cli/src/bin.ts'])).toBeUndefined();
+    expect(target(['commitx', '-m', 'fixture'])).toBeUndefined();
+  });
+
+  it('maps an exact three-argument move into one complete filesystem rename target', () => {
+    expect(target(['mv', 'scratch/source file', 'scratch/destination file'])).toEqual({
+      kind: 'fs',
+      id: 'fs:scratch/source file->scratch/destination file',
+      repository_id: 'repo:fixture',
+      canonical_relative_path: 'scratch/destination file',
+      rename_from_canonical_relative_path: 'scratch/source file',
+      operation: 'rename',
+    });
+    expect(target(['mv', 'scratch/source-only'])).toBeUndefined();
+    expect(target(['move', 'scratch/source', 'scratch/destination'])).toBeUndefined();
   });
 });

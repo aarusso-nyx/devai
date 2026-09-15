@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getValidator } from '@devai-nyx/schemas';
 
 /**
  * Local-CI-evidence policy resolution (D-117; see docs/adopters/ci-economy.md).
@@ -58,14 +59,14 @@ export function resolveLocalEvidencePolicy(repoRoot: string): LocalEvidencePolic
 
   let raw: RawLocalEvidenceConfig | undefined;
   try {
-    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as {
-      ci_economy?: { local_evidence?: RawLocalEvidenceConfig };
-    };
-    raw = parsed.ci_economy?.local_evidence;
+    const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (!getValidator('project-config.schema.json')(parsed)) return null;
+    raw = (parsed as { ci_economy?: { local_evidence?: RawLocalEvidenceConfig } }).ci_economy
+      ?.local_evidence;
   } catch {
     return null;
   }
-  if (raw === undefined) return null;
+  if (raw === undefined || raw === null) return null;
   if (!Array.isArray(raw.required_jobs) || raw.required_jobs.length === 0) return null;
 
   const manifestPath = raw.manifest_path ?? DEFAULT_MANIFEST_PATH;

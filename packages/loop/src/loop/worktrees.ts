@@ -25,7 +25,7 @@ export interface CreateWorktreeOptions {
   readonly id: string;
   /** Branch to create or check out. */
   readonly branch: string;
-  /** Base ref (default: HEAD). */
+  /** Base ref when creating a new branch (default: HEAD). */
   readonly baseRef?: string;
   readonly taskId?: string;
   readonly humanAdopted?: boolean;
@@ -82,9 +82,10 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
   const registry = loadRegistry(opts.repoRoot);
 
   // Cap enforcement (D-52). Human-adopted worktrees are cap-exempt.
-  // Re-creating an existing worktree id (the registry-update flow
-  // below dedupes by id) does not count against the cap.
-  const reusingExisting = registry.worktrees.some((w) => w.id === opts.id);
+  // Replacing an existing autonomous entry does not add a slot. Replacing a
+  // human-adopted entry with an autonomous one does, so it must satisfy the cap.
+  const existing = registry.worktrees.find((w) => w.id === opts.id);
+  const reusingExisting = existing !== undefined && existing.human_adopted !== true;
   if (
     !reusingExisting &&
     opts.humanAdopted !== true &&
@@ -101,7 +102,20 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
   mkdirSync(wtRoot, { recursive: true });
   const wtPath = join(wtRoot, opts.id);
 
-  execFileSync('git', ['worktree', 'add', '-b', opts.branch, wtPath, opts.baseRef ?? 'HEAD'], {
+  let branchExists = false;
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${opts.branch}`], {
+      cwd: opts.repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    branchExists = true;
+  } catch {
+    // Git still validates the new branch name and base before creating a worktree.
+  }
+  const args = branchExists
+    ? ['worktree', 'add', '--', wtPath, opts.branch]
+    : ['worktree', 'add', '-b', opts.branch, '--', wtPath, opts.baseRef ?? 'HEAD'];
+  execFileSync('git', args, {
     cwd: opts.repoRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
   });

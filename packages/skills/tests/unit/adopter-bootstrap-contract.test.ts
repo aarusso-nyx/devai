@@ -35,7 +35,11 @@ describe('adopter mutation-policy bootstrap contract', () => {
     expect(result.created).toContain('law/policy/mutation-strength.json');
     expect(
       JSON.parse(readFileSync(join(root, 'law/policy/mutation-strength.json'), 'utf8')),
-    ).toMatchObject({ schemaVersion: '1.0.0', id: 'mutation-strength', status: 'active' });
+    ).toMatchObject({
+      schemaVersion: '1.0.0',
+      id: 'mutation-strength',
+      status: 'deprecated-external-hardening',
+    });
   });
 
   it('preserves explicit adopter policy bytes and repeats without policy or lockfile writes', () => {
@@ -62,5 +66,85 @@ describe('adopter mutation-policy bootstrap contract', () => {
     expect(second.overwritten).toEqual([]);
     expect(readFileSync(join(root, 'law/policy/mutation-strength.json'))).toEqual(beforePolicy);
     expect(readFileSync(join(root, 'pnpm-lock.yaml'))).toEqual(beforeLock);
+  });
+});
+
+describe('adopter project.json bootstrap contract', () => {
+  it.each([
+    ['an array', '[]'],
+    ['a null document', 'null'],
+    ['a scalar string', '"tier3"'],
+    ['a scalar number', '3'],
+  ])('refuses to reconcile %s instead of rewriting adopter bytes', (_name, bytes) => {
+    const root = target();
+    const absolute = join(root, '.devai/config/project.json');
+    mkdirSync(dirname(absolute), { recursive: true });
+    writeFileSync(absolute, bytes);
+    const before = readFileSync(absolute);
+
+    expect(() =>
+      buildBootstrapPlan({ targetRoot: root, version: '1.2.1', profile: 'tier3' }),
+    ).toThrow('PROJECT_CONFIG_INVALID: expected a JSON object');
+    expect(readFileSync(absolute)).toEqual(before);
+  });
+});
+
+describe('adopter profile bootstrap contract', () => {
+  const tier3Only = [
+    'law/schemas/README.md',
+    'docs/dev/operations/README.md',
+    'docs/dev/security/README.md',
+    'work/rounds/README.md',
+    'work/audit/README.md',
+    'AGENTS.md',
+    'CLAUDE.md',
+  ] as const;
+  const governedByTier2 = [
+    'law/README.md',
+    'law/adr/README.md',
+    'law/invariants/README.md',
+    'law/policy/README.md',
+    'law/glossary/README.md',
+    'product/README.md',
+  ] as const;
+
+  function plannedPaths(profile?: 'tier1' | 'tier2' | 'tier3'): Set<string> {
+    const root = target();
+    const plan = buildBootstrapPlan({
+      targetRoot: root,
+      version: '1.2.1',
+      ...(profile !== undefined && { profile }),
+    });
+    return new Set(plan.entries.map((entry) => entry.path));
+  }
+
+  it('keeps a tier1 target free of Architect- and Owner-owned scaffolding', () => {
+    const paths = plannedPaths('tier1');
+    for (const path of [...governedByTier2, ...tier3Only]) {
+      expect(paths).not.toContain(path);
+    }
+    // The machine-owned substrate is still laid down for every tier.
+    for (const path of [
+      'record/proofs/README.md',
+      'record/derived/inventory/README.md',
+      'scratch/worktrees/README.md',
+      'record/proofs/chain.json',
+      '.devai/state/counters.json',
+    ]) {
+      expect(paths).toContain(path);
+    }
+  });
+
+  it('gives tier2 the governed law substrate without the tier3 extras', () => {
+    const paths = plannedPaths('tier2');
+    for (const path of governedByTier2) expect(paths).toContain(path);
+    for (const path of tier3Only) expect(paths).not.toContain(path);
+  });
+
+  it('defaults an unspecified tier to the strict tier3 substrate', () => {
+    const paths = plannedPaths();
+    for (const path of [...governedByTier2, ...tier3Only]) {
+      expect(paths).toContain(path);
+    }
   });
 });

@@ -7,9 +7,9 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { join } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 
-const validatePhaseClosure = getValidator('phase-closure.schema.json');
+const validatePhaseClosure = validators.phaseClosure;
 
 /**
  * Phase/round closure ledger (D-110; governance-roadmap item 4).
@@ -236,7 +236,7 @@ export function closePhase(repoRoot: string, draft: PhaseClosureDraft): ClosePha
       `phase close: closing decision ${record.closing_decision} must strictly follow declaring decision ${record.declaring_decision}`,
     );
   }
-  const dup = existing.find((r) => r.round_id === record.round_id);
+  const dup = existing.findLast((r) => r.round_id === record.round_id);
   if (dup !== undefined && record.supersedes !== dup.id) {
     throw new Error(
       `phase close: round_id '${record.round_id}' already closed as ${dup.id}; pass supersedes: '${dup.id}' to correct it`,
@@ -264,7 +264,7 @@ export function closePhase(repoRoot: string, draft: PhaseClosureDraft): ClosePha
   if (existsSync(path)) {
     throw new Error(`phase close: ${path} already exists (closures are append-only)`);
   }
-  writeFileSync(path, JSON.stringify(record, null, 2) + '\n');
+  writeFileSync(path, JSON.stringify(record, null, 2) + '\n', { flag: 'wx' });
   return { record, path };
 }
 

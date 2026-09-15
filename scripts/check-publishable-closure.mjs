@@ -58,7 +58,11 @@ function assertSensorPaths(value, owner, key = '') {
 
 const rootPackage = json('package.json');
 const cliPackage = json('packages/cli/package.json');
-if (cliPackage.name !== PACKAGE_NAME || !/^1\.4\.\d+(?:-rc\.\d+)?$/u.test(cliPackage.version)) {
+if (
+  cliPackage.name !== PACKAGE_NAME ||
+  cliPackage.version !== rootPackage.version ||
+  !/^1\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-rc\.(?:0|[1-9][0-9]*))?$/u.test(cliPackage.version)
+) {
   fail('PUBLISHABLE_PACKAGE_IDENTITY_INVALID', `${cliPackage.name}@${cliPackage.version}`);
 }
 if (cliPackage.repository?.url !== `git+https://github.com/${REPOSITORY}.git`) {
@@ -86,9 +90,9 @@ for (const [name, path] of Object.entries(SECONDARY_BINS)) {
 const verifierRoot = join(ROOT, 'packages/cli/dist/runtime/evidence-verification');
 const verifierProvenance = json('packages/cli/dist/runtime/evidence-verification/provenance.json');
 if (
-  verifierProvenance.sourceCommit !== '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de' ||
+  verifierProvenance.sourceCommit !== '9f849f117fe1e460b5e3c647515f5ccbe783cbfb' ||
   !Array.isArray(verifierProvenance.files) ||
-  verifierProvenance.files.length !== 21
+  verifierProvenance.files.length !== 26
 ) {
   fail('PUBLISHABLE_VERIFIER_PROVENANCE_INVALID', String(verifierProvenance.sourceCommit));
 }
@@ -120,11 +124,14 @@ if (publishable.length !== 1 || publishable[0]?.name !== PACKAGE_NAME) {
 }
 
 const actions = json('law/policy/action-registry.json');
-if (actions.entries?.length !== 48 || actions.counts?.total !== 48) {
+const actionCount = actions.counts?.total;
+if (!Number.isSafeInteger(actionCount) || actions.entries?.length !== actionCount) {
   fail('PUBLISHABLE_ACTION_COUNT_INVALID', String(actions.entries?.length));
 }
 const actionIds = actions.entries.map((entry) => entry.action_id);
-if (new Set(actionIds).size !== 48) fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
+if (new Set(actionIds).size !== actionCount) {
+  fail('PUBLISHABLE_ACTION_ID_DUPLICATE', 'action-registry');
+}
 for (const entry of actions.entries) {
   for (const forbidden of ['previous_name', 'lifecycle', 'migration', 'disposition']) {
     if (Object.hasOwn(entry, forbidden))
@@ -213,17 +220,23 @@ if (
   fail('PUBLISHABLE_CHECK_SUITE_POPULATION_INVALID', definedMembers.join(','));
 }
 
-const trackedPublicFiles = execFileSync('git', ['ls-files', '-z', 'docs', '.github/workflows'], {
-  cwd: ROOT,
-  encoding: 'utf8',
-})
-  .split('\0')
-  .filter((path) => path.length > 0 && existsSync(join(ROOT, path)));
+// Closure inspection also runs on source archives and Stryker sandboxes,
+// which have no Git metadata. Inspect documentation bytes directly, including
+// generated or untracked documentation; installed dependency trees are separate.
+function documentationFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const child = join(directory, entry.name);
+    if (entry.name === 'node_modules') return [];
+    if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile()))
+      fail('PUBLISHABLE_DOCUMENTATION_MEMBER_INVALID', relative(ROOT, child));
+    return entry.isDirectory() ? documentationFiles(child) : [relative(ROOT, child)];
+  });
+}
 const publicFiles = [
   'README.md',
   'CHANGELOG.md',
   '.github/SECURITY.md',
-  ...trackedPublicFiles,
+  ...documentationFiles(join(ROOT, 'docs')),
   ...filesUnder(join(ROOT, '.github/workflows')).map((path) => relative(ROOT, path)),
   ...filesUnder(join(ROOT, 'packages/cli/dist')).map((path) => relative(ROOT, path)),
 ];
@@ -246,5 +259,5 @@ for (const path of publicFiles) {
 }
 
 process.stdout.write(
-  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: 48, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: 21, secondary_bins: 5 })}\n`,
+  `${JSON.stringify({ package: `${PACKAGE_NAME}@${cliPackage.version}`, actions: actionCount, sensors: 59, recipes: 7, operations: referenced.length, publishable_packages: 1, required_runtime_dependencies: Object.keys(cliPackage.dependencies ?? {}).length, optional_runtime_dependencies: Object.keys(cliPackage.optionalDependencies ?? {}).length, verifier_files: verifierProvenance.files.length, secondary_bins: 5 })}\n`,
 );

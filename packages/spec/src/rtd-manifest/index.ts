@@ -157,7 +157,7 @@ function summarizeTrace(
   tracePath: string,
   invariantIds: ReadonlySet<string>,
 ): RtdManifestComponentEntry | null {
-  if (!existsSync(tracePath)) return null;
+  if (!existsSync(tracePath) && invariantIds.size === 0) return null;
   const rec = readJson<{ invariants?: unknown[] }>(tracePath);
   const errors: string[] = [];
   let validatorOk = true;
@@ -251,24 +251,38 @@ function summarizeAdrs(adrDir: string): RtdManifestComponentEntry | null {
       .filter((n) => /^ADR-\d{3,}.*\.md$/.test(n))
       .sort();
   } catch {
-    return null;
+    return {
+      hash: hashCanonical(null),
+      ok: false,
+      errors: [`unreadable: ${adrDir}`],
+    };
   }
   // ADRs are markdown — hash the directory listing + per-file content hash.
+  const errors: string[] = [];
   const fingerprint = files.map((f) => {
-    const content = readFileSync(join(adrDir, f), 'utf8');
-    return { name: f, sha: createHash('sha256').update(content).digest('hex') };
+    try {
+      const content = readFileSync(join(adrDir, f), 'utf8');
+      return { name: f, sha: createHash('sha256').update(content).digest('hex') };
+    } catch {
+      errors.push(`unreadable: ${join(adrDir, f)}`);
+      return { name: f, sha: null };
+    }
   });
   return {
     count: files.length,
     hash: hashCanonical(fingerprint),
-    ok: true,
+    ok: errors.length === 0,
+    ...(errors.length > 0 && { errors }),
   };
 }
 
 function summarizeForbiddenActions(repoRoot: string): RtdManifestComponentEntry | null {
   const path = join(repoRoot, 'law/policy/forbidden-actions.json');
+  if (!existsSync(path)) return null;
   const rec = readJson<{ actions?: unknown[] }>(path);
-  if (rec === null) return null;
+  if (rec === null) {
+    return { count: 0, hash: hashCanonical(null), ok: false, errors: [`unreadable: ${path}`] };
+  }
   const errors: string[] = [];
   const ok = validators.forbiddenActions(rec);
   if (!ok) {
@@ -360,7 +374,11 @@ export function buildRtdManifest(opts: BuildRtdManifestOptions): RtdManifest {
   const adrs = summarizeAdrs(adrDir);
   if (adrs !== null) {
     components.adrs = adrs;
-    subVerdicts.push({ component: 'adrs', ok: adrs.ok });
+    subVerdicts.push({
+      component: 'adrs',
+      ok: adrs.ok,
+      ...(adrs.errors !== undefined && { error_count: adrs.errors.length }),
+    });
   }
 
   const fa = summarizeForbiddenActions(repoRoot);

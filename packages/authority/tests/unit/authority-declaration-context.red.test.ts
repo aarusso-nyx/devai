@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CONSENT,
   NOW,
@@ -451,16 +451,21 @@ describe('R19 trusted machine-context derivation', () => {
     });
   }
 
-  async function directDeclaration() {
+  async function directDeclaration(source: 'cli' | 'session' = 'cli') {
     const api = await runtimeApi();
     const issuer = createIssuer(api, { invocation_id: 'invocation-binding' });
-    const deps = declarationDependencies(issuer, machineAction());
+    const deps = declarationDependencies(
+      issuer,
+      machineAction(),
+      sessionDocument({ role: 'architect' }),
+    );
     const declaration = api.resolveAuthorityDeclaration(
       {
         action_id: 'test mutate',
         invocation_id: 'invocation-binding',
         dry_run: false,
-        declaration: { as_role: 'architect' },
+        declaration:
+          source === 'cli' ? { as_role: 'architect' } : { authority_session: SESSION_ID },
         consent: CONSENT,
       },
       deps,
@@ -472,6 +477,163 @@ describe('R19 trusted machine-context derivation', () => {
       declaration: expectSuccess<{ declaration_receipt: unknown }>(declaration),
     };
   }
+
+  it.each(['cli', 'session'] as const)(
+    'binds every derived context identity for %s declarations',
+    async (source) => {
+      const h = await directDeclaration(source);
+      const origin =
+        source === 'cli'
+          ? { kind: 'direct-cli', invocation_id: 'invocation-binding' }
+          : { kind: 'interactive-session', session_id: SESSION_ID };
+      const canonical = (await import('./authority-runtime-testkit.js')).canonicalSha256;
+      const digest = vi.fn(canonical);
+      try {
+        const value = expectSuccess<{
+          context: {
+            initiated_by: unknown;
+            principal: unknown;
+            action_id: string;
+            consent: unknown;
+          };
+          context_receipt: unknown;
+        }>(
+          h.api.deriveMachineAuthorityContext(
+            {
+              action_id: 'test mutate',
+              invocation_id: 'invocation-binding',
+              declaration_receipt: h.declaration.declaration_receipt,
+              consent: CONSENT,
+            },
+            {
+              actionContracts: h.actionContracts,
+              verifiedOrigin: origin,
+              trusted_adapter_id: 'binding-authority',
+              receiptStore: h.issuer,
+              canonicalSha256: digest,
+            },
+          ),
+        );
+        const initiator = {
+          kind: 'human',
+          role: 'architect',
+          declaration:
+            source === 'cli'
+              ? { source: 'cli-flag', declared_at: NOW }
+              : { source: 'session-state', declared_at: NOW, session_id: SESSION_ID },
+        };
+        const digestInput = {
+          action_id: 'test mutate',
+          actor: 'binding',
+          transition: 'bind',
+          origin,
+          trusted_adapter_id: 'binding-authority',
+          invocation_id: 'invocation-binding',
+          initiated_by: initiator,
+          consent: CONSENT,
+        };
+        expect(digest).toHaveBeenCalledExactlyOnceWith(digestInput);
+        expect(value.context).toEqual({
+          kind: 'trusted-transition',
+          principal: {
+            kind: 'machine',
+            actor: 'binding',
+            derivation: {
+              action_id: 'test mutate',
+              transition: 'bind',
+              origin,
+              trusted_adapter_id: 'binding-authority',
+              invocation_id: 'invocation-binding',
+              context_digest_sha256: canonical(digestInput),
+            },
+          },
+          initiated_by: initiator,
+          action_id: 'test mutate',
+          consent: CONSENT,
+        });
+        expect(Object.isFrozen(value.context)).toBe(true);
+        expect(Object.isFrozen(value.context.principal)).toBe(true);
+        expect(value.context_receipt).toBeTruthy();
+      } finally {
+        h.issuer.dispose();
+      }
+    },
+  );
+
+  it.each([
+    ['cli', undefined],
+    ['cli', { kind: 'direct-cli', invocation_id: 'another-invocation' }],
+    ['session', undefined],
+    ['session', { kind: 'direct-cli', invocation_id: 'invocation-binding' }],
+    ['session', { kind: 'interactive-session', session_id: 'AUTH-SESSION-other-session' }],
+  ] as const)(
+    'refuses %s origin substitution before issuing or consuming a context',
+    async (source, origin) => {
+      const h = await directDeclaration(source);
+      const digest = vi.fn((await import('./authority-runtime-testkit.js')).canonicalSha256);
+      const input = {
+        action_id: 'test mutate',
+        invocation_id: 'invocation-binding',
+        declaration_receipt: h.declaration.declaration_receipt,
+        consent: CONSENT,
+      };
+      const deps = {
+        actionContracts: h.actionContracts,
+        verifiedOrigin: origin,
+        trusted_adapter_id: 'binding-authority',
+        receiptStore: h.issuer,
+        canonicalSha256: digest,
+      };
+      try {
+        expectFailure(
+          h.api.deriveMachineAuthorityContext(input, deps),
+          'refused',
+          'AUTHORITY_MACHINE_ORIGIN_MISMATCH',
+        );
+        expect(digest).not.toHaveBeenCalled();
+        expectSuccess(
+          h.api.deriveMachineAuthorityContext(input, {
+            ...deps,
+            verifiedOrigin:
+              source === 'cli'
+                ? { kind: 'direct-cli', invocation_id: 'invocation-binding' }
+                : { kind: 'interactive-session', session_id: SESSION_ID },
+          }),
+        );
+      } finally {
+        h.issuer.dispose();
+      }
+    },
+  );
+
+  it('refuses a genuine receipt owned by another live issuer', async () => {
+    const first = await directDeclaration(),
+      second = await directDeclaration();
+    try {
+      expectFailure(
+        first.api.deriveMachineAuthorityContext(
+          {
+            action_id: 'test mutate',
+            invocation_id: 'invocation-binding',
+            declaration_receipt: first.declaration.declaration_receipt,
+            consent: CONSENT,
+          },
+          {
+            actionContracts: first.actionContracts,
+            verifiedOrigin: { kind: 'direct-cli', invocation_id: 'invocation-binding' },
+            receiptStore: second.issuer,
+            trusted_adapter_id: 'binding-authority',
+            canonicalSha256: (await import('./authority-runtime-testkit.js')).canonicalSha256,
+          },
+        ),
+        'refused',
+        'AUTHORITY_DECLARATION_RECEIPT_UNKNOWN',
+      );
+    } finally {
+      first.issuer.dispose();
+      second.issuer.dispose();
+    }
+  });
 
   it('derives direct-CLI machine context and preserves its initiating Architect and consent', async () => {
     const { api, issuer, actionContracts, declaration } = await directDeclaration();

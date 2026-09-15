@@ -1,12 +1,19 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: every current action reaches the production authority
 // pre-dispatch boundary and exposes its required refusal in both output formats.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { authorizeCliArgv } from '../../src/authority/index.js';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  authorizeCliArgv,
+  declaredInvocationAuthority,
+  disposeCliInvocationAuthority,
+} from '../../src/authority/index.js';
+import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
 import { getFullRegistry, type RegistryEntry } from '../../src/define-command.js';
+import { resolveCliVersion } from '../../src/version.js';
 
 const originalArgv = [...process.argv];
 const originalStdout = process.stdout.write;
@@ -53,6 +60,478 @@ function expectCode(result: ReturnType<typeof refusal>, code: string): void {
 }
 
 describe('canonical production authority refusal acceptance', () => {
+  it('binds protected release adapters to exact action capabilities', () => {
+    const rule = (candidateEntries: readonly RegistryEntry[], id: string) =>
+      buildTrustedAuthoritySources(candidateEntries, process.cwd(), resolveCliVersion()).rules.find(
+        (candidate) => candidate.rule_id === id,
+      );
+    const withoutCapability = (action: string, capability: string): readonly RegistryEntry[] =>
+      current.map((entry) =>
+        entry.name === action
+          ? {
+              ...entry,
+              authority_contract: {
+                ...entry.authority_contract,
+                capabilities: entry.authority_contract.capabilities.filter(
+                  (candidate) => candidate !== capability,
+                ),
+              },
+            }
+          : entry,
+      );
+
+    expect(rule(current, 'core-protected-release-provider')).toMatchObject({
+      action_ids: ['release certify', 'release preflight'],
+    });
+    expect(
+      rule(
+        withoutCapability('release export', 'protected-export-signer-v1:sign'),
+        'core-protected-release-export-signer',
+      ),
+    ).toBeUndefined();
+    expect(
+      rule(
+        withoutCapability('release prepare', 'artifact-sink:write'),
+        'core-protected-release-artifact-sink',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('preserves exact policy action groups, consent, and provenance', () => {
+    const sources = buildTrustedAuthoritySources(current, process.cwd(), resolveCliVersion());
+    const rule = (id: string) => sources.rules.find((candidate) => candidate.rule_id === id);
+    const actionsFor = (role: string) =>
+      current
+        .filter((entry) => {
+          const subject = entry.authority_contract.subject;
+          return (
+            entry.effects !== 'read' &&
+            subject.kind === 'human' &&
+            subject.allowed_roles.includes(role as never)
+          );
+        })
+        .map((entry) => entry.name)
+        .sort();
+
+    expect(rule('adopter-engineer-packages')).toMatchObject({
+      action_ids: ['round run', 'task finish', 'task start'],
+    });
+    expect(rule('core-round-workspace-container-1')).toMatchObject({
+      action_ids: [...new Set([...actionsFor('architect'), ...actionsFor('auditor')])].sort(),
+    });
+    expect(rule('adopter-remote-sense-run-1')).toMatchObject({
+      required_consent: { write: true, allow_publish: true, experimental: false },
+    });
+    expect(sources.provenance.materialized_from).toEqual({
+      kind: 'project-config',
+      path: '.devai/config/authority-policy.json',
+    });
+  });
+
+  it.each(['--help', '-h'])('leaves %s entirely outside authority routing', (help) => {
+    expect(
+      authorizeCliArgv([process.execPath, 'devai', 'round', 'plan', help], current),
+    ).toBeUndefined();
+    expect(declaredInvocationAuthority()).toBeUndefined();
+  });
+
+  it('routes reconciliation only for round tracking sync', () => {
+    const reconcile = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'tracking', 'sync', '--reconcile', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(reconcile?.stderr ?? '{}')).toMatchObject({
+      code: 'TRACKING_ROUND_REQUIRED',
+    });
+
+    const ordinaryRound = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'plan', '--reconcile', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(ordinaryRound?.stderr ?? '{}')).toMatchObject({
+      code: 'AUTHORITY_DECLARATION_MISSING',
+    });
+  });
+
+  it('keeps check task planning read-only before an adopter policy is bound', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-task-plan-'));
+    mkdirSync(join(root, '.devai/pin'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/pin/constitution.md'),
+      readFileSync(join(process.cwd(), '.devai/pin/constitution.md')),
+    );
+    try {
+      expect(
+        authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'check',
+            '--task-plan',
+            'test-tasks.json',
+            '--repo-root',
+            root,
+            '--format',
+            'json',
+          ],
+          current,
+        ),
+      ).toBeUndefined();
+      expect(declaredInvocationAuthority()).toBeUndefined();
+    } finally {
+      disposeCliInvocationAuthority();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('routes post-merge receipts only through round close', () => {
+    const roundClose = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'close', '--post-merge-receipt', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(roundClose?.stderr ?? '{}')).toMatchObject({ code: 'HOST_RECEIPT_MISSING' });
+
+    const otherAction = authorizeCliArgv(
+      [process.execPath, 'devai', 'round', 'plan', '--post-merge-receipt', '--format', 'json'],
+      current,
+    );
+    expect(JSON.parse(otherAction?.stderr ?? '{}')).toMatchObject({
+      code: 'AUTHORITY_DECLARATION_MISSING',
+    });
+  });
+
+  it.each([
+    ['role', ['--as-role', 'owner']],
+    ['session', ['--authority-session', 'AUTH-SESSION-0123456789abcdef']],
+    ['write consent', ['--write']],
+    ['machine identity', ['--machine-actor', 'harness']],
+  ] as const)('refuses caller-selected %s for a post-merge receipt', (_label, declaration) => {
+    const result = authorizeCliArgv(
+      [
+        process.execPath,
+        'devai',
+        'round',
+        'close',
+        '--post-merge-receipt',
+        '--host-receipt',
+        'receipt.json',
+        ...declaration,
+        '--format',
+        'json',
+      ],
+      current,
+    );
+
+    expect(result).toBeDefined();
+    expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({
+      code: 'HOST_RECEIPT_CALLER_AUTHORITY_FORBIDDEN',
+      exit: 2,
+    });
+  });
+
+  it.each([
+    ['role', ['--as-role', 'owner']],
+    ['session', ['--authority-session', 'AUTH-SESSION-0123456789abcdef']],
+    ['write consent', ['--write']],
+    ['publication consent', ['--publish']],
+    ['machine identity', ['--machine-actor', 'harness']],
+  ] as const)(
+    'refuses caller-selected %s during tracking reconciliation',
+    (_label, declaration) => {
+      const result = authorizeCliArgv(
+        [
+          process.execPath,
+          'devai',
+          'round',
+          'tracking',
+          'sync',
+          '--round',
+          'R-0007',
+          '--reconcile',
+          ...declaration,
+          '--format',
+          'json',
+        ],
+        current,
+      );
+
+      expect(result).toBeDefined();
+      expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({
+        code: 'TRACKING_RECONCILE_CALLER_AUTHORITY_FORBIDDEN',
+        exit: 2,
+      });
+    },
+  );
+
+  it.each([
+    ['expired status', { status: 'expired', expires_at: '2099-01-01T00:00:00.000Z' }],
+    ['expiry boundary', { status: 'active', expires_at: '2030-01-01T00:00:00.000Z' }],
+  ] as const)('refuses an authority session at its %s', (_label, expiration) => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-expired-session-'));
+    try {
+      const sessionId = 'AUTH-SESSION-0123456789abcdef';
+      const unsigned = {
+        schemaVersion: '1.0.0',
+        session_id: sessionId,
+        repository_id: 'fixture-repository',
+        role: 'architect',
+        declaration_source: 'cli-flag',
+        ...expiration,
+        created_at: '2029-01-01T00:00:00.000Z',
+        created_by_invocation_id: 'fixture-invocation',
+        policy_binding: {
+          policy_id: 'fixture-policy',
+          policy_version: '1.0.0',
+          resolved_digest_sha256: 'a'.repeat(64),
+        },
+        constitution_binding: { version: '1.0.0', digest_sha256: 'b'.repeat(64) },
+        package_binding: { name: '@aarusso-nyx/devai', version: '1.5.0' },
+      };
+      mkdirSync(join(root, '.devai/state/authority-sessions'), { recursive: true });
+      writeFileSync(
+        join(root, '.devai/state/authority-sessions', `${sessionId}.json`),
+        `${JSON.stringify({ ...unsigned, session_digest_sha256: canonicalSha256(unsigned) })}\n`,
+      );
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-01-01T00:00:00.000Z'));
+      try {
+        const result = authorizeCliArgv(
+          [
+            process.execPath,
+            'devai',
+            'round',
+            'plan',
+            '--documents',
+            'cli',
+            '--repo-root',
+            root,
+            '--authority-session',
+            sessionId,
+            '--write',
+            '--format',
+            'json',
+          ],
+          current,
+        );
+        expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({
+          code: 'AUTHORITY_SESSION_EXPIRED',
+          exit: 2,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['policy ID', 'AUTHORITY_SESSION_POLICY_MISMATCH', 'policy_id'],
+    ['policy version', 'AUTHORITY_SESSION_POLICY_MISMATCH', 'policy_version'],
+    ['policy digest', 'AUTHORITY_SESSION_POLICY_MISMATCH', 'resolved_digest_sha256'],
+    ['Constitution', 'AUTHORITY_SESSION_CONSTITUTION_MISMATCH', 'constitution_binding'],
+    ['package', 'AUTHORITY_SESSION_PACKAGE_MISMATCH', 'package_binding'],
+  ] as const)('refuses a session with a mismatched %s binding', (_label, code, field) => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-session-binding-'));
+    try {
+      const sessionId = 'AUTH-SESSION-0123456789abcdef';
+      mkdirSync(join(root, '.devai/config'), { recursive: true });
+      mkdirSync(join(root, '.devai/pin'), { recursive: true });
+      mkdirSync(join(root, '.devai/state/authority-sessions'), { recursive: true });
+      writeFileSync(
+        join(root, '.devai/config/project.json'),
+        `${JSON.stringify({ schemaVersion: '1.0.0', project_type: 'runtime-host', name: 'fixture-repository' })}\n`,
+      );
+      writeFileSync(
+        join(root, '.devai/pin/constitution.md'),
+        readFileSync(join(import.meta.dirname, '../../../../.devai/pin/constitution.md')),
+      );
+      const sources = buildTrustedAuthoritySources(current, root, resolveCliVersion());
+      const policyBinding = {
+        policy_id: sources.provenance.policy_id,
+        policy_version: sources.provenance.policy_version,
+        resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+      };
+      const bindingOverrides = {
+        policy_id: { ...policyBinding, policy_id: 'other-policy' },
+        policy_version: { ...policyBinding, policy_version: '0.0.0' },
+        resolved_digest_sha256: {
+          ...policyBinding,
+          resolved_digest_sha256: 'c'.repeat(64),
+        },
+        constitution_binding: {
+          ...sources.constitution_binding,
+          digest_sha256: 'd'.repeat(64),
+        },
+        package_binding: { ...sources.package_binding, version: '0.0.0' },
+      } as const;
+      const baseUnsigned = {
+        schemaVersion: '1.0.0',
+        session_id: sessionId,
+        repository_id: sources.repository_id,
+        role: 'architect',
+        declaration_source: 'cli-flag',
+        status: 'active',
+        created_at: '2029-01-01T00:00:00.000Z',
+        expires_at: '2099-01-01T00:00:00.000Z',
+        created_by_invocation_id: 'fixture-invocation',
+        policy_binding: policyBinding,
+        constitution_binding: sources.constitution_binding,
+        package_binding: sources.package_binding,
+      };
+      const sessionPath = join(root, '.devai/state/authority-sessions', `${sessionId}.json`);
+      const invocation = [
+        process.execPath,
+        'devai',
+        'round',
+        'plan',
+        '--documents',
+        'cli',
+        '--repo-root',
+        root,
+        '--authority-session',
+        sessionId,
+        '--write',
+        '--plan',
+        '--format',
+        'json',
+      ];
+      writeFileSync(
+        sessionPath,
+        `${JSON.stringify({ ...baseUnsigned, session_digest_sha256: canonicalSha256(baseUnsigned) })}\n`,
+      );
+      const authorized = authorizeCliArgv(invocation, current);
+      expect(JSON.parse(authorized?.stdout ?? '{}')).toMatchObject({
+        authority: {
+          code: 'POLICY_ALLOW',
+          principal: {
+            declaration_source: 'session-state',
+            session_id: sessionId,
+          },
+        },
+        applied: false,
+      });
+
+      const driftedUnsigned = {
+        ...baseUnsigned,
+        ...(field === 'policy_id' ||
+        field === 'policy_version' ||
+        field === 'resolved_digest_sha256'
+          ? { policy_binding: bindingOverrides[field] }
+          : { [field]: bindingOverrides[field] }),
+      };
+      writeFileSync(
+        sessionPath,
+        `${JSON.stringify({ ...driftedUnsigned, session_digest_sha256: canonicalSha256(driftedUnsigned) })}\n`,
+      );
+
+      const result = authorizeCliArgv(invocation, current);
+      expect(JSON.parse(result?.stderr ?? '{}')).toMatchObject({ code, exit: 2 });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses missing, malformed, invalid, compromised, and inactive sessions', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-authority-session-integrity-'));
+    try {
+      const sessionId = 'AUTH-SESSION-0123456789abcdef';
+      const sessionPath = join(root, '.devai/state/authority-sessions', `${sessionId}.json`);
+      mkdirSync(join(root, '.devai/config'), { recursive: true });
+      mkdirSync(join(root, '.devai/pin'), { recursive: true });
+      mkdirSync(join(root, '.devai/state/authority-sessions'), { recursive: true });
+      writeFileSync(
+        join(root, '.devai/config/project.json'),
+        `${JSON.stringify({ schemaVersion: '1.0.0', project_type: 'runtime-host', name: 'fixture-repository' })}\n`,
+      );
+      writeFileSync(
+        join(root, '.devai/pin/constitution.md'),
+        readFileSync(join(import.meta.dirname, '../../../../.devai/pin/constitution.md')),
+      );
+      const sources = buildTrustedAuthoritySources(current, root, resolveCliVersion());
+      const baseUnsigned = {
+        schemaVersion: '1.0.0',
+        session_id: sessionId,
+        repository_id: sources.repository_id,
+        role: 'architect',
+        declaration_source: 'cli-flag',
+        status: 'active',
+        created_at: '2029-01-01T00:00:00.000Z',
+        expires_at: '2099-01-01T00:00:00.000Z',
+        created_by_invocation_id: 'fixture-invocation',
+        policy_binding: {
+          policy_id: sources.provenance.policy_id,
+          policy_version: sources.provenance.policy_version,
+          resolved_digest_sha256: sources.provenance.resolved_digest_sha256,
+        },
+        constitution_binding: sources.constitution_binding,
+        package_binding: sources.package_binding,
+      };
+      const signed = (unsigned: Record<string, unknown>) =>
+        `${JSON.stringify({ ...unsigned, session_digest_sha256: canonicalSha256(unsigned) })}\n`;
+      const cases = [
+        ['missing', 'AUTHORITY_SESSION_NOT_FOUND', 2, undefined],
+        ['malformed JSON', 'AUTHORITY_SESSION_SCHEMA_INVALID', 7, '{'],
+        ['schema-invalid', 'AUTHORITY_SESSION_SCHEMA_INVALID', 7, '{}\n'],
+        [
+          'digest-compromised',
+          'AUTHORITY_SESSION_DIGEST_MISMATCH',
+          2,
+          `${JSON.stringify({ ...baseUnsigned, session_digest_sha256: 'c'.repeat(64) })}\n`,
+        ],
+        [
+          'revoked',
+          'AUTHORITY_SESSION_REVOKED',
+          2,
+          signed({
+            ...baseUnsigned,
+            status: 'revoked',
+            revocation: {
+              revoked_at: '2030-01-01T00:00:00.000Z',
+              revoked_by_invocation_id: 'fixture-revocation',
+              reason: 'fixture revocation',
+            },
+          }),
+        ],
+        [
+          'stale',
+          'AUTHORITY_SESSION_STALE',
+          2,
+          signed({ ...baseUnsigned, status: 'stale', stale_reason: 'policy-changed' }),
+        ],
+        [
+          'repository-mismatched',
+          'AUTHORITY_SESSION_REPOSITORY_MISMATCH',
+          2,
+          signed({ ...baseUnsigned, repository_id: 'other-repository' }),
+        ],
+      ] as const;
+      const invocation = [
+        process.execPath,
+        'devai',
+        'round',
+        'plan',
+        '--documents',
+        'cli',
+        '--repo-root',
+        root,
+        '--authority-session',
+        sessionId,
+        '--write',
+        '--plan',
+        '--format',
+        'json',
+      ];
+
+      for (const [label, code, exit, contents] of cases) {
+        if (contents !== undefined) writeFileSync(sessionPath, contents);
+        const result = authorizeCliArgv(invocation, current);
+        expect(JSON.parse(result?.stderr ?? '{}'), label).toMatchObject({ code, exit });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('emits concrete remediation and structured context for common refusals', () => {
     const check = current.find((entry) => entry.name === 'check');
     const sense = current.find((entry) => entry.name === 'sense run');
@@ -143,7 +622,7 @@ describe('canonical production authority refusal acceptance', () => {
   });
 
   it('requires no declaration for reads and a declaration for every write-capable action', () => {
-    expect(current).toHaveLength(48);
+    expect(current).toHaveLength(57);
     const unbound = mkdtempSync(join(tmpdir(), 'devai-authority-unbound-'));
     try {
       for (const format of ['human', 'json'] as const) {

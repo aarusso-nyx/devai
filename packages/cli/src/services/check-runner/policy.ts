@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from '@devai-nyx/authority';
+import { readCheckPolicyGitSync } from '@devai-nyx/authority';
 import { sha256Hex } from './canonical.js';
 import type {
   InputSelector,
@@ -32,11 +32,14 @@ interface PolicyBuildOptions {
   readonly descriptor: TaskDescriptor;
   readonly target: TaskTarget;
   readonly baseCommit?: string;
+  readonly releaseCandidate?: Readonly<{ commit: string; tree: string }>;
   readonly releaseRequiredNodes?: readonly string[];
   readonly releaseAffectedSelection?: boolean;
   readonly releaseTaskBindings?: Readonly<Record<string, unknown>>;
   readonly toolchain: Readonly<Record<string, string>>;
   readonly environment: Readonly<Record<string, string>>;
+  readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;
+  readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
   readonly cacheState: (
     task: Readonly<
       Pick<
@@ -64,22 +67,11 @@ function git(
   args: readonly string[],
   options: Readonly<{
     encoding?: BufferEncoding | null;
-    allowFailure?: boolean;
     input?: string | Buffer;
   }> = {},
 ): string | Buffer {
-  const encoding = options.encoding === null ? null : (options.encoding ?? 'utf8');
-  const result = spawnSync('git', [...args], {
-    cwd: repoRoot,
-    encoding,
-    maxBuffer: 64 * 1024 * 1024,
-    ...(options.input !== undefined && { input: options.input }),
-  });
-  if (result.error !== undefined || (result.status !== 0 && options.allowFailure !== true)) {
-    const detail = result.error?.message ?? String(result.stderr || result.stdout).trim();
-    throw new Error(`CHECK_RUNNER_GIT: git ${args.join(' ')} failed: ${detail}`);
-  }
-  return result.stdout ?? (encoding === null ? Buffer.alloc(0) : '');
+  const result = readCheckPolicyGitSync(repoRoot, args, options.input);
+  return options.encoding === null ? result : result.toString(options.encoding ?? 'utf8');
 }
 
 function objectContentDigests(
@@ -267,6 +259,72 @@ function validateDescriptor(value: unknown): TaskDescriptor {
   return descriptor;
 }
 
+/** Recognize execution tokens, never infer execution from an arbitrary task name. */
+function invokesMutationTesting(argv: readonly string[]): boolean {
+  return argv.some((arg, index) => {
+    const executable = arg.replaceAll('\\', '/').split('/').at(-1) ?? arg;
+    const command = argv[index + 1];
+    const stryker =
+      /^(?:stryker(?:\.cmd|\.js)?|stryker-cli(?:@[^/]+)?)$/u.test(executable) ||
+      /^@stryker-mutator\/core(?:@[^/]+)?$/u.test(arg);
+    const bedel = /^bedel(?:\.cmd|\.js)?$/u.test(executable);
+    return (
+      arg === 'test:mutation' ||
+      (stryker && (command === 'run' || command === undefined)) ||
+      (bedel && (command === 'run' || command === 'resume'))
+    );
+  });
+}
+
+/** Strip only identified mutation-testing tasks; source-write authority is unrelated. */
+export function withoutMutationTestTasks(descriptor: TaskDescriptor): TaskDescriptor {
+  const retired = new Set(
+    descriptor.tasks
+      .filter(
+        (task) =>
+          ['mutation-report-set-discovery-v1', 'mutation-report-set-v1'].includes(
+            String(task.outputContract['kind']),
+          ) ||
+          task.runner === 'stryker' ||
+          task.toolchainKeys.some(
+            (key) => key === 'stryker' || key.startsWith('@stryker-mutator/'),
+          ) ||
+          invokesMutationTesting(task.argv),
+      )
+      .map((task) => task.nodeId),
+  );
+  if (retired.size === 0) return descriptor;
+  const keep = (node: string) => !retired.has(node);
+  return {
+    ...descriptor,
+    fallbackNodeId:
+      descriptor.fallbackNodeId !== null && retired.has(descriptor.fallbackNodeId)
+        ? null
+        : descriptor.fallbackNodeId,
+    tasks: descriptor.tasks
+      .filter((task) => keep(task.nodeId))
+      .map((task) => ({ ...task, dependencies: task.dependencies.filter(keep) })),
+    profiles: descriptor.profiles.map((profile) => ({
+      ...profile,
+      requiredNodes: profile.requiredNodes.filter(keep),
+      ...(profile.eligibleNodes === undefined
+        ? {}
+        : { eligibleNodes: profile.eligibleNodes.filter(keep) }),
+    })),
+  };
+}
+
+export function parseTaskDescriptor(value: unknown): TaskDescriptor {
+  try {
+    return withoutMutationTestTasks(validateDescriptor(value));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('CHECK_RUNNER_DESCRIPTOR:')) throw error;
+    throw new Error(
+      `CHECK_RUNNER_DESCRIPTOR: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 export function readTaskDescriptor(path: string): TaskDescriptor {
   if (!existsSync(path)) {
     throw new Error(
@@ -274,7 +332,7 @@ export function readTaskDescriptor(path: string): TaskDescriptor {
     );
   }
   try {
-    return validateDescriptor(JSON.parse(readFileSync(path, 'utf8')));
+    return parseTaskDescriptor(JSON.parse(readFileSync(path, 'utf8')));
   } catch (error) {
     if (
       error instanceof Error &&
@@ -436,8 +494,19 @@ function changedPaths(
 
 const HARNESS_MUTATED_PREFIXES = ['.devai/state/', 'record/', 'scratch/'] as const;
 
+const RELEASE_INPUT_PROJECTION = Object.freeze({
+  schemaVersion: '1.0.0' as const,
+  source: 'exact-candidate-tree' as const,
+  excludedPrefixes: Object.freeze([...HARNESS_MUTATED_PREFIXES].sort()),
+});
+
 function isHarnessMutatedPath(path: string): boolean {
   return HARNESS_MUTATED_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+/** Canonical changed-path population shared by intent producers and task planning. */
+export function projectChangedPaths(paths: readonly string[]): readonly string[] {
+  return [...new Set(paths)].filter((path) => !isHarnessMutatedPath(path)).sort();
 }
 
 function selectedNodeIds(
@@ -564,27 +633,33 @@ function selectedNodeIds(
 }
 
 export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
-  const { repoRoot, descriptor, target, toolchain, environment } = options;
-  const commit = gitText(repoRoot, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
-  assertCommit(repoRoot, commit, 'HEAD');
-  const tree = gitText(repoRoot, ['rev-parse', '--verify', `${commit}^{tree}`]).trim();
-  const clean = cleanStatus(repoRoot);
+  const { repoRoot, target, toolchain, environment } = options;
+  const descriptor = withoutMutationTestTasks(options.descriptor);
+  const repositoryState =
+    options.releaseCandidate === undefined
+      ? currentRepositoryState(repoRoot)
+      : exactCandidateRepositoryState(repoRoot, options.releaseCandidate);
+  const { commit, tree, clean } = repositoryState;
+  if (target === 'release' && !clean) {
+    throw new Error('CHECK_RELEASE_CANDIDATE_WORKTREE_MISMATCH');
+  }
   let changes: readonly string[] = [];
   if (target === 'affected' || target === 'release') {
     if (options.baseCommit === undefined) {
       throw new Error('CHECK_RUNNER_BASE_REQUIRED: affected and release targets require --base');
     }
     assertCommit(repoRoot, options.baseCommit, 'BASE');
-    const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', options.baseCommit, commit], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-    });
-    if (ancestor.status !== 0) throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
+    try {
+      const ancestor = gitText(repoRoot, ['merge-base', options.baseCommit, commit]).trim();
+      if (ancestor !== options.baseCommit) throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
+    } catch {
+      throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
+    }
     changes = changedPaths(repoRoot, options.baseCommit, commit, clean);
   } else if (!clean) {
     changes = changedPaths(repoRoot, commit, commit, false);
   }
-  changes = changes.filter((path) => !isHarnessMutatedPath(path));
+  changes = projectChangedPaths(changes);
   const entries = (clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot)).filter(
     (entry) => !isHarnessMutatedPath(entry.path),
   );
@@ -592,7 +667,11 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     descriptor,
     target,
     changes,
-    options.releaseRequiredNodes,
+    options.releaseRequiredNodes?.filter(
+      (node) =>
+        !options.descriptor.tasks.some((task) => task.nodeId === node) ||
+        descriptor.tasks.some((task) => task.nodeId === node),
+    ),
     options.releaseAffectedSelection,
   );
   const descriptorDigest = sha256Hex(descriptor);
@@ -632,7 +711,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     }));
     const executableName = task.argv[0] ?? '';
     const protectedExecutable = taskExecutableFromToolchain(toolchain, executableName);
-    const executable = resolveTaskExecutable(repoRoot, executableName);
+    const executable =
+      options.resolveExecutable?.(executableName) ??
+      resolveTaskExecutable(repoRoot, executableName);
     if (
       protectedExecutable !== undefined &&
       (protectedExecutable.path !== executable.path ||
@@ -654,6 +735,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       environment: selectedEnvironment,
       outputContract: outputContracts.get(task.nodeId),
       ...(releaseBinding === undefined ? {} : { releaseBinding }),
+      ...(options.protectedExecutionIdentity === undefined
+        ? {}
+        : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
       inputs,
       dependencies,
     });
@@ -686,7 +770,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       return { ...planned, ...options.cacheState(planned) };
     });
   const taskPolicy: TaskPolicy = {
-    schemaVersion: '1.1.0',
+    // v1.1 stays byte-compatible for non-release checks. The canonical verifier
+    // accepts inputProjection only in the explicitly forward v1.2 release form.
+    schemaVersion: target === 'release' ? '1.2.0' : '1.1.0',
     repositoryId: descriptor.repositoryId,
     requiredNodes: tasks.map(({ nodeId, taskKey, dependencies, outputContract }) => ({
       nodeId,
@@ -694,6 +780,12 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       dependencies,
       outputContract,
     })),
+    ...(target === 'release' && {
+      inputProjection: {
+        ...RELEASE_INPUT_PROJECTION,
+        digest: sha256Hex(entries),
+      },
+    }),
   };
   return {
     schemaVersion: '1.0.0',
@@ -731,4 +823,23 @@ export function exactCommitFile(repoRoot: string, commit: string, path: string):
   } catch {
     throw new Error('CHECK_RELEASE_VERSION_SOURCE_UNREADABLE');
   }
+}
+
+export function exactCandidateRepositoryState(
+  repoRoot: string,
+  candidate: Readonly<{ commit: string; tree: string }>,
+): Readonly<{ commit: string; tree: string; clean: boolean }> {
+  const tree = exactCommitTree(repoRoot, candidate.commit);
+  if (tree !== candidate.tree) throw new Error('CHECK_RELEASE_INTENT_CANDIDATE_MISMATCH');
+  const candidateEntries = committedSnapshot(repoRoot, candidate.commit).filter(
+    (entry) => !isHarnessMutatedPath(entry.path),
+  );
+  const worktreeEntries = worktreeSnapshot(repoRoot).filter(
+    (entry) => !isHarnessMutatedPath(entry.path),
+  );
+  return {
+    commit: candidate.commit,
+    tree,
+    clean: sha256Hex(candidateEntries) === sha256Hex(worktreeEntries),
+  };
 }

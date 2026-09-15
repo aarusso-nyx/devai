@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLogger, type WritableLike } from '../../src/logger.js';
 
 function makeMockStream(): { stream: WritableLike; output: () => string } {
@@ -86,3 +86,65 @@ describe('createLogger redaction', () => {
   });
 });
 // Invariants: INV-DEVAI-001
+
+afterEach(() => vi.useRealTimers());
+
+describe('logger output contracts', () => {
+  it('uses the current ISO timestamp when no clock is injected', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(FIXED_TS));
+    const err = makeMockStream();
+    createLogger({ err: err.stream }).error('failed');
+    expect(err.output()).toBe(
+      JSON.stringify({ level: 'error', ts: FIXED_TS, message: 'failed' }) + '\n',
+    );
+  });
+
+  it.each(['debug', 'info', 'warn', 'error'] as const)(
+    'emits exactly the levels at or above %s',
+    (level) => {
+      const err = makeMockStream();
+      const log = createLogger({ err: err.stream, level, now });
+      const levels = ['debug', 'info', 'warn', 'error'] as const;
+      for (const name of levels) log[name](name);
+      expect(err.output()).toBe(
+        levels
+          .slice(levels.indexOf(level))
+          .map((name) => JSON.stringify({ level: name, ts: FIXED_TS, message: name }) + '\n')
+          .join(''),
+      );
+    },
+  );
+
+  it('separates human fields, represents nullish and structured values, and omits empty fields', () => {
+    const out = makeMockStream();
+    const log = createLogger({ mode: 'human', out: out.stream, now });
+    log.error('failure', {
+      text: 'value',
+      nil: null,
+      missing: undefined,
+      object: { a: 1 },
+      array: [1, false],
+    });
+    log.info('empty', {});
+    expect(out.output()).toBe(
+      `[${FIXED_TS}] ERROR failure text=value nil=null missing=undefined object={"a":1} array=[1,false]\n[${FIXED_TS}] INFO empty\n`,
+    );
+  });
+
+  it('redacts human messages and nested field values before writing without changing caller data', () => {
+    const out = makeMockStream();
+    const fields = { token: 'private', detail: { key: 'sk-secret' } };
+    const log = createLogger({
+      mode: 'human',
+      out: out.stream,
+      now,
+      redaction: { patterns: [/sk-[a-z]+/g], fields: ['token'] },
+    });
+    log.info('using sk-secret', fields);
+    expect(out.output()).toBe(
+      `[${FIXED_TS}] INFO using [REDACTED] token=[REDACTED] detail={"key":"[REDACTED]"}\n`,
+    );
+    expect(fields).toEqual({ token: 'private', detail: { key: 'sk-secret' } });
+  });
+});

@@ -1,20 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "id": "mutation-strength",
-  "status": "active",
+  "status": "deprecated-external-hardening",
   "authority": "Architect",
   "thresholds": {
     "source": "law/policy/thresholds.json#/mutation",
     "score_operator": ">=",
-    "survived_operator": "<="
+    "survivor_count": "reported-only"
   },
   "applicability": {
-    "required_when_any": [
-      "invariant-verification-declares-mutation",
-      "validation-strategy-declares-mutation",
-      "governed-risk-selection-marks-mutation-relevant"
-    ],
-    "unselected_scope": "not-applicable-with-explicit-reason",
+    "required_when_any": [],
+    "unselected_scope": "not-required-mutation-external-hardening",
     "selection_must_be_nonempty": true,
     "selection_must_bind_exact_candidate": true,
     "caller_trimming_forbidden": true
@@ -26,17 +22,12 @@
       "zero-runtime-errors",
       "zero-infrastructure-errors",
       "mutation-score-meets-threshold",
-      "survivors-within-threshold",
       "independently-checkable-report"
     ],
     "readiness_sufficient_alone": false
   },
   "fail": {
-    "conditions": [
-      "required-critical-mutant-survived",
-      "mutation-score-below-threshold",
-      "survivors-above-threshold"
-    ]
+    "conditions": ["required-critical-mutant-survived", "mutation-score-below-threshold"]
   },
   "unknown": {
     "conditions": [
@@ -51,13 +42,15 @@
       "exact-subject-mismatch",
       "independently-uncheckable-result"
     ],
-    "blocks_required_readiness": true,
+    "blocks_required_readiness": false,
     "is_fail": false
   },
   "prohibitions": [
     "judge-only-substitution",
     "empty-selection-pass",
     "mutation-pass-as-sole-readiness-evidence",
-    "threshold-override-outside-canonical-policy"
+    "threshold-override-outside-canonical-policy",
+    "mutation-testing-in-ci",
+    "mutation-results-as-delivery-requirement"
   ]
 }

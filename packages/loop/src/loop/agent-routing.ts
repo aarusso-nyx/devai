@@ -110,10 +110,7 @@ export function resolveAgentExecutor(options: ResolveAgentExecutorOptions): Agen
     return fail(request, 'TASK_EFFORT_UNSUPPORTED', considered, ['TASK_EFFORT_UNSUPPORTED']);
   }
   const agentClass = options.agentClass ?? request.agent_class;
-  if (
-    agentClass !== undefined &&
-    !runtime.eligible_agent_classes.includes(agentClass)
-  ) {
+  if (agentClass !== undefined && !runtime.eligible_agent_classes.includes(agentClass)) {
     return fail(request, 'TASK_AGENT_CLASS_INELIGIBLE', considered, [
       'TASK_AGENT_CLASS_INELIGIBLE',
     ]);
@@ -126,7 +123,9 @@ export function resolveAgentExecutor(options: ResolveAgentExecutorOptions): Agen
   }
   const report = options.reportedIdentity;
   if (report === undefined) {
-    return fail(request, 'TASK_HOST_IDENTITY_REQUIRED', considered, ['TASK_HOST_IDENTITY_REQUIRED']);
+    return fail(request, 'TASK_HOST_IDENTITY_REQUIRED', considered, [
+      'TASK_HOST_IDENTITY_REQUIRED',
+    ]);
   }
   if (
     report.registry_id !== registryId ||

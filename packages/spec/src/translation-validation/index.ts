@@ -4,6 +4,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { minimatch } from 'minimatch';
 import { validators } from '@devai-nyx/schemas';
+import { canonicalSha256 } from '@devai-nyx/utils';
 
 export type TranslationStrategy =
   'regression' | 'feature-overlay' | 'behavioral-equivalence' | 'structural' | 'semantic-review';
@@ -98,6 +99,7 @@ function gitMutation(
   options: {
     readonly env?: Readonly<Record<string, string>>;
     readonly input?: string;
+    readonly trimOutput?: boolean;
     readonly error: string;
   },
 ): string {
@@ -111,19 +113,26 @@ function gitMutation(
   if (result.status !== 0) {
     throw new Error(`${options.error}: ${(result.stderr ?? '').trim()}`);
   }
-  return (result.stdout ?? '').trim();
+  const stdout = result.stdout ?? '';
+  return options.trimOutput === false ? stdout : stdout.trim();
 }
 
 function mutationPaths(repoRoot: string): readonly string[] {
-  const tracked = gitMutation(repoRoot, ['diff', '--name-only', 'HEAD', '--'], {
+  const tracked = gitMutation(repoRoot, ['diff', '--name-only', '-z', 'HEAD', '--'], {
+    trimOutput: false,
     error: 'MUTATION_DIFF_FAILED',
   })
-    .split('\n')
+    .split('\0')
     .filter(Boolean);
-  const untracked = gitMutation(repoRoot, ['ls-files', '--others', '--exclude-standard', '--'], {
-    error: 'MUTATION_UNTRACKED_SCAN_FAILED',
-  })
-    .split('\n')
+  const untracked = gitMutation(
+    repoRoot,
+    ['ls-files', '--others', '--exclude-standard', '-z', '--'],
+    {
+      trimOutput: false,
+      error: 'MUTATION_UNTRACKED_SCAN_FAILED',
+    },
+  )
+    .split('\0')
     .filter(Boolean);
   return [...new Set([...tracked, ...untracked])].sort();
 }
@@ -356,10 +365,10 @@ export async function recordMutationCandidate(input: {
   });
   const actualDiff = gitMutation(
     repoRoot,
-    ['diff-tree', '--no-commit-id', '--name-only', '-r', candidateSha],
-    { error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
+    ['diff-tree', '--no-commit-id', '--name-only', '-z', '-r', candidateSha],
+    { trimOutput: false, error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
   )
-    .split('\n')
+    .split('\0')
     .filter(Boolean)
     .sort();
   if (JSON.stringify(actualDiff) !== JSON.stringify(taskPaths)) {
@@ -423,6 +432,15 @@ export function recordMutationEvidenceCommit(input: {
   if (!validators.translationWitness(input.witness)) {
     throw new Error('MUTATION_EVIDENCE_WITNESS_INVALID');
   }
+  if (input.witness['candidate_sha'] !== input.candidate_sha) {
+    throw new Error('MUTATION_EVIDENCE_CANDIDATE_MISMATCH');
+  }
+  if (
+    input.witness['recipe_name'] !== recipeName ||
+    input.witness['recipe_variant'] !== recipeVariant
+  ) {
+    throw new Error('MUTATION_EVIDENCE_RECIPE_MISMATCH');
+  }
   const witnessId = requireId(
     String(input.witness['id']),
     /^TW-[a-f0-9]{16}$/u,
@@ -471,7 +489,7 @@ export function recordMutationEvidenceCommit(input: {
   const standaloneWitness = JSON.parse(
     readFileSync(resolve(repoRoot, witnessPath), 'utf8'),
   ) as unknown;
-  if (JSON.stringify(standaloneWitness) !== JSON.stringify(input.witness)) {
+  if (canonicalSha256(standaloneWitness) !== canonicalSha256(input.witness)) {
     throw new Error('MUTATION_EVIDENCE_WITNESS_MISMATCH');
   }
   const recipeStatePaths = statePaths.filter((path) => path.startsWith(recipePrefix));
@@ -502,7 +520,7 @@ export function recordMutationEvidenceCommit(input: {
     throw new Error('MUTATION_EVIDENCE_RECIPE_RECORD_NOT_ELIGIBLE');
   }
   if (
-    JSON.stringify(recipeRecord.evidence?.translation_witness) !== JSON.stringify(input.witness)
+    canonicalSha256(recipeRecord.evidence?.translation_witness) !== canonicalSha256(input.witness)
   ) {
     throw new Error('MUTATION_EVIDENCE_WITNESS_MISMATCH');
   }
@@ -513,6 +531,10 @@ export function recordMutationEvidenceCommit(input: {
   const agentRunPath = agentRunPaths[0] as string;
   const agentRun = JSON.parse(readFileSync(resolve(repoRoot, agentRunPath), 'utf8')) as unknown;
   if (!validators.agentRun(agentRun)) throw new Error('MUTATION_EVIDENCE_AGENT_RUN_INVALID');
+  const { manifest_hash: manifestHash, ...agentManifest } = agentRun as Record<string, unknown>;
+  if (canonicalSha256(agentManifest) !== manifestHash) {
+    throw new Error('MUTATION_EVIDENCE_AGENT_RUN_INVALID');
+  }
   const typedAgentRun = agentRun as {
     readonly run_id: string;
     readonly caller: { readonly kind: string; readonly name: string };
@@ -533,10 +555,10 @@ export function recordMutationEvidenceCommit(input: {
   const nonState = changed.filter((path) => !statePaths.includes(path));
   const candidatePaths = gitMutation(
     repoRoot,
-    ['diff-tree', '--no-commit-id', '--name-only', '-r', input.candidate_sha],
-    { error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
+    ['diff-tree', '--no-commit-id', '--name-only', '-z', '-r', input.candidate_sha],
+    { trimOutput: false, error: 'MUTATION_CANDIDATE_DIFF_FAILED' },
   )
-    .split('\n')
+    .split('\0')
     .filter(Boolean)
     .sort();
   if (JSON.stringify(nonState) !== JSON.stringify(candidatePaths)) {
@@ -558,10 +580,10 @@ export function recordMutationEvidenceCommit(input: {
   });
   const evidenceDiff = gitMutation(
     repoRoot,
-    ['diff', '--name-only', input.candidate_sha, evidenceSha, '--'],
-    { error: 'MUTATION_EVIDENCE_DIFF_FAILED' },
+    ['diff', '--name-only', '-z', input.candidate_sha, evidenceSha, '--'],
+    { trimOutput: false, error: 'MUTATION_EVIDENCE_DIFF_FAILED' },
   )
-    .split('\n')
+    .split('\0')
     .filter(Boolean);
   if (
     evidenceDiff.some(
@@ -749,7 +771,9 @@ export function classifyTranslationPath(
     return { allowed: false, effect: 'fs:architect-spec' };
   }
   if (auditorObservation) {
-    return { allowed: role === 'auditor', effect: 'fs:auditor-observation' };
+    // Article 7 permits observation only through the active round's authorized
+    // runtime action. A legacy work/audit path supplies no such binding.
+    return { allowed: false, effect: 'fs:auditor-observation' };
   }
   if (testPath) return { allowed: role === 'inspector', effect: 'fs:tests' };
   if (ownerPath) return { allowed: role === 'owner', effect: 'fs:owner-spec' };
@@ -1065,12 +1089,15 @@ function isValidationLease(value: unknown): value is ValidationLease {
   const suffix = typeof lease.id === 'string' ? lease.id.slice(4) : '';
   return (
     lease.schemaVersion === '1.0.0' &&
-    /^TVL-[a-f0-9]{16}$/u.test(lease.id ?? '') &&
-    /^TASK-[0-9]{4,}$/u.test(lease.task_id ?? '') &&
+    typeof lease.id === 'string' &&
+    /^TVL-[a-f0-9]{16}$/u.test(lease.id) &&
+    typeof lease.task_id === 'string' &&
+    /^TASK-[0-9]{4,}$/u.test(lease.task_id) &&
     lease.worktree_id === `WT-TV-${suffix}` &&
     lease.worktree_path === `.devai/worktrees/WT-TV-${suffix}` &&
     lease.database === `devai_task_TV_${suffix}` &&
-    /^[a-f0-9]{40}$/u.test(lease.base_sha ?? '') &&
+    typeof lease.base_sha === 'string' &&
+    /^[a-f0-9]{40}$/u.test(lease.base_sha) &&
     typeof lease.created_at === 'string' &&
     !Number.isNaN(Date.parse(lease.created_at))
   );

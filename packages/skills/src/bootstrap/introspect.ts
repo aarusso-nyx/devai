@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
 import { minimatch } from 'minimatch';
 import { parse as parseYaml } from 'yaml';
 
@@ -104,7 +104,7 @@ const PROTECTED_FILENAME_PATTERNS = [
   /\.pem$/,
   /\.key$/,
   /credentials.*\.json$/i,
-  /secrets?\..*$/i,
+  /secrets?\..*$/is,
   /^id_rsa(\.pub)?$/,
 ];
 
@@ -180,7 +180,7 @@ function walk(
       continue;
     }
     if (stat.isDirectory()) {
-      const rel = relative(root, full).replace(/\\/g, '/');
+      const rel = relative(root, full).split(sep).join('/');
       if (['src', 'lib', 'bin'].includes(name) && depth <= 4) state.sourceRoots.add(rel);
       if (
         ['test', 'tests', 'testing', '__tests__'].includes(name) &&
@@ -199,7 +199,7 @@ function walk(
       walk(root, state, full, depth + 1);
     } else if (stat.isFile()) {
       if (name === 'package.json') {
-        state.manifestPaths.push(relative(root, full).replace(/\\/g, '/'));
+        state.manifestPaths.push(relative(root, full).split(sep).join('/'));
       }
       const ext = extname(name);
       const lang = LANG_EXT[ext];
@@ -210,7 +210,7 @@ function walk(
       if (/\.test\.(ts|js|tsx|jsx|mts|mjs|cjs)$/.test(name)) state.hasTestFiles = true;
       for (const re of PROTECTED_FILENAME_PATTERNS) {
         if (re.test(name)) {
-          state.protectedSurfaces.push(relative(root, full).replace(/\\/g, '/'));
+          state.protectedSurfaces.push(relative(root, full).split(sep).join('/'));
           break;
         }
       }
@@ -354,13 +354,18 @@ export function introspectRepo(opts: IntrospectOptions): RepoIntrospection {
     );
   }
   if (patterns.length > 0) {
-    const manifestRoots = manifests.map((path) => path.replace(/\/package\.json$/u, ''));
-    const matched = manifestRoots.filter((path) =>
-      patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
-    );
-    const outside = manifestRoots.filter(
-      (path) => path !== '' && !patterns.some((pattern) => minimatch(path, pattern, { dot: true })),
-    );
+    const manifestRoots = manifests
+      .filter((path) => path !== 'package.json')
+      .map((path) => path.replace(/\/package\.json$/u, ''));
+    const included = patterns.filter((pattern) => !pattern.startsWith('!'));
+    const excluded = patterns
+      .filter((pattern) => pattern.startsWith('!'))
+      .map((pattern) => pattern.slice(1));
+    const inWorkspace = (path: string): boolean =>
+      included.some((pattern) => minimatch(path, pattern, { dot: true, nonegate: true })) &&
+      !excluded.some((pattern) => minimatch(path, pattern, { dot: true, nonegate: true }));
+    const matched = manifestRoots.filter(inWorkspace);
+    const outside = manifestRoots.filter((path) => path !== '' && !inWorkspace(path));
     notes.push(
       `Parsed pnpm-workspace.yaml: ${String(patterns.length)} pattern(s), ${String(matched.length)} matching manifest(s)`,
     );

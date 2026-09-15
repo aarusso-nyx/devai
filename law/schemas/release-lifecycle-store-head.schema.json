@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/release-lifecycle-store-head.schema.json",
+  "title": "Release lifecycle v2 store head",
+  "description": "The sole atomically replaced pointer for a release campaign. It names one completed state record; attempts, failures, and unknown provider outcomes never advance it. Its fields are core-derived and are never client request input.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalization",
+    "repository",
+    "candidate",
+    "generation",
+    "state_id",
+    "state_digest_sha256",
+    "completion_record",
+    "head_digest_sha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2.0.0" },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel_id", "encoding", "json_form", "digest_algorithm", "projection_excludes"],
+      "properties": {
+        "kernel_id": { "const": "devai.kernel.release-lifecycle-store-head.v2" },
+        "encoding": { "const": "utf-8" },
+        "json_form": { "const": "rfc8785-jcs" },
+        "digest_algorithm": { "const": "sha256" },
+        "projection_excludes": { "const": ["head_digest_sha256"] }
+      }
+    },
+    "repository": { "$ref": "#/$defs/repository" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "state_id": { "type": "string", "pattern": "^RLS-[0-9a-f]{16}$" },
+    "state_digest_sha256": { "$ref": "#/$defs/sha256" },
+    "completion_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "record_id", "record_digest_sha256", "attempt_id"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "record_id": { "type": "string", "pattern": "^RLE-[0-9a-f]{16}$" },
+        "record_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "attempt_id": { "type": "string", "pattern": "^RLA-[0-9a-f]{16}$" }
+      }
+    },
+    "head_digest_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "$ref": "common-defs.schema.json#/$defs/sha256" },
+    "git_object": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commit", "tree"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$" },
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/git_object" },
+        "tree": { "$ref": "#/$defs/git_object" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "candidate": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "canonicalization": {
+        "digest_algorithm": "sha256",
+        "encoding": "utf-8",
+        "json_form": "rfc8785-jcs",
+        "kernel_id": "devai.kernel.release-lifecycle-store-head.v2",
+        "projection_excludes": ["head_digest_sha256"]
+      },
+      "completion_record": {
+        "attempt_id": "RLA-54717f66fc042dc0",
+        "record_digest_sha256": "df240c830309ffaba383f5955ec21cd74a66c58f78ab4aafdd430b52dce75caa",
+        "record_id": "RLE-df240c830309ffab",
+        "sequence": 1
+      },
+      "generation": 0,
+      "head_digest_sha256": "e5b994b086b16c61bf5f09adac9507bc32261c63033ab4db9304fcb0e0463aae",
+      "repository": {
+        "commit": "7ccd06ef24f63003ef0de9752b8aae6d6660c491",
+        "id": "aarusso-nyx/devai",
+        "tree": "4eb9e872474639e398d19fc2b00f9b5e7bd93989"
+      },
+      "schemaVersion": "2.0.0",
+      "state_digest_sha256": "3cfa3789bfbf925abb937213c0e8dfc44fb991e464da60ab1bdcbb71494b34f2",
+      "state_id": "RLS-3cfa3789bfbf925a"
+    }
+  ]
+}

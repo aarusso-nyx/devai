@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, aroundEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendRecord,
   computeManifestHash,
@@ -15,6 +15,31 @@ import {
 } from '../../src/evidence/chain.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 
+const concurrentWriter = vi.hoisted(() => ({
+  prefix: undefined as string | undefined,
+  beforeWrite: undefined as ((path: string) => void) | undefined,
+}));
+// Place a competing file at the final native write boundary, after authority checks.
+vi.mock('node:fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...original,
+    writeFileSync: (...args: Parameters<typeof original.writeFileSync>) => {
+      if (
+        typeof args[0] === 'string' &&
+        concurrentWriter.prefix !== undefined &&
+        args[0].startsWith(concurrentWriter.prefix) &&
+        concurrentWriter.beforeWrite !== undefined
+      ) {
+        const callback = concurrentWriter.beforeWrite;
+        concurrentWriter.beforeWrite = undefined;
+        callback(args[0]);
+      }
+      return original.writeFileSync(...args);
+    },
+  };
+});
+
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 
 let tempDir = '';
@@ -26,6 +51,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  concurrentWriter.prefix = undefined;
+  concurrentWriter.beforeWrite = undefined;
   rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -218,3 +245,176 @@ describe('verifyChain', () => {
   });
 });
 // Invariants: INV-DEVAI-001
+
+describe('chain ordinals and predecessor aliases', () => {
+  it('verifies genesis and non-genesis aliases without changing stored bytes', () => {
+    initChain(chainPath);
+    const first = appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+    const second = appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+    expect(first).toMatchObject({ sequence: 1, previous_hash: 'GENESIS', previous_run_hash: null });
+    expect(second).toMatchObject({
+      sequence: 2,
+      previous_hash: first.manifest_hash,
+      previous_run_hash: first.manifest_hash,
+    });
+    const before = readFileSync(chainPath);
+    expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+    expect(readFileSync(chainPath)).toEqual(before);
+  });
+  it('reports independent ordinal, predecessor alias and head defects together', () => {
+    initChain(chainPath);
+    appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+    const second = appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+    const chain = loadChain(chainPath);
+    const [first, next] = chain.records;
+    if (!first || !next) throw new Error('expected two records');
+    first.sequence = 0;
+    next.sequence = 3;
+    first.previous_hash = 'incorrect-genesis';
+    next.previous_hash = 'incorrect-predecessor';
+    chain.head = null;
+    writeFileSync(chainPath, JSON.stringify(chain));
+    const before = readFileSync(chainPath);
+    expect(verifyChain(chainPath)).toEqual({
+      valid: false,
+      errors: [
+        'record EV-0000000000000001: sequence mismatch (expected 1, got 0)',
+        'record EV-0000000000000001: previous_hash mismatch (expected GENESIS, got incorrect-genesis)',
+        'record EV-0000000000000002: sequence mismatch (expected 2, got 3)',
+        `record EV-0000000000000002: previous_hash mismatch (expected ${first.manifest_hash}, got incorrect-predecessor)`,
+        `chain head mismatch (expected ${second.manifest_hash}, got null)`,
+      ],
+    });
+    expect(readFileSync(chainPath)).toEqual(before);
+  });
+  it('preserves verification of legacy records without the optional aliases', () => {
+    initChain(chainPath);
+    appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+    appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+    const chain = loadChain(chainPath);
+    for (const record of chain.records) {
+      delete record.sequence;
+      delete record.previous_hash;
+    }
+    writeFileSync(chainPath, JSON.stringify(chain));
+    expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+  });
+  it.each([
+    ['null', 'is not a JSON object'],
+    ['42', 'is not a JSON object'],
+    ['"unavailable"', 'is not a JSON object'],
+    ['false', 'is not a JSON object'],
+    ['{"records":null,"head":null}', "has an invalid 'records' field"],
+    ['{"records":[],"head":42}', "has an invalid 'head' field"],
+  ])('refuses malformed chain shape %s without rewriting it', (bytes, diagnostic) => {
+    writeFileSync(chainPath, bytes);
+    expect(() => loadChain(chainPath)).toThrow(`evidence chain at ${chainPath} ${diagnostic}`);
+    expect(readFileSync(chainPath, 'utf8')).toBe(bytes);
+  });
+});
+
+it('matches the legacy chain digest vectors while retaining artifact multiplicity and caller order', () => {
+  // Independent SHA-256 vectors over the published JSON tuple (including GENESIS).
+  expect(computeManifestHash(baseHashInputs())).toBe(
+    'd554c623dbe47accd2ffe7c505f3086811580788678dfe6a4be72029a743609c',
+  );
+  const artifacts = Object.freeze(['b'.repeat(64), null, 'a'.repeat(64), 'b'.repeat(64)]);
+  const input = { ...baseHashInputs(), artifact_sha256s: artifacts };
+  expect(computeManifestHash(input)).toBe(
+    '08e275e2c5990ecc1a0074bc41aec04849dbf0b73333130be8fd1fddb61e1cd1',
+  );
+  expect(artifacts).toEqual(['b'.repeat(64), null, 'a'.repeat(64), 'b'.repeat(64)]);
+  expect(
+    computeManifestHash({ ...input, artifact_sha256s: [null, 'a'.repeat(64), 'b'.repeat(64)] }),
+  ).not.toBe(computeManifestHash(input));
+});
+
+it('retains explicit finding counts and omits an absent summary when appending', () => {
+  initChain(chainPath);
+  const findings = { info: 0, warning: 2, error: 1, critical: 0 };
+  const first = appendRecord(
+    chainPath,
+    genesisDraft('EV-0000000000000091', { findings_summary: findings }),
+  );
+  const second = appendRecord(chainPath, genesisDraft('EV-0000000000000092'));
+  expect(first.findings_summary).toEqual(findings);
+  expect(Object.hasOwn(second, 'findings_summary')).toBe(false);
+  const persisted = loadChain(chainPath);
+  expect(persisted.records[0]?.findings_summary).toEqual(findings);
+  expect(Object.hasOwn(persisted.records[1] ?? {}, 'findings_summary')).toBe(false);
+  expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+});
+
+describe('atomic chain temporary-file collision', () => {
+  it.each(['regular file', 'symlink'] as const)(
+    'preserves the old chain and a concurrent %s at the temporary write path',
+    (kind) => {
+      initChain(chainPath);
+      const originalChain = readFileSync(chainPath);
+      const retained = Buffer.from('concurrent bytes must not be overwritten\n');
+      const target = join(tempDir, 'concurrent-target.json');
+      writeFileSync(target, retained);
+      let occupiedPath: string | undefined;
+      concurrentWriter.prefix = `${chainPath}.tmp.`;
+      concurrentWriter.beforeWrite = (path) => {
+        occupiedPath = path;
+        if (kind === 'symlink') symlinkSync(target, path);
+        else writeFileSync(path, retained);
+      };
+      expect(() => appendRecord(chainPath, genesisDraft('EV-0000000000000001'))).toThrow();
+      if (occupiedPath === undefined) throw new Error('temporary write was not reached');
+      expect(readFileSync(occupiedPath)).toEqual(retained);
+      expect(readFileSync(target)).toEqual(retained);
+      expect(readFileSync(chainPath)).toEqual(originalChain);
+      expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+    },
+  );
+});
+
+it('reports exact broken predecessor links even when every record hash was recomputed', () => {
+  initChain(chainPath);
+  appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+  appendRecord(chainPath, genesisDraft('EV-0000000000000002'));
+  const chain = loadChain(chainPath);
+  const [first, second] = chain.records;
+  if (!first || !second) throw new Error('expected two records');
+  first.previous_run_hash = 'a'.repeat(64);
+  first.manifest_hash = computeManifestHash(extractManifestInputs(first));
+  second.previous_hash = first.manifest_hash;
+  second.previous_run_hash = null;
+  second.manifest_hash = computeManifestHash(extractManifestInputs(second));
+  chain.head = 'b'.repeat(64);
+  writeFileSync(chainPath, JSON.stringify(chain));
+  const before = readFileSync(chainPath);
+  expect(verifyChain(chainPath)).toEqual({
+    valid: false,
+    errors: [
+      `record ${first.id}: previous_run_hash mismatch (expected null, got ${'a'.repeat(64)})`,
+      `record ${second.id}: previous_run_hash mismatch (expected ${first.manifest_hash}, got null)`,
+      `chain head mismatch (expected ${second.manifest_hash}, got ${'b'.repeat(64)})`,
+    ],
+  });
+  expect(readFileSync(chainPath)).toEqual(before);
+});
+
+it('reports the null predecessor when an empty chain falsely declares a head', () => {
+  writeFileSync(chainPath, JSON.stringify({ head: 'orphan', records: [] }));
+  expect(verifyChain(chainPath)).toEqual({
+    valid: false,
+    errors: ['chain head mismatch (expected null, got orphan)'],
+  });
+});
+
+it('preserves an existing populated chain byte-for-byte when initialized again', () => {
+  const empty = initChain(chainPath);
+  expect(readFileSync(chainPath, 'utf8')).toBe(`${JSON.stringify(empty, null, 2)}\n`);
+  appendRecord(chainPath, genesisDraft('EV-0000000000000001'));
+  const populated = loadChain(chainPath);
+  expect(readFileSync(chainPath, 'utf8')).toBe(`${JSON.stringify(populated, null, 2)}\n`);
+  // An existing valid serialization is retained, even with different indentation.
+  writeFileSync(chainPath, `${JSON.stringify(populated, null, 4)}\n`);
+  const before = readFileSync(chainPath);
+  expect(initChain(chainPath)).toEqual(populated);
+  expect(readFileSync(chainPath)).toEqual(before);
+  expect(verifyChain(chainPath)).toEqual({ valid: true, errors: [] });
+});

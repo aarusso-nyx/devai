@@ -279,6 +279,44 @@ describe('mode: bound but inactive', () => {
     expect(check.ok).toBe(false);
     expect(check.errors?.join(' ')).toContain('TRACKING_WORKFLOW_DRIFT');
   });
+
+  it('reports every prohibited workflow trust-boundary pattern independently', async () => {
+    const root = adopter();
+    await bind(root);
+    const path = join(root, TRACKING_WORKFLOW_RELATIVE);
+    writeFileSync(
+      path,
+      [
+        'on: pull_request_target',
+        'jobs:',
+        '  project:',
+        '    steps:',
+        '      - uses: actions/checkout@main',
+        '      - run: echo "$PACKAGES_READ_TOKEN"',
+        '',
+      ].join('\n'),
+    );
+
+    const check = await trackingCheck(root);
+    expect(check.ok).toBe(false);
+    expect(check.errors).toEqual(
+      expect.arrayContaining([
+        'TRACKING_WORKFLOW_TRUST_BOUNDARY_INVALID: pull_request_target is prohibited',
+        'TRACKING_WORKFLOW_ACTION_MUTABLE: actions/checkout@main',
+        'TRACKING_WORKFLOW_CREDENTIAL_FALLBACK: only GITHUB_TOKEN is permitted',
+      ]),
+    );
+  });
+
+  it('fails closed when the bound tracking configuration is unreadable', async () => {
+    const root = adopter();
+    await bind(root);
+    writeFileSync(join(root, TRACKING_CONFIG_RELATIVE), '{broken-json\n');
+
+    const check = await trackingCheck(root);
+    expect(check.ok).toBe(false);
+    expect(check.errors?.join('\n')).toContain('tracking configuration is unreadable');
+  });
 });
 
 describe('mode: active and offline', () => {

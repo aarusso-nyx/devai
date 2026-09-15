@@ -32,7 +32,7 @@ export function loadDomains(path: string): DomainTaxonomy {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`domains: failed to parse ${path}: ${msg}`);
   }
-  if (parsed === null || typeof parsed !== 'object') {
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`domains: ${path} is not a JSON object`);
   }
   const file = parsed as DomainsFile;

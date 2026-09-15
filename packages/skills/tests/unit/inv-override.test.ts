@@ -118,6 +118,67 @@ describe('scanInvOverrides', () => {
     expect(result.findings[0]?.message).toContain('expires');
   });
 
+  it('refuses an invalid verification clock rather than accepting an expired override', () => {
+    writeFileSync(
+      join(dir, 'packages/cli/src/x.ts'),
+      [
+        '// inv-override: INV-DEVAI-005',
+        '// reason: expired migration exception',
+        '// ticket: ENG-1',
+        '// expires: 2020-Q1',
+        '// approver: @aarusso',
+      ].join('\n'),
+    );
+    expect(
+      scanInvOverrides({ repoRoot: dir, now: new Date('2026-09-07T00:00:00Z') }).findings[0]?.code,
+    ).toBe('expired');
+    expect(() => scanInvOverrides({ repoRoot: dir, now: new Date(Number.NaN) })).toThrow(
+      'INV_OVERRIDE_CLOCK_INVALID',
+    );
+  });
+
+  it.each(['2026-02-29', '2026-02-30', '2026-04-31', '2100-02-29'])(
+    'reports impossible calendar expiry %s as malformed',
+    (expires) => {
+      writeFileSync(
+        join(dir, 'packages/cli/src/x.ts'),
+        [
+          '// inv-override: INV-DEVAI-005',
+          '// reason: temporary migration exception',
+          '// ticket: ENG-1',
+          `// expires: ${expires}`,
+          '// approver: @aarusso',
+        ].join('\n'),
+      );
+      const result = scanInvOverrides({ repoRoot: dir, now: new Date('2025-01-01T00:00:00Z') });
+      expect(result.overrides).toEqual([]);
+      expect(result.findings).toEqual([
+        expect.objectContaining({ code: 'malformed', invariant_id: 'INV-DEVAI-005' }),
+      ]);
+    },
+  );
+
+  it.each(['2028-02-29', '2400-02-29', '2026-04-30', '2026-Q1', '2026-Q2', '2026-Q3', '2026-Q4'])(
+    'retains valid calendar and quarter expiry %s',
+    (expires) => {
+      writeFileSync(
+        join(dir, 'packages/cli/src/x.ts'),
+        [
+          '// inv-override: INV-DEVAI-005',
+          '// reason: temporary migration exception',
+          '// ticket: ENG-1',
+          `// expires: ${expires}`,
+          '// approver: @aarusso',
+        ].join('\n'),
+      );
+      const result = scanInvOverrides({ repoRoot: dir, now: new Date('2025-01-01T00:00:00Z') });
+      expect(result.findings).toEqual([]);
+      expect(result.overrides).toEqual([
+        expect.objectContaining({ invariant_id: 'INV-DEVAI-005', expires }),
+      ]);
+    },
+  );
+
   it('skips files without the inv-override: marker (fast path)', () => {
     writeFileSync(
       join(dir, 'packages/cli/src/x.ts'),

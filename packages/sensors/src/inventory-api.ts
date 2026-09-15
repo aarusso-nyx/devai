@@ -150,11 +150,10 @@ export interface InventoryApiResult {
 }
 
 function joinPath(base: string, sub: string): string {
-  const cleanBase = base.startsWith('/') ? base : '/' + base;
-  if (sub === '' || sub === '/') return cleanBase === '' ? '/' : cleanBase;
-  const cleanSub = sub.startsWith('/') ? sub : '/' + sub;
-  const merged = (cleanBase === '/' ? '' : cleanBase) + cleanSub;
-  return merged === '' ? '/' : merged;
+  const cleanBase = '/' + base.replace(/^\/+|\/+$/gu, '');
+  const cleanSub = sub.replace(/^\/+/u, '');
+  if (cleanSub === '') return cleanBase;
+  return (cleanBase === '/' ? '' : cleanBase) + '/' + cleanSub;
 }
 
 function getNodeLines(sf: ts.SourceFile, node: ts.Node): { startLine: number; endLine: number } {
@@ -235,7 +234,8 @@ function extractEndpointsFromFile(
 
       const guards: string[] = [];
       const useGuardsDec = findDecoratorByName(memberDecorators, 'UseGuards');
-      if (useGuardsDec !== undefined) guards.push(...decoratorArgIdentifiers(useGuardsDec));
+      if (useGuardsDec !== undefined)
+        guards.push(...new Set(decoratorArgIdentifiers(useGuardsDec)));
       const classUseGuardsDec = findDecoratorByName(classDecorators, 'UseGuards');
       if (classUseGuardsDec !== undefined) {
         for (const g of decoratorArgIdentifiers(classUseGuardsDec)) {
@@ -335,14 +335,12 @@ export function senseInventoryApi(opts: InventoryApiOptions): InventoryApiResult
         );
       }
     }
-    // Phase 20.E: dedupe by (method, path, controller.file) when
-    // multiple scan dirs overlap. The controller file path is the
-    // tiebreaker so two distinct apps under different reference-*
-    // roots both surface even if they expose the same route.
+    // Collapse repeat scans of the same handler, preserving distinct handlers
+    // that share a verb/path. Their separate guards and evidence must stay visible.
     const seen = new Set<string>();
     const deduped: ApiMapEndpoint[] = [];
     for (const e of endpoints) {
-      const key = `${e.method}|${e.path}|${e.controller.file}`;
+      const key = JSON.stringify([e.method, e.path, e.controller, e.evidence]);
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(e);

@@ -1,0 +1,403 @@
+# Process simplification rollout
+
+> Historical prerelease campaign procedure. Its mandatory mutation evidence,
+> execution and certification requirements are superseded for DEVAI 1.5.0 by
+> [mutation-free delivery](devai-1.5-mutation-free-delivery.md). Preserve historical
+> evidence; do not use the procedures below to prepare a current release.
+
+This is DEVAI's own repository process. It preserves the public CLI, constitution,
+adopter workflows and role boundaries. Source implementation does not create a private
+repository, install credentials, change GitHub settings, push, merge, tag or publish.
+
+## Entry and order
+
+Use a dedicated worktree. Do not resolve the root checkout's unrelated cherry-pick or
+import existing 1.5 worktrees. Run focused tests and affected static checks first.
+Demonstrate the required PR result before changing branch protection. A final clean
+candidate needs one explicit RC gate and a successful non-publishing rehearsal before
+any product publication decision. No version bump is inferred from this work.
+
+For DEVAI 1.5, the ordinary RC gate is necessary but insufficient. All ten packages
+must also satisfy their existing mutation score and survivor limits for the exact
+candidate. The current workflows require version-2 evidence transport, ordinary RC
+verification and independent installed verification of the complete mutation export.
+Rehearsal and promotion bind the candidate, policy, toolchain and approved control
+identities. These source changes do not establish live protected acceptance: approve
+and provision the immutable controls and protected configuration before activation,
+then demonstrate the complete path. Missing mutation evidence blocks release.
+
+A successful installed diagnostic fixture with mutation marked `not-applicable` proves
+only its applicable checks. It cannot discharge DEVAI's required mutation semantics.
+
+1. Review hook, PR and checker changes; verify `devai-release-gate` before settings change.
+2. Prepare a live protection snapshot with `node scripts/process/prepare-settings.mjs <new-output-directory>`.
+   The output includes current/proposed JSON and an application checklist. Re-read the
+   current settings immediately before the separately authorized update; preserve unrelated settings.
+3. Approve one exact `DEVAI_PROCESS_CONTROL_COMMIT` as a repository variable. All protected
+   jobs check out and verify that revision before running process helpers. It is a control
+   rollout, not a per-product-candidate setting. Missing or malformed pins fail closed.
+4. Prepare explicit `DEVAI_LEDGER_TRANSPORT=bundle` selection and schema `2.0.0` for
+   the v1.5 protected workflows. Legacy transport is not accepted by those workflows.
+   Retain existing payload secrets until the bundle path succeeds; keep expected policy
+   digest, approved verifier provenance and tag signer trust outside the bundle.
+5. Separately authorize creation of private `aarusso-nyx/devai-evidence`, with release
+   immutability enabled. Evidence releases have tag/name `evidence-<sha256>` and exactly
+   one asset `evidence.tgz`; retain them indefinitely. Do not enable automatic cleanup.
+6. Use an operator credential with write access only for explicit evidence upload. Install
+   a separate fine-grained token with Contents: read for that private repository as
+   `DEVAI_EVIDENCE_READ_TOKEN` in DEVAI's protected ledger environment. No token is stored in source.
+7. Upload and verify a candidate bundle, approve `DEVAI_LEDGER_BUNDLE_SHA256`, then select
+   `DEVAI_LEDGER_TRANSPORT=bundle`. Demonstrate protected verification before separately
+   authorizing retirement of obsolete envelope/results/artifacts/policy/toolchain/environment secrets.
+   Keep `DEVAI_LEDGER_TRUST_STORE_B64`, revocations and the other trust anchors.
+8. Rehearse, create the separately authorized signed tag, then explicitly promote retained artifacts.
+
+Absent resources or credentials are deployment prerequisites, never reasons to switch
+transport automatically or execute candidate helpers with protected inputs.
+
+## Private mutation transport
+
+DEVAI 1.5 requires bundle schema `2.0.0`, selected explicitly with
+`--schema-version 2.0.0` for pack, verify and operator upload, and
+`BUNDLE_SCHEMA_VERSION=2.0.0` for protected materialization. A selected v2 bundle
+cannot fall back to the six-member v1 payload or legacy payload secrets.
+
+In addition to ordinary RC evidence, v2 contains `mutation-input-plan.json` and
+`mutation-export.tgz`. The latter carries the existing installed export bytes in
+this closed layout: `exported-state.json`, `policy-closure.json`, `task-policies.json`,
+and `objects/<sha256>` for the exported artifact objects. Build the transport input
+by copying those exact retained files; do not regenerate or resign them. Each object
+must match its filename digest. Pass this directory as `--mutation-export` and the
+pre-RC input plan as `--mutation-input-plan` when packing.
+
+The transport validates the approved outer digest, complete member manifest, safe
+archives and nested object hashes before writing files. Each archive is limited to
+1 GiB both compressed and fully expanded, including tar metadata and padding, and
+100,000 members including directories. Expansion is bounded before tar parsing;
+private temporary storage is used above an 8 MiB memory buffer. It does not authenticate
+export signatures or establish mutation acceptance. The installed offline verifier
+must check the exported state and policy closure with external trust and approved
+controls, followed by complete mutation semantics and rehearsal bindings. Workflow
+activation of this v2 path requires the protected approvals and live acceptance
+specified below. The current workflows invoke both verification paths. Never include
+control packages, signing keys or trust/revocation files in this layout.
+
+`verify-installed-export.mjs` provides the repository-local installed verification adapter.
+Its caller first provisions and independently approves the host package, then supplies that
+host, the approved DAG control, external signer trust, exact metadata hashes and policy
+expectations. Use a fresh process and empty private output directory for each invocation;
+the installed host permits its command adapters to be installed only once. Supply the
+separately provisioned offline authority root as `expected.verificationRoot`. An empty
+output directory cannot substitute for that root, and the adapter never initializes or
+weakens authority policy automatically.
+
+The adapter snapshots digest-addressed objects, invokes the existing installed
+`release offline-verify` action, retains the command result privately, and refuses
+unconsumed extra objects. It installs no signing or publication adapter and does not
+run candidate commands. A passing product-fixture receipt with mutation marked
+not applicable remains product acceptance only; release readiness still requires
+independent verification of all ten required mutation packages.
+
+For `aarusso-nyx/devai`, also supply `expected.mutationInputPlanBytes` and the
+independently protected `expected.mutationPlanSha256`. The adapter rejects a missing
+plan before invoking offline verification. After authenticated verification, it requires
+all nine ordered checks to pass, mandatory mutation evidence, the complete 22-member
+closure, and an identical output contract in every exported package. Each contract must
+bind the exact ten-package plan, candidate commit/tree, policy, test inputs and unchanged
+60/50 limits. These additional comparisons do not authenticate an arbitrary supplied
+receipt; they run only on the installed verifier's successful result and snapshotted
+export objects. Wiring this adapter into protected workflows remains a rollout gate.
+
+## Local prerequisites and certification
+
+Keep the configuration, package, maps, signing material, prerequisite receipt and export
+parent outside the candidate repository. The package must be the authenticated installed
+public package, including its runtime dependencies. Its file tree is pinned by the reviewed
+`packageTreeSha256`: SHA-256 of JSON.stringify of sorted `[relativePath, sha256(fileBytes)]`
+pairs for `package.json` and every regular file under `dist`. Paths use `/` separators;
+symlinks and special files are rejected. This digest is established from authenticated
+package bytes, not accepted from the candidate.
+
+The mutation control identity is required before certification. Its external approval manifest
+pins the archive, complete unpacked member population, source commit/tree, and dependencies.
+Identity inspection executes no verifier modules and does not constitute control approval or
+mutation acceptance. Certification rechecks these bindings against the prerequisite result;
+a missing control fails, and unavailable dependent checks are reported as blocked.
+The mutation input plan is bound before execution, without requiring generated receipts or
+result hashes. It must select the exact candidate and all ten packages with score minimum
+60 and survivor maximum 50. Post-run contracts must preserve these input bindings; the
+approved verifier must still check the complete artifact population and semantics.
+
+The repository-local `verify-mutation-semantics.mjs` adapter checks a complete 22-member
+mutation artifact directory through the explicitly selected approved v2.1 or v2.2 kernel.
+It compares the output contract with the protected input plan and checks canonical bytes,
+content safety, receipt provenance, exact population, score and survivor limits. v2.2 also
+requires its independent final-unit, output-contract and execution-binding controls; it
+never falls back to v2.1. This semantic result does not authenticate custody or authorize
+publication. Signed export/transport and rehearsal integration remain required separately.
+
+Configuration fields:
+
+| Field                                                    | Meaning                                                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `repo`                                                   | Exact clean candidate checkout                                                              |
+| `packageRoot`, `packageVersion`, `packageTreeSha256`     | Approved installed package identity                                                         |
+| `verifierProvenanceSha256`                               | Approved verifier provenance-file digest                                                    |
+| `mutationVerifierRoot`, `mutationVerifierApprovalSha256` | External immutable mutation control installation and separately approved manifest digest    |
+| `mutationInputPlan`, `mutationInputPlanSha256`           | External installed-host mutation input plan and independently established exact byte digest |
+| `policyDigest`                                           | Expected reconstructed RC task-policy digest                                                |
+| `toolchain`, `environment`                               | Protected map filenames; absent declared environment values are null                        |
+| `privateKey`, `publicKey`, `signerId`, `trustStore`      | External Ed25519 signer and current trust/revocation configuration                          |
+| `outputDir`                                              | New export directory whose existing parent is accessible and external                       |
+| `receipt`                                                | Exact unsigned receipt filename, only for the separate evidence phase                       |
+
+```text
+node scripts/process/release-prerequisites.mjs prerequisites <config.json> <new-prerequisites.json>
+node scripts/process/release-prerequisites.mjs certify <config.json> <prerequisites.json>
+```
+
+The first command aggregates independent setup failures without running RC or signing.
+The second rechecks exact bindings, invokes the installed RC command with only declared
+execution environment keys, requires its exact receipt, checks bindings again, and then
+runs installed exporter preflight and export. Signing paths and ambient credentials are
+not inherited by candidate task processes. The candidate's authority policy must already
+be materialized through the supported approved operation.
+
+For previously completed RC, use `evidence` instead of `certify`, with `receipt` configured
+before generating the prerequisites file. The installed exporter independently rejects
+foreign, stale, incomplete or unsafe evidence. A failed check never manufactures a PASS.
+
+```text
+python3 scripts/process/evidence_transport.py pack --export <export-directory> --toolchain <toolchain.json> --environment <environment.json> --output <new-directory>/evidence.tgz
+python3 scripts/process/evidence_transport.py verify --archive <directory>/evidence.tgz --sha256 <digest>
+```
+
+The upload command is a separately authorized external effect:
+
+```text
+python3 scripts/process/evidence_transport.py upload --archive <directory>/evidence.tgz --sha256 <digest>
+```
+
+It verifies private repository and immutability settings, creates a draft, uploads and
+byte-compares its complete asset, then publishes the immutable evidence release. Existing
+identical published evidence is a no-op. An interrupted draft or unknown result requires
+inspection; it is not overwritten, deleted or mistaken for absence.
+
+## Rehearsal and promotion interfaces
+
+Rehearsal dispatch: `publish=false`, exact `candidate_commit` on main, and intended
+`release_tag=v<packageVersion>`. The tag need not exist. The workflow verifies RC evidence,
+builds once, double-packs for determinism, creates SBOM/site/manifest and exercises installed
+adoption on Linux. Only a successful complete graph emits `devai-rehearsal-<attempt>`.
+
+Installed smoke acceptance consumes the canonical staged tarball and its SHA-256; it does
+not pack a second smoke candidate. To verify an existing artifact locally, run
+`node packages/cli/scripts/installed-tarball-smoke.mjs --tarball <absolute-path> --sha256 <digest>`.
+The digest is checked before installation and again before reporting success.
+
+The completion binds source commit/tree, intended tag, run/attempt, workflow and process
+control commits, source artifact ID/digest, manifest/files and ledger verification identities.
+Assets are named `devai-release-assets-<attempt>` and both artifacts last 30 days.
+
+Create the signed annotated tag after rehearsal under separate Owner authorization. It must
+point to the rehearsed commit. Tag pushes verify identity and evidence only; they do not build
+or publish. Existing tags remain immutable.
+
+Publication dispatch: `publish=true`, `release_tag`, `rehearsal_run_id`, `rehearsal_attempt`.
+No latest-run lookup exists. Current protected verification, successful source run/attempt,
+workflow/control revisions, exact tag/candidate and archive/file digests must all agree.
+Any changed bound trust/evidence input requires another rehearsal. The exact retained assets
+are promoted; no build, pack, SBOM generation, site generation or rehearsal smoke is repeated.
+Registry download/hash comparison and live Pages checks remain external-effect verification.
+
+Release and registry recovery first read the full relevant remote collection successfully.
+Failed authorization, network reads and ambiguous outcomes block writes. Matching effects
+are no-ops; confirmed missing effects may proceed under authorization. Mismatches are never
+overwritten. A partial draft Release is inspected completely before uploading only missing
+assets, and every asset is checked again before publication.
+
+Pages currently validates the site population before upload and verifies every public
+member's bytes after deployment. Apart from the empty root `.nojekyll` control file,
+dot-prefixed members are refused because the pinned Pages uploader excludes them.
+The workflow invokes `publish-pages.mjs` for interrupted-effect reconciliation and
+retains deployment identifiers even when publication fails. Its authenticated journal,
+reviewed migration audit and exact-byte checks distinguish matching, confirmed missing
+and unknown effects. Matching effects are no-ops; only confirmed missing effects may
+resume. A failed workflow alone never authorizes redeployment. Live GitHub acceptance,
+the single-writer boundary and protected migration-audit approval remain rollout gates;
+the Pages recovery section below specifies those requirements.
+
+## Adopter migration bundles and limited self-adoption
+
+`node scripts/process/generate-adopter-migration.mjs <config.json>` prepares local files only.
+Its configuration names `adopterRoot`, `packageRoot`, `packageTarball`, `providerTarball`
+and a new `outputDir`. Registry authentication is used only for metadata requests. The tool
+checks tarball SHA-1/SRI, compares installed package members, reads the authenticated provider
+policy/provenance and invokes the installed generator against a disposable target.
+
+Review `migration.json`, `workflow-before.yml`, `workflow-after.yml` and `REVIEW.md`.
+The Inspector verifies full provider identity and file/binary populations against the signed
+release; the Owner separately approves protected changes. Apply only if the current workflow
+still matches the recorded before digest. No adopter or protected setting is written by generation.
+Provider upgrades remain explicit; no automatic N-1 or every-release rotation is introduced.
+
+Self-adoption includes early diagnosis, retained artifacts and interrupted-effect reconciliation.
+The existing 1.5 custom packer, protected certification provider and injected artifact sink remain
+deferred. This does not alter their product contracts or declare those implementations ready.
+
+## Mutation activation compatibility
+
+Before an expensive mutation campaign, run the real runner regression:
+
+```sh
+pnpm exec vitest run --config tests/config/local.config.ts tests/integration/mutation-static-activation.integration.test.ts
+```
+
+With pinned Stryker 9.6.1, an explicit `testFiles` population produces an absolute
+file filter even for static mutants. The upstream planner labels that filter for
+runtime activation, which occurs after module initialization in the Vitest runner.
+A module-level mutation can consequently be reported as surviving without ever
+being active when the module loads.
+
+The installed DEVAI wrapper activates full-file filters before module evaluation.
+It retains the exact filter; relative per-test IDs keep their runtime activation.
+The regression executes actual static and runtime mutants with an explicit test
+population and verifies both the results and the complete test-file census.
+It is a runner compatibility check, not candidate certification.
+
+The wrapper also checks Vitest's recorded suite failures. A baseline with a failed
+suite is refused even if another file passes. During mutation, a recorded suite
+failure counts as a killed mutant when the upstream runner would otherwise report
+survival; this includes import failures before any individual test is collected.
+An empty test count alone is not treated as proof that a mutant was killed.
+
+A wrapper change changes the protected mutation program identity. Rebuild and
+rebind the installed control before a new campaign; do not reuse a previous
+package result or aggregate verdict across that identity change. Retain earlier
+reports as diagnostics, including failures. Do not remove static mutants or the
+explicit test population to work around an activation failure.
+
+## Pages interrupted-publication controller
+
+`scripts/process/pages-publication.mjs` provides repository-local orchestration for
+an authenticated, durable publication journal. Its identity binds the repository,
+tag, candidate commit/tree, rehearsal run/attempt, manifest and site archive hashes,
+and approved control commit. Each intent additionally records the uploaded artifact
+ID; a successful submission records its exact Pages deployment ID.
+
+The controller persists and reads back intent before submitting. A lost submission
+response leaves an unresolved intent and refuses automatic resubmission. A retry
+with a recorded deployment ID only observes that deployment, then verifies live
+bytes before recording completion. Matching live bytes are a no-op. Previously
+verified effects that disappear are not silently replaced. Authentication failures,
+incomplete histories, conflicting identities and unaudited migration histories fail
+closed. No build, repack, site-generation or automatic cancellation capability is
+part of this interface.
+
+The release workflow invokes the approved `publish-pages.mjs` control after exact
+rehearsal promotion and release verification. `github-pages-journal.mjs` records
+intent in GitHub deployment metadata using task `devai:pages-publication` and
+environment `devai-pages-publication`. It disables automatic merges and automatic
+inactivation. The Pages job alone has `deployments: write`, alongside its existing
+Pages/OIDC permissions. The fixed job concurrency group serializes all versions;
+other Pages writers must be disabled or use that same group. An unresolved journal
+entry from another version blocks a new publication.
+
+Before activation, the Owner reviews the earlier publication history and installs
+`DEVAI_PAGES_MIGRATION_AUDIT_JSON` and its exact SHA-256 in
+`DEVAI_PAGES_MIGRATION_AUDIT_SHA256`, in the protected `github-pages` environment.
+The audit has schema version `1.0.0`, repository `aarusso-nyx/devai`, the exact `tag`
+and approved `controlCommit`, `legacyEffects: "confirmed-absent-for-tag"`,
+`singleWriterGroup: "devai-pages-publication"`, and an ISO timestamp `reviewedAt`.
+This is a reviewed external-state assertion, not a value the candidate may generate
+or approve. Reconcile unknown earlier effects before making that assertion. A new
+tag or control identity needs a matching reviewed audit. No automatic fallback to
+legacy publication is available.
+
+Authenticated complete journal reads, together with that audit and single-writer
+boundary, establish whether a new intent is absent. A failed workflow, HTTP 404 or
+unavailable live site alone cannot establish absence. Submission IDs are retained
+locally before subsequent API operations; journal transitions are read back. Both
+the Pages upload and the always-retained reconciliation records expire after 30
+days. Deployment journal entries have no automatic deletion policy. Keep their IDs
+for operator reconciliation; do not delete unresolved entries to enable a retry.
+
+Focused tests run the actual publication CLI with all subprocess/build commands
+forbidden, exercising successful publication, matching-byte no-ops and lost POST
+responses across separate invocations. The external API is a fixture in those tests;
+live GitHub publication acceptance and protected-field installation remain pending.
+Exact-artifact promotion still requires Owner authorization.
+
+## Acceptance record
+
+Record candidate/control SHA, focused/full gate outcomes, operator intervention count,
+protected-field updates, task executed/reused counts and durations, rehearsal run/attempt,
+artifact/manifest digests and publication `buildInvocations: 0`. Do not equate fixture tests with
+live protected verification. External rollout and publication remain pending until separately
+authorized and actually demonstrated.
+
+### Installed export verification command
+
+Run `node scripts/process/installed-export-command.mjs /absolute/private-controls.json`
+from approved repository process controls. The configuration must be a private regular
+file (mode 0600); it is operator input, never a member of the evidence bundle.
+
+The command accepts `seed`, `provision`, and `verification` control objects. `seed`
+contains an external `root`, the untrusted `candidateRoot`, and independently approved
+SHA-256 `members` pins for exactly `package.json`, `host/provision-package.mjs`, and
+`index/release-host-bootstrap.js`. The package file is exactly `{"type":"module"}`
+followed by a newline. Copy the other two files from the independently reviewed host
+control artifact. Do not compute approval pins from downloaded candidate evidence.
+No other seed members or linked files are accepted.
+
+`provision` is the installed `provisionReleaseHostPackage` control object: approved
+archive path and expected package identity, private external destination parent,
+pinned tar executable, and resource limits. `verification` supplies the existing
+`verifyInstalledExport` request, approved DAG control, private transport/work paths,
+and independently bound expected identities, policy, and trust. The command supplies
+the provisioned host itself. For DEVAI, `mutationInputPlanPath` identifies the plan
+whose digest and exact ten-package inputs the verifier checks against protected
+expectations. Ordinary RC evidence remains a separate required check.
+
+Success prints only the receipt ID, digest, and verdict. Failure prints a generic
+message; preserve private work for diagnosis. This command does not authorize its
+control pins, install protected settings, or establish release readiness by itself.
+The current protected workflows wire this mandatory export check alongside ordinary
+RC verification. Activation still requires approved host/DAG identities, protected
+configuration and successful live acceptance.
+
+### Protected installed-control rollout
+
+The v1.5 repository workflows require evidence bundle schema `2.0.0`; selecting
+legacy transport or a bundle without the mutation export fails. Both ordinary RC
+verification and the installed offline verification must succeed.
+
+Provision the separately reviewed immutable control carrier in the private
+`aarusso-nyx/devai-evidence` repository as `controls.tgz` on release
+`control-<archive-sha256>`. This carrier is separate from `evidence.tgz` and contains
+only `seed/`, `dag/`, `verification-root/`, and `host.tgz`. Preserve DAG member modes
+from its approved manifest. The carrier must contain no signing keys or current
+signer trust/revocation configuration. Assemble and verify its complete draft before
+separately authorized publication with immutability enabled; never replace existing
+content. No automatic upload is implemented by the verification workflow.
+
+Set protected variable `DEVAI_INSTALLED_CONTROL_SHA256` to the independently approved
+carrier digest. Set secret `DEVAI_INSTALLED_OFFLINE_CONFIG_B64` to the base64 private
+JSON configuration described above, including approved seed pins, full host identity,
+DAG approval digest, current signer trust, policy expectations, and exact candidate
+repository/commit/tree. This configuration remains outside both carriers. The
+read-only evidence credential downloads the exact digest-selected control release;
+there is no candidate URL or transport fallback.
+
+`installed_control_transport.py` verifies the approved carrier digest before reading
+archive members, checks archive safety, and materializes private files. It replaces
+only the known runtime path fields with the workflow's actual control, candidate,
+evidence, and fresh work directories. It refuses configuration for another candidate.
+It never supplies approval digests from carrier contents. Missing approvals, missing
+assets, authentication failure, and changed trust block the protected job.
+
+The release manifest and rehearsal completion bind `installed_control_sha256` and
+`installed_offline_receipt_sha256`. Promotion compares them with fresh protected
+verification, so changed control or verification identities require another rehearsal.
+These workflow changes must not be activated until the control carrier and exact
+protected configuration have been separately approved and provisioned.

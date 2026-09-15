@@ -6,17 +6,17 @@
 
 The source workspace behind the single publishable `@aarusso-nyx/devai` package is built on a fixed set of runtime and tooling choices:
 
-| Layer              | Choice                                                                      |
-| ------------------ | --------------------------------------------------------------------------- |
-| Language           | TypeScript (strict mode, ESM modules throughout)                            |
-| Workspace manager  | pnpm workspaces (content-addressable store, lightweight orchestration)      |
-| Build              | `tsc -b` project references; Rolldown assembles one public CLI binary       |
-| Test runner        | Vitest (one root config + filename-suffix-driven test categories)           |
-| CLI framework      | `cac` (small, declarative, no plugin architecture)                          |
-| Schema contracts   | Governed JSON Schema roster plus explicit TypeScript runtime interfaces     |
-| Runtime validation | `ajv` + `ajv-formats` (Draft 2020-12 schemas, lazily compiled)              |
-| Dev platform       | Node.js 24 on macOS or Linux; Windows is not a supported RC target          |
-| CI platform        | Linux (GitHub Actions)                                                      |
+| Layer              | Choice                                                                  |
+| ------------------ | ----------------------------------------------------------------------- |
+| Language           | TypeScript (strict mode, ESM modules throughout)                        |
+| Workspace manager  | pnpm workspaces (content-addressable store, lightweight orchestration)  |
+| Build              | `tsc -b` project references; Rolldown assembles one public CLI binary   |
+| Test runner        | Vitest (one root config + filename-suffix-driven test categories)       |
+| CLI framework      | `cac` (small, declarative, no plugin architecture)                      |
+| Schema contracts   | Governed JSON Schema roster plus explicit TypeScript runtime interfaces |
+| Runtime validation | `ajv` + `ajv-formats` (Draft 2020-12 schemas, lazily compiled)          |
+| Dev platform       | Node.js 24 on macOS or Linux; Windows is not a supported RC target      |
+| CI platform        | Linux (GitHub Actions)                                                  |
 
 Ten internal TypeScript workspace packages are development boundaries. Rolldown bundles their
 runtime closure into the single publishable `@aarusso-nyx/devai` package; adopters do not install

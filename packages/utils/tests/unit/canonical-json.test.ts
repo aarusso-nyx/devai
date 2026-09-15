@@ -47,6 +47,5 @@ describe('canonicalSha256', () => {
     const b = { y: { q: 2, p: 1 }, x: 1 };
     expect(canonicalSha256(a)).toBe(canonicalSha256(b));
   });
-
 });
 // Invariants: INV-DEVAI-001

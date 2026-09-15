@@ -1,3 +1,4 @@
+import { foldWorkflowLines } from './folded-lines.js';
 import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
@@ -88,24 +89,34 @@ function isListItem(line: string): boolean {
 }
 
 function trimComment(line: string): string {
-  // Naive: drop everything after a `#` not inside quotes. Good enough for our extractor.
-  const i = line.indexOf('#');
-  if (i === -1) return line;
-  // Don't strip when inside a quoted string (best-effort): look for unbalanced quotes before #.
-  const before = line.slice(0, i);
-  const dq = (before.match(/"/g) ?? []).length;
-  const sq = (before.match(/'/g) ?? []).length;
-  if (dq % 2 === 1 || sq % 2 === 1) return line;
-  return before.trimEnd();
+  // Drop everything after a `#` that is not inside a quoted scalar. Counting
+  // quotes before the first `#` kept `"gen/#out/**" # note` whole, comment and
+  // all; scanning the line (as harness-invariant-alignment.ts does for the same
+  // construct) closes the quote and strips only the real comment.
+  let single = false;
+  let double = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (double && char === '\\') {
+      // Consume escape pairs: an even run leaves the next quote unescaped.
+      i += 1;
+      continue;
+    }
+    if (char === "'" && !double) single = !single;
+    else if (char === '"' && !single) double = !double;
+    else if (char === '#' && !single && !double && (i === 0 || /\s/.test(line[i - 1] ?? '')))
+      return line.slice(0, i).trimEnd();
+  }
+  return line;
 }
 
-const USES_RE = /^\s*-?\s*uses:\s*([^\s@'"]+)(?:@([^\s'"]+))?/;
+const USES_RE = /^\s*-?\s*uses:\s*(['"]?)([^\s@'"]+)(?:@([^\s'"]+))?\1\s*$/;
 
 function parseUses(line: string, lineNo: number): ActionUse | null {
   const m = line.match(USES_RE);
   if (m === null) return null;
-  const target = m[1] ?? '';
-  const ref = m[2] ?? '';
+  const target = m[2] ?? '';
+  const ref = m[3] ?? '';
   if (target.startsWith('./')) {
     // Local action / reusable workflow — owner '' indicates local.
     return { owner: '', repo: target, ref, line: lineNo };
@@ -155,7 +166,10 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
   let matrixKeyIndent = -1;
   // State for run: capture (multi-line scalar).
   let inRun = false;
+  let foldedRun = false;
   let runIndent = -1;
+  /** Indent of the first non-empty body line; -1 until the body starts. */
+  let runContentIndent = -1;
   let runBuffer: string[] = [];
 
   function flushMatrixKey(): void {
@@ -167,11 +181,16 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
   }
 
   function flushRun(): void {
-    if (runBuffer.length > 0) {
-      runScripts.push(runBuffer.join('\n'));
+    const script = (foldedRun ? foldWorkflowLines(runBuffer) : runBuffer.join('\n')).replace(
+      /\n+$/,
+      '',
+    );
+    if (script !== '') {
+      runScripts.push(script);
       runStepCount += 1;
     }
     inRun = false;
+    runContentIndent = -1;
     runBuffer = [];
   }
 
@@ -180,7 +199,10 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
     const ind = indentOf(line);
     const trimmed = line.trim();
     if (trimmed === '' || trimmed.startsWith('#')) {
-      if (inRun && ind <= runIndent) flushRun();
+      // A blank line inside a block scalar is body text, not the end of it: a
+      // literal/folded block ends at the first non-empty line indented less
+      // than its body. Flushing here dropped every command after the blank.
+      if (inRun) runBuffer.push('');
       continue;
     }
 
@@ -209,7 +231,8 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
 
     // Run-script capture (multi-line scalar via | or > or single-line).
     if (inRun) {
-      if (ind > runIndent) {
+      if (runContentIndent === -1 && ind > runIndent) runContentIndent = ind;
+      if (runContentIndent !== -1 && ind >= runContentIndent) {
         runBuffer.push(line.slice(runIndent + 2)); // best-effort dedent
         continue;
       } else {
@@ -252,7 +275,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       jobs.push(currentJob);
       continue;
     }
-    // Nested-job recognition for `name:` inside the current job is the same regex; guard via stepCount.
+    // Subsequent jobs are recognized at jobBaseIndent, independent of step count.
 
     // steps: marker.
     if (currentJob !== null && /^steps\s*:/.test(trimmed)) {
@@ -309,8 +332,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       inJobsBlock &&
       currentJob !== null &&
       ind === jobBaseIndent &&
-      /^[A-Za-z0-9_\-.]+\s*:\s*$/.test(trimmed) &&
-      currentJob.stepCount > 0
+      /^[A-Za-z0-9_\-.]+\s*:\s*$/.test(trimmed)
     ) {
       // Switching to a new job at the same indent.
       const name = trimmed.replace(/:\s*$/, '');
@@ -352,6 +374,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       const inline = trimmed.replace(/^-?\s*run\s*:\s*/, '');
       if (inline === '|' || inline === '>' || inline === '|-' || inline === '>-' || inline === '') {
         inRun = true;
+        foldedRun = inline.startsWith('>');
         runIndent = ind;
         runBuffer = [];
       } else {

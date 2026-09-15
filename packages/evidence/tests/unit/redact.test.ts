@@ -76,6 +76,35 @@ describe('redactRecord', () => {
     expect(expected).toBe(result.target.manifest_hash);
   });
 
+  it('redacts repository and artifact paths without changing structural evidence', () => {
+    initChain(chainPath);
+    const first = appendRecord(
+      chainPath,
+      draft('EV-0000000000000001', {
+        artifacts: [{ path: '/secret/report.json', sha256: 'a'.repeat(64), kind: 'report' }],
+        context: {
+          ...baseContext,
+          git: { head_sha: 'b'.repeat(40), dirty_files: ['tracked.txt'] },
+        },
+      }),
+    );
+
+    const result = redactRecord({
+      chainPath,
+      targetId: first.id,
+      policy: { patterns: [], fields: ['repo_root', 'path'] },
+    });
+
+    expect(result.target).toEqual({
+      ...first,
+      artifacts: [{ ...first.artifacts[0], path: '[REDACTED]' }],
+      context: { ...first.context, repo_root: '[REDACTED]' },
+    });
+    expect(loadChain(chainPath).records).toEqual([result.target]);
+    expect(readFileSync(chainPath, 'utf8')).not.toContain('/secret/');
+    expect(verifyChain(chainPath).valid).toBe(true);
+  });
+
   it('re-links downstream when a hashed field changes and chain stays valid', () => {
     initChain(chainPath);
     appendRecord(chainPath, draft('EV-0000000000000001'));
@@ -114,6 +143,27 @@ describe('redactRecord', () => {
     expect(r3.manifest_hash).not.toBe(third.manifest_hash);
     expect(chain.head).toBe(r3.manifest_hash);
 
+    expect(verifyChain(chainPath).valid).toBe(true);
+  });
+
+  it('re-links records without introducing an absent legacy hash alias', () => {
+    initChain(chainPath);
+    appendRecord(chainPath, draft('EV-0000000000000001'));
+    appendRecord(chainPath, draft('EV-0000000000000002'));
+    const original = loadChain(chainPath);
+    original.records = original.records.map(({ previous_hash: _legacy, ...record }) => record);
+    writeFileSync(chainPath, JSON.stringify(original));
+    expect(verifyChain(chainPath).valid).toBe(true);
+    const result = redactRecord({
+      chainPath,
+      targetId: 'EV-0000000000000001',
+      policy: { patterns: [], fields: ['actor'] },
+    });
+    expect(result.relinkedCount).toBe(1);
+    const persisted = loadChain(chainPath);
+    expect(persisted.records).toHaveLength(2);
+    expect(persisted.records.every((record) => !Object.hasOwn(record, 'previous_hash'))).toBe(true);
+    expect(persisted.records[1]?.previous_run_hash).toBe(result.target.manifest_hash);
     expect(verifyChain(chainPath).valid).toBe(true);
   });
 
@@ -167,7 +217,8 @@ describe('redactRecord', () => {
         targetId: 'EV-0000000000000001',
         policy: { patterns: [/sk-[a-z0-9]+/g], fields: [] },
       });
-    }).toThrow(/does not validate/);
+    }).toThrow('redactRecord: redacted target EV-0000000000000001 does not validate');
+    expect(readFileSync(chainPath, 'utf8')).toBe(JSON.stringify(chain, null, 2));
   });
 
   it('throws if a re-linked downstream record would violate the schema', () => {
@@ -197,7 +248,8 @@ describe('redactRecord', () => {
         targetId: 'EV-0000000000000001',
         policy: { patterns: [], fields: ['actor'] },
       });
-    }).toThrow(/does not validate/);
+    }).toThrow('redactRecord: re-linked downstream EV-0000000000000002 does not validate');
+    expect(readFileSync(chainPath, 'utf8')).toBe(JSON.stringify(chain, null, 2));
   });
 
   it('multiple redactions leave the chain valid', () => {

@@ -760,9 +760,12 @@ describe('R19 resolver total-order and selector matrix', () => {
   });
 });
 
-async function requiredAllowFixture(targets: readonly unknown[] = [fsTarget]) {
+async function requiredAllowFixture(
+  targets: readonly unknown[] = [fsTarget],
+  issuerOverrides: Record<string, unknown> = {},
+) {
   const api = await runtimeApi();
-  const issuer = createIssuer(api);
+  const issuer = createIssuer(api, issuerOverrides);
   const declaration = expectSuccess<{ context_receipt: unknown }>(
     api.resolveAuthorityDeclaration(
       {
@@ -867,6 +870,174 @@ async function requiredDenyFixture() {
 }
 
 describe('R19 issuer complete-set, batch, and receipt matrix', () => {
+  function expectedRecordedDecision(subject: unknown, denied: boolean, batch: boolean) {
+    const bound = subject as {
+      plan: { plan_id: string; envelope: { policy: unknown } };
+      batch?: { batch_id: string };
+    };
+    const unsigned = {
+      decision_id: 'authority-id-1',
+      subject_digest_sha256: canonicalSha256(subject),
+      authority_context_digest_sha256: canonicalSha256({
+        kind: 'human-session',
+        principal: {
+          kind: 'human',
+          role: 'engineer',
+          declaration: { source: 'cli-flag', declared_at: NOW },
+        },
+        action_id: 'test mutate',
+        origin: { kind: 'direct-cli', invocation_id: 'invocation-1' },
+      }),
+      policy_binding_digest_sha256: canonicalSha256(bound.plan.envelope.policy),
+      plan_id: batch ? 'plan-bounded' : 'plan-exact',
+      ...(batch ? { batch_id: 'batch-1' } : {}),
+      enforcement_mode: 'binding',
+      evaluation: denied ? 'deny' : 'allow',
+      disposition: denied ? 'refuse' : 'proceed',
+      reason_code: denied ? 'POLICY_DENY' : 'POLICY_ALLOW',
+      reasons: [`matched ${denied ? 'self-package-source-deny' : engineerRule.rule_id}`],
+      policy: bound.plan.envelope.policy,
+      obligations: [],
+      readiness: { eligible: !denied, reason: 'Independent acceptance remains required.' },
+    };
+    return { ...unsigned, decision_digest_sha256: canonicalSha256(unsigned) };
+  }
+
+  it.each([false, true])(
+    'records the full authenticated allow decision (batch=%s)',
+    async (batch) => {
+      const fixture = await requiredAllowFixture();
+      try {
+        const subject = batch ? boundedSubject() : exactSubject();
+        const expected = expectedRecordedDecision(subject, false, batch);
+        const issued = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject)) as {
+          receipt: unknown;
+        };
+        expect(issued).toEqual({
+          issued: true,
+          outcome: 'allow',
+          decision: expected,
+          receipt: expect.any(Object),
+        });
+        expect(Object.getPrototypeOf(issued.receipt)).toBeNull();
+        expect(Object.isFrozen(issued.receipt)).toBe(true);
+        expect(Object.keys(issued.receipt as object)).toEqual([]);
+        expect(
+          fixture.issuer.consume({
+            receipt: issued.receipt,
+            subject,
+            invocation_id: 'invocation-1',
+            adapter_id: 'fs-authority-boundary',
+          }),
+        ).toEqual({
+          ok: true,
+          value: {
+            decision_id: expected.decision_id,
+            decision_digest_sha256: expected.decision_digest_sha256,
+            subject_digest_sha256: expected.subject_digest_sha256,
+          },
+        });
+      } finally {
+        fixture.issuer.dispose();
+      }
+    },
+  );
+
+  it('records a complete denial without granting a receipt or readiness', async () => {
+    const fixture = await requiredDenyFixture();
+    try {
+      expect(
+        fixture.issuer.issueDenial({
+          subject: fixture.subject,
+          context_receipt: fixture.contextReceipt,
+          invocation_id: 'invocation-1',
+          resolution: fixture.denial,
+        }),
+      ).toEqual({
+        issued: true,
+        outcome: 'deny',
+        decision: expectedRecordedDecision(fixture.subject, true, false),
+      });
+    } finally {
+      fixture.issuer.dispose();
+    }
+  });
+
+  it.each([
+    ['exact', 'atomicity', 'each-target'],
+    ['exact', 'targets', []],
+    ['exact', 'targets', [fsTarget, fsTarget]],
+    ['exact', 'targets', [fsTarget, { ...secondFsTarget, kind: 'unknown' }]],
+    ['bounded', 'batch_id', ''],
+    ['bounded', 'batch_id', '  '],
+    ['bounded', 'ordinal', -1],
+    ['bounded', 'ordinal', 0.5],
+    ['bounded', 'ordinal', Number.MAX_SAFE_INTEGER + 1],
+    ['bounded', 'atomicity', 'each-target'],
+    ['bounded', 'targets', []],
+    ['bounded', 'targets', [fsTarget, { ...secondFsTarget, kind: 'unknown' }]],
+    [
+      'bounded',
+      'targets',
+      [fsTarget, { ...secondFsTarget, canonical_relative_path: 'docs/file.ts' }],
+    ],
+  ] as const)(
+    'refuses invalid %s %s without consuming its context',
+    async (strategy, field, value) => {
+      const fixture = await requiredAllowFixture();
+      try {
+        const subject = (strategy === 'exact' ? exactSubject() : boundedSubject()) as {
+          plan: Record<string, unknown>;
+          batch: Record<string, unknown>;
+        };
+        const target = strategy === 'exact' ? subject.plan : subject.batch;
+        target[field] = value;
+        const refused = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject));
+        expectFailure(refused, 'refused', 'AUTHORITY_DECISION_SUBJECT_NOT_EXACT');
+        expect(refused).not.toHaveProperty('receipt');
+        expect(
+          fixture.issuer.issueAllow(requiredIssueInput(fixture, exactSubject())),
+        ).toMatchObject({
+          issued: true,
+          outcome: 'allow',
+        });
+      } finally {
+        fixture.issuer.dispose();
+      }
+    },
+  );
+
+  it('accepts ordinal zero and an exactly full batch selected by one of several selectors', async () => {
+    const fixture = await requiredAllowFixture([fsTarget, secondFsTarget]);
+    try {
+      const subject = boundedSubject([fsTarget, secondFsTarget]) as {
+        plan: { selectors: unknown[] };
+        batch: { ordinal: number };
+      };
+      subject.batch.ordinal = 0;
+      subject.plan.selectors.unshift({
+        kind: 'fs',
+        repository_id: 'other-repository',
+        canonical_relative_path_glob: 'elsewhere/**',
+        operations: ['update'],
+      });
+      const issued = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject)) as {
+        receipt: unknown;
+      };
+      expect(issued).toMatchObject({ issued: true, outcome: 'allow' });
+      expectSuccess(
+        fixture.issuer.consume({
+          receipt: issued.receipt,
+          subject,
+          invocation_id: 'invocation-1',
+          adapter_id: 'fs-authority-boundary',
+        }),
+      );
+    } finally {
+      fixture.issuer.dispose();
+    }
+  });
+
   it.each([
     [
       'exact plan with batch',
@@ -1098,6 +1269,68 @@ describe('R19 issuer complete-set, batch, and receipt matrix', () => {
     );
   });
 
+  it.each([
+    [1, 0, true],
+    [1, 2, false],
+    [30_000, 29_999, true],
+    [30_000, 30_001, false],
+  ] as const)(
+    'enforces receipt TTL %s at elapsed %s milliseconds',
+    async (ttl, elapsed, allowed) => {
+      let clock = NOW;
+      const fixture = await requiredAllowFixture([fsTarget], {
+        now: () => clock,
+        receipt_ttl_ms: ttl,
+      });
+      try {
+        const subject = exactSubject();
+        const issued = fixture.issuer.issueAllow(requiredIssueInput(fixture, subject)) as {
+          receipt: unknown;
+        };
+        expect(issued).toMatchObject({ issued: true, outcome: 'allow' });
+        clock = new Date(Date.parse(NOW) + elapsed).toISOString();
+        const input = {
+          receipt: issued.receipt,
+          subject,
+          invocation_id: 'invocation-1',
+          adapter_id: 'fs-authority-boundary',
+          now: NOW,
+        };
+        const result = fixture.issuer.consume(input);
+        if (allowed) expectSuccess(result);
+        else expectFailure(result, 'refused', 'AUTHORITY_DECISION_RECEIPT_EXPIRED');
+        clock = NOW;
+        expectFailure(
+          fixture.issuer.consume(input),
+          'refused',
+          'AUTHORITY_DECISION_RECEIPT_REPLAYED',
+        );
+      } finally {
+        fixture.issuer.dispose();
+      }
+    },
+  );
+
+  it.each([
+    ['invocation_id', ''],
+    ['invocation_id', '  '],
+    ['invocation_id', null],
+    ['boundary_adapter_id', ''],
+    ['boundary_adapter_id', '  '],
+    ['boundary_adapter_id', null],
+  ] as const)('refuses malformed %s %s before closing its valid context', async (field, value) => {
+    const fixture = await requiredAllowFixture();
+    try {
+      const input = requiredIssueInput(fixture, exactSubject());
+      const result = fixture.issuer.issueAllow({ ...input, [field]: value });
+      expectFailure(result, 'refused', 'AUTHORITY_DECISION_INPUT_INVALID');
+      expect(result).not.toHaveProperty('receipt');
+      expect(fixture.issuer.issueAllow(input)).toMatchObject({ issued: true, outcome: 'allow' });
+    } finally {
+      fixture.issuer.dispose();
+    }
+  });
+
   it('expires from the issuer-owned clock rather than caller input', async () => {
     let clock = NOW;
     const api = await runtimeApi();
@@ -1146,6 +1379,17 @@ describe('R19 issuer complete-set, batch, and receipt matrix', () => {
       }),
       'refused',
       'AUTHORITY_DECISION_RECEIPT_EXPIRED',
+    );
+    clock = NOW;
+    expectFailure(
+      issuer.consume({
+        receipt: issued.receipt,
+        subject,
+        invocation_id: 'invocation-1',
+        adapter_id: 'fs-authority-boundary',
+      }),
+      'refused',
+      'AUTHORITY_DECISION_RECEIPT_REPLAYED',
     );
   });
 
@@ -1225,6 +1469,18 @@ describe('R19 issuer complete-set, batch, and receipt matrix', () => {
       }),
       'refused',
       'AUTHORITY_DECISION_RECEIPT_BINDING_MISMATCH',
+    );
+    const legitimate = {
+      receipt: fixture.receipt,
+      subject: fixture.subject,
+      invocation_id: 'invocation-1',
+      adapter_id: 'fs-authority-boundary',
+    };
+    expectSuccess(fixture.issuer.consume(legitimate));
+    expectFailure(
+      fixture.issuer.consume(legitimate),
+      'refused',
+      'AUTHORITY_DECISION_RECEIPT_REPLAYED',
     );
   });
 });

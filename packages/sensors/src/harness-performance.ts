@@ -95,7 +95,7 @@ export function senseHarnessPerformance(opts: HarnessPerformanceOptions): Sensor
       sensorName: 'harness-performance',
       sensorKind: 'harness_performance',
       command: ['gh', ...args],
-      status: 'review',
+      status: total === 0 ? 'unknown' : 'review',
       deterministic: false,
       tier: 'L2',
       ...(opts.now !== undefined && { timestamp: opts.now }),

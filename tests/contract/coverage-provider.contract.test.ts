@@ -1,7 +1,7 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const FILE = '/fixture/source.ts';
 
@@ -281,6 +281,20 @@ describe('subprocess coverage measurement integrity', () => {
 
   it('configures an auditable statement-level coverage artifact', async () => {
     const previous = process.env.DEVAI_DB_TESTS;
+    const previousCoverage = process.env.DEVAI_V8_SUBPROCESS_COVERAGE_DIR;
+    // Configuration inspection must not depend on a previous RC run's scratch output.
+    // Give the real loader explicit policy and reachable-source fixture inputs.
+    const policyBytes = readFileSync('law/policy/thresholds.json');
+    const fixture = mkdtempSync(join(tmpdir(), 'devai-coverage-config-'));
+    temporaryDirectories.push(fixture);
+    mkdirSync(join(fixture, 'law/policy'), { recursive: true });
+    mkdirSync(join(fixture, 'scratch/coverage'), { recursive: true });
+    writeFileSync(join(fixture, 'law/policy/thresholds.json'), policyBytes);
+    writeFileSync(
+      join(fixture, 'scratch/coverage/rc-reachable-sources.json'),
+      JSON.stringify({ schemaVersion: '1.0.0', sources: ['packages/cli/src/runtime-core.ts'] }),
+    );
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue(fixture);
     process.env.DEVAI_DB_TESTS = '1';
     try {
       const config = (await import('../config/rc.coverage.config.js')).default as {
@@ -291,6 +305,10 @@ describe('subprocess coverage measurement integrity', () => {
         'tests/regression/xref-resolver-performance.regression.test.ts',
       );
     } finally {
+      cwd.mockRestore();
+      if (previousCoverage === undefined)
+        Reflect.deleteProperty(process.env, 'DEVAI_V8_SUBPROCESS_COVERAGE_DIR');
+      else process.env.DEVAI_V8_SUBPROCESS_COVERAGE_DIR = previousCoverage;
       if (previous === undefined) Reflect.deleteProperty(process.env, 'DEVAI_DB_TESTS');
       else process.env.DEVAI_DB_TESTS = previous;
     }

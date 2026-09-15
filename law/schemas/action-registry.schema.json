@@ -183,6 +183,235 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": { "action_id": { "const": "release preflight" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "harness-write" },
+                "authority": { "const": "release_controller" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release preflight" },
+                    "effect": { "const": "harness-write" },
+                    "capabilities": {
+                      "const": [
+                        "fs:f5-state",
+                        "fs:proofs",
+                        "proc:git",
+                        "protected-certification-provider-v3:execute"
+                      ]
+                    },
+                    "subject": {
+                      "const": {
+                        "kind": "derived-machine",
+                        "actor": "harness",
+                        "transition": "harness-write",
+                        "initiator": {
+                          "allowed_roles": ["inspector"],
+                          "preserve_in_context": true
+                        }
+                      }
+                    },
+                    "consent": {
+                      "const": { "write": true, "allow_publish": false, "experimental": false }
+                    },
+                    "planner": {
+                      "const": {
+                        "kind": "bounded-batches",
+                        "planner_id": "release-preflight-bounded-plan",
+                        "target_kinds": ["fs", "protected-certification-provider"],
+                        "bounds": {
+                          "max_batches": 2048,
+                          "max_targets_per_batch": 64,
+                          "max_total_targets": 8192
+                        },
+                        "recovery": "preserve-and-report"
+                      }
+                    },
+                    "boundary": {
+                      "const": {
+                        "kind": "mutation-adapters",
+                        "adapter_ids": [
+                          "fs-authority-boundary",
+                          "protected-certification-provider-v3"
+                        ],
+                        "final_reverification": true
+                      }
+                    },
+                    "readiness": {
+                      "const": { "requires_binding": true, "independent_acceptance_required": true }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "action_id": { "const": "release certify" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "harness-write" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release certify" },
+                    "effect": { "const": "harness-write" },
+                    "capabilities": {
+                      "const": [
+                        "fs:f5-state",
+                        "fs:proofs",
+                        "proc:git",
+                        "protected-certification-provider-v3:execute",
+                        "certification-evidence-sink:write"
+                      ]
+                    },
+                    "planner": {
+                      "properties": {
+                        "target_kinds": {
+                          "const": [
+                            "fs",
+                            "protected-certification-provider",
+                            "certification-evidence-sink"
+                          ]
+                        }
+                      }
+                    },
+                    "boundary": {
+                      "properties": {
+                        "kind": { "const": "mutation-adapters" },
+                        "adapter_ids": {
+                          "const": [
+                            "fs-authority-boundary",
+                            "protected-certification-provider-v3",
+                            "trusted-certification-evidence-sink-v1"
+                          ]
+                        },
+                        "final_reverification": { "const": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "action_id": { "const": "release prepare" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "local-write" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release prepare" },
+                    "effect": { "const": "local-write" },
+                    "capabilities": {
+                      "const": ["fs:f5-state", "fs:proofs", "proc:git", "artifact-sink:write"]
+                    },
+                    "planner": {
+                      "const": {
+                        "kind": "bounded-batches",
+                        "planner_id": "release-prepare-bounded-plan",
+                        "target_kinds": ["fs", "artifact-sink"],
+                        "bounds": {
+                          "max_batches": 256,
+                          "max_targets_per_batch": 64,
+                          "max_total_targets": 8192
+                        },
+                        "recovery": "preserve-and-report"
+                      }
+                    },
+                    "boundary": {
+                      "properties": {
+                        "kind": { "const": "mutation-adapters" },
+                        "adapter_ids": {
+                          "const": ["fs-authority-boundary", "trusted-artifact-sink-v3"]
+                        },
+                        "final_reverification": { "const": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "action_id": { "const": "release export" } },
+              "required": ["action_id"]
+            },
+            "then": {
+              "properties": {
+                "effect": { "const": "local-write" },
+                "authority_contract": {
+                  "properties": {
+                    "action_id": { "const": "release export" },
+                    "effect": { "const": "local-write" },
+                    "capabilities": {
+                      "const": [
+                        "fs:f5-state",
+                        "fs:proofs",
+                        "fs:workspace",
+                        "proc:git",
+                        "artifact-sink:write",
+                        "protected-export-signer-v1:sign"
+                      ]
+                    },
+                    "planner": {
+                      "const": {
+                        "kind": "bounded-batches",
+                        "planner_id": "release-export-bounded-plan",
+                        "target_kinds": ["fs", "artifact-sink", "protected-export-signer"],
+                        "bounds": {
+                          "max_batches": 128,
+                          "max_targets_per_batch": 64,
+                          "max_total_targets": 8192
+                        },
+                        "recovery": "preserve-and-report"
+                      }
+                    },
+                    "boundary": {
+                      "properties": {
+                        "kind": { "const": "mutation-adapters" },
+                        "adapter_ids": {
+                          "const": [
+                            "fs-authority-boundary",
+                            "trusted-export-artifact-sink-v1",
+                            "protected-export-signer-v1"
+                          ]
+                        },
+                        "final_reverification": { "const": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "authority_contract": {
+                  "properties": {
+                    "capabilities": {
+                      "contains": { "const": "protected-export-signer-v1:sign" }
+                    }
+                  },
+                  "required": ["capabilities"]
+                }
+              },
+              "required": ["authority_contract"]
+            },
+            "then": {
+              "properties": { "action_id": { "const": "release export" } }
+            }
           }
         ]
       }
@@ -352,8 +581,15 @@
                   "db:read",
                   "db:write",
                   "db:unclassified",
-                  "host-cache:write"
+                  "host-cache:write",
+                  "protected-certification-provider-v3:execute",
+                  "certification-evidence-sink:write",
+                  "protected-export-signer-v1:sign"
                 ]
+              },
+              {
+                "type": "string",
+                "pattern": "^artifact-sink:[a-z][a-z0-9-]*$"
               },
               {
                 "type": "string",
@@ -539,7 +775,16 @@
                   "minItems": 1,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["fs", "git-ref", "db", "remote"]
+                    "enum": [
+                      "fs",
+                      "git-ref",
+                      "db",
+                      "remote",
+                      "artifact-sink",
+                      "protected-certification-provider",
+                      "certification-evidence-sink",
+                      "protected-export-signer"
+                    ]
                   }
                 },
                 "atomicity": {
@@ -564,7 +809,16 @@
                   "minItems": 1,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["fs", "git-ref", "db", "remote"]
+                    "enum": [
+                      "fs",
+                      "git-ref",
+                      "db",
+                      "remote",
+                      "artifact-sink",
+                      "protected-certification-provider",
+                      "certification-evidence-sink",
+                      "protected-export-signer"
+                    ]
                   }
                 },
                 "bounds": {

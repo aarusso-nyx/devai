@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -85,6 +85,60 @@ describe('evaluateGlobGuard', () => {
     expect(absent.ok).toBe(false);
   });
 
+  it('does not count a directory as a literal file match', () => {
+    mkdirSync(join(dir, 'named.json'));
+    expect(evaluateGlobGuard(dir, { id: 'DIRECTORY', pattern: 'named.json' })).toMatchObject({
+      ok: false,
+      match_count: 0,
+      sample_matches: [],
+    });
+  });
+
+  it.each(['node_modules/*.json', '.git/*.json', 'nested/node_modules/*.json'])(
+    'does not bypass excluded directories through the fixed glob prefix %s',
+    (pattern) => {
+      touch(pattern.replace('*', 'hidden'));
+      expect(evaluateGlobGuard(dir, { id: 'EXCLUDED_BASE', pattern })).toMatchObject({
+        ok: false,
+        match_count: 0,
+        sample_matches: [],
+      });
+    },
+  );
+
+  it('does not follow a symlink in the fixed glob prefix', () => {
+    touch('actual/file.json');
+    symlinkSync(join(dir, 'actual'), join(dir, 'alias'));
+    expect(evaluateGlobGuard(dir, { id: 'LINK_BASE', pattern: 'alias/*.json' })).toMatchObject({
+      ok: false,
+      match_count: 0,
+      sample_matches: [],
+    });
+  });
+
+  it('does not scan a parent outside the selected repository root', () => {
+    touch('outside.json');
+    mkdirSync(join(dir, 'repo'));
+    expect(
+      evaluateGlobGuard(join(dir, 'repo'), { id: 'ESCAPE', pattern: '../*.json' }),
+    ).toMatchObject({ ok: false, match_count: 0 });
+  });
+
+  it('includes dotfiles, caps samples at five, and counts the complete population', () => {
+    for (const name of ['.hidden', 'a', 'b', 'c', 'd', 'e', 'f']) touch(`data/${name}.json`);
+    const result = evaluateGlobGuard(dir, {
+      id: 'FULL_COUNT',
+      pattern: 'data/*.json',
+      min_matches: 7,
+    });
+    expect(result).toMatchObject({ ok: true, match_count: 7, min_matches: 7 });
+    expect(result.sample_matches).toHaveLength(5);
+    expect(result.sample_matches).toContain('data/.hidden.json');
+    expect(
+      evaluateGlobGuard(dir, { id: 'ZERO_ALLOWED', pattern: 'missing/*.json', min_matches: 0 }),
+    ).toMatchObject({ ok: true, match_count: 0, min_matches: 0 });
+  });
+
   it('defaults min_matches to 1 when omitted', () => {
     const result = evaluateGlobGuard(dir, { id: 'DEFAULT', pattern: 'nothing/here/*.json' });
     expect(result.min_matches).toBe(1);
@@ -144,3 +198,37 @@ describe('evaluateGlobGuards', () => {
   });
 });
 // Invariants: INV-DEVAI-014
+
+describe('glob fixed-prefix and discovery boundaries', () => {
+  it('matches top-level wildcard files without requiring a fixed directory', () => {
+    touch('root.json');
+    touch('nested/child.json');
+    expect(evaluateGlobGuard(dir, { id: 'ROOT', pattern: '*.json' }).sample_matches).toEqual([
+      'root.json',
+    ]);
+  });
+
+  it('excludes symlinked children encountered during a wildcard walk', () => {
+    touch('real/data.json');
+    symlinkSync(join(dir, 'real'), join(dir, 'alias'));
+    symlinkSync(join(dir, 'real/data.json'), join(dir, 'link.json'));
+    expect(evaluateGlobGuard(dir, { id: 'LINKS', pattern: '**/*.json' }).sample_matches).toEqual([
+      'real/data.json',
+    ]);
+  });
+
+  it('does not treat a regular-file prefix as a directory to scan', () => {
+    touch('file.json');
+    expect(
+      evaluateGlobGuard(dir, { id: 'FILE_PREFIX', pattern: 'file.json/*.json' }).match_count,
+    ).toBe(0);
+  });
+
+  it('refuses absolute and backslash-containing literal paths even when the file exists', () => {
+    touch('file.json');
+    touch('odd\\name.json');
+    for (const pattern of [join(dir, 'file.json'), 'odd\\name.json']) {
+      expect(evaluateGlobGuard(dir, { id: 'PATH', pattern }).match_count).toBe(0);
+    }
+  });
+});

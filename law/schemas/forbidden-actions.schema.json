@@ -89,7 +89,8 @@
           "id": "FORBID-FORCE-PUSH",
           "action": "Force-push to any branch",
           "rationale": "Overwrites history",
-          "severity": "critical"
+          "severity": "critical",
+          "detect_patterns": ["\\bgit\\s+push\\s+--force\\b", "\\bgit\\s+push\\s+\\+"]
         }
       ]
     }

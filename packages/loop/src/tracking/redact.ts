@@ -42,7 +42,7 @@ const SECRET_PATTERNS: readonly RegExp[] = [
   /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/gu,
   /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/gu,
   /\b[Bb]earer\s+[A-Za-z0-9._~+/-]{16,}=*/gu,
-  /\b[A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL)S?\s*[=:]\s*\S+/gu,
+  /\b(?:[A-Z][A-Z0-9_]*)?(?:TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL)S?\s*[=:]\s*\S+/gu,
   /\b[0-9a-f]{40,}\b/gu,
 ];
 

@@ -22,6 +22,8 @@ const TEMPLATE_PATHS = {
   'api.guard.policy': 'templates/api/guards/policy.guard.ts.tpl',
   'api.decorator.policy': 'templates/api/decorators/policy.decorator.ts.tpl',
   'ui.module': 'templates/ui/__kebabModule__.module.ts.tpl',
+  'ui.guard.authentication': 'templates/ui/guards/cognito.guard.ts.tpl',
+  'ui.guard.policy': 'templates/ui/policy.guard.ts.tpl',
   'ui.list-component': 'templates/ui/__kebabEntity__-list.component.ts.tpl',
   'ui.detail-component': 'templates/ui/__kebabEntity__-detail.component.ts.tpl',
   'ui.service': 'templates/ui/__kebabEntity__.service.ts.tpl',
@@ -82,6 +84,48 @@ function fieldTokens(entity: Blueprint['database']['entities'][number]): Record<
   };
 }
 
+function apiModuleTokens(blueprint: Blueprint): Record<string, string> {
+  const entities = blueprint.database.entities.map((entity) => entity.name.trim());
+  return {
+    __API_ENTITY_IMPORTS__: entities
+      .flatMap((name) => [
+        `import { ${name}Service } from './services/${kebab(name)}.service';`,
+        `import { ${name}Controller } from './controllers/${kebab(name)}.controller';`,
+      ])
+      .join('\n'),
+    __API_CONTROLLERS__: entities.map((name) => `${name}Controller`).join(', '),
+    __API_SERVICES__: entities.map((name) => `${name}Service`).join(', '),
+  };
+}
+
+function uiModuleTokens(blueprint: Blueprint): Record<string, string> {
+  const entities = blueprint.database.entities.map((entity) => entity.name.trim());
+  const components = entities.flatMap((name) => [`${name}ListComponent`, `${name}DetailComponent`]);
+  const routes = entities.map((name, index) => {
+    const resource = kebab(name);
+    const base = index === 0 ? '' : resource;
+    const guard = `${blueprint.module.name}PolicyGuard`;
+    return [
+      `      { path: '${base}', component: ${name}ListComponent, canActivate: [${guard}], data: { resource: '${resource}', action: 'read' } },`,
+      `      { path: '${base ? `${base}/` : ''}:id', component: ${name}DetailComponent, canActivate: [${guard}], data: { resource: '${resource}', action: 'read' } },`,
+    ];
+  });
+  // Named entity routes must precede the first entity's legacy :id route.
+  const orderedRoutes = [...routes.slice(1), ...routes.slice(0, 1)];
+  return {
+    __UI_ENTITY_IMPORTS__: entities
+      .flatMap((name) => [
+        `import { ${name}ListComponent } from './${kebab(name)}-list.component';`,
+        `import { ${name}DetailComponent } from './${kebab(name)}-detail.component';`,
+        `import { ${name}Service } from './${kebab(name)}.service';`,
+      ])
+      .join('\n'),
+    __UI_COMPONENTS__: components.join(', '),
+    __UI_SERVICES__: entities.map((name) => `${name}Service`).join(', '),
+    __UI_ENTITY_ROUTES__: orderedRoutes.flat().join('\n'),
+  };
+}
+
 function entityTasks(
   blueprint: Blueprint,
   moduleSlug: string,
@@ -90,7 +134,9 @@ function entityTasks(
     name: string,
   ) => readonly ScaffolderTargetTask[],
 ): ScaffolderTargetTask[] {
-  return blueprint.database.entities.flatMap((entity) => make(entity, kebab(entity.name)));
+  return blueprint.database.entities.flatMap((entity) =>
+    make(entity, kebab(entity.name)).map((task) => ({ ...task, entity_name: entity.name })),
+  );
 }
 
 const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
@@ -118,6 +164,7 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
       {
         template_id: 'api.module',
         target_path: `domain/${slug}/api/src/${slug}/${slug}.module.ts`,
+        extra_tokens: apiModuleTokens(blueprint),
       },
       {
         template_id: 'api.guard.policy',
@@ -159,11 +206,34 @@ const SPECS: Readonly<Record<string, ScaffolderSpec>> = Object.freeze({
   },
   'scaffold.ui': {
     operationId: 'scaffold.ui',
-    templateIds: ['ui.module', 'ui.list-component', 'ui.detail-component', 'ui.service'],
+    templateIds: [
+      'ui.module',
+      'ui.guard.authentication',
+      'ui.guard.policy',
+      'ui.list-component',
+      'ui.detail-component',
+      'ui.service',
+    ],
     deriveTasks: (blueprint, _pack, slug) => [
       {
         template_id: 'ui.module',
         target_path: `domain/${slug}/web/src/app/${slug}/${slug}.module.ts`,
+        extra_tokens: {
+          ...uiModuleTokens(blueprint),
+          __NsModulePascal__:
+            blueprint.module.namespace
+              .split(/[-_\s]+/u)
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join('') + blueprint.module.name,
+        },
+      },
+      {
+        template_id: 'ui.guard.authentication',
+        target_path: `domain/${slug}/web/src/app/${slug}/guards/cognito.guard.ts`,
+      },
+      {
+        template_id: 'ui.guard.policy',
+        target_path: `domain/${slug}/web/src/app/${slug}/policy.guard.ts`,
       },
       ...entityTasks(blueprint, slug, (_entity, name) => [
         {

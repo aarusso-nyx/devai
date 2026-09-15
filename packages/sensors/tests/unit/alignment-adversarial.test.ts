@@ -11,7 +11,7 @@ const NOW = '2026-07-17T02:00:00.000Z';
 let repo = '';
 
 function prepare(workflowRun: string, lifecycle: 'supported' | 'experimental' = 'supported'): void {
-  const invariantDir = join(repo, 'docs/framework/arch/invariants');
+  const invariantDir = join(repo, 'law/invariants');
   const workflowDir = join(repo, '.github/workflows');
   const evidenceDir = join(repo, '.devai/state/readings');
   mkdirSync(invariantDir, { recursive: true });
@@ -22,7 +22,7 @@ function prepare(workflowRun: string, lifecycle: 'supported' | 'experimental' = 
     JSON.stringify({
       id: 'INV-TEST-001',
       severity: 'gate',
-      measurable_via: ['policy check dependencies'],
+      measurable_via: ['check --only dependencies'],
       measurable_via_mode: 'all',
     }),
   );
@@ -62,6 +62,12 @@ afterEach(() => {
 });
 
 describe('adversarial alignment semantics', () => {
+  it('establishes a populated passing control before testing refusals', () => {
+    prepare('devai check --only dependencies');
+    const result = sense();
+    expect(result.status).toBe('pass');
+    expect(result.metrics).toMatchObject({ gate_invariants: 1, misaligned: 0 });
+  });
   it('rejects the canonical action when it is only an argument to another executable', () => {
     prepare('grep devai check --only dependencies README.md');
     expect(sense().status).not.toBe('pass');

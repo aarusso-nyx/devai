@@ -1,53 +1,47 @@
 # Release verification profiles
 
-DEVAI 1.4 lets an adopter map generic release capabilities to its existing
-`test-tasks.json` nodes. DEVAI validates and executes that declaration; it does
-not invent product commands, risks, consumers, databases, RLS rules, or mutation
-targets.
+DEVAI 1.5 maps generic release capabilities to existing `test-tasks.json` nodes.
+Mutation testing is optional external hardening owned by
+[Bedel](https://github.com/aarusso-nyx/bedel). DEVAI neither executes it in CI nor
+requires its results for certification, preparation, export or publication.
+This applies to DEVAI and every adopter, including minor, major and LTS releases.
+Bedel is not a DEVAI dependency.
 
-## Two independent axes
+## Release capabilities
 
 A release intent declares a SemVer transition (`patch`, `minor`, `major`, or
-`prerelease`) and a support intention (`preview`, `current`, or `lts`). An
-unchanged immutable artifact may enter LTS only through an explicit support
-promotion. Downgrades, invalid versions, unknown risks, and ordinary
-same-version releases block.
+`prerelease`) and support intention (`preview`, `current`, or `lts`). An unchanged
+immutable artifact may enter LTS through explicit support promotion. Invalid
+versions, downgrades, unknown risks and ordinary same-version releases block.
 
-The selected capabilities are a union. Transition, support, changed-path task
-impact, declared risks, adopter policy, and Owner escalations may add work; none
-may remove the unconditional floor. Every candidate therefore verifies
-formatting, lint, appropriate types, schema/generated consistency, secret and
-portable-path surfaces, package boundaries, and exact candidate identity.
+Transition, support, changed-path task impact, declared risks, adopter policy and
+Owner escalations select ordinary verification. Every candidate retains the
+unconditional floor: formatting, lint, types, schema/generated consistency,
+secret and portable-path checks, package boundaries and exact candidate identity.
+No selection or escalation can reintroduce mutation testing.
 
-## Configuration
+## Configuration and migration
 
-Place a schema-valid profile at
-`.devai/config/release-verification.json`. Its canonical schema is
-`release-verification-profile.schema.json`. The declaration identifies the
-release unit and version source, maps each capability to one or more existing
-task nodes, maps adopter-specific risk names to capabilities, and declares the
-mutation roster and its source/test/config/sanitizer selectors.
+Declare the release unit, version source and capability-to-task mapping in
+`.devai/config/release-verification.json`. Current profiles use schema version
+`1.4.0`, an empty `mutation_roster: []` compatibility field, and no
+`mutation_execution`. Historical profile versions remain readable for migration;
+their mutation declarations no longer select execution or require evidence.
 
-The version source is a repository-relative JSON package manifest with a string
-`version`. The runner reads it from both the exact base commit and the exact
-candidate commit and requires those bytes to agree with `current_version` and
-`target_version`. A monorepo release unit must therefore have one unambiguous
-version source. Mixed transitions require separate release intents; an absent,
-malformed, or inconsistent source fails closed.
+The version source is a repository-relative JSON package manifest containing a
+string `version`. Its exact base and candidate bytes must match the declared
+current and target versions. Mixed transitions require separate release intents.
 
-Each roster entry names its existing mutation task node, package, applicable
-risk classes, source and test populations, manifest, configuration, sanitizer
-and orchestration inputs, lockfile, toolchain identities, and thresholds. The
-runner selects affected entries from the candidate's exact declared path set,
-selects risk-matched entries for targeted assurance, and selects the complete
-roster for LTS. When targeted assurance cannot prove a narrower population it
-fails safe to the complete declared roster; an unresolved affected population
-blocks.
+Package policies opt into materialization through `release_verification`. Use
+`devai init bind` to preview the diff and the reviewed `--write` flow to apply it.
+The preview must show removal of the old roster and execution template. Preserve
+custom ordinary task mappings; customized adopter bytes are never silently
+replaced. Remove mutation tasks from CI and release dependencies, including
+reusable and manually dispatched workflows and required repository checks.
 
-Package policy can opt into materialization with `release_verification`. Use the
-existing `init bind` preview and reviewed write flow. Existing adopters without
-that field receive no release profile and retain their prior `affected`, `local`,
-and `rc` behavior. An update never silently replaces adopter-owned bytes.
+Existing adopters without a release profile retain their ordinary affected,
+local and RC verification. Mutation commands are deprecated interfaces that
+explain the move to Bedel and do not dispatch a runner.
 
 ## Preflight and certification
 
@@ -59,27 +53,17 @@ pnpm exec devai check \
   --run --as-role inspector --write --format json
 ```
 
-The preflight receipt binds the exact commit/tree, base, intent, profile, task
-policy, toolchain, and mandatory floor results. Certification uses the same
-command with `--release-stage certify` and `--preflight-receipt <path>`. It
-refuses to start when any binding differs. A receipt records `executed`,
-`reused`, `not-required`, `failed`, `blocked`, or `unknown`; skipped work is
-never reported as passed.
+Certification uses the same command with `--release-stage certify` and
+`--preflight-receipt <path>`. Receipts bind exact candidate, intent, policy,
+toolchain and mandatory results. Changes to those bindings refuse execution.
+The declared `changed_paths` must equal the base-to-candidate Git diff.
 
-Failed, blocked, and unknown checks also carry one bounded `failureClass`:
-`static-defect`, `sensor-stale`, `environment-drift`, `product-regression`,
-`policy-invalid`, `evidence-mismatch`, or `unknown`. Receipts never embed raw
-errors or unbounded command output.
+Mutation disposition is `not-required`, with reason
+`mutation-external-hardening`; it is never a fabricated pass. Absent, invalid,
+incomplete or failing mutation reports do not block delivery. Historical
+readers remain available only for historical evidence and are isolated from
+current readiness. Optional reports do not enter required publication artifacts.
 
-The release intent's `changed_paths` must exactly equal the base-to-candidate
-Git diff. `changed_packages` can provide the adopter's package mapping, but it
-cannot conceal a roster entry selected by the exact changed paths.
-
-Mutation reuse is exact per roster entry. A change to source, tests, manifest,
-configuration, orchestration, roster, thresholds, sanitizers, lockfile,
-toolchain, dependencies, report integrity, or required candidate/profile/policy
-identity invalidates reuse.
-
-These checks establish verification facts only. Human maintainers still choose
-scope and separately authorize push, merge, tag, release, publication,
-deployment, and rollback effects.
+Ordinary checks retain executed, reused, failed, blocked and unknown outcomes.
+Human authorization and existing protected approvals still control external
+publication effects.

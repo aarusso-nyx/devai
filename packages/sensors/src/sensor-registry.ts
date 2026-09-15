@@ -66,6 +66,20 @@ export interface SensorDescriptor {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+/** Assembly replaces only this fixed function with the package-owned asset bytes. */
+function bundledSensorRegistry(): string | undefined {
+  return undefined;
+}
+const CODE_BOUND_REGISTRY = bundledSensorRegistry();
+
+/** Trusted host binder compares the already code-bound data with its approved archive. */
+export function assertBundledSensorRegistry(bytes: Uint8Array): void {
+  if (
+    CODE_BOUND_REGISTRY === undefined ||
+    !Buffer.from(CODE_BOUND_REGISTRY).equals(Buffer.from(bytes))
+  )
+    throw new Error('rpl-package-identity-mismatch');
+}
 const BUNDLED_REGISTRY_PATH = join(HERE, 'sensor-registry.json');
 const DEVELOPMENT_REGISTRY_PATH = join(
   HERE,
@@ -96,10 +110,10 @@ function freezeRegistry(registry: SensorRegistry): SensorRegistry {
 }
 
 function loadRegistry(): SensorRegistry {
-  const path = registryPath();
+  const path = CODE_BOUND_REGISTRY === undefined ? registryPath() : '<code-bound sensor registry>';
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    parsed = JSON.parse(CODE_BOUND_REGISTRY ?? readFileSync(path, 'utf8')) as unknown;
   } catch (error) {
     throw new Error(`canonical sensor registry could not be read at ${path}`, { cause: error });
   }
@@ -153,22 +167,24 @@ export const DIAGNOSTIC_SENSOR_KINDS: readonly SensorKind[] = Object.freeze(
 );
 
 export const SENSOR_DESCRIPTORS: readonly SensorDescriptor[] = Object.freeze(
-  SENSOR_REGISTRY.entries.map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    kind: entry.kind,
-    command: `sense run ${entry.kind}`,
-    primaryReadingKind: entry.kind,
-    readingKinds: Object.freeze([entry.kind]),
-    lifecycle: 'supported' as const,
-    emitterModule: entry.emitter_module,
-    effect: entry.effect,
-    capabilities: Object.freeze([...(entry.effect_basis?.capabilities ?? [])]),
-    cells: Object.freeze([...(entry.cells ?? [])]),
-    diagnostic: entry.diagnostic === true,
-    tiers: Object.freeze([...entry.tiers]),
-    designNote: entry.design_note,
-  })),
+  SENSOR_REGISTRY.entries.map((entry) =>
+    Object.freeze({
+      id: entry.id,
+      title: entry.title,
+      kind: entry.kind,
+      command: `sense run ${entry.kind}`,
+      primaryReadingKind: entry.kind,
+      readingKinds: Object.freeze([entry.kind]),
+      lifecycle: 'supported' as const,
+      emitterModule: entry.emitter_module,
+      effect: entry.effect,
+      capabilities: Object.freeze([...(entry.effect_basis?.capabilities ?? [])]),
+      cells: Object.freeze([...(entry.cells ?? [])]),
+      diagnostic: entry.diagnostic === true,
+      tiers: Object.freeze([...entry.tiers]),
+      designNote: entry.design_note,
+    }),
+  ),
 );
 
 export function sensorCellMap(): Readonly<Record<SensorKind, readonly SensorCell[]>> {

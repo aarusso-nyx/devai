@@ -26,16 +26,30 @@ export function gatherGitContext(cwd: string = process.cwd()): GitContext {
   }
 
   try {
-    const status = execFileSync('git', ['status', '--porcelain'], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    // Each line: "XY path" — slice(3) drops the two-char status code + space.
-    dirty_files = status
-      .split('\n')
-      .map((line) => (line.length > 3 ? line.slice(3) : ''))
-      .filter((path) => path.length > 0);
+    const status = execFileSync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
+    // NUL records preserve Git paths without quoting or line-break ambiguity.
+    // Rename/copy records put the destination first and the source in the next record.
+    const records = status.split('\0');
+    const paths = new Set<string>();
+    for (let index = 0; index < records.length; index += 1) {
+      const record = records[index];
+      if (record === undefined || record.length <= 3) continue;
+      paths.add(record.slice(3));
+      const change = record.slice(0, 2);
+      if (change.includes('R') || change.includes('C')) {
+        const source = records[++index];
+        if (source !== undefined && source.length > 0) paths.add(source);
+      }
+    }
+    dirty_files = [...paths];
   } catch {
     dirty_files = [];
   }

@@ -1,8 +1,9 @@
 // Invariants: INV-DEVAI-019
 import { describe, expect, it, vi } from 'vitest';
+import { EXIT_PASS, EXIT_REVIEW } from '@devai-nyx/utils';
 import { readOnlyDevaiChild } from '../../src/authority/sense-run-child.js';
 import { routeArgv } from '../../src/command-router.js';
-import type { RegistryEntry } from '../../src/define-command.js';
+import { canonicalRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveSenseSelection } from '../../src/commands/sense/facade.js';
 import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
 import * as runSet from '../../src/commands/sense/run-set.js';
@@ -308,5 +309,31 @@ describe('sense run readiness aggregation', () => {
     expect(
       aggregate([{ command: 'one', processStatus: 2, stdout: reading('fail'), stderr: '' }]),
     ).toMatchObject({ execution_status: 'pass', readiness_status: 'fail', exit_code: 3 });
+  });
+
+  it('preserves UNKNOWN as the sole applicable readiness and routes a registered child path', () => {
+    expect(
+      aggregate([
+        { command: 'unknown-child', processStatus: 1, stdout: reading('unknown'), stderr: '' },
+      ]),
+    ).toMatchObject({
+      execution_status: 'pass',
+      readiness_status: 'unknown',
+      applicable_count: 1,
+      na_count: 0,
+      exit_code: EXIT_REVIEW,
+    });
+    expect(
+      aggregate([{ command: 'pass-child', processStatus: 0, stdout: reading('pass'), stderr: '' }]),
+    ).toMatchObject({ readiness_status: 'pass', applicable_count: 1, exit_code: EXIT_PASS });
+
+    expect(
+      runSet.routeSensorChildArgv(
+        ['sense', 'run', 'type_check'],
+        '/cli.js',
+        canonicalRegistry(),
+        '1.5.0',
+      ),
+    ).toEqual(['sense', 'run', 'type_check']);
   });
 });

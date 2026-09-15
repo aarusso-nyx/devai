@@ -343,7 +343,8 @@ export function governanceTrackingStatus(
   const activation = readRoundTrackingActivation({ repoRoot, round });
 
   const canonical = events.length;
-  const projected = delivery.projected_event_ids.length;
+  const delivered = new Set(delivery.projected_event_ids);
+  const projected = events.filter((event) => delivered.has(event.event_id)).length;
   const pending = Math.max(0, canonical - projected);
 
   const projection: GovernanceProjectionStatus['projection'] =

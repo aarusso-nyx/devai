@@ -5,13 +5,7 @@
   "description": "Architect-authored canonical source for the opt-in github-issues tracking adapter. Every adopter binding is materialized from this file: the bound configuration embeds this defaults block verbatim so a checker never writes its own inputs, and drift between the two is detectable. This file carries no adopter identity and no credential material.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "$schema",
-    "schemaVersion",
-    "id",
-    "authority",
-    "defaults"
-  ],
+  "required": ["$schema", "schemaVersion", "id", "authority", "defaults"],
   "properties": {
     "$schema": {
       "type": "string"
@@ -74,10 +68,7 @@
         "reconciliation": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "local",
-            "ci"
-          ],
+          "required": ["local", "ci"],
           "properties": {
             "local": {
               "const": "gh"
@@ -106,10 +97,7 @@
             "triggers": {
               "type": "array",
               "items": {
-                "enum": [
-                  "push",
-                  "workflow_dispatch"
-                ]
+                "enum": ["push", "workflow_dispatch"]
               },
               "minItems": 2,
               "maxItems": 2,
@@ -122,10 +110,7 @@
             "permissions": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "contents",
-                "issues"
-              ],
+              "required": ["contents", "issues"],
               "properties": {
                 "contents": {
                   "const": "read"
@@ -145,10 +130,7 @@
             "pinned_actions": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "checkout",
-                "setup_node"
-              ],
+              "required": ["checkout", "setup_node"],
               "description": "Immutable commit SHAs. Mutable action references (tags, branches) are a Doctor failure.",
               "properties": {
                 "checkout": {
@@ -227,12 +209,7 @@
               "minItems": 1,
               "uniqueItems": true,
               "items": {
-                "enum": [
-                  "mention",
-                  "html",
-                  "markdown-directive",
-                  "control-characters"
-                ]
+                "enum": ["mention", "html", "markdown-directive", "control-characters"]
               }
             },
             "forbidden_content": {
@@ -256,12 +233,7 @@
         "retry": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "max_attempts",
-            "initial_delay_ms",
-            "max_delay_ms",
-            "multiplier"
-          ],
+          "required": ["max_attempts", "initial_delay_ms", "max_delay_ms", "multiplier"],
           "properties": {
             "max_attempts": {
               "type": "integer",
@@ -327,10 +299,7 @@
         },
         "workflow": {
           "file": "devai-issue-tracking.yml",
-          "triggers": [
-            "push",
-            "workflow_dispatch"
-          ],
+          "triggers": ["push", "workflow_dispatch"],
           "trusted_ref": "refs/heads/main",
           "permissions": {
             "contents": "read",
@@ -356,12 +325,7 @@
           "max_events_per_batch": 128,
           "max_batch_chars": 60000,
           "withheld_payload_digest": "sha256",
-          "neutralize": [
-            "mention",
-            "html",
-            "markdown-directive",
-            "control-characters"
-          ],
+          "neutralize": ["mention", "html", "markdown-directive", "control-characters"],
           "forbidden_content": [
             "raw-prompt",
             "command-output",

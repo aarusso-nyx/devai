@@ -1,6 +1,6 @@
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 
-const validateLocalEvidenceManifest = getValidator('local-evidence-manifest.schema.json');
+const validateLocalEvidenceManifest = validators.localEvidenceManifest;
 
 export const ACTIONS_REUSABLE_JOBS = [
   'merged-coverage',
@@ -288,8 +288,14 @@ export function validateActionsEvidenceShadowTuple(
   ] as const) {
     requireTuple(full[field] === expected, `full result ${field} does not match the manifest`);
   }
+  const testedTree = full['testedTree'];
   requireTuple(
-    JSON.stringify(full['testedTree']) === JSON.stringify(claimed.testedTree),
+    isRecord(testedTree) &&
+      Object.keys(testedTree).length === 2 &&
+      Object.hasOwn(testedTree, 'algorithm') &&
+      Object.hasOwn(testedTree, 'value') &&
+      testedTree['algorithm'] === claimed.testedTree.algorithm &&
+      testedTree['value'] === claimed.testedTree.value,
     'full result tested tree does not match the manifest',
   );
   requireTuple(isRecord(full['jobs']), 'full result jobs are missing');
@@ -312,7 +318,7 @@ export function validateActionsEvidenceShadowTuple(
   );
   requireTuple(
     typeof shadow['mergedCommitSha'] === 'string' &&
-      /^[0-9a-f]{40,64}$/.test(shadow['mergedCommitSha']),
+      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(shadow['mergedCommitSha']),
     'shadow decision merge SHA is invalid',
   );
   requireTuple(shadow['fullCiResult'] === 'success', 'shadow decision full CI is not successful');
@@ -374,7 +380,12 @@ export function validateActionsEvidenceShadowTuple(
 export function verifyActionsRunEvidence(
   inputs: VerifyActionsRunEvidenceInputs,
 ): ActionsEvidenceDecision {
-  if (inputs.mode === 'gate' && inputs.gateAuthorization?.authorized !== true) {
+  if (
+    inputs.mode === 'gate' &&
+    (inputs.gateAuthorization?.authorized !== true ||
+      inputs.gateAuthorization.status !== 'active' ||
+      inputs.gateAuthorization.source !== 'base-parent')
+  ) {
     return decision(
       inputs.mode,
       'fallback-no-evidence',
@@ -471,7 +482,10 @@ export function verifyActionsRunEvidence(
   }
 
   const successful = new Set(current.successfulJobs);
-  const missingJob = manifest.policy.requiredJobs.find((job) => !successful.has(job));
+  // A claim may add requirements, but cannot subtract jobs that promotion skips.
+  const missingJob = [...ACTIONS_REUSABLE_JOBS, ...manifest.policy.requiredJobs].find(
+    (job) => !successful.has(job),
+  );
   if (missingJob !== undefined) {
     return decision(
       inputs.mode,

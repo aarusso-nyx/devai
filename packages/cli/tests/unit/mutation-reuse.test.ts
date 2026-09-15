@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../src/services/check-runner/canonical.js';
 import {
   selectMutationEvidence,
@@ -34,7 +34,15 @@ const candidate = {
 
 describe('mutation evidence reuse', () => {
   it('reuses only exact passing evidence with intact identities and report', () => {
-    expect(selectMutationEvidence(identity, candidate)).toMatchObject({ status: 'reused' });
+    expect(selectMutationEvidence(identity, undefined)).toEqual({
+      status: 'execute',
+      reason: 'evidence-missing',
+    });
+    expect(selectMutationEvidence(identity, candidate)).toEqual({
+      status: 'reused',
+      reason: 'exact-identity',
+      reportDigest: candidate.reportDigest,
+    });
   });
 
   it.each([
@@ -68,5 +76,38 @@ describe('mutation evidence reuse', () => {
       status: 'execute',
       reason: 'prior-result-not-pass',
     });
+  });
+
+  it('checks candidate identity integrity before comparing required inputs', () => {
+    const substitutedIdentity = { ...identity, sourceInputsDigest: '0'.repeat(64) };
+    expect(
+      selectMutationEvidence(identity, {
+        ...candidate,
+        identity: substitutedIdentity,
+        identityDigest: sha256Hex(identity),
+      }),
+    ).toEqual({ status: 'execute', reason: 'identity-integrity-mismatch' });
+  });
+
+  it('rejects digest fields with valid hexadecimal prefixes longer than SHA-256', () => {
+    for (const sourceInputsDigest of [
+      `${identity.sourceInputsDigest}0`,
+      `0${identity.sourceInputsDigest}`,
+    ])
+      expect(() => selectMutationEvidence({ ...identity, sourceInputsDigest }, candidate)).toThrow(
+        'CHECK_MUTATION_EVIDENCE_IDENTITY_INVALID:sourceInputsDigest',
+      );
+  });
+
+  it('rejects coercible non-string digest fields without invoking caller code', () => {
+    const toString = vi.fn(() => identity.sourceInputsDigest);
+    const malformed = {
+      ...identity,
+      sourceInputsDigest: { toString },
+    } as unknown as MutationEvidenceIdentity;
+    expect(() => selectMutationEvidence(malformed, candidate)).toThrow(
+      'CHECK_MUTATION_EVIDENCE_IDENTITY_INVALID:sourceInputsDigest',
+    );
+    expect(toString).not.toHaveBeenCalled();
   });
 });

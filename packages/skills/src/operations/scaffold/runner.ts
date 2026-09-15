@@ -43,6 +43,8 @@ export interface ScaffolderTargetTask {
   readonly template_id: string;
   /** Repo-relative path the rendered template writes to. */
   readonly target_path: string;
+  /** Blueprint entity selected by the task derivation; aggregate tasks use the first entity. */
+  readonly entity_name?: string;
   /** Extra tokens to merge into the canonical set (e.g. entity-specific). */
   readonly extra_tokens?: Readonly<Record<string, string>>;
   /** Optional conditional flags for the template engine. */
@@ -141,8 +143,8 @@ export function runScaffolder(opts: RunScaffolderOptions): ScaffoldOperationResu
   const { spec, ctx } = opts;
 
   // 1. Load + validate blueprint.
-  const blueprintPath = (ctx.inputs?.blueprint_path as string | undefined) ?? '';
-  if (blueprintPath === '') {
+  const blueprintPath = ctx.inputs?.blueprint_path;
+  if (typeof blueprintPath !== 'string' || blueprintPath.length === 0) {
     return {
       operation_id: spec.operationId,
       status: 'fail',
@@ -288,7 +290,7 @@ export function runScaffolder(opts: RunScaffolderOptions): ScaffoldOperationResu
     const tokens = buildTokens({
       namespace: blueprint.module.namespace,
       module: blueprint.module.name,
-      entity: firstEntity.name,
+      entity: task.entity_name ?? firstEntity.name,
       specVersion: blueprint.module.version,
       specSha256: bpSha,
       extra: task.extra_tokens,
@@ -341,7 +343,8 @@ export function runScaffolder(opts: RunScaffolderOptions): ScaffoldOperationResu
     // Fresh write.
     try {
       mkdirSync(dirname(absPath), { recursive: true });
-      writeFileSync(absPath, fullOutput);
+      // A concurrent creator must not turn a fresh scaffold write into an overwrite.
+      writeFileSync(absPath, fullOutput, { flag: 'wx' });
       filesCreated.push(task.target_path);
       templatesUsed.push({
         template_id: task.template_id,

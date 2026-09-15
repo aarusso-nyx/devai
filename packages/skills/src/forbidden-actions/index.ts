@@ -1,5 +1,6 @@
 import { execFileSync } from '@devai-nyx/authority';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { validateAdrs } from '@devai-nyx/spec';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -93,7 +94,7 @@ export const CANONICAL_FORBIDDEN_ACTIONS: readonly ForbiddenActionEntry[] = [
     action: 'Any `--no-verify` flag',
     rationale: 'Bypasses hooks',
     severity: 'high',
-    detect_patterns: ['\\b--no-verify\\b'],
+    detect_patterns: ['(?:^|[\\s"\'`])--no-verify(?![\\w-])'],
     safer_alternative: 'Fix the underlying hook failure',
   },
   {
@@ -101,7 +102,7 @@ export const CANONICAL_FORBIDDEN_ACTIONS: readonly ForbiddenActionEntry[] = [
     action: 'Any `--no-gpg-sign` flag',
     rationale: 'Bypasses signing',
     severity: 'high',
-    detect_patterns: ['\\b--no-gpg-sign\\b', 'commit\\.gpgsign=false'],
+    detect_patterns: ['(?:^|[\\s"\'`])--no-gpg-sign(?![\\w-])', 'commit\\.gpgsign=false'],
     safer_alternative: 'Configure signing in the environment',
   },
   {
@@ -300,32 +301,12 @@ function loadForbiddenAuthorizations(
 function activeAdrAffectedRules(repoRoot: string): ReadonlySet<string> {
   const adrDir = join(repoRoot, 'law', 'adr');
   if (!existsSync(adrDir)) return new Set();
+  const validation = validateAdrs({ adrsDir: adrDir });
+  if (!validation.ok || !validation.semantic_resolution_performed) return new Set();
   const affected = new Set<string>();
-  let files: string[];
-  try {
-    files = readdirSync(adrDir).filter((file) => /^ADR-\d{3}-.+\.md$/u.test(file));
-  } catch {
-    return affected;
-  }
-  for (const file of files) {
-    let source: string;
-    try {
-      source = readFileSync(join(adrDir, file), 'utf8');
-    } catch {
-      continue;
-    }
-    const frontmatter = source.match(/^---\n([\s\S]*?)\n---(?:\n|$)/u)?.[1];
-    if (frontmatter === undefined) continue;
-    if (!/^id: ADR-\d{3}$/mu.test(frontmatter)) continue;
-    if (!/^type: adr$/mu.test(frontmatter)) continue;
-    if (!/^status: active$/mu.test(frontmatter)) continue;
-    const block = frontmatter.match(/^affected_rules:\n((?: {2}- .+\n?)+)/mu)?.[1];
-    if (block === undefined) continue;
-    for (const line of block.split('\n')) {
-      const rule = line.match(/^ {2}- ([^\s].*)$/u)?.[1];
-      if (rule !== undefined && !rule.startsWith('/') && !rule.split('/').includes('..')) {
-        affected.add(rule);
-      }
+  for (const adr of validation.adrs) {
+    for (const rule of adr.effective_affected_rules) {
+      if (!rule.startsWith('/') && !rule.split('/').includes('..')) affected.add(rule);
     }
   }
   return affected;
@@ -344,8 +325,19 @@ export function loadForbiddenRegistry(path: string): ForbiddenActionEntry[] {
 export function loadForbiddenWaivers(path: string): ForbiddenActionWaiver[] {
   if (!existsSync(path)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { waivers?: ForbiddenActionWaiver[] };
-    return parsed.waivers ?? [];
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { waivers?: unknown };
+    if (!Array.isArray(parsed.waivers)) return [];
+    return parsed.waivers.filter((value): value is ForbiddenActionWaiver => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+      const waiver = value as Record<string, unknown>;
+      return (
+        typeof waiver['id'] === 'string' &&
+        /^FORBID-[A-Z][A-Z0-9_-]*$/.test(waiver['id']) &&
+        typeof waiver['reason'] === 'string' &&
+        [...waiver['reason']].length >= 8 &&
+        Object.keys(waiver).every((key) => key === 'id' || key === 'reason')
+      );
+    });
   } catch {
     return [];
   }
@@ -444,7 +436,14 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
     const parsed = JSON.parse(readFileSync(registryPath, 'utf8')) as {
       actions?: ForbiddenActionEntry[];
     };
-    if (!Array.isArray(parsed.actions)) throw new Error('actions must be an array');
+    if (
+      !Array.isArray(parsed.actions) ||
+      parsed.actions.some(
+        (entry) => entry === null || typeof entry !== 'object' || Array.isArray(entry),
+      )
+    ) {
+      throw new Error('actions must be an array of objects');
+    }
     registry = parsed.actions;
   } catch {
     return {
@@ -628,7 +627,7 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       } else {
         const nameStatus = execFileSync(
           'git',
-          ['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', '-M', '-m', sha],
+          ['diff-tree', '--root', '--no-commit-id', '--name-status', '-z', '-r', '-M', '-m', sha],
           {
             cwd: opts.repoRoot,
             encoding: 'utf8',
@@ -636,27 +635,35 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             stdio: ['ignore', 'pipe', 'pipe'],
           },
         );
-        changedPaths = nameStatus
-          .split('\n')
-          .filter(Boolean)
-          .flatMap((line) => line.split('\t').slice(1));
+        // NUL framing preserves tabs, newlines, and non-ASCII Git paths verbatim.
+        // Line-oriented output quotes those paths and can conceal protected prefixes.
+        const fields = nameStatus.split('\0');
+        if (fields.pop() !== '') throw new Error('Malformed Git name-status output');
+        const changes: { status: string; paths: string[] }[] = [];
+        for (let index = 0; index < fields.length;) {
+          const status = fields[index++];
+          if (status === undefined || !/^(?:[ADMTUXB]|[RC][0-9]+)$/.test(status)) {
+            throw new Error('Malformed Git change status');
+          }
+          const pathCount = status.startsWith('R') || status.startsWith('C') ? 2 : 1;
+          const paths = fields.slice(index, index + pathCount);
+          if (paths.length !== pathCount || paths.some((path) => path.length === 0)) {
+            throw new Error('Malformed Git change paths');
+          }
+          index += pathCount;
+          changes.push({ status, paths });
+        }
+        changedPaths = changes.flatMap(({ paths }) => paths);
         addedPaths = new Set(
-          nameStatus
-            .split('\n')
-            .filter(Boolean)
-            .filter((line) => line.split('\t')[0] === 'A')
-            .map((line) => line.split('\t').at(-1) ?? ''),
+          changes.filter(({ status }) => status === 'A').flatMap(({ paths }) => paths),
         );
-        operations = nameStatus
-          .split('\n')
-          .filter(Boolean)
-          .map((line) => {
-            const [status = '', ...paths] = line.split('\t');
-            if ((status.startsWith('R') || status.startsWith('C')) && paths.length >= 2) {
-              return `git rm ${paths[0] ?? ''}\ngit add ${paths[1] ?? ''}\n${line}`;
+        operations = changes
+          .map(({ status, paths }) => {
+            const line = [status, ...paths].join('\t');
+            if (status.startsWith('R') || status.startsWith('C')) {
+              return `git rm ${paths[0]}\ngit add ${paths[1]}\n${line}`;
             }
-            const path = paths.at(-1) ?? '';
-            return `${status.startsWith('D') ? 'git rm' : 'git add'} ${path}\n${line}`;
+            return `${status.startsWith('D') ? 'git rm' : 'git add'} ${paths[0]}\n${line}`;
           })
           .join('\n');
         semanticPatch = execFileSync(
@@ -705,8 +712,9 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
               'record/derived/inventory/README.md',
             ].includes(path));
         return (
-          /^(?:law\/|product\/|work\/(?:rounds|audit)\/|record\/|\.devai\/config\/)/u.test(path) &&
-          !bootstrapMaterialization
+          /^(?:law\/|product\/|work\/(?:rounds|audit)\/|record\/|\.devai\/(?:config|local\/rounds)\/)/u.test(
+            path,
+          ) && !bootstrapMaterialization
         );
       });
       const inspectorTestOnly =

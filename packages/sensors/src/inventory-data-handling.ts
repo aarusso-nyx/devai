@@ -24,7 +24,8 @@ import type { DataModelBody, DataModelColumn, DataModelTable } from './inventory
  *   - ip           → ip_address, remote_addr, user_agent
  *
  * The output is a re-emission of the data-model body with `pii_class`
- * set on matching columns; `legal_basis` and `retention` are left
+ * seeded on matching columns while preserving explicit upstream classifications.
+ * Existing `legal_basis` and `retention` are preserved; missing values are left
  * unset so the Architect (or a stack-adapter pack) can supply them.
  *
  * INV-INVENTORY-002 (Phase 17.D, severity hard-fail) consumes this
@@ -129,6 +130,7 @@ const PII_RULES: readonly PiiRule[] = [
 ];
 
 function classifyColumn(col: DataModelColumn): string | null {
+  if (col.pii_class !== undefined && col.pii_class.length > 0) return col.pii_class;
   for (const rule of PII_RULES) {
     if (rule.namePatterns.some((re) => re.test(col.name))) return rule.piiClass;
   }

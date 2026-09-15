@@ -14,3 +14,9 @@ scratch/*
 .devai/config/authority-policy.json
 .devai/worktrees/*
 !.devai/worktrees/.gitkeep
+
+# Repository-local process helper bytecode
+scripts/process/__pycache__/
+
+# Locally regenerated context graph; not release candidate inputs.
+graft/

@@ -36,7 +36,7 @@ export function runCommand(argv: readonly string[], opts: RunOptions = {}): RunR
       stderr: result.error.message,
       exit_code: 127,
       duration_ms,
-      killed: false,
+      killed: result.signal !== null && result.signal !== undefined,
     };
   }
   return {

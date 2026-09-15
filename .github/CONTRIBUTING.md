@@ -46,3 +46,14 @@ development and CI do not call a model provider.
 - Treat generated and installed package parity as a tested contract.
 - Report uncertainty and missing evidence instead of inferring success.
 - Publication remains a separate Owner-authorized action.
+
+## Commit and merge feedback
+
+The installed pre-commit hook fixes ESLint and formatting issues in staged files,
+retains lint-staged backup/partial-staging protection, and blocks remaining errors.
+It does not run the repository-wide build or schema suite on every commit. Unstaged
+hunks remain unstaged; restoration conflicts stop the commit with recoverable state.
+
+The required Linux `devai-release-gate` owns the full cheap baseline and affected checks.
+Passing it makes a change merge-ready, not release-ready. RC evidence and exact retained
+rehearsal artifacts remain publication prerequisites.

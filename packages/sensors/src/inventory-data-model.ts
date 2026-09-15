@@ -149,6 +149,10 @@ function* extractCreateTableBlocks(sql: string): Generator<{
     let i = open + 1;
     while (i < cleaned.length && depth > 0) {
       const ch = cleaned[i];
+      if (ch === "'" || ch === '"') {
+        i = sqlQuotedEnd(cleaned, i) + 1;
+        continue;
+      }
       if (ch === '(') depth += 1;
       else if (ch === ')') depth -= 1;
       i += 1;
@@ -200,7 +204,7 @@ function extractColumnAnnotations(
       const rawName = colMatch[1];
       if (rawName !== undefined) {
         const name = rawName.startsWith('"') ? rawName.slice(1, -1).replace(/""/g, '"') : rawName;
-        if (!reservedFirst.has(name.toUpperCase())) {
+        if (rawName.startsWith('"') || !reservedFirst.has(name.toUpperCase())) {
           currentColumn = name;
           if (!out.has(currentColumn)) out.set(currentColumn, {});
         } else {
@@ -446,12 +450,27 @@ function unquoteSql(s: string): string {
   return trimmed;
 }
 
+// SQL quote escapes repeat the delimiter; parentheses and commas inside are data.
+function sqlQuotedEnd(text: string, start: number): number {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    if (text[i] !== quote) continue;
+    if (text[i + 1] === quote) i += 1;
+    else return i;
+  }
+  return text.length - 1;
+}
+
 function splitTopLevelCommas(body: string): string[] {
   const out: string[] = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i < body.length; i++) {
     const ch = body[i];
+    if (ch === "'" || ch === '"') {
+      i = sqlQuotedEnd(body, i);
+      continue;
+    }
     if (ch === '(') depth += 1;
     else if (ch === ')') depth -= 1;
     else if (ch === ',' && depth === 0) {
@@ -489,7 +508,7 @@ function parseColumnLine(line: string): DataModelColumn | null {
   const rest = m[2];
   if (rawName === undefined || rest === undefined) return null;
   const name = rawName.startsWith('"') ? rawName.slice(1, -1).replace(/""/g, '"') : rawName;
-  if (RESERVED_FIRST_TOKENS.has(name.toUpperCase())) return null;
+  if (!rawName.startsWith('"') && RESERVED_FIRST_TOKENS.has(name.toUpperCase())) return null;
   // Type: one identifier or one of the explicit SQL multi-word type forms,
   // optionally followed by parens (e.g. VARCHAR(255)) or an array suffix.
   // An unconstrained second identifier would consume constraint keywords such
@@ -510,11 +529,43 @@ function parseColumnLine(line: string): DataModelColumn | null {
     ...(upper.includes('PRIMARY KEY') && { primary: true }),
     ...(upper.includes('UNIQUE') && { unique: true }),
   };
-  const defMatch = tail.match(
-    /\bDEFAULT\s+([^,]+?)(?=$|\s+(?:NOT|NULL|PRIMARY|UNIQUE|REFERENCES|CHECK|CONSTRAINT))/i,
-  );
-  const defaultValue = defMatch?.[1];
-  if (defaultValue !== undefined) (col as { default: string }).default = defaultValue.trim();
+  const defMatch = /\bDEFAULT\s+/i.exec(tail);
+  if (defMatch !== null) {
+    const start = defMatch.index + defMatch[0].length;
+    let end = tail.length;
+    let depth = 0;
+    let quote = '';
+    for (let i = start; i < tail.length; i++) {
+      const ch = tail[i];
+      if (quote.length > 0) {
+        if (ch === quote) {
+          if (tail[i + 1] === quote) i += 1;
+          else quote = '';
+        }
+        continue;
+      }
+      if (ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth += 1;
+      else if (ch === ')') depth -= 1;
+      else if (
+        depth === 0 &&
+        i > start &&
+        /\s/.test(ch ?? '') &&
+        /^\s+(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|UNIQUE|REFERENCES|CHECK|CONSTRAINT)\b/i.test(
+          tail.slice(i),
+        )
+      ) {
+        end = i;
+        break;
+      }
+    }
+    const value = tail.slice(start, end).trim();
+    if (value.length > 0) (col as { default: string }).default = value;
+    const constraints = (tail.slice(0, defMatch.index) + tail.slice(end)).toUpperCase();
+    (col as { nullable: boolean }).nullable = !constraints.includes('NOT NULL');
+    if (!constraints.includes('PRIMARY KEY')) delete (col as { primary?: boolean }).primary;
+    if (!constraints.includes('UNIQUE')) delete (col as { unique?: boolean }).unique;
+  }
   return col;
 }
 
@@ -538,7 +589,7 @@ function parseUniqueLine(line: string): readonly string[] | null {
 function parseFkLine(line: string): DataModelForeignKey | null {
   // CONSTRAINT name FOREIGN KEY (cols) REFERENCES table(cols) [ON DELETE x] [ON UPDATE y]
   const m = line.match(
-    /FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+(?:([A-Za-z_][\w]*)\.)?([A-Za-z_][\w]*)\s*(?:\(([^)]+)\))?(?:\s+ON\s+DELETE\s+([A-Za-z]+(?:\s+[A-Za-z]+)?))?(?:\s+ON\s+UPDATE\s+([A-Za-z]+(?:\s+[A-Za-z]+)?))?/i,
+    /FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+(?:([A-Za-z_][\w]*)\.)?([A-Za-z_][\w]*)\s*(?:\(([^)]+)\))?(?:\s+ON\s+DELETE\s+([A-Za-z]+(?:\s+(?!ON\b)[A-Za-z]+)?))?(?:\s+ON\s+UPDATE\s+([A-Za-z]+(?:\s+(?!ON\b)[A-Za-z]+)?))?/i,
   );
   if (m === null) return null;
   const cols = m[1];
@@ -554,11 +605,13 @@ function parseFkLine(line: string): DataModelForeignKey | null {
   const onDel = m[5];
   const onUpd = m[6];
   if (onDel !== undefined)
-    (fk as { on_delete: DataModelForeignKey['on_delete'] }).on_delete =
-      onDel.toLowerCase() as DataModelForeignKey['on_delete'];
+    (fk as { on_delete: DataModelForeignKey['on_delete'] }).on_delete = onDel
+      .toLowerCase()
+      .replace(/\s+/g, ' ') as DataModelForeignKey['on_delete'];
   if (onUpd !== undefined)
-    (fk as { on_update: DataModelForeignKey['on_update'] }).on_update =
-      onUpd.toLowerCase() as DataModelForeignKey['on_update'];
+    (fk as { on_update: DataModelForeignKey['on_update'] }).on_update = onUpd
+      .toLowerCase()
+      .replace(/\s+/g, ' ') as DataModelForeignKey['on_update'];
   return fk;
 }
 
@@ -727,13 +780,20 @@ export function senseInventoryDataModel(opts: InventoryDataModelOptions): Invent
   }> = [];
 
   const dirs = opts.migrationDirs ?? DEFAULT_MIGRATION_DIRS;
-  const scanned: string[] = [];
+  const discovered = new Set<string>();
   for (const d of dirs) {
     const abs = existingDir(opts.repoRoot, d);
     if (abs === null) continue;
-    scanned.push(...walkFiles(abs, { ignoreDirs, extensions: ['sql'], skipDeclarations: false }));
+    for (const file of walkFiles(abs, {
+      ignoreDirs,
+      extensions: ['sql'],
+      skipDeclarations: false,
+    })) {
+      discovered.add(file);
+    }
   }
 
+  const scanned = [...discovered];
   let tables: DataModelTable[] = [];
   // Phase 22.C: accumulate raw SQL across all migration files so
   // the pii-registry pass can scan inserts that target tables

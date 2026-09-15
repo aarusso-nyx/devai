@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 
 const mocks = vi.hoisted(() => ({ runCommand: vi.fn() }));
@@ -13,8 +13,8 @@ import { senseJudge, type JudgeLlmClient } from '../../src/judge.js';
 import { senseMigrateCheck } from '../../src/migrate-check.js';
 import { senseTypeCheck } from '../../src/type-check.js';
 
-const root = mkdtempSync(join(tmpdir(), 'devai-sensor-command-depth-'));
-const migrations = join(root, 'migrations');
+let root: string;
+let migrations: string;
 
 function command(exitCode = 0, stdout = '', stderr = '') {
   return {
@@ -28,8 +28,15 @@ function command(exitCode = 0, stdout = '', stderr = '') {
   };
 }
 
-beforeEach(() => mocks.runCommand.mockReset());
-afterAll(() => rmSync(root, { recursive: true, force: true }));
+beforeEach(() => {
+  mocks.runCommand.mockReset();
+  root = mkdtempSync(join(tmpdir(), 'devai-sensor-command-depth-'));
+  migrations = join(root, 'migrations');
+  mkdirSync(migrations, { recursive: true });
+  writeFileSync(join(migrations, '001.sql'), 'select 1;\n');
+  writeFileSync(join(migrations, '002.sql'), 'select 2;\n');
+});
+afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe('migration sensor depth', () => {
   it('returns skipped or error when database or every migration directory is absent', () => {

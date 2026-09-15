@@ -8,7 +8,7 @@
   },
   "mutation": {
     "score_min": 60,
-    "survived_max": 50
+    "survived_max": 9007199254740991
   },
   "lint": {
     "max_errors": 0,

@@ -39,7 +39,7 @@ describe('release verification profile resolver', () => {
       expect(resolveReleaseVerification(input).verdict).toBe('block');
   });
 
-  it('requires explicit support promotion for same-version LTS and full mutation', () => {
+  it('requires explicit support promotion for same-version LTS without mutation', () => {
     const result = resolveReleaseVerification({
       currentVersion: '1.2.0',
       targetVersion: '1.2.0',
@@ -47,7 +47,7 @@ describe('release verification profile resolver', () => {
       supportPromotion: true,
     });
     expect(result.verdict).toBe('ready');
-    expect(result.mutation).toBe('full-roster');
+    expect(result.mutation).toBe('none');
     expect(result.capabilities).toContain('provenance');
     expect(result.capabilities).toEqual(
       expect.arrayContaining(['security', 'database', 'tenancy', 'operational-matrix']),
@@ -94,7 +94,7 @@ describe('release verification profile resolver', () => {
         risks: ['regulated-export'],
         riskCapabilities: { 'regulated-export': ['consumer', 'security'] },
       }),
-    ).toMatchObject({ verdict: 'ready', mutation: 'targeted' });
+    ).toMatchObject({ verdict: 'ready', mutation: 'none' });
   });
 
   it('maps every required capability to known task nodes and fails closed on gaps', () => {
@@ -122,7 +122,7 @@ describe('release verification profile resolver', () => {
       targetVersion: '2.0.0',
       support: 'current',
     });
-    expect(major.mutation).toBe('targeted');
+    expect(major.mutation).toBe('none');
     expect(major.capabilities).toEqual(
       expect.arrayContaining([
         'unit',
@@ -146,7 +146,7 @@ describe('release verification profile resolver', () => {
         support: 'lts',
         supportPromotion: true,
       }).mutation,
-    ).toBe('full-roster');
+    ).toBe('none');
   });
 
   it('selects the MINOR behavior, consumer, materialization, and E2E floor', () => {
@@ -168,7 +168,7 @@ describe('release verification profile resolver', () => {
     );
   });
 
-  it('records documentation patch mutation as not-required and behavior as targeted', () => {
+  it('records documentation patch mutation as not-required and behavior as not-required', () => {
     expect(
       resolveReleaseVerification({
         currentVersion: '1.1.1',
@@ -176,7 +176,7 @@ describe('release verification profile resolver', () => {
         support: 'current',
         changeKind: 'documentation',
       }).mutationDisposition,
-    ).toEqual({ status: 'not-required', reason: 'documentation-only' });
+    ).toEqual({ status: 'not-required', reason: 'mutation-external-hardening' });
     expect(
       resolveReleaseVerification({
         currentVersion: '1.1.1',
@@ -184,7 +184,7 @@ describe('release verification profile resolver', () => {
         support: 'current',
         changeKind: 'behavioral',
       }).mutation,
-    ).toBe('affected');
+    ).toBe('none');
   });
 
   it('records targeted mutation as not-required when the adopter declares no mutation roster', () => {
@@ -198,7 +198,7 @@ describe('release verification profile resolver', () => {
       }),
     ).toMatchObject({
       mutation: 'none',
-      mutationDisposition: { status: 'not-required', reason: 'mutation-roster-empty' },
+      mutationDisposition: { status: 'not-required', reason: 'mutation-external-hardening' },
     });
     expect(
       resolveReleaseVerification({
@@ -208,7 +208,7 @@ describe('release verification profile resolver', () => {
         supportPromotion: true,
         mutationRosterSize: 0,
       }),
-    ).toMatchObject({ verdict: 'block', blockingReasons: ['lts-mutation-roster-empty'] });
+    ).toMatchObject({ verdict: 'ready', blockingReasons: [] });
   });
 
   it('unions escalation capabilities without allowing a de-escalation', () => {
@@ -223,10 +223,10 @@ describe('release verification profile resolver', () => {
     expect(result.capabilities).toEqual(
       expect.arrayContaining(['security', 'consumer', 'integration']),
     );
-    expect(result.mutation).toBe('targeted');
+    expect(result.mutation).toBe('none');
   });
 
-  it('selects affected, risk-targeted, and full-roster mutation task nodes', () => {
+  it('does not select mutation tasks for changes, risks or LTS', () => {
     const roster = [
       {
         id: 'a',
@@ -257,7 +257,7 @@ describe('release verification profile resolver', () => {
         [],
         ['mutation:a', 'mutation:b'],
       ),
-    ).toEqual({ taskNodes: ['mutation:a'], rosterEntryIds: ['a'] });
+    ).toEqual({ taskNodes: [], rosterEntryIds: [] });
 
     const targeted = resolveReleaseVerification({
       currentVersion: '1.0.0',
@@ -275,7 +275,7 @@ describe('release verification profile resolver', () => {
         ['authorization'],
         ['mutation:a', 'mutation:b'],
       ),
-    ).toEqual({ taskNodes: ['mutation:b'], rosterEntryIds: ['b'] });
+    ).toEqual({ taskNodes: [], rosterEntryIds: [] });
 
     const lts = resolveReleaseVerification({
       currentVersion: '1.1.0',
@@ -286,10 +286,10 @@ describe('release verification profile resolver', () => {
     });
     expect(
       resolveReleaseMutationTaskNodes(lts, roster, [], [], [], ['mutation:a', 'mutation:b']),
-    ).toEqual({ taskNodes: ['mutation:a', 'mutation:b'], rosterEntryIds: ['a', 'b'] });
+    ).toEqual({ taskNodes: [], rosterEntryIds: [] });
   });
 
-  it('fails closed when affected mutation cannot resolve a roster package', () => {
+  it('does not require a mutation roster match', () => {
     const decision = resolveReleaseVerification({
       currentVersion: '1.0.0',
       targetVersion: '1.0.1',
@@ -306,7 +306,7 @@ describe('release verification profile resolver', () => {
         [],
         ['mutation:a'],
       ),
-    ).toThrow('CHECK_RELEASE_MUTATION_TARGET_UNRESOLVED');
+    ).not.toThrow();
   });
 
   it('applies the unconditional hygiene and candidate-integrity floor to every profile', () => {

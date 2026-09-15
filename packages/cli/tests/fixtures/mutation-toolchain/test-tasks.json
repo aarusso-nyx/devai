@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0.0",
+  "descriptorVersion": "fixed-mutation-toolchain-diagnostic-v1",
+  "repositoryId": "devai-diagnostic/mutation-toolchain-diagnostic",
+  "fallbackNodeId": "diagnostic:mutation-toolchain",
+  "dynamicFallbackSelectors": [],
+  "tasks": [
+    {
+      "nodeId": "diagnostic:mutation-toolchain",
+      "dependencies": [],
+      "argv": [
+        "node",
+        "../../host/run-diagnostic.mjs"
+      ],
+      "cwd": "packages/fixture",
+      "runner": "node-v1",
+      "inputSelectors": [
+        {
+          "kind": "glob",
+          "pattern": "**"
+        }
+      ],
+      "toolchainKeys": [
+        "node",
+        "pnpm",
+        "git",
+        "vitest",
+        "typescript"
+      ],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "test",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1",
+        "paths": [
+          "packages/fixture/reports/mutation/raw.json",
+          "packages/fixture/reports/mutation/compatibility.json"
+        ]
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "profileId": "affected",
+      "mode": "affected",
+      "requiredNodes": [
+        "diagnostic:mutation-toolchain"
+      ],
+      "eligibleNodes": [
+        "diagnostic:mutation-toolchain"
+      ]
+    },
+    {
+      "profileId": "rc",
+      "mode": "fixed",
+      "requiredNodes": [
+        "diagnostic:mutation-toolchain"
+      ]
+    }
+  ]
+}

@@ -58,10 +58,11 @@ interface ParsedLog {
  * write from a crash. A malformed record anywhere else is corruption of a
  * sealed history and is refused rather than silently skipped.
  */
-function parseLog(source: string): ParsedLog {
+function parseLog(source: string, round: string): ParsedLog {
   const lines = source.split('\n');
   const trailing = lines.pop() ?? '';
   const events: GovernanceEvent[] = [];
+  const lastBySession = new Map<string, GovernanceEvent>();
   for (const [index, line] of lines.entries()) {
     if (line.length === 0) continue;
     let parsed: unknown;
@@ -73,7 +74,24 @@ function parseLog(source: string): ParsedLog {
     if (!validators.governanceEvent(parsed)) {
       trackingFail(`GOVERNANCE_EVENT_LOG_INVALID:${String(index + 1)}`);
     }
-    events.push(parsed as GovernanceEvent);
+    const event = parsed as GovernanceEvent;
+    const { event_id: eventId, ...base } = event;
+    if (eventId !== governanceEventId(base)) {
+      trackingFail(`GOVERNANCE_EVENT_IDENTITY_MISMATCH:${String(index + 1)}`);
+    }
+    if (event.round_id !== round) {
+      trackingFail(`GOVERNANCE_EVENT_ROUND_MISMATCH:${String(index + 1)}`);
+    }
+    const previous = lastBySession.get(event.authority_session_id);
+    if (
+      event.session_sequence !== (previous?.session_sequence ?? 0) + 1 ||
+      event.previous_event_digest_sha256 !==
+        (previous === undefined ? null : governanceEventDigest(previous))
+    ) {
+      trackingFail(`GOVERNANCE_EVENT_CHAIN_MISMATCH:${String(index + 1)}`);
+    }
+    lastBySession.set(event.authority_session_id, event);
+    events.push(event);
   }
   return { events, torn: trailing.length > 0 };
 }
@@ -81,7 +99,7 @@ function parseLog(source: string): ParsedLog {
 function readLog(repoRoot: string, round: string): ParsedLog {
   const path = trackingEventsPath(repoRoot, round);
   if (!existsSync(path)) return { events: [], torn: false };
-  return parseLog(readFileSync(path, 'utf8'));
+  return parseLog(readFileSync(path, 'utf8'), round);
 }
 
 export function readGovernanceEvents(options: {

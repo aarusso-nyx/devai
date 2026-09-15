@@ -328,6 +328,13 @@ export function diffBlueprintAgainstInventory(opts: BlueprintDiffOptions): Bluep
         });
       }
     }
+    for (const role of blueprint.auth?.rbac?.roles ?? []) {
+      deltas.push({
+        kind: 'missing_permission',
+        target: role,
+        detail: `role ${role} declared in blueprint; no inventory_rbac body found`,
+      });
+    }
     return {
       status: 'no_inventory',
       deltas,
@@ -335,7 +342,7 @@ export function diffBlueprintAgainstInventory(opts: BlueprintDiffOptions): Bluep
         missing_entities: deltas.filter((d) => d.kind === 'missing_entity').length,
         missing_fields: 0,
         missing_routes: deltas.filter((d) => d.kind === 'missing_route').length,
-        missing_permissions: 0,
+        missing_permissions: deltas.filter((d) => d.kind === 'missing_permission').length,
       },
     };
   }
@@ -343,67 +350,71 @@ export function diffBlueprintAgainstInventory(opts: BlueprintDiffOptions): Bluep
   const deltas: BlueprintDiffEntry[] = [];
 
   // Data-model leg.
-  if (dataModel !== null) {
-    const inventoryTables = extractTableNames(dataModel);
-    for (const entity of blueprint.database.entities) {
-      const expectedTable =
-        entity.table ??
-        deriveTableName(blueprint.module.namespace, blueprint.module.name, entity.name);
-      if (!inventoryTables.has(expectedTable)) {
-        deltas.push({
-          kind: 'missing_entity',
-          target: entity.name,
-          detail: `entity ${entity.name} (table ${expectedTable}) is in blueprint but not in inventory_data_model`,
-        });
-      } else {
-        // Table exists — check field-level coverage.
-        const inventoryFields = extractFieldNames(dataModel, expectedTable);
-        for (const field of entity.fields) {
-          if (!inventoryFields.has(field.name)) {
-            deltas.push({
-              kind: 'missing_field',
-              target: `${entity.name}.${field.name}`,
-              detail: `field ${entity.name}.${field.name} declared in blueprint; not present on inventory table ${expectedTable}`,
-            });
-          }
-        }
-      }
-    }
-  }
-
-  // API leg.
-  if (apiMap !== null) {
-    const inventoryEndpoints = extractEndpointPaths(apiMap);
-    for (const resource of blueprint.api?.resources ?? []) {
-      const basePath = blueprint.api?.basePath ?? '/api';
-      const resourcePath = resource.path ?? `/${toKebabSimple(resource.entity)}s`;
-      for (const op of resource.operations ?? []) {
-        const wantedPath = `${basePath}${resourcePath}`;
-        const present = Array.from(inventoryEndpoints).some(
-          (p) => p === wantedPath || p === `${wantedPath}/:id`,
-        );
-        if (!present) {
+  const inventoryTables = extractTableNames(dataModel ?? {});
+  for (const entity of blueprint.database.entities) {
+    const expectedTable =
+      entity.table ??
+      deriveTableName(blueprint.module.namespace, blueprint.module.name, entity.name);
+    if (!inventoryTables.has(expectedTable)) {
+      deltas.push({
+        kind: 'missing_entity',
+        target: entity.name,
+        detail: `entity ${entity.name} (table ${expectedTable}) is in blueprint but not in inventory_data_model`,
+      });
+    } else {
+      // Table exists — check field-level coverage.
+      const inventoryFields = extractFieldNames(dataModel, expectedTable);
+      for (const field of entity.fields) {
+        if (!inventoryFields.has(field.name)) {
           deltas.push({
-            kind: 'missing_route',
-            target: `${op} ${wantedPath}`,
-            detail: `operation ${op} on ${resource.entity} declared in blueprint; no matching endpoint in inventory_api`,
+            kind: 'missing_field',
+            target: `${entity.name}.${field.name}`,
+            detail: `field ${entity.name}.${field.name} declared in blueprint; not present on inventory table ${expectedTable}`,
           });
         }
       }
     }
   }
 
-  // RBAC leg.
-  if (rbac !== null) {
-    const inventoryRoles = extractRoleIds(rbac);
-    for (const role of blueprint.auth?.rbac?.roles ?? []) {
-      if (!inventoryRoles.has(role)) {
+  // Match the operation, not just a coincidentally shared URL. PUT and PATCH
+  // both implement item updates; collection and item reads remain distinct.
+  const operationMethods: Readonly<Record<Operation, readonly string[]>> = {
+    list: ['GET'],
+    get: ['GET'],
+    create: ['POST'],
+    update: ['PUT', 'PATCH'],
+    delete: ['DELETE'],
+  };
+  const inventoryEndpoints = extractEndpoints(apiMap ?? {});
+  for (const resource of blueprint.api?.resources ?? []) {
+    const basePath = blueprint.api?.basePath ?? '/api';
+    const resourcePath = resource.path ?? `/${toKebabSimple(resource.entity)}s`;
+    for (const op of resource.operations ?? []) {
+      const wantedPath = `${basePath}${resourcePath}`;
+      const operationPath =
+        op === 'get' || op === 'update' || op === 'delete' ? `${wantedPath}/:id` : wantedPath;
+      const present = operationMethods[op].some((method) =>
+        inventoryEndpoints.has(`${method} ${operationPath}`),
+      );
+      if (!present) {
         deltas.push({
-          kind: 'missing_permission',
-          target: role,
-          detail: `role ${role} declared in blueprint; not present in inventory_rbac roles`,
+          kind: 'missing_route',
+          target: `${op} ${wantedPath}`,
+          detail: `operation ${op} on ${resource.entity} declared in blueprint; no matching endpoint in inventory_api`,
         });
       }
+    }
+  }
+
+  // RBAC leg.
+  const inventoryRoles = extractRoleIds(rbac ?? {});
+  for (const role of blueprint.auth?.rbac?.roles ?? []) {
+    if (!inventoryRoles.has(role)) {
+      deltas.push({
+        kind: 'missing_permission',
+        target: role,
+        detail: `role ${role} declared in blueprint; not present in inventory_rbac roles`,
+      });
     }
   }
 
@@ -553,11 +564,13 @@ function extractFieldNames(dataModel: unknown, table: string): Set<string> {
   return out;
 }
 
-function extractEndpointPaths(apiMap: unknown): Set<string> {
+function extractEndpoints(apiMap: unknown): Set<string> {
   const out = new Set<string>();
-  const am = apiMap as { endpoints?: ReadonlyArray<{ path?: string }> };
+  const am = apiMap as { endpoints?: ReadonlyArray<{ method?: string; path?: string }> };
   for (const e of am.endpoints ?? []) {
-    if (typeof e.path === 'string') out.add(e.path);
+    if (typeof e.method === 'string' && typeof e.path === 'string') {
+      out.add(`${e.method} ${e.path}`);
+    }
   }
   return out;
 }

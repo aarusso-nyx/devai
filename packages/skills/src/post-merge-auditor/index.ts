@@ -353,7 +353,7 @@ export function createPostMergeHostScope(
           (candidate) =>
             typeof candidate !== 'string' ||
             (!contained(candidate, worktreeRoot) &&
-              resolve(candidate) !== worktreesRoot &&
+              !(request.symbol === 'mkdirSync' && resolve(candidate) === worktreesRoot) &&
               !contained(candidate, runtimeRoot)),
         )
       ) {

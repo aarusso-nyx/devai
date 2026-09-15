@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { __classEntity__Service } from './__kebabEntity__.service';
 
 @Component({
+  standalone: false,
   selector: '__kebabModule__-__kebabEntity__-list',
   template: `
     <h2>__classEntity__s</h2>

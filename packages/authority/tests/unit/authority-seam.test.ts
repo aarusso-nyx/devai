@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import { verifyDecisionBinding } from '../../src/decision.js';
 import {
   HUMAN_ROLES,
   MACHINE_ACTORS,
@@ -13,6 +15,7 @@ import {
   type AuthorityPolicyAdapter,
   type AuthorityPolicyProvenance,
   type AuthorityRuntimeAdapter,
+  type Decision,
   type EnforcementMode,
   type MachinePrincipal,
   type MutationBoundaryAdapter,
@@ -22,6 +25,7 @@ import {
   type MutationRequest,
   type PreparedMutation,
   type ResourceTarget,
+  type ResourceTargetSelector,
   type TrustedExecutionState,
   type VerifiedPreparedMutationCapability,
 } from '../../src/index.js';
@@ -182,6 +186,410 @@ function policy(
 }
 
 describe('authority decision seam', () => {
+  it('binds an unmodified decision to the exact subject and authority context', () => {
+    const trustedRuntime = runtime();
+    const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+    const decision = decide({ plan, runtime: trustedRuntime, policy: policy() });
+    expect(verifyDecisionBinding({ plan }, decision, humanContext)).toEqual({
+      verified: true,
+      capability: {
+        decision_id: decision.decision_id,
+        decision_digest_sha256: decision.decision_digest_sha256,
+        subject_digest_sha256: canonicalSha256({ plan }),
+      },
+    });
+  });
+
+  it.each([
+    { change: { disposition: 'refuse' }, reason: 'decision disposition is not proceed' },
+    { change: { evaluation: 'deny' }, reason: 'binding mutation requires an allow evaluation' },
+    { change: { plan_id: 'different-plan' }, reason: 'plan id differs' },
+    { change: { batch_id: 'unexpected-batch' }, reason: 'batch id differs' },
+    { change: { subject_digest_sha256: digest('a') }, reason: 'subject digest differs' },
+    {
+      change: { authority_context_digest_sha256: digest('a') },
+      reason: 'authority context digest differs',
+    },
+    { change: { policy_binding_digest_sha256: digest('a') }, reason: 'policy digest differs' },
+    { change: { decision_id: 'different-decision' }, reason: 'decision id differs' },
+  ] satisfies { change: Partial<Decision>; reason: string }[])(
+    'refuses resealed authorization when $reason',
+    async ({ change, reason }) => {
+      const trustedRuntime = runtime();
+      const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+      const issued = decide({ plan, runtime: trustedRuntime, policy: policy() });
+      const altered = { ...issued, ...change };
+      const unsigned: Record<string, unknown> = { ...altered };
+      delete unsigned['decision_digest_sha256'];
+      const decision: Decision = { ...altered, decision_digest_sha256: canonicalSha256(unsigned) };
+      const verification = verifyDecisionBinding({ plan }, decision, humanContext);
+      expect(verification).toMatchObject({
+        verified: false,
+        reasons: expect.arrayContaining([reason]),
+      });
+      if (verification.verified) throw Error('altered binding accepted');
+      expect(verification.reasons).not.toContain('decision digest differs');
+      let prepares = 0;
+      const adapter: MutationBoundaryAdapter = {
+        adapter_id: 'refusal-observer',
+        adapter_version: '1.0.0',
+        target_kind: 'fs',
+        prepare: async () => {
+          prepares += 1;
+          throw Error('altered authorization reached adapter');
+        },
+        verifyPrepared: () => ({ verified: false, reasons: ['never prepared'] }),
+        apply: async () => {
+          throw Error('not authorized');
+        },
+      };
+      expect(
+        await prepareAuthorizedMutation({
+          adapter,
+          subject: { plan },
+          decision,
+          context: humanContext,
+        }),
+      ).toMatchObject({ prepared: false, reasons: expect.arrayContaining([reason]) });
+      expect(prepares).toBe(0);
+    },
+  );
+
+  it('refuses an unsealed decision change and independently changed authority context', () => {
+    const trustedRuntime = runtime();
+    const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+    const decision = decide({ plan, runtime: trustedRuntime, policy: policy() });
+    expect(
+      verifyDecisionBinding(
+        { plan },
+        { ...decision, decision_digest_sha256: digest('a') },
+        humanContext,
+      ),
+    ).toMatchObject({ verified: false, reasons: ['decision digest differs'] });
+    expect(
+      verifyDecisionBinding({ plan }, decision, { ...humanContext, action_id: 'different action' }),
+    ).toMatchObject({
+      verified: false,
+      reasons: expect.arrayContaining(['authority context digest differs', 'decision id differs']),
+    });
+  });
+
+  it.each([
+    '',
+    '/absolute',
+    './file',
+    'dir/',
+    'a\\b',
+    'a\0b',
+    'a//b',
+    '../file',
+    'a/../b',
+    'a/./b',
+  ])('refuses the isolated unsafe target or rename path %j before policy', (path) => {
+    const trustedRuntime = runtime({ mode: 'shadow' });
+    const envelope = trustedRuntime.materialize(baseRequest);
+    for (const target of [
+      { ...fsTarget, canonical_relative_path: path },
+      { ...fsTarget, operation: 'rename' as const, rename_from_canonical_relative_path: path },
+    ]) {
+      let calls = 0;
+      const selectedPolicy = {
+        ...policy(),
+        evaluate: () => {
+          calls += 1;
+          return { outcome: 'allow' as const, reasons: [] };
+        },
+      };
+      const decision = decide({
+        plan: exactPlan(envelope, [target]),
+        runtime: trustedRuntime,
+        policy: selectedPolicy,
+      });
+      expect(decision.reason_code).toBe('MALFORMED_PLAN');
+      expect(decision.disposition).toBe('refuse');
+      expect(calls).toBe(0);
+    }
+  });
+
+  it('refuses duplicate IDs and duplicate semantic resources independently', () => {
+    const trustedRuntime = runtime();
+    const envelope = trustedRuntime.materialize(baseRequest);
+    const targets: ResourceTarget[] = [
+      fsTarget,
+      {
+        kind: 'git-ref',
+        id: 'git',
+        repository_id: 'example-repository',
+        ref: 'refs/heads/main',
+        operation: 'update',
+      },
+      {
+        kind: 'db',
+        id: 'db',
+        connection_id: 'local',
+        database_id: 'main',
+        object_id: 'records',
+        operation: 'update',
+      },
+      {
+        kind: 'remote',
+        id: 'remote',
+        system_id: 'service',
+        endpoint_id: 'records',
+        operation_id: 'update',
+        publication: false,
+      },
+    ];
+    for (const target of targets) {
+      const valid = decide({
+        plan: exactPlan(envelope, [target]),
+        runtime: trustedRuntime,
+        policy: policy(),
+      });
+      expect(valid.evaluation).toBe('allow');
+      const duplicateResource = { ...target, id: target.id + '-different' };
+      expect(
+        decide({
+          plan: exactPlan(envelope, [target, duplicateResource]),
+          runtime: trustedRuntime,
+          policy: policy(),
+        }).reason_code,
+      ).toBe('MALFORMED_PLAN');
+    }
+    expect(
+      decide({
+        plan: exactPlan(envelope, [
+          fsTarget,
+          { ...fsTarget, canonical_relative_path: 'another-file' },
+        ]),
+        runtime: trustedRuntime,
+        policy: policy(),
+      }).reason_code,
+    ).toBe('MALFORMED_PLAN');
+  });
+
+  it('rejects each empty semantic identifier and credential-style remote endpoint', () => {
+    const trustedRuntime = runtime();
+    const envelope = trustedRuntime.materialize(baseRequest);
+    const targets: ResourceTarget[] = [
+      { ...fsTarget, id: ' ' },
+      { ...fsTarget, repository_id: ' ' },
+      { kind: 'git-ref', id: 'git', repository_id: '', ref: 'main', operation: 'update' },
+      {
+        kind: 'git-ref',
+        id: 'git',
+        repository_id: 'example-repository',
+        ref: ' ',
+        operation: 'update',
+      },
+      ...['connection_id', 'database_id', 'object_id'].map((key) => ({
+        kind: 'db' as const,
+        id: 'db',
+        connection_id: 'local',
+        database_id: 'main',
+        object_id: 'records',
+        operation: 'update' as const,
+        [key]: '',
+      })),
+      ...['system_id', 'endpoint_id', 'operation_id'].map((key) => ({
+        kind: 'remote' as const,
+        id: 'remote',
+        system_id: 'service',
+        endpoint_id: 'records',
+        operation_id: 'update',
+        publication: false,
+        [key]: ' ',
+      })),
+      {
+        kind: 'remote',
+        id: 'remote',
+        system_id: 'service',
+        endpoint_id: 'https://example.invalid/records',
+        operation_id: 'update',
+        publication: false,
+      },
+    ];
+    for (const target of targets)
+      expect(
+        decide({ plan: exactPlan(envelope, [target]), runtime: trustedRuntime, policy: policy() })
+          .reason_code,
+      ).toBe('MALFORMED_PLAN');
+  });
+
+  it('binds every selector dimension before allowing an exact batch', () => {
+    const trustedRuntime = runtime({
+      executionState: {
+        applied_batch_ids: [],
+        applied_target_count: 0,
+        partial_effect_evidence_refs: [],
+      },
+    });
+    const envelope = trustedRuntime.materialize({
+      ...baseRequest,
+      consent: { ...baseRequest.consent, allow_publish: true },
+    });
+    const cases: {
+      target: ResourceTarget;
+      selector: ResourceTargetSelector;
+      outside: ResourceTarget[];
+    }[] = [
+      {
+        target: { ...fsTarget, canonical_relative_path: 'docs/.hidden' },
+        selector: {
+          kind: 'fs',
+          repository_id: 'example-repository',
+          canonical_relative_path_glob: 'docs/**',
+          operations: ['update'],
+        },
+        outside: [
+          { ...fsTarget, canonical_relative_path: 'outside/file' },
+          { ...fsTarget, canonical_relative_path: 'docs/file', repository_id: 'other' },
+          { ...fsTarget, canonical_relative_path: 'docs/file', operation: 'delete' },
+        ],
+      },
+      {
+        target: {
+          kind: 'git-ref',
+          id: 'git',
+          repository_id: 'example-repository',
+          ref: 'refs/heads/main',
+          operation: 'update',
+        },
+        selector: {
+          kind: 'git-ref',
+          repository_id: 'example-repository',
+          ref_glob: 'refs/heads/*',
+          operations: ['update'],
+        },
+        outside: [
+          {
+            kind: 'git-ref',
+            id: 'git',
+            repository_id: 'other',
+            ref: 'refs/heads/main',
+            operation: 'update',
+          },
+          {
+            kind: 'git-ref',
+            id: 'git',
+            repository_id: 'example-repository',
+            ref: 'refs/tags/v1',
+            operation: 'update',
+          },
+          {
+            kind: 'git-ref',
+            id: 'git',
+            repository_id: 'example-repository',
+            ref: 'refs/heads/main',
+            operation: 'delete',
+          },
+        ],
+      },
+      {
+        target: {
+          kind: 'db',
+          id: 'db',
+          connection_id: 'local',
+          database_id: 'main',
+          object_id: 'records',
+          operation: 'update',
+        },
+        selector: {
+          kind: 'db',
+          connection_id: 'local',
+          database_id_glob: 'main',
+          object_id_glob: 'records',
+          operations: ['update'],
+        },
+        outside: ['connection_id', 'database_id', 'object_id', 'operation'].map((key) => ({
+          kind: 'db' as const,
+          id: 'db',
+          connection_id: 'local',
+          database_id: 'main',
+          object_id: 'records',
+          operation: 'update' as const,
+          [key]: key === 'operation' ? 'delete' : 'other',
+        })),
+      },
+      {
+        target: {
+          kind: 'remote',
+          id: 'remote',
+          system_id: 'service',
+          endpoint_id: 'records',
+          operation_id: 'update',
+          publication: false,
+        },
+        selector: {
+          kind: 'remote',
+          system_id: 'service',
+          endpoint_ids: ['records'],
+          operation_ids: ['update'],
+          publication: false,
+        },
+        outside: [
+          ...['system_id', 'endpoint_id', 'operation_id'].map((key) => ({
+            kind: 'remote' as const,
+            id: 'remote',
+            system_id: 'service',
+            endpoint_id: 'records',
+            operation_id: 'update',
+            publication: false,
+            [key]: 'other',
+          })),
+          {
+            kind: 'remote',
+            id: 'remote',
+            system_id: 'service',
+            endpoint_id: 'records',
+            operation_id: 'update',
+            publication: true,
+          },
+        ],
+      },
+    ];
+    for (const entry of cases) {
+      const plan: MutationPlan = {
+        plan_id: 'bounded-dimensions',
+        envelope,
+        strategy: 'bounded-batches',
+        selectors: [entry.selector],
+        bounds: { max_batches: 1, max_targets_per_batch: 1, max_total_targets: 1 },
+        batch_atomicity: 'each-batch',
+        recovery: 'preserve-and-report',
+      };
+      const batch: MutationBatch = {
+        batch_id: 'first-batch',
+        plan_id: plan.plan_id,
+        ordinal: 1,
+        atomicity: 'whole-batch',
+        targets: [entry.target],
+      };
+      expect(decide({ plan, batch, runtime: trustedRuntime, policy: policy() }).evaluation).toBe(
+        'allow',
+      );
+      for (const target of entry.outside)
+        expect(
+          decide({
+            plan,
+            batch: { ...batch, targets: [target] },
+            runtime: trustedRuntime,
+            policy: policy(),
+          }).reason_code,
+        ).toBe('MALFORMED_PLAN');
+      const unrelated = cases.find((other) => other.target.kind !== entry.target.kind);
+      if (!unrelated) throw Error('missing cross-kind fixture');
+      expect(
+        decide({
+          plan,
+          batch: { ...batch, targets: [unrelated.target] },
+          runtime: trustedRuntime,
+          policy: policy(),
+        }).reason_code,
+      ).toBe('MALFORMED_PLAN');
+    }
+  });
+
   it('declares exactly the five human roles and rejects machine actors', () => {
     for (const role of HUMAN_ROLES) {
       expect(
@@ -760,5 +1168,327 @@ describe('authority decision seam', () => {
       expect(decision.reason_code).toBe(testCase.reason);
       expect(decision.disposition).toBe('refuse');
     }
+  });
+});
+
+describe('policy provenance before authority evaluation', () => {
+  const textFields: [string, (value: string) => AuthorityPolicyProvenance][] = [
+    ['policy ID', (value) => ({ ...provenance, policy_id: value })],
+    ['policy version', (value) => ({ ...provenance, policy_version: value })],
+    ['repository ID', (value) => ({ ...provenance, repository_id: value })],
+    [
+      'constitution version',
+      (value) => ({ ...provenance, constitution: { ...provenance.constitution, version: value } }),
+    ],
+  ];
+  const hashFields: [string, (value: string) => AuthorityPolicyProvenance][] = [
+    [
+      'constitution digest',
+      (value) => ({
+        ...provenance,
+        constitution: { ...provenance.constitution, digest_sha256: value },
+      }),
+    ],
+    [
+      'source policy digest',
+      (value) => ({
+        ...provenance,
+        source_policy: { ...provenance.source_policy, digest_sha256: value },
+      }),
+    ],
+    ['resolved policy digest', (value) => ({ ...provenance, resolved_digest_sha256: value })],
+    [
+      'extension digest',
+      (value) => ({
+        ...provenance,
+        additive_extensions: [
+          { extension_id: 'extension', extension_version: '1.0.0', digest_sha256: value },
+        ],
+      }),
+    ],
+  ];
+  function expectProvenanceRefusal(selected: AuthorityPolicyProvenance) {
+    const trustedRuntime = runtime({ policy: selected });
+    const evaluate = vi.fn(() => ({
+      outcome: 'allow' as const,
+      reasons: ['must never authorize malformed provenance'],
+    }));
+    const decision = decide({
+      plan: exactPlan(trustedRuntime.materialize(baseRequest)),
+      runtime: trustedRuntime,
+      policy: { provenance: selected, evaluate },
+    });
+    expect(decision.reason_code).toBe('POLICY_PROVENANCE_INVALID');
+    expect(decision.evaluation).toBe('deny');
+    expect(decision.disposition).toBe('refuse');
+    expect(evaluate).not.toHaveBeenCalled();
+  }
+  for (const [name, withValue] of textFields) {
+    it.each(['', ' ', '\t\n'])(`refuses empty or whitespace-only ${name}: %j`, (value) => {
+      expectProvenanceRefusal(withValue(value));
+    });
+  }
+  for (const [name, withValue] of hashFields) {
+    it.each([
+      '',
+      'a'.repeat(63),
+      'a'.repeat(65),
+      'G'.repeat(64),
+      'A'.repeat(64),
+      `prefix${'a'.repeat(64)}`,
+      `${'a'.repeat(64)}suffix`,
+    ])(`refuses malformed ${name}: %j`, (value) => {
+      expectProvenanceRefusal(withValue(value));
+    });
+  }
+  it('accepts lowercase SHA-256 endpoints with exact policy identity', () => {
+    for (const value of ['0'.repeat(64), 'f'.repeat(64)]) {
+      const selected = { ...provenance, resolved_digest_sha256: value };
+      const trustedRuntime = runtime({ policy: selected });
+      const decision = decide({
+        plan: exactPlan(trustedRuntime.materialize(baseRequest)),
+        runtime: trustedRuntime,
+        policy: policy(selected),
+      });
+      expect(decision.reason_code).toBe('POLICY_ALLOW');
+      expect(decision.disposition).toBe('proceed');
+    }
+  });
+});
+
+describe('decision binding independent field checks', () => {
+  it.each([
+    ['plan_id', 'other-plan', 'plan id differs'],
+    ['batch_id', 'unexpected-batch', 'batch id differs'],
+    ['subject_digest_sha256', digest('f'), 'subject digest differs'],
+    ['authority_context_digest_sha256', digest('f'), 'authority context digest differs'],
+    ['policy_binding_digest_sha256', digest('f'), 'policy digest differs'],
+    ['decision_id', 'AUTH-0000000000000000', 'decision id differs'],
+    ['disposition', 'refuse', 'decision disposition is not proceed'],
+    ['evaluation', 'deny', 'binding mutation requires an allow evaluation'],
+  ])(
+    'rejects substituted %s even when the decision digest is recomputed',
+    async (field, value, reason) => {
+      const trustedRuntime = runtime();
+      const plan = exactPlan(trustedRuntime.materialize(baseRequest), [fsTarget]);
+      const original = decide({ plan, runtime: trustedRuntime, policy: policy() });
+      expect(verifyDecisionBinding({ plan }, original, humanContext).verified).toBe(true);
+      const { decision_digest_sha256: _digest, ...unsigned } = original;
+      const altered = { ...unsigned, [field]: value };
+      const changed = { ...altered, decision_digest_sha256: canonicalSha256(altered) } as Decision;
+      const verification = verifyDecisionBinding({ plan }, changed, humanContext);
+      expect(verification.verified).toBe(false);
+      if (verification.verified) throw new Error('forged decision accepted');
+      expect(verification.reasons).toContain(reason);
+      expect(verification.reasons).not.toContain('decision digest differs');
+      const prepare = vi.fn(async () => {
+        throw new Error('prepare must not run');
+      });
+      const adapter: MutationBoundaryAdapter = {
+        target_kind: 'fs',
+        adapter_id: 'binding-regression',
+        adapter_version: '1.0.0',
+        prepare,
+        verifyPrepared: () => {
+          throw new Error('verify must not run');
+        },
+        apply: async () => {
+          throw new Error('apply must not run');
+        },
+      };
+      const result = await prepareAuthorizedMutation({
+        adapter,
+        subject: { plan },
+        decision: changed,
+        context: humanContext,
+      });
+      expect(result.prepared).toBe(false);
+      expect(prepare).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('bounded selector validation with independently valid limits', () => {
+  const selectors: readonly ResourceTargetSelector[] = [
+    {
+      kind: 'fs',
+      repository_id: 'example-repository',
+      canonical_relative_path_glob: 'docs/**',
+      operations: ['update'],
+    },
+    {
+      kind: 'git-ref',
+      repository_id: 'example-repository',
+      ref_glob: 'refs/heads/*',
+      operations: ['update'],
+    },
+    {
+      kind: 'db',
+      connection_id: 'primary',
+      database_id_glob: 'app*',
+      object_id_glob: 'table*',
+      operations: ['update'],
+    },
+    {
+      kind: 'remote',
+      system_id: 'registry',
+      endpoint_ids: ['package'],
+      operation_ids: ['inspect'],
+      publication: false,
+    },
+  ];
+  const cases: [string, ResourceTargetSelector][] = [];
+  for (const selector of selectors) {
+    if (selector.kind === 'fs') {
+      for (const path of [
+        '',
+        '/absolute',
+        './relative',
+        'docs/',
+        'a\\b',
+        'a\0b',
+        'a//b',
+        'a/./b',
+        'a/../b',
+      ]) {
+        cases.push([
+          `fs path ${JSON.stringify(path)}`,
+          { ...selector, canonical_relative_path_glob: path },
+        ]);
+      }
+    }
+    const fields =
+      selector.kind === 'git-ref'
+        ? ['repository_id', 'ref_glob']
+        : selector.kind === 'db'
+          ? ['connection_id', 'database_id_glob', 'object_id_glob']
+          : selector.kind === 'remote'
+            ? ['system_id']
+            : [];
+    for (const field of fields) {
+      for (const value of ['', ' ', '\t\n'])
+        cases.push([
+          `${selector.kind} ${field} ${JSON.stringify(value)}`,
+          { ...selector, [field]: value },
+        ]);
+    }
+    if (selector.kind === 'remote') {
+      cases.push(['remote empty endpoints', { ...selector, endpoint_ids: [] }]);
+      cases.push(['remote empty operations', { ...selector, operation_ids: [] }]);
+      for (const value of ['', ' ', '\t\n', 'https://registry.example/package']) {
+        cases.push([
+          `remote invalid endpoint ${JSON.stringify(value)}`,
+          { ...selector, endpoint_ids: ['valid', value] },
+        ]);
+      }
+    } else cases.push([`${selector.kind} empty operations`, { ...selector, operations: [] }]);
+  }
+  function evaluate(selector: ResourceTargetSelector, mode: EnforcementMode) {
+    const trustedRuntime = runtime({ mode });
+    const selectedPolicy = policy();
+    const evaluatePolicy = vi.fn(selectedPolicy.evaluate);
+    const plan: MutationPlan = {
+      plan_id: 'selector-validation',
+      envelope: trustedRuntime.materialize(baseRequest),
+      strategy: 'bounded-batches',
+      selectors: [selector],
+      bounds: { max_batches: 1, max_targets_per_batch: 1, max_total_targets: 1 },
+      batch_atomicity: 'each-batch',
+      recovery: 'preserve-and-report',
+    };
+    return {
+      decision: decide({
+        plan,
+        runtime: trustedRuntime,
+        policy: { ...selectedPolicy, evaluate: evaluatePolicy },
+      }),
+      evaluatePolicy,
+    };
+  }
+  it.each(selectors)(
+    'accepts the valid $kind selector with minimal positive limits',
+    (selector) => {
+      const { decision, evaluatePolicy } = evaluate(selector, 'binding');
+      expect(decision.reason_code).toBe('POLICY_ALLOW');
+      expect(decision.evaluation).toBe('allow');
+      expect(decision.readiness.eligible).toBe(false);
+      expect(evaluatePolicy).toHaveBeenCalledOnce();
+    },
+  );
+  it.each(cases)('refuses %s before policy evaluation in binding and shadow', (_name, selector) => {
+    for (const mode of ['binding', 'shadow'] as const) {
+      const { decision, evaluatePolicy } = evaluate(selector, mode);
+      expect(decision.reason_code).toBe('MALFORMED_PLAN');
+      expect(decision.disposition).toBe('refuse');
+      expect(decision.evaluation).toBe('deny');
+      expect(decision.reasons).toHaveLength(1);
+      expect(evaluatePolicy).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe('policy decision evidence retention', () => {
+  const recovery: TrustedExecutionState = {
+    applied_batch_ids: ['already-applied'],
+    applied_target_count: 1,
+    partial_effect_evidence_refs: ['evidence:prior-effect'],
+    recovery_checkpoint_ref: 'checkpoint:prior-effect',
+  };
+  it.each(['allow', 'deny'] as const)(
+    'retains ordered reasons and obligations for %s',
+    (outcome) => {
+      const trustedRuntime = runtime({ executionState: recovery });
+      const plan = exactPlan(trustedRuntime.materialize(baseRequest));
+      const reasons = ['first policy finding', 'second policy finding'];
+      const obligations = ['retain evidence', 'obtain independent review'];
+      const decision = decide({
+        plan,
+        runtime: trustedRuntime,
+        policy: { provenance, evaluate: () => ({ outcome, reasons, obligations }) },
+      });
+      expect(decision.evaluation).toBe(outcome);
+      expect(decision.reason_code).toBe(outcome === 'allow' ? 'POLICY_ALLOW' : 'POLICY_DENY');
+      expect(decision.reasons).toEqual(reasons);
+      expect(decision.obligations).toEqual(obligations);
+      expect(decision.recovery).toEqual(recovery);
+      expect(decision.authority_context_digest_sha256).toBe(canonicalSha256(humanContext));
+      expect(decision.policy_binding_digest_sha256).toBe(canonicalSha256(provenance));
+      const { decision_digest_sha256, ...unsigned } = decision;
+      expect(decision_digest_sha256).toBe(canonicalSha256(unsigned));
+      expect(canonicalSha256({ ...unsigned, obligations: [...obligations].reverse() })).not.toBe(
+        decision_digest_sha256,
+      );
+      expect(canonicalSha256({ ...unsigned, recovery: undefined })).not.toBe(
+        decision_digest_sha256,
+      );
+    },
+  );
+  it.each([
+    [new Error('policy unavailable'), 'policy unavailable'],
+    ['policy unavailable', 'policy unavailable'],
+    [null, 'null'],
+    [undefined, 'undefined'],
+  ])('retains failure diagnostics and recovery for thrown %j', (failure, message) => {
+    const trustedRuntime = runtime({ executionState: recovery });
+    const decision = decide({
+      plan: exactPlan(trustedRuntime.materialize(baseRequest)),
+      runtime: trustedRuntime,
+      policy: {
+        provenance,
+        evaluate: () => {
+          throw failure;
+        },
+      },
+    });
+    expect(decision).toMatchObject({
+      evaluation: 'deny',
+      disposition: 'refuse',
+      reason_code: 'POLICY_ADAPTER_ERROR',
+      reasons: [`authority policy adapter failed: ${message}`],
+      obligations: [],
+      recovery,
+      authority_context_digest_sha256: canonicalSha256(humanContext),
+      readiness: { eligible: false },
+    });
   });
 });

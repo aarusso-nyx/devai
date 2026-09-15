@@ -60,9 +60,7 @@ describe('installed inventory_api sensor', () => {
     };
 
     for (const [key, schema] of Object.entries(COMPATIBILITY_VALIDATORS)) {
-      expect(packaged.roster, `${key} schema is absent from the packaged roster`).toContain(
-        schema,
-      );
+      expect(packaged.roster, `${key} schema is absent from the packaged roster`).toContain(schema);
       expect(
         packaged.callable,
         `${key} validator is not callable from the packaged registry`,
@@ -112,16 +110,7 @@ describe('installed inventory_api sensor', () => {
 
     const result = spawnSync(
       process.execPath,
-      [
-        BIN,
-        'sense',
-        'run',
-        'inventory_api',
-        '--repo-root',
-        repository,
-        '--format',
-        'json',
-      ],
+      [BIN, 'sense', 'run', 'inventory_api', '--repo-root', repository, '--format', 'json'],
       {
         cwd: repository,
         encoding: 'utf8',

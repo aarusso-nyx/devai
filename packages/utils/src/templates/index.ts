@@ -150,6 +150,10 @@ function parseConditionals(body: string): ConditionalNode[] {
   while (cursor < body.length) {
     const remaining = body.slice(cursor);
     const openMatch = IF_OPEN.exec(remaining);
+    const closeMatch = IF_CLOSE.exec(remaining);
+    if (closeMatch !== null && (openMatch === null || closeMatch.index < openMatch.index)) {
+      throw new Error(`parseConditionals: unmatched closing ENDIF:${closeMatch[1]}`);
+    }
     if (openMatch === null) {
       if (cursor < body.length) result.push({ kind: 'text', content: body.slice(cursor) });
       break;

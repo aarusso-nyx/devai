@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "descriptorVersion": "v1rc-survivor-3",
+  "descriptorVersion": "v1rc-survivor-4",
   "repositoryId": "aarusso-nyx/devai",
   "fallbackNodeId": "test:local-full",
   "dynamicFallbackSelectors": [],
@@ -43,7 +43,7 @@
     {
       "nodeId": "test:authority",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:authority"],
+      "argv": ["pnpm", "run", "test:authority", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -62,6 +62,10 @@
         {
           "kind": "exact",
           "pattern": "vitest.config.ts"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/schemas/"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -73,8 +77,17 @@
     },
     {
       "nodeId": "test:cli",
-      "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:cli"],
+      "dependencies": ["build", "test:package-staging"],
+      "argv": [
+        "pnpm",
+        "run",
+        "test:cli",
+        "--configLoader",
+        "runner",
+        "--no-cache",
+        "--exclude",
+        "**/release-package-staging.test.ts"
+      ],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -151,9 +164,111 @@
       }
     },
     {
+      "nodeId": "test:package-staging",
+      "dependencies": ["build"],
+      "argv": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "tests/config/local.config.ts",
+        "--configLoader",
+        "runner",
+        "--no-cache",
+        "packages/cli/tests/unit/release-package-staging.test.ts"
+      ],
+      "cwd": ".",
+      "runner": "vitest-v1",
+      "inputSelectors": [
+        {
+          "kind": "prefix",
+          "pattern": "packages/cli/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/authority/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/effects-check/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/evidence/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/loop/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/schemas/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/sensors/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/skills/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/spec/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/utils/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/authority/src/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/evidence/src/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/sensors/src/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "packages/skills/src/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "vitest.config.ts"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "pnpm-lock.yaml"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        }
+      ],
+      "toolchainKeys": ["node", "pnpm", "vitest"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "vitest",
+        "requiredResult": "pass"
+      }
+    },
+    {
       "nodeId": "test:effects",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:effects"],
+      "argv": ["pnpm", "run", "test:effects", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -180,7 +295,7 @@
     {
       "nodeId": "test:evidence",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:evidence"],
+      "argv": ["pnpm", "run", "test:evidence", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -219,7 +334,7 @@
     {
       "nodeId": "test:loop",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:loop"],
+      "argv": ["pnpm", "run", "test:loop", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -278,7 +393,7 @@
     {
       "nodeId": "test:sensors",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:sensors"],
+      "argv": ["pnpm", "run", "test:sensors", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -321,7 +436,7 @@
     {
       "nodeId": "test:schemas",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:schemas"],
+      "argv": ["pnpm", "run", "test:schemas", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -352,7 +467,7 @@
     {
       "nodeId": "test:skills",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:skills"],
+      "argv": ["pnpm", "run", "test:skills", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -415,7 +530,7 @@
     {
       "nodeId": "test:spec",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:spec"],
+      "argv": ["pnpm", "run", "test:spec", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -458,7 +573,7 @@
     {
       "nodeId": "test:utils",
       "dependencies": ["generate"],
-      "argv": ["pnpm", "run", "test:utils"],
+      "argv": ["pnpm", "run", "test:utils", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -485,7 +600,7 @@
     {
       "nodeId": "test:root",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:root"],
+      "argv": ["pnpm", "run", "test:root", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-v1",
       "inputSelectors": [
@@ -540,13 +655,22 @@
     {
       "nodeId": "format",
       "dependencies": [],
-      "argv": ["pnpm", "run", "format:check"],
+      "argv": ["pnpm", "run", "format:check:all"],
       "cwd": ".",
       "runner": "pnpm-script-v1",
-      "inputSelectors": [{ "kind": "glob", "pattern": "**" }],
+      "inputSelectors": [
+        {
+          "kind": "glob",
+          "pattern": "**"
+        }
+      ],
       "toolchainKeys": ["node", "pnpm"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1"
+      }
     },
     {
       "nodeId": "release:static-integrity",
@@ -555,16 +679,38 @@
       "cwd": ".",
       "runner": "pnpm-script-v1",
       "inputSelectors": [
-        { "kind": "prefix", "pattern": "packages/" },
-        { "kind": "prefix", "pattern": "law/policy/" },
-        { "kind": "prefix", "pattern": "law/schemas/" },
-        { "kind": "prefix", "pattern": "scripts/" },
-        { "kind": "exact", "pattern": "package.json" },
-        { "kind": "exact", "pattern": "pnpm-lock.yaml" }
+        {
+          "kind": "prefix",
+          "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/policy/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/schemas/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "pnpm-lock.yaml"
+        }
       ],
-      "toolchainKeys": ["node", "pnpm"],
+      "toolchainKeys": ["node", "pnpm", "git"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1"
+      }
     },
     {
       "nodeId": "release:closure",
@@ -573,18 +719,46 @@
       "cwd": ".",
       "runner": "pnpm-script-v1",
       "inputSelectors": [
-        { "kind": "prefix", "pattern": "packages/" },
-        { "kind": "prefix", "pattern": "docs/" },
-        { "kind": "prefix", "pattern": ".github/workflows/" },
-        { "kind": "prefix", "pattern": "law/" },
-        { "kind": "prefix", "pattern": "scripts/" },
-        { "kind": "exact", "pattern": "package.json" },
-        { "kind": "exact", "pattern": "pnpm-lock.yaml" },
-        { "kind": "exact", "pattern": "test-tasks.json" }
+        {
+          "kind": "prefix",
+          "pattern": "packages/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": ".github/workflows/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "scripts/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "pnpm-lock.yaml"
+        },
+        {
+          "kind": "exact",
+          "pattern": "test-tasks.json"
+        }
       ],
-      "toolchainKeys": ["node", "pnpm"],
+      "toolchainKeys": ["node", "pnpm", "git"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "command-result", "requiredResult": "pass" }
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass",
+        "git_view": "candidate-local-shallow-v1"
+      }
     },
     {
       "nodeId": "release:affected-anchor",
@@ -592,10 +766,18 @@
       "argv": ["node", "-e", "process.stdout.write('affected release selection complete\\n')"],
       "cwd": ".",
       "runner": "node-builtin-v1",
-      "inputSelectors": [{ "kind": "exact", "pattern": "test-tasks.json" }],
+      "inputSelectors": [
+        {
+          "kind": "exact",
+          "pattern": "test-tasks.json"
+        }
+      ],
       "toolchainKeys": ["node"],
       "allowlistedEnv": [],
-      "outputContract": { "kind": "marker", "value": "affected release selection complete" }
+      "outputContract": {
+        "kind": "marker",
+        "value": "affected release selection complete"
+      }
     },
     {
       "nodeId": "test:local-full",
@@ -664,7 +846,88 @@
       "outputContract": {
         "kind": "workspace-build",
         "requiredResult": "pass",
-        "paths": ["scratch/coverage/rc-reachable-sources.json"]
+        "paths": [
+          "scratch/coverage/rc-reachable-sources.json",
+          "packages/authority/tsconfig.tsbuildinfo",
+          "packages/cli/tsconfig.tsbuildinfo",
+          "packages/effects-check/tsconfig.tsbuildinfo",
+          "packages/evidence/tsconfig.tsbuildinfo",
+          "packages/loop/tsconfig.tsbuildinfo",
+          "packages/schemas/tsconfig.tsbuildinfo",
+          "packages/sensors/tsconfig.tsbuildinfo",
+          "packages/skills/tsconfig.tsbuildinfo",
+          "packages/spec/tsconfig.tsbuildinfo",
+          "packages/utils/tsconfig.tsbuildinfo"
+        ],
+        "execution_only_paths": true,
+        "generated_namespaces": [
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/authority/dist",
+            "package_manifest": "packages/authority/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/cli/dist",
+            "package_manifest": "packages/cli/package.json",
+            "required_artifacts": [
+              "runtime/package.json",
+              "runtime/evidence-verification/provenance.json",
+              "law/constitution.md",
+              "runtime/law/constitution.md"
+            ]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/effects-check/dist",
+            "package_manifest": "packages/effects-check/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/evidence/dist",
+            "package_manifest": "packages/evidence/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/loop/dist",
+            "package_manifest": "packages/loop/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/schemas/dist",
+            "package_manifest": "packages/schemas/package.json",
+            "required_artifacts": [
+              "sensor-registry.json",
+              "schemas/release-lifecycle-state.schema.json"
+            ]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/sensors/dist",
+            "package_manifest": "packages/sensors/package.json",
+            "required_artifacts": [
+              "sensor-registry.json",
+              "sense-presets.json",
+              "round-execution.json"
+            ]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/skills/dist",
+            "package_manifest": "packages/skills/package.json",
+            "required_artifacts": ["law/constitution.md", "law/policy/release-verification.json"]
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/spec/dist",
+            "package_manifest": "packages/spec/package.json"
+          },
+          {
+            "derivation": "devai-package-dist-v1",
+            "prefix": "packages/utils/dist",
+            "package_manifest": "packages/utils/package.json"
+          }
+        ]
       }
     },
     {
@@ -734,13 +997,21 @@
       "allowlistedEnv": [],
       "outputContract": {
         "kind": "command-result",
-        "requiredResult": "pass"
+        "requiredResult": "pass",
+        "paths": ["scratch/typecheck/cli.tsbuildinfo"],
+        "execution_only_paths": true,
+        "generated_namespaces": [
+          {
+            "derivation": "devai-cli-typecheck-v1",
+            "prefix": "scratch/typecheck/cli"
+          }
+        ]
       }
     },
     {
       "nodeId": "test:coverage:rc",
       "dependencies": ["build"],
-      "argv": ["pnpm", "run", "test:coverage:rc"],
+      "argv": ["pnpm", "run", "test:coverage:rc", "--configLoader", "runner", "--no-cache"],
       "cwd": ".",
       "runner": "vitest-coverage-v1",
       "inputSelectors": [
@@ -799,7 +1070,15 @@
     {
       "profileId": "affected",
       "mode": "affected",
-      "requiredNodes": ["generate"],
+      "requiredNodes": [
+        "generate",
+        "format",
+        "lint",
+        "typecheck",
+        "test:schemas",
+        "release:static-integrity",
+        "release:closure"
+      ],
       "eligibleNodes": [
         "generate",
         "test:authority",
@@ -817,7 +1096,10 @@
         "build",
         "format",
         "lint",
-        "typecheck"
+        "typecheck",
+        "release:static-integrity",
+        "release:closure",
+        "test:package-staging"
       ]
     },
     {

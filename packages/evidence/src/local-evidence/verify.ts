@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 import { computeSourceHash } from './source-hash.js';
 import { dirname } from 'node:path';
 import { resolveLocalEvidencePolicy, type LocalEvidencePolicy } from './config.js';
 import type { LocalEvidenceManifest } from './collect.js';
 import { deriveExactSubject, deriveTrailerParentSubject } from './subject.js';
 
-const validateLocalEvidenceManifest = getValidator('local-evidence-manifest.schema.json');
+const validateLocalEvidenceManifest = validators.localEvidenceManifest;
 
 /**
  * `devai evidence local verify` core (D-117): validate a
@@ -58,7 +58,7 @@ export interface VerifyLocalResult {
 }
 
 export function parseTrailerPath(message: string): string {
-  const match = /^Local-CI-Evidence:\s*(\S+)\s*$/imu.exec(message);
+  const match = /^Local-CI-Evidence:[^\S\r\n]*(\S+)[^\S\r\n]*\r?$/imu.exec(message);
   return match?.[1] ?? '';
 }
 
@@ -115,6 +115,7 @@ function validatePolicyAlignment(
 }
 
 function validateAge(manifest: LocalEvidenceManifest, now: number): void {
+  if (!Number.isFinite(now)) fail('verification clock is not a finite timestamp');
   const generatedAt = Date.parse(manifest.generatedAt);
   if (!Number.isFinite(generatedAt)) fail('manifest generatedAt is not a valid timestamp');
   if (generatedAt > now + 5 * 60 * 1000) fail('manifest generatedAt is in the future');
@@ -230,7 +231,9 @@ function validateTools(
 function validateJobs(manifest: LocalEvidenceManifest, policy: LocalEvidencePolicy): void {
   for (const jobName of policy.requiredJobs) {
     const job = manifest.jobs[jobName];
-    if (job === undefined) fail(`manifest missing required job: ${jobName}`);
+    if (!Object.hasOwn(manifest.jobs, jobName) || job === undefined) {
+      fail(`manifest missing required job: ${jobName}`);
+    }
     if (job.result !== 'success') fail(`manifest job ${jobName} did not succeed`);
     if (job.metadata['job'] !== jobName) fail(`manifest job ${jobName} metadata does not match`);
     const platform = job.metadata['platform'] ?? '';

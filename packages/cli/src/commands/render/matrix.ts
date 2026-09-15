@@ -445,6 +445,8 @@ function checkStrict(
   for (const scope of matrix.scopes) {
     const row = matrix.grid.get(scope) as Map<string, Cell>;
     for (const tier of allRequiredTiers) {
+      // Historical mutation rows are informational; hardening never gates DEVAI.
+      if (tier === 'mutation') continue;
       const cell = row.get(tier);
 
       // Tier is completely absent from the matrix for this scope.
@@ -498,16 +500,6 @@ function checkStrict(
               scope,
               tier,
               reason: `below threshold: coverage ${m.coverage_pct.lines.toFixed(1)}% < required ${req.toFixed(1)}%`,
-            });
-          }
-        }
-        if (tier === 'mutation' && typeof m?.mutation_score === 'number') {
-          const req = thresholds.mutation?.score_min;
-          if (req !== undefined && m.mutation_score < req) {
-            violations.push({
-              scope,
-              tier,
-              reason: `below threshold: mutation score ${m.mutation_score.toFixed(1)}% < required ${req.toFixed(1)}%`,
             });
           }
         }

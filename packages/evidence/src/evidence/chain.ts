@@ -7,9 +7,9 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { dirname } from 'node:path';
-import { getValidator } from '@devai-nyx/schemas';
+import { validators } from '@devai-nyx/schemas';
 
-const validateEvidence = getValidator('evidence.schema.json');
+const validateEvidence = validators.evidence;
 
 export interface EvidenceContext {
   repo_root: string;
@@ -126,7 +126,7 @@ export function extractManifestInputs(record: EvidenceRecord): ManifestHashInput
 
 function atomicWriteFileSync(path: string, contents: string): void {
   const tmp = `${path}.tmp.${process.pid.toString()}.${Date.now().toString()}`;
-  writeFileSync(tmp, contents);
+  writeFileSync(tmp, contents, { flag: 'wx' });
   renameSync(tmp, path);
 }
 

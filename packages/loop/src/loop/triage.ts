@@ -381,7 +381,7 @@ export async function tieBreakWithLadder(opts: TieBreakLadderOptions): Promise<T
   // Inconclusive — escalate.
   return {
     schemaVersion: '1.0.0',
-    id: opts.first.id,
+    id: triageId(opts.first.subject_evidence_ref, 'inconclusive'),
     generated_at: generatedAt,
     subject_evidence_ref: opts.first.subject_evidence_ref,
     classification: 'inconclusive',

@@ -118,6 +118,100 @@ describe('deterministic operation catalog', () => {
     ]);
   });
 
+  it.each([
+    { slice: 'packages', expected: 'packages' },
+    { slice: '  ', expected: 'all' },
+    { slice: '', expected: 'all' },
+    { slice: 42, expected: 'all' },
+  ])(
+    'selects the requested inventory slice or its empty-input default: $slice',
+    async ({ slice, expected }) => {
+      const run = vi.fn<OperationCommandRunner['run']>(() => ({
+        operation: 'sense.inventory',
+        status: 'pass',
+      }));
+      await runOperation(
+        {
+          recipe: 'devai-assess',
+          variant: 'inventory',
+          operation: 'sense.inventory',
+          repo_root: '/repo',
+          inputs: { slice },
+        },
+        createOperationHost({ run }),
+      );
+      expect(run).toHaveBeenCalledExactlyOnceWith({
+        argv: ['devai', 'sense', 'inventory', '--slice', expected],
+        cwd: '/repo',
+        effect: 'read',
+        write_paths: [],
+      });
+    },
+  );
+
+  it('forwards explicit chain verification scope', async () => {
+    const run = vi.fn<OperationCommandRunner['run']>(() => ({
+      operation: 'evidence.verify',
+      status: 'pass',
+    }));
+    await runOperation(
+      {
+        recipe: 'devai-verify',
+        variant: 'rc',
+        operation: 'evidence.verify',
+        repo_root: '/repo',
+        inputs: { scope: 'chain' },
+      },
+      createOperationHost({ run }),
+    );
+    expect(run).toHaveBeenCalledExactlyOnceWith({
+      argv: ['devai', 'evidence', 'verify', '--scope', 'chain'],
+      cwd: '/repo',
+      effect: 'read',
+      write_paths: [],
+    });
+  });
+
+  it.each(['remote', 'CHAIN'])(
+    'refuses unsupported verification scope before running a command: %s',
+    async (scope) => {
+      const run = vi.fn<OperationCommandRunner['run']>();
+      await expect(
+        runOperation(
+          {
+            recipe: 'devai-verify',
+            variant: 'rc',
+            operation: 'evidence.verify',
+            repo_root: '/repo',
+            inputs: { scope },
+          },
+          createOperationHost({ run }),
+        ),
+      ).rejects.toThrow('OPERATION_INPUT_INVALID:scope');
+      expect(run).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([undefined, '', '  ', 42])(
+    'refuses an absent or malformed required round before running a command: %s',
+    async (round) => {
+      const run = vi.fn<OperationCommandRunner['run']>();
+      await expect(
+        runOperation(
+          {
+            recipe: 'devai-assess',
+            variant: 'round',
+            operation: 'round.assess',
+            repo_root: '/repo',
+            inputs: { round },
+          },
+          createOperationHost({ run }),
+        ),
+      ).rejects.toThrow('OPERATION_INPUT_REQUIRED:round');
+      expect(run).not.toHaveBeenCalled();
+    },
+  );
+
   it('materializes reviewed test candidates exactly and refuses drift', async () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-tests-from-docs-'));
     const path = 'packages/demo/tests/from-docs.test.ts';

@@ -1,0 +1,35 @@
+import * as fs from 'node:fs';
+import * as child from 'node:child_process';
+declare function defineCommand(input: { name: string; run: () => unknown }): unknown;
+// Parsed as a TypeScript program only; these host effects are never executed.
+export const commands = [
+  defineCommand({ name: 'fs appendFile', run: () => fs.appendFile('target', 'data', () => {}) }),
+  defineCommand({ name: 'fs appendFileSync', run: () => fs.appendFileSync('target', 'data') }),
+  defineCommand({ name: 'fs chmod', run: () => fs.chmod('target', 0o600, () => {}) }),
+  defineCommand({ name: 'fs chmodSync', run: () => fs.chmodSync('target', 0o600) }),
+  defineCommand({ name: 'fs copyFile', run: () => fs.copyFile('source', 'target', () => {}) }),
+  defineCommand({ name: 'fs copyFileSync', run: () => fs.copyFileSync('source', 'target') }),
+  defineCommand({ name: 'fs cp', run: () => fs.cp('source', 'target', () => {}) }),
+  defineCommand({ name: 'fs cpSync', run: () => fs.cpSync('source', 'target') }),
+  defineCommand({ name: 'fs mkdir', run: () => fs.mkdir('target', () => {}) }),
+  defineCommand({ name: 'fs mkdirSync', run: () => fs.mkdirSync('target') }),
+  defineCommand({ name: 'fs rename', run: () => fs.rename('source', 'target', () => {}) }),
+  defineCommand({ name: 'fs renameSync', run: () => fs.renameSync('source', 'target') }),
+  defineCommand({ name: 'fs rm', run: () => fs.rm('target', () => {}) }),
+  defineCommand({ name: 'fs rmSync', run: () => fs.rmSync('target') }),
+  defineCommand({ name: 'fs symlink', run: () => fs.symlink('source', 'target', () => {}) }),
+  defineCommand({ name: 'fs symlinkSync', run: () => fs.symlinkSync('source', 'target') }),
+  defineCommand({ name: 'fs unlink', run: () => fs.unlink('target', () => {}) }),
+  defineCommand({ name: 'fs unlinkSync', run: () => fs.unlinkSync('target') }),
+  defineCommand({ name: 'fs write', run: () => fs.write(0, 'data', () => {}) }),
+  defineCommand({ name: 'fs writeFile', run: () => fs.writeFile('target', 'data', () => {}) }),
+  defineCommand({ name: 'fs writeFileSync', run: () => fs.writeFileSync('target', 'data') }),
+  defineCommand({ name: 'fs writeSync', run: () => fs.writeSync(0, 'data') }),
+  defineCommand({ name: 'proc exec', run: () => child.exec('git') }),
+  defineCommand({ name: 'proc execFile', run: () => child.execFile('git', ['status']) }),
+  defineCommand({ name: 'proc execFileSync', run: () => child.execFileSync('git', ['status']) }),
+  defineCommand({ name: 'proc fork', run: () => child.fork('git', ['status']) }),
+  defineCommand({ name: 'proc spawn', run: () => child.spawn('git', ['status']) }),
+  defineCommand({ name: 'proc spawnSync', run: () => child.spawnSync('git', ['status']) }),
+  defineCommand({ name: 'fs readFileSync', run: () => fs.readFileSync('source') }),
+];

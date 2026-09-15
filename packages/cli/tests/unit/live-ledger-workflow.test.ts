@@ -2,7 +2,6 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
-  cpSync,
   linkSync,
   mkdirSync,
   mkdtempSync,
@@ -25,6 +24,7 @@ import {
   VERIFIER_SOURCE_COMMIT,
 } from '../../src/services/ci-scaffold/index.js';
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
+import { createHistoricalVerifierGitFixture } from '../fixtures/historical-verifier-1.4.4/index.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CHECKER = join(ROOT, 'scripts/check-workflows.mjs');
@@ -49,17 +49,21 @@ const VERIFIER_POLICY = JSON.parse(
     integrity_sri: string;
     release_source: { repository: string; commit: string; tree: string };
   };
-  verifier: { provenance_sha256: string; root: string };
+  verifier: {
+    provenance_sha256: string;
+    root: string;
+    payload_file_count: number;
+    source_commit: string;
+  };
 };
 const roots: string[] = [];
 const EXPLICIT_PUBLISH_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
-const REHEARSAL_CONDITION =
-  "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
+const REHEARSAL_CONDITION = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
 const PERMISSIVE_PUSH_PUBLICATION_CONDITION =
   "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}";
-const DISPATCH_ONLY_REHEARSAL_CONDITION =
-  "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
+const PUSH_REHEARSAL_CONDITION =
+  "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}";
 
 /**
  * Both RC workflows are mandatory in every fixture; the preflight lane is
@@ -67,7 +71,11 @@ const DISPATCH_ONLY_REHEARSAL_CONDITION =
  * bytes for whichever file the case is not mutating keeps a fixture from
  * failing CI_WORKFLOW_SET_INVALID for an unrelated reason.
  */
-const REQUIRED_WORKFLOWS = ['devai-ledger-verify.yml', 'release.yml'] as const;
+const REQUIRED_WORKFLOWS = [
+  'devai-ledger-verify.yml',
+  'release.yml',
+  PREFLIGHT_WORKFLOW_FILE,
+] as const;
 
 function fixture(source = CHECKED_IN_LEDGER, file = 'devai-ledger-verify.yml') {
   const root = mkdtempSync(join(tmpdir(), 'devai-ledger-workflow-'));
@@ -117,20 +125,42 @@ function executablePackageMaterializationFixture(
   mkdirSync(verifierRoot, { recursive: true });
   mkdirSync(runnerTemp, { recursive: true });
   mkdirSync(mockBin, { recursive: true });
-  cpSync(
-    join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
-    join(verifierRoot, 'provenance.json'),
+  // This fixture models the published 1.4.4 package, whose frozen control has
+  // 21 runtime files. It must not inherit the current package's v2.1 vendor.
+  const historicalArchive = join(root, 'published-1.4.4-verifier.tar');
+  const historical = createHistoricalVerifierGitFixture();
+  try {
+    writeFileSync(
+      historicalArchive,
+      historical.git([
+        'archive',
+        // The isolated bare fixture has no attributes; avoid indexing unrelated
+        // historical trees. The helper still pins every original archive byte.
+        '--worktree-attributes',
+        '--format=tar',
+        VERIFIER_POLICY.package.release_source.commit,
+        'packages/cli/vendor/evidence-verification',
+      ]),
+    );
+  } finally {
+    historical.cleanup();
+  }
+  execFileSync(
+    'tar',
+    ['-xf', historicalArchive, '--strip-components=4', '--directory', verifierRoot],
+    { cwd: root },
   );
-  cpSync(
-    join(ROOT, 'packages/cli/vendor/evidence-verification/schemas'),
-    join(verifierRoot, 'schemas'),
-    {
-      recursive: true,
-    },
+  rmSync(join(verifierRoot, 'test'), { recursive: true, force: true });
+  const historicalProvenance = readFileSync(join(verifierRoot, 'provenance.json'));
+  expect(createHash('sha256').update(historicalProvenance).digest('hex')).toBe(
+    VERIFIER_POLICY.verifier.provenance_sha256,
   );
-  cpSync(join(ROOT, 'packages/cli/vendor/evidence-verification/src'), join(verifierRoot, 'src'), {
-    recursive: true,
-  });
+  const historicalManifest = JSON.parse(historicalProvenance.toString('utf8')) as {
+    sourceCommit: string;
+    files: unknown[];
+  };
+  expect(historicalManifest.sourceCommit).toBe(VERIFIER_POLICY.verifier.source_commit);
+  expect(historicalManifest.files).toHaveLength(VERIFIER_POLICY.verifier.payload_file_count);
   writeFileSync(
     join(packageRoot, 'package.json'),
     `${JSON.stringify({
@@ -392,26 +422,20 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'privileged pull-request-target workflow',
-      mutate: (source: string) => source.replace('pull_request:', 'pull_request_target:'),
+      mutate: (source: string) => source.replace('on:\n', 'on:\n  pull_request_target:\n'),
       diagnostic: 'CI_WORKFLOW_TRUST_BOUNDARY_INVALID',
     },
     {
-      name: 'protected environment on untrusted preflight',
+      name: 'unbound process control checkout',
       mutate: (source: string) =>
-        source.replace(
-          '    name: Validate candidate verifier without protected inputs\n',
-          `    name: Validate candidate verifier without protected inputs\n    environment: ${LEDGER_ENVIRONMENT}\n`,
-        ),
-      diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
+        source.replaceAll('vars.DEVAI_PROCESS_CONTROL_COMMIT', 'github.sha'),
+      diagnostic: 'CI_PROCESS_CONTROL_UNBOUND',
     },
     {
-      name: 'protected variable on untrusted preflight',
+      name: 'missing explicit transport selection',
       mutate: (source: string) =>
-        source.replace(
-          '    name: Validate candidate verifier without protected inputs\n',
-          '    name: Validate candidate verifier without protected inputs\n    env:\n      PROTECTED: ${{ vars.PROTECTED }}\n',
-        ),
-      diagnostic: 'CI_UNTRUSTED_PREFLIGHT_PRIVILEGED',
+        source.replaceAll('vars.DEVAI_LEDGER_TRANSPORT', 'vars.OTHER_TRANSPORT'),
+      diagnostic: 'CI_EXTERNAL_CONTROL_INPUT_MISSING',
     },
     {
       name: 'protected verification pull-request guard removed',
@@ -474,7 +498,8 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'wrong package-owned verifier provenance',
-      mutate: (source: string) => source.replaceAll(VERIFIER_SOURCE_COMMIT, 'a'.repeat(40)),
+      mutate: (source: string) =>
+        source.replaceAll('9f849f117fe1e460b5e3c647515f5ccbe783cbfb', 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
@@ -507,11 +532,7 @@ describe('live ledger-verification workflow', () => {
     },
     {
       name: 'candidate SHA drift',
-      mutate: (source: string) =>
-        source.replaceAll(
-          '${{ github.event.pull_request.head.sha || github.sha }}',
-          '${{ github.sha }}',
-        ),
+      mutate: (source: string) => source.replaceAll('${{ github.sha }}', '${{ github.ref }}'),
       diagnostic: 'CI_CANDIDATE_SHA_UNBOUND',
     },
     {
@@ -521,6 +542,7 @@ describe('live ledger-verification workflow', () => {
       diagnostic: 'CI_VERIFIER_BINDING_MODE_INVALID',
     },
   ])('rejects $name', ({ mutate, diagnostic }) => {
+    expect(mutate(CHECKED_IN_LEDGER)).not.toBe(CHECKED_IN_LEDGER);
     const result = check(fixture(mutate(CHECKED_IN_LEDGER)));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
@@ -535,7 +557,7 @@ describe('live ledger-verification workflow', () => {
     expect(result.stderr).toContain('CI_OBSOLETE_WORKFLOW_PRESENT');
   });
 
-  it('keeps tag pushes rehearsal-only and publication explicit, ledger-bound, and coverage-free', () => {
+  it('keeps tag pushes validation-only and publication explicit, ledger-bound, and coverage-free', () => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const discipline = readFileSync(
       join(ROOT, 'docs/dev/operations/release-discipline.md'),
@@ -544,7 +566,7 @@ describe('live ledger-verification workflow', () => {
     const result = check(fixture(release, 'release.yml'));
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('workflow contract: PASS\n');
-    expect(release).toContain("tags: ['v*']");
+    expect(parse(release).on.push.tags).toEqual(['v*']);
     expect(release).toContain('workflow_dispatch:');
     const parsed = parse(release) as {
       jobs?: Record<string, { if?: string }>;
@@ -556,7 +578,7 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 48');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 57');
     expect(release).toContain('pnpm run release:closure');
     const buildIndex = release.indexOf('pnpm run build');
     expect(buildIndex).toBeGreaterThanOrEqual(0);
@@ -582,18 +604,56 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('grep -Fq "$expected"');
     expect(release).toContain('?release=${RELEASE_TAG#v}&attempt=$attempt');
     expect(discipline).toContain(
-      'A signed annotated version-tag push is a non-publishing rehearsal trigger.',
+      'A signed annotated version-tag push validates identity without rebuilding or publishing.',
     );
     expect(discipline).toContain(
       'Only an explicit `workflow_dispatch` with `publish: true` may finalize',
     );
   });
 
-  it('accepts only explicit dispatch publication and push-or-false-dispatch rehearsal guards', () => {
+  it.each([
+    ['group: devai-pages-publication', 'group: pages-${{ github.run_id }}'],
+    [
+      'PAGES_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}',
+      'PAGES_ARTIFACT_ID: latest',
+    ],
+    [
+      'PAGES_MIGRATION_AUDIT_SHA256: ${{ vars.DEVAI_PAGES_MIGRATION_AUDIT_SHA256 }}',
+      'PAGES_MIGRATION_AUDIT_SHA256: candidate',
+    ],
+    [
+      'node release-control/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record',
+      'node candidate/scripts/process/publish-pages.mjs release-assets pages-site pages-publication-record',
+    ],
+    ['path: pages-publication-record/*', 'path: discarded-record/*'],
+    ['name: github-pages-${{ github.run_attempt }}', 'name: github-pages'],
+  ])('refuses weakening Pages recovery binding %s', (before, after) => {
+    const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    expect(current).toContain(before);
+    const result = check(fixture(current.replace(before, after), 'release.yml'));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('RELEASE_PAGES_RECOVERY_UNBOUND');
+  });
+
+  it.each([
+    'pnpm --filter @aarusso-nyx/devai run pack:smoke',
+    'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball"',
+  ])('rejects smoke acceptance without the exact staged archive binding: %s', (replacement) => {
+    const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const command =
+      'node packages/cli/scripts/installed-tarball-smoke.mjs --tarball "$tarball" --sha256 "$package_sha256"';
+    expect(current).toContain(command);
+    const result = check(fixture(current.replace(command, replacement), 'release.yml'));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('RELEASE_CONTROL_MISSING');
+    expect(result.stderr).toContain(command);
+  });
+
+  it('accepts explicit dispatch publication and forbids builds on tag pushes', () => {
     const current = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
     const intended = current
       .replaceAll(PERMISSIVE_PUSH_PUBLICATION_CONDITION, EXPLICIT_PUBLISH_CONDITION)
-      .replace(DISPATCH_ONLY_REHEARSAL_CONDITION, REHEARSAL_CONDITION);
+      .replace(PUSH_REHEARSAL_CONDITION, REHEARSAL_CONDITION);
     const accepted = check(fixture(intended, 'release.yml'));
     expect(accepted.status, accepted.stderr).toBe(0);
     expect(accepted.stdout).toBe('workflow contract: PASS\n');
@@ -606,13 +666,10 @@ describe('live ledger-verification workflow', () => {
     expect(permissive.status).toBe(1);
     expect(permissive.stderr).toContain('RELEASE_REHEARSAL_PUBLICATION_GUARD_MISSING');
 
-    const dispatchOnlyRehearsal = intended.replace(
-      REHEARSAL_CONDITION,
-      DISPATCH_ONLY_REHEARSAL_CONDITION,
-    );
+    const dispatchOnlyRehearsal = intended.replace(REHEARSAL_CONDITION, PUSH_REHEARSAL_CONDITION);
     const incompleteRehearsal = check(fixture(dispatchOnlyRehearsal, 'release.yml'));
     expect(incompleteRehearsal.status).toBe(1);
-    expect(incompleteRehearsal.stderr).toContain('RELEASE_REHEARSAL_JOB_INVALID');
+    expect(incompleteRehearsal.stderr).toContain('RELEASE_PROMOTION_BOUNDARY_INVALID');
   });
 
   it('binds workflow, documentation, and release scripts into the RC task key', () => {
@@ -684,12 +741,12 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 48', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 57', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {
       name: 'non-version trigger',
-      mutate: (source: string) => source.replace("tags: ['v*']", 'tags: [release-*]'),
+      mutate: (source: string) => source.replace('- v*', '- release-*'),
       diagnostic: 'RELEASE_TRIGGER_INVALID',
     },
     {
@@ -734,6 +791,7 @@ describe('live ledger-verification workflow', () => {
     },
   ])('rejects $name', ({ mutate, diagnostic }) => {
     const release = readFileSync(join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    expect(mutate(release)).not.toBe(release);
     const result = check(fixture(mutate(release), 'release.yml'));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
@@ -773,10 +831,12 @@ describe('remote preflight workflow', () => {
     expect(result.stdout).toBe('workflow contract: PASS\n');
   });
 
-  it('keeps the preflight lane optional', () => {
-    const result = check(fixture());
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe('workflow contract: PASS\n');
+  it('requires the consolidated preflight lane', () => {
+    const root = fixture();
+    rmSync(join(root, '.github/workflows', PREFLIGHT_WORKFLOW_FILE));
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('CI_WORKFLOW_SET_INVALID');
   });
 
   it('still rejects any other additional workflow file', () => {
@@ -790,12 +850,22 @@ describe('remote preflight workflow', () => {
 
   it('binds the lane to the cheap local closure and to no protected input', () => {
     const gate = readFileSync(join(ROOT, 'scripts/run-pr-release-gate.mjs'), 'utf8');
-    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run lint');
-    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run typecheck');
     expect(CHECKED_IN_PREFLIGHT).toContain('name: devai-release-gate');
-    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run format:check');
-    expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run release:static-integrity');
     expect(CHECKED_IN_PREFLIGHT).toContain('pnpm run release:pr-gate');
+    const descriptor = JSON.parse(readFileSync(join(ROOT, 'test-tasks.json'), 'utf8'));
+    expect(
+      descriptor.profiles.find((profile: { profileId: string }) => profile.profileId === 'affected')
+        .requiredNodes,
+    ).toEqual(
+      expect.arrayContaining([
+        'lint',
+        'typecheck',
+        'format',
+        'release:static-integrity',
+        'release:closure',
+        'test:schemas',
+      ]),
+    );
     expect(CHECKED_IN_PREFLIGHT).toContain(`actions/checkout@${CHECKOUT_COMMIT}`);
     expect(CHECKED_IN_PREFLIGHT).toContain(`actions/setup-node@${SETUP_NODE_COMMIT}`);
     expect(CHECKED_IN_PREFLIGHT).toContain('persist-credentials: false');
@@ -854,6 +924,30 @@ describe('remote preflight workflow', () => {
         ),
       diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
     },
+    ...[
+      'vars.DEVAI_LEDGER_POLICY_DIGEST',
+      "secrets['PACKAGES_READ_TOKEN']",
+      "vars['DEVAI_LEDGER_POLICY_DIGEST']",
+      'toJSON(secrets)',
+      'toJSON(vars)',
+    ].map((reference) => ({
+      name: `protected input expression ${reference}`,
+      mutate: (source: string) =>
+        source.replace(
+          '          node-version: 24',
+          '          node-version: 24\n          token: ${{ ' + reference + ' }}',
+        ),
+      diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
+    })),
+    ...['if: false', 'continue-on-error: true'].map((setting) => ({
+      name: `optional required job ${setting}`,
+      mutate: (source: string) =>
+        source.replace(
+          '    name: devai-release-gate',
+          '    ' + setting + '\n    name: devai-release-gate',
+        ),
+      diagnostic: 'CI_PREFLIGHT_GATE_INVALID',
+    })),
     {
       name: 'remote execution of the attested RC closure',
       mutate: (source: string) =>
@@ -866,15 +960,15 @@ describe('remote preflight workflow', () => {
     {
       name: 'a script outside the cheap local closure',
       mutate: (source: string) =>
-        source.replace('run: pnpm run lint', 'run: pnpm publish --no-git-checks'),
+        source.replace('run: pnpm run release:bootstrap', 'run: pnpm publish --no-git-checks'),
       diagnostic: 'CI_PREFLIGHT_SCRIPT_NOT_ALLOWED',
     },
     {
       name: 'an artifact upload',
       mutate: (source: string) =>
         source.replace(
-          '      - name: Build',
-          '      - name: Save\n        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\n\n      - name: Build',
+          '      - name: Compile the check runner bootstrap',
+          '      - name: Save\n        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\n\n      - name: Compile the check runner bootstrap',
         ),
       diagnostic: 'CI_PREFLIGHT_ARTIFACT_FORBIDDEN',
     },
@@ -898,7 +992,10 @@ describe('remote preflight workflow', () => {
     {
       name: 'a step on the evidence path',
       mutate: (source: string) =>
-        source.replace('run: pnpm run typecheck', 'run: node ./export-receipt.mjs --attest'),
+        source.replace(
+          'run: pnpm run release:bootstrap',
+          'run: node ./export-receipt.mjs --attest',
+        ),
       diagnostic: 'CI_PREFLIGHT_NON_ATTESTING_VIOLATION',
     },
     {
@@ -907,6 +1004,7 @@ describe('remote preflight workflow', () => {
       diagnostic: 'CI_PREFLIGHT_RUNNER_INVALID',
     },
   ])('rejects $name', ({ mutate, diagnostic }) => {
+    expect(mutate(CHECKED_IN_PREFLIGHT)).not.toBe(CHECKED_IN_PREFLIGHT);
     const result = check(fixture(mutate(CHECKED_IN_PREFLIGHT), PREFLIGHT_WORKFLOW_FILE));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
@@ -995,4 +1093,29 @@ describe('ci-economy concurrency-cancel rule', () => {
       { severity: 'pass' },
     );
   });
+});
+
+describe('ordinary ledger without mutation ceremony', () => {
+  it.each(['devai-ledger-verify.yml', 'release.yml'])(
+    'rejects reintroduced mutation export prerequisites in %s',
+    (file) => {
+      const source = readFileSync(join(ROOT, '.github/workflows', file), 'utf8');
+      expect(source).not.toContain('installed-offline');
+      expect(source).not.toContain('DEVAI_INSTALLED_CONTROL_SHA256');
+      for (const changed of [
+        source.replace("BUNDLE_SCHEMA_VERSION: '1.0.0'", "BUNDLE_SCHEMA_VERSION: '2.0.0'"),
+        source.replace("BUNDLE_SCHEMA_VERSION: '1.0.0'", "BUNDLE_SCHEMA_VERSION: '3.0.0'"),
+        source.replace("vars.DEVAI_LEDGER_TRANSPORT || 'legacy'", 'vars.DEVAI_LEDGER_TRANSPORT'),
+        source.replace(
+          'python3 release-control/scripts/process/evidence_transport.py materialize',
+          'python3 release-control/scripts/process/installed_control_transport.py',
+        ),
+      ]) {
+        const directory = fixture(changed, file);
+        const result = spawnSync(process.execPath, [CHECKER], { cwd: directory, encoding: 'utf8' });
+        expect(result.status).not.toBe(0);
+        expect(result.stdout + result.stderr).toContain('CI_MUTATION_CEREMONY_FORBIDDEN');
+      }
+    },
+  );
 });

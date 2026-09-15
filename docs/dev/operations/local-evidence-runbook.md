@@ -65,3 +65,22 @@ does not run product test commands.
 Trusted local attestation is deliberately limited: it makes tampering and identity mismatch
 detectable, but cannot prove that a trusted signer executed the commands. Failed or incomplete
 verification is a hard rejection, never an invitation to silently reuse evidence.
+
+## Own-repository prerequisite orchestration and transport
+
+DEVAI's own release process first runs the repository-local prerequisite helper from
+an approved control checkout. It validates candidate identity, installed package bytes,
+protected maps and signer configuration, export destination, and policy reconstruction
+before RC. The existing installed exporter checks receipts and artifacts after RC;
+those outputs are not prerequisites for starting RC.
+
+Protected jobs explicitly select `DEVAI_LEDGER_TRANSPORT=legacy` or `bundle`; no
+implicit default or fallback exists. Bundle mode reads one digest-addressed immutable
+release from private `aarusso-nyx/devai-evidence`. `DEVAI_LEDGER_BUNDLE_SHA256` is the
+approved selector, and `DEVAI_EVIDENCE_READ_TOKEN` is scoped read-only to that repository.
+Trust store, revocations, expected policy and verifier provenance stay external.
+The bundle and its maps must never be uploaded as public Actions artifacts.
+
+See [process simplification rollout](process-simplification-rollout.md) for configuration,
+local commands, and the separate Owner-authorized setup steps. Existing adopter transport
+is unchanged; legacy fields are retired only after protected bundle verification succeeds.

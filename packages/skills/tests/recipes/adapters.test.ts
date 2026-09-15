@@ -1,8 +1,23 @@
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { parse as parseYaml } from 'yaml';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { aroundEach, describe, expect, it } from 'vitest';
-import { buildRecipeAdapterPlan, installRecipeAdapters } from '../../src/recipes/adapters.js';
+import {
+  buildRecipeAdapterPlan,
+  installRecipeAdapters,
+  preflightRecipeAdapterInstall,
+  type RecipeHost,
+} from '../../src/recipes/adapters.js';
+import { loadRecipes } from '../../src/recipes/loader.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
 
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
@@ -119,4 +134,106 @@ describe('v1 RC recipe adapters', () => {
     );
     expect(readFileSync(outside, 'utf8')).toBe('outside\n');
   });
+});
+
+describe('recipe adapter selection and installation boundaries', () => {
+  it.each([
+    ['codex', 'codex'],
+    ['claude', 'claude'],
+    ['codex', 'unsupported'],
+  ])('rejects ambiguous or unsupported host selection %j', (...hosts) => {
+    expect(() => buildRecipeAdapterPlan(undefined, hosts as RecipeHost[])).toThrow(
+      'INVALID_RECIPE_HOSTS',
+    );
+  });
+
+  it('keeps each host under its own adapter root and emits parseable canonical metadata', () => {
+    const plan = buildRecipeAdapterPlan();
+    for (const file of plan.files) {
+      expect(
+        file.path.startsWith(file.host === 'codex' ? '.agents/skills/' : '.claude/skills/'),
+      ).toBe(true);
+      if (!file.path.endsWith('/agents/openai.yaml')) continue;
+      const base = file.path.slice(0, -'/agents/openai.yaml'.length);
+      const manifest = JSON.parse(
+        plan.files.find((entry) => entry.path === `${base}/devai.recipe.json`)?.content ?? '{}',
+      ) as { name: string; description: string; status: string };
+      expect(() => parseYaml(file.content)).not.toThrow();
+      expect(parseYaml(file.content)).toEqual({
+        interface: { display_name: manifest.name, short_description: manifest.description },
+        policy: { allow_implicit_invocation: manifest.status === 'stable' },
+      });
+      const operations = JSON.parse(
+        plan.files.find((entry) => entry.path === `${base}/devai.operations.json`)?.content ?? '{}',
+      ) as { schemaVersion: string; recipe: string };
+      expect(operations.schemaVersion).toBe('1');
+      expect(operations.recipe).toBe(manifest.name);
+    }
+  });
+
+  it.each(['../outside.txt', '../repo-sibling/file.txt'])(
+    'refuses an escaping planned target %s before writing',
+    (path) => {
+      const repo = mkdtempSync(join(tmpdir(), 'devai-adapter-boundary-'));
+      expect(() =>
+        preflightRecipeAdapterInstall(repo, {
+          files: [{ host: 'codex', path, content: 'never written' }],
+        }),
+      ).toThrow(`RECIPE_INSTALL_ESCAPE: ${path}`);
+    },
+  );
+
+  it('reports every conflicting path while preserving the existing bytes', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'devai-adapter-conflicts-'));
+    const files = ['one.txt', 'two.txt'].map((path) => ({
+      host: 'codex' as const,
+      path,
+      content: 'generated',
+    }));
+    for (const file of files) writeFileSync(join(repo, file.path), `original ${file.path}`);
+    expect(() => preflightRecipeAdapterInstall(repo, { files })).toThrow(
+      'RECIPE_ADAPTER_CONFLICT: one.txt, two.txt',
+    );
+    for (const file of files)
+      expect(readFileSync(join(repo, file.path), 'utf8')).toBe(`original ${file.path}`);
+  });
+});
+
+it.each([
+  String.raw`Inspect C:\workspace\repo and "quoted" policy`,
+  'Verificar ação: "próxima etapa"',
+])('preserves description bytes through generated YAML: %s', (description) => {
+  const canonical = loadRecipes()[0];
+  if (canonical === undefined) throw new Error('canonical recipe population missing');
+  const root = mkdtempSync(join(tmpdir(), 'devai adapter metadata ç '));
+  try {
+    cpSync(dirname(canonical.resource_dir), root, { recursive: true });
+    const manifestPath = join(root, canonical.manifest.name, 'devai.recipe.json');
+    const markdownPath = join(root, canonical.manifest.name, 'SKILL.md');
+    const manifest = { ...canonical.manifest, description };
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    writeFileSync(
+      markdownPath,
+      canonical.skill_markdown.replace(
+        `description: ${canonical.manifest.description}`,
+        `description: ${description}`,
+      ),
+    );
+    const manifestBytes = readFileSync(manifestPath);
+    const markdownBytes = readFileSync(markdownPath);
+    const plan = buildRecipeAdapterPlan(root, ['codex']);
+    const metadata = plan.files.find(
+      (file) => file.path === `.agents/skills/${canonical.manifest.name}/agents/openai.yaml`,
+    );
+    expect(metadata).toBeDefined();
+    expect(() => parseYaml(metadata?.content ?? '')).not.toThrow();
+    expect(parseYaml(metadata?.content ?? '')).toEqual({
+      interface: { display_name: canonical.manifest.name, short_description: description },
+      policy: { allow_implicit_invocation: canonical.manifest.status === 'stable' },
+    });
+    expect(readFileSync(manifestPath)).toEqual(manifestBytes);
+    expect(readFileSync(markdownPath)).toEqual(markdownBytes);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

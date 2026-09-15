@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, relative, resolve } from 'node:path';
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import { readProcessSync } from '@devai-nyx/authority';
 
@@ -39,6 +39,12 @@ function scalar(value: string): unknown {
   if (trimmed === '[]') return [];
   if (trimmed === '{}') return {};
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      // Generated inline arrays use JSON quoting, including embedded separators.
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      // Retain the existing bare-word and semicolon-separated YAML subset.
+    }
     const inner = trimmed.slice(1, -1).trim();
     return inner.length === 0 ? [] : inner.split(/[;,]/u).map((item) => scalar(item));
   }
@@ -46,6 +52,13 @@ function scalar(value: string): unknown {
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
+    if (trimmed.startsWith('"')) {
+      try {
+        return JSON.parse(trimmed) as unknown;
+      } catch {
+        // Non-JSON quoted forms retain the existing subset interpretation.
+      }
+    }
     return trimmed.slice(1, -1);
   }
   if (trimmed === 'true') return true;
@@ -66,7 +79,7 @@ function parseYamlSubset(source: string): Record<string, unknown> {
     .filter((line) => line.text.length > 0 && !line.text.startsWith('#'));
 
   function parseObject(start: number, indent: number): [Record<string, unknown>, number] {
-    const result: Record<string, unknown> = {};
+    const result = Object.create(null) as Record<string, unknown>;
     let index = start;
     while (index < lines.length) {
       const line = lines[index];
@@ -111,9 +124,8 @@ function parseYamlSubset(source: string): Record<string, unknown> {
       const item = line.text.slice(2).trim();
       if (item.includes(':')) {
         const colon = item.indexOf(':');
-        const object: Record<string, unknown> = {
-          [item.slice(0, colon).trim()]: scalar(item.slice(colon + 1).trim()),
-        };
+        const object = Object.create(null) as Record<string, unknown>;
+        object[item.slice(0, colon).trim()] = scalar(item.slice(colon + 1).trim());
         index += 1;
         while (index < lines.length) {
           const nested = lines[index];
@@ -180,17 +192,17 @@ function markdownFiles(dir: string): readonly string[] {
     );
 }
 
-function git(repoRoot: string, args: readonly string[]): string | null {
+function git(repoRoot: string, args: readonly string[], trim = true): string | null {
   const result = readProcessSync('git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   });
-  return result.status === 0 ? result.stdout.trim() : null;
+  return result.status === 0 ? (trim ? result.stdout.trim() : result.stdout) : null;
 }
 
 function gitFile(repoRoot: string, commit: string, path: string): string | null {
-  return git(repoRoot, ['show', `${commit}:${path}`]);
+  return git(repoRoot, ['show', `${commit}:${path}`], false);
 }
 
 interface HistoricalPath {
@@ -310,9 +322,14 @@ function sealedHistoryFindings(
   const originalSeal = sealed;
   let lockedMutationObserved = false;
   const priorTerminalStates: string[] = [];
-  const laterHistory = history.slice(sealIndex + 1);
+  // Validate the exact inspected bytes as the final revision, even before commit.
+  const laterHistory: { commit: string | null; path: string }[] = [
+    ...history.slice(sealIndex + 1),
+    { commit: null, path: record.path },
+  ];
   for (const [laterIndex, entry] of laterHistory.entries()) {
-    const laterSource = gitFile(repoRoot, entry.commit, entry.path);
+    const laterSource =
+      entry.commit === null ? record.source : gitFile(repoRoot, entry.commit, entry.path);
     if (laterSource === null) {
       return [
         {
@@ -538,10 +555,10 @@ export function decisionCitationResolution(options: {
   for (const path of roots.flatMap((root) => walkFiles(resolve(options.repoRoot, root)))) {
     const rel = relative(options.repoRoot, path);
     if (
-      path.includes(`${join('node_modules', '')}`) ||
-      path.includes(`${join('dist', '')}`) ||
+      rel.split(sep).some((component) => component === 'node_modules' || component === 'dist') ||
       (!strictRoots &&
-        (path.startsWith(recordsDir) ||
+        (path === recordsDir ||
+          path.startsWith(recordsDir + sep) ||
           rel.startsWith('law/register/') ||
           rel.startsWith('law/adr/archive/') ||
           rel.startsWith('docs/site/versioned_docs/') ||
@@ -577,7 +594,19 @@ export function archiveImmutability(options: {
 }): GovernanceIntegrityReport {
   const archiveDir = resolve(options.repoRoot, options.archiveDir ?? DEFAULT_ARCHIVE_DIR);
   const manifestPath = join(archiveDir, 'MANIFEST.json');
-  if (!existsSync(archiveDir)) return { ok: true, findings: [] };
+  const archiveStat = lstatSync(archiveDir, { throwIfNoEntry: false });
+  if (archiveStat === undefined) return { ok: true, findings: [] };
+  if (!archiveStat.isDirectory())
+    return {
+      ok: false,
+      findings: [
+        {
+          code: 'ARCHIVE_MANIFEST_INVALID',
+          message: 'Archive root must be a directory, not a link.',
+          path: relative(options.repoRoot, archiveDir),
+        },
+      ],
+    };
   if (!existsSync(manifestPath)) {
     return {
       ok: false,
@@ -592,14 +621,22 @@ export function archiveImmutability(options: {
   }
   let manifest: ArchiveManifest;
   try {
+    if (!lstatSync(manifestPath).isFile()) throw new Error('manifest is not a regular file');
     manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ArchiveManifest;
+    if (
+      manifest === null ||
+      typeof manifest !== 'object' ||
+      Array.isArray(manifest) ||
+      !Array.isArray(manifest.files)
+    )
+      throw new Error('manifest files array is required');
   } catch {
     return {
       ok: false,
       findings: [
         {
           code: 'ARCHIVE_MANIFEST_INVALID',
-          message: 'MANIFEST.json is not valid JSON.',
+          message: 'MANIFEST.json must be a regular JSON file containing a files array.',
           path: relative(options.repoRoot, manifestPath),
         },
       ],
@@ -607,22 +644,52 @@ export function archiveImmutability(options: {
   }
   const findings: GovernanceFinding[] = [];
   const declared = new Set<string>();
+  const inventory = new Map<string, string>();
+  const scan = (directory: string): void => {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) scan(path);
+      else if (stat.isFile()) inventory.set(relative(archiveDir, path).split(sep).join('/'), path);
+      else
+        findings.push({
+          code: 'ARCHIVE_FILE_UNSAFE',
+          message: 'Archive members must not be links or special files.',
+          path: relative(options.repoRoot, path),
+        });
+    }
+  };
+  scan(archiveDir);
   for (const entry of manifest.files ?? []) {
-    if (typeof entry.path !== 'string' || typeof entry.sha256 !== 'string') {
+    if (
+      entry === null ||
+      typeof entry !== 'object' ||
+      typeof entry.path !== 'string' ||
+      typeof entry.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(entry.sha256) ||
+      /[\\\p{Cc}]/u.test(entry.path) ||
+      /^[A-Za-z]:/u.test(entry.path) ||
+      !entry.path
+        .split('/')
+        .every((part: string) => part !== '' && part !== '.' && part !== '..') ||
+      entry.path === 'MANIFEST.json' ||
+      declared.has(entry.path)
+    ) {
       findings.push({
         code: 'ARCHIVE_MANIFEST_INVALID',
-        message: 'Every manifest entry requires string path and sha256 fields.',
+        message:
+          'Every manifest entry requires a unique canonical member path and lowercase SHA-256.',
         path: relative(options.repoRoot, manifestPath),
       });
       continue;
     }
     declared.add(entry.path);
-    const path = join(archiveDir, entry.path);
-    if (!existsSync(path)) {
+    const path = inventory.get(entry.path);
+    if (path === undefined) {
       findings.push({
         code: 'ARCHIVE_FILE_MISSING',
         message: `${entry.path} is declared but absent.`,
-        path: relative(options.repoRoot, path),
+        path: relative(options.repoRoot, join(archiveDir, entry.path)),
       });
       continue;
     }
@@ -635,8 +702,7 @@ export function archiveImmutability(options: {
       });
     }
   }
-  for (const path of walkFiles(archiveDir)) {
-    const rel = relative(archiveDir, path);
+  for (const [rel, path] of inventory) {
     if (rel !== 'MANIFEST.json' && !declared.has(rel)) {
       findings.push({
         code: 'ARCHIVE_FILE_UNDECLARED',
@@ -646,6 +712,53 @@ export function archiveImmutability(options: {
     }
   }
   return { ok: findings.length === 0, findings };
+}
+
+function closedRoundHistoryFindings(
+  repoRoot: string,
+  rel: string,
+  name: string,
+): readonly GovernanceFinding[] {
+  const unavailable = (): readonly GovernanceFinding[] => [
+    {
+      code: 'ROUND_HISTORY_UNAVAILABLE',
+      message: `${name} closed history could not be verified completely.`,
+      path: rel,
+    },
+  ];
+  const history = git(repoRoot, ['log', '--format=%H', '--reverse', '--', rel]);
+  if (history === null || history.length === 0) return unavailable();
+  let sealedTree: string | undefined;
+  for (const commit of history.split('\n').filter(Boolean)) {
+    const tree = git(repoRoot, ['rev-parse', `${commit}:${rel}`]);
+    if (tree === null) return unavailable();
+    if (sealedTree !== undefined) {
+      if (tree !== sealedTree) {
+        return [
+          {
+            code: 'ROUND_ARCHIVE_MUTATED',
+            message: `${name} changed after its first closed commit.`,
+            path: rel,
+          },
+        ];
+      }
+      continue;
+    }
+    const recordPath = `${rel}/record.md`;
+    const population = git(repoRoot, ['ls-tree', '--name-only', commit, '--', recordPath]);
+    if (population === null) return unavailable();
+    if (population.length === 0) continue; // Working scaffold before a record exists.
+    const source = gitFile(repoRoot, commit, recordPath);
+    if (source === null) return unavailable();
+    let record: ParsedGovernanceRecord;
+    try {
+      record = parseRecordSource(recordPath, source);
+    } catch {
+      return unavailable();
+    }
+    if (record.frontmatter['status'] === 'closed') sealedTree = tree;
+  }
+  return sealedTree === undefined ? unavailable() : [];
 }
 
 export function roundRecordIntegrity(options: {
@@ -700,20 +813,7 @@ export function roundRecordIntegrity(options: {
         });
       }
       const rel = relative(options.repoRoot, dir);
-      const commits = (git(options.repoRoot, ['log', '--format=%H', '--reverse', '--', rel]) ?? '')
-        .split('\n')
-        .filter(Boolean);
-      if (commits.length > 1) {
-        const sealedTree = git(options.repoRoot, ['rev-parse', `${commits[0]}:${rel}`]);
-        const currentTree = git(options.repoRoot, ['rev-parse', `HEAD:${rel}`]);
-        if (sealedTree !== null && currentTree !== null && sealedTree !== currentTree) {
-          findings.push({
-            code: 'ROUND_ARCHIVE_MUTATED',
-            message: `${name} changed after its first closed commit.`,
-            path: rel,
-          });
-        }
-      }
+      findings.push(...closedRoundHistoryFindings(options.repoRoot, rel, name));
     }
   }
   return { ok: findings.length === 0, findings };
@@ -734,6 +834,13 @@ export function renderDecisionRecords(options: {
   ].join('\n');
 }
 
+function markdownTableText(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r\n|\r|\n/g, '<br>');
+}
+
 export function renderDecisionIndex(options: {
   readonly repoRoot: string;
   readonly recordsDir?: string;
@@ -747,6 +854,9 @@ export function renderDecisionIndex(options: {
       String(record.frontmatter['status'] ?? ''),
       String(record.frontmatter['round'] ?? ''),
       String(record.frontmatter['date'] ?? ''),
+      encodeURIComponent(basename(path)).replace(/[()]/g, (character) =>
+        character === '(' ? '%28' : '%29',
+      ),
     ];
   });
   return [
@@ -757,8 +867,8 @@ export function renderDecisionIndex(options: {
     '| ID | Title | Status | Round | Date |',
     '|---|---|---|---|---|',
     ...rows.map(
-      ([id, title, status, round, date]) =>
-        `| [${id}](./${id}.md) | ${title} | ${status} | ${round} | ${date} |`,
+      ([id = '', title = '', status = '', round = '', date = '', filename]) =>
+        `| [${markdownTableText(id)}](./${filename}) | ${[title, status, round, date].map(markdownTableText).join(' | ')} |`,
     ),
     '',
   ].join('\n');

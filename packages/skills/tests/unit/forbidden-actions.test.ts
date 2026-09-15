@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,6 +15,7 @@ aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 
 let dir = '';
 let registryPath = '';
+const REPO_ROOT = process.cwd();
 
 function writeRegistry(body: Record<string, unknown>): void {
   writeFileSync(registryPath, JSON.stringify(body, null, 2));
@@ -185,16 +186,32 @@ describe('scanForbiddenActions', () => {
   }
 
   function writeCiAdr(options?: {
-    readonly status?: 'active' | 'superseded';
+    readonly status?: 'accepted' | 'superseded';
     readonly affectedRule?: string;
     readonly malformed?: boolean;
   }): void {
-    mkdirSync(join(dir, 'law/adr'), { recursive: true });
+    cpSync(join(REPO_ROOT, 'law', 'adr'), join(dir, 'law', 'adr'), { recursive: true });
+    for (const file of [
+      'ADR-GOV-0008-canonical-subject-projections.md',
+      'ADR-GOV-0009-instance-validatable-adr-results.md',
+      'ADR-GOV-0010-complete-adr-validation-result.md',
+      'ADR-GOV-0011-fail-closed-adr-result-state.md',
+    ]) {
+      const path = join(dir, 'law', 'adr', file);
+      writeFileSync(
+        path,
+        readFileSync(path, 'utf8').replaceAll(
+          'scripts/check-workflows.mjs',
+          'scripts/adr-fixture-coverage.mjs',
+        ),
+      );
+    }
+    cpSync(join(REPO_ROOT, 'law', 'policy'), join(dir, 'law', 'policy'), { recursive: true });
     writeFileSync(
-      join(dir, 'law/adr/ADR-014-ci-checker.md'),
+      join(dir, 'law/adr/ADR-GOV-9999-ci-checker.md'),
       options?.malformed === true
         ? '---\nid: ADR-014\nstatus active\n---\n'
-        : `---\nid: ADR-014\ntype: adr\nstatus: ${options?.status ?? 'active'}\naffected_rules:\n  - ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\n---\n`,
+        : `---\nid: ADR-GOV-9999\ntitle: CI checker change review\ntype: adr\nstatus: ${options?.status ?? 'accepted'}\ndate: 2026-09-03\nauthority: Architect\nsupersedes: []\nprovenance:\n  - law/constitution.md Article 6 (substrate authority-by-path)\naffected_rules:\n  - ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\ninspector_acceptance:\n  - IA-001 -- A CI checker change requires an effective accepted ADR that covers its exact governed path.\n${options?.status === 'superseded' ? 'disposition: Superseded fixture record has no active authority.\n' : ''}---\n\n# CI checker change review\n\n## Status\n\nFixture record.\n\n## Context\n\nFixture coverage for a governed CI checker change.\n\n## Decision\n\nThe fixture records the exact governed checker path.\n\n## Consequences\n\nOnly an effective accepted record can authorize coverage.\n\n## Alternatives Considered\n\n**No ADR coverage.** Rejected because the forbidden-action check must fail closed.\n\n## Affected Rules\n\n- ${options?.affectedRule ?? 'scripts/check-workflows.mjs'}\n\n## Inspector Adversarial Acceptance\n\n- IA-001 -- A superseded, malformed, or unrelated fixture does not provide coverage.\n`,
     );
   }
 
@@ -217,6 +234,34 @@ describe('scanForbiddenActions', () => {
     );
     return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
   }
+
+  it.each([
+    ['git push +HEAD:topic', 'FORBID-FORCE-PUSH'],
+    ['git commit --no-verify', 'FORBID-NO-VERIFY'],
+    ['git commit --no-gpg-sign', 'FORBID-NO-GPG-SIGN'],
+    ['git push origin main', 'FORBID-PUSH-MAIN'],
+    ['git reset --hard HEAD', 'FORBID-RESET-HARD'],
+    ['git rebase -i HEAD~2', 'FORBID-REBASE-I'],
+    ['git rebase --interactive HEAD~2', 'FORBID-REBASE-I'],
+    ['git branch -D obsolete', 'FORBID-DELETE-BRANCH'],
+    ['git push origin --delete obsolete', 'FORBID-DELETE-BRANCH'],
+    ['rm -rf uncommitted-work', 'FORBID-RM-RF'],
+    ['gh issue comment 12 --body message', 'FORBID-EXTERNAL-MESSAGES'],
+    ['aws kms describe-key --key-id production', 'FORBID-SECRETS-PROD'],
+    ['npm publish', 'FORBID-PUBLISH'],
+    ['pnpm publish', 'FORBID-PUBLISH'],
+    ['yarn publish', 'FORBID-PUBLISH'],
+    ['aws s3 rm s3://production/data', 'FORBID-AWS-DELETE-PROD'],
+    ['aws s3 sync ./data s3://production --delete', 'FORBID-AWS-DELETE-PROD'],
+  ])('reports committed command text %s as %s without executing it', (command, forbidden_id) => {
+    writeContextAwareRegistry();
+    seedRepository();
+    const ref = commitForbiddenFixture(`${command}\n`);
+    const result = scanForbiddenActions({ repoRoot: dir, maxCommits: 1 });
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ forbidden_id, ref, source: 'commit-change' }),
+    );
+  });
 
   it('does not self-match a newly materialized forbidden-action registry', () => {
     writeContextAwareRegistry();
@@ -1132,3 +1177,83 @@ describe('scanForbiddenActions', () => {
   });
 });
 // Invariants: INV-DEVAI-001
+
+describe('reasoned canonical coverage waivers', () => {
+  it.each([undefined, '', 'short', 123, null, '😀😀😀😀'])(
+    'does not waive a missing protection using invalid reason %j',
+    (reason) => {
+      writeRegistry({
+        actions: CANONICAL_FORBIDDEN_ACTIONS.filter((entry) => entry.id !== 'FORBID-RM-RF'),
+        waivers: [{ id: 'FORBID-RM-RF', reason }],
+      });
+      expect(checkForbiddenRegistryCoverage(registryPath)).toMatchObject({
+        ok: false,
+        waived: [],
+        unwaived_missing: ['FORBID-RM-RF'],
+      });
+    },
+  );
+
+  it('accepts the schema minimum reason length and retains the exact reason', () => {
+    writeRegistry({
+      actions: CANONICAL_FORBIDDEN_ACTIONS.filter((entry) => entry.id !== 'FORBID-RM-RF'),
+      waivers: [{ id: 'FORBID-RM-RF', reason: 'No shell' }],
+    });
+    expect(checkForbiddenRegistryCoverage(registryPath)).toMatchObject({
+      ok: true,
+      waived: [{ id: 'FORBID-RM-RF', reason: 'No shell' }],
+      unwaived_missing: [],
+    });
+  });
+});
+
+it.each([null, [], { id: 'FORBID-RM-RF', reason: 'No shell', extra: true }])(
+  'ignores malformed waiver entry %j without satisfying coverage',
+  (value) => {
+    writeRegistry({
+      actions: CANONICAL_FORBIDDEN_ACTIONS.filter((entry) => entry.id !== 'FORBID-RM-RF'),
+      waivers: [value],
+    });
+    expect(checkForbiddenRegistryCoverage(registryPath)).toMatchObject({
+      ok: false,
+      waived: [],
+      unwaived_missing: ['FORBID-RM-RF'],
+    });
+  },
+);
+
+describe('hook and signature bypass flag boundaries', () => {
+  it.each(['no-verify', 'no-gpg-sign'])(
+    'keeps declared and bootstrap --%s detection aligned',
+    (flag) => {
+      const id = flag === 'no-verify' ? 'FORBID-NO-VERIFY' : 'FORBID-NO-GPG-SIGN';
+      const registries = [
+        CANONICAL_FORBIDDEN_ACTIONS,
+        ...['law/policy/forbidden-actions.json', '.devai/config/forbidden-actions.json'].map(
+          (path) => JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8')).actions,
+        ),
+      ];
+      for (const registry of registries) {
+        const entry = registry.find((value: { id: string }) => value.id === id);
+        if (!entry) throw new Error('missing declared prohibition');
+        const matches = (text: string) =>
+          entry.detect_patterns.some((pattern: string) => new RegExp(pattern, 'i').test(text));
+        for (const text of [
+          `--${flag}`,
+          `git commit --${flag}`,
+          `git commit\t--${flag};`,
+          `git commit "--${flag}"`,
+          `git commit '--${flag}'`,
+        ])
+          expect(matches(text), text).toBe(true);
+        for (const text of [
+          `git commit --${flag}-extra`,
+          `git commit --${flag}x`,
+          `prefix--${flag}`,
+          'git commit --signoff',
+        ])
+          expect(matches(text), text).toBe(false);
+      }
+    },
+  );
+});

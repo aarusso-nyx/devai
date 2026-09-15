@@ -43,7 +43,6 @@ import {
 import { validateInvariantStrategies, type InvariantLike } from '@devai-nyx/spec';
 import { ACTION_REGISTRY } from '../../generated/action-registry.js';
 import { auditDocumentationLinks } from '../docs/links.js';
-import { checkMutationReport } from '../mutation/report-check.js';
 import { executeTranslationValidation } from '../verify/translation.js';
 import { runActionCoverageCheck } from '../spec/validate-action-coverage.js';
 import { runCheckTasks } from '../../services/check-runner/index.js';
@@ -407,61 +406,13 @@ async function inventoryIntegrityReport(repoRoot: string): Promise<unknown> {
   };
 }
 
-function mutationPolicyReport(repoRoot: string): RawExecution {
-  const policyPath = join(repoRoot, 'law/policy/mutation-strength.json');
-  const policy = JSON.parse(readFileSync(policyPath, 'utf8')) as Record<string, unknown>;
-  const validPolicy =
-    policy['schemaVersion'] === '1.0.0' &&
-    policy['id'] === 'mutation-strength' &&
-    policy['status'] === 'active';
-  if (!validPolicy) return fromValue({ ok: false, policy: policyPath });
-  const required = readdirSync(join(repoRoot, 'law/invariants'))
-    .filter((name) => name.endsWith('.json'))
-    .some((name) => {
-      const invariant = JSON.parse(
-        readFileSync(join(repoRoot, 'law/invariants', name), 'utf8'),
-      ) as Record<string, unknown>;
-      return JSON.stringify(invariant['verification'] ?? {}).includes('mutation');
-    });
-  if (!required) {
-    return {
-      status: 'na',
-      value: {
-        status: 'na',
-        applicable: false,
-        reason: 'no invariant verification strategy declares mutation',
-        policy: policyPath,
-      },
-    };
-  }
-  try {
-    return fromValue(checkMutationReport({ repoRoot }));
-  } catch (error) {
-    return {
-      status: 'unknown',
-      code: 'CHECK_MUTATION_EVIDENCE_MISSING',
-      message: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-function mutationVerificationReport(options: CheckExecutionOptions): RawExecution {
-  try {
-    return fromValue(
-      checkMutationReport({
-        repoRoot: options.repoRoot,
-        ...(options.mutationBaseline !== undefined && { baseline: options.mutationBaseline }),
-        ...(options.mutationCurrent !== undefined && { current: options.mutationCurrent }),
-        ...(options.mutationThresholds !== undefined && { thresholds: options.mutationThresholds }),
-      }),
-    );
-  } catch (error) {
-    return {
-      status: 'unknown',
-      code: 'CHECK_MUTATION_EVIDENCE_MISSING',
-      message: error instanceof Error ? error.message : String(error),
-    };
-  }
+function mutationDeprecationReport(): RawExecution {
+  return {
+    status: 'na',
+    code: 'MUTATION_OFFLOADED_TO_BEDEL',
+    message:
+      'Mutation testing is not required by DEVAI. Use bedel (https://github.com/aarusso-nyx/bedel).',
+  };
 }
 
 function securityPerformanceReport(repoRoot: string): RawExecution {
@@ -611,9 +562,9 @@ async function directService(
     case 'inventory-integrity':
       return fromValue(await inventoryIntegrityReport(repoRoot));
     case 'mutation':
-      return mutationPolicyReport(repoRoot);
+      return mutationDeprecationReport();
     case 'mutation-verification':
-      return mutationVerificationReport(options);
+      return mutationDeprecationReport();
     case 'security-performance':
       return securityPerformanceReport(repoRoot);
     case 'harness-integrity':
