@@ -360,7 +360,8 @@ function forgeArtifact(fx: HostFixture, name: (typeof ARTIFACT_NAMES)[number], v
 }
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const root of roots.splice(0))
+    rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 });
 
 describe('post-merge completed round identity', () => {
