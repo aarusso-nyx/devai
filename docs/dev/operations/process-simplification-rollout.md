@@ -401,3 +401,21 @@ The release manifest and rehearsal completion bind `installed_control_sha256` an
 verification, so changed control or verification identities require another rehearsal.
 These workflow changes must not be activated until the control carrier and exact
 protected configuration have been separately approved and provisioned.
+
+### Private runtime environment for ordinary certification
+
+The release-prerequisites configuration uses `environment` for the protected evidence
+map of `sha256:<hex>` identities (or `null` for an absent value). For `certify`, also
+supply `runtimeEnvironment`: an explicit JSON file outside the candidate, with mode
+0600, containing the actual runtime strings. Keep this file private and out of bundles.
+Before invoking any task, certification verifies each allowlisted value selected by
+the fixed `rc` profile and its dependency closure against the protected identity map.
+Unselected task inputs are neither required nor forwarded. A selected null identity
+requires the runtime key to be absent. Missing, mismatched or malformed identities
+fail before execution; diagnostic messages contain no runtime values.
+
+Ordinary RC receipts (schema 1.1) bind the exact candidate, selected task outcomes,
+and declared output paths. They do not certify a sealed generated namespace.
+Protected release certification (schema 1.2) additionally requires the protected
+executor's complete namespace capture after execution has stopped. Ordinary RC
+success must never be represented as that protected certification.
