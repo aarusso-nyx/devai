@@ -155,7 +155,12 @@ export function githubPagesControls({
         pagesId = match[2];
         phase = match[1];
       }
-      if (payload.identity.tag !== identity.tag) {
+      const matchingIdentity =
+        payload.identity !== null &&
+        typeof payload.identity === 'object' &&
+        Object.keys(payload.identity).length === Object.keys(identity).length &&
+        Object.entries(identity).every(([key, value]) => payload.identity[key] === value);
+      if (!matchingIdentity) {
         if (phase !== 'verified') fail('OTHER_PUBLICATION_UNRESOLVED');
         continue;
       }
