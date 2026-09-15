@@ -457,6 +457,12 @@ jobs:
       contents: write
       packages: write
     steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 1
+          persist-credentials: false
       - name: Check out approved process controls
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -471,12 +477,6 @@ jobs:
           set -euo pipefail
           [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
-      - name: Check out exact release commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-          fetch-depth: 1
-          persist-credentials: false
       - name: Set up Node and GitHub Packages
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
