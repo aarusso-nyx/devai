@@ -498,6 +498,7 @@ jobs:
         with:
           artifact-ids: ${{ needs.promote-assets.outputs.release_asset_id }}
           path: release-assets
+          merge-multiple: true
       - name: Verify canonical asset set
         shell: bash
         run: (cd release-assets && sha256sum --check SHA256SUMS)
@@ -619,6 +620,7 @@ jobs:
         with:
           artifact-ids: ${{ needs.promote-assets.outputs.release_asset_id }}
           path: release-assets
+          merge-multiple: true
       - name: Materialize the manifest-bound site archive
         shell: bash
         run: |
