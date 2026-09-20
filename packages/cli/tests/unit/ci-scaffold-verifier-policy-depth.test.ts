@@ -148,7 +148,7 @@ describe('CI scaffold verifier policy boundary', () => {
     [
       'payload population',
       (policy: VerifierPolicy) => {
-        if (policy.verifier !== undefined) policy.verifier.payload_file_count = 20;
+        if (policy.verifier !== undefined) policy.verifier.payload_file_count = 0;
       },
     ],
     [
@@ -200,5 +200,14 @@ describe('CI scaffold verifier policy boundary', () => {
     expect(scaffold.ledgerVerificationWorkflow()).toContain(
       "const selected = metadata.versions?.['10.11.12'];",
     );
+  });
+
+  it('binds the declared verifier population instead of a historical fixed count', async () => {
+    const policy = structuredClone(canonicalPolicy);
+    if (policy.verifier === undefined) throw new Error('canonical verifier policy missing');
+    policy.verifier.payload_file_count = 27;
+
+    const scaffold = await importScaffoldWithPolicy(policy);
+    expect(scaffold.attestedRcVerificationWorkflow()).toContain('files.length !== 27');
   });
 });

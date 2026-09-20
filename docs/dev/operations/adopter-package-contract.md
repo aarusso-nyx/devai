@@ -145,7 +145,7 @@ prerequisite for an independence claim.
 
 The generated trusted-local-RC workflow resolves its verifier from the single Architect-owned
 identity in `law/policy/trusted-local-rc-verifier-package.json`. The current supported identity is
-exactly `@aarusso-nyx/devai@1.4.4`; neither `latest`, a version range, a source checkout, nor an
+exactly `@aarusso-nyx/devai@1.5.1`; neither `latest`, a version range, a source checkout, nor an
 allowlist of interchangeable package or provenance identities is valid. The policy binds the
 authenticated registry response and downloaded tarball to the exact package name, version,
 tarball URL, SHA-1 shasum, SRI integrity, DEVAI release source commit, and release source tree.
@@ -169,7 +169,7 @@ to a fresh runner-temporary root and does not preserve archive ownership or perm
 
 After extraction, the only verifier root is
 `dist/runtime/evidence-verification` inside the authenticated DEVAI package. Its committed binding
-is the exact provenance-file SHA-256, embedded verifier source commit, 21-file declared payload,
+is the exact provenance-file SHA-256, embedded verifier source commit, policy-declared 26-file payload,
 per-file SHA-256 population, and exact five evidence binary mappings in the Architect policy.
 Missing, extra, symlinked, special, digest-drifted, or binary-drifted content fails closed before
 any verifier binary executes. `DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256` is a mandatory protected
@@ -182,7 +182,7 @@ an automatic `N-1` rule. The Architect records registry metadata observed from
 the authenticated registry and the signed release tag's commit/tree. An
 independent Inspector verifies the downloaded tarball SHA-1 and SRI, extracts it
 without lifecycle execution, and confirms the provenance digest, source commit,
-21-file population, per-file digests, and five binary mappings. The Owner must
+26-file population, per-file digests, and five binary mappings. The Owner must
 separately authorize updating the protected provenance duplicate. The previous
 immutable release and policy history remain available as audit anchors; no tag,
 tarball, or historical policy entry is moved or replaced.

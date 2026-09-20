@@ -20,6 +20,9 @@ const siteFile = resolve(required('SITE_ARCHIVE'));
 const sbomFile = resolve(required('SBOM_FILE'));
 const outputFile = resolve(required('OUTPUT_FILE'));
 const packageManifest = JSON.parse(readFileSync('packages/cli/package.json', 'utf8'));
+const verifierPackagePolicy = JSON.parse(
+  readFileSync('law/policy/trusted-local-rc-verifier-package.json', 'utf8'),
+);
 const verifierProvenanceBytes = readFileSync(
   'packages/cli/vendor/evidence-verification/provenance.json',
 );
@@ -31,7 +34,10 @@ if (
   verifierProvenance.schemaVersion !== '1.0.0' ||
   typeof verifierProvenance.sourceCommit !== 'string' ||
   !/^[a-f0-9]{40}$/u.test(verifierProvenance.sourceCommit) ||
-  verifierPackageVersion !== packageManifest.version
+  verifierPackagePolicy.package?.name !== '@aarusso-nyx/devai' ||
+  verifierPackageVersion !== verifierPackagePolicy.package.version ||
+  verifierProvenanceSha256 !== verifierPackagePolicy.verifier?.provenance_sha256 ||
+  verifierProvenance.sourceCommit !== verifierPackagePolicy.verifier?.source_commit
 ) {
   throw new Error('RELEASE_MANIFEST_VERIFIER_IDENTITY_INVALID');
 }

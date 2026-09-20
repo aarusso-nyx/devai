@@ -86,7 +86,8 @@ function loadVerifierPackagePolicy(): VerifierPackagePolicy {
     policy.verifier?.root !== 'dist/runtime/evidence-verification' ||
     !/^[0-9a-f]{64}$/u.test(policy.verifier.provenance_sha256) ||
     !/^[0-9a-f]{40}$/u.test(policy.verifier.source_commit) ||
-    policy.verifier.payload_file_count !== 21 ||
+    !Number.isSafeInteger(policy.verifier.payload_file_count) ||
+    policy.verifier.payload_file_count < 1 ||
     Object.keys(policy.verifier.binaries ?? {}).length !== 5 ||
     policy.external_duplicate?.name !== 'DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256' ||
     policy.external_duplicate.required !== true ||

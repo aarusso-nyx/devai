@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.2 — 2026-09-20
+
+- Roll over generated trusted-local-RC workflows to the exact immutable
+  `@aarusso-nyx/devai@1.5.1` provider package: authenticated registry metadata,
+  tarball SHA-1 and SRI, signed-release commit/tree, verifier provenance, and source commit.
+- Bind the verifier's policy-declared 26-file population rather than a historical fixed count,
+  while preserving the exact five evidence binary mappings and fail-closed drift checks.
+- Regenerate and test the canonical scaffold so its package materialization validates the complete
+  1.5.1 provider identity before extraction or verifier execution.
+
 ## 1.4.5 — 2026-08-30
 
 - Bind generated trusted-local-RC workflows to immutable `@aarusso-nyx/devai@1.4.4`, the first
