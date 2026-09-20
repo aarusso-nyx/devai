@@ -84,7 +84,7 @@
     },
     {
       "path": "src/policy-builder.js",
-      "sha256": "2c6568ed3db8b6fd7107dc2fd8f4378cdbbfe6c65c1ee89c8d1672bc9756e4de"
+      "sha256": "a63b13a41bb33bbf85a759369e33a1fb5f5208b098b63b48c9323433f889c37b"
     },
     {
       "path": "src/publish-cli.js",

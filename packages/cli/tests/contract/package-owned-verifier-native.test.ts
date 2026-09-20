@@ -8,8 +8,8 @@ const VERIFIER_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verifi
 const VERIFIER_TEST_ROOT = join(VERIFIER_ROOT, 'test');
 const EXPECTED_PROVENANCE = {
   sourceCommit: '7ad2a394fbc0a6220808561f645830addf5e5184',
-  manifestDigest: 'f4db895e1d642fe2a3e90a1db87e15c933fc83e3ccf88c38e27b64489e3b40d9',
-  filePopulationDigest: 'de959ef12e6d3b06f36680fae9a1ed7afe815e09eb44d85a880f89b2621cbad3',
+  manifestDigest: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
+  filePopulationDigest: 'a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf',
   runtimeFileCount: 26,
 } as const;
 const UPSTREAM_TEST_DIGESTS = new Map([
