@@ -1,20 +1,15 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { createHistoricalVerifierGitFixture } from '../fixtures/historical-verifier-1.4.4/index.js';
+import { describe, expect, it } from 'vitest';
 import { renderHelp } from '../../src/command-router.js';
 import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '1.5.1';
-const PUBLISHED_RELEASE_VERSION = '1.4.5';
-const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.4.4';
-const historicalFixtures: Array<ReturnType<typeof createHistoricalVerifierGitFixture>> = [];
-afterEach(() => {
-  for (const fixture of historicalFixtures.splice(0)) fixture.cleanup();
-});
+const CANDIDATE_RELEASE_VERSION = '1.5.2';
+const PUBLISHED_RELEASE_VERSION = '1.5.1';
+const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.1';
 
 describe('resolveCliVersion', () => {
   it('returns a semver-shaped string', () => {
@@ -83,21 +78,21 @@ describe('resolveCliVersion', () => {
     expect(policy.package.version).toBe(TRUSTED_VERIFIER_PACKAGE_VERSION);
     expect(policy.package).toMatchObject({
       tarball:
-        'https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.4.4/fcdf9a21f92094fce10d4cee42440abf44200467',
-      shasum_sha1: 'fcdf9a21f92094fce10d4cee42440abf44200467',
+        'https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.5.1/10ab06c759ea9c52a30b0e2afe42dbb05edecca9',
+      shasum_sha1: '10ab06c759ea9c52a30b0e2afe42dbb05edecca9',
       integrity_sri:
-        'sha512-B1AJzDAZNw+UM1m7bQjwHT9q0gO3cutNpGPRAXFEBtq3L6AZymI6RvLc4ghh05ssOoREynXKuJyjsayRJbWPEQ==',
+        'sha512-n6XFg8YgF2RWUHqRrawk/UhZjnHMjb6ddzVY8Vq/PagfLUtFMvMFfqf8Ru+owKpBtAoZz6/bgEt+VRhARJxW8A==',
       release_source: {
-        commit: '3aec624d0c0aecc534e60ee45306a4e5e6a7e94d',
-        tree: '2cad519aba8117a1850eee85d41eae452d51a141',
+        commit: '63578da0b66f94636b359bf19443fb75e6a42d39',
+        tree: 'c343d2b5c6c521359073d30048827e0f705f2256',
       },
     });
     expect(policy.verifier).toMatchObject({
-      provenance_sha256: '8ebafff53524031a3207a2256ebcd0fa6e0cc4271fd4bb6bca5aa003395034bd',
-      source_commit: '37e75a5c27569d4cb3fdb4a3dc97a140da4d78de',
+      provenance_sha256: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
+      source_commit: '7ad2a394fbc0a6220808561f645830addf5e5184',
     });
     const currentReleaseNotes = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8')
-      .split(`## ${PUBLISHED_RELEASE_VERSION}`)[1]
+      .split(`## ${CANDIDATE_RELEASE_VERSION}`)[1]
       ?.split('\n## ')[0];
     expect(currentReleaseNotes).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
     expect(
@@ -105,7 +100,7 @@ describe('resolveCliVersion', () => {
     ).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
   });
 
-  it('proves the trusted provider release contains the declared verifier provenance', () => {
+  it('proves the committed verifier population matches the exact trusted provider policy', () => {
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
@@ -119,20 +114,14 @@ describe('resolveCliVersion', () => {
         payload_file_count: number;
       };
     };
-    const releaseCommit = policy.package.release_source.commit;
-    const historical = createHistoricalVerifierGitFixture();
-    historicalFixtures.push(historical);
-    const git = historical.git;
-    const text = (args: string[]): string => git(args).toString('utf8').trim();
-
-    expect(text(['cat-file', '-t', `v${policy.package.version}`])).toBe('tag');
-    expect(text(['rev-parse', `v${policy.package.version}^{commit}`])).toBe(releaseCommit);
-    expect(text(['rev-parse', `${releaseCommit}^{tree}`])).toBe(policy.package.release_source.tree);
-
-    const provenanceBytes = git([
-      'show',
-      `${releaseCommit}:packages/cli/vendor/evidence-verification/provenance.json`,
-    ]);
+    expect(policy.package.release_source).toEqual({
+      repository: 'aarusso-nyx/devai',
+      commit: '63578da0b66f94636b359bf19443fb75e6a42d39',
+      tree: 'c343d2b5c6c521359073d30048827e0f705f2256',
+    });
+    const provenanceBytes = readFileSync(
+      join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
+    );
     const provenance = JSON.parse(provenanceBytes.toString('utf8')) as {
       schemaVersion: string;
       sourceCommit: string;

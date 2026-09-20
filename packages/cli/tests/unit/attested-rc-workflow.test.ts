@@ -8,6 +8,7 @@ import {
   attestedRcVerificationWorkflow,
   buildCiScaffoldPlan,
 } from '../../src/services/ci-scaffold/index.js';
+import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
 
 const roots: string[] = [];
 
@@ -260,6 +261,20 @@ describe('attested RC workflow scaffold', () => {
     expect(plan.content).toContain('name: verified-local-rc');
     expect(plan.content).toContain('--binding "${{ steps.identity.outputs.binding }}"');
     expect(plan.content).toContain('control/law/policy/devai-local-rc-trust-store.json');
+  });
+
+  it('satisfies the CI-economy protected package-verifier marker after canonical generation', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-attested-workflow-'));
+    roots.push(root);
+    project(root);
+    const plan = buildCiScaffoldPlan({ targetRoot: root });
+    mkdirSync(dirname(plan.path), { recursive: true });
+    writeFileSync(plan.path, plan.content);
+
+    const finding = checkCiEconomy({ repoRoot: root }).findings.find(
+      (entry) => entry.ruleId === 'ci-economy.evidence-gate-wired',
+    );
+    expect(finding).toMatchObject({ severity: 'pass' });
   });
 
   it('fails closed instead of generating from malformed attested-RC policy', () => {

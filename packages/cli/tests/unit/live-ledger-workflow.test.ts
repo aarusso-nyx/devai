@@ -24,7 +24,6 @@ import {
   VERIFIER_SOURCE_COMMIT,
 } from '../../src/services/ci-scaffold/index.js';
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
-import { createHistoricalVerifierGitFixture } from '../fixtures/historical-verifier-1.4.4/index.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CHECKER = join(ROOT, 'scripts/check-workflows.mjs');
@@ -125,42 +124,39 @@ function executablePackageMaterializationFixture(
   mkdirSync(verifierRoot, { recursive: true });
   mkdirSync(runnerTemp, { recursive: true });
   mkdirSync(mockBin, { recursive: true });
-  // This fixture models the published 1.4.4 package, whose frozen control has
-  // 21 runtime files. It must not inherit the current package's v2.1 vendor.
-  const historicalArchive = join(root, 'published-1.4.4-verifier.tar');
-  const historical = createHistoricalVerifierGitFixture();
-  try {
-    writeFileSync(
-      historicalArchive,
-      historical.git([
-        'archive',
-        // The isolated bare fixture has no attributes; avoid indexing unrelated
-        // historical trees. The helper still pins every original archive byte.
-        '--worktree-attributes',
-        '--format=tar',
-        VERIFIER_POLICY.package.release_source.commit,
-        'packages/cli/vendor/evidence-verification',
-      ]),
-    );
-  } finally {
-    historical.cleanup();
-  }
+  // The committed runtime verifier must match the policy's immutable 1.5.1
+  // provider identity before this fixture re-packs it for mocked registry I/O.
+  // The generated workflow independently binds the actual registry tarball to
+  // that same exact release commit/tree, SHA-1, and SRI before extraction.
+  const publishedArchive = join(root, 'published-1.5.1-verifier.tar');
   execFileSync(
     'tar',
-    ['-xf', historicalArchive, '--strip-components=4', '--directory', verifierRoot],
+    [
+      '-cf',
+      publishedArchive,
+      '--format=ustar',
+      '-C',
+      ROOT,
+      'packages/cli/vendor/evidence-verification',
+    ],
+    { cwd: root, env: { ...process.env, COPYFILE_DISABLE: '1' } },
+  );
+  execFileSync(
+    'tar',
+    ['-xf', publishedArchive, '--strip-components=4', '--directory', verifierRoot],
     { cwd: root },
   );
   rmSync(join(verifierRoot, 'test'), { recursive: true, force: true });
-  const historicalProvenance = readFileSync(join(verifierRoot, 'provenance.json'));
-  expect(createHash('sha256').update(historicalProvenance).digest('hex')).toBe(
+  const publishedProvenance = readFileSync(join(verifierRoot, 'provenance.json'));
+  expect(createHash('sha256').update(publishedProvenance).digest('hex')).toBe(
     VERIFIER_POLICY.verifier.provenance_sha256,
   );
-  const historicalManifest = JSON.parse(historicalProvenance.toString('utf8')) as {
+  const publishedManifest = JSON.parse(publishedProvenance.toString('utf8')) as {
     sourceCommit: string;
     files: unknown[];
   };
-  expect(historicalManifest.sourceCommit).toBe(VERIFIER_POLICY.verifier.source_commit);
-  expect(historicalManifest.files).toHaveLength(VERIFIER_POLICY.verifier.payload_file_count);
+  expect(publishedManifest.sourceCommit).toBe(VERIFIER_POLICY.verifier.source_commit);
+  expect(publishedManifest.files).toHaveLength(VERIFIER_POLICY.verifier.payload_file_count);
   writeFileSync(
     join(packageRoot, 'package.json'),
     `${JSON.stringify({

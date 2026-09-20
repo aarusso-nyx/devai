@@ -17,7 +17,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
-const SELECTED_RELEASE_VERSION = '1.5.1';
+const SELECTED_RELEASE_VERSION = '1.5.2';
+const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.1';
 const VENDORED_VERIFIER_SOURCE_COMMIT = '7ad2a394fbc0a6220808561f645830addf5e5184';
 const VENDORED_VERIFIER_PROVENANCE = readFileSync(
   join(root, 'packages/cli/vendor/evidence-verification/provenance.json'),
@@ -43,7 +44,7 @@ function manifestEnvironment(input: {
     OUTPUT_FILE: input.output,
     COMMIT_SHA: 'b'.repeat(40),
     TREE_SHA: 'c'.repeat(40),
-    LEDGER_VERIFIER_PACKAGE_VERSION: input.version ?? SELECTED_RELEASE_VERSION,
+    LEDGER_VERIFIER_PACKAGE_VERSION: input.version ?? TRUSTED_VERIFIER_PACKAGE_VERSION,
     LEDGER_VERIFIER_PROVENANCE_SHA256: input.provenance ?? VENDORED_VERIFIER_PROVENANCE_SHA256,
     LEDGER_POLICY_DIGEST: digest,
     LEDGER_ENVELOPE_SHA256: digest,
@@ -119,7 +120,7 @@ describe('normalized release package staging', () => {
     expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.5.1', () => {
+  it('records a stable release and latest dist-tag for version 1.5.2', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');
@@ -144,7 +145,7 @@ describe('normalized release package staging', () => {
     });
     expect(value.ledger).toMatchObject({
       verifier_package: '@aarusso-nyx/devai',
-      verifier_package_version: SELECTED_RELEASE_VERSION,
+      verifier_package_version: TRUSTED_VERIFIER_PACKAGE_VERSION,
       verifier_provenance_sha256: VENDORED_VERIFIER_PROVENANCE_SHA256,
       verifier_source_commit: VENDORED_VERIFIER_SOURCE_COMMIT,
     });
@@ -172,7 +173,10 @@ describe('normalized release package staging', () => {
 
   it.each([
     ['wrong provenance', { provenance: 'f'.repeat(64) }],
-    ['wrong package version', { version: '1.4.4' }],
+    [
+      'candidate package version instead of the trusted verifier',
+      { version: SELECTED_RELEASE_VERSION },
+    ],
   ])('refuses %s verifier identity before writing a release manifest', (_name, identity) => {
     const manifest = join(output, `release-manifest-invalid-${_name.replaceAll(' ', '-')}.json`);
     expect(() =>

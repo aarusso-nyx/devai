@@ -128,6 +128,8 @@ const PROVENANCE_DIGEST_BINDING =
   /test\s+"\$actual_provenance_sha256"\s*=\s*"\$VERIFIER_PROVENANCE_SHA256"/u;
 const RUNNER_TEMP_COPY =
   /cp\s+-R\s+"\$source_root\/schemas"\s+"\$source_root\/src"\s+"\$verifier_root\/"/u;
+const RUNNER_TEMP_PACKAGE_MATERIALIZATION =
+  /control="\$RUNNER_TEMP\/devai-verifier-package"[\s\S]*tar\s+-xzf\s+"\$archive"\s+--directory\s+"\$control\/extracted"/u;
 const PACKAGE_VERIFIER_INVOCATION = /node\s+"\$DEVAI_EVIDENCE_(?:VERIFY|BUNDLE_VERIFY)"/u;
 
 /**
@@ -212,7 +214,7 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
     hasEvidenceMarker:
       PROTECTED_PROVENANCE_DIGEST.test(text) &&
       PROVENANCE_DIGEST_BINDING.test(text) &&
-      RUNNER_TEMP_COPY.test(text) &&
+      (RUNNER_TEMP_COPY.test(text) || RUNNER_TEMP_PACKAGE_MATERIALIZATION.test(text)) &&
       PACKAGE_VERIFIER_INVOCATION.test(text),
   };
 }
