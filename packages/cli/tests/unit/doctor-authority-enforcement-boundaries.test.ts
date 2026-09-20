@@ -223,7 +223,7 @@ describe('Doctor authority enforcement boundaries', () => {
     ['repository id', (policy: JsonObject) => (policy['repository_id'] = 'other-repository')],
     [
       'framework package',
-      (policy: JsonObject) => (object(policy['framework_package'])['version'] = '1.5.1'),
+      (policy: JsonObject) => (object(policy['framework_package'])['version'] = '1.5.0'),
     ],
     [
       'constitution digest',
@@ -237,7 +237,7 @@ describe('Doctor authority enforcement boundaries', () => {
       'additive extension version',
       (policy: JsonObject) => {
         const extensions = policy['additive_extensions'] as JsonObject[];
-        object(extensions[0])['extension_version'] = '1.5.1';
+        object(extensions[0])['extension_version'] = '1.5.0';
       },
     ],
     [

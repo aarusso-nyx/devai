@@ -28,9 +28,9 @@ function verify(value: Awaited<ReturnType<typeof fixture>>, closure = value.clos
 }
 
 describe('unit-scoped mutation evidence closure (ADR-MUT-0008 IA-002 through IA-004)', () => {
-  it('semantically verifies ten internal package pairs plus summary/receipt and a separate contract', async () => {
+  it('rejects preserved historical evidence when its verifier provenance is no longer trusted', async () => {
     const value = await fixture();
-    await expect(verify(value)).resolves.toBeUndefined();
+    await expect(verify(value)).rejects.toThrow(REFUSAL);
     expect(value.closure.members).toHaveLength(22);
     expect(value.read).toHaveBeenCalledTimes(23);
     expect(value.closure.release_unit).toBe('@fixture/publishable');
@@ -68,9 +68,9 @@ describe('unit-scoped mutation evidence closure (ADR-MUT-0008 IA-002 through IA-
     ]);
   });
 
-  it('preserves a reused immutable pair and not-required row without adding another pair', async () => {
+  it('rejects preserved reused evidence when its producing verifier is no longer trusted', async () => {
     const value = await fixture({ reused: true, notRequired: true });
-    await expect(verify(value)).resolves.toBeUndefined();
+    await expect(verify(value)).rejects.toThrow(REFUSAL);
     expect(value.closure.members).toHaveLength(22);
     expect(value.composed.summary).toMatchObject({
       aggregate: {
@@ -256,7 +256,7 @@ describe('unit-scoped mutation evidence closure (ADR-MUT-0008 IA-002 through IA-
     };
     await expect(
       verifyUnitMutationEvidenceDocuments({ closure, expected, read, maximum_bytes: 1_000_000 }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow(REFUSAL);
     expect(captured).toEqual(value.binding);
     expect(expected.candidate_commit).not.toBe(captured.candidate_commit);
   });

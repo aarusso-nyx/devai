@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "sourceCommit": "9f849f117fe1e460b5e3c647515f5ccbe783cbfb",
+  "sourceCommit": "7ad2a394fbc0a6220808561f645830addf5e5184",
   "files": [
     {
       "path": "schemas/candidate-receipt-1.1.schema.json",
@@ -84,7 +84,7 @@
     },
     {
       "path": "src/policy-builder.js",
-      "sha256": "9650313a834cbf76472446444e29074cc4a3c82a5d4ba3b188507eaebe806e56"
+      "sha256": "a63b13a41bb33bbf85a759369e33a1fb5f5208b098b63b48c9323433f889c37b"
     },
     {
       "path": "src/publish-cli.js",

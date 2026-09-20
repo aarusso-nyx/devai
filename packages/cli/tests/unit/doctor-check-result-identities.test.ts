@@ -136,7 +136,7 @@ async function canonicalRepo(): Promise<string> {
     schemaVersion: '1.0.0',
     project_type: 'runtime-host',
     profile: 'tier1',
-    devai_version: '1.5.0',
+    devai_version: '1.5.1',
   });
   for (const file of MATERIALIZED_POLICY_FILES) {
     put(repo, `${CONFIG}/${file}`, resolveCanonicalPolicyContent(file));
@@ -790,7 +790,7 @@ describe('Doctor whole CheckResult identities', () => {
         "malformedProject": {
           "errors": [
             "materialized target is invalid: .devai/config/project.json",
-            "bound DEVAI version missing differs from installed DEVAI version 1.5.0",
+            "bound DEVAI version missing differs from installed DEVAI version 1.5.1",
             "adopter-policy source cannot be materialized: law/policy/devai-adoption.json",
           ],
           "info": {
@@ -811,7 +811,7 @@ describe('Doctor whole CheckResult identities', () => {
         "missingCollision": {
           "errors": [
             "materialized target is missing: .devai/config/project.json",
-            "bound DEVAI version missing differs from installed DEVAI version 1.5.0",
+            "bound DEVAI version missing differs from installed DEVAI version 1.5.1",
           ],
           "info": {
             "binding": ".devai/config/adopter-policy-binding.json",
@@ -836,7 +836,7 @@ describe('Doctor whole CheckResult identities', () => {
         "missingProject": {
           "errors": [
             "materialized target is missing: .devai/config/project.json",
-            "bound DEVAI version missing differs from installed DEVAI version 1.5.0",
+            "bound DEVAI version missing differs from installed DEVAI version 1.5.1",
           ],
           "info": {
             "binding": ".devai/config/adopter-policy-binding.json",
