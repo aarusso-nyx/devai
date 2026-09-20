@@ -25,7 +25,7 @@ const UPSTREAM_TEST_DIGESTS = new Map([
     '9496d28bfffa1731fc4fc92a02255b64e13174d3cba999e6e5e47c7a95078065',
   ],
   ['mutation.test.js', '9a5815d17a17f7e606aaca0f088b23d7bb900e5b171d875cf9903670142dd661'],
-  ['policy-builder.test.js', '2f2f1c3cc25edbf21593b692e5d6ff9efceabd6cfe1da9d7ed27ec2cf9403a1e'],
+  ['policy-builder.test.js', '950dddd8cc2e06da2eea75be124a3ced431617e3838a32b312205a9bc823485a'],
   ['publish.test.js', 'fa32181e7690efc6443080db9c5dd1f5a0d3f9fc6102859d4c99680f7c764666'],
   ['verifier.test.js', '0bffed225e86fdf59900b8c86eafa685af06b2fd17ceff56eac2133792613ed1'],
 ]);
@@ -61,7 +61,7 @@ describe('package-owned evidence verifier native suite', () => {
     }
   });
 
-  it('executes all 129 vendored node:test cases against the packaged implementation', () => {
+  it('executes all 130 vendored node:test cases against the packaged implementation', () => {
     const files = readdirSync(VERIFIER_TEST_ROOT)
       .filter((name) => name.endsWith('.test.js'))
       .sort()
@@ -77,8 +77,8 @@ describe('package-owned evidence verifier native suite', () => {
     expect(result.error, output).toBeUndefined();
     expect(result.status, output).toBe(0);
     expect(result.signal, output).toBeNull();
-    expect(output).toMatch(/# tests 129(?:\r?\n|$)/u);
-    expect(output).toMatch(/# pass 129(?:\r?\n|$)/u);
+    expect(output).toMatch(/# tests 130(?:\r?\n|$)/u);
+    expect(output).toMatch(/# pass 130(?:\r?\n|$)/u);
     expect(output).toMatch(/# fail 0(?:\r?\n|$)/u);
   }, 130_000);
 });
