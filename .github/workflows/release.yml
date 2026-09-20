@@ -239,7 +239,7 @@ jobs:
           const ledger=Object.fromEntries(Object.entries(fields).map(([key,file])=>[key,createHash('sha256').update(readFileSync(root+'/'+file)).digest('hex')]));
           ledger.verifier_package='@aarusso-nyx/devai';
           ledger.verifier_package_version=process.env.VERIFIER_PACKAGE_VERSION;
-          ledger.verifier_source_commit='9f849f117fe1e460b5e3c647515f5ccbe783cbfb';
+          ledger.verifier_source_commit='7ad2a394fbc0a6220808561f645830addf5e5184';
           ledger.policy_digest=process.env.POLICY_DIGEST;
           ledger.verifier_provenance_sha256=process.env.VERIFIER_PROVENANCE;
           console.log('ledger_json='+JSON.stringify(ledger));

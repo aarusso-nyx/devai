@@ -7,9 +7,9 @@ import { describe, expect, it } from 'vitest';
 const VERIFIER_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
 const VERIFIER_TEST_ROOT = join(VERIFIER_ROOT, 'test');
 const EXPECTED_PROVENANCE = {
-  sourceCommit: '9f849f117fe1e460b5e3c647515f5ccbe783cbfb',
-  manifestDigest: 'f61cccd8a0c0c5e7020cc6055f254c1a5ab56388fc9fc220ea76b1f9dc9a196c',
-  filePopulationDigest: '9ce3f981f51fb4fa5f628cd5d2249bf8146aa44017b06603b797589ebe6505d4',
+  sourceCommit: '7ad2a394fbc0a6220808561f645830addf5e5184',
+  manifestDigest: 'f4db895e1d642fe2a3e90a1db87e15c933fc83e3ccf88c38e27b64489e3b40d9',
+  filePopulationDigest: 'de959ef12e6d3b06f36680fae9a1ed7afe815e09eb44d85a880f89b2621cbad3',
   runtimeFileCount: 26,
 } as const;
 const UPSTREAM_TEST_DIGESTS = new Map([
