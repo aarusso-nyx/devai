@@ -1162,7 +1162,7 @@ try {
   if (
     verifierProvenance.sourceCommit !== '7ad2a394fbc0a6220808561f645830addf5e5184' ||
     digest(join(verifierRoot, 'provenance.json')) !==
-      'f4db895e1d642fe2a3e90a1db87e15c933fc83e3ccf88c38e27b64489e3b40d9' ||
+      '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff' ||
     verifierProvenance.files?.length !== 26 ||
     verifierFiles.length !== 26 ||
     JSON.stringify(verifierFiles) !== JSON.stringify(declaredVerifierFiles) ||
