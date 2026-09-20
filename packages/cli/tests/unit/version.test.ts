@@ -8,7 +8,7 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '1.5.0';
+const CANDIDATE_RELEASE_VERSION = '1.5.1';
 const PUBLISHED_RELEASE_VERSION = '1.4.5';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.4.4';
 const historicalFixtures: Array<ReturnType<typeof createHistoricalVerifierGitFixture>> = [];

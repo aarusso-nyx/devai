@@ -160,7 +160,7 @@ function matrixResult(
     scope: input.scope,
     tier: input.tier ?? 'unit',
     status: input.status ?? 'pass',
-    timestamp: input.timestamp ?? '2026-09-10T10:00:00.000Z',
+    timestamp: input.timestamp ?? new Date(Date.now()).toISOString(),
     metrics: input.metrics ?? { passed: 1, failed: 0 },
   };
 }
@@ -218,7 +218,7 @@ describe('render matrix public command boundaries', () => {
       '01-newer',
       matrixResult('newer', {
         scope: 'latest-scope',
-        timestamp: '2026-09-10T10:00:00.000Z',
+        timestamp: new Date(Date.now()).toISOString(),
       }),
     );
 
