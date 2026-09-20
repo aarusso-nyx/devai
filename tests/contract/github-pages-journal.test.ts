@@ -39,6 +39,7 @@ function fixture() {
     records: unknown[] = [],
     calls: { url: string; method: string; body: string }[] = [];
   let pagesState = 'succeed',
+    pagesStates: string[] = [],
     live = false,
     loseSubmission = false;
   const fetchImpl = vi.fn(async (url: string, options: { method: string; body?: string }) => {
@@ -50,8 +51,9 @@ function fixture() {
     if (options.method === 'GET' && path.endsWith('/deployments'))
       return Response.json(deployments);
     if (options.method === 'GET' && path.endsWith('/pages/deployments/pages-17')) {
-      if (pagesState === 'succeed') live = true;
-      return Response.json({ status: pagesState });
+      const state = pagesStates.shift() ?? pagesState;
+      if (state === 'succeed') live = true;
+      return Response.json({ status: state });
     }
     if (options.method === 'POST' && path.endsWith('/pages/deployments')) {
       if (loseSubmission) throw new Error('secret-provider-response');
@@ -103,6 +105,9 @@ function fixture() {
     },
     setPagesState: (value: string) => {
       pagesState = value;
+    },
+    setPagesStates: (values: string[]) => {
+      pagesStates = [...values];
     },
   };
 }
@@ -160,6 +165,12 @@ it('retains and resumes a known deployment without a new Pages POST', async () =
     f.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/pages/deployments')),
   ).toHaveLength(1);
   expect(f.calls.some((c) => c.url.endsWith('/cancel'))).toBe(false);
+});
+it('waits for a building Pages deployment before verifying it', async () => {
+  const f = fixture();
+  f.setPagesStates(['building', 'succeed']);
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified', pagesId: 'pages-17' });
+  expect(f.options.sleep).toHaveBeenCalledTimes(1);
 });
 it.each([401, 403, 404, 500])(
   'API status %s cannot establish missing publication',

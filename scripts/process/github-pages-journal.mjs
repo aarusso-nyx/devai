@@ -252,7 +252,7 @@ export function githubPagesControls({
       for (let count = 0; count < 60; count++) {
         const result = await request('GET', `${ROOT}/pages/deployments/${pagesId}`);
         if (result?.status === 'succeed') return 'succeeded';
-        if (!['deployment_in_progress', 'queued', 'waiting'].includes(result?.status))
+        if (!['building', 'deployment_in_progress', 'queued', 'waiting'].includes(result?.status))
           return 'unresolved';
         await sleep(5000);
       }
