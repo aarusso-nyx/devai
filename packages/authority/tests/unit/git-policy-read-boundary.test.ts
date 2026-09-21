@@ -104,6 +104,13 @@ describe('closed policy reconstruction Git grammar', () => {
     expect(
       readCheckPolicyGitSync(root, ['cat-file', '--batch'], Buffer.from(blob + '\n')).toString(),
     ).toBe(`${blob} blob 6\nfirst\n\n`);
+    expect(
+      readCheckPolicyGitSync(
+        root,
+        ['cat-file', '--batch-check'],
+        Buffer.from(blob + '\n'),
+      ).toString(),
+    ).toBe(`${blob} blob 6\n`);
     expect(readFileSync(join(root, '.git/index'))).toEqual(index);
   });
 
@@ -179,6 +186,8 @@ describe('closed policy reconstruction Git grammar', () => {
       ['ls-tree', '-r', '-z', '--full-tree', first, 'file ç.txt'],
       ['cat-file', '--filters', first + ':file ç.txt'],
       ['cat-file', '--batch', '--buffer'],
+      ['cat-file', '--batch-check', '--buffer'],
+      ['cat-file', '--batch-check', '--batch-all-objects'],
       ['rev-parse', '--verify', 'HEAD^{commit}', '--'],
       ['merge-base', first, second, '--all'],
       ['diff', '--name-status', '-z', '-M', '--find-renames', first, second, '--ext-diff'],
@@ -192,22 +201,31 @@ describe('closed policy reconstruction Git grammar', () => {
   });
 
   it('accepts only complete newline-delimited exact batch identities', () => {
-    for (const input of [
-      undefined,
-      '',
-      Buffer.alloc(0),
-      blob,
-      blob + '\n\n',
-      'HEAD\n',
-      blob + '\r\n',
-      Buffer.from([0xff, 0x0a]),
-    ])
-      expect(() => readCheckPolicyGitSync(root, ['cat-file', '--batch'], input)).toThrow(
-        'GIT_POLICY_READ_INPUT_INVALID',
-      );
+    for (const command of ['--batch', '--batch-check']) {
+      for (const input of [
+        undefined,
+        '',
+        Buffer.alloc(0),
+        blob,
+        blob + '\n\n',
+        'HEAD\n',
+        blob + '\r\n',
+        Buffer.from([0xff, 0x0a]),
+      ])
+        expect(() => readCheckPolicyGitSync(root, ['cat-file', command], input)).toThrow(
+          'GIT_POLICY_READ_INPUT_INVALID',
+        );
+    }
     expect(
       readCheckPolicyGitSync(root, ['cat-file', '--batch'], blob + '\n' + blob + '\n').toString(),
     ).toBe(`${blob} blob 6\nfirst\n\n`.repeat(2));
+    expect(
+      readCheckPolicyGitSync(
+        root,
+        ['cat-file', '--batch-check'],
+        blob + '\n' + blob + '\n',
+      ).toString(),
+    ).toBe(`${blob} blob 6\n`.repeat(2));
     expect(() =>
       readCheckPolicyGitSync(root, ['status', '--porcelain=v1', '--untracked-files=all'], ''),
     ).toThrow('GIT_POLICY_READ_INPUT_INVALID');

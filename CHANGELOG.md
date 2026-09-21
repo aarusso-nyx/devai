@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.3 — 2026-09-21
+
+- Bound clean committed-snapshot hashing by querying immutable Git object sizes and reading blobs
+  in deterministic batches, without increasing the protected 64 MiB subprocess ceiling.
+- Keep the closed Git-read grammar fail-closed for malformed or truncated size/content responses.
+- Exercise an installed package against a clean 70 MiB committed snapshot and prove RC execution
+  plus task-policy digest equivalence with the per-file worktree path.
+- Retain immutable `@aarusso-nyx/devai@1.5.1` as the trusted local-RC verifier provider.
+
 ## 1.5.2 — 2026-09-20
 
 - Roll over generated trusted-local-RC workflows to the exact immutable
