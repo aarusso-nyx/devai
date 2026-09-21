@@ -575,6 +575,10 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 57');
+    expect(verifierMaterializationScript(release)).toContain('echo "version=1.5.1"');
+    expect(verifierMaterializationScript(release)).not.toContain(
+      'require("./" + process.argv[1] + "/package.json").version',
+    );
     expect(release).toContain('pnpm run release:closure');
     const buildIndex = release.indexOf('pnpm run build');
     expect(buildIndex).toBeGreaterThanOrEqual(0);
