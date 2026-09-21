@@ -6,8 +6,8 @@ type Json = Record<string, unknown>;
 
 const APPROVED_SOURCE = {
   repository: 'devai-nyx/devai-verifier',
-  commit: '7ad2a394fbc0a6220808561f645830addf5e5184',
-  tree: '17b5a1fab7efb9096b941e10b940ed714fdc6d14',
+  commit: '8174749ebcfabab246031281a036032f636b8a39',
+  tree: 'e231ff55353f45bedf530a1ebd4821493328d67b',
 } as const;
 
 const PROVENANCE_PROOF = {
@@ -15,12 +15,12 @@ const PROVENANCE_PROOF = {
   vendor: {
     root: 'packages/cli/vendor/evidence-verification',
     manifestPath: 'packages/cli/vendor/evidence-verification/provenance.json',
-    manifestDigest: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
+    manifestDigest: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
     sourceCommit: APPROVED_SOURCE.commit,
     sourceTree: APPROVED_SOURCE.tree,
-    byteSetDigest: 'a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf',
+    byteSetDigest: '670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224',
   },
-  sourceByteSetDigest: 'a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf',
+  sourceByteSetDigest: '670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224',
   byteEqual: true,
 } as const;
 

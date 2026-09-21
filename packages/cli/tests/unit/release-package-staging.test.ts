@@ -17,9 +17,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
-const SELECTED_RELEASE_VERSION = '1.5.3';
+const SELECTED_RELEASE_VERSION = '1.5.4';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.1';
-const VENDORED_VERIFIER_SOURCE_COMMIT = '7ad2a394fbc0a6220808561f645830addf5e5184';
+const VENDORED_VERIFIER_SOURCE_COMMIT = '8174749ebcfabab246031281a036032f636b8a39';
 const VENDORED_VERIFIER_PROVENANCE = readFileSync(
   join(root, 'packages/cli/vendor/evidence-verification/provenance.json'),
 );
@@ -120,7 +120,7 @@ describe('normalized release package staging', () => {
     expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
   });
 
-  it('records a stable release and latest dist-tag for version 1.5.3', () => {
+  it('records a stable release and latest dist-tag for version 1.5.4', () => {
     const packageTarball = join(output, 'package.tgz');
     const siteArchive = join(output, 'site.tar.gz');
     const sbom = join(output, 'sbom.json');

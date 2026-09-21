@@ -7,9 +7,9 @@ import { describe, expect, it } from 'vitest';
 const VERIFIER_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
 const VERIFIER_TEST_ROOT = join(VERIFIER_ROOT, 'test');
 const EXPECTED_PROVENANCE = {
-  sourceCommit: '7ad2a394fbc0a6220808561f645830addf5e5184',
-  manifestDigest: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
-  filePopulationDigest: 'a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf',
+  sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
+  manifestDigest: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
+  filePopulationDigest: '670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224',
   runtimeFileCount: 26,
 } as const;
 const UPSTREAM_TEST_DIGESTS = new Map([
@@ -26,7 +26,7 @@ const UPSTREAM_TEST_DIGESTS = new Map([
   ],
   ['mutation.test.js', '9a5815d17a17f7e606aaca0f088b23d7bb900e5b171d875cf9903670142dd661'],
   ['policy-builder.test.js', '950dddd8cc2e06da2eea75be124a3ced431617e3838a32b312205a9bc823485a'],
-  ['publish.test.js', 'fa32181e7690efc6443080db9c5dd1f5a0d3f9fc6102859d4c99680f7c764666'],
+  ['publish.test.js', '74a4472721b84efef62ea3ce5e28eca6f5d706323bb4d488c42d96ade6cdf70c'],
   ['verifier.test.js', '0bffed225e86fdf59900b8c86eafa685af06b2fd17ceff56eac2133792613ed1'],
 ]);
 
@@ -61,7 +61,7 @@ describe('package-owned evidence verifier native suite', () => {
     }
   });
 
-  it('executes all 130 vendored node:test cases against the packaged implementation', () => {
+  it('executes all 131 vendored node:test cases against the packaged implementation', () => {
     const files = readdirSync(VERIFIER_TEST_ROOT)
       .filter((name) => name.endsWith('.test.js'))
       .sort()
@@ -77,8 +77,8 @@ describe('package-owned evidence verifier native suite', () => {
     expect(result.error, output).toBeUndefined();
     expect(result.status, output).toBe(0);
     expect(result.signal, output).toBeNull();
-    expect(output).toMatch(/# tests 130(?:\r?\n|$)/u);
-    expect(output).toMatch(/# pass 130(?:\r?\n|$)/u);
+    expect(output).toMatch(/# tests 131(?:\r?\n|$)/u);
+    expect(output).toMatch(/# pass 131(?:\r?\n|$)/u);
     expect(output).toMatch(/# fail 0(?:\r?\n|$)/u);
   }, 130_000);
 });

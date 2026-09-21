@@ -5,7 +5,7 @@ It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
 DEVAI ships as one package, `@aarusso-nyx/devai`; the published installation
-below remains pinned to **1.5.2**. This source tree's machine catalog contains
+below remains pinned to **1.5.3**. This source tree's machine catalog contains
 **57 actions** (32 stable, 14 preview, 11 internal), **59 sensors**, and
 **7 host-invoked recipes**. The ordinary public CLI is organized
 into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
@@ -16,7 +16,7 @@ into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.5.2
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.5.3
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
