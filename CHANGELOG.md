@@ -7,6 +7,7 @@
 - Keep the closed Git-read grammar fail-closed for malformed or truncated size/content responses.
 - Exercise an installed package against a clean 70 MiB committed snapshot and prove RC execution
   plus task-policy digest equivalence with the per-file worktree path.
+- Retain immutable `@aarusso-nyx/devai@1.5.1` as the trusted local-RC verifier provider.
 
 ## 1.5.2 — 2026-09-20
 
