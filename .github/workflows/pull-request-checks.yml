@@ -80,7 +80,7 @@ jobs:
           }
           const provenancePath = join(verifierRoot, 'provenance.json');
           const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
-          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '7ad2a394fbc0a6220808561f645830addf5e5184') {
+          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '8174749ebcfabab246031281a036032f636b8a39') {
             throw new Error('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
           }
           const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));

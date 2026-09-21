@@ -79,7 +79,15 @@ jobs:
           test "$VERIFIER_PROVENANCE_SHA256" != ""
           test "${#VERIFIER_PROVENANCE_SHA256}" = 64
           control="$RUNNER_TEMP/devai-verifier-package"
-          package_root="candidate/packages/cli"
+          source="$control/source"
+          trusted_commit="63578da0b66f94636b359bf19443fb75e6a42d39"
+          trusted_tree="c343d2b5c6c521359073d30048827e0f705f2256"
+          test "$(git -C candidate cat-file -t "$trusted_commit")" = commit
+          test "$(git -C candidate rev-parse "$trusted_commit^{tree}")" = "$trusted_tree"
+          mkdir -p "$source"
+          git -C candidate archive "$trusted_commit" \
+            packages/cli/package.json packages/cli/vendor/evidence-verification | tar -x -C "$source"
+          package_root="$source/packages/cli"
           source_root="$package_root/vendor/evidence-verification"
           provenance="$source_root/provenance.json"
           actual_provenance_sha256="$(sha256sum "$provenance" | cut -d' ' -f1)"

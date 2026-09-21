@@ -335,7 +335,10 @@ function checkWorkflow(file, source, findings) {
     }
   }
   for (const marker of [
-    'package_root="candidate/packages/cli"',
+    'trusted_commit="63578da0b66f94636b359bf19443fb75e6a42d39"',
+    'trusted_tree="c343d2b5c6c521359073d30048827e0f705f2256"',
+    'git -C candidate archive "$trusted_commit"',
+    'package_root="$source/packages/cli"',
     'source_root="$package_root/vendor/evidence-verification"',
     'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
@@ -905,7 +908,10 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'node "$DEVAI_EVIDENCE_VERIFY"',
     'node "$DEVAI_EVIDENCE_POLICY"',
     'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
-    'package_root="candidate/packages/cli"',
+    'trusted_commit="63578da0b66f94636b359bf19443fb75e6a42d39"',
+    'trusted_tree="c343d2b5c6c521359073d30048827e0f705f2256"',
+    'git -C candidate archive "$trusted_commit"',
+    'package_root="$source/packages/cli"',
     'source_root="$package_root/vendor/evidence-verification"',
     'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',

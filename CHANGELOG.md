@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.4 — 2026-09-21
+
+- Materialize the verifier's empty artifact snapshot root so valid RC schema 1.1 bundles with an
+  exact zero-artifact population pass both pre-tag verification stages.
+- Preserve fail-closed rejection of undeclared, missing, digest-drifted, or unsafe artifacts while
+  adopting canonical `devai-verifier` commit `8174749` and its exact provenance.
+- Retain immutable `@aarusso-nyx/devai@1.5.1` as the trusted local-RC verifier provider.
+
 ## 1.5.3 — 2026-09-21
 
 - Bound clean committed-snapshot hashing by querying immutable Git object sizes and reading blobs

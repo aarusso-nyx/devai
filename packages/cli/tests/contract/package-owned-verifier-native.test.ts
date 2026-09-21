@@ -1,15 +1,20 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+// @ts-expect-error The package-owned verifier intentionally ships native ESM without declarations.
+import { canonicalize } from '../../vendor/evidence-verification/src/canonical.js';
+// @ts-expect-error The package-owned verifier intentionally ships native ESM without declarations.
+import { verifyPreparedBundle } from '../../vendor/evidence-verification/src/publish.js';
 
 const VERIFIER_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
 const VERIFIER_TEST_ROOT = join(VERIFIER_ROOT, 'test');
 const EXPECTED_PROVENANCE = {
-  sourceCommit: '7ad2a394fbc0a6220808561f645830addf5e5184',
-  manifestDigest: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
-  filePopulationDigest: 'a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf',
+  sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
+  manifestDigest: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
+  filePopulationDigest: '670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224',
   runtimeFileCount: 26,
 } as const;
 const UPSTREAM_TEST_DIGESTS = new Map([
@@ -26,7 +31,7 @@ const UPSTREAM_TEST_DIGESTS = new Map([
   ],
   ['mutation.test.js', '9a5815d17a17f7e606aaca0f088b23d7bb900e5b171d875cf9903670142dd661'],
   ['policy-builder.test.js', '950dddd8cc2e06da2eea75be124a3ced431617e3838a32b312205a9bc823485a'],
-  ['publish.test.js', 'fa32181e7690efc6443080db9c5dd1f5a0d3f9fc6102859d4c99680f7c764666'],
+  ['publish.test.js', '74a4472721b84efef62ea3ce5e28eca6f5d706323bb4d488c42d96ade6cdf70c'],
   ['verifier.test.js', '0bffed225e86fdf59900b8c86eafa685af06b2fd17ceff56eac2133792613ed1'],
 ]);
 
@@ -61,7 +66,7 @@ describe('package-owned evidence verifier native suite', () => {
     }
   });
 
-  it('executes all 130 vendored node:test cases against the packaged implementation', () => {
+  it('executes all 131 vendored node:test cases against the packaged implementation', () => {
     const files = readdirSync(VERIFIER_TEST_ROOT)
       .filter((name) => name.endsWith('.test.js'))
       .sort()
@@ -77,8 +82,67 @@ describe('package-owned evidence verifier native suite', () => {
     expect(result.error, output).toBeUndefined();
     expect(result.status, output).toBe(0);
     expect(result.signal, output).toBeNull();
-    expect(output).toMatch(/# tests 130(?:\r?\n|$)/u);
-    expect(output).toMatch(/# pass 130(?:\r?\n|$)/u);
+    expect(output).toMatch(/# tests 131(?:\r?\n|$)/u);
+    expect(output).toMatch(/# pass 131(?:\r?\n|$)/u);
     expect(output).toMatch(/# fail 0(?:\r?\n|$)/u);
   }, 130_000);
+
+  it('keeps a declared artifact mandatory during pre-tag bundle verification', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-missing-declared-artifact-'));
+    const resultDigest = 'a'.repeat(64);
+    const artifactDigest = 'b'.repeat(64);
+    const policyDigest = 'c'.repeat(64);
+    const put = (path: string, value: unknown) => {
+      mkdirSync(resolve(path, '..'), { recursive: true });
+      writeFileSync(path, `${canonicalize(value)}\n`);
+    };
+
+    try {
+      put(join(root, 'manifest.json'), {
+        schemaVersion: '1.1.0',
+        repositoryId: 'fixture/repository',
+        commit: 'd'.repeat(40),
+        tree: 'e'.repeat(40),
+        profile: 'rc',
+        signerId: 'fixture-signer',
+        taskPolicyDigest: policyDigest,
+        envelopeDigest: 'f'.repeat(64),
+        resultDigests: [resultDigest],
+        artifacts: [
+          {
+            path: 'declared.json',
+            mediaType: 'application/json',
+            sha256: artifactDigest,
+          },
+        ],
+      });
+      put(join(root, 'task-policy.json'), {
+        schemaVersion: '1.1.0',
+        repositoryId: 'fixture/repository',
+        requiredNodes: [
+          {
+            nodeId: 'test:rc',
+            taskKey: '1'.repeat(64),
+            dependencies: [],
+            outputContract: {
+              kind: 'files',
+              paths: ['declared.json'],
+              requiredResult: 'pass',
+            },
+          },
+        ],
+      });
+      put(join(root, 'envelope.json'), {});
+      put(join(root, 'results', `${resultDigest}.json`), {});
+
+      expect(() =>
+        verifyPreparedBundle({
+          bundleDir: root,
+          trustStorePath: join(root, 'unused-trust.json'),
+        }),
+      ).toThrow(expect.objectContaining({ code: 'BUNDLE_POPULATION_MISMATCH' }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

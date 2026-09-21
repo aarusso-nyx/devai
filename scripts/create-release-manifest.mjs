@@ -23,21 +23,14 @@ const packageManifest = JSON.parse(readFileSync('packages/cli/package.json', 'ut
 const verifierPackagePolicy = JSON.parse(
   readFileSync('law/policy/trusted-local-rc-verifier-package.json', 'utf8'),
 );
-const verifierProvenanceBytes = readFileSync(
-  'packages/cli/vendor/evidence-verification/provenance.json',
-);
-const verifierProvenance = JSON.parse(verifierProvenanceBytes.toString('utf8'));
 const verifierProvenanceSha256 = required('LEDGER_VERIFIER_PROVENANCE_SHA256');
 const verifierPackageVersion = required('LEDGER_VERIFIER_PACKAGE_VERSION');
 if (
-  createHash('sha256').update(verifierProvenanceBytes).digest('hex') !== verifierProvenanceSha256 ||
-  verifierProvenance.schemaVersion !== '1.0.0' ||
-  typeof verifierProvenance.sourceCommit !== 'string' ||
-  !/^[a-f0-9]{40}$/u.test(verifierProvenance.sourceCommit) ||
   verifierPackagePolicy.package?.name !== '@aarusso-nyx/devai' ||
   verifierPackageVersion !== verifierPackagePolicy.package.version ||
   verifierProvenanceSha256 !== verifierPackagePolicy.verifier?.provenance_sha256 ||
-  verifierProvenance.sourceCommit !== verifierPackagePolicy.verifier?.source_commit
+  verifierPackagePolicy.verifier?.source_commit !== '7ad2a394fbc0a6220808561f645830addf5e5184' ||
+  !/^[a-f0-9]{40}$/u.test(verifierPackagePolicy.verifier?.source_commit ?? '')
 ) {
   throw new Error('RELEASE_MANIFEST_VERIFIER_IDENTITY_INVALID');
 }
@@ -66,7 +59,7 @@ const manifest = {
     verifier_package: '@aarusso-nyx/devai',
     verifier_package_version: verifierPackageVersion,
     verifier_provenance_sha256: verifierProvenanceSha256,
-    verifier_source_commit: verifierProvenance.sourceCommit,
+    verifier_source_commit: verifierPackagePolicy.verifier.source_commit,
     policy_digest: required('LEDGER_POLICY_DIGEST'),
     envelope_sha256: required('LEDGER_ENVELOPE_SHA256'),
     results_archive_sha256: required('LEDGER_RESULTS_SHA256'),

@@ -64,8 +64,8 @@
     "approvedSource": {
       "const": {
         "repository": "devai-nyx/devai-verifier",
-        "commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-        "tree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14"
+        "commit": "8174749ebcfabab246031281a036032f636b8a39",
+        "tree": "e231ff55353f45bedf530a1ebd4821493328d67b"
       }
     },
     "activation": {
@@ -73,18 +73,18 @@
         "provenanceProof": {
           "source": {
             "repository": "devai-nyx/devai-verifier",
-            "commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "tree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14"
+            "commit": "8174749ebcfabab246031281a036032f636b8a39",
+            "tree": "e231ff55353f45bedf530a1ebd4821493328d67b"
           },
           "vendor": {
             "root": "packages/cli/vendor/evidence-verification",
             "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
-            "manifestDigest": "771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff",
-            "sourceCommit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "sourceTree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14",
-            "byteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf"
+            "manifestDigest": "1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf",
+            "sourceCommit": "8174749ebcfabab246031281a036032f636b8a39",
+            "sourceTree": "e231ff55353f45bedf530a1ebd4821493328d67b",
+            "byteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224"
           },
-          "sourceByteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf",
+          "sourceByteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224",
           "byteEqual": true
         },
         "emissionPermitted": true,
@@ -116,17 +116,17 @@
         "semanticReceiptProvenance": {
           "source": {
             "repository": "devai-verifier",
-            "commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "tree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14",
-            "byteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf"
+            "commit": "8174749ebcfabab246031281a036032f636b8a39",
+            "tree": "e231ff55353f45bedf530a1ebd4821493328d67b",
+            "byteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224"
           },
           "vendor": {
             "root": "packages/cli/vendor/evidence-verification",
             "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
-            "manifestDigest": "771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff",
-            "sourceCommit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "sourceTree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14",
-            "byteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf"
+            "manifestDigest": "1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf",
+            "sourceCommit": "8174749ebcfabab246031281a036032f636b8a39",
+            "sourceTree": "e231ff55353f45bedf530a1ebd4821493328d67b",
+            "byteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224"
           },
           "byteEquality": true
         },
@@ -589,25 +589,25 @@
       },
       "approvedSource": {
         "repository": "devai-nyx/devai-verifier",
-        "commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-        "tree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14"
+        "commit": "8174749ebcfabab246031281a036032f636b8a39",
+        "tree": "e231ff55353f45bedf530a1ebd4821493328d67b"
       },
       "activation": {
         "provenanceProof": {
           "source": {
             "repository": "devai-nyx/devai-verifier",
-            "commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "tree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14"
+            "commit": "8174749ebcfabab246031281a036032f636b8a39",
+            "tree": "e231ff55353f45bedf530a1ebd4821493328d67b"
           },
           "vendor": {
             "root": "packages/cli/vendor/evidence-verification",
             "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
-            "manifestDigest": "771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff",
-            "sourceCommit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "sourceTree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14",
-            "byteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf"
+            "manifestDigest": "1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf",
+            "sourceCommit": "8174749ebcfabab246031281a036032f636b8a39",
+            "sourceTree": "e231ff55353f45bedf530a1ebd4821493328d67b",
+            "byteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224"
           },
-          "sourceByteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf",
+          "sourceByteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224",
           "byteEqual": true
         },
         "emissionPermitted": true,
@@ -637,17 +637,17 @@
         "semanticReceiptProvenance": {
           "source": {
             "repository": "devai-verifier",
-            "commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "tree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14",
-            "byteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf"
+            "commit": "8174749ebcfabab246031281a036032f636b8a39",
+            "tree": "e231ff55353f45bedf530a1ebd4821493328d67b",
+            "byteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224"
           },
           "vendor": {
             "root": "packages/cli/vendor/evidence-verification",
             "manifestPath": "packages/cli/vendor/evidence-verification/provenance.json",
-            "manifestDigest": "771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff",
-            "sourceCommit": "7ad2a394fbc0a6220808561f645830addf5e5184",
-            "sourceTree": "17b5a1fab7efb9096b941e10b940ed714fdc6d14",
-            "byteSetDigest": "a9206ffc3b27819c7589cc63bdef02e68453a0897e7d0133841be1127766e1bf"
+            "manifestDigest": "1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf",
+            "sourceCommit": "8174749ebcfabab246031281a036032f636b8a39",
+            "sourceTree": "e231ff55353f45bedf530a1ebd4821493328d67b",
+            "byteSetDigest": "670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224"
           },
           "byteEquality": true
         },

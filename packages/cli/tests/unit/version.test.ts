@@ -7,8 +7,8 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '1.5.3';
-const PUBLISHED_RELEASE_VERSION = '1.5.2';
+const CANDIDATE_RELEASE_VERSION = '1.5.4';
+const PUBLISHED_RELEASE_VERSION = '1.5.3';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.1';
 
 describe('resolveCliVersion', () => {
@@ -100,7 +100,7 @@ describe('resolveCliVersion', () => {
     ).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
   });
 
-  it('proves the committed verifier population matches the exact trusted provider policy', () => {
+  it('keeps the candidate verifier distinct from the exact trusted provider policy', () => {
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
@@ -127,14 +127,17 @@ describe('resolveCliVersion', () => {
       sourceCommit: string;
       files: unknown[];
     };
-    expect(createHash('sha256').update(provenanceBytes).digest('hex')).toBe(
-      policy.verifier.provenance_sha256,
+    const candidateProvenanceSha256 = createHash('sha256').update(provenanceBytes).digest('hex');
+    expect(candidateProvenanceSha256).toBe(
+      '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
     );
     expect(provenance).toMatchObject({
       schemaVersion: '1.0.0',
-      sourceCommit: policy.verifier.source_commit,
+      sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
     });
     expect(provenance.files).toHaveLength(policy.verifier.payload_file_count);
+    expect(candidateProvenanceSha256).not.toBe(policy.verifier.provenance_sha256);
+    expect(provenance.sourceCommit).not.toBe(policy.verifier.source_commit);
   });
 });
 
