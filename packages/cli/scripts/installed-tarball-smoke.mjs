@@ -45,6 +45,8 @@ const projectRoot = join(smokeRoot, 'project');
 const conflictRoot = join(smokeRoot, 'conflict-project');
 const authorizationRoot = join(smokeRoot, 'authorization-project');
 let smokePassed = false;
+let largeSnapshotBytes = 0;
+let largeSnapshotTaskPolicyDigest = '';
 const secondaryBins = [
   'devai-evidence-policy',
   'devai-evidence-verify',
@@ -156,6 +158,150 @@ try {
   }
   const help = run(binary, ['--help']);
   if (!help.includes('Usage: devai <command>')) throw new Error('INSTALLED_HELP_INVALID');
+
+  const largeSnapshotRoot = join(smokeRoot, 'large clean snapshot ç');
+  mkdirSync(join(largeSnapshotRoot, 'bulk'), { recursive: true });
+  run('git', ['init', '-q'], largeSnapshotRoot);
+  run('git', ['config', 'user.name', 'DEVAI large snapshot smoke'], largeSnapshotRoot);
+  run('git', ['config', 'user.email', 'large-snapshot@example.invalid'], largeSnapshotRoot);
+  writeFileSync(join(largeSnapshotRoot, '.gitignore'), '.devai/state/\nrecord/\nscratch/\n');
+  writeFileSync(
+    join(largeSnapshotRoot, 'test-tasks.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: '1.0.0',
+        descriptorVersion: 'installed-large-snapshot-v1',
+        repositoryId: 'installed/large-snapshot',
+        fallbackNodeId: null,
+        dynamicFallbackSelectors: [],
+        tasks: [
+          {
+            nodeId: 'test:rc',
+            dependencies: [],
+            argv: ['node', '-e', 'process.stdout.write("large snapshot rc passed\\n")'],
+            cwd: '.',
+            runner: 'node-v1',
+            inputSelectors: [{ kind: 'prefix', pattern: 'bulk/' }],
+            toolchainKeys: ['node'],
+            allowlistedEnv: [],
+            outputContract: { kind: 'test', requiredResult: 'pass' },
+          },
+        ],
+        profiles: [{ profileId: 'rc', mode: 'fixed', requiredNodes: ['test:rc'] }],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const largeBlobBytes = 14 * 1024 * 1024;
+  for (let index = 0; index < 5; index++) {
+    writeFileSync(
+      join(largeSnapshotRoot, 'bulk', `blob-${String(index)}.bin`),
+      Buffer.alloc(largeBlobBytes, index + 1),
+    );
+    largeSnapshotBytes += largeBlobBytes;
+  }
+  if (largeSnapshotBytes <= 64 * 1024 * 1024) {
+    throw new Error('INSTALLED_LARGE_SNAPSHOT_FIXTURE_TOO_SMALL');
+  }
+  run(
+    binary,
+    [
+      'init',
+      'bind',
+      '--target',
+      largeSnapshotRoot,
+      '--tier',
+      'tier1',
+      '--constitution',
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ],
+    largeSnapshotRoot,
+  );
+  for (const contract of ['--operational-law', '--subprocess-effects']) {
+    run(
+      binary,
+      [
+        'init',
+        'bind',
+        contract,
+        '--target',
+        largeSnapshotRoot,
+        '--as-role',
+        'architect',
+        '--write',
+        '--format',
+        'json',
+      ],
+      largeSnapshotRoot,
+    );
+  }
+  run(
+    binary,
+    [
+      'init',
+      'bind',
+      '--target',
+      largeSnapshotRoot,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ],
+    largeSnapshotRoot,
+  );
+  run('git', ['add', '.'], largeSnapshotRoot);
+  run('git', ['commit', '-qm', 'large clean snapshot fixture'], largeSnapshotRoot);
+  const largeRun = JSON.parse(
+    run(binary, [
+      'check',
+      '--rc',
+      '--run',
+      '--repo-root',
+      largeSnapshotRoot,
+      '--as-role',
+      'inspector',
+      '--write',
+      '--format',
+      'json',
+    ]),
+  )?.result?.value;
+  const largeTask = largeRun?.plan?.tasks?.find((task) => task.nodeId === 'test:rc');
+  if (
+    largeRun?.exitCode !== 0 ||
+    largeRun?.plan?.clean !== true ||
+    largeRun?.execution?.[0]?.outcome !== 'PASS' ||
+    largeTask?.inputPaths?.length !== 5
+  ) {
+    throw new Error('INSTALLED_LARGE_SNAPSHOT_RUN_INVALID');
+  }
+  writeFileSync(join(largeSnapshotRoot, 'unselected-marker.txt'), 'dirty but unselected\n');
+  const dirtyLargePlan = JSON.parse(
+    run(binary, [
+      'check',
+      '--rc',
+      '--task-plan',
+      '--repo-root',
+      largeSnapshotRoot,
+      '--format',
+      'json',
+    ]),
+  )?.result?.value?.plan;
+  const dirtyLargeTask = dirtyLargePlan?.tasks?.find((task) => task.nodeId === 'test:rc');
+  if (
+    dirtyLargePlan?.clean !== false ||
+    dirtyLargePlan?.taskPolicyDigest !== largeRun.plan.taskPolicyDigest ||
+    dirtyLargeTask?.inputDigest !== largeTask.inputDigest
+  ) {
+    throw new Error('INSTALLED_LARGE_SNAPSHOT_DIGEST_DRIFT');
+  }
+  largeSnapshotTaskPolicyDigest = largeRun.plan.taskPolicyDigest;
+  rmSync(largeSnapshotRoot, { recursive: true, force: true });
 
   const unboundCatalog = JSON.parse(run(binary, ['catalog', 'actions', '--format', 'json']));
   if (unboundCatalog?.result?.value?.length !== expectedActionCount) {
@@ -1484,6 +1630,8 @@ void adapters;
       schemas: schemas.length,
       verifier_files: verifierFiles.length,
       secondary_bins: secondaryBins.length,
+      large_snapshot_bytes: largeSnapshotBytes,
+      large_snapshot_task_policy_digest: largeSnapshotTaskPolicyDigest,
       runtime_dependencies: dependencyNames.sort(),
     }) + '\n',
   );

@@ -1481,6 +1481,8 @@ export function readCheckPolicyGitSync(
     typeof value === 'string' &&
     /^(?:HEAD|[a-f0-9]{40}|[a-f0-9]{64})\^\{(?:commit|tree)\}$/u.test(value);
   const batch = matches('cat-file', '--batch');
+  const batchCheck = matches('cat-file', '--batch-check');
+  const batchRead = batch || batchCheck;
   const separator = args[2]?.indexOf(':') ?? -1;
   const objectPath =
     separator < 0 ? undefined : [args[2]?.slice(0, separator), args[2]?.slice(separator + 1)];
@@ -1507,9 +1509,9 @@ export function readCheckPolicyGitSync(
       objectPath?.length === 2 &&
       validGitObject(objectPath[0] ?? '') &&
       validGitPath(objectPath[1] ?? '')) ||
-    batch;
+    batchRead;
   if (!valid) throw new Error('GIT_POLICY_READ_ARGUMENTS_INVALID');
-  if (batch) {
+  if (batchRead) {
     const bytes = typeof input === 'string' ? Buffer.from(input) : input;
     if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > 64 * 1024 * 1024)
       throw new Error('GIT_POLICY_READ_INPUT_INVALID');
