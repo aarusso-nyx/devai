@@ -495,7 +495,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'wrong package-owned verifier provenance',
       mutate: (source: string) =>
-        source.replaceAll('7ad2a394fbc0a6220808561f645830addf5e5184', 'a'.repeat(40)),
+        source.replaceAll('8174749ebcfabab246031281a036032f636b8a39', 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {

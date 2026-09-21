@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "sourceCommit": "7ad2a394fbc0a6220808561f645830addf5e5184",
+  "sourceCommit": "8174749ebcfabab246031281a036032f636b8a39",
   "files": [
     {
       "path": "schemas/candidate-receipt-1.1.schema.json",
@@ -92,7 +92,7 @@
     },
     {
       "path": "src/publish.js",
-      "sha256": "dbb6b54fcad42bff17a9e722b37b51eefbf87f3b8fddcd7dd45fe023cc54ed2e"
+      "sha256": "8ae41845a0dd01e9b9f6639b8f4d01de8e324bf62362eff90529f0cc2f2f1a8d"
     },
     {
       "path": "src/safe-path.js",

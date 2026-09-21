@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.4 — 2026-09-21
+
+- Materialize the captured artifact root when an RC schema 1.1 bundle declares an exact empty
+  artifact population, allowing valid zero-artifact pre-tag verification and publication.
+- Preserve strict signature, hash, policy, roster, artifact-digest, and exact-population checks.
+- Adopt canonical verifier source commit `8174749ebcfabab246031281a036032f636b8a39` with
+  byte-identical runtime and regression assets.
+- Retain immutable `@aarusso-nyx/devai@1.5.1` as the trusted local-RC verifier provider.
+
 ## 1.5.3 — 2026-09-21
 
 - Bound clean committed-snapshot hashing by querying immutable Git object sizes and reading blobs

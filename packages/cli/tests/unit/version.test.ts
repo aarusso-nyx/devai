@@ -7,8 +7,8 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '1.5.3';
-const PUBLISHED_RELEASE_VERSION = '1.5.2';
+const CANDIDATE_RELEASE_VERSION = '1.5.4';
+const PUBLISHED_RELEASE_VERSION = '1.5.3';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.1';
 
 describe('resolveCliVersion', () => {
@@ -88,8 +88,8 @@ describe('resolveCliVersion', () => {
       },
     });
     expect(policy.verifier).toMatchObject({
-      provenance_sha256: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
-      source_commit: '7ad2a394fbc0a6220808561f645830addf5e5184',
+      provenance_sha256: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
+      source_commit: '8174749ebcfabab246031281a036032f636b8a39',
     });
     const currentReleaseNotes = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8')
       .split(`## ${CANDIDATE_RELEASE_VERSION}`)[1]
