@@ -124,10 +124,10 @@ function executablePackageMaterializationFixture(
   mkdirSync(verifierRoot, { recursive: true });
   mkdirSync(runnerTemp, { recursive: true });
   mkdirSync(mockBin, { recursive: true });
-  // The committed runtime verifier must match the policy's immutable 1.5.1
-  // provider identity before this fixture re-packs it for mocked registry I/O.
-  // The generated workflow independently binds the actual registry tarball to
-  // that same exact release commit/tree, SHA-1, and SRI before extraction.
+  // Reconstruct the immutable 1.5.1 runtime from the candidate's additive
+  // 1.5.4 verifier update before re-packing it for mocked registry I/O. The
+  // generated workflow independently binds the real registry tarball to the
+  // same exact release commit/tree, SHA-1, SRI, and provenance digest.
   const publishedArchive = join(root, 'published-1.5.1-verifier.tar');
   execFileSync(
     'tar',
@@ -146,6 +146,27 @@ function executablePackageMaterializationFixture(
     ['-xf', publishedArchive, '--strip-components=4', '--directory', verifierRoot],
     { cwd: root },
   );
+  const publishPath = join(verifierRoot, 'src/publish.js');
+  const currentPublish = readFileSync(publishPath, 'utf8');
+  const emptyArtifactRootFix = `    // Schema 1.1 binds an exact artifact population, including the valid empty
+    // population. The verifier still requires the population root to exist so
+    // it can prove that no undeclared files are present.
+    mkdirSync(join(snapshot, 'artifacts'), { recursive: false });
+`;
+  const trustedPublish = currentPublish.replace(emptyArtifactRootFix, '');
+  expect(trustedPublish).not.toBe(currentPublish);
+  writeFileSync(publishPath, trustedPublish);
+  const trustedProvenancePath = join(verifierRoot, 'provenance.json');
+  const trustedProvenance = JSON.parse(readFileSync(trustedProvenancePath, 'utf8')) as {
+    sourceCommit: string;
+    files: Array<{ path: string; sha256: string }>;
+  };
+  trustedProvenance.sourceCommit = '7ad2a394fbc0a6220808561f645830addf5e5184';
+  const publishEntry = trustedProvenance.files.find((entry) => entry.path === 'src/publish.js');
+  expect(publishEntry).toBeDefined();
+  if (publishEntry === undefined) throw new Error('trusted verifier publish entry missing');
+  publishEntry.sha256 = 'dbb6b54fcad42bff17a9e722b37b51eefbf87f3b8fddcd7dd45fe023cc54ed2e';
+  writeFileSync(trustedProvenancePath, `${JSON.stringify(trustedProvenance, null, 2)}\n`);
   rmSync(join(verifierRoot, 'test'), { recursive: true, force: true });
   const publishedProvenance = readFileSync(join(verifierRoot, 'provenance.json'));
   expect(createHash('sha256').update(publishedProvenance).digest('hex')).toBe(
@@ -495,7 +516,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'wrong package-owned verifier provenance',
       mutate: (source: string) =>
-        source.replaceAll('8174749ebcfabab246031281a036032f636b8a39', 'a'.repeat(40)),
+        source.replaceAll('7ad2a394fbc0a6220808561f645830addf5e5184', 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {

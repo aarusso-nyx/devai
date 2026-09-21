@@ -49,8 +49,8 @@
   },
   "verifier": {
     "root": "dist/runtime/evidence-verification",
-    "provenance_sha256": "1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf",
-    "source_commit": "8174749ebcfabab246031281a036032f636b8a39",
+    "provenance_sha256": "771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff",
+    "source_commit": "7ad2a394fbc0a6220808561f645830addf5e5184",
     "payload_file_count": 26,
     "binaries": {
       "devai-evidence-policy": "./dist/runtime/evidence-verification/src/build-policy-cli.js",

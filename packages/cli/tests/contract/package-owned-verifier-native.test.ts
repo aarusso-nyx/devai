@@ -1,8 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+// @ts-expect-error The package-owned verifier intentionally ships native ESM without declarations.
+import { canonicalize } from '../../vendor/evidence-verification/src/canonical.js';
+// @ts-expect-error The package-owned verifier intentionally ships native ESM without declarations.
+import { verifyPreparedBundle } from '../../vendor/evidence-verification/src/publish.js';
 
 const VERIFIER_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
 const VERIFIER_TEST_ROOT = join(VERIFIER_ROOT, 'test');
@@ -81,4 +86,63 @@ describe('package-owned evidence verifier native suite', () => {
     expect(output).toMatch(/# pass 131(?:\r?\n|$)/u);
     expect(output).toMatch(/# fail 0(?:\r?\n|$)/u);
   }, 130_000);
+
+  it('keeps a declared artifact mandatory during pre-tag bundle verification', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-missing-declared-artifact-'));
+    const resultDigest = 'a'.repeat(64);
+    const artifactDigest = 'b'.repeat(64);
+    const policyDigest = 'c'.repeat(64);
+    const put = (path: string, value: unknown) => {
+      mkdirSync(resolve(path, '..'), { recursive: true });
+      writeFileSync(path, `${canonicalize(value)}\n`);
+    };
+
+    try {
+      put(join(root, 'manifest.json'), {
+        schemaVersion: '1.1.0',
+        repositoryId: 'fixture/repository',
+        commit: 'd'.repeat(40),
+        tree: 'e'.repeat(40),
+        profile: 'rc',
+        signerId: 'fixture-signer',
+        taskPolicyDigest: policyDigest,
+        envelopeDigest: 'f'.repeat(64),
+        resultDigests: [resultDigest],
+        artifacts: [
+          {
+            path: 'declared.json',
+            mediaType: 'application/json',
+            sha256: artifactDigest,
+          },
+        ],
+      });
+      put(join(root, 'task-policy.json'), {
+        schemaVersion: '1.1.0',
+        repositoryId: 'fixture/repository',
+        requiredNodes: [
+          {
+            nodeId: 'test:rc',
+            taskKey: '1'.repeat(64),
+            dependencies: [],
+            outputContract: {
+              kind: 'files',
+              paths: ['declared.json'],
+              requiredResult: 'pass',
+            },
+          },
+        ],
+      });
+      put(join(root, 'envelope.json'), {});
+      put(join(root, 'results', `${resultDigest}.json`), {});
+
+      expect(() =>
+        verifyPreparedBundle({
+          bundleDir: root,
+          trustStorePath: join(root, 'unused-trust.json'),
+        }),
+      ).toThrow(expect.objectContaining({ code: 'BUNDLE_POPULATION_MISMATCH' }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

@@ -12,7 +12,7 @@ export const RELEASE_WORKFLOW_FILE = 'release.yml';
 export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
 export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
 export const VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
-export const NEXT_VERIFIER_SOURCE_COMMIT = '8174749ebcfabab246031281a036032f636b8a39';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '7ad2a394fbc0a6220808561f645830addf5e5184';
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
 export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
 export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
@@ -335,7 +335,10 @@ function checkWorkflow(file, source, findings) {
     }
   }
   for (const marker of [
-    'package_root="candidate/packages/cli"',
+    'trusted_commit="63578da0b66f94636b359bf19443fb75e6a42d39"',
+    'trusted_tree="c343d2b5c6c521359073d30048827e0f705f2256"',
+    'git -C candidate archive "$trusted_commit"',
+    'package_root="$source/packages/cli"',
     'source_root="$package_root/vendor/evidence-verification"',
     'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
@@ -905,7 +908,10 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'node "$DEVAI_EVIDENCE_VERIFY"',
     'node "$DEVAI_EVIDENCE_POLICY"',
     'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
-    'package_root="candidate/packages/cli"',
+    'trusted_commit="63578da0b66f94636b359bf19443fb75e6a42d39"',
+    'trusted_tree="c343d2b5c6c521359073d30048827e0f705f2256"',
+    'git -C candidate archive "$trusted_commit"',
+    'package_root="$source/packages/cli"',
     'source_root="$package_root/vendor/evidence-verification"',
     'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
