@@ -1,4 +1,14 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parse } from 'yaml';
@@ -9,6 +19,10 @@ import {
   buildCiScaffoldPlan,
 } from '../../src/services/ci-scaffold/index.js';
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
+// @ts-expect-error The package-owned verifier intentionally ships native ESM without declarations.
+import { canonicalize } from '../../vendor/evidence-verification/src/canonical.js';
+// @ts-expect-error The package-owned verifier intentionally ships native ESM without declarations.
+import { verifyPreparedBundle } from '../../vendor/evidence-verification/src/publish.js';
 
 const roots: string[] = [];
 
@@ -93,6 +107,28 @@ function generatedWorkflow(): {
   );
   if (packageStep === undefined) throw new Error('generated verifier-package step is missing');
   return { content: plan.content, document, packageStep };
+}
+
+function workflowRun(name: string): string {
+  const step = generatedWorkflow().document.jobs['verify-attested-rc'].steps.find(
+    (entry) => entry.name === name,
+  );
+  if (typeof step?.run !== 'string') throw new Error(`generated workflow step is missing: ${name}`);
+  return step.run;
+}
+
+function filesBelow(root: string, current = root): string[] {
+  return readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = join(current, entry.name);
+    return entry.isDirectory()
+      ? filesBelow(root, absolute)
+      : [
+          absolute
+            .slice(root.length + 1)
+            .split('\\')
+            .join('/'),
+        ];
+  });
 }
 
 describe('attested RC workflow scaffold', () => {
@@ -261,6 +297,142 @@ describe('attested RC workflow scaffold', () => {
     expect(plan.content).toContain('name: verified-local-rc');
     expect(plan.content).toContain('--binding "${{ steps.identity.outputs.binding }}"');
     expect(plan.content).toContain('control/law/policy/devai-local-rc-trust-store.json');
+  });
+
+  it('archives an actions-checkout-shaped proof into inert versioned bytes without hiding ordinary files', () => {
+    const materialize = workflowRun('Materialize inert versioned proof payload');
+    const buildFixture = (includeUnexpected: boolean) => {
+      const root = mkdtempSync(join(tmpdir(), 'devai-proof-payload-'));
+      roots.push(root);
+      const source = join(root, 'source');
+      const checkout = join(root, 'evidence');
+      const runnerTemp = join(root, 'runner-temp');
+      const githubOutput = join(root, 'github-output');
+      mkdirSync(source, { recursive: true });
+      mkdirSync(runnerTemp, { recursive: true });
+      writeFileSync(githubOutput, '');
+      execFileSync('git', ['init', '--quiet'], { cwd: source });
+      execFileSync('git', ['config', 'user.name', 'DEVAI fixture'], { cwd: source });
+      execFileSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: source });
+      const taskPolicy = {
+        schemaVersion: '1.1.0',
+        repositoryId: 'fixture/repository',
+        requiredNodes: [
+          {
+            nodeId: 'test:rc',
+            taskKey: '1'.repeat(64),
+            dependencies: [],
+            outputContract: { kind: 'files' },
+          },
+        ],
+      };
+      const policyDigest = createHash('sha256').update(canonicalize(taskPolicy)).digest('hex');
+      const envelope = {};
+      const manifest = {
+        schemaVersion: '1.1.0',
+        repositoryId: 'fixture/repository',
+        commit: '2'.repeat(40),
+        tree: '3'.repeat(40),
+        profile: 'rc',
+        signerId: 'fixture-signer',
+        taskPolicyDigest: policyDigest,
+        envelopeDigest: '4'.repeat(64),
+        resultDigests: [],
+        artifacts: [],
+      };
+      writeFileSync(join(source, 'envelope.json'), `${canonicalize(envelope)}\n`);
+      writeFileSync(join(source, 'manifest.json'), `${canonicalize(manifest)}\n`);
+      writeFileSync(join(source, 'task-policy.json'), `${canonicalize(taskPolicy)}\n`);
+      if (includeUnexpected) writeFileSync(join(source, 'unexpected.txt'), 'still versioned\n');
+      execFileSync('git', ['add', '.'], { cwd: source });
+      execFileSync('git', ['commit', '--quiet', '-m', 'proof'], { cwd: source });
+      const proofCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: source,
+        encoding: 'utf8',
+      }).trim();
+      execFileSync('git', ['worktree', 'add', '--quiet', '--detach', checkout, proofCommit], {
+        cwd: source,
+      });
+      expect(existsSync(join(checkout, '.git'))).toBe(true);
+      const result = spawnSync(
+        'bash',
+        ['-c', materialize.replaceAll('${{ steps.identity.outputs.proof_commit }}', proofCommit)],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: { ...process.env, RUNNER_TEMP: runnerTemp, GITHUB_OUTPUT: githubOutput },
+        },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const bundle = join(runnerTemp, 'devai-local-rc/proof');
+      expect(existsSync(join(bundle, '.git'))).toBe(false);
+      return { bundle, policyDigest, files: filesBelow(bundle).sort() };
+    };
+
+    const ordinary = buildFixture(false);
+    expect(ordinary.files).toEqual(['envelope.json', 'manifest.json', 'task-policy.json']);
+    expect(() =>
+      verifyPreparedBundle({
+        bundleDir: ordinary.bundle,
+        trustStorePath: join(ordinary.bundle, 'unused-trust.json'),
+        expectedRepository: 'fixture/repository',
+        expectedCommit: '2'.repeat(40),
+        expectedTree: '3'.repeat(40),
+        expectedPolicyDigest: ordinary.policyDigest,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'ENVELOPE_DIGEST_MISMATCH' }));
+
+    const unexpected = buildFixture(true);
+    expect(unexpected.files).toContain('unexpected.txt');
+    expect(() =>
+      verifyPreparedBundle({
+        bundleDir: unexpected.bundle,
+        trustStorePath: join(unexpected.bundle, 'unused-trust.json'),
+        expectedRepository: 'fixture/repository',
+        expectedCommit: '2'.repeat(40),
+        expectedTree: '3'.repeat(40),
+        expectedPolicyDigest: unexpected.policyDigest,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'BUNDLE_POPULATION_MISMATCH' }));
+  });
+
+  it('retains a parseable concise diagnostic when verifier JSON is emitted only on stderr', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-verifier-summary-'));
+    roots.push(root);
+    const state = join(root, 'devai-local-rc');
+    mkdirSync(state, { recursive: true });
+    writeFileSync(join(state, 'verified.json'), '');
+    writeFileSync(
+      join(state, 'verifier-error.json'),
+      '{"ok":false,"code":"BUNDLE_POPULATION_MISMATCH","message":"population differs"}\n',
+    );
+    const result = spawnSync('bash', ['-c', workflowRun('Build concise verification artifact')], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        RUNNER_TEMP: root,
+        VERIFY_OUTCOME: 'failure',
+        CANDIDATE_SHA: '5'.repeat(40),
+        CANDIDATE_TREE: '6'.repeat(40),
+        BINDING: 'exact-tree',
+        POLICY_DIGEST: '7'.repeat(64),
+      },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(join(state, 'verification-summary.json'), 'utf8'))).toEqual({
+      schemaVersion: '1.0.0',
+      verdict: 'fail',
+      signer: null,
+      evidenceCommit: null,
+      candidateCommit: '5'.repeat(40),
+      tree: '6'.repeat(40),
+      binding: 'exact-tree',
+      policyDigest: '7'.repeat(64),
+      rosterCount: 0,
+      failureCode: 'BUNDLE_POPULATION_MISMATCH',
+      failureMessage: 'population differs',
+    });
   });
 
   it('satisfies the CI-economy protected package-verifier marker after canonical generation', () => {

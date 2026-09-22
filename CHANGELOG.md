@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.6 — 2026-09-22
+
+- Materialize the immutable proof commit as an inert archive before strict bundle verification so checkout-owned Git administration is excluded without weakening bundle population checks.
+- Preserve every versioned proof file in that archive, keeping undeclared ordinary files fail-closed under `BUNDLE_POPULATION_MISMATCH`.
+- Preserve verifier failures in release summaries when the structured diagnostic is emitted on stderr and stdout is empty.
+- Retain immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider.
+
 ## 1.5.5 — 2026-09-22
 
 - Promote immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider so
