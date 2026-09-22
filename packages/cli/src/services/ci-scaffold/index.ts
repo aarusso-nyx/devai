@@ -352,6 +352,18 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Materialize inert versioned proof payload
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof="$RUNNER_TEMP/devai-local-rc/proof"
+          mkdir -p "$proof"
+          git -C evidence archive "\${{ steps.identity.outputs.proof_commit }}" ${backslash}
+            | tar -x -C "$proof" --no-same-owner --no-same-permissions
+          test ! -e "$proof/.git"
+          echo "path=$proof" >> "$GITHUB_OUTPUT"
+
       - name: Reconstruct exact RC task policy
         id: policy
         shell: bash
@@ -369,7 +381,7 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
             --schema-version 1.1.0 ${backslash}
             --output "$RUNNER_TEMP/devai-local-rc/expected-task-policy.json" ${backslash}
             > "$RUNNER_TEMP/devai-local-rc/policy-result.json"
-          cmp "$RUNNER_TEMP/devai-local-rc/expected-task-policy.json" evidence/task-policy.json
+          cmp "$RUNNER_TEMP/devai-local-rc/expected-task-policy.json" "\${{ steps.proof.outputs.path }}/task-policy.json"
           digest="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(x.taskPolicyDigest)' "$RUNNER_TEMP/devai-local-rc/policy-result.json")"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
@@ -380,14 +392,15 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
         run: |
           set -euo pipefail
           node "$DEVAI_EVIDENCE_BUNDLE_VERIFY" ${backslash}
-            --bundle evidence ${backslash}
+            --bundle "\${{ steps.proof.outputs.path }}" ${backslash}
             --trust control/law/policy/devai-local-rc-trust-store.json ${backslash}
             --repository "$GITHUB_REPOSITORY" ${backslash}
             --commit "$CANDIDATE_SHA" ${backslash}
             --tree "\${{ steps.identity.outputs.tree }}" ${backslash}
             --policy-digest "\${{ steps.policy.outputs.digest }}" ${backslash}
             --binding "\${{ steps.identity.outputs.binding }}" ${backslash}
-            > "$RUNNER_TEMP/devai-local-rc/verified.json"
+            > "$RUNNER_TEMP/devai-local-rc/verified.json" ${backslash}
+            2> "$RUNNER_TEMP/devai-local-rc/verifier-error.json"
 
       - name: Build concise verification artifact
         if: always()
@@ -399,14 +412,29 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
           POLICY_DIGEST: \${{ steps.policy.outputs.digest }}
         run: |
           set -euo pipefail
-          node - "$RUNNER_TEMP/devai-local-rc/verified.json" "$RUNNER_TEMP/devai-local-rc/verification-summary.json" <<'NODE'
+          node - "$RUNNER_TEMP/devai-local-rc/verified.json" "$RUNNER_TEMP/devai-local-rc/verifier-error.json" "$RUNNER_TEMP/devai-local-rc/verification-summary.json" <<'NODE'
           const fs = require('node:fs');
-          const [input, output] = process.argv.slice(2);
-          const verified = fs.existsSync(input) ? JSON.parse(fs.readFileSync(input, 'utf8')) : {};
+          const [successInput, failureInput, output] = process.argv.slice(2);
+          const parseDiagnostic = (path) => {
+            if (!fs.existsSync(path)) return {};
+            const text = fs.readFileSync(path, 'utf8').trim();
+            if (text === '') return {};
+            for (const candidate of [text, ...text.split(/\\r?\\n/u).reverse()]) {
+              try {
+                const value = JSON.parse(candidate);
+                if (value !== null && typeof value === 'object' && !Array.isArray(value)) return value;
+              } catch {}
+            }
+            return {};
+          };
+          const success = parseDiagnostic(successInput);
+          const failure = parseDiagnostic(failureInput);
+          const verified = Object.keys(success).length > 0 ? success : failure;
           const mutation = Array.isArray(verified.verifiedMutation) ? verified.verifiedMutation : [];
+          const passed = process.env.VERIFY_OUTCOME === 'success';
           const summary = {
             schemaVersion: '1.0.0',
-            verdict: process.env.VERIFY_OUTCOME === 'success' ? 'pass' : 'fail',
+            verdict: passed ? 'pass' : 'fail',
             signer: verified.signerId ?? null,
             evidenceCommit: verified.evidenceCommit ?? null,
             candidateCommit: process.env.CANDIDATE_SHA,
@@ -414,6 +442,8 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
             binding: process.env.BINDING,
             policyDigest: process.env.POLICY_DIGEST,
             rosterCount: mutation.reduce((count, entry) => count + Number(entry.packageCount ?? 0), 0),
+            failureCode: passed ? null : (verified.code ?? verified.error?.code ?? 'VERIFIER_FAILED'),
+            failureMessage: passed ? null : (verified.message ?? verified.error?.message ?? null),
           };
           fs.writeFileSync(output, JSON.stringify(summary) + '\\n');
           NODE
