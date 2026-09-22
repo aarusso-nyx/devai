@@ -7,9 +7,9 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '1.5.4';
-const PUBLISHED_RELEASE_VERSION = '1.5.3';
-const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.1';
+const CANDIDATE_RELEASE_VERSION = '1.5.5';
+const PUBLISHED_RELEASE_VERSION = '1.5.4';
+const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.4';
 
 describe('resolveCliVersion', () => {
   it('returns a semver-shaped string', () => {
@@ -78,18 +78,18 @@ describe('resolveCliVersion', () => {
     expect(policy.package.version).toBe(TRUSTED_VERIFIER_PACKAGE_VERSION);
     expect(policy.package).toMatchObject({
       tarball:
-        'https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.5.1/10ab06c759ea9c52a30b0e2afe42dbb05edecca9',
-      shasum_sha1: '10ab06c759ea9c52a30b0e2afe42dbb05edecca9',
+        'https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.5.4/e5c34a17bc27b47cc1dba711561e4f9c6394cac8',
+      shasum_sha1: 'e5c34a17bc27b47cc1dba711561e4f9c6394cac8',
       integrity_sri:
-        'sha512-n6XFg8YgF2RWUHqRrawk/UhZjnHMjb6ddzVY8Vq/PagfLUtFMvMFfqf8Ru+owKpBtAoZz6/bgEt+VRhARJxW8A==',
+        'sha512-neGgDPkoCiaex2f6GzSVrZsCIxaQhml6D0EC+bpHb2bgSDb4nm78Evx+Lo49VmH81gTwSI1WQFWb48PWj0/arQ==',
       release_source: {
-        commit: '63578da0b66f94636b359bf19443fb75e6a42d39',
-        tree: 'c343d2b5c6c521359073d30048827e0f705f2256',
+        commit: '8b600ed16ebd101ff88ecfaac9cc04abcf0ce174',
+        tree: 'd2f60e0602ffc849e9b5b1b52ca54731eca7c8b1',
       },
     });
     expect(policy.verifier).toMatchObject({
-      provenance_sha256: '771d4a2a611bbc850875b1ad65db12770d5a6b1bd1ee001a40adff1afec4c5ff',
-      source_commit: '7ad2a394fbc0a6220808561f645830addf5e5184',
+      provenance_sha256: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
+      source_commit: '8174749ebcfabab246031281a036032f636b8a39',
     });
     const currentReleaseNotes = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8')
       .split(`## ${CANDIDATE_RELEASE_VERSION}`)[1]
@@ -100,7 +100,7 @@ describe('resolveCliVersion', () => {
     ).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
   });
 
-  it('keeps the candidate verifier distinct from the exact trusted provider policy', () => {
+  it('binds the candidate verifier bytes to the exact trusted 1.5.4 provider policy', () => {
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
@@ -116,8 +116,8 @@ describe('resolveCliVersion', () => {
     };
     expect(policy.package.release_source).toEqual({
       repository: 'aarusso-nyx/devai',
-      commit: '63578da0b66f94636b359bf19443fb75e6a42d39',
-      tree: 'c343d2b5c6c521359073d30048827e0f705f2256',
+      commit: '8b600ed16ebd101ff88ecfaac9cc04abcf0ce174',
+      tree: 'd2f60e0602ffc849e9b5b1b52ca54731eca7c8b1',
     });
     const provenanceBytes = readFileSync(
       join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
@@ -136,8 +136,8 @@ describe('resolveCliVersion', () => {
       sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
     });
     expect(provenance.files).toHaveLength(policy.verifier.payload_file_count);
-    expect(candidateProvenanceSha256).not.toBe(policy.verifier.provenance_sha256);
-    expect(provenance.sourceCommit).not.toBe(policy.verifier.source_commit);
+    expect(candidateProvenanceSha256).toBe(policy.verifier.provenance_sha256);
+    expect(provenance.sourceCommit).toBe(policy.verifier.source_commit);
   });
 });
 
