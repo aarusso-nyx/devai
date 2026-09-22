@@ -5,7 +5,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   readlinkSync,
   realpathSync,
   rmSync,
@@ -92,41 +91,24 @@ export function createSelfContainedRepositoryFixture(
     ])
       git(['config', name as string, value as string]);
 
-    const paths: string[] = [];
-    const walk = (directory: string) => {
-      const entries = readdirSync(join(sourceRoot, directory), { withFileTypes: true })
-        .map((entry) => ({
-          entry,
-          path: directory === '' ? entry.name : `${directory}/${entry.name}`,
-        }))
-        .filter(({ path }) => !excluded(path));
-      if (entries.length === 0) return;
-      // Only the fresh index is used. Candidate-owned nested ignore rules are
-      // evaluated before descending into ignored generated directories.
-      const result = invoke(
-        [
-          `--git-dir=${join(root, '.git')}`,
-          `--work-tree=${sourceRoot}`,
-          'check-ignore',
-          '--no-index',
-          '-z',
-          '--stdin',
-        ],
-        entries.map(({ path }) => `${path}\0`).join(''),
-      );
-      if (result.status !== 0 && result.status !== 1)
-        throw new Error(`repository fixture ignores: ${result.stderr}`);
-      const ignored = new Set(result.stdout.split('\0'));
-      for (const { entry, path } of entries) {
-        if (ignored.has(path)) continue;
-        if (entry.isDirectory()) walk(path);
-        else if (entry.isFile() || entry.isSymbolicLink()) paths.push(path);
-        else throw new Error(`repository fixture unsupported file: ${path}`);
-      }
-    };
+    let paths: string[] = [];
     const worktreePlaceholder = '.devai/worktrees/.gitkeep';
     if (options.paths === undefined) {
-      walk('');
+      // Enumerate the candidate filesystem against the fixture's fresh index in
+      // one bounded Git process. This retains nested ignore semantics without
+      // consulting or mutating the caller's index, and avoids one subprocess
+      // for every directory in a full-repository fixture.
+      const result = invoke([
+        `--git-dir=${join(root, '.git')}`,
+        `--work-tree=${sourceRoot}`,
+        'ls-files',
+        '--others',
+        '--exclude-standard',
+        '-z',
+      ]);
+      if (result.status !== 0)
+        throw new Error(`repository fixture candidate census: ${result.stderr}`);
+      paths = result.stdout.split('\0').filter((path) => path !== '' && !excluded(path));
       // Preserve this known tracked placeholder by exact direct read only.
       // Never enumerate its parent or any historical worktree; absence refuses.
       if (!lstatSync(join(sourceRoot, worktreePlaceholder)).isFile())

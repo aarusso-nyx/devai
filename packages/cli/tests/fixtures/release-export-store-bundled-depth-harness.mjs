@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { deflateSync } from 'node:zlib';
 import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
 import { installedPackage, fixture } from '../helpers/release-mutation-inputs-fixture.js';
 import { bindReleaseHostPackageSnapshot } from '../../src/services/release-host-package-binding.js';
@@ -44,6 +45,16 @@ const git = (root, args, input) => {
 };
 const oid = (type, bytes) =>
   createHash('sha1').update(`${type} ${bytes.length}\0`).update(bytes).digest('hex');
+const writeObject = (root, id, object) => {
+  const directory = join(root, '.git', 'objects', id.slice(0, 2));
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, id.slice(2)),
+    deflateSync(
+      Buffer.concat([Buffer.from(`${object.type} ${object.bytes.length}\0`), object.bytes]),
+    ),
+  );
+};
 function candidate(files, parent) {
   const root = { children: new Map() };
   const objects = new Map();
@@ -104,11 +115,10 @@ function checkout(snapshot, root, ancestors = []) {
   git(root, ['config', 'user.name', 'DEVAI Fixture']);
   git(root, ['config', 'user.email', 'fixture@example.invalid']);
   for (const proof of [...ancestors, snapshot]) {
-    for (const [id, object] of proof.readProof(proof.paths))
-      assert.equal(
-        git(root, ['hash-object', '-w', '--literally', '-t', object.type, '--stdin'], object.bytes),
-        id,
-      );
+    for (const [id, object] of proof.readProof(proof.paths)) {
+      assert.equal(oid(object.type, object.bytes), id);
+      writeObject(root, id, object);
+    }
   }
   git(root, ['checkout', '--detach', snapshot.repository.commit]);
   git(root, ['remote', 'add', 'origin', `https://github.com/${snapshot.repository.id}.git`]);
