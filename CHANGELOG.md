@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.5 — 2026-09-22
+
+- Promote immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider so
+  generated adopter workflows use the released zero-artifact snapshot correction.
+- Prove a zero-artifact protected proof still verifies after Git materializes the proof checkout
+  without an empty `artifacts/` directory.
+- Preserve exact population, digest, signer, package, release-source, and provenance checks while
+  rejecting every undeclared artifact.
+
 ## 1.5.4 — 2026-09-21
 
 - Materialize the verifier's empty artifact snapshot root so valid RC schema 1.1 bundles with an

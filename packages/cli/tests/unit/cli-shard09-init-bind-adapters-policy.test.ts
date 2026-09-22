@@ -350,7 +350,7 @@ describe('CLI shard 09 init bind adapter and policy boundaries', () => {
       if (adapter === 'post-merge') {
         put(root, '.devai/config/authority-policy.json', { schemaVersion: '1.0.0' });
         put(root, 'law/constitution.md', '# Fixture constitution\n');
-        put(root, 'node_modules/.bin/devai', '#!/bin/sh\nprintf "devai/1.5.4\\n"\n');
+        put(root, 'node_modules/.bin/devai', '#!/bin/sh\nprintf "devai/1.5.5\\n"\n');
         chmodSync(join(root, 'node_modules/.bin/devai'), 0o755);
       }
       const planResult = await invoke(root, ['--host-adapter', adapter]);
@@ -418,7 +418,7 @@ describe('CLI shard 09 init bind adapter and policy boundaries', () => {
       if (adapter === 'post-merge') {
         put(root, '.devai/config/authority-policy.json', { schemaVersion: '1.0.0' });
         put(root, 'law/constitution.md', '# Fixture constitution\n');
-        put(root, 'node_modules/.bin/devai', '#!/bin/sh\nprintf "devai/1.5.4\\n"\n');
+        put(root, 'node_modules/.bin/devai', '#!/bin/sh\nprintf "devai/1.5.5\\n"\n');
         chmodSync(join(root, 'node_modules/.bin/devai'), 0o755);
       }
       const projectBefore = readFileSync(join(root, '.devai/config/project.json'), 'utf8');

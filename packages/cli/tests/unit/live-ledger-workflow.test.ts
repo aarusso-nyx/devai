@@ -17,6 +17,7 @@ import { parse } from 'yaml';
 import {
   buildCiScaffoldPlan,
   CHECKOUT_COMMIT,
+  attestedRcVerificationWorkflow,
   LEDGER_ENVIRONMENT,
   ledgerVerificationWorkflow,
   SETUP_NODE_COMMIT,
@@ -58,6 +59,8 @@ const VERIFIER_POLICY = JSON.parse(
 const roots: string[] = [];
 const EXPLICIT_PUBLISH_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}";
+const EXPLICIT_PAGES_CONDITION =
+  "${{ github.event_name == 'workflow_dispatch' && inputs.publish && inputs.publish_pages }}";
 const REHEARSAL_CONDITION = "${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}";
 const PERMISSIVE_PUSH_PUBLICATION_CONDITION =
   "${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}";
@@ -124,11 +127,10 @@ function executablePackageMaterializationFixture(
   mkdirSync(verifierRoot, { recursive: true });
   mkdirSync(runnerTemp, { recursive: true });
   mkdirSync(mockBin, { recursive: true });
-  // Reconstruct the immutable 1.5.1 runtime from the candidate's additive
-  // 1.5.4 verifier update before re-packing it for mocked registry I/O. The
-  // generated workflow independently binds the real registry tarball to the
-  // same exact release commit/tree, SHA-1, SRI, and provenance digest.
-  const publishedArchive = join(root, 'published-1.5.1-verifier.tar');
+  // Repack the exact policy-selected verifier payload for mocked registry I/O.
+  // The generated workflow independently binds the real registry tarball to
+  // the same release commit/tree, SHA-1, SRI, and provenance digest.
+  const publishedArchive = join(root, 'published-verifier.tar');
   execFileSync(
     'tar',
     [
@@ -146,27 +148,6 @@ function executablePackageMaterializationFixture(
     ['-xf', publishedArchive, '--strip-components=4', '--directory', verifierRoot],
     { cwd: root },
   );
-  const publishPath = join(verifierRoot, 'src/publish.js');
-  const currentPublish = readFileSync(publishPath, 'utf8');
-  const emptyArtifactRootFix = `    // Schema 1.1 binds an exact artifact population, including the valid empty
-    // population. The verifier still requires the population root to exist so
-    // it can prove that no undeclared files are present.
-    mkdirSync(join(snapshot, 'artifacts'), { recursive: false });
-`;
-  const trustedPublish = currentPublish.replace(emptyArtifactRootFix, '');
-  expect(trustedPublish).not.toBe(currentPublish);
-  writeFileSync(publishPath, trustedPublish);
-  const trustedProvenancePath = join(verifierRoot, 'provenance.json');
-  const trustedProvenance = JSON.parse(readFileSync(trustedProvenancePath, 'utf8')) as {
-    sourceCommit: string;
-    files: Array<{ path: string; sha256: string }>;
-  };
-  trustedProvenance.sourceCommit = '7ad2a394fbc0a6220808561f645830addf5e5184';
-  const publishEntry = trustedProvenance.files.find((entry) => entry.path === 'src/publish.js');
-  expect(publishEntry).toBeDefined();
-  if (publishEntry === undefined) throw new Error('trusted verifier publish entry missing');
-  publishEntry.sha256 = 'dbb6b54fcad42bff17a9e722b37b51eefbf87f3b8fddcd7dd45fe023cc54ed2e';
-  writeFileSync(trustedProvenancePath, `${JSON.stringify(trustedProvenance, null, 2)}\n`);
   rmSync(join(verifierRoot, 'test'), { recursive: true, force: true });
   const publishedProvenance = readFileSync(join(verifierRoot, 'provenance.json'));
   expect(createHash('sha256').update(publishedProvenance).digest('hex')).toBe(
@@ -345,6 +326,28 @@ describe('live ledger-verification workflow', () => {
     ]);
   });
 
+  it('materializes the zero-artifact-capable provider in the official attested-RC workflow', () => {
+    const materialization = executablePackageMaterializationFixture(
+      attestedRcVerificationWorkflow(),
+    );
+    const result = spawnSync('bash', ['-c', materialization.script], {
+      cwd: materialization.root,
+      encoding: 'utf8',
+      env: materialization.env,
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    const installedPublish = join(
+      materialization.runnerTemp,
+      'devai-verifier-package/extracted/package',
+      VERIFIER_POLICY.verifier.root,
+      'src/publish.js',
+    );
+    expect(readFileSync(installedPublish, 'utf8')).toContain(
+      "mkdirSync(join(snapshot, 'artifacts'), { recursive: false });",
+    );
+  });
+
   it.each([
     { name: 'missing', token: undefined },
     { name: 'empty', token: '' },
@@ -516,7 +519,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'wrong package-owned verifier provenance',
       mutate: (source: string) =>
-        source.replaceAll('7ad2a394fbc0a6220808561f645830addf5e5184', 'a'.repeat(40)),
+        source.replaceAll('8174749ebcfabab246031281a036032f636b8a39', 'a'.repeat(40)),
       diagnostic: 'CI_VERIFIER_PACKAGE_BINDING_MISSING',
     },
     {
@@ -589,14 +592,14 @@ describe('live ledger-verification workflow', () => {
       jobs?: Record<string, { if?: string }>;
     };
     expect(parsed.jobs?.['finalize-release']?.if).toBe(EXPLICIT_PUBLISH_CONDITION);
-    expect(parsed.jobs?.['deploy-pages']?.if).toBe(EXPLICIT_PUBLISH_CONDITION);
+    expect(parsed.jobs?.['deploy-pages']?.if).toBe(EXPLICIT_PAGES_CONDITION);
     expect(parsed.jobs?.['rehearsal-summary']?.if).toBe(REHEARSAL_CONDITION);
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 57');
-    expect(verifierMaterializationScript(release)).toContain('echo "version=1.5.1"');
+    expect(verifierMaterializationScript(release)).toContain('echo "version=1.5.4"');
     expect(verifierMaterializationScript(release)).not.toContain(
       'require("./" + process.argv[1] + "/package.json").version',
     );
