@@ -24,6 +24,29 @@ pnpm add --save-dev --save-exact @aarusso-nyx/devai@1.5.4
 pnpm exec devai catalog actions --format json
 ```
 
+## Required credentials
+
+DEVAI declares the credentials an adoption needs in
+`law/policy/adopter-defaults/credential-requirements-binding.json`, validated by
+`law/schemas/credential-requirements.schema.json`. The binding carries names, kinds,
+scopes, and consumers only; it never holds a value. DEVAI verifies presence, shape, and
+scope through the consuming tool's own status command and never reads, stores, or
+generates a credential value. The adopter starting set is:
+
+| Name                  | Kind               | Scope           | Consumer                                                              | Absence |
+| --------------------- | ------------------ | --------------- | --------------------------------------------------------------------- | ------- |
+| `NODE_AUTH_TOKEN`     | environment        | `read:packages` | `pnpm add --save-dev --save-exact @aarusso-nyx/devai`                 | block   |
+| `PACKAGES_READ_TOKEN` | repository secret  | `read:packages` | `.github/workflows/devai-ledger-verify.yml`, job `verify-attested-rc` | block   |
+| `GH_TOKEN`            | gh auth (optional) | `issues:write`  | `round tracking sync`                                                 | degrade |
+
+`NODE_AUTH_TOKEN` is the shell variable the project `.npmrc` references during
+installation. `PACKAGES_READ_TOKEN` is the repository or protected-environment secret the
+generated local-RC verifier workflow passes as `NODE_AUTH_TOKEN`; the post-merge
+observation workflow, when bound, reuses it. `GH_TOKEN` stands for the local `gh` session
+(keyring login or variable) that projects round state onto GitHub issues; without it
+tracking sync reports unauthenticated and writes nothing. Add an entry to the binding for
+every further secret your own workflows reference.
+
 ## 1. Preview
 
 `init plan` is read-only. It describes the files and role-owned segments that an
