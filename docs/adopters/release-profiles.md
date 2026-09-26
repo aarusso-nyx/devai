@@ -20,6 +20,26 @@ unconditional floor: formatting, lint, types, schema/generated consistency,
 secret and portable-path checks, package boundaries and exact candidate identity.
 No selection or escalation can reintroduce mutation testing.
 
+## Prerelease channels
+
+Prerelease versions follow the ladder in the materialized lifecycle policy
+(`plan_determination.prerelease_ladder`, ADR-REL-0028): `alpha`, then `beta`,
+then `rc`, each with a numeric suffix such as `2.0.0-beta.3`. Any other prerelease
+identifier blocks as `invalid-semver`. Each rung requires its own verification
+depth: alpha runs the unconditional floor plus affected and dependent checks, beta
+adds the unit and integration closure, and rc requires the complete RC coverage
+closure. Only an rc may be promoted to the stable version.
+
+Rungs publish to their own dist-tags, `alpha`, `beta`, and `next`; stable versions
+publish to `latest` only. Promotion moves forward one rung at a time or increments
+the suffix within a rung; skipping a rung or moving backward blocks as a
+`downgrade`. A release intent may declare `channel` (`alpha`, `beta`, `rc`, or
+`stable`); it must agree with the target version or the plan blocks.
+
+Adopters inherit the ladder through the materialized policy. They may narrow which
+rungs they use, for example by publishing only `rc` builds, but may never add
+identifiers or reorder the ladder.
+
 ## Configuration and migration
 
 Declare the release unit, version source and capability-to-task mapping in
