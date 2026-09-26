@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { bumpFloorOverRange, loadGrammar } from './check-commit-range.mjs';
 import { prFailureDiagnostics } from './pr-failure-diagnostics.mjs';
 import { projectChangedPaths } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
 import { selectorMatches } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
@@ -99,6 +100,66 @@ function run(options) {
   }
   return report.exitCode || status;
 }
+
+// Commit hygiene (ADR-GOV-0018): re-apply the grammar and the single-family
+// rule over the first-parent range, catching commits that bypassed the hooks.
+const rangeCheck = spawnSync(
+  process.execPath,
+  [join(root, 'scripts/check-commit-range.mjs'), base, candidateCommit],
+  { cwd: root, encoding: 'utf8' },
+);
+process.stderr.write(`${rangeCheck.stdout}${rangeCheck.stderr}`);
+if (rangeCheck.status !== 0) process.exit(rangeCheck.status ?? 1);
+
+// Bump floor (ADR-REL-0027): the commit types in the range set the minimum
+// manifest version delta. The table below restates ADR-REL-0027 and is used
+// only when the repository carries no commit grammar policy.
+const FLOOR_FALLBACK = {
+  subject_pattern: '^[a-z]+(\\([a-z0-9-]+\\))?(!)?: .+$',
+  breaking_marker: { marker: '!', bump: 'major' },
+  types: Object.fromEntries(
+    [
+      ...[
+        ['feat', 'minor'],
+        ['fix', 'patch'],
+        ['perf', 'patch'],
+        ['refactor', 'patch'],
+      ],
+      ...['test', 'docs', 'ci', 'build', 'chore', 'law', 'spec', 'plan'].map((t) => [t, 'none']),
+    ].map(([type, bump_floor]) => [type, { bump_floor }]),
+  ),
+};
+const BUMP_RANK = { none: 0, patch: 1, minor: 2, major: 3 };
+function versionDelta(from, to) {
+  const core = (version) => version.split(/[-+]/u)[0].split('.').map(Number);
+  const [a, b] = [core(from), core(to)];
+  if (b[0] !== a[0]) return b[0] > a[0] ? 'major' : 'none';
+  if (b[1] !== a[1]) return b[1] > a[1] ? 'minor' : 'none';
+  return b[2] > a[2] ? 'patch' : 'none';
+}
+const bumpFloor = bumpFloorOverRange(
+  root,
+  loadGrammar(root) ?? FLOOR_FALLBACK,
+  base,
+  candidateCommit,
+);
+const bumpDelta = versionDelta(currentVersion, targetVersion);
+if (BUMP_RANK[bumpDelta] < BUMP_RANK[bumpFloor]) {
+  // The release intent schema is closed, so the blocking reason is reported
+  // beside it and the gate fails before any preflight work.
+  process.stdout.write(
+    `${JSON.stringify({
+      nonAttesting: true,
+      blockingReasons: [`bump-floor-${bumpFloor}`],
+      bumpFloor,
+      versionDelta: bumpDelta,
+      current_version: currentVersion,
+      target_version: targetVersion,
+    })}\n`,
+  );
+  process.exit(1);
+}
+
 if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));
 
 // Release intent derives from the change-class set of the changed paths
