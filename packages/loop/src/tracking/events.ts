@@ -23,6 +23,7 @@ export const GOVERNANCE_EVENT_KINDS = [
   'evidence_superseded',
   'round_verdict',
   'tracking_disabled',
+  'backlog_item_projected',
 ] as const;
 
 export type GovernanceEventKind = (typeof GOVERNANCE_EVENT_KINDS)[number];
