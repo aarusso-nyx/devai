@@ -169,6 +169,7 @@ describe('S06-A check contract selection and policy boundaries', () => {
       'action-effects',
       'adrs',
       'blueprint',
+      'change-taxonomy',
       'ci-economy',
       'cli-reference',
       'dependencies',
