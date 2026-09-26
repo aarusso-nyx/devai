@@ -118,7 +118,7 @@
     "subject_pattern": {
       "type": "string",
       "minLength": 1,
-      "description": "Regular expression the first line of every non-exempt commit message must match: `^(type)(\\(scope\\))?(!)?: .+$` with the type alternation equal to the closed type set and the scope group equal to `scope_pattern`."
+      "description": "Regular expression the first line of every non-exempt commit message must match, anchored at both ends: type, an optional parenthesized scope, an optional breaking marker, a colon, a space, and the subject; the type alternation equals the closed type set and the scope group equals scope_pattern."
     },
     "scope_pattern": {
       "type": "string",
