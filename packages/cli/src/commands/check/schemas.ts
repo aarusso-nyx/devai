@@ -50,6 +50,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'stack-adapter.schema.json',
   'task-freshness.schema.json',
   'test-task-descriptor.schema.json',
+  'toolchain-manifest.schema.json',
 ] as const;
 
 export function checkSchemaCanon(repoRoot: string): SchemaCanonReport {
