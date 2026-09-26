@@ -12,6 +12,7 @@ import type {
   TaskTarget,
 } from './types.js';
 import { resolveMutationOutputContract } from './mutation-output.js';
+import { PREFLIGHT_RUNNER, validatePreflightProbes } from './preflight.js';
 import { CHANGE_CLASSES, loadChangeTaxonomy } from '../change-taxonomy.js';
 import {
   BARE_EXECUTABLE,
@@ -79,6 +80,8 @@ interface PolicyBuildOptions {
   readonly environment: Readonly<Record<string, string>>;
   readonly resolveExecutable?: (name: string) => Readonly<{ path: string; sha256: string }>;
   readonly protectedExecutionIdentity?: Readonly<Record<string, unknown>>;
+  /** Planned nodes that stay outside the task policy (the adopter preflight root). */
+  readonly unattestedNodes?: readonly string[];
   readonly cacheState: (
     task: Readonly<
       Pick<
@@ -300,6 +303,38 @@ function validSelector(value: unknown): boolean {
   return kind === 'exact' || kind === 'prefix' || kind === 'glob';
 }
 
+/** True for a node executed by the preflight runner (ADR-CHK-0001). */
+export function isPreflightNode(task: Readonly<{ runner?: unknown }>): boolean {
+  return task.runner === PREFLIGHT_RUNNER;
+}
+
+/** A preflight node carries no argv; the parsed form carries an empty one. */
+function withPreflightArgv(descriptor: TaskDescriptor): TaskDescriptor {
+  if (!descriptor.tasks.some((task) => isPreflightNode(task))) return descriptor;
+  return {
+    ...descriptor,
+    tasks: descriptor.tasks.map((task) => (isPreflightNode(task) ? { ...task, argv: [] } : task)),
+  };
+}
+
+/**
+ * Adds a synthetic node (the adopter preflight root) to a parsed descriptor.
+ * Task keys keep binding the authored descriptor digest.
+ */
+export function withSyntheticNode(
+  descriptor: TaskDescriptor,
+  node: TaskDescriptorNode,
+): TaskDescriptor {
+  if (descriptor.tasks.some((task) => task.nodeId === node.nodeId)) {
+    throw new Error(
+      `CHECK_RUNNER_DESCRIPTOR: synthetic node ${node.nodeId} collides with a declared node`,
+    );
+  }
+  const augmented: TaskDescriptor = { ...descriptor, tasks: [node, ...descriptor.tasks] };
+  authoredDescriptorDigests.set(augmented, taskDescriptorDigest(descriptor));
+  return augmented;
+}
+
 function validateDescriptor(value: unknown): TaskDescriptor {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('CHECK_RUNNER_DESCRIPTOR: descriptor must be an object');
@@ -321,14 +356,26 @@ function validateDescriptor(value: unknown): TaskDescriptor {
   }
   const ids = new Set<string>();
   for (const task of descriptor.tasks) {
+    const preflight = isPreflightNode(task);
+    if (preflight) {
+      if ((task as { argv?: unknown }).argv !== undefined) {
+        throw new Error(`CHECK_RUNNER_DESCRIPTOR: preflight node ${task.nodeId} declares argv`);
+      }
+      validatePreflightProbes(task.probes, String(task.nodeId));
+    } else if ((task as { probes?: unknown }).probes !== undefined) {
+      throw new Error(
+        `CHECK_RUNNER_DESCRIPTOR: ${task.nodeId} declares probes outside preflight-v1`,
+      );
+    }
     if (
       typeof task.nodeId !== 'string' ||
       ids.has(task.nodeId) ||
       !Array.isArray(task.dependencies) ||
-      !Array.isArray(task.argv) ||
-      task.argv.length === 0 ||
-      task.argv.some((argument: unknown) => typeof argument !== 'string') ||
-      !BARE_EXECUTABLE.test(task.argv[0] ?? '') ||
+      (!preflight &&
+        (!Array.isArray(task.argv) ||
+          task.argv.length === 0 ||
+          task.argv.some((argument: unknown) => typeof argument !== 'string') ||
+          !BARE_EXECUTABLE.test(task.argv[0] ?? ''))) ||
       !Array.isArray(task.inputSelectors) ||
       task.inputSelectors.length === 0 ||
       !(task.inputSelectors as readonly unknown[]).every(validSelector) ||
@@ -374,6 +421,11 @@ function validateDescriptor(value: unknown): TaskDescriptor {
     }
     const requiredNodes = profile.requiredNodes as readonly string[];
     const eligible = new Set<string>((profile.eligibleNodes ?? []) as readonly string[]);
+    // Preflight nodes are selected for every target, so an affected profile is
+    // closed without naming them, and an empty profile routes nothing.
+    const preflightIds = new Set(
+      descriptor.tasks.filter((task) => isPreflightNode(task)).map((task) => task.nodeId),
+    );
     for (const nodeId of [...requiredNodes, ...eligible]) {
       if (!ids.has(nodeId)) {
         throw new Error(`CHECK_RUNNER_DESCRIPTOR: profile ${profile.profileId} names unknown node`);
@@ -382,12 +434,14 @@ function validateDescriptor(value: unknown): TaskDescriptor {
     if (
       profile.mode === 'affected' &&
       (requiredNodes.some((nodeId) => !eligible.has(nodeId)) ||
-        (descriptor.fallbackNodeId !== null && !eligible.has(descriptor.fallbackNodeId)) ||
+        (descriptor.fallbackNodeId !== null &&
+          eligible.size > 0 &&
+          !eligible.has(descriptor.fallbackNodeId)) ||
         descriptor.tasks.some(
           (task) =>
             eligible.has(task.nodeId) &&
             (task.dependencies as readonly string[]).some(
-              (dependency) => !eligible.has(dependency),
+              (dependency) => !eligible.has(dependency) && !preflightIds.has(dependency),
             ),
         ))
     ) {
@@ -471,7 +525,7 @@ export function taskDescriptorDigest(descriptor: TaskDescriptor): string {
 export function parseTaskDescriptor(value: unknown): TaskDescriptor {
   try {
     const validated = validateDescriptor(value);
-    const parsed = withoutMutationTestTasks(validated);
+    const parsed = withoutMutationTestTasks(withPreflightArgv(validated));
     authoredDescriptorDigests.set(parsed, taskDescriptorDigest(validated));
     return parsed;
   } catch (error) {
@@ -688,7 +742,9 @@ function selectedNodeIds(
 ): Set<string> {
   const selected = new Set<string>();
   const impacted = new Set<string>();
-  if (target === 'release') {
+  if (target === 'preflight') {
+    // Only the probe nodes and their dependencies.
+  } else if (target === 'release') {
     if (releaseRequiredNodes.length === 0) {
       throw new Error('CHECK_RELEASE_PROFILE_TASKS_REQUIRED');
     }
@@ -785,6 +841,10 @@ function selectedNodeIds(
       }
     }
   }
+  // Preflight nodes are selected unconditionally for every target (ADR-CHK-0001).
+  descriptor.tasks
+    .filter((task) => isPreflightNode(task))
+    .forEach((task) => selected.add(task.nodeId));
   const byId = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const dependencies = [...selected];
   for (let index = 0; index < dependencies.length; index += 1) {
@@ -824,6 +884,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
     }
     changes = changedPaths(repoRoot, options.baseCommit, commit, clean);
+  } else if (target === 'preflight' && options.baseCommit !== undefined) {
+    assertCommit(repoRoot, options.baseCommit, 'BASE');
+    if (!clean) changes = changedPaths(repoRoot, commit, commit, false);
   } else if (!clean) {
     changes = changedPaths(repoRoot, commit, commit, false);
   }
@@ -879,11 +942,16 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       nodeId,
       taskKey: taskKeys.get(nodeId),
     }));
+    const preflight = isPreflightNode(task);
     const executableName = task.argv[0] ?? '';
-    const protectedExecutable = taskExecutableFromToolchain(toolchain, executableName);
-    const executable =
-      options.resolveExecutable?.(executableName) ??
-      resolveTaskExecutable(repoRoot, executableName);
+    const protectedExecutable = preflight
+      ? undefined
+      : taskExecutableFromToolchain(toolchain, executableName);
+    // A preflight node executes no declared program; its identity is its probe list.
+    const executable = preflight
+      ? { path: PREFLIGHT_RUNNER, sha256: sha256Hex(task.probes ?? []) }
+      : (options.resolveExecutable?.(executableName) ??
+        resolveTaskExecutable(repoRoot, executableName));
     if (
       protectedExecutable !== undefined &&
       (protectedExecutable.path !== executable.path ||
@@ -898,6 +966,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       descriptorVersion: descriptor.descriptorVersion,
       nodeId: task.nodeId,
       argv: task.argv,
+      ...(preflight && { probes: task.probes, base: options.baseCommit ?? null }),
       ...(protectedExecutable === undefined ? {} : { executable: protectedExecutable }),
       cwd: task.cwd,
       runner: task.runner,
@@ -944,12 +1013,14 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     // accepts inputProjection only in the explicitly forward v1.2 release form.
     schemaVersion: target === 'release' ? '1.2.0' : '1.1.0',
     repositoryId: descriptor.repositoryId,
-    requiredNodes: tasks.map(({ nodeId, taskKey, dependencies, outputContract }) => ({
-      nodeId,
-      taskKey,
-      dependencies,
-      outputContract,
-    })),
+    requiredNodes: tasks
+      .filter((task) => !(options.unattestedNodes ?? []).includes(task.nodeId))
+      .map(({ nodeId, taskKey, dependencies, outputContract }) => ({
+        nodeId,
+        taskKey,
+        dependencies,
+        outputContract,
+      })),
     ...(target === 'release' && {
       inputProjection: {
         ...RELEASE_INPUT_PROJECTION,

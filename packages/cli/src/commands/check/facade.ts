@@ -19,6 +19,7 @@ interface CheckCliOptions extends Omit<CheckExecutionOptions, 'repoRoot'> {
   readonly repoRoot?: string;
   readonly human?: boolean;
   readonly affected?: boolean;
+  readonly preflight?: boolean;
   readonly local?: boolean;
   readonly rc?: boolean;
   readonly releaseIntent?: string;
@@ -49,6 +50,7 @@ function runnerSelection(
 ): Readonly<{ target: TaskTarget; operation: TaskOperation }> | undefined {
   const targetFlags = [
     options.affected,
+    options.preflight,
     options.local,
     options.rc,
     options.releaseIntent !== undefined,
@@ -59,11 +61,12 @@ function runnerSelection(
     target: exactlyOne<TaskTarget>(
       [
         { name: 'affected', selected: options.affected },
+        { name: 'preflight', selected: options.preflight },
         { name: 'local', selected: options.local },
         { name: 'rc', selected: options.rc },
         { name: 'release', selected: options.releaseIntent !== undefined },
       ],
-      'task target: --affected, --local, --rc, or --release-intent',
+      'task target: --affected, --preflight, --local, --rc, or --release-intent',
     ),
     operation: exactlyOne<TaskOperation>(
       [
@@ -86,6 +89,11 @@ function renderRunnerHuman(report: CheckRunnerReport): string {
     lines.push(
       `  ${(executed?.disposition ?? task.cacheState).toUpperCase()} ${task.nodeId}: ${executed?.reason ?? task.reason}`,
     );
+  }
+  for (const blocked of report.blocked ?? []) {
+    for (const remediation of blocked.remediation) {
+      lines.push(`  REMEDIATION ${blocked.nodeId}: ${remediation}`);
+    }
   }
   if (report.receipt !== undefined) lines.push(`  RECEIPT ${report.receipt.digest}`);
   if (report.receiptRefusal !== undefined) lines.push(`  NO RECEIPT: ${report.receiptRefusal}`);
@@ -137,6 +145,10 @@ export const checkCmd = defineCommand({
       .option('--mutation-current <path>', 'Mutation current report for --only mutation')
       .option('--mutation-thresholds <path>', 'Mutation thresholds for --only mutation')
       .option('--affected', 'Select tasks affected since the exact --base commit')
+      .option(
+        '--preflight',
+        'Select the preflight probe nodes; --base names the freshly fetched base',
+      )
       .option('--local', 'Select the complete cheap local task closure')
       .option('--rc', 'Select the fixed release-candidate task closure')
       .option(
@@ -301,6 +313,7 @@ export const checkCmd = defineCommand({
             message.startsWith('CHECK_SELECTION_CONFLICT') ||
             message.startsWith('CHECK_RUNNER_SELECTION') ||
             message.startsWith('CHECK_RUNNER_BASE_REQUIRED') ||
+            message.startsWith('CHECK_RUNNER_BASE:') ||
             message.startsWith('CHECK_RUNNER_TIMEOUT')
               ? EXIT_USAGE
               : EXIT_FAIL;
