@@ -21,6 +21,7 @@ export interface ReleaseIntentDocument {
   readonly support: 'preview' | 'current' | 'lts';
   readonly support_promotion?: boolean;
   readonly change_kind?: 'documentation' | 'metadata' | 'behavioral';
+  readonly channel?: 'alpha' | 'beta' | 'rc' | 'stable';
   readonly changed_paths: readonly string[];
   readonly changed_packages: readonly string[];
   readonly risks?: readonly string[];
@@ -209,6 +210,7 @@ export function buildReleasePlanReceipt(input: {
       ? {}
       : { supportPromotion: intent.support_promotion }),
     ...(intent.change_kind === undefined ? {} : { changeKind: intent.change_kind }),
+    ...(intent.channel === undefined ? {} : { channel: intent.channel }),
     ...(intent.risks === undefined ? {} : { risks: intent.risks }),
     ...(intent.owner_escalations === undefined
       ? {}
