@@ -1,0 +1,76 @@
+{
+  "$schema": "../schemas/commit-grammar.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "commit-grammar",
+  "status": "active",
+  "authority": "Architect",
+  "taxonomy": "law/policy/change-taxonomy.json",
+  "subject_pattern": "^(feat|fix|refactor|perf|test|docs|ci|build|chore|law|spec|plan)(\\([a-z0-9-]+\\))?(!)?: .+$",
+  "scope_pattern": "^[a-z0-9-]+$",
+  "breaking_marker": {
+    "marker": "!",
+    "bump": "major"
+  },
+  "types": {
+    "feat": {
+      "allowed_classes": ["code", "tests", "docs", "generated"],
+      "bump_floor": "minor"
+    },
+    "fix": {
+      "allowed_classes": ["code", "tests", "docs", "generated"],
+      "bump_floor": "patch"
+    },
+    "refactor": {
+      "allowed_classes": ["code", "tests", "generated"],
+      "bump_floor": "patch"
+    },
+    "perf": {
+      "allowed_classes": ["code", "tests"],
+      "bump_floor": "patch"
+    },
+    "test": {
+      "allowed_classes": ["tests"],
+      "bump_floor": "none"
+    },
+    "docs": {
+      "allowed_classes": ["docs"],
+      "bump_floor": "none"
+    },
+    "ci": {
+      "allowed_classes": ["ci"],
+      "bump_floor": "none"
+    },
+    "build": {
+      "allowed_classes": ["toolchain"],
+      "bump_floor": "none"
+    },
+    "chore": {
+      "allowed_classes": ["tests", "docs", "generated", "ci", "toolchain"],
+      "bump_floor": "none"
+    },
+    "law": {
+      "allowed_classes": ["law", "spec", "generated"],
+      "bump_floor": "none"
+    },
+    "spec": {
+      "allowed_classes": ["spec"],
+      "bump_floor": "none"
+    },
+    "plan": {
+      "allowed_classes": ["plan"],
+      "bump_floor": "none"
+    }
+  },
+  "exemptions": {
+    "merge_commits": {
+      "condition": "parent-count-above-one",
+      "treatment": "inherit"
+    },
+    "reverts": {
+      "condition": "subject-starts-with-revert-and-body-names-reverted-commit",
+      "subject_prefix": "Revert ",
+      "treatment": "inherit"
+    }
+  },
+  "historical_cutoff": null
+}
