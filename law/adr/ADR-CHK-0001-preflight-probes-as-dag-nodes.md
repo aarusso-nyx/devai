@@ -13,7 +13,7 @@ provenance:
   - .github/workflows/pull-request-checks.yml
 affected_rules:
   - law/schemas/preflight-probe.schema.json
-  - law/schemas/test-tasks.schema.json
+  - law/schemas/test-task-descriptor.schema.json
   - test-tasks.json
   - packages/cli/src/services/check-runner/types.ts
   - packages/cli/src/services/check-runner/runner.ts

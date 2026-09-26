@@ -1,0 +1,286 @@
+{
+  "$schema": "../schemas/campaign-execution-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "campaign-execution",
+  "status": "proposed",
+  "authority": "Architect",
+  "policy_version": "1.0.0",
+  "plan_schema": "law/schemas/campaign.schema.json",
+  "containment": {
+    "levels": ["campaign", "round", "wave", "task"],
+    "cardinality": "every-level-has-exactly-one-parent",
+    "campaign_holds": "an ordered set of rounds implementing an explicit set of accepted decision records",
+    "round_holds": "the smallest set of waves that can close with one attestation decision and one merged head",
+    "wave_holds": "one coupled task group: exactly one architect, one inspector, and one engineer task in pipeline order, or one single-role task",
+    "task_holds": "one role, one session, one branch, one pull request, one boundary",
+    "cross_round_dependency": "forbidden-between-waves-and-tasks; only rounds depend on rounds",
+    "record_coverage": "every record listed on the campaign appears on at least one round and every round record appears on at least one of its waves",
+    "runtime_state": "this document is a plan and ledger; runtime state lives in governed round and task records"
+  },
+  "identity": {
+    "campaign": "^CMP-[0-9]{4}$",
+    "round": "^R-[0-9]{4}$",
+    "wave": "^CTG-[0-9]{4,}$",
+    "task": "^TASK-[0-9]{4,}$",
+    "uniqueness": "campaign-wide-for-rounds-waves-and-tasks",
+    "allocation": "round ids are allocated from the campaign number times one hundred plus the round ordinal; wave and task ids are allocated from .devai/state/counters.json when materialized and may be pre-allocated in the plan",
+    "collision_with_governed_records": "a plan id that already exists under work/rounds or .devai/state/tasks is a load error"
+  },
+  "ordering": {
+    "rounds": "depends_on-partial-order; a round opens only when every round it depends on is closed",
+    "rounds_without_dependency_between_them": "may-run-concurrently",
+    "waves_within_round": "depends_on-partial-order then id-utf8-ascending",
+    "waves_with_overlapping_lock_scopes": "serialized-by-id-utf8-ascending",
+    "tasks_within_wave": "coupled-pipeline-position-ascending: architect, inspector, engineer",
+    "position_authority": "law/constitution.md#article-24-coupled-task-triplets",
+    "merge_order": "architect, inspector, engineer; each downstream branch rebases after the upstream merge",
+    "branch_creation": "architect from integration head; inspector from architect head; engineer from inspector head"
+  },
+  "lifecycle": {
+    "campaign": {
+      "initial": "proposed",
+      "terminal": ["closed", "abandoned"],
+      "transitions": [
+        {
+          "from": "proposed",
+          "to": ["accepted", "abandoned"],
+          "when": "the mandate holder approves the plan, or withdraws it"
+        },
+        {
+          "from": "accepted",
+          "to": ["active", "abandoned"],
+          "when": "the first round opens, or the mandate is withdrawn"
+        },
+        {
+          "from": "active",
+          "to": ["closed", "abandoned"],
+          "when": "every round is closed, or the mandate is withdrawn with at least one round not closed"
+        }
+      ],
+      "undeclared_transition": "CAMPAIGN_TRANSITION_FORBIDDEN"
+    },
+    "round": {
+      "initial": "planned",
+      "terminal": ["closed", "abandoned"],
+      "transitions": [
+        {
+          "from": "planned",
+          "to": ["open", "abandoned"],
+          "when": "the round open gate holds, or the campaign is abandoned"
+        },
+        {
+          "from": "open",
+          "to": ["closing", "abandoned"],
+          "when": "every task in every wave is merged or cancelled with at least one merged, or the campaign is abandoned"
+        },
+        {
+          "from": "closing",
+          "to": ["closed", "open"],
+          "when": "the round close gate holds, or a close check fails and a task is reopened to correct it"
+        }
+      ],
+      "undeclared_transition": "CAMPAIGN_ROUND_TRANSITION_FORBIDDEN"
+    },
+    "wave": {
+      "initial": "planned",
+      "terminal": ["merged", "cancelled"],
+      "transitions": [
+        {
+          "from": "planned",
+          "to": ["open", "cancelled"],
+          "when": "its round is open and every wave it depends on is merged and no open wave shares a lock scope, or the round is abandoned"
+        },
+        {
+          "from": "open",
+          "to": ["merged", "cancelled"],
+          "when": "its last task in pipeline order is merged, or the round is abandoned"
+        }
+      ],
+      "undeclared_transition": "CAMPAIGN_WAVE_TRANSITION_FORBIDDEN"
+    },
+    "task": {
+      "initial": "planned",
+      "terminal": ["merged", "cancelled"],
+      "transitions": [
+        {
+          "from": "planned",
+          "to": ["ready", "cancelled"],
+          "when": "its wave is open and its upstream task is merged or it has no upstream, or the wave is cancelled"
+        },
+        {
+          "from": "ready",
+          "to": ["in_progress", "cancelled"],
+          "when": "a human opens a session with the task discipline declared and the prompt sha256 is pinned"
+        },
+        {
+          "from": "in_progress",
+          "to": ["checkpoint", "pre_merge", "blocked", "cancelled"],
+          "when": "the session emits a checkpoint, opens the pull request with acceptance commands passing, reports a gap that needs another role, or is withdrawn"
+        },
+        {
+          "from": "checkpoint",
+          "to": ["in_progress", "pre_merge", "blocked"],
+          "when": "work resumes, the pull request is opened, or a gap is reported"
+        },
+        {
+          "from": "pre_merge",
+          "to": ["merged", "in_progress"],
+          "when": "the pull-request gate is green and a human merges, or review requests a change"
+        },
+        {
+          "from": "blocked",
+          "to": ["ready", "cancelled"],
+          "when": "the gap is resolved by the responsible role, or the task is withdrawn"
+        }
+      ],
+      "undeclared_transition": "CAMPAIGN_TASK_TRANSITION_FORBIDDEN"
+    }
+  },
+  "gates": {
+    "round_open": [
+      "every record on the round has status accepted",
+      "every round in depends_on is closed",
+      "every task boundary path is inside the constitution authority row of its discipline"
+    ],
+    "wave_open": [
+      "the round is open",
+      "every wave in depends_on is merged",
+      "no open wave in the round shares a lock scope prefix"
+    ],
+    "task_start": [
+      "the upstream task is merged or the task is the architect position",
+      "the prompt file sha256 is recorded on the task",
+      "the session role equals the task discipline"
+    ],
+    "task_pre_merge": [
+      "every acceptance command exits zero on the branch head",
+      "every wave gate check member passes on the branch head",
+      "every commit on the branch satisfies the commit rules below",
+      "the diff touches only boundary paths"
+    ],
+    "round_close_universal": [
+      "adrs",
+      "schemas",
+      "docs-links",
+      "format:check:all",
+      "action-registry:check"
+    ],
+    "round_close": [
+      "every task is merged or cancelled",
+      "the universal close checks and the round close_checks pass on the merged head",
+      "every owner effect in owner_effects_required has performed_at set",
+      "when attestation_reissue is true, the new task-policy digest is recorded in closure and the attestation is re-issued for it before any release plan uses the head"
+    ],
+    "gate_evaluation": "a human evaluates and records; no gate is inferred from a green check alone"
+  },
+  "isolation": {
+    "worktree": "one dedicated worktree per task; never the root checkout",
+    "branch_pattern": "^(codex|claude)/R-[0-9]{4}-TASK-[0-9]{4,}-[a-z0-9-]+$",
+    "base": "architect from the integration branch head; downstream positions from the upstream branch head, rebased after each upstream merge",
+    "integration_branch": "main",
+    "merge_method": "merge-commit-or-rebase; squash is forbidden because it recombines single-family commits",
+    "pull_request_cardinality": "exactly-one-per-task"
+  },
+  "prompts": {
+    "composition": ["preamble", "task"],
+    "preamble": "the campaign prompts.preamble file, pasted verbatim first",
+    "task": "the task prompt.path file, pasted verbatim second",
+    "self_contained": "a task prompt must name its record, discipline, boundary, deliverables, acceptance commands, and commit types without relying on conversation history",
+    "pinning": "sha256 of the task prompt file is recorded on the task at start; a change afterwards is drift and requires re-review of the open pull request",
+    "forbidden_content": [
+      "credential",
+      "token",
+      "signing-material",
+      "environment-value",
+      "absolute-host-path"
+    ],
+    "role_declaration": "the prompt states exactly one role and the session declares the same role"
+  },
+  "commits": {
+    "grammar": "type(scope): subject as declared by the campaign task commit_types until law/policy/commit-grammar.json exists, then that policy",
+    "single_family": true,
+    "families": {
+      "governance": ["law", "spec", "plan"],
+      "implementation": ["code", "tests", "generated", "docs"],
+      "infrastructure": ["ci", "toolchain"]
+    },
+    "cross_family_commit": "rejected; split the commit",
+    "declared_pairings": [["law", "generated"]],
+    "attribution": "the session tool's attribution trailer is kept",
+    "no_version_bump": "a campaign task never edits a package version"
+  },
+  "failure": {
+    "acceptance_failure": "the task stays in_progress; the report names the failing command and output",
+    "extrinsic_failure": "an environment or credential failure is reported as blocked-environment, never as an acceptance failure",
+    "gap": "a missing or contradictory contract moves the task to blocked with the exact question; the responsible role answers in its own session",
+    "automatic_retry": "forbidden",
+    "dependent_after_failure": "a downstream task never starts on a failed or blocked upstream",
+    "rollback": "as law/policy/round-execution.json rollback: unmerged branches are abandoned, merged work is reverted by a new authorized commit"
+  },
+  "evidence": {
+    "task_merge": ["pull_request", "merged_as"],
+    "round_close": [
+      "merged_head",
+      "closed_at",
+      "task_policy_digest when attestation_reissue",
+      "phase_closure when materialized"
+    ],
+    "acceptance_output": "summarized in the pull request description; raw output is not committed",
+    "campaign_ledger": "the campaign document is updated by the maintainer after each merge and each close; it is committed as plan class"
+  },
+  "materialization": {
+    "governed_round_record": {
+      "target": "work/rounds/{round}/record.md",
+      "mapping": {
+        "id": "round.id",
+        "title": "round.title",
+        "goal": "round.goal",
+        "waves[].id": "wave.id",
+        "waves[].title": "wave.title",
+        "waves[].roles": "wave.tasks[].discipline",
+        "waves[].type": "wave.type",
+        "waves[].lock_scopes": "wave.lock_scopes",
+        "waves[].gates": "wave.gates",
+        "gates": "round.close_checks plus gates.round_close_universal",
+        "plan_path": "the campaign document path",
+        "orchestrator_prompt": "the campaign prompts.preamble path"
+      }
+    },
+    "governed_task_record": {
+      "target": "law/schemas/task.schema.json",
+      "mapping": {
+        "id": "task.id",
+        "round_id": "round.id",
+        "discipline": "task.discipline",
+        "coupled_task_group": "wave.id",
+        "coupled_pipeline_position": "task.coupled_pipeline_position",
+        "upstream_task_id": "task.upstream_task_id",
+        "title": "task.title",
+        "target_substrates": "task.target_substrates",
+        "acceptance_commands": "task.acceptance_commands",
+        "intent_diff.planned_files": "task.boundary.paths",
+        "intent_diff.planned_steps": "task.deliverables",
+        "executor": "kind human with role equal to discipline and instructions_ref equal to the prompt path"
+      }
+    },
+    "when": "optional; a campaign may run entirely as human-driven pull requests without materialization",
+    "self_dogfood": "when constraints.self_dogfood is true, materialization is limited to what law/policy/self-dogfood.json permits and never dispatches an executor"
+  },
+  "fail_closed": [
+    "unknown-status",
+    "undeclared-transition",
+    "duplicate-id",
+    "unresolved-dependency",
+    "dependency-cycle",
+    "record-not-accepted-at-open",
+    "position-order-violation",
+    "discipline-position-mismatch",
+    "boundary-outside-authority",
+    "prompt-missing",
+    "prompt-drift-without-review",
+    "cross-family-commit",
+    "squash-merge",
+    "owner-effect-not-performed",
+    "attestation-not-reissued"
+  ]
+}
