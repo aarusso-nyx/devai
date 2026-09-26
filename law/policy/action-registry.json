@@ -1111,7 +1111,7 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "read",
       "authority": "mesh_controller",
-      "description": "Build the exact segmented bootstrap plan without authorizing a mutation.",
+      "description": "Build the exact segmented bootstrap plan without authorizing a mutation. With --interactive, author the plan through schema-driven prompts; the flow replays as init bind and init apply and prints the exact non-interactive argv it executed.",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
