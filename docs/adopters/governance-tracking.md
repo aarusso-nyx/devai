@@ -35,6 +35,7 @@ Events are recorded at these boundaries:
 | Routine executor verification receipt              | `verification_result` (with exact commit and tree) |
 | Round closed                                       | `round_verdict`                                    |
 | Tracking disabled                                  | `tracking_disabled`                                |
+| Backlog item projected (`backlog add --round`)     | `backlog_item_projected`                           |
 | Sensor failure triaged (`triage classify --round`) | `finding_classified`                               |
 | Auditor observation (`audit observe --round`)      | `finding_emitted`                                  |
 | Authority granted an outward-reaching action       | `authorization_recorded`                           |
@@ -199,6 +200,37 @@ The generated workflow runs only on trusted `main` pushes and explicit dispatch,
 action to an immutable commit SHA, uses a per-round concurrency group, and is **not** a required
 readiness context. Its reconciliation step runs under derived authority as described above, so a
 workflow edit cannot grant itself publication rights the Owner never recorded.
+
+## Backlog projection
+
+The repository backlog (`backlog add`, `backlog list`, `backlog show`, `backlog resolve`;
+ADR-GOV-0019) is a **local store**. Items live under `.devai/state/backlog/` as records validated
+against `backlog-item.schema.json`, every backlog action works with network access denied, and
+none of them is a remote write. A backlog item is not a round gap: it cannot pause, resolve, or
+otherwise alter one, and it carries no round semantics of its own.
+
+Projection of a backlog item into a governed round's issue is an extension of the same adapter,
+under the same three decisions:
+
+| Requirement        | Source                                                                      |
+| ------------------ | --------------------------------------------------------------------------- |
+| Repository binding | The existing Architect `init bind` — no separate backlog binding            |
+| Round activation   | The existing Owner `round tracking enable --publish` for that exact round   |
+| Disclosure         | The existing `public-safe-v1` profile — title and body digests, never text  |
+| Event kind         | `backlog_item_projected`, appended to the round's canonical event log       |
+| Batch bound        | `defaults.backlog_projection.max_items_per_batch` (64) items per projection |
+
+Round attribution is **opt-in per item** through `backlog add --round R-0042`, exactly as
+`triage classify --round` and `audit observe --round` work. Without it the item is recorded and
+surfaced locally by `doctor` and `round plan`, and nothing is ever projected — a round is never
+inferred from the session, the branch, or the active round. `backlog resolve` reads the round
+from the item it resolves and never assigns one.
+
+The `backlog_projection` block in `law/policy/github-issues-tracking.json` declares
+`enabled_by: "round-activation"`: there is no backlog-specific activation, profile, or authority,
+and an item attributed to a round whose activation is `frozen` or `disabled` stays local. As with
+every other projected event, GitHub being unreachable is a failure to observe a remote and never
+changes the item, its status, or any readiness verdict.
 
 ## Doctor behavior
 
