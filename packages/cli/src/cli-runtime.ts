@@ -28,6 +28,7 @@ import {
 
 const DOMAIN_ORDER = [
   'audit',
+  'backlog',
   'catalog',
   'check',
   'doctor',
@@ -69,6 +70,11 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         import('./commands/audit/scorecard.js'),
       ]);
       return [auditObserve, auditScorecard];
+    }
+    case 'backlog': {
+      const { backlogAdd, backlogList, backlogResolve, backlogShow } =
+        await import('./commands/backlog/index.js');
+      return [backlogAdd, backlogList, backlogResolve, backlogShow];
     }
     case 'catalog': {
       const { actionsList } = await import('./commands/actions-list.js');

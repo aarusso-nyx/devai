@@ -10,6 +10,7 @@ import {
   diffBlueprintAgainstInventory,
   emitRgr,
   governedRoundStatus,
+  listBacklogItems,
   listRgrs,
   loadBlueprint,
   planScaffoldFromBlueprint,
@@ -343,6 +344,25 @@ export const roundGapResolve = defineCommand({
   },
 });
 
+/**
+ * ADR-GOV-0019: a planner sees open repository backlog items before scoping
+ * tasks. Items are listed for every round alike; attribution is never inferred.
+ */
+function openBacklogItems(repoRoot: string): ReadonlyArray<Record<string, string>> {
+  try {
+    return listBacklogItems({ repoRoot }).map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      status: item.status,
+      ...(item.round_id === undefined ? {} : { round_id: item.round_id }),
+    }));
+  } catch {
+    // The backlog is advisory for planning; an unreadable item is reported by doctor.
+    return [];
+  }
+}
+
 export const roundPlan = defineCommand({
   name: 'round plan',
   description: 'Create or render Architect-owned round planning material from canonical inputs.',
@@ -433,7 +453,13 @@ export const roundPlan = defineCommand({
                 : options.scaffold === true
                   ? scaffoldGovernedRound({ repoRoot: root(options), round })
                   : governedRoundStatus({ repoRoot: root(options), round });
-            emit(result, options.human === true, `round plan: ${round}`);
+            const backlog = openBacklogItems(root(options));
+            emit(
+              backlog.length === 0 ? result : { ...result, open_backlog_items: backlog },
+              options.human === true,
+              `round plan: ${round}` +
+                (backlog.length === 0 ? '' : `; ${String(backlog.length)} open backlog item(s)`),
+            );
           } catch (error) {
             failure('plan', error);
           }
