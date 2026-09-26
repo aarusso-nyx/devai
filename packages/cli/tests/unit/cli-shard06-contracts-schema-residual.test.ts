@@ -398,6 +398,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'stack-adapter.schema.json',
   'task-freshness.schema.json',
   'test-task-descriptor.schema.json',
+  'toolchain-manifest.schema.json',
 ] as const;
 
 function schemaCanonRoot(): string {
@@ -421,7 +422,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     const root = schemaCanonRoot();
     put(root, 'law/schemas/README.txt', 'not a schema');
     fsBoundary.readdirSync.mockReturnValue([
-      'test-task-descriptor.schema.json',
+      'toolchain-manifest.schema.json',
       'README.txt',
       'beta.schema.json',
       'alpha.schema.json',
@@ -430,7 +431,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
 
     expect(checkSchemaCanon(root)).toEqual({
       ok: true,
-      canonical_total: 11,
+      canonical_total: 12,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -505,7 +506,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     put(source, 'packages/schemas/src/roster.ts', 'source roster');
     expect(checkSchemasForRepository(source)).toEqual({
       ok: true,
-      canonical_total: 11,
+      canonical_total: 12,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
