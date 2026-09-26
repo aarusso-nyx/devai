@@ -780,6 +780,87 @@
       }
     },
     {
+      "nodeId": "plan:validate",
+      "dependencies": [],
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "journeys",
+        "--format",
+        "json"
+      ],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "plan"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "law:validate",
+      "dependencies": [],
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "adrs",
+        "--format",
+        "json"
+      ],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "law"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "docs:validate",
+      "dependencies": [],
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "cli-reference",
+        "--format",
+        "json"
+      ],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "docs"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
       "nodeId": "test:local-full",
       "dependencies": [
         "test:authority",
@@ -1099,7 +1180,10 @@
         "typecheck",
         "release:static-integrity",
         "release:closure",
-        "test:package-staging"
+        "test:package-staging",
+        "plan:validate",
+        "law:validate",
+        "docs:validate"
       ]
     },
     {
