@@ -88,6 +88,16 @@ describe('release lifecycle state and refusal contracts', () => {
         support_promotion: true,
       },
     ],
+    [
+      'channel-mismatch',
+      {
+        current_version: '1.5.7',
+        target_version: '1.6.0-alpha.1',
+        support: 'preview',
+        support_promotion: false,
+        channel: 'beta',
+      },
+    ],
   ] as const;
 
   function blockedPlanReceipt(reason: string, intentPatch: Record<string, unknown>): Json {
