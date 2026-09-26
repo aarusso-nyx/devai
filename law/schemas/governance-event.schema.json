@@ -80,7 +80,8 @@
         "failure_observed",
         "evidence_superseded",
         "round_verdict",
-        "tracking_disabled"
+        "tracking_disabled",
+        "backlog_item_projected"
       ]
     },
     "recorded_at": {
