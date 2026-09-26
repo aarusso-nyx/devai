@@ -9,8 +9,10 @@ produces, substitutes for, or supplements a candidate receipt in the protected
 ledger. A transient preflight receipt coordinates the current run; it is not uploaded.
 An unsigned local cache record from an untrusted run is not signing authority.
 
-One required `devai-release-gate` runs on pull requests. It validates verifier-package
-materialization and executes the unconditional cheap floor plus affected selection on
+One required `devai-release-gate` runs on pull requests. Its lane is three steps:
+install, preflight check, affected check. The preflight check executes the
+`preflight-v1` node of `test-tasks.json` against the pull-request base, and the
+affected check executes the unconditional cheap floor plus affected selection on
 Linux. It proves only execution outcomes and consistency on that runner. It does not
 prove the local RC closure executed, and a signed local claim does not prove Linux
 execution. These observations answer different questions.
@@ -31,11 +33,14 @@ Verifier materialization validates bytes; it never invokes signing or receipt ve
 Cancellation uses workflow identity and PR number, so a new head cancels the previous
 head's work. Main and release runs are never cancelled by this mechanism.
 
-Installation, verifier validation and runner bootstrap report their outcomes. The
-final required step rejects failed, cancelled, skipped or missing prerequisites.
-The task DAG aggregates independent failures and explicitly blocks dependents.
-It owns formatting, lint, type integrity, schema/generated checks, static integrity,
-package closure and selected tests. Both ordinary and version-changing PRs require
+The step-level aggregator that once read every workflow step outcome moves into the
+runner report: the task DAG aggregates independent failures, marks the dependents of a
+`BLOCKED` preflight probe blocked-environment, and the lane's verdict is the report's
+verdict (ADR-CHK-0001). Verifier-package materialization and toolchain identity are
+preflight probes of that same descriptor, so the local run and the lane run plan the
+same node set for the same base and candidate. The DAG owns formatting, lint, type
+integrity, schema/generated checks, static integrity, package closure and selected
+tests. Both ordinary and version-changing PRs require
 the floor. Compile-only bootstrap makes the typed runner executable; it does not
 assemble a release package or claim a candidate build result.
 
