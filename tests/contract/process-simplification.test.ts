@@ -456,6 +456,38 @@ describe('publication recovery observations', () => {
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout.trim()).toBe(expected);
   });
+  it('reads a release collection larger than the default spawn buffer', () => {
+    const directory = temporary();
+    const padding = 'x'.repeat(4096);
+    const releases = Array.from({ length: 400 }, (_, index) => ({
+      tag_name: `v0.0.${index}`,
+      draft: false,
+      body: padding,
+    }));
+    releases.push({ tag_name: 'v1.4.5', draft: false, body: padding });
+    const payload = JSON.stringify([releases]);
+    expect(payload.length).toBeGreaterThan(1024 * 1024);
+    writeFileSync(join(directory, 'payload.json'), payload);
+    writeFileSync(
+      join(directory, 'gh'),
+      '#!/usr/bin/env node\nprocess.stdout.write(require("node:fs").readFileSync(process.env.STATE_FIXTURE));\n',
+    );
+    chmodSync(join(directory, 'gh'), 0o755);
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'scripts/process/publication-state.mjs'), 'release', 'v1.4.5'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          STATE_FIXTURE: join(directory, 'payload.json'),
+          PATH: `${directory}:${process.env.PATH}`,
+        },
+      },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe('present');
+  });
   it('never converts an authentication or network error into absence', () => {
     const directory = temporary();
     for (const name of ['gh', 'npm']) {
