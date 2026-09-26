@@ -50,7 +50,7 @@
       "id": "R-0101",
       "title": "Toolchain manifest",
       "goal": "One adopter-owned manifest declares every toolchain pin; workflows, provisioning, and the runner consume it.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-CHK-0002"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -80,7 +80,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -116,8 +116,8 @@
                 "path": "prompts/TASK-0111.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/95",
+              "merged_as": "3e0a60f39312a10c037a240c9614414ce27f0651",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -130,7 +130,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0111",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -153,8 +153,8 @@
                 "path": "prompts/TASK-0112.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/95",
+              "merged_as": "f47fffcbbda9ba5c4b73a1d681cf9a534e9e5249",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -167,7 +167,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0112",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -199,8 +199,8 @@
                 "path": "prompts/TASK-0113.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/95",
+              "merged_as": "87412e17aebdbc3bddafb79133b00c4fecfaf15c",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -209,13 +209,19 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "d8419b541e48f5c785a5659a72dee0acde18d4c2",
+        "closed_at": "2026-09-26T08:58:12Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0102",
       "title": "Change class taxonomy",
       "goal": "Every tracked path has exactly one change class; the task DAG and the pull-request gate select by class.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-GOV-0017"],
       "depends_on": ["R-0101"],
       "attestation_reissue": true,
@@ -246,7 +252,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -301,7 +307,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0121",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -338,7 +344,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0122",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
