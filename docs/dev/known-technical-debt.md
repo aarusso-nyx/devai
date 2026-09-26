@@ -42,3 +42,16 @@ CI scaffold emits from `packages/cli/src/services/ci-scaffold`. The preflight
 workflow echoes verifier version 1.5.1 for the in-repo vendored verifier
 while the trusted provider is 1.5.4; the checker deliberately does not compare
 that literal.
+
+## Class selectors in DEVAI's own descriptor
+
+The check runner evaluates `class` input selectors, but the vendored evidence
+verifier under `packages/cli/vendor/evidence-verification` accepts only
+exact, prefix, and glob selectors and rebuilds the RC policy from
+`test-tasks.json` as written. DEVAI's own `plan:validate`, `law:validate`,
+and `docs:validate` nodes therefore carry the prefix and exact selectors
+equivalent to the plan, law, and docs bindings until the vendored verifier
+learns the `class` kind. Adopters whose verifier is that same package have
+the same limit. `scripts/classify-paths.mjs` prints `DEVAI_CHANGE_TAXONOMY_*`
+codes while the runtime service uses `CHANGE_TAXONOMY_*`; the script is a
+transitional tool.
