@@ -12,6 +12,7 @@ const files = [
   'thresholds.json',
   'subprocess-effects.json',
   'release-verification.json',
+  'change-taxonomy.json',
 ];
 
 for (const file of files) {
