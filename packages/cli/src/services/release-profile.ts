@@ -1,6 +1,8 @@
 export type VersionTransition = 'patch' | 'minor' | 'major' | 'prerelease' | 'support-promotion';
 export type SupportIntention = 'preview' | 'current' | 'lts';
 export type ChangeKind = 'documentation' | 'metadata' | 'behavioral';
+export type PrereleaseRung = 'alpha' | 'beta' | 'rc';
+export type ReleaseChannel = PrereleaseRung | 'stable';
 export type MutationRequirement = 'none' | 'affected' | 'targeted' | 'full-roster';
 export type ReleaseCapability =
   | 'formatting-hygiene'
@@ -68,6 +70,7 @@ export interface ReleaseVerificationInput {
   readonly ownerEscalations?: readonly ReleaseCapability[];
   readonly riskCapabilities?: Readonly<Record<string, readonly ReleaseCapability[]>>;
   readonly mutationRosterSize?: number;
+  readonly channel?: ReleaseChannel;
 }
 
 export interface ReleaseVerificationDecision {
@@ -200,6 +203,72 @@ const LTS_CAPABILITIES: readonly ReleaseCapability[] = [
   'operational-matrix',
 ];
 
+/**
+ * Prerelease channel ladder mirrored from
+ * law/policy/release-lifecycle.json#/plan_determination/prerelease_ladder
+ * (ADR-REL-0028). The identifier pattern, rung order, stable_from rung, and
+ * per-rung required capabilities must stay equal to that policy.
+ */
+const PRERELEASE_IDENTIFIER = /^(alpha|beta|rc)\.(0|[1-9][0-9]*)$/u;
+const RUNG_ORDER: readonly PrereleaseRung[] = ['alpha', 'beta', 'rc'];
+const STABLE_FROM: PrereleaseRung = 'rc';
+const RUNG_CAPABILITIES: Record<PrereleaseRung, readonly ReleaseCapability[]> = {
+  alpha: [...UNCONDITIONAL_FLOOR, 'affected-checks', 'dependent-checks'],
+  beta: [...UNCONDITIONAL_FLOOR, 'affected-checks', 'dependent-checks', 'unit', 'integration'],
+  rc: [
+    ...UNCONDITIONAL_FLOOR,
+    'affected-checks',
+    'dependent-checks',
+    'unit',
+    'integration',
+    'e2e',
+    'consumer',
+    'api-compatibility',
+    'migration',
+    'rollback',
+    'adopter-materialization',
+    'security',
+    'database',
+    'tenancy',
+    'provenance',
+    'reproducibility',
+  ],
+};
+
+interface RungPosition {
+  readonly rung: PrereleaseRung;
+  readonly suffix: number;
+}
+
+/**
+ * Resolve the ladder rung of a parsed version: `null` for a stable version,
+ * `undefined` for a prerelease identifier outside the ladder.
+ */
+function resolveRung(version: ParsedVersion): RungPosition | null | undefined {
+  if (version.prerelease.length === 0) return null;
+  const match = PRERELEASE_IDENTIFIER.exec(version.prerelease.join('.'));
+  if (match === null) return undefined;
+  return { rung: match[1] as PrereleaseRung, suffix: Number(match[2]) };
+}
+
+function sameCore(left: ParsedVersion, right: ParsedVersion): boolean {
+  return left.major === right.major && left.minor === right.minor && left.patch === right.patch;
+}
+
+/**
+ * Promotion within one version core: a same-rung suffix increment, the next
+ * rung only, or stable from the stable_from rung. Anything else is a downgrade.
+ */
+function ladderPromotionAllowed(
+  current: RungPosition | null,
+  target: RungPosition | null,
+): boolean {
+  if (current === null) return target === null;
+  if (target === null) return current.rung === STABLE_FROM;
+  if (current.rung === target.rung) return target.suffix > current.suffix;
+  return RUNG_ORDER.indexOf(target.rung) === RUNG_ORDER.indexOf(current.rung) + 1;
+}
+
 function parseVersion(value: string): ParsedVersion | undefined {
   const match = SEMVER.exec(value);
   if (match === null) return undefined;
@@ -299,11 +368,21 @@ export function resolveReleaseVerification(
   const current = parseVersion(input.currentVersion);
   const target = parseVersion(input.targetVersion);
   if (current === undefined || target === undefined) return blocked(input, 'invalid-semver');
-  if (compareVersions(current, target) > 0) return blocked(input, 'downgrade');
+  const currentRung = resolveRung(current);
+  const targetRung = resolveRung(target);
+  if (currentRung === undefined || targetRung === undefined)
+    return blocked(input, 'invalid-semver');
+  const order = compareVersions(current, target);
+  if (order > 0) return blocked(input, 'downgrade');
+  if (order < 0 && sameCore(current, target) && !ladderPromotionAllowed(currentRung, targetRung))
+    return blocked(input, 'downgrade');
   const transition = classifyTransition(current, target, input.supportPromotion === true);
   if (transition === undefined) return blocked(input, 'same-version-without-support-promotion');
   if (transition === 'support-promotion' && input.support !== 'lts')
     return blocked(input, 'support-promotion-requires-lts');
+  const channel: ReleaseChannel = targetRung === null ? 'stable' : targetRung.rung;
+  if (input.channel !== undefined && input.channel !== channel)
+    return blocked(input, 'channel-mismatch');
   const declaredRiskClasses = new Set(Object.keys(input.riskCapabilities ?? {}));
   const unknownRisks = (input.risks ?? []).filter(
     (risk) => !KNOWN_RISKS.has(risk as KnownRiskClass) && !declaredRiskClasses.has(risk),
@@ -315,6 +394,8 @@ export function resolveReleaseVerification(
     ...UNCONDITIONAL_FLOOR,
     ...TRANSITION_CAPABILITIES[transition],
   ]);
+  const rung = targetRung?.rung ?? (currentRung === null ? undefined : STABLE_FROM);
+  if (rung !== undefined) RUNG_CAPABILITIES[rung].forEach((value) => capabilities.add(value));
   if (input.support === 'lts') {
     LTS_CAPABILITIES.forEach((value) => capabilities.add(value));
   }
