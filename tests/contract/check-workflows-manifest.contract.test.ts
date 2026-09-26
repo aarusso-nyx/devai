@@ -18,10 +18,18 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
-import { checkWorkflowTree } from '../../scripts/check-workflows.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
+interface WorkflowFinding {
+  readonly code: string;
+  readonly file: string;
+  readonly detail: string;
+}
+const { checkWorkflowTree } = (await import(
+  pathToFileURL(join(ROOT, 'scripts/check-workflows.mjs')).href
+)) as { checkWorkflowTree: (root: string) => { ok: boolean; findings: WorkflowFinding[] } };
 const WORKFLOWS_DIR = resolve(ROOT, '.github/workflows');
 const MANIFEST_PATH = resolve(ROOT, '.devai/config/toolchain.json');
 
@@ -61,7 +69,9 @@ function mutate(root: string, file: string, from: string, to: string): void {
 it('names the file, the manifest action key, the observed digest, and the required digest when a pinned action digest diverges from the manifest', () => {
   const root = fixture();
   const file = 'pull-request-checks.yml';
-  const requiredDigest = manifest.actions['actions/checkout'].digest;
+  const checkout = manifest.actions['actions/checkout'];
+  if (checkout === undefined) throw new Error('manifest lacks actions/checkout');
+  const requiredDigest = checkout.digest;
   const observedDigest = 'f'.repeat(40);
   mutate(root, file, `actions/checkout@${requiredDigest}`, `actions/checkout@${observedDigest}`);
 
@@ -80,7 +90,7 @@ it('names the file, the manifest action key, the observed digest, and the requir
 it('names the file, the node key, the observed major, and the required major when a workflow node-version diverges from the manifest', () => {
   const root = fixture();
   const file = 'devai-ledger-verify.yml';
-  const requiredMajor = manifest.runtimes.node.split('.')[0];
+  const requiredMajor = manifest.runtimes.node.split('.')[0] ?? '';
   const observedMajor = '99';
   mutate(root, file, `node-version: ${requiredMajor}`, `node-version: ${observedMajor}`);
 

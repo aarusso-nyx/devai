@@ -9,7 +9,10 @@ import { resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import {
+import { pathToFileURL } from 'node:url';
+
+const ROOT = resolve(import.meta.dirname, '../..');
+const {
   CHECKOUT_COMMIT,
   CONFIGURE_PAGES_COMMIT,
   DEPLOY_PAGES_COMMIT,
@@ -21,9 +24,19 @@ import {
   UPLOAD_ARTIFACT_COMMIT,
   UPLOAD_PAGES_COMMIT,
   VERIFIER_PACKAGE,
-} from '../../scripts/check-workflows.mjs';
-
-const ROOT = resolve(import.meta.dirname, '../..');
+} = (await import(pathToFileURL(resolve(ROOT, 'scripts/check-workflows.mjs')).href)) as {
+  readonly CHECKOUT_COMMIT: string;
+  readonly CONFIGURE_PAGES_COMMIT: string;
+  readonly DEPLOY_PAGES_COMMIT: string;
+  readonly DOWNLOAD_ARTIFACT_COMMIT: string;
+  readonly LEDGER_ENVIRONMENT: string;
+  readonly PNPM_SETUP_PEELED_COMMIT: string;
+  readonly PNPM_SETUP_TAG_OBJECT: string;
+  readonly SETUP_NODE_COMMIT: string;
+  readonly UPLOAD_ARTIFACT_COMMIT: string;
+  readonly UPLOAD_PAGES_COMMIT: string;
+  readonly VERIFIER_PACKAGE: string;
+};
 const SCHEMA_PATH = resolve(ROOT, 'law/schemas/toolchain-manifest.schema.json');
 const MANIFEST_PATH = resolve(ROOT, '.devai/config/toolchain.json');
 const WORKFLOWS_DIR = resolve(ROOT, '.github/workflows');
@@ -106,7 +119,7 @@ it('matches every node-version pinned in .github/workflows/*.yml to the manifest
   for (const file of files) {
     const source = readFileSync(resolve(WORKFLOWS_DIR, file), 'utf8');
     for (const match of source.matchAll(/node-version:\s*['"]?([0-9]+)/gu)) {
-      observed.push({ file, major: match[1] });
+      observed.push({ file, major: match[1] ?? '' });
     }
   }
   expect(observed.length).toBeGreaterThan(0);

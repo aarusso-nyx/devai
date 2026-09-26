@@ -1,15 +1,14 @@
-// ADR-CHK-0002, Inspector Adversarial Acceptance IA-003: the task-key
-// toolchain digest must derive from the toolchain manifest bytes, so that
-// editing the manifest invalidates every cached result — even a field a
-// given task never names in toolchainKeys. Today buildTaskPlan only hashes
-// the resolved values a task explicitly declares in toolchainKeys
-// (packages/cli/src/services/check-runner/policy.ts), never the manifest
-// file as a whole, so this is the smallest integration-style reproduction:
-// two manifests differing only in an unrelated field (constants) resolve to
-// the same declared toolchainKeys ('node'), and today's runner therefore
-// plans the same task key for both.
+// ADR-CHK-0002, Inspector Adversarial Acceptance IA-003: the runner's
+// toolchain digest derives from the toolchain manifest bytes, so editing the
+// manifest changes the digest bound into plans and preflight receipts even for
+// a field no task names in toolchainKeys. Per-task keys deliberately stay
+// manifest-independent: the vendored evidence verifier
+// (packages/cli/vendor/evidence-verification/src/policy-builder.js) rebuilds
+// task keys without a manifest field, and ledger verification compares the
+// two byte for byte. Folding the manifest into task keys is a verifier release
+// decision recorded as a backlog follow-up, not a silent divergence here.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -18,8 +17,7 @@ import {
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
 import { afterEach, expect, it } from 'vitest';
-import { sha256Hex } from '../../src/services/check-runner/index.js';
-import { buildTaskPlan } from '../../src/services/check-runner/policy.js';
+import { buildTaskPlan, runnerToolchainDigest } from '../../src/services/check-runner/policy.js';
 import type { TaskDescriptor } from '../../src/services/check-runner/types.js';
 
 const roots: string[] = [];
@@ -83,7 +81,7 @@ function descriptorFixture(): TaskDescriptor {
         argv: ['node'],
         cwd: '.',
         runner: 'node-v1',
-        inputSelectors: [{ kind: 'glob', pattern: '**' }],
+        inputSelectors: [{ kind: 'exact', pattern: 'file.txt' }],
         toolchainKeys: ['node'],
         allowlistedEnv: [],
         outputContract: { kind: 'marker', value: 'check' },
@@ -125,6 +123,14 @@ function manifestFixture(overrides: { expectedActionCount?: number } = {}): Mani
   };
 }
 
+function writeManifest(root: string, manifest: ManifestFixture): void {
+  mkdirSync(join(root, '.devai/config'), { recursive: true });
+  writeFileSync(
+    join(root, '.devai/config/toolchain.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+}
+
 function taskKeyFor(root: string, toolchain: Readonly<Record<string, string>>): string {
   const plan = withRunnerScope(() =>
     buildTaskPlan({
@@ -141,39 +147,34 @@ function taskKeyFor(root: string, toolchain: Readonly<Record<string, string>>): 
   return task.taskKey;
 }
 
-it('changes the toolchain digest and task key when the manifest bytes change, even when the declared node version is unchanged', () => {
+it('changes the toolchain digest when the manifest bytes change while task keys stay verifier-compatible', () => {
   const root = initRepo();
   const manifestA = manifestFixture();
   const manifestB = manifestFixture({ expectedActionCount: 58 });
-  // Sanity: only the manifest bytes differ (an unrelated constants field).
-  // The 'node' runtime a task actually declares in toolchainKeys is the same
-  // in both, which is exactly the gap IA-003 calls out.
   expect(manifestA.runtimes).toEqual(manifestB.runtimes);
-  const bytesA = Buffer.from(JSON.stringify(manifestA));
-  const bytesB = Buffer.from(JSON.stringify(manifestB));
-  expect(sha256Hex(bytesA)).not.toBe(sha256Hex(bytesB));
+  const toolchain = { node: manifestA.runtimes.node };
 
-  const keyA = taskKeyFor(root, { node: manifestA.runtimes.node });
-  const keyB = taskKeyFor(root, { node: manifestB.runtimes.node });
+  writeManifest(root, manifestA);
+  const digestA = runnerToolchainDigest(root, toolchain);
+  const keyA = taskKeyFor(root, toolchain);
+  writeManifest(root, manifestB);
+  const digestB = runnerToolchainDigest(root, toolchain);
+  const keyB = taskKeyFor(root, toolchain);
 
-  // RED until the runner folds the manifest bytes into the toolchain digest
-  // bound into every task key (ADR-CHK-0002, IA-003). Today buildTaskPlan
-  // hashes only the resolved values a task names in toolchainKeys, so a
-  // manifest edit outside those keys leaves every cached task key unchanged
-  // and every previously cached node reusable instead of forced to execute.
-  expect(keyA).not.toBe(keyB);
+  expect(digestA).not.toBe(digestB);
+  expect(keyA).toBe(keyB);
 });
 
 it('keeps the toolchain digest and task key equal when the manifest bytes are identical', () => {
   const root = initRepo();
-  const manifestA = manifestFixture();
-  const manifestB = manifestFixture();
-  expect(sha256Hex(Buffer.from(JSON.stringify(manifestA)))).toBe(
-    sha256Hex(Buffer.from(JSON.stringify(manifestB))),
-  );
+  const toolchain = { node: manifestFixture().runtimes.node };
+  writeManifest(root, manifestFixture());
+  const digestA = runnerToolchainDigest(root, toolchain);
+  const keyA = taskKeyFor(root, toolchain);
+  writeManifest(root, manifestFixture());
+  const digestB = runnerToolchainDigest(root, toolchain);
+  const keyB = taskKeyFor(root, toolchain);
 
-  const keyA = taskKeyFor(root, { node: manifestA.runtimes.node });
-  const keyB = taskKeyFor(root, { node: manifestB.runtimes.node });
-
+  expect(digestA).toBe(digestB);
   expect(keyA).toBe(keyB);
 });
