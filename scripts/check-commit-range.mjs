@@ -204,6 +204,15 @@ export function bumpFloorOverRange(root, grammar, base, head) {
   return floor;
 }
 
+function commitPresent(root, sha) {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function checkRange(root, base, head) {
   const grammar = loadGrammar(root);
   if (grammar === null) {
@@ -212,7 +221,17 @@ function checkRange(root, base, head) {
   }
   const taxonomy = loadTaxonomy(root);
   const exclusions = [`^${base}`];
-  if (grammar.historical_cutoff !== null) exclusions.push(`^${grammar.historical_cutoff}`);
+  if (grammar.historical_cutoff !== null) {
+    if (commitPresent(root, grammar.historical_cutoff)) {
+      exclusions.push(`^${grammar.historical_cutoff}`);
+    } else {
+      // A repository without the cutoff commit (a fixture, a shallow clone) has no
+      // history before it to exempt: the whole range is checked.
+      process.stderr.write(
+        `commit range: historical_cutoff ${grammar.historical_cutoff} is not in this repository; checking the whole range\n`,
+      );
+    }
+  }
   const shas = gitIn(root, ['rev-list', '--first-parent', '--reverse', head, ...exclusions])
     .split('\n')
     .filter(Boolean);
