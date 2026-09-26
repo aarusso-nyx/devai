@@ -48,6 +48,7 @@ const manifest = {
     registry: 'https://npm.pkg.github.com',
     release_type: channel.release_type,
     prerelease: channel.prerelease,
+    channel: channel.channel,
     dist_tag: channel.dist_tag,
     pages: 'https://aarusso-nyx.github.io/devai/',
   },
