@@ -142,7 +142,15 @@ describe('CLI shard 09 init core planning', () => {
         initPlan,
         'init-plan',
         'Generate the non-authorizing bootstrap plan',
-        [...common, ['--introspect', 'Include repository introspection']],
+        [
+          ...common,
+          ['--introspect', 'Include repository introspection'],
+          [
+            '--interactive',
+            'Author the plan through schema-driven prompts; writes replay as init bind and init apply',
+          ],
+          ['--mode <mode>', 'Interactive mode: bind | edit (default: bind)'],
+        ],
       ],
       [
         initApplyOwner,
