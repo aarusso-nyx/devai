@@ -2131,7 +2131,8 @@
             "invalid-semver",
             "downgrade",
             "same-version-without-support-promotion",
-            "support-promotion-requires-lts"
+            "support-promotion-requires-lts",
+            "channel-mismatch"
           ]
         },
         "blocked_receipt": {
@@ -2149,7 +2150,8 @@
             "invalid-semver",
             "downgrade",
             "same-version-without-support-promotion",
-            "support-promotion-requires-lts"
+            "support-promotion-requires-lts",
+            "channel-mismatch"
           ],
           "semver_outcomes": [
             {
@@ -2171,6 +2173,11 @@
               "condition": "support-promotion-requires-lts",
               "blocking_reasons": ["support-promotion-requires-lts"],
               "mutation_disposition_reason": "support-promotion-requires-lts"
+            },
+            {
+              "condition": "channel-mismatch",
+              "blocking_reasons": ["channel-mismatch"],
+              "mutation_disposition_reason": "channel-mismatch"
             }
           ]
         },
@@ -3699,7 +3706,8 @@
             "invalid-semver",
             "downgrade",
             "same-version-without-support-promotion",
-            "support-promotion-requires-lts"
+            "support-promotion-requires-lts",
+            "channel-mismatch"
           ]
         },
         "blocked_receipt": {
@@ -3717,7 +3725,8 @@
             "invalid-semver",
             "downgrade",
             "same-version-without-support-promotion",
-            "support-promotion-requires-lts"
+            "support-promotion-requires-lts",
+            "channel-mismatch"
           ],
           "semver_outcomes": [
             {
@@ -3739,6 +3748,11 @@
               "condition": "support-promotion-requires-lts",
               "blocking_reasons": ["support-promotion-requires-lts"],
               "mutation_disposition_reason": "support-promotion-requires-lts"
+            },
+            {
+              "condition": "channel-mismatch",
+              "blocking_reasons": ["channel-mismatch"],
+              "mutation_disposition_reason": "channel-mismatch"
             }
           ]
         },

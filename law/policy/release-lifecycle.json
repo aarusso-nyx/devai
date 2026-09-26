@@ -4,7 +4,7 @@
   "id": "release-lifecycle",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.16.0",
+  "policy_version": "2.17.0",
   "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
   "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
   "receipt_schemas": {
@@ -59,7 +59,8 @@
         "invalid-semver",
         "downgrade",
         "same-version-without-support-promotion",
-        "support-promotion-requires-lts"
+        "support-promotion-requires-lts",
+        "channel-mismatch"
       ]
     },
     "blocked_receipt": {
@@ -77,7 +78,8 @@
         "invalid-semver",
         "downgrade",
         "same-version-without-support-promotion",
-        "support-promotion-requires-lts"
+        "support-promotion-requires-lts",
+        "channel-mismatch"
       ],
       "semver_outcomes": [
         {
@@ -99,6 +101,11 @@
           "condition": "support-promotion-requires-lts",
           "blocking_reasons": ["support-promotion-requires-lts"],
           "mutation_disposition_reason": "support-promotion-requires-lts"
+        },
+        {
+          "condition": "channel-mismatch",
+          "blocking_reasons": ["channel-mismatch"],
+          "mutation_disposition_reason": "channel-mismatch"
         }
       ]
     },
@@ -423,7 +430,10 @@
         "effective_authorities"
       ],
       "actions": [
-        { "action_id": "release plan", "fields": ["candidate_locator", "repository_locator"] },
+        {
+          "action_id": "release plan",
+          "fields": ["candidate_locator", "repository_locator"]
+        },
         {
           "action_id": "release preflight",
           "fields": ["candidate_locator", "repository_locator", "receipt_locators"]
@@ -706,24 +716,56 @@
       "readable_observation_schema_versions": ["1.0.0", "1.1.0"],
       "always_pure": true,
       "next_actions": [
-        { "from": "none", "next_action": "release plan", "outcome": "ready" },
-        { "from": "planned", "next_action": "release preflight", "outcome": "ready" },
-        { "from": "preflight_passed", "next_action": "release certify", "outcome": "ready" },
-        { "from": "certified", "next_action": "release prepare", "outcome": "ready" },
-        { "from": "prepared", "next_action": "release export", "outcome": "ready" },
-        { "from": "exported", "next_action": "release offline-verify", "outcome": "ready" },
+        {
+          "from": "none",
+          "next_action": "release plan",
+          "outcome": "ready"
+        },
+        {
+          "from": "planned",
+          "next_action": "release preflight",
+          "outcome": "ready"
+        },
+        {
+          "from": "preflight_passed",
+          "next_action": "release certify",
+          "outcome": "ready"
+        },
+        {
+          "from": "certified",
+          "next_action": "release prepare",
+          "outcome": "ready"
+        },
+        {
+          "from": "prepared",
+          "next_action": "release export",
+          "outcome": "ready"
+        },
+        {
+          "from": "exported",
+          "next_action": "release offline-verify",
+          "outcome": "ready"
+        },
         {
           "from": "offline_verified",
           "next_action": "release evidence-publish",
           "outcome": "ready"
         },
-        { "from": "evidence_published", "next_action": "release publish", "outcome": "ready" },
+        {
+          "from": "evidence_published",
+          "next_action": "release publish",
+          "outcome": "ready"
+        },
         {
           "from": "publication_dispatched",
           "next_action": "release resume",
           "outcome": "awaiting-external-receipt"
         },
-        { "from": "published", "next_action": null, "outcome": "complete" }
+        {
+          "from": "published",
+          "next_action": null,
+          "outcome": "complete"
+        }
       ],
       "blocked_outcomes": [
         "broken-chain",
