@@ -1,0 +1,1223 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "CMP-0001",
+  "title": "Workflow economy",
+  "type": "campaign",
+  "status": "proposed",
+  "date": "2026-09-26",
+  "authority": "Architect",
+  "mandate": {
+    "kind": "maintainer-decision",
+    "ref": "docs/dev/operations/workflow-economy-proposals.md"
+  },
+  "goal": "Implement the nine workflow economy decision records so that checks run per change class, commits carry their class and version intent, preflights separate environment failures from real observations, and configuration, credentials, and backlog have declared contracts.",
+  "records": [
+    "ADR-CHK-0002",
+    "ADR-GOV-0017",
+    "ADR-GOV-0018",
+    "ADR-REL-0027",
+    "ADR-CHK-0001",
+    "ADR-SEC-0001",
+    "ADR-REL-0028",
+    "ADR-GOV-0019",
+    "ADR-CFG-0001"
+  ],
+  "constraints": {
+    "self_dogfood": true,
+    "human_invoked_only": true,
+    "one_role_per_session": true,
+    "remote_effects": "forbidden"
+  },
+  "owner_effects": [
+    {
+      "id": "OE-01",
+      "description": "Disable squash merging on the main branch so single-family commits survive integration.",
+      "required_before": "R-0103",
+      "performed_at": null
+    },
+    {
+      "id": "OE-02",
+      "description": "Require the devai-release-gate check and strict up-to-date status in branch protection for main.",
+      "required_before": "R-0104",
+      "performed_at": null
+    }
+  ],
+  "prompts": {
+    "preamble": "prompts/preamble.md"
+  },
+  "rounds": [
+    {
+      "id": "R-0101",
+      "title": "Toolchain manifest",
+      "goal": "One adopter-owned manifest declares every toolchain pin; workflows, provisioning, and the runner consume it.",
+      "status": "planned",
+      "records": ["ADR-CHK-0002"],
+      "depends_on": [],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["schemas"],
+      "waves": [
+        {
+          "id": "CTG-0101",
+          "title": "Manifest schema, tests, consumers",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/toolchain-manifest.schema.json",
+            "law/policy/adopter-defaults/toolchain.json",
+            ".devai/config/toolchain.json",
+            "scripts/check-workflows.mjs",
+            "scripts/release-host/provision-toolchain.mjs",
+            "packages/cli/src/services/check-runner/",
+            ".github/workflows/"
+          ],
+          "gates": ["schemas", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0111",
+              "title": "Declare the toolchain manifest schema, DEVAI's manifest, and the adopter default",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/toolchain-manifest.schema.json",
+                  "law/policy/adopter-defaults/toolchain.json",
+                  ".devai/config/toolchain.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/adopters/test-tasks.md"
+                ],
+                "forbidden": [".github/workflows/", "scripts/check-workflows.mjs"]
+              },
+              "deliverables": [
+                "A schema declaring runtimes, pinned actions, the verifier reference, and named repository constants.",
+                "DEVAI's manifest holding every value currently hardcoded in workflows, the workflow checker, and the provisioning script.",
+                "An adopter default with the same shape.",
+                "The schema catalogued as a source-only schema.",
+                "A documentation section describing the manifest."
+              ],
+              "acceptance_commands": [
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(toolchain)", "docs(adopters)"],
+              "prompt": { "path": "prompts/TASK-0111.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0112",
+              "title": "Author the manifest consumer tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0111",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/toolchain-manifest.contract.test.ts",
+                  "tests/contract/check-workflows-manifest.contract.test.ts",
+                  "packages/cli/tests/unit/check-runner-toolchain-digest.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests proving a divergent workflow pin is reported by file, key, observed, and required value.",
+                "A red test proving the provisioning script refuses without a manifest.",
+                "A red test proving the runner toolchain digest derives from the manifest bytes."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["test(toolchain)"],
+              "prompt": { "path": "prompts/TASK-0112.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0113",
+              "title": "Consume the manifest in the checker, provisioning, runner, and workflows",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0112",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "scripts/check-workflows.mjs",
+                  "scripts/release-host/provision-toolchain.mjs",
+                  "packages/cli/src/services/check-runner/runner.ts",
+                  "packages/cli/src/services/check-runner/policy.ts",
+                  ".github/workflows/pull-request-checks.yml",
+                  ".github/workflows/release.yml",
+                  ".github/workflows/devai-ledger-verify.yml",
+                  "docs/reference/scripts.md"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/"]
+              },
+              "deliverables": [
+                "The workflow checker loads the manifest and reports every divergent pin.",
+                "The provisioning script reads the manifest and refuses without it.",
+                "The runner derives the toolchain digest from the manifest bytes.",
+                "Workflow literals that YAML cannot read from a file carry a comment naming the manifest key."
+              ],
+              "acceptance_commands": [
+                ["node", "scripts/check-workflows.mjs"],
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "typecheck"]
+              ],
+              "commit_types": ["feat(toolchain)", "ci(workflows)", "docs(reference)"],
+              "prompt": { "path": "prompts/TASK-0113.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0102",
+      "title": "Change class taxonomy",
+      "goal": "Every tracked path has exactly one change class; the task DAG and the pull-request gate select by class.",
+      "status": "planned",
+      "records": ["ADR-GOV-0017"],
+      "depends_on": ["R-0101"],
+      "attestation_reissue": true,
+      "owner_effects_required": [],
+      "close_checks": ["change-taxonomy", "test-task-selectors:check"],
+      "waves": [
+        {
+          "id": "CTG-0102",
+          "title": "Taxonomy policy, selection tests, class selector",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0017"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/change-taxonomy.json",
+            "law/schemas/change-taxonomy.schema.json",
+            "law/schemas/test-task-descriptor.schema.json",
+            ".devai/config/change-taxonomy-binding.json",
+            "packages/cli/src/services/check-runner/",
+            "packages/cli/src/commands/check/",
+            "scripts/run-pr-release-gate.mjs",
+            "test-tasks.json"
+          ],
+          "gates": ["schemas", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0121",
+              "title": "Declare the class vocabulary, bindings, and the class selector kind",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/change-taxonomy.json",
+                  "law/schemas/change-taxonomy.schema.json",
+                  "law/policy/adopter-defaults/change-taxonomy-binding.json",
+                  ".devai/config/change-taxonomy-binding.json",
+                  "law/schemas/test-task-descriptor.schema.json",
+                  "scripts/check-policy-materialization.mjs",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "law/policy/round-execution.json",
+                  "docs/roles/cross-role-coordination.md",
+                  "docs/adopters/ci-economy.md"
+                ],
+                "forbidden": ["test-tasks.json", "scripts/run-pr-release-gate.mjs"]
+              },
+              "deliverables": [
+                "The closed class vocabulary with families, check members, pairings, and constitution authority per class.",
+                "A binding for DEVAI that classifies every tracked path, and an adopter default.",
+                "The class selector kind in the descriptor schema.",
+                "The coupled_order discrepancy between round-execution.json and the cross-role documentation resolved.",
+                "The taxonomy added to the materialization list and documented."
+              ],
+              "acceptance_commands": [
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(taxonomy)", "docs(adopters)", "docs(roles)"],
+              "prompt": { "path": "prompts/TASK-0121.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0122",
+              "title": "Author selection, classification, and gate derivation tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0121",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/check-runner-class-selector.test.ts",
+                  "packages/cli/tests/unit/check-taxonomy-member.test.ts",
+                  "tests/contract/pr-release-intent-classes.contract.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests for class selection, fallback widening of unbound paths, and plan-only plans without code nodes.",
+                "Red tests for the change-taxonomy member: unclassified path, overlapping bindings, unknown class.",
+                "Red tests for release intent change kind and risks derived from classes."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"]
+              ],
+              "commit_types": ["test(taxonomy)"],
+              "prompt": { "path": "prompts/TASK-0122.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0123",
+              "title": "Implement the class selector, the taxonomy member, and class-derived release intent",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0122",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/services/change-taxonomy.ts",
+                  "packages/cli/src/services/check-runner/policy.ts",
+                  "packages/cli/src/commands/check/adapters.ts",
+                  "scripts/run-pr-release-gate.mjs",
+                  "test-tasks.json",
+                  "docs/reference/cli/check-suites.md"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/", "law/"]
+              },
+              "deliverables": [
+                "A change-taxonomy service that loads the policy and binding and classifies paths.",
+                "The class selector kind evaluated by the check-runner policy.",
+                "A change-taxonomy check member naming every unclassified path.",
+                "Release intent change kind and risks derived from the class set.",
+                "Descriptor nodes for plan, law, and docs classes so classified paths never reach the fallback.",
+                "The new task-policy digest reported for attestation re-issue."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test-task-selectors:check"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "change-taxonomy",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(taxonomy)", "ci(test-tasks)"],
+              "prompt": { "path": "prompts/TASK-0123.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0103",
+      "title": "Commit grammar and changeset retirement",
+      "goal": "Commit messages carry type and class, mixed-family commits are rejected, and version intent comes from commit types.",
+      "status": "planned",
+      "records": ["ADR-GOV-0018", "ADR-REL-0027"],
+      "depends_on": ["R-0102"],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-01"],
+      "close_checks": ["schemas"],
+      "waves": [
+        {
+          "id": "CTG-0103",
+          "title": "Grammar policy, hook tests, hooks and gate",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0018", "ADR-REL-0027"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/commit-grammar.json",
+            "law/schemas/commit-grammar.schema.json",
+            ".githooks/",
+            "scripts/check-change-hygiene.mjs",
+            "scripts/check-commit-range.mjs",
+            "scripts/run-pr-release-gate.mjs",
+            ".changeset/",
+            "scripts/check-changesets.mjs",
+            "packages/cli/src/commands/check/adapters.ts"
+          ],
+          "gates": ["schemas", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0131",
+              "title": "Declare the commit grammar and the bump floor",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/policy/commit-grammar.json",
+                  "law/schemas/commit-grammar.schema.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "AGENTS.md",
+                  "docs/dev/contributing.md"
+                ],
+                "forbidden": [".githooks/", "scripts/"]
+              },
+              "deliverables": [
+                "The closed type set with allowed classes and bump floor per type, families by reference to the taxonomy, exemptions, and the historical cutoff.",
+                "One sentence in the agent contract.",
+                "A contributing section with two split examples."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", ".devai/state/pr-bootstrap/cli/bin.js", "doctor", "--format", "json"]
+              ],
+              "commit_types": ["law(commit-grammar)", "docs(agents)", "docs(dev)"],
+              "prompt": { "path": "prompts/TASK-0131.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0132",
+              "title": "Author hook, range, floor, and removal tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0131",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/commit-grammar-hook.contract.test.ts",
+                  "tests/contract/commit-range-hygiene.contract.test.ts",
+                  "tests/contract/version-bump-floor.contract.test.ts",
+                  "packages/cli/tests/unit/check-adapters-changeset-removed.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests for commit-msg and pre-commit rejection with classes named.",
+                "Red tests for the range checker on a bypassed mixed commit, with merge and revert exemptions.",
+                "Red tests for the bump floor per type and breaking marker.",
+                "A red test that the changeset-version member is an unknown-member error."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["test(commit-grammar)"],
+              "prompt": { "path": "prompts/TASK-0132.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0133",
+              "title": "Implement hooks, the range checker, the bump floor, and remove changesets",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0132",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  ".githooks/commit-msg",
+                  ".githooks/pre-commit",
+                  "scripts/check-change-hygiene.mjs",
+                  "scripts/check-commit-range.mjs",
+                  "scripts/run-pr-release-gate.mjs",
+                  ".changeset/config.json",
+                  "scripts/check-changesets.mjs",
+                  "packages/cli/src/commands/check/adapters.ts",
+                  "docs/reference/scripts.md",
+                  "package.json"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/", "law/"]
+              },
+              "deliverables": [
+                "A commit-msg hook validating the grammar.",
+                "A pre-commit classification step rejecting cross-family sets and type-class disagreement with a suggested split.",
+                "A first-parent range checker wired into the pull-request gate.",
+                "The bump floor computed in the gate and emitted as a blocking reason.",
+                "The changeset directory, script, check member, and documentation row removed."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "hooks:install"],
+                ["git", "diff", "--check"]
+              ],
+              "commit_types": ["feat(hooks)", "ci(gate)", "chore(changesets)", "docs(reference)"],
+              "prompt": { "path": "prompts/TASK-0133.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0104",
+      "title": "Preflight probes and credential requirements",
+      "goal": "Environment failures are BLOCKED probes, never FAIL results; credentials are declared per effect and probed without reading values.",
+      "status": "planned",
+      "records": ["ADR-CHK-0001", "ADR-SEC-0001"],
+      "depends_on": ["R-0101", "R-0102"],
+      "attestation_reissue": true,
+      "owner_effects_required": ["OE-02"],
+      "close_checks": ["schemas", "ci-economy"],
+      "waves": [
+        {
+          "id": "CTG-0104",
+          "title": "Probe schema, runner outcome, lane collapse",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/preflight-probe.schema.json",
+            "law/schemas/test-task-descriptor.schema.json",
+            "packages/cli/src/services/check-runner/",
+            "test-tasks.json",
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/run-pr-release-gate.mjs",
+            "scripts/pr-failure-diagnostics.mjs"
+          ],
+          "gates": ["schemas", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0141",
+              "title": "Declare the preflight probe contract and the BLOCKED outcome",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/preflight-probe.schema.json",
+                  "law/schemas/test-task-descriptor.schema.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/adopters/test-tasks.md",
+                  "docs/dev/operations/remote-preflight-contract.md",
+                  "AGENTS.md"
+                ],
+                "forbidden": ["test-tasks.json", "packages/cli/src/services/"]
+              },
+              "deliverables": [
+                "A probe schema with identity, class, probe kind, expected, redacted observed, status, remediation, and dependencies.",
+                "The descriptor schema extended with the preflight-v1 runner kind and the BLOCKED outcome documented.",
+                "The remote preflight contract updated for the collapsed lane.",
+                "One sentence in the agent contract requiring the local preflight before a pull request."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(preflight)",
+                "docs(adopters)",
+                "docs(operations)",
+                "docs(agents)"
+              ],
+              "prompt": { "path": "prompts/TASK-0141.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0142",
+              "title": "Author BLOCKED semantics, cache, parity, and redaction tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0141",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/check-runner-preflight-blocked.test.ts",
+                  "packages/cli/tests/unit/check-cache-blocked-never-reusable.test.ts",
+                  "packages/cli/tests/unit/preflight-diagnostics-redaction.test.ts",
+                  "tests/contract/preflight-lane-parity.contract.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests that an extrinsic probe failure yields BLOCKED, marks dependents blocked-environment, and writes no FAIL.",
+                "A red test that a BLOCKED result is never reusable.",
+                "A red test that a secret-shaped observed value is redacted in diagnostics.",
+                "A red test that the lane and the local invocation plan identical node sets."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"]
+              ],
+              "commit_types": ["test(preflight)"],
+              "prompt": { "path": "prompts/TASK-0142.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0143",
+              "title": "Implement the preflight runner kind, BLOCKED outcome, probe nodes, and the collapsed lane",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0142",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/services/check-runner/types.ts",
+                  "packages/cli/src/services/check-runner/runner.ts",
+                  "packages/cli/src/services/check-runner/cache.ts",
+                  "packages/cli/src/services/check-runner/policy.ts",
+                  "packages/cli/src/services/check-runner/preflight.ts",
+                  "packages/cli/src/commands/check/facade.ts",
+                  "test-tasks.json",
+                  ".github/workflows/pull-request-checks.yml",
+                  "scripts/run-pr-release-gate.mjs",
+                  "scripts/pr-failure-diagnostics.mjs",
+                  "docs/reference/scripts.md"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/", "law/"]
+              },
+              "deliverables": [
+                "The BLOCKED outcome and blocked-environment dependents in the runner and cache.",
+                "A preflight-v1 runner kind executing probes from the descriptor.",
+                "Probe nodes in the descriptor for git base, clean tree, lockfile, toolchain, verifier provenance, materialization, constitution pin, generated views, taxonomy, and commit range.",
+                "The pull-request workflow reduced to install, preflight check, affected check.",
+                "The new task-policy digest reported for attestation re-issue."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "typecheck"],
+                ["node", "scripts/check-workflows.mjs"]
+              ],
+              "commit_types": [
+                "feat(preflight)",
+                "ci(test-tasks)",
+                "ci(workflows)",
+                "docs(reference)"
+              ],
+              "prompt": { "path": "prompts/TASK-0143.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        },
+        {
+          "id": "CTG-0105",
+          "title": "Credential requirements manifest and probe",
+          "type": "coupled-triplet",
+          "records": ["ADR-SEC-0001"],
+          "depends_on": ["CTG-0104"],
+          "lock_scopes": [
+            "law/schemas/credential-requirements.schema.json",
+            "law/policy/credential-requirements.json",
+            "scripts/check-workflows.mjs",
+            "packages/cli/src/commands/doctor.ts",
+            "packages/cli/src/services/credential-probe.ts",
+            "scripts/process/release-prerequisites.mjs",
+            ".github/workflows/release.yml",
+            ".github/workflows/devai-ledger-verify.yml"
+          ],
+          "gates": ["schemas", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0151",
+              "title": "Declare credential requirements per effect",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/credential-requirements.schema.json",
+                  "law/policy/credential-requirements.json",
+                  "law/policy/adopter-defaults/credential-requirements-binding.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/adopters/install.md",
+                  "docs/dev/security/security-policy.md"
+                ],
+                "forbidden": [".github/workflows/", "scripts/"]
+              },
+              "deliverables": [
+                "A schema for credential entries: kind, scope, consumer, absence behavior.",
+                "DEVAI's manifest enumerating every secret the three workflows reference and every local credential the install guide requires.",
+                "An adopter default binding.",
+                "The boundary statement in the security policy: presence, shape, scope verified; values never read."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(credentials)", "docs(adopters)", "docs(security)"],
+              "prompt": { "path": "prompts/TASK-0151.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0152",
+              "title": "Author bijection, probe redaction, scan, and prerequisites-job tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0151",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/check-workflows-credentials.contract.test.ts",
+                  "packages/cli/tests/unit/doctor-credential-probe.test.ts",
+                  "tests/contract/credential-scan.contract.test.ts",
+                  "tests/contract/release-prerequisites-job.contract.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests for the workflow-to-manifest bijection in both directions.",
+                "A red test that the probe output never contains a marker embedded in a fake credential value.",
+                "A red test that a literal token shape in an unrelated committed configuration file fails the scan.",
+                "A red test that the release workflow's first job is the prerequisites probe."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["test(credentials)"],
+              "prompt": { "path": "prompts/TASK-0152.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0153",
+              "title": "Implement the credential probe, the workflow bijection, the scan, and the prerequisites job",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0152",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/services/credential-probe.ts",
+                  "packages/cli/src/services/check-runner/preflight.ts",
+                  "packages/cli/src/commands/doctor.ts",
+                  "packages/cli/src/services/github-issues-tracking/config.ts",
+                  "scripts/check-workflows.mjs",
+                  "scripts/process/release-prerequisites.mjs",
+                  ".github/workflows/release.yml",
+                  ".github/workflows/devai-ledger-verify.yml",
+                  "docs/reference/scripts.md"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/", "law/"]
+              },
+              "deliverables": [
+                "One probe implementation shared by doctor and the preflight credential kind.",
+                "The workflow checker enforcing the secret bijection.",
+                "The tracking token-shape scan generalized to committed configuration and folded into secret-scan.",
+                "The prerequisites probe as the first job of the release workflow."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "typecheck"],
+                ["node", "scripts/check-workflows.mjs"]
+              ],
+              "commit_types": ["feat(credentials)", "ci(workflows)", "docs(reference)"],
+              "prompt": { "path": "prompts/TASK-0153.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0105",
+      "title": "Prerelease ladder and backlog family",
+      "goal": "Prerelease rungs carry their own depth and dist-tags; findings outlive the session that made them.",
+      "status": "planned",
+      "records": ["ADR-REL-0028", "ADR-GOV-0019"],
+      "depends_on": ["R-0101"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["action-registry:check", "cli-reference", "action-effects"],
+      "waves": [
+        {
+          "id": "CTG-0106",
+          "title": "Prerelease channel ladder",
+          "type": "coupled-triplet",
+          "records": ["ADR-REL-0028"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/release-lifecycle.json",
+            "law/schemas/release-lifecycle-policy.schema.json",
+            "law/schemas/release-intent.schema.json",
+            "scripts/release-channel.mjs",
+            "scripts/create-release-manifest.mjs",
+            "packages/cli/src/services/release-",
+            ".github/workflows/release.yml"
+          ],
+          "gates": ["schemas", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0161",
+              "title": "Declare the rung table and the intent channel field",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/policy/release-lifecycle.json",
+                  "law/schemas/release-lifecycle-policy.schema.json",
+                  "law/schemas/release-intent.schema.json",
+                  "docs/dev/operations/versioning-policy.md",
+                  "docs/adopters/release-profiles.md"
+                ],
+                "forbidden": ["scripts/", "packages/cli/src/"]
+              },
+              "deliverables": [
+                "A prerelease_ladder section with alpha, beta, rc: dist_tag, required capabilities, promotion order, and the rc-only promotion to stable.",
+                "An optional channel field on the release intent, derived from the version and blocked on disagreement.",
+                "Documentation of the ladder for maintainers and adopters."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:schemas"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(release)", "docs(operations)", "docs(adopters)"],
+              "prompt": { "path": "prompts/TASK-0161.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0162",
+              "title": "Author ladder kernel and channel tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0161",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/release-plan-prerelease-ladder.test.ts",
+                  "tests/contract/release-channel-ladder.contract.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests that an identifier outside the ladder blocks as invalid-semver, a backward or skipped rung blocks as downgrade, and rc-only stable promotion holds.",
+                "Red tests that the channel script maps each rung to its dist-tag and refuses alpha to latest."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"]
+              ],
+              "commit_types": ["test(release)"],
+              "prompt": { "path": "prompts/TASK-0162.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0163",
+              "title": "Implement rung resolution in the kernel, the channel script, and the release workflow",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0162",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "scripts/release-channel.mjs",
+                  "scripts/create-release-manifest.mjs",
+                  "packages/cli/src/services/release-plan.ts",
+                  "packages/cli/src/services/release-preflight.ts",
+                  ".github/workflows/release.yml",
+                  "docs/reference/scripts.md"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/", "law/"]
+              },
+              "deliverables": [
+                "The plan kernel resolves the rung, validates promotion order, and requires the rung capabilities.",
+                "The channel script emits the rung dist-tag.",
+                "The release workflow publishes to the rung dist-tag only."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "typecheck"],
+                ["node", "scripts/check-workflows.mjs"]
+              ],
+              "commit_types": ["feat(release)", "ci(workflows)", "docs(reference)"],
+              "prompt": { "path": "prompts/TASK-0163.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        },
+        {
+          "id": "CTG-0107",
+          "title": "Backlog action family",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0019"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/action-registry.json",
+            "law/schemas/backlog-item.schema.json",
+            "law/schemas/backlog-list-output.schema.json",
+            "law/policy/github-issues-tracking.json",
+            "packages/cli/src/commands/backlog/",
+            "packages/loop/src/repository-backlog/",
+            "packages/cli/src/commands/doctor.ts",
+            "packages/cli/src/services/github-issues-tracking/"
+          ],
+          "gates": ["action-registry:check", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0171",
+              "title": "Register the backlog actions and declare the item contract",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/policy/action-registry.json",
+                  "law/schemas/backlog-item.schema.json",
+                  "law/schemas/backlog-list-output.schema.json",
+                  "law/policy/github-issues-tracking.json",
+                  "law/schemas/github-issues-tracking-policy.schema.json",
+                  "packages/cli/src/generated/action-registry.ts",
+                  "packages/effects-check/src/generated/action-catalog.ts",
+                  "packages/sensors/src/generated/action-kinds.ts",
+                  ".devai/config/toolchain.json",
+                  "docs/adopters/governance-tracking.md"
+                ],
+                "forbidden": ["packages/cli/src/commands/", "packages/loop/src/"]
+              },
+              "deliverables": [
+                "Four stable registry entries with local-write effect, round-gap authority, and complete output and error contracts.",
+                "The item schema with kind, class, origin session, resolution reference, and optional round.",
+                "One added tracking event kind and the projection extension.",
+                "The expected action count updated in the toolchain manifest.",
+                "Regenerated generated views committed with the registry."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "devai:prepare"],
+                ["pnpm", "run", "action-registry:check"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(backlog)", "docs(adopters)"],
+              "prompt": { "path": "prompts/TASK-0171.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0172",
+              "title": "Author backlog store, action, surface, and projection tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0171",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/loop/tests/unit/repository-backlog-store.test.ts",
+                  "packages/cli/tests/unit/backlog-actions.test.ts",
+                  "packages/cli/tests/unit/doctor-backlog-surface.test.ts",
+                  "packages/cli/tests/unit/tracking-backlog-projection.test.ts"
+                ]
+              },
+              "deliverables": [
+                "Red tests that every backlog action succeeds with network denied and performs only local writes.",
+                "Red tests that projection refuses without an activation and never infers a round.",
+                "A red test that an item created in one clone is surfaced by doctor in a fresh clone of the same commit.",
+                "A red test that a backlog action cannot resolve a round gap."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:loop"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["test(backlog)"],
+              "prompt": { "path": "prompts/TASK-0172.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0173",
+              "title": "Implement the backlog store, actions, doctor surface, and projection",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0172",
+              "status": "planned",
+              "target_substrates": ["F2"],
+              "boundary": {
+                "paths": [
+                  "packages/loop/src/repository-backlog/index.ts",
+                  "packages/loop/src/index.ts",
+                  "packages/cli/src/commands/backlog/index.ts",
+                  "packages/cli/src/command-manifest.ts",
+                  "packages/cli/src/commands/doctor.ts",
+                  "packages/cli/src/commands/round/workflow.ts",
+                  "packages/cli/src/services/github-issues-tracking/projection.ts",
+                  "docs/reference/cli/index.md"
+                ],
+                "forbidden": ["tests/", "packages/cli/tests/", "packages/loop/tests/", "law/"]
+              },
+              "deliverables": [
+                "A schema-validated store under .devai/state/backlog with add, list, show, resolve.",
+                "The four actions registered in the command manifest with their registry contracts.",
+                "Doctor and round plan surfacing open items.",
+                "The tracking projection extended with the backlog event kind."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:loop"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "typecheck"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "action-effects",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "cli-reference",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(backlog)", "docs(reference)"],
+              "prompt": { "path": "prompts/TASK-0173.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0106",
+      "title": "Interactive configuration",
+      "goal": "Adoption and adopter-owned settings can be authored through schema-driven prompts that replay as existing actions.",
+      "status": "planned",
+      "records": ["ADR-CFG-0001"],
+      "depends_on": ["R-0102", "R-0104"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["cli-reference"],
+      "waves": [
+        {
+          "id": "CTG-0108",
+          "title": "Interactive init plan",
+          "type": "coupled-triplet",
+          "records": ["ADR-CFG-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/commands/init/",
+            "packages/cli/src/services/interactive-config.ts",
+            "packages/cli/src/services/schema-prompts.ts",
+            "docs/adopters/install.md",
+            "docs/adopters/interactive-configuration.md"
+          ],
+          "gates": ["cli-reference", "format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0181",
+              "title": "Specify the interactive contract and its two modes",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "docs/adopters/interactive-configuration.md",
+                  "docs/adopters/install.md",
+                  "law/policy/action-registry.json",
+                  "packages/cli/src/generated/action-registry.ts",
+                  "packages/effects-check/src/generated/action-catalog.ts",
+                  "packages/sensors/src/generated/action-kinds.ts"
+                ],
+                "forbidden": ["packages/cli/src/commands/", "packages/cli/src/services/"]
+              },
+              "deliverables": [
+                "A contract page: bind or re-bind mode, edit mode, adopter-owned key list, refusal of materialized files, replay guarantee, no-terminal behavior.",
+                "The init plan registry description mentioning the interactive flag without any effect or capability change.",
+                "The install guide pointing at the interactive path as an alternative."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "devai:prepare"],
+                ["pnpm", "run", "action-registry:check"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(registry)", "docs(adopters)"],
+              "prompt": { "path": "prompts/TASK-0181.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0182",
+              "title": "Author replay, refusal, prompt validation, and no-terminal tests",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0181",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/init-interactive-replay.test.ts",
+                  "packages/cli/tests/unit/init-interactive-materialized-refusal.test.ts",
+                  "packages/cli/tests/unit/init-interactive-schema-prompts.test.ts",
+                  "packages/cli/tests/unit/init-interactive-no-tty.test.ts"
+                ]
+              },
+              "deliverables": [
+                "A red test that every write traces to an init bind or apply invocation and the printed argv reproduces the plan.",
+                "A red test that editing a materialized policy file is refused with a re-bind offer.",
+                "A red test that an out-of-enumeration answer is rejected at the prompt with the schema message.",
+                "A red test that a closed standard input yields a structured error and no write."
+              ],
+              "acceptance_commands": [["pnpm", "run", "test:cli"]],
+              "commit_types": ["test(init)"],
+              "prompt": { "path": "prompts/TASK-0182.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            },
+            {
+              "id": "TASK-0183",
+              "title": "Implement schema-driven prompts and the interactive init plan flow",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0182",
+              "status": "planned",
+              "target_substrates": ["F2"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/init/index.ts",
+                  "packages/cli/src/services/interactive-config.ts",
+                  "packages/cli/src/services/schema-prompts.ts",
+                  "docs/reference/cli/index.md"
+                ],
+                "forbidden": [
+                  "tests/",
+                  "packages/cli/tests/",
+                  "law/",
+                  "package.json",
+                  "packages/cli/package.json"
+                ]
+              },
+              "deliverables": [
+                "A schema-to-prompt service on the platform readline with no new dependency.",
+                "The interactive flag on init plan running bind or apply through the existing actions and printing the replay argv.",
+                "Refusal of materialized files in edit mode."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "release:closure"]
+              ],
+              "commit_types": ["feat(init)", "docs(reference)"],
+              "prompt": { "path": "prompts/TASK-0183.md", "sha256": null },
+              "pull_request": null,
+              "merged_as": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
