@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.dev/schemas/test-task-descriptor.schema.json",
   "title": "Adopter test task descriptor",
+  "description": "Adopter-owned test task DAG. Every node names a runner; a node under any runner except `preflight-v1` declares an `argv` contract, while a `preflight-v1` node declares a `probes` array of preflight probe objects (preflight-probe.schema.json, ADR-CHK-0001) and carries no argv. A task outcome is one of five values: PASS, FAIL, SKIPPED, CACHED, and BLOCKED. BLOCKED is the outcome of a preflight node whose extrinsic probe did not pass; its dependents are marked blocked-environment and not executed, and no BLOCKED result is ever written as a reusable cache entry. An intrinsic probe mismatch is FAIL, as for any other node.",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -46,7 +47,6 @@
         "required": [
           "nodeId",
           "dependencies",
-          "argv",
           "cwd",
           "runner",
           "inputSelectors",
@@ -63,6 +63,12 @@
             "items": { "type": "string" },
             "prefixItems": [{ "type": "string", "pattern": "^[A-Za-z0-9._-]+$" }]
           },
+          "probes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "https://devai.nyxk.com.br/schemas/preflight-probe.schema.json" },
+            "description": "Preflight probes executed in `depends_on` order by the `preflight-v1` runner. Present only on a `preflight-v1` node."
+          },
           "cwd": { "type": "string", "minLength": 1 },
           "runner": { "type": "string", "minLength": 1 },
           "inputSelectors": {
@@ -73,7 +79,10 @@
           "toolchainKeys": { "type": "array", "items": { "type": "string" } },
           "allowlistedEnv": { "type": "array", "items": { "type": "string" } },
           "outputContract": { "type": "object" }
-        }
+        },
+        "if": { "properties": { "runner": { "const": "preflight-v1" } }, "required": ["runner"] },
+        "then": { "required": ["probes"], "not": { "required": ["argv"] } },
+        "else": { "required": ["argv"], "not": { "required": ["probes"] } }
       }
     },
     "profiles": { "type": "array" }

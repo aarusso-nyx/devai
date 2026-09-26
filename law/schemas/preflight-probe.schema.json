@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/preflight-probe.schema.json",
+  "title": "Preflight probe",
+  "description": "One preflight probe executed as a task DAG node under the `preflight-v1` runner (ADR-CHK-0001). A probe observes one fact about the host, the checkout, or a remote and compares it with `expected`. Its `class` decides the outcome of a mismatch: an `extrinsic` probe observes something outside the candidate (an environment variable, a registry, a credential, a toolchain version, the fetched base), so its failure yields `blocked`, marks every dependent blocked-environment, and is never written to the result cache, because it says nothing about the candidate; an `intrinsic` probe observes the candidate itself (a tracked file, a clean tree, a command over the checkout), so its failure yields `fail` and is cached like any other observation. The same probe list runs locally and in the pull-request lane from the same descriptor, so the planned node sets are byte-identical for the same base and candidate.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "class",
+    "probe",
+    "expected",
+    "observed",
+    "status",
+    "remediation",
+    "depends_on"
+  ],
+  "$defs": {
+    "probe_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Probe identity, unique within one descriptor node. Lower-case, starts with a letter, hyphenated."
+    },
+    "probe_class": {
+      "type": "string",
+      "enum": ["extrinsic", "intrinsic"],
+      "description": "`extrinsic`: the observed fact lives outside the candidate; a mismatch yields `blocked` and is never cached. `intrinsic`: the observed fact is the candidate itself; a mismatch yields `fail` and is cached."
+    },
+    "probe_status": {
+      "type": "string",
+      "enum": ["pass", "fail", "blocked", "skipped"],
+      "description": "`pass`: observed matches expected. `fail`: an intrinsic mismatch, cached as a real observation. `blocked`: an extrinsic mismatch or an observation that could not be made at all; never cached, re-executed on every plan, and every dependent is blocked-environment. `skipped`: a probe in `depends_on` did not pass, so this probe did not execute and `observed` is null."
+    },
+    "environment_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "description": "Reads one environment variable of the executing host.",
+      "properties": {
+        "kind": { "const": "environment" },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "The variable name. Its value is compared with `expected` when given; otherwise presence is the observation."
+        },
+        "expected": {
+          "type": "string",
+          "description": "The exact value required. Absent means the variable only has to be set."
+        }
+      }
+    },
+    "file_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "must_exist"],
+      "description": "Inspects one file resolved inside the checkout.",
+      "properties": {
+        "kind": { "const": "file" },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path. Paths escaping the checkout are refused before execution."
+        },
+        "expected_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The digest the file content must carry. Absent means only existence is observed."
+        },
+        "must_exist": {
+          "type": "boolean",
+          "description": "True when absence is a mismatch; false when the probe asserts absence."
+        }
+      }
+    },
+    "command_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argv", "expected_exit"],
+      "description": "Runs one declared argument vector with `shell: false` and observes its exit status.",
+      "properties": {
+        "kind": { "const": "command" },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "prefixItems": [{ "type": "string", "pattern": "^[A-Za-z0-9._-]+$" }],
+          "description": "Argument vector under the same rules as a task node: a bare executable name first, never a shell string."
+        },
+        "expected_exit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "The exit status that counts as a match."
+        }
+      }
+    },
+    "git_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "check"],
+      "description": "Observes the checkout through Git.",
+      "properties": {
+        "kind": { "const": "git" },
+        "check": {
+          "type": "string",
+          "enum": ["base-up-to-date", "clean-tree", "commit-range"],
+          "description": "`base-up-to-date`: the candidate contains the freshly fetched `base`. `clean-tree`: no tracked or untracked change is pending. `commit-range`: every commit from `base` to the candidate satisfies the commit grammar."
+        },
+        "base": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The base reference or exact commit for `base-up-to-date` and `commit-range`."
+        }
+      }
+    },
+    "registry_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url"],
+      "description": "Reaches one package registry or remote endpoint.",
+      "properties": {
+        "kind": { "const": "registry" },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The endpoint to reach. An unreachable host is `blocked`, never `fail`."
+        },
+        "expected_version": {
+          "type": "string",
+          "description": "The version the registry must report for the package the URL names. Absent means reachability is the observation."
+        }
+      }
+    },
+    "toolchain_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "manifest_path"],
+      "description": "Compares the observed runtime versions with the adopter toolchain manifest (ADR-CHK-0002).",
+      "properties": {
+        "kind": { "const": "toolchain" },
+        "manifest_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path of the manifest that conforms to toolchain-manifest.schema.json."
+        }
+      }
+    },
+    "credential_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "manifest_id"],
+      "description": "Confirms a credential named by the credential manifest (ADR-SEC-0001) is present without reading its value into any report.",
+      "properties": {
+        "kind": { "const": "credential" },
+        "manifest_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The manifest entry identity. The observed value of a credential probe is always redacted."
+        }
+      }
+    }
+  },
+  "properties": {
+    "id": { "$ref": "#/$defs/probe_id" },
+    "class": { "$ref": "#/$defs/probe_class" },
+    "probe": {
+      "description": "The observation to make, closed per `kind`.",
+      "oneOf": [
+        { "$ref": "#/$defs/environment_probe" },
+        { "$ref": "#/$defs/file_probe" },
+        { "$ref": "#/$defs/command_probe" },
+        { "$ref": "#/$defs/git_probe" },
+        { "$ref": "#/$defs/registry_probe" },
+        { "$ref": "#/$defs/toolchain_probe" },
+        { "$ref": "#/$defs/credential_probe" }
+      ]
+    },
+    "expected": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable statement of the expected observation, printed beside `observed` in the runner report."
+    },
+    "observed": {
+      "type": ["string", "null"],
+      "description": "The redacted observation. Null before execution and for a `skipped` probe. A value that resembles a secret is replaced by a fixed marker before it reaches any report or diagnostics path; a `credential` probe never carries the raw value."
+    },
+    "status": { "$ref": "#/$defs/probe_status" },
+    "remediation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the operator does when the probe does not pass, printed with the outcome."
+    },
+    "depends_on": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/probe_id" },
+      "description": "Probe ids in the same node that must pass first. A probe whose dependency is `blocked` is blocked-environment; one whose dependency is `fail` or `skipped` is `skipped`."
+    }
+  },
+  "examples": [
+    {
+      "id": "base-fetched",
+      "class": "extrinsic",
+      "probe": { "kind": "git", "check": "base-up-to-date", "base": "origin/main" },
+      "expected": "candidate contains the fetched origin/main",
+      "observed": null,
+      "status": "pass",
+      "remediation": "Run git fetch origin main and merge or rebase the candidate onto it.",
+      "depends_on": []
+    },
+    {
+      "id": "node-toolchain",
+      "class": "extrinsic",
+      "probe": { "kind": "toolchain", "manifest_path": ".devai/config/toolchain.json" },
+      "expected": "node 24.20.0, pnpm 9.15.0, git 2.47.3",
+      "observed": "node 22.11.0, pnpm 9.15.0, git 2.47.3",
+      "status": "blocked",
+      "remediation": "Install the node version declared in .devai/config/toolchain.json.",
+      "depends_on": ["base-fetched"]
+    },
+    {
+      "id": "lockfile-tracked",
+      "class": "intrinsic",
+      "probe": { "kind": "file", "path": "pnpm-lock.yaml", "must_exist": true },
+      "expected": "pnpm-lock.yaml is present",
+      "observed": "present",
+      "status": "pass",
+      "remediation": "Commit pnpm-lock.yaml.",
+      "depends_on": []
+    },
+    {
+      "id": "publish-token",
+      "class": "extrinsic",
+      "probe": { "kind": "credential", "manifest_id": "npm-publish" },
+      "expected": "credential npm-publish is present",
+      "observed": "[redacted]",
+      "status": "pass",
+      "remediation": "Provide the credential named npm-publish in the credential manifest.",
+      "depends_on": []
+    }
+  ]
+}
