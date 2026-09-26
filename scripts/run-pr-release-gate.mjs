@@ -144,7 +144,15 @@ const bumpFloor = bumpFloorOverRange(
   candidateCommit,
 );
 const bumpDelta = versionDelta(currentVersion, targetVersion);
-if (BUMP_RANK[bumpDelta] < BUMP_RANK[bumpFloor]) {
+// The floor binds a pull request that changes the manifest version: its delta
+// must reach the floor of its own commits. A pull request that leaves the
+// version alone records the floor as an obligation for the release rollover,
+// which settles it against every commit since the last published version.
+if (currentVersion === targetVersion) {
+  process.stdout.write(
+    `${JSON.stringify({ nonAttesting: true, bumpFloor, versionDelta: bumpDelta, obligation: true })}\n`,
+  );
+} else if (BUMP_RANK[bumpDelta] < BUMP_RANK[bumpFloor]) {
   // The release intent schema is closed, so the blocking reason is reported
   // beside it and the gate fails before any preflight work.
   process.stdout.write(
