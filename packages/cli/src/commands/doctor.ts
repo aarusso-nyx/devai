@@ -49,6 +49,7 @@ import {
   type JsonObject,
 } from '../services/adopter-policy.js';
 import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
+import { probeCredentialManifest } from '../services/credential-probe.js';
 import { listBacklogItems } from '#runtime-core';
 
 const DEFAULT_REPO_ROOT = '.';
@@ -1111,6 +1112,52 @@ function checkBacklogOpenItems(repoRoot: string): CheckResult {
   }
 }
 
+/**
+ * ADR-SEC-0001: every credential the governing manifest declares, with its
+ * probe status. Informational: absence is reported, never a doctor failure,
+ * because most entries are workflow secrets that cannot be observed locally.
+ * The info carries ids, kinds, statuses, and fixed reason words, never a value.
+ */
+function checkCredentialRequirements(repoRoot: string): CheckResult {
+  const name = 'credential-requirements';
+  try {
+    const { manifest, results } = probeCredentialManifest(repoRoot, (argv) => {
+      const [command = '', ...args] = argv;
+      const result = spawnSync(command, args, {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        shell: false,
+        timeout: 15_000,
+      });
+      if (result.error !== undefined) throw new Error('refused');
+      return {
+        status: result.status,
+        stdout: String(result.stdout ?? ''),
+        stderr: String(result.stderr ?? ''),
+      };
+    });
+    return {
+      name,
+      ok: true,
+      info: {
+        manifest: manifest.path.startsWith(`${resolve(repoRoot)}${sep}`)
+          ? relative(resolve(repoRoot), manifest.path).split(sep).join('/')
+          : 'packaged',
+        entries: results,
+      },
+    };
+  } catch (error) {
+    return {
+      name,
+      ok: true,
+      info: {
+        entries: [],
+        unreadable: error instanceof Error ? error.message : 'CREDENTIAL_MANIFEST_UNREADABLE',
+      },
+    };
+  }
+}
+
 const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'f1-paths-present',
@@ -1132,6 +1179,10 @@ const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'backlog-open-items',
     run: (repoRoot) => checkBacklogOpenItems(repoRoot),
+  },
+  {
+    name: 'credential-requirements',
+    run: (repoRoot) => checkCredentialRequirements(repoRoot),
   },
   {
     name: 'agents-claude-sync',
