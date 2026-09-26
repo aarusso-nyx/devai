@@ -295,7 +295,11 @@ jobs:
           test "$(node -p "require('./packages/cli/package.json').name")" = "$PACKAGE_NAME"
           channel="$(node scripts/release-channel.mjs "$package_version")"
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
-          echo "PACKAGE_DIST_TAG=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")" >> "$GITHUB_ENV"
+          release_channel="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.channel)' "$channel")"
+          dist_tag="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")"
+          if test "$release_channel" = stable; then test "$dist_tag" = latest; else test "$dist_tag" != latest; fi
+          echo "RELEASE_CHANNEL=$release_channel" >> "$GITHUB_ENV"
+          echo "PACKAGE_DIST_TAG=$dist_tag" >> "$GITHUB_ENV"
           echo "RELEASE_IS_PRERELEASE=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.prerelease))' "$channel")" >> "$GITHUB_ENV"
           test -z "$(git status --porcelain --untracked-files=all)"
       - name: Install frozen dependencies
@@ -508,7 +512,11 @@ jobs:
           test "$RELEASE_TAG" = "v$package_version"
           channel="$(node scripts/release-channel.mjs "$package_version")"
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
-          echo "PACKAGE_DIST_TAG=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")" >> "$GITHUB_ENV"
+          release_channel="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.channel)' "$channel")"
+          dist_tag="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(v.dist_tag)' "$channel")"
+          if test "$release_channel" = stable; then test "$dist_tag" = latest; else test "$dist_tag" != latest; fi
+          echo "RELEASE_CHANNEL=$release_channel" >> "$GITHUB_ENV"
+          echo "PACKAGE_DIST_TAG=$dist_tag" >> "$GITHUB_ENV"
           echo "RELEASE_IS_PRERELEASE=$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.prerelease))' "$channel")" >> "$GITHUB_ENV"
       - name: Download exact release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
