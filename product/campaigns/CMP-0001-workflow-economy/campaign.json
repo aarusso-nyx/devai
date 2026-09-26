@@ -3,7 +3,7 @@
   "id": "CMP-0001",
   "title": "Workflow economy",
   "type": "campaign",
-  "status": "active",
+  "status": "closed",
   "date": "2026-09-26",
   "authority": "Architect",
   "mandate": {
@@ -1451,7 +1451,7 @@
       "id": "R-0107",
       "title": "Release 1.6.0",
       "goal": "Roll the candidate to 1.6.0 with a changelog that summarizes the campaign, so the Owner can rehearse and publish.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-REL-0027"],
       "depends_on": ["R-0103", "R-0104", "R-0105", "R-0106"],
       "attestation_reissue": false,
@@ -1478,7 +1478,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1516,12 +1516,18 @@
                 "path": "prompts/TASK-0191.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/103",
+              "merged_as": "abfcaaabc891c043795062d450d2086c2e559a96"
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "349894356a89e16d92bcb57581e97ca5fc89a2eb",
+        "closed_at": "2026-09-26T18:47:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     }
   ],
   "models": {
