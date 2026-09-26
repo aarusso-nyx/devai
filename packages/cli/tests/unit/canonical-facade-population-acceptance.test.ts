@@ -1,7 +1,9 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
-// Inspector acceptance: the 57 current actions have a one-to-one executable
+// Inspector acceptance: the 61 current actions have a one-to-one executable
 // facade population, and every facade has a bounded, non-silent refusal probe.
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   createAuthorityDecisionIssuer,
   runWithAuthorityHostEffects,
@@ -62,6 +64,12 @@ interface FacadeDefinition {
   register(cli: CAC): void;
 }
 
+// The backlog facades (ADR-GOV-0019) load through a file URL so this suite
+// typechecks before packages/cli/src/commands/backlog/index.ts exists.
+const { backlogCommands } = (await import(
+  pathToFileURL(resolve(import.meta.dirname, '../../src/commands/backlog/index.ts')).href
+)) as { backlogCommands: readonly FacadeDefinition[] };
+
 interface RefusalProbe {
   readonly args: readonly string[];
   readonly exit: 1 | 2;
@@ -71,6 +79,7 @@ const FACADES: readonly FacadeDefinition[] = [
   auditObserve,
   auditScorecard,
   actionsList,
+  ...backlogCommands,
   checkCmd,
   doctor,
   evidenceCollect,
@@ -112,6 +121,10 @@ const failed = (args: readonly string[]): RefusalProbe => ({ args, exit: 1 });
 const REFUSAL_PROBES: Readonly<Record<string, RefusalProbe>> = {
   'audit observe': usage([]),
   'audit scorecard': usage([]),
+  'backlog add': usage([]),
+  'backlog list': usage(['--status', 'not-a-status']),
+  'backlog resolve': usage(['not-a-backlog-id']),
+  'backlog show': usage(['not-a-backlog-id']),
   'catalog actions': usage(['--authority', 'invalid-authority']),
   check: usage(['--only', 'not-a-check-service']),
   doctor: usage(['--probe', 'not-a-probe']),
@@ -179,9 +192,9 @@ describe('canonical facade population acceptance', () => {
     const facadeNames = FACADES.map((definition) => definition.name).sort();
     const currentBindings = ACTION_REGISTRY.map((entry) => entry.handler).sort();
 
-    expect(FACADES).toHaveLength(57);
-    expect(ACTION_REGISTRY).toHaveLength(57);
-    expect(new Set(facadeNames).size).toBe(57);
+    expect(FACADES).toHaveLength(61);
+    expect(ACTION_REGISTRY).toHaveLength(61);
+    expect(new Set(facadeNames).size).toBe(61);
     expect(facadeNames).toEqual(currentBindings);
     expect(Object.keys(REFUSAL_PROBES).sort()).toEqual(currentBindings);
 
@@ -189,7 +202,7 @@ describe('canonical facade population acceptance', () => {
     for (const definition of FACADES) definition.register(cli);
   });
 
-  it('executes a bounded refusal probe for all 57 current facades without external effects', async () => {
+  it('executes a bounded refusal probe for all 61 current facades without external effects', async () => {
     const cli = cac('devai-canonical-facade-refusals');
     for (const definition of FACADES) definition.register(cli);
 

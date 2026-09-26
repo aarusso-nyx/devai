@@ -622,7 +622,7 @@ describe('canonical production authority refusal acceptance', () => {
   });
 
   it('requires no declaration for reads and a declaration for every write-capable action', () => {
-    expect(current).toHaveLength(57);
+    expect(current).toHaveLength(61);
     const unbound = mkdtempSync(join(tmpdir(), 'devai-authority-unbound-'));
     try {
       for (const format of ['human', 'json'] as const) {
