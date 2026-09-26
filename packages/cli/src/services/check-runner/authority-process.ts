@@ -3,6 +3,13 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { readExactGitTreeSync, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { parseTaskDescriptor, readTaskDescriptor, taskDescriptorDigest } from './policy.js';
 import { resolveTaskExecutable } from './executable.js';
+import {
+  ADOPTER_PREFLIGHT_NODE_ID,
+  BASE_PLACEHOLDER,
+  PREFLIGHT_RUNNER,
+  loadAdopterPreflightProbes,
+} from './preflight.js';
+import type { PreflightProbe } from './types.js';
 
 export interface DeclaredCheckTaskProcess {
   readonly nodeId: string;
@@ -125,6 +132,92 @@ function exactDeclaredTask(
   return task === undefined ? undefined : { nodeId: task.nodeId, cwd };
 }
 
+const EXACT_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+
+/** The argument vectors a preflight probe list may execute, `{base}` left unsubstituted. */
+function probeArgvs(probes: readonly PreflightProbe[] | undefined): readonly (readonly string[])[] {
+  return (probes ?? []).flatMap((entry) =>
+    entry.probe.kind === 'command'
+      ? [entry.probe.argv]
+      : entry.probe.kind === 'git' && entry.probe.check === 'commit-range'
+        ? [['node', 'scripts/check-commit-range.mjs', BASE_PLACEHOLDER, 'HEAD']]
+        : [],
+  );
+}
+
+/**
+ * `{base}` admits only the exact base commit: the invocation's --base when it is
+ * an exact commit, otherwise the exact commit the runner resolved it to.
+ */
+function argumentMatches(declared: string, requested: string, base: string | undefined): boolean {
+  if (!declared.includes(BASE_PLACEHOLDER)) return declared === requested;
+  const [prefix = '', suffix = ''] = declared.split(BASE_PLACEHOLDER, 2);
+  if (declared.split(BASE_PLACEHOLDER).length !== 2) return false;
+  if (!requested.startsWith(prefix) || !requested.endsWith(suffix)) return false;
+  const value = requested.slice(prefix.length, requested.length - suffix.length);
+  return base !== undefined && EXACT_COMMIT.test(base) ? value === base : EXACT_COMMIT.test(value);
+}
+
+/**
+ * A process that is exactly a preflight probe command (ADR-CHK-0001): declared by
+ * a preflight-v1 node of the descriptor, or, under --preflight only, by the
+ * adopter probe list. Same shell, cwd, and executable rules as a declared task.
+ */
+function exactDeclaredProbe(
+  repoRoot: string,
+  invocationArgv: readonly string[],
+  request: AuthorityHostEffectRequest,
+): DeclaredCheckTaskProcess | undefined {
+  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  const executable = request.arguments[0];
+  const argv = request.arguments[1];
+  const rawOptions = request.arguments[2];
+  if (
+    typeof executable !== 'string' ||
+    !Array.isArray(argv) ||
+    argv.some((argument) => typeof argument !== 'string') ||
+    rawOptions === null ||
+    typeof rawOptions !== 'object' ||
+    Array.isArray(rawOptions)
+  ) {
+    return undefined;
+  }
+  const options = rawOptions as Readonly<Record<string, unknown>>;
+  if (options.shell !== undefined && options.shell !== false) return undefined;
+  if (typeof options.cwd !== 'string' || !existsSync(resolve(options.cwd))) return undefined;
+  const root = realpathSync(resolve(repoRoot));
+  const cwd = realpathSync(resolve(options.cwd));
+  if (!within(root, cwd)) return undefined;
+  const baseIndex = invocationArgv.indexOf('--base');
+  const base = baseIndex < 0 ? undefined : invocationArgv[baseIndex + 1];
+  const candidates: { nodeId: string; cwd: string; argvs: readonly (readonly string[])[] }[] =
+    readTaskDescriptor(resolve(root, 'test-tasks.json'))
+      .tasks.filter((task) => task.runner === PREFLIGHT_RUNNER)
+      .map((task) => ({ nodeId: task.nodeId, cwd: task.cwd, argvs: probeArgvs(task.probes) }));
+  if (invocationArgv.includes('--preflight')) {
+    candidates.push({
+      nodeId: ADOPTER_PREFLIGHT_NODE_ID,
+      cwd: '.',
+      argvs: probeArgvs(loadAdopterPreflightProbes(root)),
+    });
+  }
+  const requested = argv as readonly string[];
+  const match = candidates.find(
+    (candidate) =>
+      existsSync(resolve(root, candidate.cwd)) &&
+      realpathSync(resolve(root, candidate.cwd)) === cwd &&
+      candidate.argvs.some(
+        (declared) =>
+          matchesDeclaredExecutable(root, declared[0] ?? '', executable) &&
+          declared.length === requested.length + 1 &&
+          declared
+            .slice(1)
+            .every((argument, index) => argumentMatches(argument, requested[index] ?? '', base)),
+      ),
+  );
+  return match === undefined ? undefined : { nodeId: match.nodeId, cwd };
+}
+
 /** Exact descriptor-only matcher for lifecycle-owned check-runner execution. */
 export function matchDeclaredReleaseTaskProcess(
   repoRoot: string,
@@ -193,8 +286,8 @@ export function matchDeclaredCheckTaskProcess(
   request: AuthorityHostEffectRequest,
 ): DeclaredCheckTaskProcess | undefined {
   if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
-  const targets = ['--affected', '--local', '--rc', '--release-intent'].filter((flag) =>
-    invocationArgv.includes(flag),
+  const targets = ['--affected', '--preflight', '--local', '--rc', '--release-intent'].filter(
+    (flag) => invocationArgv.includes(flag),
   );
   const suiteIndex = invocationArgv.indexOf('--suite');
   const suite = suiteIndex < 0 ? undefined : invocationArgv[suiteIndex + 1];
@@ -207,7 +300,10 @@ export function matchDeclaredCheckTaskProcess(
   const ledgerOnlyRun = ['ledger-local', 'ledger-rc'].includes(only ?? '');
   const explicitTaskRun = invocationArgv.includes('--run') && targets.length === 1;
   if (!explicitTaskRun && !suiteRun && !ledgerOnlyRun) return undefined;
-  return exactDeclaredTask(repoRoot, request);
+  return (
+    exactDeclaredTask(repoRoot, request) ??
+    (explicitTaskRun ? exactDeclaredProbe(repoRoot, invocationArgv, request) : undefined)
+  );
 }
 
 export function describeDeclaredCheckTaskRefusal(
