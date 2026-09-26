@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/backlog-item.schema.json",
+  "title": "Repository backlog item",
+  "description": "One schema-validated record under .devai/state/backlog/ written by the backlog action family (ADR-GOV-0019): a finding discovered during work that belongs to no round, a proposition for a later session, a note from one agent to another, or a flaky test observed under ADR-CHK-0001. An item carries its origin session, role, and commit so it outlives the session that made it. Round attribution is optional and is never inferred. A backlog item is not a round gap: it cannot pause, resolve, or otherwise alter one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "kind",
+    "title",
+    "body",
+    "origin",
+    "status",
+    "created_at",
+    "resolved_at"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^BL-[0-9]{4,}$",
+      "description": "Stable repository-wide identifier allocated by backlog add and never reused."
+    },
+    "kind": {
+      "enum": ["finding", "proposition", "note", "flaky-test"]
+    },
+    "class": {
+      "enum": ["law", "spec", "plan", "code", "tests", "docs", "ci", "toolchain", "generated"],
+      "description": "Change class from the ADR-GOV-0017 taxonomy. Present when the item concerns a path; absent otherwise."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "role", "commit"],
+      "description": "Where the item came from. Recorded at creation and never edited.",
+      "properties": {
+        "session": {
+          "type": "string",
+          "pattern": "^(?:AUTH-SESSION|DIRECT-CLI)-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$",
+          "description": "Chain identity of the creating invocation: a validated authority session or the deterministic direct-cli chain, exactly as governance events record it."
+        },
+        "role": {
+          "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "description": "Exact HEAD commit of the working tree when the item was created."
+        }
+      }
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4}$",
+      "description": "Present only when the creator passed an explicit --round. Never inferred from the session, the branch, or the active round."
+    },
+    "status": {
+      "enum": ["open", "resolved"]
+    },
+    "resolution": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Reference that closes the item: a commit, a pull request, a decision record, a task id, or another backlog item. Present exactly when status is resolved."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolved_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Null while the item is open; set once by backlog resolve."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "resolved"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["resolution"],
+        "properties": {
+          "resolved_at": {
+            "type": "string"
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": ["resolution"]
+        },
+        "properties": {
+          "resolved_at": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "BL-0001",
+      "kind": "finding",
+      "class": "tests",
+      "title": "Sensor inventory test depends on directory listing order",
+      "body": "packages/sensors/tests/unit/inventory.test.ts asserts an array built from readdirSync without sorting; it passes on APFS and fails on ext4.",
+      "origin": {
+        "session": "DIRECT-CLI-0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+        "role": "engineer",
+        "commit": "f537a374f537a374f537a374f537a374f537a374"
+      },
+      "status": "open",
+      "created_at": "2026-09-26T14:05:00Z",
+      "resolved_at": null
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "id": "BL-0002",
+      "kind": "flaky-test",
+      "class": "tests",
+      "title": "live-ledger-workflow times out under parallel shards",
+      "body": "Observed twice in CI shard 06; passes in isolation.",
+      "origin": {
+        "session": "AUTH-SESSION-abcdefghijklmnopqrstuvwx",
+        "role": "inspector",
+        "commit": "6f772ffc6f772ffc6f772ffc6f772ffc6f772ffc"
+      },
+      "round_id": "R-0105",
+      "status": "resolved",
+      "resolution": "TASK-0172",
+      "created_at": "2026-09-26T14:10:00Z",
+      "resolved_at": "2026-09-27T09:00:00Z"
+    }
+  ]
+}

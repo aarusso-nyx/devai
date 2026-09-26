@@ -163,7 +163,8 @@
                       "release",
                       "task",
                       "catalog",
-                      "triage"
+                      "triage",
+                      "backlog"
                     ]
                   }
                 ]

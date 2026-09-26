@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/backlog-list-output.schema.json",
+  "title": "Backlog list output",
+  "description": "The success payload of backlog list: every repository backlog item that matched the invocation's filters, in ascending id order, each validated against backlog-item.schema.json. An empty items array is a valid, complete answer and never an error.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "items"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "backlog-item.schema.json"
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "items": [
+        {
+          "schemaVersion": "1.0.0",
+          "id": "BL-0001",
+          "kind": "note",
+          "title": "Round plan should surface open backlog items",
+          "body": "Doctor lists open items; round plan should too so a planner sees them before scoping tasks.",
+          "origin": {
+            "session": "DIRECT-CLI-0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+            "role": "architect",
+            "commit": "f537a374f537a374f537a374f537a374f537a374"
+          },
+          "status": "open",
+          "created_at": "2026-09-26T14:05:00Z",
+          "resolved_at": null
+        }
+      ]
+    }
+  ]
+}
