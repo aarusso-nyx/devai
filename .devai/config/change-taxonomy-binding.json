@@ -28,7 +28,7 @@
     { "selector": { "kind": "prefix", "pattern": "packages/spec/src/" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/utils/src/" }, "class": "code" },
     { "selector": { "kind": "glob", "pattern": "packages/*/scripts/**" }, "class": "code" },
-    { "selector": { "kind": "glob", "pattern": "packages/*/package.json" }, "class": "code" },
+    { "selector": { "kind": "glob", "pattern": "packages/*/package.json" }, "class": "toolchain" },
     { "selector": { "kind": "glob", "pattern": "packages/*/tsconfig*.json" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "tests/" }, "class": "tests" },
     { "selector": { "kind": "glob", "pattern": "packages/*/tests/**" }, "class": "tests" },
