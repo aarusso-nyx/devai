@@ -24,6 +24,10 @@
     "support": { "enum": ["preview", "current", "lts"] },
     "support_promotion": { "type": "boolean" },
     "change_kind": { "enum": ["documentation", "metadata", "behavioral"] },
+    "channel": {
+      "enum": ["alpha", "beta", "rc", "stable"],
+      "description": "Optional prerelease channel derived from target_version under the lifecycle policy prerelease ladder (ADR-REL-0028): the rung named by the prerelease identifier, or stable when there is none. The kernel blocks when the declared channel disagrees with the version string."
+    },
     "changed_paths": {
       "type": "array",
       "uniqueItems": true,
