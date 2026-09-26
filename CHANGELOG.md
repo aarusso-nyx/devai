@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.6.0 — 2026-09-26
+
+- ADR-CHK-0002: declare toolchain identity in one manifest that workflows and preflight probes
+  consume, replacing pins scattered across scripts and CI (#95).
+- ADR-GOV-0017: classify every tracked path into one change class declared in law, giving commits
+  and checks a shared, closed vocabulary (#96).
+- ADR-GOV-0018, ADR-REL-0027: require semantic commit messages under a closed type grammar, forbid
+  commits that cross change-class families, and retire the unused changeset mechanism in favor of a
+  commit-derived version-bump floor (#97).
+- ADR-REL-0028: declare a prerelease channel ladder of alpha, beta, and rc rungs, each with its own
+  dist-tag and required verification capability (#98).
+- ADR-GOV-0019: add a repository backlog action family with an opt-in GitHub Issues projection (#99).
+- ADR-CHK-0001: execute preflight probes as task DAG nodes with a `BLOCKED` outcome, reducing the
+  pull-request workflow to a three-step lane (#100).
+- ADR-SEC-0001: declare a credential requirements manifest and probe presence, scope, and expiry
+  through the consuming tool's own status command without reading values (#101).
+- ADR-CFG-0001: author the init plan through schema-driven prompts that replay as the existing
+  bind and apply actions and print the exact argv they executed (#102).
+- Record the CMP-0001 workflow-economy campaign contract and its activation plan with accepted
+  records and model tiers (#92, #94).
+- Retain immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider; the
+  verifier payload is unchanged.
+
 ## 1.5.7 — 2026-09-26
 
 - Bind check-runner task keys to the descriptor as authored in `test-tasks.json`. Mutation
