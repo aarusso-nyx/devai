@@ -18,8 +18,17 @@ const args =
         ]
       : null;
 if (!args || !identity) throw new Error('PUBLICATION_STATE_USAGE');
-const result = spawnSync(args[0], args.slice(1), { encoding: 'utf8' });
-if (result.status !== 0) throw new Error('PUBLICATION_STATE_UNKNOWN');
+// The release collection already exceeds Node's default 1 MiB spawn buffer; a truncated
+// read terminates the child and must surface as UNKNOWN, never as absence.
+const result = spawnSync(args[0], args.slice(1), {
+  encoding: 'utf8',
+  maxBuffer: 512 * 1024 * 1024,
+});
+if (result.status !== 0) {
+  if (result.error) process.stderr.write(`${result.error.message}\n`);
+  if (result.stderr) process.stderr.write(result.stderr);
+  throw new Error('PUBLICATION_STATE_UNKNOWN');
+}
 const value = JSON.parse(result.stdout);
 if (!Array.isArray(value)) throw new Error('PUBLICATION_STATE_UNKNOWN');
 if (kind === 'release') {
