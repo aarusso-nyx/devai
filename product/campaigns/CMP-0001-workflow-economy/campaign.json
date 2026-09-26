@@ -582,7 +582,7 @@
       "id": "R-0104",
       "title": "Preflight probes and credential requirements",
       "goal": "Environment failures are BLOCKED probes, never FAIL results; credentials are declared per effect and probed without reading values.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-CHK-0001", "ADR-SEC-0001"],
       "depends_on": ["R-0101", "R-0102"],
       "attestation_reissue": true,
@@ -789,7 +789,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -833,8 +833,8 @@
                 "path": "prompts/TASK-0151.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/101",
+              "merged_as": "18a1210071e5712b5c3dfb2f832e0176b08d3c32",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -847,7 +847,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0151",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -872,8 +872,8 @@
                 "path": "prompts/TASK-0152.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/101",
+              "merged_as": "9e0dd5c12689781e682affbc970b9b00249a5799",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -886,7 +886,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0152",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -919,8 +919,8 @@
                 "path": "prompts/TASK-0153.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/101",
+              "merged_as": "c8e55e1931630f9f8fa6613ad5d4b7f2afb58b2e",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -929,7 +929,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "8e616c17692dc36bd9cd14a1a11f055e371c76bf",
+        "closed_at": "2026-09-26T13:36:28Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0105",
@@ -1305,7 +1311,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "pre_merge",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -1355,7 +1361,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0181",
-              "status": "checkpoint",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1391,7 +1397,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0182",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
