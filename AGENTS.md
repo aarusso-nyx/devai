@@ -11,6 +11,8 @@ development: human maintainers choose scope, review changes, and decide releases
 - Run the smallest trustworthy checks affected by the change. Reuse fresh evidence for
   untouched areas; reserve full Vitest and coverage for explicit RC gates.
 - Read command output and `git diff --check` before committing. Keep commits coherent.
+- Before opening a pull request, fetch the base branch and run the local preflight against
+  that fetched base; a `BLOCKED` probe names the environment fix, not a candidate defect.
 - Write commit subjects as `type(scope)!: subject` from the closed type set in
   `law/policy/commit-grammar.json`, and keep every commit inside one change family from
   `law/policy/change-taxonomy.json`; only the pairings that policy lists may cross families.
