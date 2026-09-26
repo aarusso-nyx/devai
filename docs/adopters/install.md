@@ -63,6 +63,11 @@ pnpm exec devai init plan \
 Review the target, tier, existing-file decisions, and every projected operation.
 Planning does not authorize an apply.
 
+If you would rather answer prompts than assemble the flags below by hand, `init plan --interactive`
+drives the same plan from the configuration schemas and ends by printing the exact non-interactive
+commands it ran, so the record stays a replayable command. See
+[Interactive configuration](interactive-configuration.md) for the two modes and what each refuses.
+
 `doctor` is also safe before binding. Its missing-binding findings are a structured
 `review` result, not a transport failure.
 
