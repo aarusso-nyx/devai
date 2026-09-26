@@ -29,6 +29,7 @@ jobs:
       - name: Set up verifier runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
       - name: Materialize protected DEVAI verifier package
         id: verifier-package
