@@ -241,6 +241,7 @@ const CURRENT_ONLY_SELECTORS = new Set([
   'action-effects',
   'adrs',
   'blueprint',
+  'change-taxonomy',
   'ci-economy',
   'cli-reference',
   'dependencies',

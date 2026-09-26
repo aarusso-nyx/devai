@@ -204,6 +204,7 @@ describe('S06-A policy parsing and public selection residuals', () => {
       'action-effects',
       'adrs',
       'blueprint',
+      'change-taxonomy',
       'ci-economy',
       'cli-reference',
       'dependencies',
