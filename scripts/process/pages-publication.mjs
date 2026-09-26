@@ -85,8 +85,16 @@ export async function publishPages({ identity, artifactId, controls }) {
   let record = journal.records.length ? journalRecord(journal.records[0], identity) : null;
   const effect = await controls.readEffect(identity);
   if (!['matching', 'confirmed-missing', 'unknown'].includes(effect)) fail('EFFECT_UNKNOWN');
-  if (effect === 'matching')
+  if (effect === 'matching') {
+    // Bytes that already serve still leave a submitted intent open, and an open
+    // intent blocks every later publication as OTHER_PUBLICATION_UNRESOLVED.
+    // Close it here after observing that exact Pages deployment.
+    if (record?.phase === 'submitted') {
+      if ((await controls.observe(record.pagesId)) !== 'succeeded') fail('DEPLOYMENT_UNRESOLVED');
+      await controls.recordVerified({ ...record, phase: 'verified' });
+    }
     return { outcome: 'no-op', identitySha256: digest, buildInvocations: 0 };
+  }
   if (record?.phase === 'verified') fail('VERIFIED_EFFECT_MISSING');
   if (record?.phase === 'intent') fail('SUBMISSION_UNKNOWN');
   if (!record) {
