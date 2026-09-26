@@ -168,6 +168,7 @@ describe('check facade task-runner boundary', () => {
       ['--mutation-current <path>', 'Mutation current report for --only mutation'],
       ['--mutation-thresholds <path>', 'Mutation thresholds for --only mutation'],
       ['--affected', 'Select tasks affected since the exact --base commit'],
+      ['--preflight', 'Select the preflight probe nodes; --base names the freshly fetched base'],
       ['--local', 'Select the complete cheap local task closure'],
       ['--rc', 'Select the fixed release-candidate task closure'],
       [

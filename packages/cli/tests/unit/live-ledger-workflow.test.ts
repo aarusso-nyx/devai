@@ -984,7 +984,10 @@ describe('remote preflight workflow', () => {
     {
       name: 'a script outside the cheap local closure',
       mutate: (source: string) =>
-        source.replace('run: pnpm run release:bootstrap', 'run: pnpm publish --no-git-checks'),
+        source.replace(
+          '          pnpm run release:bootstrap\n',
+          '          pnpm publish --no-git-checks\n',
+        ),
       diagnostic: 'CI_PREFLIGHT_SCRIPT_NOT_ALLOWED',
     },
     {
@@ -1017,8 +1020,8 @@ describe('remote preflight workflow', () => {
       name: 'a step on the evidence path',
       mutate: (source: string) =>
         source.replace(
-          'run: pnpm run release:bootstrap',
-          'run: node ./export-receipt.mjs --attest',
+          '          pnpm run release:bootstrap\n',
+          '          node ./export-receipt.mjs --attest\n',
         ),
       diagnostic: 'CI_PREFLIGHT_NON_ATTESTING_VIOLATION',
     },
