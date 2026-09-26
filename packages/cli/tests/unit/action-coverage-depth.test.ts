@@ -42,12 +42,12 @@ describe('action coverage scope and discovery boundaries', () => {
     expect(result).toMatchObject({
       ok: false,
       scope: 'self',
-      registeredCount: 57,
-      inScopeCount: 57,
+      registeredCount: 61,
+      inScopeCount: 61,
       claimedCount: 0,
       orphanClaims: [],
     });
-    expect(result.unclaimed).toHaveLength(57);
+    expect(result.unclaimed).toHaveLength(61);
     expect(result.unclaimed).toContain('release publish');
     expect(result.unclaimed).toContain('sense inventory');
     expect(result).not.toHaveProperty('adopterFacingAuthorities');

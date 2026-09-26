@@ -132,10 +132,10 @@ describe('canonical action registry constructor', () => {
     ).toThrow("action 'round close' status differs from the canonical registry");
   });
 
-  it('always constructs the complete 57-action surface without handler registration', () => {
+  it('always constructs the complete 61-action surface without handler registration', () => {
     const first = canonicalRegistry();
     const second = canonicalRegistry();
-    expect(first).toHaveLength(57);
+    expect(first).toHaveLength(61);
     expect(first.map((entry) => entry.name)).toContain('audit observe');
     expect(first.map((entry) => entry.name)).toContain('triage classify');
     expect(second).toEqual(first);
