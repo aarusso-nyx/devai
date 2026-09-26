@@ -25,3 +25,20 @@ The inherited rules are documented in
 [documentation layout](../adopters/docs-layout.md) and
 [CI economy](../adopters/ci-economy.md), with enforcement owned by the current
 package checks. The historical ADRs must not be treated as present product contracts.
+
+## Toolchain manifest follow-ups
+
+Round R-0101 of campaign CMP-0001 bound the manifest into the runner's
+toolchain digest but not into per-task keys, because the vendored evidence
+verifier rebuilds task keys without a manifest field and ledger verification
+compares the two byte for byte. Folding the manifest into task keys needs a
+verifier release. Until then a manifest edit re-keys only tasks whose input
+selectors cover `.devai/config/toolchain.json`.
+
+Inline versions still exist outside the manifest in
+`scripts/release-host/install-toolchain.mjs`,
+`scripts/release-host/provision-dependencies.mjs`, and the node version the
+CI scaffold emits from `packages/cli/src/services/ci-scaffold`. The preflight
+workflow echoes verifier version 1.5.1 for the in-repo vendored verifier
+while the trusted provider is 1.5.4; the checker deliberately does not compare
+that literal.
