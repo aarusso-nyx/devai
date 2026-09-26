@@ -175,3 +175,62 @@ into every task key from it, so editing the manifest invalidates every cached
 result. A host whose observed version differs from a declared runtime is reported
 as a `BLOCKED` probe naming the observed and required values rather than as a
 silent cache miss.
+
+## Preflight probes
+
+A node whose `runner` is `preflight-v1` declares no `argv`. It carries a `probes`
+array instead, each item conforming to `law/schemas/preflight-probe.schema.json`,
+schema version `1.0.0`, and the runner selects the node unconditionally for every
+target so the same probe list executes locally and in the pull-request lane
+(ADR-CHK-0001). Each probe names its `class`: an `extrinsic` probe observes the
+host, a remote, a credential, or the fetched base, and a mismatch yields the
+`BLOCKED` task outcome, marks every dependent node blocked-environment, and is
+never written to the cache; an `intrinsic` probe observes the candidate itself and
+a mismatch yields `FAIL` like any other node. `BLOCKED` is therefore the fifth task
+outcome beside `PASS`, `FAIL`, `SKIPPED`, and `CACHED`. Every probe prints its
+`expected` value, its redacted `observed` value, and its `remediation`, so the
+report names the fix before any expensive node runs. Probe kinds are
+`environment`, `file`, `command`, `git`, `registry`, `toolchain`, and `credential`;
+the last two read the toolchain manifest above and the credential manifest.
+
+Example node:
+
+```json
+{
+  "nodeId": "preflight",
+  "dependencies": [],
+  "cwd": ".",
+  "runner": "preflight-v1",
+  "probes": [
+    {
+      "id": "base-fetched",
+      "class": "extrinsic",
+      "probe": { "kind": "git", "check": "base-up-to-date", "base": "origin/main" },
+      "expected": "candidate contains the fetched origin/main",
+      "observed": null,
+      "status": "pass",
+      "remediation": "Run git fetch origin main and merge or rebase the candidate onto it.",
+      "depends_on": []
+    },
+    {
+      "id": "toolchain",
+      "class": "extrinsic",
+      "probe": { "kind": "toolchain", "manifest_path": ".devai/config/toolchain.json" },
+      "expected": "runtimes match .devai/config/toolchain.json",
+      "observed": null,
+      "status": "pass",
+      "remediation": "Install the runtime versions declared in .devai/config/toolchain.json.",
+      "depends_on": ["base-fetched"]
+    }
+  ],
+  "inputSelectors": [{ "kind": "exact", "pattern": ".devai/config/toolchain.json" }],
+  "toolchainKeys": ["node", "pnpm", "git"],
+  "allowlistedEnv": [],
+  "outputContract": { "kind": "probes", "requiredStatus": "pass" }
+}
+```
+
+Make every other node depend on `preflight`, directly or through its dependency
+chain, so a blocked environment stops the plan before the first suite starts.
+Run `devai check --affected --base <fetched-base-commit>` locally before opening a
+pull request; the lane runs the same descriptor against the same base.
