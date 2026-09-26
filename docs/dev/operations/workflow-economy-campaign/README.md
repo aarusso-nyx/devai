@@ -18,6 +18,21 @@ Its structure is `law/schemas/campaign.schema.json`; its semantics are
   are disjoint.
 - **Task.** One role, one session, one branch, one pull request, one boundary.
 
+## Models, effort, and time
+
+Every task carries an `execution` block with a tier and an effort. The
+tiers are the only model names prompts use; `models.tiers` in the campaign
+document maps each tier to a Claude model and a Codex model, and that map is
+the place to change when models evolve. Today: architect is Fable 5.1 or
+Astra 6, worker-high is Opus 5.5 or Sol 6, worker is Sonnet 5 or Terra 6,
+clerk is Haiku 4.5 or Luna 6. The orchestrator runs at the architect tier.
+
+Escalation is the orchestrator's call: after one failed iteration, a blocked
+report, or a time budget exceeded without a pull request, rerun the task one
+rank up, up to the architect tier. A second failure at the ceiling is a gap
+for a human. Every prompt states that time matters and that partial progress
+beats perfection.
+
 ## Opening a round
 
 1. The Architect sets each of the round's records to `accepted` in a
