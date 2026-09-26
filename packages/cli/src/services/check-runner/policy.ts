@@ -354,9 +354,25 @@ export function withoutMutationTestTasks(descriptor: TaskDescriptor): TaskDescri
   };
 }
 
+/**
+ * Digest of the descriptor as the adopter wrote it, keyed by the parsed
+ * (mutation-stripped) descriptor. Mutation stripping narrows selection only;
+ * task keys must bind the authored bytes so the package-owned evidence
+ * verifier, which reconstructs policy from the committed test-tasks.json,
+ * derives the same keys.
+ */
+const authoredDescriptorDigests = new WeakMap<TaskDescriptor, string>();
+
+export function taskDescriptorDigest(descriptor: TaskDescriptor): string {
+  return authoredDescriptorDigests.get(descriptor) ?? sha256Hex(descriptor);
+}
+
 export function parseTaskDescriptor(value: unknown): TaskDescriptor {
   try {
-    return withoutMutationTestTasks(validateDescriptor(value));
+    const validated = validateDescriptor(value);
+    const parsed = withoutMutationTestTasks(validated);
+    authoredDescriptorDigests.set(parsed, taskDescriptorDigest(validated));
+    return parsed;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('CHECK_RUNNER_DESCRIPTOR:')) throw error;
     throw new Error(
@@ -714,7 +730,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     ),
     options.releaseAffectedSelection,
   );
-  const descriptorDigest = sha256Hex(descriptor);
+  const descriptorDigest = taskDescriptorDigest(options.descriptor);
   const ordered = topologicalTasks(descriptor);
   const outputContracts = new Map(
     ordered.map((task) => [

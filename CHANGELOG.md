@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.7 — 2026-09-26
+
+- Bind check-runner task keys to the descriptor as authored in `test-tasks.json`. Mutation
+  retirement still removes mutation tasks from selection, but the descriptor digest no longer
+  hashes the stripped copy, so an adopter that keeps an optional manual `test:mutation` node gets
+  the same RC task policy the package-owned verifier reconstructs, and local RC export no longer
+  fails with `POLICY_DIGEST_MISMATCH`.
+- Task keys change once for descriptors that contain retired mutation tasks; all other
+  descriptors keep identical keys.
+- Retain immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider; the
+  verifier payload is unchanged.
+
 ## 1.5.6 — 2026-09-22
 
 - Materialize the immutable proof commit as an inert archive before strict bundle verification so checkout-owned Git administration is excluded without weakening bundle population checks.
