@@ -684,7 +684,7 @@
                   "law/policy/adopter-defaults/credential-requirements-binding.json",
                   "packages/cli/src/commands/check/schemas.ts",
                   "docs/adopters/install.md",
-                  "docs/dev/security/security-policy.md"
+                  "docs/dev/security/secret-handling.md"
                 ],
                 "forbidden": [".github/workflows/", "scripts/"]
               },
@@ -692,7 +692,7 @@
                 "A schema for credential entries: kind, scope, consumer, absence behavior.",
                 "DEVAI's manifest enumerating every secret the three workflows reference and every local credential the install guide requires.",
                 "An adopter default binding.",
-                "The boundary statement in the security policy: presence, shape, scope verified; values never read."
+                "The boundary statement in the secret handling guide: presence, shape, scope verified; values never read."
               ],
               "acceptance_commands": [
                 [
@@ -900,7 +900,7 @@
                 "paths": [
                   "scripts/release-channel.mjs",
                   "scripts/create-release-manifest.mjs",
-                  "packages/cli/src/services/release-plan.ts",
+                  "packages/cli/src/services/release-profile.ts",
                   "packages/cli/src/services/release-preflight.ts",
                   ".github/workflows/release.yml",
                   "docs/reference/scripts.md"
@@ -1038,7 +1038,7 @@
                   "packages/cli/src/command-manifest.ts",
                   "packages/cli/src/commands/doctor.ts",
                   "packages/cli/src/commands/round/workflow.ts",
-                  "packages/cli/src/services/github-issues-tracking/projection.ts",
+                  "packages/cli/src/services/github-issues-tracking/projector.ts",
                   "docs/reference/cli/index.md"
                 ],
                 "forbidden": ["tests/", "packages/cli/tests/", "packages/loop/tests/", "law/"]
