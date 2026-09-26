@@ -347,8 +347,71 @@ export function certificationEnvironment(config, descriptor) {
   return environment;
 }
 
+const CREDENTIAL_MANIFEST = fileURLToPath(
+  new URL('../../law/policy/credential-requirements.json', import.meta.url),
+);
+const WORKFLOW_SECRET_KINDS = new Set(['repository-secret', 'environment-secret']);
+
+/**
+ * ADR-SEC-0001 IA-004: the first job of a release or ledger workflow names every
+ * secret the manifest declares for that workflow job and stops when one that
+ * blocks is absent, before any build or verification step. The job passes each
+ * secret as a presence flag under the secret's own name (`secrets.NAME != ''`),
+ * so no value ever reaches this process; any non-empty value other than
+ * `false` also counts as present when run by hand.
+ */
+export function inspectWorkflowCredentials(manifest, workflow, job, environment = process.env) {
+  requireValue(Array.isArray(manifest?.entries), 'CREDENTIAL_MANIFEST_INVALID');
+  const checks = manifest.entries
+    .filter(
+      (entry) =>
+        WORKFLOW_SECRET_KINDS.has(entry.kind) &&
+        Array.isArray(entry.consumer) &&
+        entry.consumer.some((consumer) => consumer?.workflow === workflow && consumer?.job === job),
+    )
+    .map((entry) => {
+      const flag = environment[entry.id];
+      const present = typeof flag === 'string' && flag !== '' && flag !== 'false';
+      return {
+        id: entry.id,
+        scope: entry.scope,
+        absence: entry.absence,
+        status: present ? 'present' : 'absent',
+      };
+    });
+  requireValue(checks.length > 0, 'CREDENTIAL_CONSUMER_UNDECLARED');
+  return {
+    schemaVersion: '1.0.0',
+    phase: 'credentials',
+    workflow,
+    job,
+    ok: checks.every((check) => check.status === 'present' || check.absence !== 'block'),
+    checks,
+  };
+}
+
+function runCredentials(workflow, job) {
+  requireValue(
+    /^\.github\/workflows\/[a-z0-9-]+\.ya?ml$/u.test(workflow ?? '') &&
+      /^[a-z][a-z0-9-]*$/u.test(job ?? ''),
+    'USAGE',
+  );
+  const report = inspectWorkflowCredentials(read(CREDENTIAL_MANIFEST), workflow, job);
+  process.stdout.write(`${JSON.stringify(report)}\n`);
+  for (const check of report.checks.filter((entry) => entry.status === 'absent')) {
+    process.stderr.write(
+      `CREDENTIAL_ABSENT:${check.id} scope=${check.scope} absence=${check.absence}\n`,
+    );
+  }
+  process.exitCode = report.ok ? 0 : 1;
+}
+
 function run() {
   const [phase, configPath, receiptPath] = process.argv.slice(2);
+  if (phase === 'credentials') {
+    runCredentials(configPath, receiptPath);
+    return;
+  }
   requireValue(
     ['prerequisites', 'certify', 'evidence'].includes(phase) && configPath && receiptPath,
     'USAGE',

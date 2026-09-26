@@ -19,6 +19,13 @@ export const TOOLCHAIN_MANIFEST_RELATIVE_PATH = '.devai/config/toolchain.json';
 const DEFAULT_TOOLCHAIN_MANIFEST_PATH = fileURLToPath(
   new URL(`../${TOOLCHAIN_MANIFEST_RELATIVE_PATH}`, import.meta.url),
 );
+// ADR-SEC-0001: every secret a workflow job references must be declared by the
+// credential manifest for that workflow and job, and every workflow consumer the
+// manifest declares must be referenced. Action and command consumers are exempt.
+export const CREDENTIAL_MANIFEST_RELATIVE_PATH = 'law/policy/credential-requirements.json';
+const DEFAULT_CREDENTIAL_MANIFEST_PATH = fileURLToPath(
+  new URL(`../${CREDENTIAL_MANIFEST_RELATIVE_PATH}`, import.meta.url),
+);
 const GIT_OBJECT_ID = /^[0-9a-f]{40}$/u;
 const EXACT_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+$/u;
 
@@ -342,12 +349,103 @@ export function checkWorkflowTree(root = process.cwd()) {
       ),
     );
   }
+  const sources = new Map();
   for (const file of files) {
     const path = join(root, '.github/workflows', file);
     const source = readFileSync(path, 'utf8');
+    sources.set(file, source);
     checkWorkflow(file, source, findings, pins);
   }
+  checkCredentialBijection(root, sources, findings);
   return { ok: findings.length === 0, files, findings };
+}
+
+function loadCredentialManifest(root, findings) {
+  const rootPath = join(root, CREDENTIAL_MANIFEST_RELATIVE_PATH);
+  const path = existsSync(rootPath) ? rootPath : DEFAULT_CREDENTIAL_MANIFEST_PATH;
+  try {
+    const entries = JSON.parse(readFileSync(path, 'utf8')).entries;
+    if (!Array.isArray(entries)) throw new Error('entries must be an array');
+    return entries.map(object).filter((entry) => typeof entry.id === 'string');
+  } catch (error) {
+    findings.push(
+      finding(
+        'CI_CREDENTIAL_MANIFEST_INVALID',
+        CREDENTIAL_MANIFEST_RELATIVE_PATH,
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+    return undefined;
+  }
+}
+
+/** Credential names a workflow fragment references: secrets.NAME, secrets['NAME'], github.token. */
+export function credentialReferences(value) {
+  const text = JSON.stringify(value) ?? '';
+  const names = new Set();
+  for (const match of text.matchAll(
+    /\bsecrets\s*(?:\.\s*([A-Za-z_][A-Za-z0-9_]*)|\[\s*\\?['"]([A-Za-z_][A-Za-z0-9_]*)\\?['"]\s*\])/gu,
+  )) {
+    names.add(match[1] ?? match[2]);
+  }
+  if (/\bgithub\s*\.\s*token\b/u.test(text)) names.add('GITHUB_TOKEN');
+  return names;
+}
+
+function checkCredentialBijection(root, sources, findings) {
+  const entries = loadCredentialManifest(root, findings);
+  if (entries === undefined) return;
+  const declared = new Set();
+  for (const entry of entries) {
+    for (const consumer of Array.isArray(entry.consumer) ? entry.consumer.map(object) : []) {
+      if (typeof consumer.workflow === 'string' && typeof consumer.job === 'string') {
+        declared.add(`${consumer.workflow}#${consumer.job}#${entry.id}`);
+      }
+    }
+  }
+  const referenced = new Set();
+  for (const [file, source] of sources) {
+    const document = parseDocument(source, { uniqueKeys: true });
+    if (document.errors.length > 0) continue;
+    const workflow = object(document.toJS());
+    const workflowPath = `.github/workflows/${file}`;
+    const { jobs, ...workflowLevel } = workflow;
+    for (const name of credentialReferences(workflowLevel)) {
+      findings.push(
+        finding(
+          'CI_CREDENTIAL_SCOPE_INVALID',
+          file,
+          `${name} is referenced at workflow level; reference it inside the consuming job`,
+        ),
+      );
+    }
+    for (const [job, value] of Object.entries(object(jobs))) {
+      for (const name of credentialReferences(value)) {
+        referenced.add(`${workflowPath}#${job}#${name}`);
+        if (!declared.has(`${workflowPath}#${job}#${name}`)) {
+          findings.push(
+            finding(
+              'CI_CREDENTIAL_UNDECLARED',
+              file,
+              `jobs.${job} references ${name}, which ${CREDENTIAL_MANIFEST_RELATIVE_PATH} does not declare for ${workflowPath} job ${job}`,
+            ),
+          );
+        }
+      }
+    }
+  }
+  for (const key of [...declared].sort()) {
+    const [workflowPath, job, name] = key.split('#');
+    const file = workflowPath.slice('.github/workflows/'.length);
+    if (!sources.has(file) || referenced.has(key)) continue;
+    findings.push(
+      finding(
+        'CI_CREDENTIAL_UNREFERENCED',
+        file,
+        `${name} is declared for ${workflowPath} job ${job}, which never references it`,
+      ),
+    );
+  }
 }
 
 function checkOrdinaryLedgerWorkflow(file, workflow, findings) {
