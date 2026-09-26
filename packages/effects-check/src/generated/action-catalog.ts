@@ -15,6 +15,30 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: ['proc:git'],
   },
   {
+    action_id: 'backlog add',
+    public_action_id: 'backlog add',
+    effect: 'local-write',
+    capabilities: ['fs:f5-state', 'fs:workspace', 'proc:git'],
+  },
+  {
+    action_id: 'backlog list',
+    public_action_id: 'backlog list',
+    effect: 'read',
+    capabilities: [],
+  },
+  {
+    action_id: 'backlog resolve',
+    public_action_id: 'backlog resolve',
+    effect: 'local-write',
+    capabilities: ['fs:f5-state', 'fs:workspace', 'proc:git'],
+  },
+  {
+    action_id: 'backlog show',
+    public_action_id: 'backlog show',
+    effect: 'read',
+    capabilities: [],
+  },
+  {
     action_id: 'catalog actions',
     public_action_id: 'catalog actions',
     effect: 'read',

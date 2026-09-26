@@ -46,7 +46,7 @@
     "policy": "law/policy/trusted-local-rc-verifier-package.json"
   },
   "constants": {
-    "expected_action_count": 57,
+    "expected_action_count": 61,
     "ledger_environment": "devai-ledger-verification"
   }
 }
