@@ -191,6 +191,23 @@ function objectContentDigests(
   return digests;
 }
 
+/**
+ * Read-only Git text for preflight probes through the closed check-policy
+ * grammar; a refused or failing read is undefined, never a crash. This is the
+ * only door the preflight runner has to Git, so ownership stays here.
+ */
+export function readPreflightGitText(
+  repoRoot: string,
+  args: readonly string[],
+): string | undefined {
+  try {
+    const result = git(repoRoot, args);
+    return typeof result === 'string' ? result : result.toString('utf8');
+  } catch {
+    return undefined;
+  }
+}
+
 function gitText(repoRoot: string, args: readonly string[]): string {
   return String(git(repoRoot, args));
 }

@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { readCheckPolicyGitSync, spawnSync } from '@devai-nyx/authority';
+import { spawnSync } from '@devai-nyx/authority';
+import { readPreflightGitText } from './policy.js';
 import { probeCredential, redactDiagnosticText } from '../credential-probe.js';
 import type {
   PreflightProbe,
@@ -205,11 +206,7 @@ export function adopterPreflightNode(probes: readonly PreflightProbe[]): TaskDes
 
 /** Read-only Git through the closed check-policy grammar; never a task process. */
 function policyGit(repoRoot: string, args: readonly string[]): string | undefined {
-  try {
-    return readCheckPolicyGitSync(repoRoot, args).toString('utf8');
-  } catch {
-    return undefined;
-  }
+  return readPreflightGitText(repoRoot, args);
 }
 
 /** A host process whose refusal or failure is an unobservable fact, never a crash. */
