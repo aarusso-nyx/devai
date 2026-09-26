@@ -112,6 +112,17 @@ export function checkCampaign(root, campaignDir) {
         if (!body.includes(task.id)) problem(`${task.id} prompt does not name the task`);
         const role = task.discipline[0].toUpperCase() + task.discipline.slice(1);
         if (!body.includes(`Role: ${role}`)) problem(`${task.id} prompt does not declare ${role}`);
+        if (campaign.models.tiers[task.execution.tier] === undefined) {
+          problem(
+            `${task.id} execution tier ${task.execution.tier} is not declared in models.tiers`,
+          );
+        }
+        if (!body.includes(`Tier: ${task.execution.tier}`)) {
+          problem(`${task.id} prompt does not state its tier ${task.execution.tier}`);
+        }
+        if (!body.includes(`Effort: ${task.execution.effort}`)) {
+          problem(`${task.id} prompt does not state its effort ${task.execution.effort}`);
+        }
         if (CREDENTIAL_SHAPE.test(body)) problem(`${task.id} prompt contains a credential shape`);
         const blocks = [...body.matchAll(/```bash\n([\s\S]*?)```/gu)].flatMap((match) =>
           match[1]
