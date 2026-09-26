@@ -1,0 +1,102 @@
+[
+  {
+    "id": "base-up-to-date",
+    "class": "extrinsic",
+    "probe": { "kind": "git", "check": "base-up-to-date" },
+    "expected": "the candidate contains the freshly fetched base",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Run git fetch origin main, then rebase the candidate onto origin/main and pass --base origin/main.",
+    "depends_on": []
+  },
+  {
+    "id": "clean-tree",
+    "class": "intrinsic",
+    "probe": { "kind": "git", "check": "clean-tree" },
+    "expected": "no tracked or untracked change is pending",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Commit or remove every pending change so the candidate is exactly the commit under review.",
+    "depends_on": []
+  },
+  {
+    "id": "lockfile-present",
+    "class": "intrinsic",
+    "probe": { "kind": "file", "path": "pnpm-lock.yaml", "must_exist": true },
+    "expected": "pnpm-lock.yaml is present",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Run pnpm install and commit pnpm-lock.yaml.",
+    "depends_on": []
+  },
+  {
+    "id": "constitution-present",
+    "class": "intrinsic",
+    "probe": { "kind": "file", "path": "law/constitution.md", "must_exist": true },
+    "expected": "law/constitution.md is present",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Restore law/constitution.md from the base.",
+    "depends_on": []
+  },
+  {
+    "id": "toolchain",
+    "class": "extrinsic",
+    "probe": { "kind": "toolchain", "manifest_path": ".devai/config/toolchain.json" },
+    "expected": "node major, pnpm version, and git major match .devai/config/toolchain.json",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Install the node major, pnpm version, and git major declared in .devai/config/toolchain.json.",
+    "depends_on": []
+  },
+  {
+    "id": "policy-materialization",
+    "class": "intrinsic",
+    "probe": {
+      "kind": "command",
+      "argv": ["node", "scripts/check-policy-materialization.mjs"],
+      "expected_exit": 0
+    },
+    "expected": "the materialized adopter policy matches law",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Rematerialize the adopter policy and commit the generated files.",
+    "depends_on": ["toolchain"]
+  },
+  {
+    "id": "commit-range",
+    "class": "intrinsic",
+    "probe": {
+      "kind": "command",
+      "argv": ["node", "scripts/check-commit-range.mjs", "{base}", "HEAD"],
+      "expected_exit": 0
+    },
+    "expected": "every commit from the base to HEAD satisfies the commit grammar",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Reword or split the commits named by scripts/check-commit-range.mjs.",
+    "depends_on": ["base-up-to-date"]
+  },
+  {
+    "id": "change-taxonomy",
+    "class": "intrinsic",
+    "probe": {
+      "kind": "command",
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "change-taxonomy",
+        "--format",
+        "json"
+      ],
+      "expected_exit": 0
+    },
+    "expected": "every changed path is classified by the change taxonomy",
+    "observed": null,
+    "status": "pass",
+    "remediation": "Bind every unclassified path in .devai/config/change-taxonomy-binding.json, or run pnpm run release:bootstrap first.",
+    "depends_on": ["toolchain"]
+  }
+]
