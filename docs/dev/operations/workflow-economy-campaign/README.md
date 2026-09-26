@@ -18,6 +18,14 @@ Its structure is `law/schemas/campaign.schema.json`; its semantics are
   are disjoint.
 - **Task.** One role, one session, one branch, one pull request, one boundary.
 
+## Opening a round
+
+1. The Architect sets each of the round's records to `accepted` in a
+   `law(adr)` commit, after the Inspector acceptance items are agreed.
+2. Confirm every round in `depends_on` is `closed`.
+3. Set the round to `open` in the campaign document, in a `plan(campaign)`
+   commit, and run `pnpm run campaign:check`.
+
 ## Running a task
 
 1. Confirm the round is open: its records are accepted and its upstream
@@ -34,7 +42,21 @@ Its structure is `law/schemas/campaign.schema.json`; its semantics are
    the closure.
 
 The campaign document is the ledger. Update it after every merge and every
-close in a commit of type `plan(campaign)`.
+close in a commit of type `plan(campaign)`, and run `pnpm run campaign:check`
+before committing it.
+
+## Closing a round
+
+1. Run the universal close checks (`adrs`, `schemas`, `docs-links`,
+   `format:check:all`, `action-registry:check`) and the round's
+   `close_checks` on the merged head.
+2. Perform and date every owner effect the round requires.
+3. When `attestation_reissue` is true, record the new task-policy digest in
+   the round closure and re-issue the RC attestation for it as described in
+   [release discipline](../release-discipline.md) before any release plan
+   uses that head.
+4. Set the round to `closed` with its `closure` block in a `plan(campaign)`
+   commit.
 
 ## Self-dogfood limits
 
