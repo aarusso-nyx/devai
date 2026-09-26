@@ -48,6 +48,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'claim-runtime-inputs.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
+  'preflight-probe.schema.json',
   'prompt-composition.schema.json',
   'stack-adapter.schema.json',
   'task-freshness.schema.json',
