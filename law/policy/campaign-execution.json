@@ -179,7 +179,7 @@
     "base": "architect from the integration branch head; downstream positions from the upstream branch head, rebased after each upstream merge",
     "integration_branch": "main",
     "merge_method": "merge-commit-or-rebase; squash is forbidden because it recombines single-family commits",
-    "pull_request_cardinality": "exactly-one-per-task"
+    "pull_request_cardinality": "one-per-task, or one-per-wave when one orchestrator runs the wave's tasks in pipeline order as separate role-declared sessions on one branch; commits stay single-family and role-attributed either way"
   },
   "prompts": {
     "composition": ["preamble", "task"],
@@ -194,7 +194,9 @@
       "environment-value",
       "absolute-host-path"
     ],
-    "role_declaration": "the prompt states exactly one role and the session declares the same role"
+    "role_declaration": "the prompt states exactly one role and the session declares the same role",
+    "model_and_effort": "every task prompt states its tier and effort from the campaign models map; the host model behind a tier is resolved from that map, never named in the prompt",
+    "time_bound": "every prompt states that time matters: deliver the declared scope within the time budget, report partial progress rather than pursue perfection, and never widen scope to chase an unrelated improvement"
   },
   "commits": {
     "grammar": "type(scope): subject as declared by the campaign task commit_types until law/policy/commit-grammar.json exists, then that policy",
@@ -215,7 +217,8 @@
     "gap": "a missing or contradictory contract moves the task to blocked with the exact question; the responsible role answers in its own session",
     "automatic_retry": "forbidden",
     "dependent_after_failure": "a downstream task never starts on a failed or blocked upstream",
-    "rollback": "as law/policy/round-execution.json rollback: unmerged branches are abandoned, merged work is reverted by a new authorized commit"
+    "rollback": "as law/policy/round-execution.json rollback: unmerged branches are abandoned, merged work is reverted by a new authorized commit",
+    "escalation": "after one failed iteration or a blocked report the orchestrator re-runs the task one tier rank up, up to the ceiling; a second failure at the ceiling is a gap for a human"
   },
   "evidence": {
     "task_merge": ["pull_request", "merged_as"],
@@ -281,6 +284,8 @@
     "cross-family-commit",
     "squash-merge",
     "owner-effect-not-performed",
-    "attestation-not-reissued"
+    "attestation-not-reissued",
+    "unknown-tier",
+    "effort-outside-tier-grammar"
   ]
 }
