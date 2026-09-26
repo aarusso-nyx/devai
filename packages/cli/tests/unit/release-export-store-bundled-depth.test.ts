@@ -141,7 +141,9 @@ export class ProtectedCertificationContainer extends OriginalProtectedCertificat
                 if (/function bundledPackageAssets\(\)[^{]*\{\s*return undefined;\s*\}/u.test(code))
                   return code.replace(
                     /function bundledPackageAssets\(\)[^{]*\{\s*return undefined;\s*\}/u,
-                    `function bundledPackageAssets() { return ${JSON.stringify({ ...schemaAssets, 'sensor-registry.json': registry })}; }`,
+                    // A function replacer keeps `$` sequences in asset bytes literal.
+                    () =>
+                      `function bundledPackageAssets() { return ${JSON.stringify({ ...schemaAssets, 'sensor-registry.json': registry })}; }`,
                   );
                 return null;
               }
@@ -150,7 +152,7 @@ export class ProtectedCertificationContainer extends OriginalProtectedCertificat
                   `function ${selected[0]}\\(\\)(?:\\s*:[^{]+)?\\s*\\{\\s*return undefined;\\s*\\}`,
                   'u',
                 ),
-                `function ${selected[0]}() { return ${JSON.stringify(selected[1])}; }`,
+                () => `function ${selected[0]}() { return ${JSON.stringify(selected[1])}; }`,
               );
             },
           },
