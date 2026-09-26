@@ -38,6 +38,7 @@ concurrency:
   cancel-in-progress: false
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
+  # Literal checked against .devai/config/toolchain.json constants.expected_action_count by scripts/check-workflows.mjs.
   EXPECTED_ACTION_COUNT: 57
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   CANDIDATE_REF: ${{ github.event_name == 'workflow_dispatch' && (inputs.publish && inputs.release_tag || inputs.candidate_commit) || github.ref }}
@@ -73,6 +74,7 @@ jobs:
       - name: Set up verifier runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
       - name: Materialize protected DEVAI verifier package
         id: verifier-package
@@ -278,6 +280,7 @@ jobs:
       - name: Set up Node and GitHub Packages
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: '@aarusso-nyx'
@@ -375,6 +378,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
       - name: Download exact release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -492,6 +496,7 @@ jobs:
       - name: Set up Node and GitHub Packages
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: '@aarusso-nyx'
@@ -626,6 +631,7 @@ jobs:
       - name: Set up Node for Pages verification
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
       - name: Download canonical release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -718,6 +724,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
       - name: Download exact rehearsal assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -781,6 +788,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
       - name: Verify selected rehearsal
         env:
