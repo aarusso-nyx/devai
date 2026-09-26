@@ -39,7 +39,7 @@ concurrency:
 env:
   PACKAGE_NAME: '@aarusso-nyx/devai'
   # Literal checked against .devai/config/toolchain.json constants.expected_action_count by scripts/check-workflows.mjs.
-  EXPECTED_ACTION_COUNT: 57
+  EXPECTED_ACTION_COUNT: 61
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   CANDIDATE_REF: ${{ github.event_name == 'workflow_dispatch' && (inputs.publish && inputs.release_tag || inputs.candidate_commit) || github.ref }}
 jobs:
