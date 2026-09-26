@@ -12,6 +12,7 @@ import type {
   TaskTarget,
 } from './types.js';
 import { resolveMutationOutputContract } from './mutation-output.js';
+import { CHANGE_CLASSES, loadChangeTaxonomy } from '../change-taxonomy.js';
 import {
   BARE_EXECUTABLE,
   resolveTaskExecutable,
@@ -235,10 +236,68 @@ function globExpression(pattern: string): RegExp {
   return new RegExp(`${expression}$`, 'u');
 }
 
-export function selectorMatches(selector: InputSelector, path: string): boolean {
+/**
+ * Selector as evaluated by the policy layer: the descriptor grammar plus the
+ * change-class kind (ADR-GOV-0017), which selects every path the
+ * change-taxonomy binding assigns to the named class.
+ */
+type PolicyInputSelector = Readonly<{
+  kind: InputSelector['kind'] | 'class';
+  pattern: string;
+}>;
+
+/** Resolves a repository path to its change class, or undefined when unbound. */
+export type PathClassifier = (path: string) => string | undefined;
+
+export function selectorMatches(
+  selector: PolicyInputSelector,
+  path: string,
+  classifyPath?: PathClassifier,
+): boolean {
   if (selector.kind === 'exact') return path === selector.pattern;
   if (selector.kind === 'prefix') return path.startsWith(selector.pattern);
+  if (selector.kind === 'class') {
+    if (classifyPath === undefined) {
+      throw new Error(`CHECK_RUNNER_CLASS_SELECTOR_UNRESOLVED: ${selector.pattern}`);
+    }
+    return classifyPath(path) === selector.pattern;
+  }
   return globExpression(selector.pattern).test(path);
+}
+
+function anySelectorMatches(
+  selectors: readonly PolicyInputSelector[],
+  path: string,
+  classifyPath: PathClassifier | undefined,
+): boolean {
+  return selectors.some((selector) => selectorMatches(selector, path, classifyPath));
+}
+
+function descriptorSelectors(descriptor: TaskDescriptor): readonly PolicyInputSelector[] {
+  return [
+    ...(descriptor.dynamicFallbackSelectors as readonly PolicyInputSelector[]),
+    ...descriptor.tasks.flatMap((task) => task.inputSelectors as readonly PolicyInputSelector[]),
+  ];
+}
+
+/** Load the change-taxonomy classifier only when the descriptor selects by class. */
+function descriptorClassifier(
+  repoRoot: string,
+  descriptor: TaskDescriptor,
+): PathClassifier | undefined {
+  if (!descriptorSelectors(descriptor).some((selector) => selector.kind === 'class')) {
+    return undefined;
+  }
+  const taxonomy = loadChangeTaxonomy(repoRoot);
+  return (path) => taxonomy.classify(path);
+}
+
+function validSelector(value: unknown): boolean {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const { kind, pattern } = value as Record<string, unknown>;
+  if (typeof pattern !== 'string' || pattern === '') return false;
+  if (kind === 'class') return (CHANGE_CLASSES as readonly string[]).includes(pattern);
+  return kind === 'exact' || kind === 'prefix' || kind === 'glob';
 }
 
 function validateDescriptor(value: unknown): TaskDescriptor {
@@ -257,6 +316,9 @@ function validateDescriptor(value: unknown): TaskDescriptor {
   ) {
     throw new Error('CHECK_RUNNER_DESCRIPTOR: unsupported or malformed descriptor');
   }
+  if (!(descriptor.dynamicFallbackSelectors as readonly unknown[]).every(validSelector)) {
+    throw new Error('CHECK_RUNNER_DESCRIPTOR: malformed dynamic fallback selector');
+  }
   const ids = new Set<string>();
   for (const task of descriptor.tasks) {
     if (
@@ -269,6 +331,7 @@ function validateDescriptor(value: unknown): TaskDescriptor {
       !BARE_EXECUTABLE.test(task.argv[0] ?? '') ||
       !Array.isArray(task.inputSelectors) ||
       task.inputSelectors.length === 0 ||
+      !(task.inputSelectors as readonly unknown[]).every(validSelector) ||
       !Array.isArray(task.toolchainKeys) ||
       !Array.isArray(task.allowlistedEnv) ||
       task.outputContract === null ||
@@ -499,6 +562,18 @@ function committedSnapshot(repoRoot: string, commit: string): readonly SnapshotE
   );
 }
 
+/** Tracked paths of the index, read through the closed check-policy git grammar. */
+export function trackedPaths(repoRoot: string): readonly string[] {
+  const paths = new Set<string>();
+  for (const record of Buffer.from(git(repoRoot, ['ls-files', '-s', '-z'], { encoding: null }))
+    .toString('utf8')
+    .split('\0')) {
+    const path = /^\d+ [0-9a-f]+ \d+\t(.+)$/u.exec(record)?.[1];
+    if (path !== undefined) paths.add(path);
+  }
+  return [...paths].sort();
+}
+
 function worktreeSnapshot(repoRoot: string): readonly SnapshotEntry[] {
   const staged = Buffer.from(git(repoRoot, ['ls-files', '-s', '-z'], { encoding: null }))
     .toString('utf8')
@@ -609,6 +684,7 @@ function selectedNodeIds(
   changes: readonly string[],
   releaseRequiredNodes: readonly string[] = [],
   releaseAffectedSelection = false,
+  classifyPath?: PathClassifier,
 ): Set<string> {
   const selected = new Set<string>();
   const impacted = new Set<string>();
@@ -631,9 +707,7 @@ function selectedNodeIds(
     if (profile.mode === 'affected') {
       const eligible = new Set(profile.eligibleNodes ?? []);
       for (const path of changes) {
-        if (
-          descriptor.dynamicFallbackSelectors.some((selector) => selectorMatches(selector, path))
-        ) {
+        if (anySelectorMatches(descriptor.dynamicFallbackSelectors, path, classifyPath)) {
           if (descriptor.fallbackNodeId === null) throw new Error('CHECK_RUNNER_UNKNOWN_PATH');
           impacted.add(descriptor.fallbackNodeId);
           continue;
@@ -642,7 +716,7 @@ function selectedNodeIds(
           (task) =>
             eligible.has(task.nodeId) &&
             task.nodeId !== descriptor.fallbackNodeId &&
-            task.inputSelectors.some((selector) => selectorMatches(selector, path)),
+            anySelectorMatches(task.inputSelectors, path, classifyPath),
         );
         if (matches.length === 0) {
           if (descriptor.fallbackNodeId === null) {
@@ -663,7 +737,7 @@ function selectedNodeIds(
     }
     const eligible = new Set(affectedProfile.eligibleNodes ?? []);
     for (const path of changes) {
-      if (descriptor.dynamicFallbackSelectors.some((selector) => selectorMatches(selector, path))) {
+      if (anySelectorMatches(descriptor.dynamicFallbackSelectors, path, classifyPath)) {
         if (descriptor.fallbackNodeId === null) throw new Error('CHECK_RUNNER_UNKNOWN_PATH');
         impacted.add(descriptor.fallbackNodeId);
         continue;
@@ -672,7 +746,7 @@ function selectedNodeIds(
         (task) =>
           eligible.has(task.nodeId) &&
           task.nodeId !== descriptor.fallbackNodeId &&
-          task.inputSelectors.some((selector) => selectorMatches(selector, path)),
+          anySelectorMatches(task.inputSelectors, path, classifyPath),
       );
       if (matches.length === 0) {
         if (descriptor.fallbackNodeId === null)
@@ -757,6 +831,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   const entries = (clean ? committedSnapshot(repoRoot, commit) : worktreeSnapshot(repoRoot)).filter(
     (entry) => !isHarnessMutatedPath(entry.path),
   );
+  const classifyPath = descriptorClassifier(repoRoot, descriptor);
   const selected = selectedNodeIds(
     descriptor,
     target,
@@ -767,6 +842,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
         descriptor.tasks.some((task) => task.nodeId === node),
     ),
     options.releaseAffectedSelection,
+    classifyPath,
   );
   const descriptorDigest = taskDescriptorDigest(options.descriptor);
   const ordered = topologicalTasks(descriptor);
@@ -797,7 +873,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
           : `sha256:${sha256Hex(Buffer.from(environment[key], 'utf8'))}`;
     }
     const inputs = entries.filter((entry) =>
-      task.inputSelectors.some((selector) => selectorMatches(selector, entry.path)),
+      anySelectorMatches(task.inputSelectors, entry.path, classifyPath),
     );
     const dependencies = task.dependencies.map((nodeId) => ({
       nodeId,
@@ -851,7 +927,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       }),
       inputPaths: inputs.map((entry) => entry.path),
       matchedChangedPaths: changes.filter((path) =>
-        task.inputSelectors.some((selector) => selectorMatches(selector, path)),
+        anySelectorMatches(task.inputSelectors, path, classifyPath),
       ),
       outputContract: outputContracts.get(task.nodeId) ?? task.outputContract,
     });

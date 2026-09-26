@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { prFailureDiagnostics } from './pr-failure-diagnostics.mjs';
 import { projectChangedPaths } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
+import { selectorMatches } from '../.devai/state/pr-bootstrap/cli/services/check-runner/policy.js';
 
 const root = resolve(import.meta.dirname, '..');
 const base = process.argv.slice(2).find((argument) => argument !== '--');
@@ -100,32 +101,57 @@ function run(options) {
 }
 if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));
 
+// Release intent derives from the change-class set of the changed paths
+// (ADR-GOV-0017). The law policy declares the class vocabulary and the adopter
+// binding assigns paths to classes; a path two bindings reach is a load error.
+function readPolicyJson(candidates) {
+  const path = candidates.find((candidate) => existsSync(join(root, candidate)));
+  if (path === undefined) throw new Error(`PR_RELEASE_GATE_TAXONOMY_MISSING:${candidates[0]}`);
+  return JSON.parse(readFileSync(join(root, path), 'utf8'));
+}
+const taxonomy = readPolicyJson([
+  'law/policy/change-taxonomy.json',
+  '.devai/config/change-taxonomy.json',
+]);
+const bindings = readPolicyJson([
+  '.devai/config/change-taxonomy-binding.json',
+  'law/policy/adopter-defaults/change-taxonomy-binding.json',
+]).bindings;
+for (const entry of bindings) {
+  if (!Object.hasOwn(taxonomy.classes, entry.class)) {
+    throw new Error(`CHANGE_TAXONOMY_CLASS_UNKNOWN:${entry.class}`);
+  }
+}
+function classOf(path) {
+  const hits = bindings.filter((entry) => selectorMatches(entry.selector, path));
+  if (hits.length > 1) throw new Error(`CHANGE_TAXONOMY_BINDING_OVERLAP:${path}`);
+  return hits[0]?.class ?? null;
+}
+const classified = changedPaths.map((path) => ({ path, changeClass: classOf(path) }));
+const classes = new Set(classified.map(({ changeClass }) => changeClass));
+const METADATA_CLASSES = new Set(['plan', 'law', 'spec', 'docs', 'generated']);
 const risks = new Set();
-for (const path of changedPaths) {
-  if (
-    /^(?:\.github\/workflows\/release\.yml|scripts\/(?:check-publishable|create-release|release-|stage-release)|packages\/cli\/src\/services\/(?:check-runner|release-))/u.test(
-      path,
-    )
-  ) {
+for (const { path, changeClass } of classified) {
+  if (changeClass === 'ci') {
     risks.add('release-integrity');
+    risks.add('test-policy');
+  }
+  if (changeClass === 'toolchain') {
+    risks.add('toolchain');
+    if (path === 'pnpm-lock.yaml') risks.add('lockfile');
   }
   if (
-    /^(?:test-tasks\.json|tests\/config\/|law\/(?:policy|schemas)\/|packages\/cli\/src\/services\/mutation-)/u.test(
-      path,
-    )
+    (changeClass === 'law' || changeClass === 'spec') &&
+    (path.startsWith('law/policy/') || path.startsWith('law/schemas/'))
   ) {
     risks.add('test-policy');
   }
-  if (/^(?:packages\/cli\/package\.json|packages\/cli\/src\/)/u.test(path)) risks.add('public-api');
-  if (path === 'pnpm-lock.yaml') risks.add('lockfile');
-  if (/^(?:package\.json|pnpm-lock\.yaml|tsconfig)/u.test(path)) risks.add('toolchain');
+  if (changeClass === 'code' && path.startsWith('packages/cli/')) risks.add('public-api');
 }
-const documentationOnly = changedPaths.every((path) =>
-  /^(?:docs\/|README\.md$|CHANGELOG\.md$)/u.test(path),
-);
-const metadataOnly = changedPaths.every((path) =>
-  /(?:^|\/)(?:package\.json|[^/]+\.md)$/u.test(path),
-);
+const documentationOnly = [...classes].every((changeClass) => changeClass === 'docs');
+const metadataOnly =
+  [...classes].every((changeClass) => METADATA_CLASSES.has(changeClass)) &&
+  !changedPaths.includes('law/policy/action-registry.json');
 const intent = {
   schemaVersion: '1.0.0',
   release_unit: '@aarusso-nyx/devai',

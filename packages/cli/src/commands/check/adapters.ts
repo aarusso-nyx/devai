@@ -46,6 +46,8 @@ import { auditDocumentationLinks } from '../docs/links.js';
 import { executeTranslationValidation } from '../verify/translation.js';
 import { runActionCoverageCheck } from '../spec/validate-action-coverage.js';
 import { runCheckTasks } from '../../services/check-runner/index.js';
+import { trackedPaths } from '../../services/check-runner/policy.js';
+import { loadChangeTaxonomy } from '../../services/change-taxonomy.js';
 import { checkActionEffects } from './action-effects.js';
 import { checkCiEconomy } from './ci-economy.js';
 import { checkDependencies } from './dependencies.js';
@@ -406,6 +408,36 @@ async function inventoryIntegrityReport(repoRoot: string): Promise<unknown> {
   };
 }
 
+/** Classify every tracked path; name each path no binding covers (ADR-GOV-0017). */
+function changeTaxonomyReport(repoRoot: string): RawExecution {
+  const paths = trackedPaths(repoRoot);
+  const counts: Record<string, number> = {};
+  const unclassified: string[] = [];
+  try {
+    const taxonomy = loadChangeTaxonomy(repoRoot);
+    for (const path of paths) {
+      const className = taxonomy.classify(path);
+      if (className === undefined) unclassified.push(path);
+      else counts[className] = (counts[className] ?? 0) + 1;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const code = /^(CHANGE_TAXONOMY_[A-Z_]+)/u.exec(message)?.[1] ?? 'CHANGE_TAXONOMY_LOAD_FAILED';
+    return { status: 'fail', code, message, value: { ok: false, code, message } };
+  }
+  const ok = unclassified.length === 0;
+  return {
+    status: ok ? 'pass' : 'fail',
+    ...(ok
+      ? {}
+      : {
+          code: 'CHANGE_TAXONOMY_PATH_UNCLASSIFIED',
+          message: `unclassified tracked paths: ${unclassified.join(', ')}`,
+        }),
+    value: { ok, tracked_paths: paths.length, classes: counts, unclassified },
+  };
+}
+
 function mutationDeprecationReport(): RawExecution {
   return {
     status: 'na',
@@ -609,6 +641,8 @@ async function directService(
     }
     case 'action-effects':
       return fromValue(await checkActionEffects({ repoRoot }));
+    case 'change-taxonomy':
+      return changeTaxonomyReport(repoRoot);
     case 'adrs':
       return fromValue(adrsReport(repoRoot));
     case 'ci-economy':
