@@ -49,6 +49,7 @@ import {
   type JsonObject,
 } from '../services/adopter-policy.js';
 import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
+import { listBacklogItems } from '#runtime-core';
 
 const DEFAULT_REPO_ROOT = '.';
 const DEFAULT_CHAIN_RELATIVE = 'record/proofs/chain.json';
@@ -1084,6 +1085,32 @@ function checkGovernanceTracking(repoRoot: string): CheckResult {
   };
 }
 
+/**
+ * ADR-GOV-0019: surface open repository backlog items at session start. The
+ * items are committed, so a fresh clone sees them without host-specific state.
+ * Open items are information for the next session, never a failure.
+ */
+function checkBacklogOpenItems(repoRoot: string): CheckResult {
+  const name = 'backlog-open-items';
+  try {
+    const items = listBacklogItems({ repoRoot }).map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      status: item.status,
+      ...(item.round_id === undefined ? {} : { round_id: item.round_id }),
+    }));
+    return { name, ok: true, info: { count: items.length, items } };
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    return {
+      name,
+      ok: true,
+      info: { count: 0, items: [], unreadable: typeof code === 'string' ? code : 'unreadable' },
+    };
+  }
+}
+
 const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'f1-paths-present',
@@ -1101,6 +1128,10 @@ const CHECK_SPECS: readonly CheckSpec[] = [
   {
     name: 'governance-tracking-binding',
     run: (repoRoot) => checkGovernanceTracking(repoRoot),
+  },
+  {
+    name: 'backlog-open-items',
+    run: (repoRoot) => checkBacklogOpenItems(repoRoot),
   },
   {
     name: 'agents-claude-sync',
