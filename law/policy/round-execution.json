@@ -50,8 +50,8 @@
     "implicit_task_independence": "forbidden"
   },
   "roles": {
-    "coupled_order": ["inspector", "architect", "engineer"],
-    "coupled_merge_order": ["inspector", "architect", "engineer"],
+    "coupled_order": ["architect", "inspector", "engineer"],
+    "coupled_merge_order": ["architect", "inspector", "engineer"],
     "owner_or_auditor_inference": "forbidden",
     "role_change": "new-session-and-commit-boundary",
     "path_authority": "discipline-only",
