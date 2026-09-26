@@ -252,7 +252,20 @@ export function githubPagesControls({
       for (let count = 0; count < 60; count++) {
         const result = await request('GET', `${ROOT}/pages/deployments/${pagesId}`);
         if (result?.status === 'succeed') return 'succeeded';
-        if (!['building', 'deployment_in_progress', 'queued', 'waiting'].includes(result?.status))
+        // Every documented in-flight Pages deployment status; the v1.6.0 promotion
+        // observed 'syncing_files' and bailed as unresolved while the deploy went on to succeed.
+        if (
+          ![
+            'building',
+            'deployment_in_progress',
+            'syncing_files',
+            'finished_file_sync',
+            'updating_pages',
+            'purging_cdn',
+            'queued',
+            'waiting',
+          ].includes(result?.status)
+        )
           return 'unresolved';
         await sleep(5000);
       }
