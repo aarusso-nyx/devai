@@ -33,13 +33,13 @@
       "id": "OE-01",
       "description": "Disable squash merging on the main branch so single-family commits survive integration.",
       "required_before": "R-0103",
-      "performed_at": null
+      "performed_at": "2026-09-26T08:20:00Z"
     },
     {
       "id": "OE-02",
       "description": "Require the devai-release-gate check and strict up-to-date status in branch protection for main.",
       "required_before": "R-0104",
-      "performed_at": null
+      "performed_at": "2026-09-26T08:20:00Z"
     }
   ],
   "prompts": {
@@ -221,7 +221,7 @@
       "id": "R-0102",
       "title": "Change class taxonomy",
       "goal": "Every tracked path has exactly one change class; the task DAG and the pull-request gate select by class.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-GOV-0017"],
       "depends_on": ["R-0101"],
       "attestation_reissue": true,
@@ -252,7 +252,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -293,8 +293,8 @@
                 "path": "prompts/TASK-0121.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/96",
+              "merged_as": "d2e3d8e86aea9704963422072f957e226a0f01fd",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -307,7 +307,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0121",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -330,8 +330,8 @@
                 "path": "prompts/TASK-0122.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/96",
+              "merged_as": "4662ace034af90973e6440898790d89335f58509",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -344,7 +344,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0122",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -384,8 +384,8 @@
                 "path": "prompts/TASK-0123.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/96",
+              "merged_as": "de8cdad64a9927a5ac891f46b83d4542526abb20",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -394,13 +394,19 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "f3d479bdf8d5e2f4dd4090c5a551249a64f73232",
+        "closed_at": "2026-09-26T09:33:57Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0103",
       "title": "Commit grammar and changeset retirement",
       "goal": "Commit messages carry type and class, mixed-family commits are rejected, and version intent comes from commit types.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-GOV-0018", "ADR-REL-0027"],
       "depends_on": ["R-0102"],
       "attestation_reissue": false,
@@ -432,7 +438,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -480,7 +486,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0131",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -519,7 +525,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0132",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
