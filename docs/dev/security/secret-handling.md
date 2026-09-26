@@ -17,3 +17,16 @@ does not substitute an alias, default, preferred model, or policy fallback. Neve
 credentials make an ordinary test or sensor external-dependent.
 If a secret enters evidence, preserve the incident record and use `evidence redact` to append an
 attributable erratum.
+
+## Credential boundary
+
+Credential requirements are declared by name in `law/policy/credential-requirements.json`
+(DEVAI's own manifest) and `law/policy/adopter-defaults/credential-requirements-binding.json`
+(the adopter starting set), both under `law/schemas/credential-requirements.schema.json`
+(ADR-SEC-0001). The boundary is law: DEVAI verifies presence, shape, and scope of a declared
+credential through the consuming tool's own status command and reports one of present, absent,
+scope-insufficient, or expired. It never reads a value except at the subprocess boundary that
+consumes it, never stores one in configuration, evidence, cache keys, or diagnostics, and never
+generates keys. Signing keys stay in the trust store allowlist with revocation; custody remains
+with the operator. A manifest entry, a probe report, and a doctor finding carry the credential
+name and the required scope, never the value or a fragment of it.
