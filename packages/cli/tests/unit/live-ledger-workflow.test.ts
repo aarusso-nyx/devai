@@ -826,7 +826,9 @@ describe('live ledger-verification workflow', () => {
     expect(source).toContain('.github/workflows/devai-ledger-verify.yml');
     expect(source).not.toContain('--devai-ref');
     expect(source).not.toContain('--chain-file');
-    expect(source).not.toContain('--mode <mode>');
+    // The only --mode option is the interactive init plan mode, never a ledger scaffold mode.
+    expect(source.match(/--mode <mode>/gu)).toHaveLength(1);
+    expect(source).toContain('Interactive mode: bind | edit');
   });
 
   it('binds live check adapters to canonical local and RC config names', () => {
