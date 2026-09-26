@@ -1,6 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
 // Explicit protected host setup, not a release lifecycle action. No candidate files, bind
@@ -10,11 +17,34 @@ if (process.argv.length !== 3 || !isAbsolute(path ?? ''))
   throw new Error('DEVAI_TOOLCHAIN_CONTROLS_REQUIRED');
 const c = JSON.parse(readFileSync(path));
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+// Runtime versions come from the toolchain manifest (ADR-CHK-0002) named by the
+// controls file; there is no inline fallback. The manifest is read and validated
+// before any Docker invocation.
+if (
+  typeof c.manifest_path !== 'string' ||
+  !isAbsolute(c.manifest_path) ||
+  !existsSync(c.manifest_path)
+)
+  throw new Error('DEVAI_TOOLCHAIN_MANIFEST_REQUIRED');
+const manifestBytes = readFileSync(c.manifest_path);
+let manifest;
+try {
+  manifest = JSON.parse(manifestBytes.toString('utf8'));
+} catch {
+  throw new Error('DEVAI_TOOLCHAIN_MANIFEST_INVALID');
+}
+const runtimes = manifest?.runtimes ?? {};
+if (
+  manifest?.schemaVersion !== '1.0.0' ||
+  ['node', 'pnpm', 'git'].some((key) => !/^[0-9]+\.[0-9]+\.[0-9]+$/u.test(String(runtimes[key])))
+)
+  throw new Error('DEVAI_TOOLCHAIN_MANIFEST_INVALID');
 const expectedIdentity = {
   protocol: 'devai.protected-linux-toolchain.v1',
   platform: 'linux/arm64',
   snapshot: '20260824T000000Z',
   distribution: { id: 'debian', version_id: '13', codename: 'trixie' },
+  // The manifest does not model Debian packages, so this table stays inline.
   packages: {
     git: { version: '1:2.47.3-0+deb13u1', architecture: 'arm64' },
     'git-man': { version: '1:2.47.3-0+deb13u1', architecture: 'all' },
@@ -33,9 +63,9 @@ const expectedIdentity = {
     python3: { version: '3.13.5-1', architecture: 'arm64' },
   },
   versions: {
-    node: 'v24.20.0',
-    pnpm: '9.15.0',
-    git: 'git version 2.47.3',
+    node: `v${runtimes.node}`,
+    pnpm: runtimes.pnpm,
+    git: `git version ${runtimes.git}`,
     ps: 'ps from procps-ng 4.0.4',
     python3: 'Python 3.13.5',
   },
@@ -202,6 +232,7 @@ writeFileSync(
       image: ids[0],
       engine_version: c.engine_version,
       docker_binary_sha256: c.docker_binary_sha256,
+      toolchain_manifest_sha256: hash(manifestBytes),
       build_sources: sources,
       uncached_builds: 2,
       identical: true,

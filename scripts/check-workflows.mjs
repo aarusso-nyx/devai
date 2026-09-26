@@ -10,22 +10,128 @@ export const RELEASE_WORKFLOW_FILE = 'release.yml';
 // Required own-repository non-attesting preflight lane. Contract:
 // docs/dev/operations/remote-preflight-contract.md
 export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
-export const VERIFIER_PACKAGE = '@aarusso-nyx/devai';
+// Toolchain identity is owned by the adopter manifest (ADR-CHK-0002). The
+// exported pin constants below are derived from this repository's manifest at
+// load time; checkWorkflowTree(root) compares each workflow against the
+// manifest under root, falling back to this repository's manifest when root
+// carries none.
+export const TOOLCHAIN_MANIFEST_RELATIVE_PATH = '.devai/config/toolchain.json';
+const DEFAULT_TOOLCHAIN_MANIFEST_PATH = fileURLToPath(
+  new URL(`../${TOOLCHAIN_MANIFEST_RELATIVE_PATH}`, import.meta.url),
+);
+const GIT_OBJECT_ID = /^[0-9a-f]{40}$/u;
+const EXACT_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+$/u;
+
+/**
+ * Reads and structurally validates a toolchain manifest. Only the fields the
+ * checker consumes are validated here; the full contract is
+ * law/schemas/toolchain-manifest.schema.json.
+ */
+export function loadToolchainManifest(path) {
+  if (!existsSync(path)) {
+    throw new Error(`DEVAI_TOOLCHAIN_MANIFEST_REQUIRED: ${path}`);
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(
+      `DEVAI_TOOLCHAIN_MANIFEST_INVALID: ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const invalid = (reason) => new Error(`DEVAI_TOOLCHAIN_MANIFEST_INVALID: ${path}: ${reason}`);
+  if (object(manifest).schemaVersion !== '1.0.0') throw invalid('schemaVersion');
+  for (const key of ['node', 'pnpm', 'git']) {
+    if (!EXACT_VERSION.test(String(object(manifest.runtimes)[key]))) {
+      throw invalid(`runtimes.${key}`);
+    }
+  }
+  const actions = object(manifest.actions);
+  if (Object.keys(actions).length === 0) throw invalid('actions');
+  for (const [key, value] of Object.entries(actions)) {
+    const pin = object(value);
+    if (
+      !GIT_OBJECT_ID.test(String(pin.digest)) ||
+      (pin.peeled_commit !== undefined && !GIT_OBJECT_ID.test(String(pin.peeled_commit)))
+    ) {
+      throw invalid(`actions.${key}`);
+    }
+  }
+  if (typeof object(manifest.verifier).package !== 'string') throw invalid('verifier.package');
+  const constants = object(manifest.constants);
+  if (
+    constants.expected_action_count !== undefined &&
+    !Number.isInteger(constants.expected_action_count)
+  ) {
+    throw invalid('constants.expected_action_count');
+  }
+  return manifest;
+}
+
+function manifestActionDigest(manifest, key) {
+  const digest = object(object(manifest.actions)[key]).digest;
+  if (typeof digest !== 'string') {
+    throw new Error(`DEVAI_TOOLCHAIN_MANIFEST_INVALID: actions.${key} is not declared`);
+  }
+  return digest;
+}
+
+/** The pinned values a check run compares workflows against. */
+function toolchainPins(manifest) {
+  const pnpmSetup = object(object(manifest.actions)['pnpm/action-setup']);
+  return {
+    manifest,
+    checkout: object(object(manifest.actions)['actions/checkout']).digest,
+    setupNode: object(object(manifest.actions)['actions/setup-node']).digest,
+    pnpmTagObject: pnpmSetup.digest,
+    pnpmPeeledCommit: pnpmSetup.peeled_commit ?? pnpmSetup.digest,
+    verifierPackage: manifest.verifier.package,
+    ledgerEnvironment: object(manifest.constants).ledger_environment ?? 'devai-ledger-verification',
+    expectedActionCount: object(manifest.constants).expected_action_count,
+  };
+}
+
+const DEFAULT_TOOLCHAIN_MANIFEST = loadToolchainManifest(DEFAULT_TOOLCHAIN_MANIFEST_PATH);
+const DEFAULT_PINS = toolchainPins(DEFAULT_TOOLCHAIN_MANIFEST);
+
+export const VERIFIER_PACKAGE = DEFAULT_PINS.verifierPackage;
+// Not modeled by the manifest: the trusted verifier policy owns source commits.
 export const VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
 export const NEXT_VERIFIER_SOURCE_COMMIT = '8174749ebcfabab246031281a036032f636b8a39';
-export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
-export const CHECKOUT_COMMIT = '3d3c42e5aac5ba805825da76410c181273ba90b1';
-export const SETUP_NODE_COMMIT = '820762786026740c76f36085b0efc47a31fe5020';
-// v4.1.0 is an annotated tag: this is the immutable tag object accepted by
-// Actions, not its peeled commit. Keep both identities explicit so the checker
-// does not falsely demand a repin from the authentic object to its commit.
-export const PNPM_SETUP_TAG_OBJECT = '7088e561eb65bb68695d245aa206f005ef30921d';
-export const PNPM_SETUP_PEELED_COMMIT = 'a7487c7e89a18df4991f7f222e4898a00d66ddda';
-export const UPLOAD_ARTIFACT_COMMIT = 'ea165f8d65b6e75b540449e92b4886f43607fa02';
-export const DOWNLOAD_ARTIFACT_COMMIT = 'd3f86a106a0bac45b974a628896c90dbdf5c8093';
-export const CONFIGURE_PAGES_COMMIT = '983d7736d9b0ae728b81ab479565c72886d7745b';
-export const UPLOAD_PAGES_COMMIT = '7b1f4a764d45c48632c6b24a0339c27f5614fb0b';
-export const DEPLOY_PAGES_COMMIT = 'd6db90164ac5ed86f2b6aed7e0febac5b3c0c03e';
+export const LEDGER_ENVIRONMENT = DEFAULT_PINS.ledgerEnvironment;
+export const CHECKOUT_COMMIT = manifestActionDigest(DEFAULT_TOOLCHAIN_MANIFEST, 'actions/checkout');
+export const SETUP_NODE_COMMIT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'actions/setup-node',
+);
+// v4.1.0 is an annotated tag: the digest is the immutable tag object accepted
+// by Actions, not its peeled commit. The manifest keeps both identities so the
+// checker does not falsely demand a repin from the authentic object to its commit.
+export const PNPM_SETUP_TAG_OBJECT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'pnpm/action-setup',
+);
+export const PNPM_SETUP_PEELED_COMMIT = DEFAULT_PINS.pnpmPeeledCommit;
+export const UPLOAD_ARTIFACT_COMMIT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'actions/upload-artifact',
+);
+export const DOWNLOAD_ARTIFACT_COMMIT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'actions/download-artifact',
+);
+export const CONFIGURE_PAGES_COMMIT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'actions/configure-pages',
+);
+export const UPLOAD_PAGES_COMMIT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'actions/upload-pages-artifact',
+);
+export const DEPLOY_PAGES_COMMIT = manifestActionDigest(
+  DEFAULT_TOOLCHAIN_MANIFEST,
+  'actions/deploy-pages',
+);
 export const CANDIDATE_SHA_EXPRESSION = '${{ github.event.pull_request.head.sha || github.sha }}';
 export const RELEASE_TAG_EXPRESSION =
   "${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}";
@@ -95,8 +201,123 @@ function finding(code, file, detail) {
   return { code, file, detail };
 }
 
+function rootPins(root, findings) {
+  const path = join(root, TOOLCHAIN_MANIFEST_RELATIVE_PATH);
+  if (!existsSync(path)) return DEFAULT_PINS;
+  try {
+    return toolchainPins(loadToolchainManifest(path));
+  } catch (error) {
+    findings.push(
+      finding(
+        'CI_TOOLCHAIN_MANIFEST_INVALID',
+        TOOLCHAIN_MANIFEST_RELATIVE_PATH,
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+    return DEFAULT_PINS;
+  }
+}
+
+function workflowSteps(workflow) {
+  return Object.entries(object(workflow.jobs)).flatMap(([jobName, value]) =>
+    (Array.isArray(object(value).steps) ? object(value).steps : []).map((step, index) => ({
+      location: `jobs.${jobName}.steps[${String(index)}]`,
+      step: object(step),
+    })),
+  );
+}
+
+/**
+ * ADR-CHK-0002: every action reference, node version, and restated repository
+ * constant in every workflow must agree with the toolchain manifest. Each
+ * divergence names the file, the manifest key, the observed value, and the
+ * required value.
+ */
+function checkToolchainPins(file, workflow, pins, findings) {
+  const { manifest } = pins;
+  const actions = object(manifest.actions);
+  const nodeVersion = manifest.runtimes.node;
+  const nodeMajor = nodeVersion.split('.')[0];
+  for (const { location, step } of workflowSteps(workflow)) {
+    const uses = typeof step.uses === 'string' ? step.uses : '';
+    const match = /^([^@/]+\/[^@/]+)(?:\/[^@]*)?@(.+)$/u.exec(uses);
+    if (match !== null) {
+      const [, key, observed] = match;
+      const pin = object(actions[key]);
+      if (typeof pin.digest !== 'string') {
+        findings.push(
+          finding(
+            'CI_TOOLCHAIN_ACTION_UNDECLARED',
+            file,
+            `${location} uses ${key}@${observed}; manifest actions.${key} is not declared`,
+          ),
+        );
+      } else if (observed !== pin.digest && observed !== pin.peeled_commit) {
+        findings.push(
+          finding(
+            'CI_TOOLCHAIN_ACTION_DIVERGENT',
+            file,
+            `${location} manifest actions.${key}: observed ${observed}, required ${pin.digest}`,
+          ),
+        );
+      }
+    }
+    const declaredNode = object(step.with)['node-version'];
+    if (declaredNode !== undefined) {
+      const observed = String(declaredNode).trim();
+      const exact = EXACT_VERSION.test(observed);
+      const observedMajor = /^v?([0-9]+)/u.exec(observed)?.[1];
+      if (exact ? observed !== nodeVersion : observedMajor !== nodeMajor) {
+        findings.push(
+          finding(
+            'CI_TOOLCHAIN_NODE_DIVERGENT',
+            file,
+            exact
+              ? `${location} manifest runtimes.node: observed node ${observed}, required node ${nodeVersion}`
+              : `${location} manifest runtimes.node: observed node major ${observedMajor ?? observed}, required node major ${nodeMajor}`,
+          ),
+        );
+      }
+    }
+    const run = typeof step.run === 'string' ? step.run : '';
+    const verifierVersion = /echo "version=([0-9]+\.[0-9]+\.[0-9]+)"/u.exec(run)?.[1];
+    // The preflight lane materializes the in-repository vendored verifier, not
+    // the trusted package, so only the ledger and release lanes restate
+    // manifest verifier.version.
+    if (
+      file !== PREFLIGHT_WORKFLOW_FILE &&
+      step.id === 'verifier-package' &&
+      verifierVersion !== undefined &&
+      verifierVersion !== manifest.verifier.version
+    ) {
+      findings.push(
+        finding(
+          'CI_TOOLCHAIN_VERIFIER_DIVERGENT',
+          file,
+          `${location} manifest verifier.version: observed ${verifierVersion}, required ${String(manifest.verifier.version)}`,
+        ),
+      );
+    }
+  }
+  const environment = object(workflow.env);
+  if (
+    pins.expectedActionCount !== undefined &&
+    environment.EXPECTED_ACTION_COUNT !== undefined &&
+    environment.EXPECTED_ACTION_COUNT !== pins.expectedActionCount
+  ) {
+    findings.push(
+      finding(
+        'CI_TOOLCHAIN_CONSTANT_DIVERGENT',
+        file,
+        `env.EXPECTED_ACTION_COUNT manifest constants.expected_action_count: observed ${String(environment.EXPECTED_ACTION_COUNT)}, required ${String(pins.expectedActionCount)}`,
+      ),
+    );
+  }
+}
+
 export function checkWorkflowTree(root = process.cwd()) {
   const findings = [];
+  const pins = rootPins(root, findings);
   const files = workflowFiles(root);
   const required = [LEDGER_WORKFLOW_FILE, RELEASE_WORKFLOW_FILE, PREFLIGHT_WORKFLOW_FILE].sort();
   const permitted = required;
@@ -114,7 +335,7 @@ export function checkWorkflowTree(root = process.cwd()) {
   for (const file of files) {
     const path = join(root, '.github/workflows', file);
     const source = readFileSync(path, 'utf8');
-    checkWorkflow(file, source, findings);
+    checkWorkflow(file, source, findings, pins);
   }
   return { ok: findings.length === 0, files, findings };
 }
@@ -143,7 +364,7 @@ function checkOrdinaryLedgerWorkflow(file, workflow, findings) {
   }
 }
 
-function checkWorkflow(file, source, findings) {
+function checkWorkflow(file, source, findings, pins) {
   for (const marker of OLD_WORKFLOW_MARKERS) {
     if (file.includes(marker) || source.includes(marker)) {
       findings.push(finding('CI_OBSOLETE_WORKFLOW_PRESENT', file, marker));
@@ -158,15 +379,16 @@ function checkWorkflow(file, source, findings) {
     return;
   }
   const workflow = object(document.toJS());
+  checkToolchainPins(file, workflow, pins, findings);
   if ([RELEASE_WORKFLOW_FILE, LEDGER_WORKFLOW_FILE].includes(file))
     checkOrdinaryLedgerWorkflow(file, workflow, findings);
 
   if (file === RELEASE_WORKFLOW_FILE) {
-    checkReleaseWorkflow(file, workflow, source, findings);
+    checkReleaseWorkflow(file, workflow, source, findings, pins);
     return;
   }
   if (file === PREFLIGHT_WORKFLOW_FILE) {
-    checkPreflightWorkflow(file, workflow, source, findings);
+    checkPreflightWorkflow(file, workflow, source, findings, pins);
     return;
   }
   if (file !== LEDGER_WORKFLOW_FILE) {
@@ -226,12 +448,12 @@ function checkWorkflow(file, source, findings) {
       ),
     );
   }
-  if (job.environment !== LEDGER_ENVIRONMENT) {
+  if (job.environment !== pins.ledgerEnvironment) {
     findings.push(
       finding(
         'CI_LEDGER_ENVIRONMENT_MISSING',
         file,
-        `verify-ledger must use protected environment ${LEDGER_ENVIRONMENT}`,
+        `verify-ledger must use protected environment ${pins.ledgerEnvironment}`,
       ),
     );
   }
@@ -253,8 +475,8 @@ function checkWorkflow(file, source, findings) {
       findings.push(finding('CI_ACTION_REFERENCE_MUTABLE', file, `${location} uses ${uses}`));
     }
     if (
-      (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${CHECKOUT_COMMIT}`) ||
-      (uses.startsWith('actions/setup-node@') && uses !== `actions/setup-node@${SETUP_NODE_COMMIT}`)
+      (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${pins.checkout}`) ||
+      (uses.startsWith('actions/setup-node@') && uses !== `actions/setup-node@${pins.setupNode}`)
     ) {
       findings.push(finding('CI_ACTION_PIN_MISMATCH', file, `${location} uses ${uses}`));
     }
@@ -343,7 +565,7 @@ function checkWorkflow(file, source, findings) {
     'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
     'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
-    `manifest.name !== '${VERIFIER_PACKAGE}'`,
+    `manifest.name !== '${pins.verifierPackage}'`,
     `provenance.sourceCommit !== '${NEXT_VERIFIER_SOURCE_COMMIT}'`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
@@ -443,7 +665,7 @@ function checkWorkflow(file, source, findings) {
  * non-attesting (no path by which its result becomes evidence).
  * See docs/dev/operations/remote-preflight-contract.md.
  */
-function checkPreflightWorkflow(file, workflow, source, findings) {
+function checkPreflightWorkflow(file, workflow, source, findings, pins) {
   const triggerNames = Object.keys(object(workflow.on)).sort();
   if (triggerNames.length !== 1 || triggerNames[0] !== 'pull_request') {
     findings.push(
@@ -583,12 +805,12 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
         findings.push(finding('CI_ACTION_REFERENCE_MUTABLE', file, `${location} uses ${uses}`));
       }
       if (
-        (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${CHECKOUT_COMMIT}`) ||
+        (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${pins.checkout}`) ||
         (uses.startsWith('actions/setup-node@') &&
-          uses !== `actions/setup-node@${SETUP_NODE_COMMIT}`) ||
+          uses !== `actions/setup-node@${pins.setupNode}`) ||
         (uses.startsWith('pnpm/action-setup@') &&
-          uses !== `pnpm/action-setup@${PNPM_SETUP_TAG_OBJECT}` &&
-          uses !== `pnpm/action-setup@${PNPM_SETUP_PEELED_COMMIT}`)
+          uses !== `pnpm/action-setup@${pins.pnpmTagObject}` &&
+          uses !== `pnpm/action-setup@${pins.pnpmPeeledCommit}`)
       ) {
         findings.push(finding('CI_ACTION_PIN_MISMATCH', file, `${location} uses ${uses}`));
       }
@@ -653,7 +875,7 @@ function checkPreflightWorkflow(file, workflow, source, findings) {
   }
 }
 
-function checkReleaseWorkflow(file, workflow, source, findings) {
+function checkReleaseWorkflow(file, workflow, source, findings, pins) {
   const triggers = object(workflow.on);
   const push = object(triggers.push);
   const dispatch = object(triggers.workflow_dispatch);
@@ -702,7 +924,8 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const environment = object(workflow.env);
   if (
     environment.PACKAGE_NAME !== '@aarusso-nyx/devai' ||
-    environment.EXPECTED_ACTION_COUNT !== 57 ||
+    (pins.expectedActionCount !== undefined &&
+      environment.EXPECTED_ACTION_COUNT !== pins.expectedActionCount) ||
     environment.PACKAGE_VERSION !== undefined ||
     environment.RELEASE_TAG !== RELEASE_TAG_EXPRESSION
   ) {
@@ -730,7 +953,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
   const pages = object(jobs['deploy-pages']);
   const rehearsal = object(jobs['rehearsal-summary']);
   const linuxAdopter = object(jobs['verify-linux-adopter']);
-  if (verify.environment !== LEDGER_ENVIRONMENT) {
+  if (verify.environment !== pins.ledgerEnvironment) {
     findings.push(finding('RELEASE_LEDGER_ENVIRONMENT_INVALID', file, String(verify.environment)));
   }
   if (build.environment !== 'devai-rc-release') {
@@ -878,16 +1101,9 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
         'Pages requires serialized durable intent, exact artifact controls and retained recovery records',
       ),
     );
-  const immutablePins = new Map([
-    ['actions/checkout', CHECKOUT_COMMIT],
-    ['actions/setup-node', SETUP_NODE_COMMIT],
-    ['pnpm/action-setup', PNPM_SETUP_TAG_OBJECT],
-    ['actions/upload-artifact', UPLOAD_ARTIFACT_COMMIT],
-    ['actions/download-artifact', DOWNLOAD_ARTIFACT_COMMIT],
-    ['actions/configure-pages', CONFIGURE_PAGES_COMMIT],
-    ['actions/upload-pages-artifact', UPLOAD_PAGES_COMMIT],
-    ['actions/deploy-pages', DEPLOY_PAGES_COMMIT],
-  ]);
+  const immutablePins = new Map(
+    Object.entries(object(pins.manifest.actions)).map(([key, pin]) => [key, object(pin).digest]),
+  );
   const steps = Object.entries(jobs).flatMap(([jobName, value]) =>
     (Array.isArray(object(value).steps) ? object(value).steps : []).map((step, index) => ({
       jobName,
@@ -923,7 +1139,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     'test "$actual_provenance_sha256" = "$VERIFIER_PROVENANCE_SHA256"',
     'cp "$source_root/provenance.json" "$verifier_root/provenance.json"',
     'cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"',
-    `manifest.name !== '${VERIFIER_PACKAGE}'`,
+    `manifest.name !== '${pins.verifierPackage}'`,
     `provenance.sourceCommit !== '${NEXT_VERIFIER_SOURCE_COMMIT}'`,
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
@@ -1005,7 +1221,7 @@ function checkReleaseWorkflow(file, workflow, source, findings) {
     typeof step.uses === 'string' ? step.uses.startsWith('pnpm/action-setup@') : false,
   );
   if (pnpmStep === undefined) {
-    findings.push(finding('RELEASE_PNPM_SETUP_MISSING', file, PNPM_SETUP_TAG_OBJECT));
+    findings.push(finding('RELEASE_PNPM_SETUP_MISSING', file, pins.pnpmTagObject));
   } else if (object(pnpmStep.step.with).version !== undefined) {
     findings.push(
       finding(

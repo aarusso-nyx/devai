@@ -24,6 +24,7 @@ import {
   exactCommitTree,
   parseTaskDescriptor,
   readTaskDescriptor,
+  runnerToolchainDigest,
 } from './policy.js';
 import type {
   CandidateReceipt,
@@ -608,6 +609,7 @@ function* runCheckTaskSteps(
   );
   const cache = new CheckCache(options.repoRoot, cacheRoot);
   const toolchain = options.toolchain ?? resolvedRunnerToolchain(options);
+  const toolchainDigest = runnerToolchainDigest(options.repoRoot, toolchain);
   const environment: Record<string, string> = { ...(options.environment ?? {}) };
   const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
   if (requiredEnvironment.includes(authorityDigestKey)) {
@@ -647,7 +649,7 @@ function* runCheckTaskSteps(
           ...rawPlan,
           releaseIntentDigest: releaseBinding.digest,
           releaseProfileDigest: releaseBinding.profileDigest,
-          toolchainDigest: sha256Hex(toolchain),
+          toolchainDigest,
           releaseDecision: releaseBinding.decision,
         };
   if (options.target === 'release' && options.releaseStage === 'certify') {
@@ -682,7 +684,7 @@ function* runCheckTaskSteps(
       releaseIntentDigest: releaseBinding.digest,
       releaseProfileDigest: releaseBinding.profileDigest,
       taskPolicyDigest: preflightPlan.taskPolicyDigest,
-      toolchainDigest: sha256Hex(toolchain),
+      toolchainDigest,
     });
   }
   if (options.operation !== 'run') {
@@ -922,7 +924,7 @@ function* runCheckTaskSteps(
       releaseIntentDigest: releaseBinding.digest,
       releaseProfileDigest: releaseBinding.profileDigest,
       taskPolicyDigest: plan.taskPolicyDigest,
-      toolchainDigest: sha256Hex(toolchain),
+      toolchainDigest,
       checks,
       verdict: 'pass',
       blockingReasons: [],
@@ -934,7 +936,7 @@ function* runCheckTaskSteps(
       releaseIntentDigest: releaseBinding.digest,
       releaseProfileDigest: releaseBinding.profileDigest,
       taskPolicyDigest: plan.taskPolicyDigest,
-      toolchainDigest: sha256Hex(toolchain),
+      toolchainDigest,
     });
     const written = cache.writePreflightReceipt(value);
     preflightReceipt = { ...written, value };

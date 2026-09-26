@@ -20,6 +20,44 @@ import {
 
 const GIT_OBJECT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
+/** Repository-relative path of the adopter toolchain manifest (ADR-CHK-0002). */
+export const TOOLCHAIN_MANIFEST_PATH = '.devai/config/toolchain.json';
+
+/**
+ * SHA-256 of the canonical bytes of the toolchain manifest under repoRoot, or
+ * undefined when the repository carries no manifest. Canonicalizing first makes
+ * the digest independent of whitespace and key order, so only a semantic
+ * manifest edit changes it.
+ */
+export function toolchainManifestDigest(repoRoot: string): string | undefined {
+  const path = join(repoRoot, TOOLCHAIN_MANIFEST_PATH);
+  if (!existsSync(path)) return undefined;
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(
+      `CHECK_RUNNER_TOOLCHAIN_MANIFEST_INVALID: ${TOOLCHAIN_MANIFEST_PATH}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return sha256Hex(manifest);
+}
+
+/**
+ * The toolchain digest the runner binds into release preflight receipts: the
+ * resolved toolchain record (versions and protected executable identities)
+ * together with the canonical manifest digest when a manifest is present.
+ */
+export function runnerToolchainDigest(
+  repoRoot: string,
+  toolchain: Readonly<Record<string, string>>,
+): string {
+  const manifestDigest = toolchainManifestDigest(repoRoot);
+  return manifestDigest === undefined
+    ? sha256Hex(toolchain)
+    : sha256Hex({ toolchain, toolchainManifestSha256: manifestDigest });
+}
+
 interface SnapshotEntry {
   readonly path: string;
   readonly mode: string;
