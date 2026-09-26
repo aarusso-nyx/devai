@@ -13,6 +13,8 @@ export const ROSTER = [
   'audit-observation-result.schema.json',
   'authority-policy.schema.json',
   'authority-session.schema.json',
+  'backlog-item.schema.json',
+  'backlog-list-output.schema.json',
   'check-suites.schema.json',
   'common-defs.schema.json',
   'coverage-matrix.schema.json',
