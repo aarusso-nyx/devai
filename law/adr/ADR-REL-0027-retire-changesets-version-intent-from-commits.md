@@ -2,7 +2,7 @@
 id: ADR-REL-0027
 title: Retire changesets and derive the minimum version bump from commit types
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -26,7 +26,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Depends on ADR-GOV-0018 for enforced commit types.
+Accepted on 2026-09-26 by maintainer decision. Depends on ADR-GOV-0018 for enforced commit types.
 
 ## Context
 

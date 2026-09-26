@@ -2,7 +2,7 @@
 id: ADR-CHK-0001
 title: Execute preflight probes as task DAG nodes with a blocked outcome
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -33,7 +33,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Adds a runner kind and an outcome value, so the task-policy digest
+Accepted on 2026-09-26 by maintainer decision. Adds a runner kind and an outcome value, so the task-policy digest
 changes and the RC attestation must be re-issued for the adopting candidate.
 
 ## Context

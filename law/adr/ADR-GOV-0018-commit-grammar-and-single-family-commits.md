@@ -2,7 +2,7 @@
 id: ADR-GOV-0018
 title: Require semantic commit messages and forbid cross-family commits
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -30,7 +30,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Depends on ADR-GOV-0017 for the class vocabulary. Disabling squash
+Accepted on 2026-09-26 by maintainer decision. Depends on ADR-GOV-0017 for the class vocabulary. Disabling squash
 merges in repository settings is a separate Owner-authorized effect that this
 record requires but does not perform.
 

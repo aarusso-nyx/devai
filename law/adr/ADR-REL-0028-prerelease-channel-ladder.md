@@ -2,7 +2,7 @@
 id: ADR-REL-0028
 title: Declare a prerelease channel ladder with per-rung verification capabilities
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -26,7 +26,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Extends the release lifecycle policy; the kernel identifier is
+Accepted on 2026-09-26 by maintainer decision. Extends the release lifecycle policy; the kernel identifier is
 unchanged because the change adds a rung table without altering existing
 transition semantics.
 

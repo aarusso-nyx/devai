@@ -2,7 +2,7 @@
 id: ADR-GOV-0019
 title: Add a repository backlog action family with an opt-in issue projection
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -29,7 +29,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Adds four stable actions to the registry; the expected action
+Accepted on 2026-09-26 by maintainer decision. Adds four stable actions to the registry; the expected action
 count must be read from the manifest under ADR-CHK-0002 before this lands.
 
 ## Context

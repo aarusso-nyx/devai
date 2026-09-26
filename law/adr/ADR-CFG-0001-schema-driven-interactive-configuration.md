@@ -2,7 +2,7 @@
 id: ADR-CFG-0001
 title: Offer schema-driven interactive configuration that replays as existing actions
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -26,7 +26,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Adds no registry action and no runtime dependency.
+Accepted on 2026-09-26 by maintainer decision. Adds no registry action and no runtime dependency.
 
 ## Context
 
