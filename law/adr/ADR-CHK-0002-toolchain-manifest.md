@@ -2,7 +2,7 @@
 id: ADR-CHK-0002
 title: Declare toolchain identity in one manifest that workflows and probes consume
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -31,7 +31,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Depends on ADR-CHK-0001 for the probe that consumes it.
+Accepted on 2026-09-26 by maintainer decision. Depends on ADR-CHK-0001 for the probe that consumes it.
 
 ## Context
 

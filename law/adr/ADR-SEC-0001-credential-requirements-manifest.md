@@ -2,7 +2,7 @@
 id: ADR-SEC-0001
 title: Declare credential requirements per effect and probe presence without reading values
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -33,7 +33,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Depends on ADR-CHK-0001 for the `credential` probe kind.
+Accepted on 2026-09-26 by maintainer decision. Depends on ADR-CHK-0001 for the `credential` probe kind.
 
 ## Context
 

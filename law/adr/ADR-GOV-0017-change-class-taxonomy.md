@@ -2,7 +2,7 @@
 id: ADR-GOV-0017
 title: Classify every tracked path into one change class declared in law
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-26
 authority: Architect
 supersedes: []
@@ -29,7 +29,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed. Changes the task descriptor and the derived release intent, so the
+Accepted on 2026-09-26 by maintainer decision. Changes the task descriptor and the derived release intent, so the
 task-policy digest changes and the RC attestation must be re-issued for the
 candidate that adopts it.
 
