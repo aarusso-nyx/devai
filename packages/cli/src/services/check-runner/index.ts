@@ -44,6 +44,7 @@ export type {
 export {
   buildTaskPlan,
   parseTaskDescriptor,
+  taskDescriptorDigest,
   readTaskDescriptor,
   selectorMatches,
 } from './policy.js';

@@ -1,8 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { readExactGitTreeSync, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { sha256Hex } from './canonical.js';
-import { parseTaskDescriptor, readTaskDescriptor } from './policy.js';
+import { parseTaskDescriptor, readTaskDescriptor, taskDescriptorDigest } from './policy.js';
 import { resolveTaskExecutable } from './executable.js';
 
 export interface DeclaredCheckTaskProcess {
@@ -168,7 +167,7 @@ export function matchDeclaredReleaseTaskProcess(
   } catch {
     return undefined;
   }
-  if (sha256Hex(descriptor) !== binding.descriptor_digest) return undefined;
+  if (taskDescriptorDigest(descriptor) !== binding.descriptor_digest) return undefined;
   const task = descriptor.tasks.find((candidate) => candidate.nodeId === binding.node_id);
   if (task === undefined || JSON.stringify(task.argv) !== JSON.stringify(binding.argv)) {
     return undefined;
