@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/change-taxonomy.schema.json",
+  "title": "Change class taxonomy",
+  "description": "Law-declared closed vocabulary of change classes (ADR-GOV-0017). The taxonomy document at law/policy/change-taxonomy.json declares, for each class, its family, the check members it engages, the constitution Article 6 authority row it maps onto, and the class pairings a single commit may carry. A separate binding document (the law default under law/policy/adopter-defaults/change-taxonomy-binding.json, the adopter copy at .devai/config/change-taxonomy-binding.json) assigns paths to classes with ordered selector entries. A binding may only assign paths to the classes declared here; it may not add, rename, or merge classes. Every tracked path resolves to exactly one class: two bindings that match the same path are a policy load error, never a precedence rule, and declaration order carries no meaning beyond presentation.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "status", "authority", "classes", "pairings", "bindings"],
+  "$defs": {
+    "class_name": {
+      "type": "string",
+      "enum": ["law", "spec", "plan", "code", "tests", "docs", "ci", "toolchain", "generated"],
+      "description": "The closed class vocabulary. A binding may reference these names only."
+    },
+    "family": {
+      "type": "string",
+      "enum": ["governance", "implementation", "infrastructure"],
+      "description": "Commit hygiene family. Governance paths and implementation paths never share a commit unless a declared pairing allows it."
+    },
+    "check_member": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "A member name accepted by the check adapter switch in packages/cli/src/commands/check/adapters.ts."
+    },
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\\\u0000][^\\\\\\u0000]*$",
+      "description": "Repository-relative path without a leading slash, backslash, or NUL."
+    },
+    "class_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "description", "check_members", "constitution_authority"],
+      "properties": {
+        "family": {
+          "$ref": "#/$defs/family"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10
+        },
+        "check_members": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/check_member"
+          },
+          "description": "Check members a change of this class engages. May be empty for classes whose verification is a script rather than a check member."
+        },
+        "constitution_authority": {
+          "type": "string",
+          "minLength": 3,
+          "description": "The law/constitution.md Article 6 authority-by-path row this class maps onto. The taxonomy never contradicts that table."
+        }
+      }
+    },
+    "pairing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classes", "reason"],
+      "properties": {
+        "classes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/class_name"
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["exact", "prefix", "glob"],
+          "description": "exact compares the whole path; prefix compares a leading substring; glob uses the check-runner glob grammar (* within a segment, ** across segments, ? one character)."
+        },
+        "pattern": {
+          "$ref": "#/$defs/repository_path"
+        }
+      }
+    },
+    "binding_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector", "class"],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "class": {
+          "$ref": "#/$defs/class_name"
+        }
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/binding_entry"
+      },
+      "description": "Ordered entries of {selector, class}. The order is presentational only: every path must be matched by at most one entry, and a loader that finds two entries matching one path (two prefixes where one extends the other, an exact path under a prefix, or a glob that reaches a bound path) fails with an overlap error instead of choosing the earlier or the later entry."
+    },
+    "binding_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "id", "taxonomy", "bindings"],
+      "description": "Shape of a binding file. The taxonomy field names the law policy whose class vocabulary the bindings must use.",
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "id": {
+          "const": "change-taxonomy-binding"
+        },
+        "taxonomy": {
+          "const": "law/policy/change-taxonomy.json"
+        },
+        "bindings": {
+          "$ref": "#/$defs/bindings"
+        }
+      }
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "change-taxonomy"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active"]
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["law", "spec", "plan", "code", "tests", "docs", "ci", "toolchain", "generated"],
+      "description": "One declaration per class; the key set equals the closed enum exactly.",
+      "properties": {
+        "law": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "spec": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "plan": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "code": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "tests": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "docs": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "ci": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "toolchain": {
+          "$ref": "#/$defs/class_declaration"
+        },
+        "generated": {
+          "$ref": "#/$defs/class_declaration"
+        }
+      }
+    },
+    "pairings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pairing"
+      },
+      "description": "Class pairs a single commit may carry. Any pair not listed is a commit hygiene violation under ADR-GOV-0018."
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default", "materialized", "overlap"],
+      "description": "Where the path-to-class bindings live and how overlap is treated. The binding entries themselves live in the referenced documents, validated by #/$defs/binding_document.",
+      "properties": {
+        "default": {
+          "const": "law/policy/adopter-defaults/change-taxonomy-binding.json"
+        },
+        "materialized": {
+          "const": ".devai/config/change-taxonomy-binding.json"
+        },
+        "overlap": {
+          "const": "load-error"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "change-taxonomy",
+      "status": "active",
+      "authority": "Architect",
+      "classes": {
+        "law": {
+          "family": "governance",
+          "description": "Constitution, decision records, policy sources, glossary, and trace.",
+          "check_members": ["adrs", "forbidden-actions"],
+          "constitution_authority": "law/ — Architect (F1-law)"
+        },
+        "spec": {
+          "family": "governance",
+          "description": "Invariants and schemas.",
+          "check_members": ["invariants", "schemas"],
+          "constitution_authority": "law/ — Architect (F1-law: schemas, invariants)"
+        },
+        "plan": {
+          "family": "governance",
+          "description": "Campaign plans, round plans, product records.",
+          "check_members": [],
+          "constitution_authority": "product/ — Owner (F1-business); record/ — machine only"
+        },
+        "code": {
+          "family": "implementation",
+          "description": "Package sources.",
+          "check_members": ["build", "lint", "type-check", "unit-test"],
+          "constitution_authority": "packages/ and root workspace configuration — Engineer (F2)"
+        },
+        "tests": {
+          "family": "implementation",
+          "description": "Test sources and fixtures.",
+          "check_members": ["unit-test"],
+          "constitution_authority": "tests/ and packages/*/tests/ — Inspector (F3)"
+        },
+        "docs": {
+          "family": "implementation",
+          "description": "Published human documentation.",
+          "check_members": ["docs-links"],
+          "constitution_authority": "docs/ — Architect (published human documentation)"
+        },
+        "ci": {
+          "family": "infrastructure",
+          "description": "Workflows, hooks, and repository scripts.",
+          "check_members": ["workflow-reference"],
+          "constitution_authority": "Host-tool configuration directories — path fixed by the toolchain"
+        },
+        "toolchain": {
+          "family": "infrastructure",
+          "description": "Root workspace configuration and pinned dependency identity.",
+          "check_members": ["dependencies"],
+          "constitution_authority": "packages/ and root workspace configuration — Engineer (F2)"
+        },
+        "generated": {
+          "family": "implementation",
+          "description": "Generated views and materialized policy copies.",
+          "check_members": ["schemas"],
+          "constitution_authority": ".devai/pin/ and .devai/config/ — materialized from canonical sources"
+        }
+      },
+      "pairings": [
+        {
+          "classes": ["law", "generated"],
+          "reason": "The action registry and its generated views must co-commit."
+        }
+      ],
+      "bindings": {
+        "default": "law/policy/adopter-defaults/change-taxonomy-binding.json",
+        "materialized": ".devai/config/change-taxonomy-binding.json",
+        "overlap": "load-error"
+      }
+    }
+  ]
+}

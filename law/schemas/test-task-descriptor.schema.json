@@ -12,12 +12,32 @@
     "tasks",
     "profiles"
   ],
+  "$defs": {
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern"],
+      "description": "Input selector. exact compares the whole path, prefix a leading substring, glob the check-runner glob grammar. class selects every path the change-taxonomy binding assigns to the named class (ADR-GOV-0017); its pattern is restricted to the closed class enum of law/schemas/change-taxonomy.schema.json.",
+      "properties": {
+        "kind": { "type": "string", "enum": ["exact", "prefix", "glob", "class"] },
+        "pattern": { "type": "string", "minLength": 1 }
+      },
+      "if": { "properties": { "kind": { "const": "class" } } },
+      "then": {
+        "properties": {
+          "pattern": {
+            "enum": ["law", "spec", "plan", "code", "tests", "docs", "ci", "toolchain", "generated"]
+          }
+        }
+      }
+    }
+  },
   "properties": {
     "schemaVersion": { "const": "1.0.0" },
     "descriptorVersion": { "type": "string", "minLength": 1 },
     "repositoryId": { "type": "string", "minLength": 1 },
     "fallbackNodeId": { "type": ["string", "null"] },
-    "dynamicFallbackSelectors": { "type": "array" },
+    "dynamicFallbackSelectors": { "type": "array", "items": { "$ref": "#/$defs/selector" } },
     "tasks": {
       "type": "array",
       "minItems": 1,
@@ -45,7 +65,11 @@
           },
           "cwd": { "type": "string", "minLength": 1 },
           "runner": { "type": "string", "minLength": 1 },
-          "inputSelectors": { "type": "array", "minItems": 1 },
+          "inputSelectors": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/selector" }
+          },
           "toolchainKeys": { "type": "array", "items": { "type": "string" } },
           "allowlistedEnv": { "type": "array", "items": { "type": "string" } },
           "outputContract": { "type": "object" }

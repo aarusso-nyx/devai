@@ -1,0 +1,90 @@
+{
+  "$schema": "../schemas/change-taxonomy.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "change-taxonomy",
+  "status": "active",
+  "authority": "Architect",
+  "classes": {
+    "law": {
+      "family": "governance",
+      "description": "Constitution, decision records, policy sources, glossary, and trace: the reference every other class is measured against.",
+      "check_members": [
+        "adrs",
+        "action-effects",
+        "forbidden-actions",
+        "glob-guards",
+        "overrides",
+        "prompt-overlays",
+        "trace"
+      ],
+      "constitution_authority": "law/ — Architect (F1-law: constitution, register, ADRs, schemas, invariants, trace, policy sources; law/glossary/ joint with Owner)"
+    },
+    "spec": {
+      "family": "governance",
+      "description": "Invariants and schemas: the machine-checkable contracts under law/invariants/ and law/schemas/.",
+      "check_members": ["invariants", "invariant-strategies", "schemas", "test-trace", "trace"],
+      "constitution_authority": "law/ — Architect (F1-law: schemas and invariants)"
+    },
+    "plan": {
+      "family": "governance",
+      "description": "Campaign and round plans, product records, and the machine-written record tree: intent and evidence, never behavior.",
+      "check_members": ["journeys"],
+      "constitution_authority": "product/ — Owner (F1-business); record/ — machine only (record/derived/ by regeneration, record/proofs/ appended by executing verbs)"
+    },
+    "code": {
+      "family": "implementation",
+      "description": "Package sources, package manifests, and package-local scripts and resources.",
+      "check_members": [
+        "build",
+        "lint",
+        "type-check",
+        "unit-test",
+        "action-coverage",
+        "sensor-integrity",
+        "cli-reference"
+      ],
+      "constitution_authority": "packages/ and root workspace configuration — Engineer (F2)"
+    },
+    "tests": {
+      "family": "implementation",
+      "description": "Test sources, fixtures, helpers, and test configuration under tests/ and packages/*/tests/.",
+      "check_members": ["unit-test", "full-tests", "test-trace"],
+      "constitution_authority": "tests/ and packages/*/tests/ — Inspector (F3)"
+    },
+    "docs": {
+      "family": "implementation",
+      "description": "Published human documentation under docs/ and the root prose files.",
+      "check_members": ["docs-links", "docs-governance", "cli-reference", "ci-economy"],
+      "constitution_authority": "docs/ — Architect (published human documentation); root prose files (README.md, CLAUDE.md, AGENTS.md) — Architect"
+    },
+    "ci": {
+      "family": "infrastructure",
+      "description": "Workflows, repository hooks, repository automation scripts, and the test task descriptor that drives the local and remote gates.",
+      "check_members": ["workflow-reference", "ci-economy", "pr-compliance", "harness-integrity"],
+      "constitution_authority": "Host-tool configuration directories (.changeset/, .claude/, and peers) — path fixed by the toolchain; contents classified per content class"
+    },
+    "toolchain": {
+      "family": "infrastructure",
+      "description": "Root workspace configuration, lockfile, runtime and formatter pins, changesets, and vendored verifier bytes: dependency and runtime identity.",
+      "check_members": ["dependencies", "changeset-version", "provenance-readiness"],
+      "constitution_authority": "packages/ and root workspace configuration — Engineer (F2)"
+    },
+    "generated": {
+      "family": "implementation",
+      "description": "Generated views of the action registry and the materialized policy and pin copies under .devai/: derived from canonical sources, never hand-edited.",
+      "check_members": ["schemas", "action-coverage"],
+      "constitution_authority": ".devai/pin/ and .devai/config/ — modified only through registered init apply or init bind actions, materialized from canonical package or policy sources; generated views under packages/ — Engineer (F2)"
+    }
+  },
+  "pairings": [
+    {
+      "classes": ["law", "generated"],
+      "reason": "The action registry under law/policy/action-registry.json and its generated views must co-commit, and a materialized policy copy under .devai/config must co-commit with the law policy it mirrors; a commit that carries one side alone leaves the generated side stale."
+    }
+  ],
+  "bindings": {
+    "default": "law/policy/adopter-defaults/change-taxonomy-binding.json",
+    "materialized": ".devai/config/change-taxonomy-binding.json",
+    "overlap": "load-error"
+  }
+}
