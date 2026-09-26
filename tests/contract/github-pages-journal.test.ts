@@ -172,6 +172,19 @@ it('waits for a building Pages deployment before verifying it', async () => {
   expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified', pagesId: 'pages-17' });
   expect(f.options.sleep).toHaveBeenCalledTimes(1);
 });
+it('waits through every in-flight Pages deployment status before verifying it', async () => {
+  const f = fixture();
+  f.setPagesStates([
+    'deployment_in_progress',
+    'syncing_files',
+    'finished_file_sync',
+    'updating_pages',
+    'purging_cdn',
+    'succeed',
+  ]);
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified', pagesId: 'pages-17' });
+  expect(f.options.sleep).toHaveBeenCalledTimes(5);
+});
 it.each([401, 403, 404, 500])(
   'API status %s cannot establish missing publication',
   async (status) => {
