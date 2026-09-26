@@ -3,7 +3,7 @@
   "id": "CMP-0001",
   "title": "Workflow economy",
   "type": "campaign",
-  "status": "proposed",
+  "status": "active",
   "date": "2026-09-26",
   "authority": "Architect",
   "mandate": {
@@ -50,7 +50,7 @@
       "id": "R-0101",
       "title": "Toolchain manifest",
       "goal": "One adopter-owned manifest declares every toolchain pin; workflows, provisioning, and the runner consume it.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CHK-0002"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -112,9 +112,17 @@
                 ]
               ],
               "commit_types": ["law(toolchain)", "docs(adopters)"],
-              "prompt": { "path": "prompts/TASK-0111.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0111.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0112",
@@ -141,9 +149,17 @@
                 ["pnpm", "run", "test:cli"]
               ],
               "commit_types": ["test(toolchain)"],
-              "prompt": { "path": "prompts/TASK-0112.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0112.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
             },
             {
               "id": "TASK-0113",
@@ -179,9 +195,17 @@
                 ["pnpm", "run", "typecheck"]
               ],
               "commit_types": ["feat(toolchain)", "ci(workflows)", "docs(reference)"],
-              "prompt": { "path": "prompts/TASK-0113.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0113.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         }
@@ -259,9 +283,17 @@
                 ]
               ],
               "commit_types": ["law(taxonomy)", "docs(adopters)", "docs(roles)"],
-              "prompt": { "path": "prompts/TASK-0121.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0121.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0122",
@@ -288,9 +320,17 @@
                 ["pnpm", "run", "test:root"]
               ],
               "commit_types": ["test(taxonomy)"],
-              "prompt": { "path": "prompts/TASK-0122.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0122.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0123",
@@ -334,9 +374,17 @@
                 ]
               ],
               "commit_types": ["feat(taxonomy)", "ci(test-tasks)"],
-              "prompt": { "path": "prompts/TASK-0123.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0123.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         }
@@ -408,9 +456,17 @@
                 ["node", ".devai/state/pr-bootstrap/cli/bin.js", "doctor", "--format", "json"]
               ],
               "commit_types": ["law(commit-grammar)", "docs(agents)", "docs(dev)"],
-              "prompt": { "path": "prompts/TASK-0131.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0131.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0132",
@@ -439,9 +495,17 @@
                 ["pnpm", "run", "test:cli"]
               ],
               "commit_types": ["test(commit-grammar)"],
-              "prompt": { "path": "prompts/TASK-0132.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0132.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
             },
             {
               "id": "TASK-0133",
@@ -480,9 +544,17 @@
                 ["git", "diff", "--check"]
               ],
               "commit_types": ["feat(hooks)", "ci(gate)", "chore(changesets)", "docs(reference)"],
-              "prompt": { "path": "prompts/TASK-0133.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0133.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         }
@@ -567,9 +639,17 @@
                 "docs(operations)",
                 "docs(agents)"
               ],
-              "prompt": { "path": "prompts/TASK-0141.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0141.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0142",
@@ -598,9 +678,17 @@
                 ["pnpm", "run", "test:root"]
               ],
               "commit_types": ["test(preflight)"],
-              "prompt": { "path": "prompts/TASK-0142.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0142.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0143",
@@ -645,9 +733,17 @@
                 "ci(workflows)",
                 "docs(reference)"
               ],
-              "prompt": { "path": "prompts/TASK-0143.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0143.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         },
@@ -715,9 +811,17 @@
                 ]
               ],
               "commit_types": ["law(credentials)", "docs(adopters)", "docs(security)"],
-              "prompt": { "path": "prompts/TASK-0151.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0151.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0152",
@@ -746,9 +850,17 @@
                 ["pnpm", "run", "test:cli"]
               ],
               "commit_types": ["test(credentials)"],
-              "prompt": { "path": "prompts/TASK-0152.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0152.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
             },
             {
               "id": "TASK-0153",
@@ -785,9 +897,17 @@
                 ["node", "scripts/check-workflows.mjs"]
               ],
               "commit_types": ["feat(credentials)", "ci(workflows)", "docs(reference)"],
-              "prompt": { "path": "prompts/TASK-0153.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0153.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         }
@@ -857,9 +977,17 @@
                 ]
               ],
               "commit_types": ["law(release)", "docs(operations)", "docs(adopters)"],
-              "prompt": { "path": "prompts/TASK-0161.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0161.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0162",
@@ -884,9 +1012,17 @@
                 ["pnpm", "run", "test:root"]
               ],
               "commit_types": ["test(release)"],
-              "prompt": { "path": "prompts/TASK-0162.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0162.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
             },
             {
               "id": "TASK-0163",
@@ -919,9 +1055,17 @@
                 ["node", "scripts/check-workflows.mjs"]
               ],
               "commit_types": ["feat(release)", "ci(workflows)", "docs(reference)"],
-              "prompt": { "path": "prompts/TASK-0163.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0163.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         },
@@ -987,9 +1131,17 @@
                 ]
               ],
               "commit_types": ["law(backlog)", "docs(adopters)"],
-              "prompt": { "path": "prompts/TASK-0171.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0171.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0172",
@@ -1018,9 +1170,17 @@
                 ["pnpm", "run", "test:cli"]
               ],
               "commit_types": ["test(backlog)"],
-              "prompt": { "path": "prompts/TASK-0172.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0172.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
             },
             {
               "id": "TASK-0173",
@@ -1073,9 +1233,17 @@
                 ]
               ],
               "commit_types": ["feat(backlog)", "docs(reference)"],
-              "prompt": { "path": "prompts/TASK-0173.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0173.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
             }
           ]
         }
@@ -1145,9 +1313,17 @@
                 ]
               ],
               "commit_types": ["law(registry)", "docs(adopters)"],
-              "prompt": { "path": "prompts/TASK-0181.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0181.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
             },
             {
               "id": "TASK-0182",
@@ -1173,9 +1349,17 @@
               ],
               "acceptance_commands": [["pnpm", "run", "test:cli"]],
               "commit_types": ["test(init)"],
-              "prompt": { "path": "prompts/TASK-0182.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0182.md",
+                "sha256": null
+              },
               "pull_request": null,
-              "merged_as": null
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
             },
             {
               "id": "TASK-0183",
@@ -1211,7 +1395,91 @@
                 ["pnpm", "run", "release:closure"]
               ],
               "commit_types": ["feat(init)", "docs(reference)"],
-              "prompt": { "path": "prompts/TASK-0183.md", "sha256": null },
+              "prompt": {
+                "path": "prompts/TASK-0183.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0107",
+      "title": "Release 1.6.0",
+      "goal": "Roll the candidate to 1.6.0 with a changelog that summarizes the campaign, so the Owner can rehearse and publish.",
+      "status": "planned",
+      "records": ["ADR-REL-0027"],
+      "depends_on": ["R-0103", "R-0104", "R-0105", "R-0106"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["release:closure", "release:static-integrity"],
+      "waves": [
+        {
+          "id": "CTG-0109",
+          "title": "Version rollover and changelog",
+          "type": "single-role",
+          "records": ["ADR-REL-0027"],
+          "depends_on": [],
+          "lock_scopes": [
+            "package.json",
+            "packages/cli/package.json",
+            "CHANGELOG.md",
+            "docs/site/src/pages/index.tsx"
+          ],
+          "gates": ["format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0191",
+              "title": "Roll the candidate to 1.6.0 and write the changelog",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "package.json",
+                  "packages/cli/package.json",
+                  "CHANGELOG.md",
+                  "docs/site/src/pages/index.tsx",
+                  "packages/cli/tests/unit/version.test.ts",
+                  "packages/cli/tests/unit/release-package-staging.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts",
+                  "packages/cli/tests/unit/doctor-adopter-policy-binding.test.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts",
+                  "packages/cli/tests/unit/doctor-observable-boundaries.test.ts"
+                ],
+                "forbidden": ["law/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "Version 1.6.0 at every site that carried 1.5.7, including pinned test fixtures.",
+                "A changelog entry summarizing each merged round in one line per record.",
+                "Static integrity and publishable closure green."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "release:static-integrity"],
+                ["pnpm", "run", "release:closure"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["chore(release)"],
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 45
+              },
+              "prompt": {
+                "path": "prompts/TASK-0191.md",
+                "sha256": null
+              },
               "pull_request": null,
               "merged_as": null
             }
@@ -1219,5 +1487,45 @@
         }
       ]
     }
-  ]
+  ],
+  "models": {
+    "schemaVersion": "1.0.0",
+    "hosts": ["claude", "codex"],
+    "tiers": {
+      "architect": {
+        "rank": 1,
+        "claude": "Fable 5.1",
+        "codex": "Astra 6",
+        "default_effort": "high",
+        "use_for": "orchestration, contracts, schemas, policy, decision records"
+      },
+      "worker-high": {
+        "rank": 2,
+        "claude": "Opus 5.5",
+        "codex": "Sol 6",
+        "default_effort": "high",
+        "use_for": "implementation across several modules, runner and kernel changes, tests of runtime semantics"
+      },
+      "worker": {
+        "rank": 3,
+        "claude": "Sonnet 5",
+        "codex": "Terra 6",
+        "default_effort": "medium",
+        "use_for": "bounded tests, documentation, single-module changes"
+      },
+      "clerk": {
+        "rank": 4,
+        "claude": "Haiku 4.5",
+        "codex": "Luna 6",
+        "default_effort": "low",
+        "use_for": "mechanical edits, regeneration, rollovers, formatting"
+      }
+    },
+    "escalation": {
+      "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+      "step": "one-rank-up",
+      "ceiling": "architect",
+      "authority": "orchestrator"
+    }
+  }
 }

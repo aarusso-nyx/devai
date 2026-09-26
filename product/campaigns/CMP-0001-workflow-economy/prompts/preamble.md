@@ -9,6 +9,18 @@ Read first: `AGENTS.md`, `law/constitution.md` Articles 6 to 10 and 24 to 28,
 the decision record named in the task, `law/policy/campaign-execution.json`, and
 the task entry in `product/campaigns/CMP-0001-workflow-economy/campaign.json`.
 
+Model and effort: the task prompt names a tier and an effort. The orchestrator
+resolves the tier to a host model through `models.tiers` in `campaign.json`
+(Claude and Codex columns). Never name a model in a commit or report; name
+the tier. If the task fails once, reports a gap, or exceeds its time budget
+without a pull request, the orchestrator reruns it one tier rank up.
+
+Time matters. Deliver the declared scope within the time budget. When a
+choice would take more than a few minutes to settle, take the simpler option
+that satisfies the acceptance commands and note the alternative in your
+report. Report partial progress rather than pursue perfection, and never
+widen scope to chase an unrelated improvement.
+
 Rules for every task:
 
 - Stay inside the task boundary paths. A needed change outside them is a reason to
