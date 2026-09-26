@@ -393,6 +393,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'campaign-execution-policy.schema.json',
   'campaign.schema.json',
   'change-taxonomy.schema.json',
+  'commit-grammar.schema.json',
   'claim-runtime-inputs.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
@@ -433,7 +434,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
 
     expect(checkSchemaCanon(root)).toEqual({
       ok: true,
-      canonical_total: 13,
+      canonical_total: 14,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -508,7 +509,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     put(source, 'packages/schemas/src/roster.ts', 'source roster');
     expect(checkSchemasForRepository(source)).toEqual({
       ok: true,
-      canonical_total: 13,
+      canonical_total: 14,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
