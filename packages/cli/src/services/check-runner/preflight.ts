@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { readCheckPolicyGitSync, spawnSync } from '@devai-nyx/authority';
-import { redact } from '@devai-nyx/utils';
+import { probeCredential, redactDiagnosticText } from '../credential-probe.js';
 import type {
   PreflightProbe,
   PreflightProbeObservation,
@@ -22,27 +22,8 @@ export const BASE_PLACEHOLDER = '{base}';
 const REGISTRY_TIMEOUT_MS = 10_000;
 const GIT_TIMEOUT_MS = 30_000;
 
-/**
- * Token-shaped values and secret-named assignments. Every probe observation,
- * failure reason, and diagnostic stream tail passes through these before it is
- * written to a report or a diagnostics file.
- */
-const SECRET_PATTERNS: readonly RegExp[] = [
-  /\b(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})/gu,
-  /\bnpm_[A-Za-z0-9]{20,}/gu,
-  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/gu,
-  /\bsk-[A-Za-z0-9_-]{20,}/gu,
-  /\bxox[abposr]-[A-Za-z0-9-]{10,}/gu,
-  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gu,
-  /\b(?:Bearer|Basic) [A-Za-z0-9._~+/=-]{8,}/gu,
-  /_authToken=\S+/gu,
-  /\b[A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Z0-9_]*=\S+/gu,
-];
-
 /** Masks every token-shaped value and secret-named assignment in text. */
-export function redactDiagnosticText(value: string): string {
-  return redact(value, { patterns: SECRET_PATTERNS, fields: [] }) as string;
-}
+export { redactDiagnosticText };
 
 const PROBE_ID = /^[a-z][a-z0-9-]*$/u;
 const BARE_EXECUTABLE = /^[A-Za-z0-9._-]+$/u;
@@ -236,7 +217,7 @@ function hostProcess(
   command: string,
   args: readonly string[],
   options: Readonly<{ cwd?: string; timeout: number; env?: NodeJS.ProcessEnv }>,
-): Readonly<{ status: number | null; stdout: string; error?: string }> {
+): Readonly<{ status: number | null; stdout: string; stderr: string; error?: string }> {
   try {
     const result = spawnSync(command, [...args], {
       ...options,
@@ -246,10 +227,16 @@ function hostProcess(
     return {
       status: result.status,
       stdout: String(result.stdout ?? ''),
+      stderr: String(result.stderr ?? ''),
       ...(result.error !== undefined && { error: result.error.message }),
     };
   } catch (error) {
-    return { status: null, stdout: '', error: error instanceof Error ? error.message : 'refused' };
+    return {
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: error instanceof Error ? error.message : 'refused',
+    };
   }
 }
 
@@ -389,6 +376,38 @@ function registryObservation(url: string, expectedVersion: string | undefined): 
   }
   if (result.status === 3) return { matched: false, observed };
   return { matched: result.status === 0, observed, unobservable: result.status !== 0 };
+}
+
+const CREDENTIAL_TIMEOUT_MS = 15_000;
+
+/**
+ * ADR-SEC-0001: the same probe doctor uses, over the runner's host-process
+ * rules. A refused or failed spawn is an unobservable fact (blocked), never a
+ * crash; only the manifest id, status, and a fixed reason word are observed.
+ */
+function credentialObservation(context: PreflightContext, id: string): Observation {
+  const result = probeCredential({
+    repoRoot: context.repoRoot,
+    id,
+    environment: { ...process.env, ...context.environment },
+    run: (argv) => {
+      const [command = '', ...args] = argv;
+      const spawned = hostProcess(command, args, {
+        cwd: context.repoRoot,
+        timeout: CREDENTIAL_TIMEOUT_MS,
+      });
+      if (spawned.error !== undefined) throw new Error('refused');
+      return { status: spawned.status, stdout: spawned.stdout, stderr: spawned.stderr };
+    },
+  });
+  const observed = `${result.id} ${result.status}${result.reason === undefined ? '' : ` (${result.reason})`}`;
+  return {
+    matched: result.status === 'present',
+    observed,
+    ...((result.reason === 'probe-refused' || result.reason === 'probe-unavailable') && {
+      unobservable: true,
+    }),
+  };
 }
 
 function sha256File(path: string): string {
@@ -562,8 +581,7 @@ export function* evaluatePreflightProbes(
           observation = toolchainObservation(context.repoRoot, kind.manifest_path);
           break;
         case 'credential':
-          // The credential service (ADR-SEC-0001) is not wired yet; never read a value.
-          observation = { matched: false, observed: null, skipped: true };
+          observation = credentialObservation(context, kind.manifest_id);
           break;
       }
     }
