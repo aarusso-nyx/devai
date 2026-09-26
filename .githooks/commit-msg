@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+# Commit grammar and type-versus-class check (ADR-GOV-0018); $1 is the message file.
+hooks=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec node "$hooks/../scripts/check-change-hygiene.mjs" --commit-msg "$1"
