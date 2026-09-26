@@ -110,3 +110,68 @@ The example above is directly runnable in a repository whose `package.json` defi
 `test` script and whose environment provides `pnpm`: save it as `test-tasks.json`,
 replace `owner/repository` with the repository identity, and run the planning command
 before authorizing `devai check --affected --run --base <exact-commit> --write`.
+
+## Toolchain manifest
+
+The `toolchainKeys` a node declares (`node`, `pnpm`, `git`, and the others the
+runner resolves) are compared against one adopter-owned manifest,
+`.devai/config/toolchain.json`, whose contract is
+`law/schemas/toolchain-manifest.schema.json`, schema version `1.0.0`. DEVAI
+materializes it from `law/policy/adopter-defaults/toolchain.json` through the
+scaffold; after that the adopter owns the values, because a toolchain is host
+truth, not contract. It is therefore not part of the policy materialization
+drift check that binds `law/policy` sources to `.devai/config` copies.
+
+The manifest declares four sections:
+
+- `runtimes`: exact versions of `node`, `pnpm`, and `git` without a leading `v`.
+  `pnpm` must agree with the `packageManager` field of `package.json`. A workflow
+  may pin only the node major; the checker compares the major there and the full
+  version where a workflow states one.
+- `actions`: a map from GitHub Action repository (`owner/name`) to an object with
+  `ref`, `digest`, and optionally `peeled_commit`. `digest` is the immutable
+  object every `uses:` reference must carry; `ref` records the tag it was pinned
+  from for human review. When the pin is an annotated tag object, `peeled_commit`
+  names the commit it peels to so a checker recognizes both identities without
+  demanding a repin.
+- `verifier`: the trusted release-candidate verifier package by `package` name
+  and exact `version`, plus `policy`, the path of
+  `law/policy/trusted-local-rc-verifier-package.json`. Tarball digests, the
+  source commit, and materialization rules stay in that policy; the manifest
+  references it and never copies it.
+- `constants`: named repository constants a workflow restates, such as
+  `expected_action_count` (the size of the approved action set) and
+  `ledger_environment`. A constant that is absent is not checked.
+
+Minimal example:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "runtimes": { "node": "24.20.0", "pnpm": "9.15.0", "git": "2.47.3" },
+  "actions": {
+    "actions/checkout": {
+      "ref": "v7.0.1",
+      "digest": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    },
+    "actions/setup-node": {
+      "ref": "v7.0.0",
+      "digest": "820762786026740c76f36085b0efc47a31fe5020"
+    }
+  },
+  "verifier": {
+    "package": "@aarusso-nyx/devai",
+    "version": "1.5.4",
+    "policy": "law/policy/trusted-local-rc-verifier-package.json"
+  },
+  "constants": {}
+}
+```
+
+One edit to the manifest rolls a pin everywhere: the workflow checker verifies
+every pinned value in every workflow against it, the provisioning script reads
+it instead of an inline table, and the runner derives the toolchain digest bound
+into every task key from it, so editing the manifest invalidates every cached
+result. A host whose observed version differs from a declared runtime is reported
+as a `BLOCKED` probe naming the observed and required values rather than as a
+silent cache miss.
