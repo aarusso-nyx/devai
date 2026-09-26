@@ -612,7 +612,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -661,8 +661,8 @@
                 "path": "prompts/TASK-0141.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/100",
+              "merged_as": "90724d66108757dd4c00e71d023a1fa570d86fa6",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -675,7 +675,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0141",
-              "status": "checkpoint",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -700,8 +700,8 @@
                 "path": "prompts/TASK-0142.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/100",
+              "merged_as": "c3b6d259dc55e22891a2aeb09fca453b338ea7b6",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -714,7 +714,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0142",
-              "status": "blocked",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -755,8 +755,8 @@
                 "path": "prompts/TASK-0143.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/100",
+              "merged_as": "0d76f0c4673058cef0c487bbf8d9da1764499d46",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -789,7 +789,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -847,7 +847,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0151",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -886,7 +886,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0152",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1277,7 +1277,7 @@
       "id": "R-0106",
       "title": "Interactive configuration",
       "goal": "Adoption and adopter-owned settings can be authored through schema-driven prompts that replay as existing actions.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CFG-0001"],
       "depends_on": ["R-0102", "R-0104"],
       "attestation_reissue": false,
@@ -1305,7 +1305,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "checkpoint",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -1355,7 +1355,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0181",
-              "status": "planned",
+              "status": "checkpoint",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1391,7 +1391,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0182",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
