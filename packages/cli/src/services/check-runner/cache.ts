@@ -10,6 +10,7 @@ import type {
   TaskResult,
 } from './types.js';
 import type { ReleasePreflightReceipt } from '../release-preflight.js';
+import { redactDiagnosticText } from './preflight.js';
 
 const MAX_DIAGNOSTIC_STREAM_BYTES = 8 * 1024;
 
@@ -130,13 +131,16 @@ export class CheckCache {
     if (
       index.nodeId !== task.nodeId ||
       index.schemaVersion !== '1.0.0' ||
-      !['PASS', 'FAIL', 'TIMEOUT', 'KILLED', 'ABORTED'].some((outcome) => outcome === index.outcome)
+      !['PASS', 'FAIL', 'TIMEOUT', 'KILLED', 'ABORTED', 'BLOCKED'].some(
+        (outcome) => outcome === index.outcome,
+      )
     ) {
       return { cacheState: 'stale', reason: 'cache-index-malformed' };
     }
     if (index.taskKey !== task.taskKey) {
       return { cacheState: 'stale', reason: 'task-key-changed' };
     }
+    // Only PASS is ever reusable; BLOCKED re-executes as previous-blocked (ADR-CHK-0001).
     if (index.outcome !== 'PASS' || index.resultDigest === undefined) {
       return { cacheState: 'execute', reason: `previous-${String(index.outcome).toLowerCase()}` };
     }
@@ -207,19 +211,22 @@ export class CheckCache {
     finishedAt: string,
     reason: string,
     execution: TaskExecutionResult,
+    remediation?: readonly string[],
   ): string {
+    // Diagnostics are printed by the pull-request lane; secret-shaped values never reach them.
     const diagnostic = {
       schemaVersion: '1.0.0',
       nodeId: task.nodeId,
       taskKey: task.taskKey,
       outcome,
       finishedAt,
-      reason,
+      reason: redactDiagnosticText(reason),
       exitCode: execution.status,
       signal: execution.signal,
       errorCode: execution.errorCode ?? null,
-      stdoutTail: boundedTail(execution.stdout),
-      stderrTail: boundedTail(execution.stderr),
+      stdoutTail: redactDiagnosticText(boundedTail(execution.stdout)),
+      stderrTail: redactDiagnosticText(boundedTail(execution.stderr)),
+      ...(remediation !== undefined && remediation.length > 0 && { remediation }),
     };
     const path = join(
       this.#root,

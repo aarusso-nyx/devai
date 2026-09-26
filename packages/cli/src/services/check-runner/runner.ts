@@ -24,8 +24,19 @@ import {
   exactCommitTree,
   parseTaskDescriptor,
   readTaskDescriptor,
+  isPreflightNode,
   runnerToolchainDigest,
+  withSyntheticNode,
 } from './policy.js';
+import {
+  ADOPTER_PREFLIGHT_NODE_ID,
+  ADOPTER_PREFLIGHT_PROBES_PATH,
+  adopterPreflightNode,
+  evaluatePreflightProbes,
+  loadAdopterPreflightProbes,
+  resolveBaseCommit,
+  type PreflightEvaluation,
+} from './preflight.js';
 import type {
   CandidateReceipt,
   CheckRunnerOptions,
@@ -65,11 +76,32 @@ export function readProtectedCompletedTaskResults(
 }
 
 function descriptorFor(options: CheckRunnerOptions) {
-  return options.descriptorDocument === undefined
-    ? readTaskDescriptor(
-        resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-      )
-    : parseTaskDescriptor(options.descriptorDocument);
+  const descriptor =
+    options.descriptorDocument === undefined
+      ? readTaskDescriptor(
+          resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
+        )
+      : parseTaskDescriptor(options.descriptorDocument);
+  if (options.target !== 'preflight') return descriptor;
+  // The --preflight target also plans the adopter-owned probe list as a synthetic
+  // root node; it is never part of the task policy the verifier rebuilds.
+  const probes = loadAdopterPreflightProbes(options.repoRoot);
+  const augmented =
+    probes === undefined ? descriptor : withSyntheticNode(descriptor, adopterPreflightNode(probes));
+  if (!augmented.tasks.some((task) => isPreflightNode(task))) {
+    throw new Error(
+      `CHECK_PREFLIGHT_PROBES_MISSING: declare a preflight-v1 node in test-tasks.json or probes in ${ADOPTER_PREFLIGHT_PROBES_PATH}`,
+    );
+  }
+  return augmented;
+}
+
+/** Planned nodes outside the task policy: the synthetic adopter preflight root. */
+function unattestedNodeIds(options: CheckRunnerOptions): readonly string[] {
+  return options.target === 'preflight' &&
+    existsSync(join(options.repoRoot, ADOPTER_PREFLIGHT_PROBES_PATH))
+    ? [ADOPTER_PREFLIGHT_NODE_ID]
+    : [];
 }
 
 function commandVersion(command: string, args: readonly string[], cwd: string): string {
@@ -209,6 +241,7 @@ function planWithCache(
 ) {
   const descriptor = descriptorFor(options);
   const reusableDigests = new Map<string, string>();
+  const unattested = unattestedNodeIds(options);
   return buildTaskPlan({
     repoRoot: options.repoRoot,
     descriptor,
@@ -226,6 +259,7 @@ function planWithCache(
     }),
     toolchain,
     environment,
+    ...(unattested.length > 0 && { unattestedNodes: unattested }),
     ...(options.resolveExecutable === undefined
       ? {}
       : { resolveExecutable: options.resolveExecutable }),
@@ -233,6 +267,10 @@ function planWithCache(
       ? {}
       : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
     cacheState(task) {
+      // The "ready for a pull request" probes always observe the present environment.
+      if (unattested.includes(task.nodeId)) {
+        return { cacheState: 'execute' as const, reason: 'preflight-always-executes' };
+      }
       const dependencies: Record<string, string> = {};
       for (const dependency of task.dependencies) {
         const digest = reusableDigests.get(dependency);
@@ -261,19 +299,27 @@ function requiredTaskNodes(
   releaseScope: 'selected' | 'complete' = 'complete',
 ): readonly TaskDescriptorNode[] {
   const descriptor = descriptorFor(options);
+  // Preflight nodes are selected for every target (ADR-CHK-0001).
+  const preflightRoots = descriptor.tasks
+    .filter((task) => isPreflightNode(task))
+    .map((task) => task.nodeId);
   if (options.target === 'affected') {
     const profile = descriptor.profiles.find((entry) => entry.profileId === 'affected');
-    const eligible = new Set(profile?.eligibleNodes ?? []);
+    const eligible = new Set([...(profile?.eligibleNodes ?? []), ...preflightRoots]);
     return descriptor.tasks.filter((task) => eligible.has(task.nodeId));
   }
-  const roots =
-    options.target === 'release'
-      ? releaseScope === 'complete'
-        ? (options.releaseAllNodes ?? options.releaseRequiredNodes ?? [])
-        : (options.releaseRequiredNodes ?? [])
-      : options.target === 'local'
-        ? [descriptor.fallbackNodeId]
-        : (descriptor.profiles.find((entry) => entry.profileId === 'rc')?.requiredNodes ?? []);
+  const roots = [
+    ...preflightRoots,
+    ...(options.target === 'preflight'
+      ? []
+      : options.target === 'release'
+        ? releaseScope === 'complete'
+          ? (options.releaseAllNodes ?? options.releaseRequiredNodes ?? [])
+          : (options.releaseRequiredNodes ?? [])
+        : options.target === 'local'
+          ? [descriptor.fallbackNodeId]
+          : (descriptor.profiles.find((entry) => entry.profileId === 'rc')?.requiredNodes ?? [])),
+  ];
   const byId = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const selected = new Set<string>();
   const pending = roots.filter((nodeId): nodeId is string => nodeId !== null);
@@ -498,6 +544,28 @@ type AsyncTaskExecutor = (
 
 type TaskExecutionEffect = () => TaskExecutionResult | Promise<TaskExecutionResult>;
 
+/**
+ * A probe process the host refuses or cannot start is an observation that could
+ * not be made: it resolves to an error result (BLOCKED), never to a crashed run.
+ */
+function probeEffect(effect: TaskExecutionEffect): TaskExecutionEffect {
+  const refused = (error: unknown): TaskExecutionResult => ({
+    status: null,
+    signal: null,
+    stdout: '',
+    stderr: error instanceof Error ? error.message : String(error),
+    errorCode: 'PROBE_PROCESS_REFUSED',
+  });
+  return () => {
+    try {
+      const result = effect();
+      return result instanceof Promise ? result.catch(refused) : result;
+    } catch (error) {
+      return refused(error);
+    }
+  };
+}
+
 /** The synchronous API and protected asynchronous host share every planning/result rule. */
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
   const steps = runCheckTaskSteps(inputOptions);
@@ -571,7 +639,16 @@ function* runCheckTaskSteps(
   inputOptions: CheckRunnerOptions,
   asyncExecutor?: AsyncTaskExecutor,
 ): Generator<TaskExecutionEffect, CheckRunnerReport, TaskExecutionResult> {
-  const request = bindReleaseRequest(inputOptions);
+  // The preflight target accepts a named base (the freshly fetched origin/main)
+  // and binds the exact commit it resolves to before planning.
+  const request = bindReleaseRequest(
+    inputOptions.target === 'preflight' && inputOptions.baseCommit !== undefined
+      ? {
+          ...inputOptions,
+          baseCommit: resolveBaseCommit(inputOptions.repoRoot, inputOptions.baseCommit),
+        }
+      : inputOptions,
+  );
   const options = request.options;
   const protectedOutputCapture =
     options.protectedExecutionIdentity !== undefined &&
@@ -708,8 +785,25 @@ function* runCheckTaskSteps(
   const resultDigests = new Map<string, string>();
   const taskResults = new Map<string, TaskResult>();
   const execution: ExecutedTask[] = [];
+  const blockedNodes = new Set<string>();
+  const unattested = unattestedNodeIds(options);
 
   for (const task of plan.tasks) {
+    const blockedBy = task.dependencies.find((dependency) => blockedNodes.has(dependency));
+    if (blockedBy !== undefined) {
+      // blocked-environment: never executed and never cached as a result.
+      blockedNodes.add(task.nodeId);
+      cache.writeAttempt(task.nodeId, task.taskKey, 'BLOCKED', now());
+      execution.push({
+        nodeId: task.nodeId,
+        taskKey: task.taskKey,
+        disposition: 'blocked-environment',
+        outcome: 'BLOCKED',
+        reason: `blocked-environment:${blockedBy}`,
+        durationMs: 0,
+      });
+      continue;
+    }
     const dependencyResultDigests: Record<string, string> = {};
     let dependencyMissing = false;
     for (const dependency of task.dependencies) {
@@ -730,8 +824,14 @@ function* runCheckTaskSteps(
       });
       continue;
     }
-    const cached = cache.inspect(task, dependencyResultDigests);
-    if (cached.cacheState === 'reusable' && cached.cachedResultDigest !== undefined) {
+    const cached = unattested.includes(task.nodeId)
+      ? { cacheState: 'execute' as const, reason: 'preflight-always-executes' }
+      : cache.inspect(task, dependencyResultDigests);
+    if (
+      cached.cacheState === 'reusable' &&
+      cached.cachedResultDigest !== undefined &&
+      'result' in cached
+    ) {
       if (cached.result === undefined)
         throw new Error('CHECK_RUNNER_INTERNAL: reusable task result missing');
       resultDigests.set(task.nodeId, cached.cachedResultDigest);
@@ -756,37 +856,101 @@ function* runCheckTaskSteps(
     }
     const taskCwd = realpathSync(resolve(options.repoRoot, task.cwd));
     const taskEnv = taskEnvironment(descriptorTask, environment);
-    const result = yield () =>
-      asyncExecutor !== undefined
-        ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv, {
-            nodeId: task.nodeId,
-            taskKey: task.taskKey,
-          })
-        : options.executeTask === undefined
-          ? defaultExecute(
-              [task.executable.path, ...task.argv.slice(1)],
-              taskCwd,
-              timeoutMs,
-              taskEnv,
-              options.target === 'release'
-                ? {
-                    candidate: {
-                      commit: plan.repository.commit,
-                      tree: plan.repository.tree,
-                    },
-                    descriptor_digest: plan.descriptorDigest,
-                    task_policy_digest: plan.taskPolicyDigest,
-                    node_id: task.nodeId,
-                    executable: task.executable,
-                    argv: task.argv,
-                    cwd: task.cwd,
-                  }
-                : undefined,
-            )
-          : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv, {
+    const executeArgv =
+      (argv: readonly string[]): TaskExecutionEffect =>
+      () =>
+        asyncExecutor !== undefined
+          ? asyncExecutor(argv, taskCwd, timeoutMs, taskEnv, {
               nodeId: task.nodeId,
               taskKey: task.taskKey,
-            });
+            })
+          : options.executeTask === undefined
+            ? defaultExecute(argv, taskCwd, timeoutMs, taskEnv)
+            : options.executeTask(argv, taskCwd, timeoutMs, taskEnv, {
+                nodeId: task.nodeId,
+                taskKey: task.taskKey,
+              });
+    let preflight: PreflightEvaluation | undefined;
+    if (isPreflightNode(descriptorTask)) {
+      const probeSteps = evaluatePreflightProbes(descriptorTask.probes ?? [], {
+        repoRoot: taskCwd,
+        ...(plan.baseCommit !== undefined && { baseCommit: plan.baseCommit }),
+        environment: taskEnv,
+      });
+      let probeStep = probeSteps.next();
+      while (!probeStep.done) {
+        const probeResult: TaskExecutionResult = yield probeEffect(executeArgv(probeStep.value));
+        probeStep = probeSteps.next(probeResult);
+      }
+      preflight = probeStep.value;
+    }
+    if (preflight !== undefined && preflight.outcome !== 'PASS') {
+      const durationMs = Math.max(0, Date.now() - started);
+      const finishedAt = now();
+      const probeResult: TaskExecutionResult = {
+        status: preflight.outcome === 'FAIL' ? 1 : null,
+        signal: null,
+        stdout: preflight.stdout,
+        stderr: preflight.stderr,
+      };
+      const diagnosticPath = cache.writeFailureDiagnostic(
+        task,
+        preflight.outcome,
+        finishedAt,
+        preflight.reason,
+        probeResult,
+        preflight.remediation,
+      );
+      // An extrinsic BLOCKED is recorded only as an attempt, never as a result.
+      cache.writeAttempt(task.nodeId, task.taskKey, preflight.outcome, finishedAt);
+      if (preflight.outcome === 'BLOCKED') blockedNodes.add(task.nodeId);
+      execution.push({
+        nodeId: task.nodeId,
+        taskKey: task.taskKey,
+        disposition: 'executed',
+        outcome: preflight.outcome,
+        reason: preflight.reason,
+        durationMs,
+        diagnosticPath,
+        probes: preflight.observations,
+        remediation: preflight.remediation,
+      });
+      continue;
+    }
+    const result: TaskExecutionResult =
+      preflight !== undefined
+        ? { status: 0, signal: null, stdout: preflight.stdout, stderr: preflight.stderr }
+        : yield () =>
+            asyncExecutor !== undefined
+              ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv, {
+                  nodeId: task.nodeId,
+                  taskKey: task.taskKey,
+                })
+              : options.executeTask === undefined
+                ? defaultExecute(
+                    [task.executable.path, ...task.argv.slice(1)],
+                    taskCwd,
+                    timeoutMs,
+                    taskEnv,
+                    options.target === 'release'
+                      ? {
+                          candidate: {
+                            commit: plan.repository.commit,
+                            tree: plan.repository.tree,
+                          },
+                          descriptor_digest: plan.descriptorDigest,
+                          task_policy_digest: plan.taskPolicyDigest,
+                          node_id: task.nodeId,
+                          executable: task.executable,
+                          argv: task.argv,
+                          cwd: task.cwd,
+                        }
+                      : undefined,
+                  )
+                : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv, {
+                    nodeId: task.nodeId,
+                    taskKey: task.taskKey,
+                  });
     const durationMs = Math.max(0, Date.now() - started);
     const finishedAt = now();
     const outcome = executionOutcome(result);
@@ -871,6 +1035,7 @@ function* runCheckTaskSteps(
       durationMs,
       resultDigest,
       exitCode: 0,
+      ...(preflight !== undefined && { probes: preflight.observations }),
     });
   }
 
@@ -878,6 +1043,17 @@ function* runCheckTaskSteps(
   let preflightReceipt: CheckRunnerReport['preflightReceipt'];
   let receiptRefusal: string | undefined;
   const allPass = execution.every((task) => task.outcome === 'PASS');
+  const blocked = execution
+    .filter((task) => task.outcome === 'BLOCKED')
+    .map((task) => ({
+      nodeId: task.nodeId,
+      disposition:
+        task.disposition === 'blocked-environment'
+          ? ('blocked-environment' as const)
+          : ('executed' as const),
+      reason: task.reason,
+      remediation: task.remediation ?? [],
+    }));
   const finalState = repositoryState();
   if (
     requiresProtectedOutputCapture &&
@@ -886,6 +1062,8 @@ function* runCheckTaskSteps(
   )
     receiptRefusal = 'protected-namespace-closure-unproven';
   else if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
+  else if (options.target === 'preflight') receiptRefusal = 'preflight-target-not-attestable';
+  else if (blocked.length > 0) receiptRefusal = 'environment-blocked';
   else if (!plan.clean || !initialState.clean) receiptRefusal = 'dirty-start';
   else if (!allPass) receiptRefusal = 'task-population-not-pass';
   else if (
@@ -947,7 +1125,7 @@ function* runCheckTaskSteps(
     const candidateReceipt: CandidateReceipt = {
       schemaVersion: '1.1.0',
       repository: plan.repository,
-      profile: options.target === 'release' ? 'rc' : options.target,
+      profile: options.target === 'affected' ? 'affected' : 'rc',
       taskPolicyDigest: plan.taskPolicyDigest,
       createdAt: now(),
       tasks: plan.tasks.map((task) => {
@@ -982,7 +1160,7 @@ function* runCheckTaskSteps(
             ? result.disposition === 'reused'
               ? ('reused' as const)
               : ('executed' as const)
-            : result.disposition === 'aborted'
+            : result.disposition === 'aborted' || result.outcome === 'BLOCKED'
               ? ('blocked' as const)
               : result.outcome === 'FAIL'
                 ? ('failed' as const)
@@ -1004,6 +1182,7 @@ function* runCheckTaskSteps(
       }),
     }),
     ...(receiptRefusal !== undefined && { receiptRefusal }),
+    ...(blocked.length > 0 && { blocked }),
     exitCode: allPass ? 0 : 1,
   };
   if (

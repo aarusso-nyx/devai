@@ -1,6 +1,50 @@
-export type TaskTarget = 'affected' | 'local' | 'rc' | 'release';
+export type TaskTarget = 'affected' | 'local' | 'rc' | 'release' | 'preflight';
 export type TaskOperation = 'plan' | 'run' | 'status' | 'explain';
-export type TaskOutcome = 'PASS' | 'FAIL' | 'TIMEOUT' | 'KILLED' | 'ABORTED';
+/**
+ * BLOCKED (ADR-CHK-0001) is the outcome of a preflight node whose extrinsic probe
+ * did not pass, and of every dependent it left blocked-environment. It says
+ * nothing about the candidate, so it is never written as a reusable result.
+ */
+export type TaskOutcome = 'PASS' | 'FAIL' | 'TIMEOUT' | 'KILLED' | 'ABORTED' | 'BLOCKED';
+
+export type PreflightProbeClass = 'extrinsic' | 'intrinsic';
+export type PreflightProbeStatus = 'pass' | 'fail' | 'blocked' | 'skipped';
+
+export type PreflightProbeKind =
+  | Readonly<{ kind: 'environment'; name: string; expected?: string }>
+  | Readonly<{ kind: 'file'; path: string; must_exist: boolean; expected_sha256?: string }>
+  | Readonly<{ kind: 'command'; argv: readonly string[]; expected_exit: number }>
+  | Readonly<{
+      kind: 'git';
+      check: 'base-up-to-date' | 'clean-tree' | 'commit-range';
+      base?: string;
+    }>
+  | Readonly<{ kind: 'registry'; url: string; expected_version?: string }>
+  | Readonly<{ kind: 'toolchain'; manifest_path: string }>
+  | Readonly<{ kind: 'credential'; manifest_id: string }>;
+
+/** One probe as declared by law/schemas/preflight-probe.schema.json. */
+export interface PreflightProbe {
+  readonly id: string;
+  readonly class: PreflightProbeClass;
+  readonly probe: PreflightProbeKind;
+  readonly expected: string;
+  readonly observed: string | null;
+  readonly status: PreflightProbeStatus;
+  readonly remediation: string;
+  readonly depends_on: readonly string[];
+}
+
+/** One executed probe as reported: `observed` is always redacted. */
+export interface PreflightProbeObservation {
+  readonly id: string;
+  readonly class: PreflightProbeClass;
+  readonly kind: PreflightProbeKind['kind'];
+  readonly status: PreflightProbeStatus;
+  readonly expected: string;
+  readonly observed: string | null;
+  readonly remediation: string;
+}
 
 export interface InputSelector {
   readonly kind: 'exact' | 'prefix' | 'glob';
@@ -10,7 +54,9 @@ export interface InputSelector {
 export interface TaskDescriptorNode {
   readonly nodeId: string;
   readonly dependencies: readonly string[];
+  /** Empty for a `preflight-v1` node, which declares `probes` instead. */
   readonly argv: readonly string[];
+  readonly probes?: readonly PreflightProbe[];
   readonly cwd: string;
   readonly runner: string;
   readonly inputSelectors: readonly InputSelector[];
@@ -112,7 +158,8 @@ export interface CandidateReceipt {
 export interface ExecutedTask {
   readonly nodeId: string;
   readonly taskKey: string;
-  readonly disposition: 'executed' | 'reused' | 'aborted';
+  /** blocked-environment: a dependency was BLOCKED, so this node was never executed. */
+  readonly disposition: 'executed' | 'reused' | 'aborted' | 'blocked-environment';
   readonly outcome: TaskOutcome;
   readonly reason: string;
   readonly durationMs: number;
@@ -120,6 +167,10 @@ export interface ExecutedTask {
   readonly exitCode?: number;
   readonly signal?: string;
   readonly diagnosticPath?: string;
+  /** Redacted per-probe observations of a `preflight-v1` node. */
+  readonly probes?: readonly PreflightProbeObservation[];
+  /** Remediation of every probe that did not pass. */
+  readonly remediation?: readonly string[];
 }
 
 export interface CheckRunnerReport {
@@ -141,6 +192,13 @@ export interface CheckRunnerReport {
     resultDigest?: string;
   }>[];
   readonly receiptRefusal?: string;
+  /** BLOCKED nodes aggregated apart from failures, each with its remediation. */
+  readonly blocked?: readonly Readonly<{
+    nodeId: string;
+    disposition: 'executed' | 'blocked-environment';
+    reason: string;
+    remediation: readonly string[];
+  }>[];
   readonly exitCode: number;
 }
 
