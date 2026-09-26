@@ -795,8 +795,12 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "plan"
+          "kind": "prefix",
+          "pattern": "product/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "record/"
         }
       ],
       "toolchainKeys": ["node"],
@@ -822,8 +826,24 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "law"
+          "kind": "prefix",
+          "pattern": "law/adr/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/policy/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "law/glossary/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "law/constitution.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "law/trace.json"
         }
       ],
       "toolchainKeys": ["node"],
@@ -849,8 +869,36 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "docs"
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "README.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CLAUDE.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "AGENTS.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CHANGELOG.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "LICENSE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "NOTICE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scratch/README.md"
         }
       ],
       "toolchainKeys": ["node"],
