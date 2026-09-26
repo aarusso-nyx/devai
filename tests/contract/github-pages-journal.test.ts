@@ -166,6 +166,23 @@ it('retains and resumes a known deployment without a new Pages POST', async () =
   ).toHaveLength(1);
   expect(f.calls.some((c) => c.url.endsWith('/cancel'))).toBe(false);
 });
+it('closes a submitted intent when the live bytes already match', async () => {
+  const f = fixture();
+  f.setPagesState('deployment_failed');
+  await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+  f.setPagesState('succeed');
+  f.setLive();
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'no-op', buildInvocations: 0 });
+  expect(f.statuses.at(-1)).toMatchObject({
+    state: 'success',
+    description: 'devai-pages:verified:pages-17',
+  });
+  expect(
+    f.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/pages/deployments')),
+  ).toHaveLength(1);
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'no-op' });
+  expect(f.statuses).toHaveLength(2);
+});
 it('waits for a building Pages deployment before verifying it', async () => {
   const f = fixture();
   f.setPagesStates(['building', 'succeed']);
