@@ -935,7 +935,7 @@
       "id": "R-0105",
       "title": "Prerelease ladder and backlog family",
       "goal": "Prerelease rungs carry their own depth and dist-tags; findings outlive the session that made them.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-REL-0028", "ADR-GOV-0019"],
       "depends_on": ["R-0101"],
       "attestation_reissue": false,
@@ -1111,7 +1111,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -1153,8 +1153,8 @@
                 "path": "prompts/TASK-0171.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/99",
+              "merged_as": "0b3bca1f5da9fb8dcc5325af7ecef8cf9cb3df87",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1167,7 +1167,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0171",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1192,8 +1192,8 @@
                 "path": "prompts/TASK-0172.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/99",
+              "merged_as": "f6149277f9546b5970d898706c208f4b1a839060",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1206,7 +1206,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0172",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1255,8 +1255,8 @@
                 "path": "prompts/TASK-0173.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/99",
+              "merged_as": "9d833d7e60dea87bff5726e2afde89187918f0ec",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1265,7 +1265,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "4b00848175986b1d8339743d4e5e9e9207b7c877",
+        "closed_at": "2026-09-26T11:30:56Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0106",
