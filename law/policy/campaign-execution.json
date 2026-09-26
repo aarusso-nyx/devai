@@ -209,7 +209,7 @@
     "cross_family_commit": "rejected; split the commit",
     "declared_pairings": [["law", "generated"]],
     "attribution": "the session tool's attribution trailer is kept",
-    "no_version_bump": "a campaign task never edits a package version"
+    "no_version_bump": "a campaign task never edits a package version, except a release rollover task the campaign declares for that purpose"
   },
   "failure": {
     "acceptance_failure": "the task stays in_progress; the report names the failing command and output",
