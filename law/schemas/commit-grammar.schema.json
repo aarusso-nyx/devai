@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/commit-grammar.schema.json",
+  "title": "Commit grammar",
+  "description": "Law-declared commit grammar and version bump floor (ADR-GOV-0018, ADR-REL-0027). The policy at law/policy/commit-grammar.json fixes the subject pattern `type(scope)!: subject` over a closed type set, binds every type to the change classes it may touch and to the minimum version bump it carries, and declares the breaking marker, the exemptions for merge commits and reverts, and the historical cutoff after which the pull-request range check applies. Class names are the closed vocabulary of the taxonomy policy named by `taxonomy`; the families that make a commit mixed and the class pairings a single commit may carry are read from that policy and never restated here.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "taxonomy",
+    "subject_pattern",
+    "scope_pattern",
+    "breaking_marker",
+    "types",
+    "exemptions",
+    "historical_cutoff"
+  ],
+  "$defs": {
+    "commit_type": {
+      "type": "string",
+      "enum": [
+        "feat",
+        "fix",
+        "refactor",
+        "perf",
+        "test",
+        "docs",
+        "ci",
+        "build",
+        "chore",
+        "law",
+        "spec",
+        "plan"
+      ],
+      "description": "The closed type set. A subject whose type is not listed fails the grammar."
+    },
+    "class_name": {
+      "type": "string",
+      "enum": ["law", "spec", "plan", "code", "tests", "docs", "ci", "toolchain", "generated"],
+      "description": "A class name from the taxonomy policy named by `taxonomy`. The set here equals that policy's closed vocabulary; the taxonomy, not this schema, assigns each class to a family."
+    },
+    "bump_floor": {
+      "type": "string",
+      "enum": ["none", "patch", "minor"],
+      "description": "The minimum version bump a commit of this type requires. A candidate may exceed the floor; the human version decision remains authoritative above it."
+    },
+    "type_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_classes", "bump_floor"],
+      "properties": {
+        "allowed_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/class_name"
+          },
+          "description": "Classes a commit of this type may touch. A path of any other class makes the commit mixed even when every path belongs to one family. Whether two allowed classes may share one commit is decided by the families and pairings of the taxonomy policy."
+        },
+        "bump_floor": {
+          "$ref": "#/$defs/bump_floor"
+        }
+      }
+    },
+    "exemption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "treatment"],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "enum": [
+            "parent-count-above-one",
+            "subject-starts-with-revert-and-body-names-reverted-commit"
+          ],
+          "description": "The evidence that makes a commit exempt from grammar and class checks."
+        },
+        "subject_prefix": {
+          "type": "string",
+          "const": "Revert ",
+          "description": "The literal subject prefix a revert carries; the body must name the reverted commit."
+        },
+        "treatment": {
+          "type": "string",
+          "enum": ["inherit"],
+          "description": "An exempt commit inherits its classification: a merge commit is never mixed on its own, and a revert takes the classification of the commit it reverts."
+        }
+      }
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "commit-grammar"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active"]
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "taxonomy": {
+      "const": "law/policy/change-taxonomy.json",
+      "description": "The taxonomy policy that declares the classes, their families, and the pairings a single commit may carry. The single-family rule and the permitted pairings are read from it."
+    },
+    "subject_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Regular expression the first line of every non-exempt commit message must match: `^(type)(\\(scope\\))?(!)?: .+$` with the type alternation equal to the closed type set and the scope group equal to `scope_pattern`."
+    },
+    "scope_pattern": {
+      "type": "string",
+      "const": "^[a-z0-9-]+$",
+      "description": "Regular expression a scope must match when present."
+    },
+    "breaking_marker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["marker", "bump"],
+      "description": "The marker placed after the type or scope that declares a breaking change. It maps to a major bump regardless of type.",
+      "properties": {
+        "marker": {
+          "const": "!"
+        },
+        "bump": {
+          "const": "major"
+        }
+      }
+    },
+    "types": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feat",
+        "fix",
+        "refactor",
+        "perf",
+        "test",
+        "docs",
+        "ci",
+        "build",
+        "chore",
+        "law",
+        "spec",
+        "plan"
+      ],
+      "description": "One binding per type; the key set equals the closed type set exactly.",
+      "properties": {
+        "feat": { "$ref": "#/$defs/type_binding" },
+        "fix": { "$ref": "#/$defs/type_binding" },
+        "refactor": { "$ref": "#/$defs/type_binding" },
+        "perf": { "$ref": "#/$defs/type_binding" },
+        "test": { "$ref": "#/$defs/type_binding" },
+        "docs": { "$ref": "#/$defs/type_binding" },
+        "ci": { "$ref": "#/$defs/type_binding" },
+        "build": { "$ref": "#/$defs/type_binding" },
+        "chore": { "$ref": "#/$defs/type_binding" },
+        "law": { "$ref": "#/$defs/type_binding" },
+        "spec": { "$ref": "#/$defs/type_binding" },
+        "plan": { "$ref": "#/$defs/type_binding" }
+      }
+    },
+    "exemptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merge_commits", "reverts"],
+      "description": "Commits the grammar and class checks do not examine on their own. Both inherit classification.",
+      "properties": {
+        "merge_commits": {
+          "$ref": "#/$defs/exemption"
+        },
+        "reverts": {
+          "$ref": "#/$defs/exemption"
+        }
+      }
+    },
+    "historical_cutoff": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The full hash of the commit after which the pull-request range check applies. First-parent commits at or before it are historical exceptions the range check never re-examines. Null while unset: the maintainer fills it with the merge commit of the round R-0103 Engineer pull request that lands the enforcement, and the local hooks apply from that pull request onward regardless of this value."
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "commit-grammar",
+      "status": "active",
+      "authority": "Architect",
+      "taxonomy": "law/policy/change-taxonomy.json",
+      "subject_pattern": "^(feat|fix|refactor|perf|test|docs|ci|build|chore|law|spec|plan)(\\([a-z0-9-]+\\))?(!)?: .+$",
+      "scope_pattern": "^[a-z0-9-]+$",
+      "breaking_marker": { "marker": "!", "bump": "major" },
+      "types": {
+        "feat": {
+          "allowed_classes": ["code", "tests", "docs", "generated"],
+          "bump_floor": "minor"
+        },
+        "fix": { "allowed_classes": ["code", "tests", "docs", "generated"], "bump_floor": "patch" },
+        "refactor": { "allowed_classes": ["code", "tests", "generated"], "bump_floor": "patch" },
+        "perf": { "allowed_classes": ["code", "tests"], "bump_floor": "patch" },
+        "test": { "allowed_classes": ["tests"], "bump_floor": "none" },
+        "docs": { "allowed_classes": ["docs"], "bump_floor": "none" },
+        "ci": { "allowed_classes": ["ci"], "bump_floor": "none" },
+        "build": { "allowed_classes": ["toolchain"], "bump_floor": "none" },
+        "chore": {
+          "allowed_classes": ["tests", "docs", "generated", "ci", "toolchain"],
+          "bump_floor": "none"
+        },
+        "law": { "allowed_classes": ["law", "spec", "generated"], "bump_floor": "none" },
+        "spec": { "allowed_classes": ["spec"], "bump_floor": "none" },
+        "plan": { "allowed_classes": ["plan"], "bump_floor": "none" }
+      },
+      "exemptions": {
+        "merge_commits": { "condition": "parent-count-above-one", "treatment": "inherit" },
+        "reverts": {
+          "condition": "subject-starts-with-revert-and-body-names-reverted-commit",
+          "subject_prefix": "Revert ",
+          "treatment": "inherit"
+        }
+      },
+      "historical_cutoff": null
+    }
+  ]
+}
