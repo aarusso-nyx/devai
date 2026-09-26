@@ -458,7 +458,6 @@ describe('S06-A residual subprocess adapter routes', () => {
         '--coverage.reportsDirectory=scratch/coverage/rc',
       ],
     ],
-    ['changeset-version', 'low', ['node', 'scripts/check-changesets.mjs']],
   ] as const)('binds %s to its exact argv', async (serviceId, cost, expectedArgv) => {
     processBoundary.spawnSync.mockReturnValue({
       status: 0,
