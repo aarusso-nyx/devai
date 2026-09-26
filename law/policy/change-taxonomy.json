@@ -65,8 +65,8 @@
     },
     "toolchain": {
       "family": "infrastructure",
-      "description": "Root workspace configuration, lockfile, runtime and formatter pins, changesets, and vendored verifier bytes: dependency and runtime identity.",
-      "check_members": ["dependencies", "changeset-version", "provenance-readiness"],
+      "description": "Root workspace configuration, lockfile, runtime and formatter pins, and vendored verifier bytes: dependency and runtime identity.",
+      "check_members": ["dependencies", "provenance-readiness"],
       "constitution_authority": "packages/ and root workspace configuration — Engineer (F2)"
     },
     "generated": {
