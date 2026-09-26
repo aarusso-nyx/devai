@@ -674,10 +674,13 @@ describe('ADR-v3 public result and semantic authority', () => {
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
     expect(result.files_scanned).toBe(66);
-    expect(result.subject_authorities).toHaveLength(121);
+    expect(result.subject_authorities).toHaveLength(181);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
+      'ADR-CFG-0001',
+      'ADR-CHK-0001',
+      'ADR-CHK-0002',
       'ADR-GOV-0002',
       'ADR-GOV-0004',
       'ADR-GOV-0007',
@@ -686,6 +689,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-GOV-0014',
       'ADR-GOV-0015',
       'ADR-GOV-0016',
+      'ADR-GOV-0017',
+      'ADR-GOV-0018',
+      'ADR-GOV-0019',
       'ADR-MUT-0004',
       'ADR-MUT-0006',
       'ADR-MUT-0007',
@@ -715,6 +721,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0022',
       'ADR-REL-0023',
       'ADR-REL-0024',
+      'ADR-REL-0027',
+      'ADR-REL-0028',
+      'ADR-SEC-0001',
     ]);
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
     expect(matchesAdrSemantics(records, result, markdownFiles(adrRoot).length)).toBe(true);
