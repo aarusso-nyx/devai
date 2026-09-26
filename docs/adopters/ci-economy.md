@@ -33,6 +33,44 @@ receipt. `--local` always uses the complete cheap cached closure and does not pr
 A clean affected or RC execution may produce an unsigned candidate receipt only when the tree
 is unchanged before and after execution and the commit/tree binding is exact.
 
+## Change classes and the class selector
+
+Every tracked path belongs to exactly one change class, and the class decides which
+checks a change engages ([ADR-GOV-0017](../../law/adr/ADR-GOV-0017-change-class-taxonomy.md)).
+The vocabulary is closed and declared in law at `law/policy/change-taxonomy.json`, validated by
+`law/schemas/change-taxonomy.schema.json`: `law`, `spec`, `plan`, `code`, `tests`, `docs`,
+`ci`, `toolchain`, and `generated`. Each class carries a family (`governance`,
+`implementation`, or `infrastructure`), the check members it engages, and the Constitution
+Article 6 authority row it maps onto; the taxonomy never contradicts that table. A commit may
+carry one class, or one of the declared `pairings`; today the only pairing is `law` with
+`generated`, because the action registry and its generated views, and a law policy and its
+materialized copy under `.devai/config/`, must land together.
+
+The mapping from path to class is a binding, and the binding is adopter policy with a law
+default. `law/policy/adopter-defaults/change-taxonomy-binding.json` is the starting binding
+for a conventional layout; DEVAI's own binding lives at `.devai/config/change-taxonomy-binding.json`.
+A binding is an ordered list of `{ "selector": { "kind", "pattern" }, "class" }` entries with
+the same `exact`, `prefix`, and `glob` selector grammar as the task descriptor. A binding may
+only assign paths to law classes; it may not add, rename, or merge a class. Two entries that
+match the same path are a load error, never a precedence rule, so prefer disjoint prefixes
+and use exact entries for root files. Check the binding against the tracked tree with:
+
+```bash
+git ls-files | node scripts/classify-paths.mjs \
+  --binding .devai/config/change-taxonomy-binding.json --require-all
+```
+
+The script prints every unclassified path and exits non-zero on an overlap, an unknown class,
+or, with `--require-all`, any unclassified path. The taxonomy policy is materialized to
+`.devai/config/change-taxonomy.json` byte for byte, and `scripts/check-policy-materialization.mjs`
+fails on drift.
+
+The task descriptor gains a fourth selector kind, `class`, whose pattern is one of the nine
+class names. A node that declares `{ "kind": "class", "pattern": "plan" }` selects every path
+the binding assigns to `plan`, so plan-only, law-only, and docs-only changes reach their class
+nodes instead of widening to the `test:local-full` fallback. The fallback remains for genuinely
+unclassified paths: unknown paths still widen, never vanish.
+
 ## RC gate
 
 `devai check --rc --task-plan` selects the fixed release-candidate closure. The RC profile
