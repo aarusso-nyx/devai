@@ -262,7 +262,27 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "The exact closed set of v1.3.0 event kinds. Producing an unlisted kind is a validation failure, not a silent pass-through."
+          "description": "The exact closed set of event kinds: the v1.3.0 kinds plus backlog_item_projected (ADR-GOV-0019). Producing an unlisted kind is a validation failure, not a silent pass-through."
+        },
+        "backlog_projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled_by", "disclosure_profile", "max_items_per_batch"],
+          "description": "ADR-GOV-0019 extension: projection of repository backlog items into the governed round's issue. It reuses the Owner activation and the public-safe disclosure profile of the round; it has no activation, profile, or authority of its own, and a backlog item with no explicit round attribution is never projected.",
+          "properties": {
+            "enabled_by": {
+              "const": "round-activation",
+              "$comment": "Projection is authorized only by the existing Owner activation of the round the item was explicitly attributed to. There is no separate backlog activation and a round is never inferred."
+            },
+            "disclosure_profile": {
+              "const": "public-safe-v1"
+            },
+            "max_items_per_batch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          }
         }
       }
     }
@@ -354,8 +374,14 @@
           "failure_observed",
           "evidence_superseded",
           "round_verdict",
-          "tracking_disabled"
-        ]
+          "tracking_disabled",
+          "backlog_item_projected"
+        ],
+        "backlog_projection": {
+          "enabled_by": "round-activation",
+          "disclosure_profile": "public-safe-v1",
+          "max_items_per_batch": 64
+        }
       }
     }
   ]

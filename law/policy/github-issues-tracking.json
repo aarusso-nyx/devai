@@ -73,7 +73,13 @@
       "failure_observed",
       "evidence_superseded",
       "round_verdict",
-      "tracking_disabled"
-    ]
+      "tracking_disabled",
+      "backlog_item_projected"
+    ],
+    "backlog_projection": {
+      "enabled_by": "round-activation",
+      "disclosure_profile": "public-safe-v1",
+      "max_items_per_batch": 64
+    }
   }
 }
