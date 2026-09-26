@@ -45,6 +45,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'campaign.schema.json',
   'change-taxonomy.schema.json',
   'commit-grammar.schema.json',
+  'credential-requirements.schema.json',
   'claim-runtime-inputs.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
