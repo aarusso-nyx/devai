@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "runtimes": {
+    "node": "24.20.0",
+    "pnpm": "9.15.0",
+    "git": "2.47.3"
+  },
+  "actions": {
+    "actions/checkout": {
+      "ref": "v7.0.1",
+      "digest": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    },
+    "actions/setup-node": {
+      "ref": "v7.0.0",
+      "digest": "820762786026740c76f36085b0efc47a31fe5020"
+    },
+    "pnpm/action-setup": {
+      "ref": "v4.1.0",
+      "digest": "7088e561eb65bb68695d245aa206f005ef30921d",
+      "peeled_commit": "a7487c7e89a18df4991f7f222e4898a00d66ddda"
+    },
+    "actions/upload-artifact": {
+      "ref": "v4.6.2",
+      "digest": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+    },
+    "actions/download-artifact": {
+      "ref": "v4.3.0",
+      "digest": "d3f86a106a0bac45b974a628896c90dbdf5c8093"
+    },
+    "actions/configure-pages": {
+      "ref": "v5.0.0",
+      "digest": "983d7736d9b0ae728b81ab479565c72886d7745b"
+    },
+    "actions/upload-pages-artifact": {
+      "ref": "v4.0.0",
+      "digest": "7b1f4a764d45c48632c6b24a0339c27f5614fb0b"
+    },
+    "actions/deploy-pages": {
+      "ref": "v4.0.5",
+      "digest": "d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e"
+    }
+  },
+  "verifier": {
+    "package": "@aarusso-nyx/devai",
+    "version": "1.5.4",
+    "policy": "law/policy/trusted-local-rc-verifier-package.json"
+  },
+  "constants": {
+    "expected_action_count": 57,
+    "ledger_environment": "devai-ledger-verification"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "runtimes": {
+    "node": "24.20.0",
+    "pnpm": "9.15.0",
+    "git": "2.47.3"
+  },
+  "actions": {
+    "actions/checkout": {
+      "ref": "v7.0.1",
+      "digest": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    },
+    "actions/setup-node": {
+      "ref": "v7.0.0",
+      "digest": "820762786026740c76f36085b0efc47a31fe5020"
+    },
+    "actions/upload-artifact": {
+      "ref": "v4.6.2",
+      "digest": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+    }
+  },
+  "verifier": {
+    "package": "@aarusso-nyx/devai",
+    "version": "1.5.4",
+    "policy": "law/policy/trusted-local-rc-verifier-package.json"
+  },
+  "constants": {}
+}

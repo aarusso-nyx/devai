@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/toolchain-manifest.schema.json",
+  "title": "Toolchain manifest",
+  "description": "One adopter-owned declaration of toolchain identity, materialized at .devai/config/toolchain.json from the law default under law/policy/adopter-defaults/toolchain.json. Workflows, the workflow checker, the provisioning script, and the runner's toolchain probe consume this manifest instead of restating versions inline (ADR-CHK-0002). It declares exact runtime versions, every pinned GitHub Action digest with the ref it was pinned from, the trusted verifier package by name and version with a reference to the trusted verifier policy, and the named repository constants a workflow must agree with.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runtimes", "actions", "verifier", "constants"],
+  "$defs": {
+    "exact_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Exact semantic version without a leading v. Consumers normalize observed output (for example process.version or git --version) before comparing."
+    },
+    "git_object_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pinned_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "digest"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "description": "The tag or branch the digest was pinned from, kept for human review; it never appears in a uses: reference."
+        },
+        "digest": {
+          "$ref": "#/$defs/git_object_id",
+          "description": "The immutable object that every uses: reference must carry. For an annotated tag this is the tag object accepted by Actions, not its peeled commit."
+        },
+        "peeled_commit": {
+          "$ref": "#/$defs/git_object_id",
+          "description": "Present only when digest is an annotated tag object: the commit it peels to, so a checker can recognize both identities without demanding a repin."
+        }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "runtimes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "pnpm", "git"],
+      "description": "Exact versions the executing host must provide. Workflows may pin a major only; the checker compares the major against node and the full version where a workflow states one.",
+      "properties": {
+        "node": {
+          "$ref": "#/$defs/exact_version"
+        },
+        "pnpm": {
+          "$ref": "#/$defs/exact_version",
+          "description": "Must agree with the version in the packageManager field of package.json."
+        },
+        "git": {
+          "$ref": "#/$defs/exact_version"
+        }
+      }
+    },
+    "actions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "description": "Map from GitHub Action repository (owner/name) to its pinned identity. Every action a workflow references must appear here and every entry must be referenced by its digest.",
+      "patternProperties": {
+        "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$": {
+          "$ref": "#/$defs/pinned_action"
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "version", "policy"],
+      "description": "Identity of the trusted release-candidate verifier package. Tarball digests, source commit, and materialization rules stay in the referenced policy and are never copied here.",
+      "properties": {
+        "package": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$"
+        },
+        "version": {
+          "$ref": "#/$defs/exact_version"
+        },
+        "policy": {
+          "const": "law/policy/trusted-local-rc-verifier-package.json",
+          "description": "Repository-relative path of the trusted verifier policy this manifest defers to. The package name and version above must equal that policy's package.name and package.version."
+        }
+      }
+    },
+    "constants": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Named repository constants that a workflow restates and must agree with. Absent constants are not checked.",
+      "properties": {
+        "expected_action_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the approved action set in law/policy/action-registry.json, as the release workflow's EXPECTED_ACTION_COUNT environment value."
+        },
+        "ledger_environment": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "description": "Name of the protected deployment environment the ledger verification workflow binds."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "runtimes": {
+        "node": "24.20.0",
+        "pnpm": "9.15.0",
+        "git": "2.47.3"
+      },
+      "actions": {
+        "actions/checkout": {
+          "ref": "v7.0.1",
+          "digest": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+        },
+        "actions/setup-node": {
+          "ref": "v7.0.0",
+          "digest": "820762786026740c76f36085b0efc47a31fe5020"
+        },
+        "pnpm/action-setup": {
+          "ref": "v4.1.0",
+          "digest": "7088e561eb65bb68695d245aa206f005ef30921d",
+          "peeled_commit": "a7487c7e89a18df4991f7f222e4898a00d66ddda"
+        }
+      },
+      "verifier": {
+        "package": "@aarusso-nyx/devai",
+        "version": "1.5.4",
+        "policy": "law/policy/trusted-local-rc-verifier-package.json"
+      },
+      "constants": {
+        "expected_action_count": 57,
+        "ledger_environment": "devai-ledger-verification"
+      }
+    }
+  ]
+}
