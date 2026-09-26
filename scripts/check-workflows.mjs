@@ -182,6 +182,16 @@ const PREFLIGHT_ALLOWED_SCRIPTS = [
 // Tokens that would make a preflight run look like an evidence path. Checked
 // against executed content only (run bodies, step names, uses) — never against
 // comments, which are documentation and carry no authority.
+// The collapsed lane (ADR-CHK-0001): the step ids in order and the commands
+// each must carry.
+const PREFLIGHT_STEP_ID = 'preflight';
+const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected'];
+const PREFLIGHT_BASE = '--base ${{ github.event.pull_request.base.sha }}';
+const PREFLIGHT_LANE_COMMANDS = {
+  install: ['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap'],
+  [PREFLIGHT_STEP_ID]: [`check --preflight --run ${PREFLIGHT_BASE}`],
+  affected: [`check --affected --run ${PREFLIGHT_BASE}`, 'pnpm run release:pr-gate'],
+};
 const PREFLIGHT_EVIDENCE_TOKENS =
   /\b(?:evidence|receipt|attest(?:ation)?|verifier|provenance|ledger|sign(?:ing|ed)?)\b/iu;
 
@@ -715,9 +725,11 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     return;
   }
 
+  // The preflight step materializes the vendored verifier for the gate and then
+  // runs the preflight probe nodes (ADR-CHK-0001).
   const materializer = Object.values(jobs)
     .flatMap((job) => object(job).steps ?? [])
-    .find((step) => step.id === 'verifier-package');
+    .find((step) => step.id === PREFLIGHT_STEP_ID);
   for (const marker of [
     'DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID',
     'DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID',
@@ -748,23 +760,32 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
       jobs.preflight['continue-on-error'] !== false)
   )
     findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, 'one required result'));
-  const gate = jobs.preflight?.steps?.find(
-    (step) => step.name === 'Require every preflight result',
-  );
-  if (
-    !gate ||
-    gate.if !== '${{ !cancelled() }}' ||
-    gate['continue-on-error'] === true ||
-    !gate.run?.includes("outcome !== 'success'") ||
-    !gate.run?.includes('process.exit(1)')
-  )
-    findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, 'missing fail-closed aggregate'));
-  for (const required of ['install', 'verifier-package', 'bootstrap', 'product']) {
-    if (
-      !gate?.run?.includes(`'${required}'`) ||
-      !jobs.preflight?.steps?.some((step) => step.id === required)
-    )
-      findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, required));
+  // Three run steps, each failing the job on its own: install, the preflight
+  // target, and the affected target with the profile gate. The runner report is
+  // the aggregate, so no step may be optional or conditional.
+  const laneSteps = (Array.isArray(jobs.preflight?.steps) ? jobs.preflight.steps : [])
+    .map(object)
+    .filter((step) => typeof step.run === 'string');
+  if (JSON.stringify(laneSteps.map((step) => step.id)) !== JSON.stringify(PREFLIGHT_LANE_STEP_IDS))
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_GATE_INVALID',
+        file,
+        `run steps must be exactly ${PREFLIGHT_LANE_STEP_IDS.join(', ')}`,
+      ),
+    );
+  for (const step of laneSteps) {
+    if (step['continue-on-error'] !== undefined || step.if !== undefined)
+      findings.push(
+        finding('CI_PREFLIGHT_GATE_INVALID', file, `step ${String(step.id)} must not be optional`),
+      );
+  }
+  for (const [id, required] of Object.entries(PREFLIGHT_LANE_COMMANDS)) {
+    const step = laneSteps.find((candidate) => candidate.id === id);
+    for (const text of required) {
+      if (!step?.run?.includes(text))
+        findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, `${id} must run ${text}`));
+    }
   }
   for (const [name, rawJob] of Object.entries(jobs)) {
     const job = object(rawJob);
@@ -850,7 +871,7 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         PREFLIGHT_EVIDENCE_TOKENS.test(
           executed.replaceAll("'verifier-package'", "'package-check'"),
         ) &&
-        step.id !== 'verifier-package'
+        step.id !== PREFLIGHT_STEP_ID
       ) {
         findings.push(
           finding(

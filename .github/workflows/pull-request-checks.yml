@@ -41,15 +41,16 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Install workspace
+      # Three steps, each failing the job on its own; the runner report replaces
+      # the former step-level aggregator (ADR-CHK-0001).
+      - name: Compile the check runner bootstrap
         id: install
-        continue-on-error: true
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run release:bootstrap
 
-      - name: Materialize protected DEVAI verifier package
-        id: verifier-package
-        if: ${{ !cancelled() }}
-        continue-on-error: true
+      - name: Preflight probes
+        id: preflight
         shell: bash
         run: |
           set -euo pipefail
@@ -109,28 +110,9 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "version=1.5.1" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
+          node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
+          node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base ${{ github.event.pull_request.base.sha }} --as-role inspector --write --format json
 
-      - name: Compile the check runner bootstrap
-        id: bootstrap
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        continue-on-error: true
-        run: pnpm run release:bootstrap
-
-      - name: Profile-selected candidate preflight
-        id: product
-        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
-        continue-on-error: true
-        run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }}
-
-      - name: Require every preflight result
-        if: ${{ !cancelled() }}
-        env:
-          RESULTS: ${{ toJSON(steps) }}
-        run: |
-          node - <<'NODE'
-          const steps = JSON.parse(process.env.RESULTS);
-          const required = ['install', 'verifier-package', 'bootstrap', 'product'];
-          const findings = required.map(id => ({ id, outcome: steps[id]?.outcome ?? 'missing' }));
-          console.log(JSON.stringify({ nonAttesting: true, findings }));
-          if (findings.some(({ outcome }) => outcome !== 'success')) process.exit(1);
-          NODE
+      - name: Affected checks and profile-selected candidate preflight
+        id: affected
+        run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }} && node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base ${{ github.event.pull_request.base.sha }} --as-role inspector --write --format json
