@@ -41,6 +41,8 @@ const RULES = [
 // These source contracts are retained for development and historical compatibility.
 // They are not members of the current CLI/runtime validator roster.
 const SOURCE_ONLY_SCHEMAS = [
+  'campaign-execution-policy.schema.json',
+  'campaign.schema.json',
   'claim-runtime-inputs.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
