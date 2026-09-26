@@ -627,8 +627,6 @@ async function directService(
       return fromValue(checkDependencies({ repoRoot }));
     case 'provenance-readiness':
       return provenanceReadinessReport(repoRoot);
-    case 'changeset-version':
-      return executeArgv(member, ['node', 'scripts/check-changesets.mjs'], repoRoot);
     case 'workflow-reference':
       return executeArgv(member, ['node', 'scripts/check-workflows.mjs'], repoRoot);
     case 'cli-reference':
