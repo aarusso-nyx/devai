@@ -58,6 +58,8 @@ Merge to integration respects the authority chain:
 
 After Architect merges, Inspector's branch rebases on the new integration HEAD. After Inspector merges, Engineer's branch rebases. The pipeline serialises at merge time even though the work parallelises during authoring.
 
+The runtime policy `law/policy/round-execution.json` states this same order twice, as `roles.coupled_order` (the position used by the `coupled-authority-position-ascending` selection step) and `roles.coupled_merge_order` (the order in which triplet branches reach integration). Both read `architect`, `inspector`, `engineer`, because Article 24 fixes that order and the policy is a materialisation of the constitution, not a second source of it: the Architect sets the reference (the invariant), the Inspector derives the sensor (the test) from that reference, and the Engineer actuates against the sensor last. An earlier revision of the policy listed the Inspector first; that was a transcription error corrected under ADR-GOV-0017, and a policy that disagrees with Article 24 on this point is wrong by construction.
+
 ## Module locks (Article 25)
 
 Each task in a triplet acquires its own module locks. Locks are **not** held across triplet boundaries — Architect releases its locks at merge, Inspector acquires fresh locks, etc.
