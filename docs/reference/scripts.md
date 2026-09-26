@@ -4,6 +4,7 @@ The current root maintenance scripts are:
 
 | Script                                 | Purpose                                                  |
 | -------------------------------------- | -------------------------------------------------------- |
+| `scripts/check-campaign.mjs`           | validate campaign plans under `product/campaigns`        |
 | `scripts/check-changesets.mjs`         | validate release metadata for publishable packages       |
 | `scripts/check-workflows.mjs`          | validate the current receipt-verification workflow shape |
 | `scripts/generate-action-registry.mjs` | regenerate CLI registry projections from policy          |
