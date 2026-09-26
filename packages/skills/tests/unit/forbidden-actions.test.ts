@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
@@ -191,19 +199,16 @@ describe('scanForbiddenActions', () => {
     readonly malformed?: boolean;
   }): void {
     cpSync(join(REPO_ROOT, 'law', 'adr'), join(dir, 'law', 'adr'), { recursive: true });
-    for (const file of [
-      'ADR-GOV-0008-canonical-subject-projections.md',
-      'ADR-GOV-0009-instance-validatable-adr-results.md',
-      'ADR-GOV-0010-complete-adr-validation-result.md',
-      'ADR-GOV-0011-fail-closed-adr-result-state.md',
-    ]) {
+    // Only the fixture record below may cover the checker path: every copied
+    // real record that names it is redirected to a fixture-only path.
+    for (const file of readdirSync(join(dir, 'law', 'adr'))) {
+      if (!file.endsWith('.md')) continue;
       const path = join(dir, 'law', 'adr', file);
+      const source = readFileSync(path, 'utf8');
+      if (!source.includes('scripts/check-workflows.mjs')) continue;
       writeFileSync(
         path,
-        readFileSync(path, 'utf8').replaceAll(
-          'scripts/check-workflows.mjs',
-          'scripts/adr-fixture-coverage.mjs',
-        ),
+        source.replaceAll('scripts/check-workflows.mjs', 'scripts/adr-fixture-coverage.mjs'),
       );
     }
     cpSync(join(REPO_ROOT, 'law', 'policy'), join(dir, 'law', 'policy'), { recursive: true });
