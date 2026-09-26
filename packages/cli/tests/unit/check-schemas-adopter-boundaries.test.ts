@@ -181,7 +181,7 @@ describe('complete schema canon filesystem checks', () => {
   it('accepts the complete source catalogue without expanding the runtime roster', () => {
     const report = checkSchemaCanon(canonFixture());
     expect(ROSTER).toHaveLength(91);
-    expect(report).toMatchObject({ ok: true, canonical_total: 104, findings: [] });
+    expect(report).toMatchObject({ ok: true, canonical_total: 105, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
     'reports %s source inventory changes without throwing',
@@ -200,7 +200,7 @@ describe('complete schema canon filesystem checks', () => {
         );
       const report = checkSchemaCanon(root);
       expect(report.ok).toBe(false);
-      expect(report.canonical_total).toBe(kind === 'unexpected' ? 105 : 103);
+      expect(report.canonical_total).toBe(kind === 'unexpected' ? 106 : 104);
       expect(report.findings).toContainEqual({
         rule: 'recursive-closed-complete-objects',
         path: 'law/schemas',
@@ -288,7 +288,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: canonFixture() });
     expect(JSON.parse(result.stdout)).toEqual({
       ok: true,
-      canonical_total: 104,
+      canonical_total: 105,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -304,7 +304,7 @@ describe('check schemas command boundary', () => {
 
   it('renders the exact passing human summary', () => {
     const result = invokeCommand({ repoRoot: canonFixture(), human: true });
-    expect(result.stdout).toBe('policy check schemas: OK (104 canonical schemas, 0 findings)\n');
+    expect(result.stdout).toBe('policy check schemas: OK (105 canonical schemas, 0 findings)\n');
     expect(result.exitCode).toBe(EXIT_PASS);
   });
 
@@ -316,7 +316,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: root, human: true });
     expect(result.stdout).toBe(
       [
-        'policy check schemas: FAIL (104 canonical schemas, 1 findings)',
+        'policy check schemas: FAIL (105 canonical schemas, 1 findings)',
         `  [dereferenced-publish-byte-identity] ${missing}: Bundled publish bytes differ from canonical law bytes.`,
         '',
       ].join('\n'),
