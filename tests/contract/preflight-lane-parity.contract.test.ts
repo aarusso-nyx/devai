@@ -131,8 +131,16 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
     ).toEqual(['install', 'check:preflight', 'check:affected']);
   });
 
-  it('declares at least one preflight-v1 node in test-tasks.json', () => {
-    expect(preflightNodeIds().length, 'preflight-v1 nodes in test-tasks.json').toBeGreaterThan(0);
+  it('declares preflight probes in test-tasks.json or .devai/config/preflight-probes.json', () => {
+    // DEVAI keeps its own probes in the adopter-owned probe file, which the
+    // --preflight target plans as a synthetic root node outside the task policy.
+    const adopterProbes = join(ROOT, '.devai/config/preflight-probes.json');
+    const probeCount =
+      preflightNodeIds().length +
+      (existsSync(adopterProbes)
+        ? (JSON.parse(readFileSync(adopterProbes, 'utf8')) as readonly unknown[]).length
+        : 0);
+    expect(probeCount, 'preflight probes from either source').toBeGreaterThan(0);
   });
 
   it.each(['--preflight', '--affected'] as const)(
