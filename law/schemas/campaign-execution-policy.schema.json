@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/campaign-execution-policy.schema.json",
+  "title": "Campaign execution policy",
+  "description": "Schema for the policy that gives campaign, round, wave, and task documents their execution semantics: containment, identity, ordering, lifecycle, gates, isolation, prompts, commits, failure, evidence, and materialization into governed records.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "plan_schema",
+    "containment",
+    "identity",
+    "ordering",
+    "lifecycle",
+    "gates",
+    "isolation",
+    "prompts",
+    "commits",
+    "failure",
+    "evidence",
+    "materialization",
+    "fail_closed"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/campaign-execution-policy.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "campaign-execution"
+    },
+    "status": {
+      "enum": ["proposed", "active"]
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "plan_schema": {
+      "const": "law/schemas/campaign.schema.json"
+    },
+    "containment": {
+      "$ref": "#/$defs/section"
+    },
+    "identity": {
+      "$ref": "#/$defs/section"
+    },
+    "ordering": {
+      "$ref": "#/$defs/section"
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["campaign", "round", "wave", "task"],
+      "properties": {
+        "campaign": {
+          "$ref": "#/$defs/machine"
+        },
+        "round": {
+          "$ref": "#/$defs/machine"
+        },
+        "wave": {
+          "$ref": "#/$defs/machine"
+        },
+        "task": {
+          "$ref": "#/$defs/machine"
+        }
+      }
+    },
+    "gates": {
+      "$ref": "#/$defs/section"
+    },
+    "isolation": {
+      "$ref": "#/$defs/section"
+    },
+    "prompts": {
+      "$ref": "#/$defs/section"
+    },
+    "commits": {
+      "$ref": "#/$defs/section"
+    },
+    "failure": {
+      "$ref": "#/$defs/section"
+    },
+    "evidence": {
+      "$ref": "#/$defs/section"
+    },
+    "materialization": {
+      "$ref": "#/$defs/section"
+    },
+    "fail_closed": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "A declarative section of closed string, boolean, number, array, or nested object values."
+    },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initial", "terminal", "transitions", "undeclared_transition"],
+      "properties": {
+        "initial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terminal": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to", "when"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "when": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The condition, in prose, that must hold for any listed transition."
+              }
+            }
+          }
+        },
+        "undeclared_transition": {
+          "type": "string",
+          "pattern": "^CAMPAIGN_[A-Z0-9_]+$"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "$schema": "../schemas/campaign-execution-policy.schema.json",
+      "schemaVersion": "1.0.0",
+      "id": "campaign-execution",
+      "status": "proposed",
+      "authority": "Architect",
+      "policy_version": "1.0.0",
+      "plan_schema": "law/schemas/campaign.schema.json",
+      "containment": {
+        "levels": ["campaign", "round", "wave", "task"]
+      },
+      "identity": {
+        "campaign": "^CMP-[0-9]{4}$"
+      },
+      "ordering": {
+        "rounds": "depends_on-partial-order"
+      },
+      "lifecycle": {
+        "campaign": {
+          "initial": "proposed",
+          "terminal": ["closed", "abandoned"],
+          "transitions": [
+            {
+              "from": "proposed",
+              "to": ["accepted", "abandoned"],
+              "when": "the mandate holder approves or withdraws"
+            }
+          ],
+          "undeclared_transition": "CAMPAIGN_TRANSITION_FORBIDDEN"
+        },
+        "round": {
+          "initial": "planned",
+          "terminal": ["closed", "abandoned"],
+          "transitions": [
+            {
+              "from": "planned",
+              "to": ["open"],
+              "when": "the open gate holds"
+            }
+          ],
+          "undeclared_transition": "CAMPAIGN_ROUND_TRANSITION_FORBIDDEN"
+        },
+        "wave": {
+          "initial": "planned",
+          "terminal": ["merged", "cancelled"],
+          "transitions": [
+            {
+              "from": "planned",
+              "to": ["open"],
+              "when": "its round is open and its depends_on waves are merged"
+            }
+          ],
+          "undeclared_transition": "CAMPAIGN_WAVE_TRANSITION_FORBIDDEN"
+        },
+        "task": {
+          "initial": "planned",
+          "terminal": ["merged", "cancelled"],
+          "transitions": [
+            {
+              "from": "planned",
+              "to": ["ready"],
+              "when": "its wave is open and its upstream task is merged"
+            }
+          ],
+          "undeclared_transition": "CAMPAIGN_TASK_TRANSITION_FORBIDDEN"
+        }
+      },
+      "gates": {
+        "round_open": ["records-accepted"]
+      },
+      "isolation": {
+        "branch_pattern": "^(codex|claude)/R-[0-9]{4}-TASK-[0-9]{4,}-[a-z0-9-]+$"
+      },
+      "prompts": {
+        "composition": ["preamble", "task"]
+      },
+      "commits": {
+        "single_family": true
+      },
+      "failure": {
+        "automatic_retry": "forbidden"
+      },
+      "evidence": {
+        "task_merge": ["pull_request", "merged_as"]
+      },
+      "materialization": {
+        "round_record": "work/rounds/{round}/record.md"
+      },
+      "fail_closed": ["unknown-status"]
+    }
+  ]
+}
