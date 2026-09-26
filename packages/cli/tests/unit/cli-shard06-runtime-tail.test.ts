@@ -134,6 +134,13 @@ vi.mock('../../src/commands/release/facade.js', () => ({
   releaseStatus: harness.command('releaseStatus'),
   releaseVerify: harness.command('releaseVerify'),
 }));
+vi.mock('../../src/commands/backlog/index.js', () => ({
+  backlogAdd: harness.command('backlogAdd'),
+  backlogList: harness.command('backlogList'),
+  backlogShow: harness.command('backlogShow'),
+  backlogResolve: harness.command('backlogResolve'),
+  backlogCommands: [],
+}));
 vi.mock('../../src/commands/round/workflow.js', () => ({
   roundAssess: harness.command('roundAssess'),
   roundClose: harness.command('roundClose'),
