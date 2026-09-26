@@ -406,7 +406,7 @@
       "id": "R-0103",
       "title": "Commit grammar and changeset retirement",
       "goal": "Commit messages carry type and class, mixed-family commits are rejected, and version intent comes from commit types.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-GOV-0018", "ADR-REL-0027"],
       "depends_on": ["R-0102"],
       "attestation_reissue": false,
@@ -438,7 +438,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -472,8 +472,8 @@
                 "path": "prompts/TASK-0131.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/97",
+              "merged_as": "329ada09c9be692429ec9bad7d99bceaae404a37",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -486,7 +486,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0131",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -511,8 +511,8 @@
                 "path": "prompts/TASK-0132.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/97",
+              "merged_as": "8cdf2ddd37f8c73545d34be1ab62ef94218477f7",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -525,7 +525,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0132",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -560,8 +560,8 @@
                 "path": "prompts/TASK-0133.md",
                 "sha256": null
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/97",
+              "merged_as": "ea43907134e602e078c213e5555cfe020e678892",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -570,13 +570,19 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "f537a374a88f72fe3fac1d0b4dc436efb9633fd9",
+        "closed_at": "2026-09-26T10:30:39Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0104",
       "title": "Preflight probes and credential requirements",
       "goal": "Environment failures are BLOCKED probes, never FAIL results; credentials are declared per effect and probed without reading values.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CHK-0001", "ADR-SEC-0001"],
       "depends_on": ["R-0101", "R-0102"],
       "attestation_reissue": true,
@@ -606,7 +612,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "checkpoint",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -669,7 +675,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0141",
-              "status": "planned",
+              "status": "checkpoint",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -708,7 +714,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0142",
-              "status": "planned",
+              "status": "blocked",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -929,7 +935,7 @@
       "id": "R-0105",
       "title": "Prerelease ladder and backlog family",
       "goal": "Prerelease rungs carry their own depth and dist-tags; findings outlive the session that made them.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-REL-0028", "ADR-GOV-0019"],
       "depends_on": ["R-0101"],
       "attestation_reissue": false,
@@ -959,7 +965,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -1007,7 +1013,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0161",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1042,7 +1048,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0162",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1105,7 +1111,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -1161,7 +1167,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0171",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1200,7 +1206,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0172",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
