@@ -78,7 +78,21 @@
       }
     },
     "plan_determination": {
-      "$ref": "#/$defs/plan_determination"
+      "description": "Byte-frozen plan determination contract; the prerelease_ladder member is additionally modelled as a closed object so its shape is explicit beyond the frozen values.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/plan_determination"
+        },
+        {
+          "type": "object",
+          "required": ["prerelease_ladder"],
+          "properties": {
+            "prerelease_ladder": {
+              "$ref": "#/$defs/prerelease_ladder"
+            }
+          }
+        }
+      ]
     },
     "execution_seams": {
       "$ref": "#/$defs/execution_seams"
@@ -2252,6 +2266,107 @@
             "operational-matrix"
           ]
         },
+        "prerelease_ladder": {
+          "description": "Prerelease channel ladder declared by ADR-REL-0028. A prerelease identifier takes the semver 2.0 dot form <rung>.<n> with n a non-negative integer without leading zeros, for example 1.6.0-alpha.1; any other prerelease identifier blocks with invalid-semver precedence and is never defaulted to a rung. The kernel identifier stays devai.kernel.release-plan-determination.v3 because this section adds a rung table and a dist-tag map without altering any existing transition, block condition, capability selection, or receipt semantics: stable transitions and the existing v1.5.0-rc.1 lineage resolve exactly as before.",
+          "record": "ADR-REL-0028",
+          "identifier_pattern": "^(alpha|beta|rc)\\.(0|[1-9][0-9]*)$",
+          "unknown_identifier": "invalid-semver",
+          "rung_order": ["alpha", "beta", "rc"],
+          "rungs": [
+            {
+              "rung": "alpha",
+              "order": 1,
+              "dist_tag": "alpha",
+              "required_capabilities": [
+                "formatting-hygiene",
+                "lint",
+                "type-integrity",
+                "schema-consistency",
+                "secret-scan",
+                "path-portability",
+                "package-integrity",
+                "exact-candidate",
+                "affected-checks",
+                "dependent-checks"
+              ]
+            },
+            {
+              "rung": "beta",
+              "order": 2,
+              "dist_tag": "beta",
+              "required_capabilities": [
+                "formatting-hygiene",
+                "lint",
+                "type-integrity",
+                "schema-consistency",
+                "secret-scan",
+                "path-portability",
+                "package-integrity",
+                "exact-candidate",
+                "affected-checks",
+                "dependent-checks",
+                "unit",
+                "integration"
+              ]
+            },
+            {
+              "rung": "rc",
+              "order": 3,
+              "dist_tag": "next",
+              "required_capabilities": [
+                "formatting-hygiene",
+                "lint",
+                "type-integrity",
+                "schema-consistency",
+                "secret-scan",
+                "path-portability",
+                "package-integrity",
+                "exact-candidate",
+                "affected-checks",
+                "dependent-checks",
+                "unit",
+                "integration",
+                "e2e",
+                "consumer",
+                "api-compatibility",
+                "migration",
+                "rollback",
+                "adopter-materialization",
+                "security",
+                "database",
+                "tenancy",
+                "provenance",
+                "reproducibility"
+              ]
+            }
+          ],
+          "stable_dist_tag": "latest",
+          "stable_from": "rc",
+          "promotion": {
+            "scope": "same-version-core",
+            "allowed": [
+              {
+                "rule": "same-rung-suffix-increment",
+                "condition": "same-rung-and-strictly-greater-suffix"
+              },
+              {
+                "rule": "forward-along-ladder",
+                "condition": "next-rung-in-rung-order-any-suffix-skipping-a-rung-is-a-downgrade"
+              },
+              {
+                "rule": "stable-from-rc",
+                "condition": "current-rung-is-rc-and-target-is-the-bare-version-core"
+              }
+            ],
+            "otherwise": "downgrade"
+          },
+          "dist_tag_rules": [
+            "stable-versions-publish-to-latest-only",
+            "each-rung-publishes-to-its-own-dist-tag-only",
+            "no-prerelease-resolves-to-latest"
+          ],
+          "adopter_narrowing": "adopters-may-omit-rungs-never-add-identifiers-or-reorder-the-ladder"
+        },
         "lts_capabilities": [
           "unit",
           "integration",
@@ -2348,6 +2463,124 @@
             "offline": "include-and-reverify-complete-toolchain-and-producer-build-source-evidence-under-the-same-external-expectation",
             "producer_build_provenance_schema": "law/schemas/release-policy-resolution.schema.json#/$defs/producer_build_provenance"
           }
+        }
+      }
+    },
+    "prerelease_ladder": {
+      "type": "object",
+      "description": "Closed prerelease channel ladder (ADR-REL-0028): three rungs in order, each with a dist-tag and required capabilities, plus the promotion rules and the rc-only promotion to stable.",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "record",
+        "identifier_pattern",
+        "unknown_identifier",
+        "rung_order",
+        "rungs",
+        "stable_dist_tag",
+        "stable_from",
+        "promotion",
+        "dist_tag_rules",
+        "adopter_narrowing"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 10
+        },
+        "record": {
+          "const": "ADR-REL-0028"
+        },
+        "identifier_pattern": {
+          "const": "^(alpha|beta|rc)\\.(0|[1-9][0-9]*)$"
+        },
+        "unknown_identifier": {
+          "const": "invalid-semver"
+        },
+        "rung_order": {
+          "const": ["alpha", "beta", "rc"]
+        },
+        "rungs": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rung", "order", "dist_tag", "required_capabilities"],
+            "properties": {
+              "rung": {
+                "enum": ["alpha", "beta", "rc"]
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "dist_tag": {
+                "enum": ["alpha", "beta", "next"]
+              },
+              "required_capabilities": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                }
+              }
+            }
+          }
+        },
+        "stable_dist_tag": {
+          "const": "latest"
+        },
+        "stable_from": {
+          "const": "rc"
+        },
+        "promotion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope", "allowed", "otherwise"],
+          "properties": {
+            "scope": {
+              "const": "same-version-core"
+            },
+            "allowed": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["rule", "condition"],
+                "properties": {
+                  "rule": {
+                    "enum": ["same-rung-suffix-increment", "forward-along-ladder", "stable-from-rc"]
+                  },
+                  "condition": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "otherwise": {
+              "const": "downgrade"
+            }
+          }
+        },
+        "dist_tag_rules": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "adopter_narrowing": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -3600,6 +3833,107 @@
             "reproducibility",
             "operational-matrix"
           ]
+        },
+        "prerelease_ladder": {
+          "description": "Prerelease channel ladder declared by ADR-REL-0028. A prerelease identifier takes the semver 2.0 dot form <rung>.<n> with n a non-negative integer without leading zeros, for example 1.6.0-alpha.1; any other prerelease identifier blocks with invalid-semver precedence and is never defaulted to a rung. The kernel identifier stays devai.kernel.release-plan-determination.v3 because this section adds a rung table and a dist-tag map without altering any existing transition, block condition, capability selection, or receipt semantics: stable transitions and the existing v1.5.0-rc.1 lineage resolve exactly as before.",
+          "record": "ADR-REL-0028",
+          "identifier_pattern": "^(alpha|beta|rc)\\.(0|[1-9][0-9]*)$",
+          "unknown_identifier": "invalid-semver",
+          "rung_order": ["alpha", "beta", "rc"],
+          "rungs": [
+            {
+              "rung": "alpha",
+              "order": 1,
+              "dist_tag": "alpha",
+              "required_capabilities": [
+                "formatting-hygiene",
+                "lint",
+                "type-integrity",
+                "schema-consistency",
+                "secret-scan",
+                "path-portability",
+                "package-integrity",
+                "exact-candidate",
+                "affected-checks",
+                "dependent-checks"
+              ]
+            },
+            {
+              "rung": "beta",
+              "order": 2,
+              "dist_tag": "beta",
+              "required_capabilities": [
+                "formatting-hygiene",
+                "lint",
+                "type-integrity",
+                "schema-consistency",
+                "secret-scan",
+                "path-portability",
+                "package-integrity",
+                "exact-candidate",
+                "affected-checks",
+                "dependent-checks",
+                "unit",
+                "integration"
+              ]
+            },
+            {
+              "rung": "rc",
+              "order": 3,
+              "dist_tag": "next",
+              "required_capabilities": [
+                "formatting-hygiene",
+                "lint",
+                "type-integrity",
+                "schema-consistency",
+                "secret-scan",
+                "path-portability",
+                "package-integrity",
+                "exact-candidate",
+                "affected-checks",
+                "dependent-checks",
+                "unit",
+                "integration",
+                "e2e",
+                "consumer",
+                "api-compatibility",
+                "migration",
+                "rollback",
+                "adopter-materialization",
+                "security",
+                "database",
+                "tenancy",
+                "provenance",
+                "reproducibility"
+              ]
+            }
+          ],
+          "stable_dist_tag": "latest",
+          "stable_from": "rc",
+          "promotion": {
+            "scope": "same-version-core",
+            "allowed": [
+              {
+                "rule": "same-rung-suffix-increment",
+                "condition": "same-rung-and-strictly-greater-suffix"
+              },
+              {
+                "rule": "forward-along-ladder",
+                "condition": "next-rung-in-rung-order-any-suffix-skipping-a-rung-is-a-downgrade"
+              },
+              {
+                "rule": "stable-from-rc",
+                "condition": "current-rung-is-rc-and-target-is-the-bare-version-core"
+              }
+            ],
+            "otherwise": "downgrade"
+          },
+          "dist_tag_rules": [
+            "stable-versions-publish-to-latest-only",
+            "each-rung-publishes-to-its-own-dist-tag-only",
+            "no-prerelease-resolves-to-latest"
+          ],
+          "adopter_narrowing": "adopters-may-omit-rungs-never-add-identifiers-or-reorder-the-ladder"
         },
         "lts_capabilities": [
           "unit",

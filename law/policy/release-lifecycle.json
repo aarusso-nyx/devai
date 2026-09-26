@@ -4,7 +4,7 @@
   "id": "release-lifecycle",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.15.0",
+  "policy_version": "2.16.0",
   "state_record_schema": "law/schemas/release-lifecycle-state.schema.json",
   "authorization_event_schema": "law/schemas/effect-authorization-event.schema.json",
   "receipt_schemas": {
@@ -193,6 +193,107 @@
         "reproducibility",
         "operational-matrix"
       ]
+    },
+    "prerelease_ladder": {
+      "description": "Prerelease channel ladder declared by ADR-REL-0028. A prerelease identifier takes the semver 2.0 dot form <rung>.<n> with n a non-negative integer without leading zeros, for example 1.6.0-alpha.1; any other prerelease identifier blocks with invalid-semver precedence and is never defaulted to a rung. The kernel identifier stays devai.kernel.release-plan-determination.v3 because this section adds a rung table and a dist-tag map without altering any existing transition, block condition, capability selection, or receipt semantics: stable transitions and the existing v1.5.0-rc.1 lineage resolve exactly as before.",
+      "record": "ADR-REL-0028",
+      "identifier_pattern": "^(alpha|beta|rc)\\.(0|[1-9][0-9]*)$",
+      "unknown_identifier": "invalid-semver",
+      "rung_order": ["alpha", "beta", "rc"],
+      "rungs": [
+        {
+          "rung": "alpha",
+          "order": 1,
+          "dist_tag": "alpha",
+          "required_capabilities": [
+            "formatting-hygiene",
+            "lint",
+            "type-integrity",
+            "schema-consistency",
+            "secret-scan",
+            "path-portability",
+            "package-integrity",
+            "exact-candidate",
+            "affected-checks",
+            "dependent-checks"
+          ]
+        },
+        {
+          "rung": "beta",
+          "order": 2,
+          "dist_tag": "beta",
+          "required_capabilities": [
+            "formatting-hygiene",
+            "lint",
+            "type-integrity",
+            "schema-consistency",
+            "secret-scan",
+            "path-portability",
+            "package-integrity",
+            "exact-candidate",
+            "affected-checks",
+            "dependent-checks",
+            "unit",
+            "integration"
+          ]
+        },
+        {
+          "rung": "rc",
+          "order": 3,
+          "dist_tag": "next",
+          "required_capabilities": [
+            "formatting-hygiene",
+            "lint",
+            "type-integrity",
+            "schema-consistency",
+            "secret-scan",
+            "path-portability",
+            "package-integrity",
+            "exact-candidate",
+            "affected-checks",
+            "dependent-checks",
+            "unit",
+            "integration",
+            "e2e",
+            "consumer",
+            "api-compatibility",
+            "migration",
+            "rollback",
+            "adopter-materialization",
+            "security",
+            "database",
+            "tenancy",
+            "provenance",
+            "reproducibility"
+          ]
+        }
+      ],
+      "stable_dist_tag": "latest",
+      "stable_from": "rc",
+      "promotion": {
+        "scope": "same-version-core",
+        "allowed": [
+          {
+            "rule": "same-rung-suffix-increment",
+            "condition": "same-rung-and-strictly-greater-suffix"
+          },
+          {
+            "rule": "forward-along-ladder",
+            "condition": "next-rung-in-rung-order-any-suffix-skipping-a-rung-is-a-downgrade"
+          },
+          {
+            "rule": "stable-from-rc",
+            "condition": "current-rung-is-rc-and-target-is-the-bare-version-core"
+          }
+        ],
+        "otherwise": "downgrade"
+      },
+      "dist_tag_rules": [
+        "stable-versions-publish-to-latest-only",
+        "each-rung-publishes-to-its-own-dist-tag-only",
+        "no-prerelease-resolves-to-latest"
+      ],
+      "adopter_narrowing": "adopters-may-omit-rungs-never-add-identifiers-or-reorder-the-ladder"
     },
     "lts_capabilities": [
       "unit",
