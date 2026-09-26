@@ -31,6 +31,21 @@ jobs:
         with:
           # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
           node-version: 24
+      - name: Probe declared credential prerequisites
+        shell: bash
+        # Presence flags only (ADR-SEC-0001): each variable is true or false, never a value.
+        env:
+          DEVAI_LEDGER_ENVELOPE_B64: ${{ secrets.DEVAI_LEDGER_ENVELOPE_B64 != '' }}
+          DEVAI_LEDGER_RESULTS_TGZ_B64: ${{ secrets.DEVAI_LEDGER_RESULTS_TGZ_B64 != '' }}
+          DEVAI_LEDGER_ARTIFACTS_TGZ_B64: ${{ secrets.DEVAI_LEDGER_ARTIFACTS_TGZ_B64 != '' }}
+          DEVAI_LEDGER_TASK_POLICY_B64: ${{ secrets.DEVAI_LEDGER_TASK_POLICY_B64 != '' }}
+          DEVAI_LEDGER_TRUST_STORE_B64: ${{ secrets.DEVAI_LEDGER_TRUST_STORE_B64 != '' }}
+          DEVAI_LEDGER_TOOLCHAIN_B64: ${{ secrets.DEVAI_LEDGER_TOOLCHAIN_B64 != '' }}
+          DEVAI_LEDGER_ENVIRONMENT_B64: ${{ secrets.DEVAI_LEDGER_ENVIRONMENT_B64 != '' }}
+          DEVAI_EVIDENCE_READ_TOKEN: ${{ secrets.DEVAI_EVIDENCE_READ_TOKEN != '' }}
+        run: |-
+          set -euo pipefail
+          node candidate/scripts/process/release-prerequisites.mjs credentials .github/workflows/devai-ledger-verify.yml verify-ledger
       - name: Materialize protected DEVAI verifier package
         id: verifier-package
         shell: bash
