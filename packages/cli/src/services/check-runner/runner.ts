@@ -344,6 +344,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     support: 'preview' | 'current' | 'lts';
     support_promotion?: boolean;
     change_kind?: 'documentation' | 'metadata' | 'behavioral';
+    channel?: 'alpha' | 'beta' | 'rc' | 'stable';
     changed_paths?: string[];
     changed_packages?: string[];
     risks?: string[];
@@ -405,6 +406,7 @@ function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
     mutationRosterSize: profile.mutation_roster.length,
     ...(intent.support_promotion !== undefined && { supportPromotion: intent.support_promotion }),
     ...(intent.change_kind !== undefined && { changeKind: intent.change_kind }),
+    ...(intent.channel !== undefined && { channel: intent.channel }),
     ...(intent.risks !== undefined && { risks: intent.risks }),
     ...(intent.owner_escalations !== undefined && { ownerEscalations: intent.owner_escalations }),
   });
