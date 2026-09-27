@@ -1792,7 +1792,8 @@
                   "packages/cli/tests/unit/sense-adapter-acceptance.test.ts",
                   "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
                   "packages/skills/tests/unit/authority-host-test-scope.ts",
-                  "docs/adopters/sensor-inputs.md"
+                  "docs/adopters/sensor-inputs.md",
+                  "tests/contract/sensor-inputs.contract.test.ts"
                 ],
                 "forbidden": [
                   ".github/workflows/",
@@ -1844,7 +1845,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0264.md",
-                "sha256": "867dccd7b7254356c80752d23500750604587f13b28764e8797955f771840bdc"
+                "sha256": "6398a7a56169f3be85b0cbc16cf960975664c93afc85123c7e8d1da21dfe1f7c"
               },
               "pull_request": null,
               "merged_as": null,
