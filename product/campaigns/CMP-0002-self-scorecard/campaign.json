@@ -408,7 +408,14 @@
                   "packages/sensors/src/action-effect-inference.ts",
                   "packages/sensors/src/type-check.ts",
                   "packages/sensors/src/perf-test.ts",
-                  "packages/cli/src/commands/sense/adapters.ts"
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "docs/reference/error-codes.md",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-command.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-execution.test.ts",
+                  "packages/schemas/src/roster.ts",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -444,10 +451,17 @@
                   "json"
                 ]
               ],
-              "commit_types": ["feat(sensors)"],
+              "commit_types": [
+                "feat(sensors)",
+                "test(sensors)",
+                "refactor(schemas)",
+                "test(schemas)",
+                "chore(generated)",
+                "docs(reference)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-0223.md",
-                "sha256": "c505e40861b904dc896c65b59a0d845887da4fab0cda6a7b0e2dc0c18687da5a"
+                "sha256": "f3841a3e9325da0adbb1ffdb313fee35da90d8aae8a87afd0b6a78cf546201bb"
               },
               "pull_request": null,
               "merged_as": null,
