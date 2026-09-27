@@ -349,3 +349,37 @@ Follow-ups recorded during the round:
 1. `sense record` enforces the reading's attribution (declaring role and
    human invocation) at record time, but does not store it, because the
    closed reading schema admits no attribution field.
+
+Waves CTG-0263 and CTG-0264 (the `test:perf` script and the broker-run
+performance and type-check sensor invocations) merged through #148 at
+`042b2326`. The first inspector attempt at that head stopped before recording
+anything, as the rules require, and reported the cells that cannot pass by a
+code change. Maintainer decisions on 2026-09-27:
+
+1. **Record the first scorecard as measured.** No threshold, override, or
+   reading is edited; every non-PASS cell is listed here with its finding.
+   The round goal and TASK-0261 now say so.
+2. **The harness cells read live CI history.** `harness_green_main`,
+   `harness_performance`, and `harness_robustness` read `gh run list
+--branch main --limit 50`. Of the last 50 runs on main, 28 were ledger
+   verification runs left in `waiting` on the protected environment because
+   the workflow triggers on every push to main, and the successful ledger
+   runs include the approval wait in their duration. The fix is owner-side:
+   drop the push trigger of `devai-ledger-verify.yml` (keep the manual
+   dispatch) and cancel the waiting runs. F5:T9 and F5:T7 turn green only once
+   the 50-run window rolls past those runs.
+3. **F3:T2 stays without a coverage run.** `test:coverage:rc` refuses without
+   a reachable test database; no database is provided for the self-scorecard.
+4. **The reachable N/A count is above two.** Under ADR-SCR-0003 the rbac
+   surface is declared absent, so F4:T6 joins F1:T1 and F4:T5 as N/A by
+   declaration rather than by override.
+5. **Wave CTG-0265 repoints the consuming sensors.** `inventory_performance`
+   and `harness_invariant_alignment` still read `record/proofs/sensor-readings`,
+   the store ADR-SCR-0002 retired; they now read `.devai/state/sensor-readings`
+   like the loop resolver. The recording wave waits for it.
+6. **Fresh worktrees lack the authority policy.** `.devai/config/authority-policy.json`
+   is gitignored; the inspector copies it from the bound checkout before
+   `sense record`, since `init bind` needs a second role and rewrites tracked
+   files outside the boundary.
+7. **The scorecard acceptance flag was wrong.** `audit scorecard` takes
+   `--format human`, not `--human`; the ledger and prompt were corrected.
