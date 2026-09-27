@@ -8,6 +8,8 @@
     { "selector": { "kind": "prefix", "pattern": "law/glossary/" }, "class": "law" },
     { "selector": { "kind": "exact", "pattern": "law/constitution.md" }, "class": "law" },
     { "selector": { "kind": "exact", "pattern": "law/trace.json" }, "class": "law" },
+    { "selector": { "kind": "prefix", "pattern": "law/security/" }, "class": "law" },
+    { "selector": { "kind": "prefix", "pattern": "law/targets/" }, "class": "law" },
     { "selector": { "kind": "prefix", "pattern": "law/invariants/" }, "class": "spec" },
     { "selector": { "kind": "prefix", "pattern": "law/schemas/" }, "class": "spec" },
     { "selector": { "kind": "prefix", "pattern": "product/" }, "class": "plan" },
