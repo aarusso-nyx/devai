@@ -1100,7 +1100,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "in_progress",
               "target_substrates": ["F2", "F1"],
               "boundary": {
                 "paths": [
@@ -1133,7 +1133,7 @@
               "commit_types": ["fix(loop)", "test(loop)", "law(schemas)", "docs(law)"],
               "prompt": {
                 "path": "prompts/TASK-0241.md",
-                "sha256": null
+                "sha256": "1a071c09a0063ed2d41c360da0625588057cb4bbbd840e9abb950bf073418cdc"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1151,7 +1151,7 @@
       "id": "R-0205",
       "title": "Plant and observation hygiene",
       "goal": "The dependency audit is clean, tests are classified so the security, performance, and robustness coverage sensors count them, the largest plant files are within depth thresholds, and the workflows satisfy the harness idiomaticity sensor.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0004", "ADR-SCR-0005"],
       "depends_on": ["R-0202", "R-0203"],
       "attestation_reissue": false,
@@ -1173,7 +1173,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1197,7 +1197,7 @@
               "commit_types": ["build(deps)"],
               "prompt": {
                 "path": "prompts/TASK-0251.md",
-                "sha256": null
+                "sha256": "5c5704eaa2b1748d79aeef587f89347077b582aa3a3817b7005bb1f796db58f0"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1228,7 +1228,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1270,7 +1270,7 @@
               "commit_types": ["test(classification)", "docs(dev)", "fix(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0252.md",
-                "sha256": null
+                "sha256": "4fd4cb1de615b4e90755bf5c21bad0947e17303d78f12e682c2edb3f47ffc5a6"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1297,7 +1297,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1335,7 +1335,7 @@
               "commit_types": ["refactor(plant)"],
               "prompt": {
                 "path": "prompts/TASK-0253.md",
-                "sha256": null
+                "sha256": "86869f3933c8b2e5fcfcd47cac2dfe9b864b19092f00ce18d4217e7b8f8c2a3d"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1362,7 +1362,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1386,7 +1386,7 @@
               "commit_types": ["ci(workflows)", "test(workflows)"],
               "prompt": {
                 "path": "prompts/TASK-0254.md",
-                "sha256": null
+                "sha256": "da50b99ecd9f81a3dd8a77cb469755d31154de602d6122bd2fa7f2c728a8ff6f"
               },
               "pull_request": null,
               "merged_as": null,
