@@ -474,3 +474,39 @@ Non-PASS cells, each a follow-up:
     the 5% pass threshold.
 14. F5:T9 FAIL, `harness_green_main`: 20 of the last 50 runs on main succeeded
     (40%), since the ledger runs wait on the protected environment (decision 2).
+
+### R-0206 closed 2026-09-27 at `5fd20653`
+
+Waves CTG-0262 (#144), CTG-0263 and CTG-0264 (#148), CTG-0265 (#149),
+CTG-0266 and CTG-0267 (#150), and CTG-0261 (#151) merged. The first
+self-scorecard, SC-20260927T205906-001, is committed under
+`record/proofs/compliance/scorecards/` as measured at `86d8ccea`: PASS 31,
+REVIEW 5, FAIL 3, UNKNOWN 3, N/A 3. Close checks ran in a clean checkout at
+the closing head. The campaign closes with this round; its goal was amended
+to the maintainer decision of recording as measured.
+
+Follow-ups carried out of the campaign, in priority order:
+
+1. Owner-side: drop the push trigger of `devai-ledger-verify.yml` and cancel
+   the waiting runs; F5:T7 and F5:T9 turn green once 50 newer runs exist on
+   main. Owner-side too: the two read-only `gh api` GET admissions for
+   `site_drift`, the control-commit repoint before the next release, and the
+   pages audit reissue for the next tag.
+2. Admit a `build` invocation under the broker so F2:T4 and F2:T9 can be read
+   (an authority decision, since the build runs a shell chain today).
+3. Give `e2e_test` a governed configuration that includes `tests/e2e` (the
+   local configuration covers contract and integration only), or declare the
+   surface absent by record; F3:T1 reads FAIL on that error alone.
+4. `harness_invariant_alignment` counts a recorded reading as evidence only
+   with a `sense.readings.record` entry in `record/proofs/chain.json`, which
+   `sense record` never writes (F5:T4); and `inventory_performance` runs
+   inside the sweep before any reading is recorded, so a fresh store always
+   reads REVIEW (F4:T7): sequence the sweep or add a second pass.
+5. `inventory_regeneration` touches no kinds on a CLI-shaped repository (F4:T9)
+   and `inventory_adherence` finds no inventory input (F4:T4); decide whether
+   these cells are N/A by record for the framework.
+6. The observation backlog file does not match `law/schemas/backlog-item.schema.json`;
+   no schema covers it. The post-merge hook path observes from a detached
+   worktree whose ignored readings store is empty; decide whether hook
+   observations read the bound checkout's store.
+7. F3:T2 stays without a coverage run until a test database is provided.
