@@ -6,7 +6,7 @@
 
 ## Operational definition
 
-Walks `record/proofs/sensor-readings/inventory_*/` (the canonical 21.E + 23.G persistence path); for each persisted SR, reads `duration_ms`. Aggregates per kind:
+Walks `.devai/state/sensor-readings/inventory_*/` (the canonical readings store that `sense record` writes and the scorecard input resolver reads, per ADR-SCR-0002); for each persisted SR, reads `duration_ms`. Aggregates per kind:
 
 - `count` per kind
 - `mean_ms` per kind
@@ -28,7 +28,7 @@ If no inventory SRs exist (adopter hasn't run sense-inventory-* yet): `status='r
 ## Adopter overrides
 
 - `extractor_params.inventory_performance.thresholds: {pass:number, review:number}` — override the p95 boundaries in milliseconds.
-- `extractor_params.inventory_performance.readings_dir: string` — override the readings directory. Default `record/proofs/sensor-readings`.
+- `extractor_params.inventory_performance.readings_dir: string` — override the readings directory. Default `.devai/state/sensor-readings`.
 
 ## Out of scope
 
