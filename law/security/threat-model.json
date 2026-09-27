@@ -1,0 +1,164 @@
+{
+  "$schema": "../schemas/threat-model.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "threat-model",
+  "title": "DEVAI framework repository threat model",
+  "status": "active",
+  "authority": "Architect",
+  "date": "2026-09-27",
+  "subject": "aarusso-nyx/devai, the framework repository governed by its own harness under law/policy/self-dogfood.json",
+  "boundaries": [
+    {
+      "id": "TB-AUTH-001",
+      "name": "Authority broker",
+      "defended_by": {
+        "component": "authority-broker",
+        "code_areas": ["packages/authority/src/**", "packages/cli/src/authority/**"]
+      },
+      "inside": "A human session that declared exactly one constitutional role and invokes a registered action with explicit write consent.",
+      "outside": "Ambient environment state, undeclared or inferred roles, host tools writing governed paths outside the runtime, and any caller presenting authorization bytes it did not earn.",
+      "assets": [
+        "Governed write paths under law/, product/, packages/, tests/, docs/, record/, .devai/config/, and .devai/pin/",
+        "The effect authorization ledger and every one-time Owner grant",
+        "The self-dogfood role and effect matrix"
+      ],
+      "threats": [
+        {
+          "id": "TH-AUTH-001",
+          "description": "A caller writes a governed path that its declared role does not own, or relies on a wildcard remainder to widen its scope.",
+          "mitigation": "Authority is a fixed two-segment path prefix lookup decided before mutation; an unauthorized prefix is refused with zero exemptions.",
+          "invariants": ["INV-AUTH-001"],
+          "decisions": ["ADR-AUT-0001"]
+        },
+        {
+          "id": "TH-AUTH-002",
+          "description": "A session infers a role from context, elevates to another role mid-session, or initiates an action reserved to a different discipline.",
+          "mitigation": "Exactly one declared role per session; ambient state is ignored for authorization and a cross-role action is refused rather than elevated.",
+          "invariants": ["INV-AUTH-002", "INV-AUTH-004"],
+          "decisions": ["ADR-GOV-0002", "ADR-SCR-0001"]
+        },
+        {
+          "id": "TH-AUTH-003",
+          "description": "A remote-write effect replays a consumed authorization, presents a revoked or expired one, substitutes a different candidate or repository, or claims authority by possession of the ledger bytes.",
+          "mitigation": "Every remote-write consumes exactly one exact, unexpired, unrevoked Owner authorization bound to action, effect, resource, repository, candidate, role, and consent; a gapped, broken, or absent ledger denies everything.",
+          "invariants": ["INV-AUTH-003"],
+          "decisions": ["ADR-AUT-0001"]
+        },
+        {
+          "id": "TH-AUTH-004",
+          "description": "A self-dogfood run is triggered by a timer, a hook, or a prior run's output and treats a passing check as publication authority.",
+          "mitigation": "Self-dogfood invocations are human-initiated, admitted only by the matrix row of the declared role and check id, forbid remote-write for every role, and grant no publication authority.",
+          "invariants": ["INV-AUTH-004", "INV-CORE-006"],
+          "decisions": ["ADR-GOV-0002"]
+        }
+      ]
+    },
+    {
+      "id": "TB-EVID-001",
+      "name": "Evidence transport",
+      "defended_by": {
+        "component": "evidence",
+        "code_areas": [
+          "packages/evidence/src/**",
+          "packages/cli/src/commands/evidence/**",
+          "packages/cli/src/commands/record/**",
+          "scripts/process/evidence_transport.py"
+        ]
+      },
+      "inside": "Records appended by executing verbs into the hash chain under record/proofs/ and .devai/state/, and the exported evidence bundles bound by content digest.",
+      "outside": "Human edits under record/, evidence rewritten or truncated in transit, credential values that would leak through diagnostics, and any observation that claims a verdict it did not make.",
+      "assets": [
+        "The proof chain and every sensor reading, run, and closure record",
+        "Exported evidence manifests and their signatures",
+        "Credential values that must never enter a file, a log, or a report"
+      ],
+      "threats": [
+        {
+          "id": "TH-EVID-001",
+          "description": "A record in the chain is edited, reordered, or removed, or a chain with a gap is resolved to its intact prefix.",
+          "mitigation": "Evidence is append-only, content-hashed, predecessor-linked, and attributed to the verb; a gap or broken digest link fails verification as a whole.",
+          "invariants": ["INV-CORE-007"],
+          "decisions": ["ADR-GOV-0012", "ADR-GOV-0013", "ADR-REL-0022"]
+        },
+        {
+          "id": "TH-EVID-002",
+          "description": "A crash, timeout, missing input, or infrastructure fault is recorded as a PASS or a FAIL, or a BLOCKED probe result is cached and reused as a defect.",
+          "mitigation": "Every failure is a closed error envelope; an extrinsic failure yields BLOCKED, is never cached as FAIL, and never manufactures a readiness claim.",
+          "invariants": ["INV-CORE-001", "INV-CORE-004"],
+          "decisions": ["ADR-CHK-0001"]
+        },
+        {
+          "id": "TH-EVID-003",
+          "description": "A credential probe, a redacted diagnostic, or a rendered evidence view emits a substring of a secret, or a token shape is committed in configuration.",
+          "mitigation": "Credential requirements are declared per effect; probes report presence without values, redaction is verified not to leak, and the repository-wide scan fails on any token shape.",
+          "invariants": ["INV-SEC-001"],
+          "decisions": ["ADR-SEC-0001", "ADR-CHK-0001"]
+        },
+        {
+          "id": "TH-EVID-004",
+          "description": "A reading is recorded without the declaring role or the human invocation, or a second copy of the readings store diverges from the one the scorecard reads.",
+          "mitigation": "One readings store feeds the scorecard at the same head; a reading without role and invocation is rejected by sense record.",
+          "invariants": ["INV-HARNESS-004", "INV-CORE-002"],
+          "decisions": ["ADR-SCR-0001", "ADR-SCR-0002"]
+        }
+      ]
+    },
+    {
+      "id": "TB-REL-001",
+      "name": "Release workflow",
+      "defended_by": {
+        "component": "release-lifecycle",
+        "code_areas": [
+          "packages/cli/src/commands/release/**",
+          "packages/loop/src/release-lifecycle/**",
+          "packages/loop/src/release/**",
+          "scripts/check-workflows.mjs"
+        ]
+      },
+      "inside": "The nine-state release lifecycle executed by the registry role for each action, bound to the canonical repository identity, an exact candidate commit and tree, a plan digest, and the toolchain manifest.",
+      "outside": "Any session, adapter, or workflow step that supplies lifecycle identity, authority, or consent from the client side, a near-match repository or candidate, an unpinned action or runtime, and a publication observed without a verified signed receipt.",
+      "assets": [
+        "The release lifecycle state head and append log",
+        "Package tarballs, manifests, SBOMs, and export closures",
+        "The published package identity and the trust identity that signs it",
+        "The pinned toolchain and the trusted verifier package"
+      ],
+      "threats": [
+        {
+          "id": "TH-REL-001",
+          "description": "A release action is invoked by a role other than the one the registry declares, or accepts client-supplied lifecycle identity, digest, actor, authority, authorization, or consent.",
+          "mitigation": "Each lifecycle action accepts only its declared initiator and its declared locator projection; the core rechecks every bound identity and hashes the only appendable record.",
+          "invariants": ["INV-SEC-002", "INV-AUTH-002"],
+          "decisions": ["ADR-REL-0001", "ADR-REL-0016", "ADR-GOV-0012"]
+        },
+        {
+          "id": "TH-REL-002",
+          "description": "A plan, request, candidate, or adapter binding names a repository or candidate that merely resembles the canonical one, or a resume observation claims published without a verified signed publication receipt.",
+          "mitigation": "Repository locator, candidate commit and tree, plan digest, and trust identity must agree exactly across request, state, store, receipt, and provider; a near match is a mismatch and an unverifiable receipt is no evidence.",
+          "invariants": ["INV-SEC-002"],
+          "decisions": ["ADR-REL-0002", "ADR-REL-0023"]
+        },
+        {
+          "id": "TH-REL-003",
+          "description": "A workflow pins a node version, action digest, or verifier commit that differs from the toolchain manifest, or a host toolchain mismatch is treated as a silent cache miss.",
+          "mitigation": "One toolchain manifest is the source of every pin; the workflow check fails by name and value and a host mismatch is a BLOCKED probe.",
+          "invariants": ["INV-HARNESS-001"],
+          "decisions": ["ADR-CHK-0002"]
+        },
+        {
+          "id": "TH-REL-004",
+          "description": "A pure read such as release plan, offline-verify, resume, or status writes state, evidence, or a receipt, or a publication is dispatched from a second grant that was never issued.",
+          "mitigation": "Pure reads leave the repository byte-identical; every publication consumes exactly one fresh Owner authorization and a consumed one is never replayed.",
+          "invariants": ["INV-SEC-002", "INV-AUTH-003"],
+          "decisions": ["ADR-REL-0002", "ADR-AUT-0001"]
+        }
+      ]
+    }
+  ],
+  "out_of_scope": [
+    "Compromise of the host operating system or of the git binary the runtime shells out to.",
+    "Compromise of the package registry or of GitHub itself; the workflow defends what it sends, not the receiving service.",
+    "Edits made directly to the repository outside the DEVAI runtime by a human with push rights; Article 6 requires the framework to report that boundary, not to control it."
+  ],
+  "decisions": ["ADR-SCR-0004"]
+}

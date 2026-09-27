@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/threat-model.schema.json",
+  "title": "Threat model",
+  "description": "Architect-authored threat model for one repository, stored at law/security/threat-model.json (ADR-SCR-0004). It names every trust boundary the harness defends, the component that defends it, the assets behind it, and the threats the boundary answers, each threat bound to the invariants that make the mitigation observable and to the decisions that established it. The spec security coverage sensor reads it as the presence signal for F1 x T6.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "status",
+    "authority",
+    "date",
+    "subject",
+    "boundaries"
+  ],
+  "$defs": {
+    "invariant_ref": {
+      "$ref": "common-defs.schema.json#/$defs/id_invariant"
+    },
+    "decision_ref": {
+      "type": "string",
+      "pattern": "^ADR-(?:[0-9]{3}|[A-Z]{3}-[0-9]{4})$",
+      "description": "Identity of an accepted decision record under law/adr/."
+    },
+    "threat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "mitigation", "invariants"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^TH-[A-Z]+-[0-9]{3}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What an adversary or a fault attempts across the boundary."
+        },
+        "mitigation": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How the defending component refuses or contains the attempt."
+        },
+        "invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/invariant_ref"
+          },
+          "description": "Invariant records under law/invariants/ that a test can observe for this mitigation."
+        },
+        "decisions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/decision_ref"
+          }
+        }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "defended_by", "inside", "outside", "assets", "threats"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^TB-[A-Z]+-[0-9]{3}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defended_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["component", "code_areas"],
+          "properties": {
+            "component": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Logical component name, matching a scope.components entry of the bound invariants."
+            },
+            "code_areas": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Repository-relative path globs of the defending code."
+            }
+          }
+        },
+        "inside": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the boundary trusts."
+        },
+        "outside": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the boundary does not trust."
+        },
+        "assets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "threats": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/threat"
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "$schema": {
+      "const": "../schemas/threat-model.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["draft", "active"]
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The repository or system the model describes."
+    },
+    "boundaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/boundary"
+      }
+    },
+    "out_of_scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Threats the model deliberately does not defend, stated so absence is explicit rather than forgotten."
+    },
+    "decisions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/decision_ref"
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "threat-model",
+      "title": "Example threat model",
+      "status": "active",
+      "authority": "Architect",
+      "date": "2026-09-27",
+      "subject": "example repository",
+      "boundaries": [
+        {
+          "id": "TB-AUTH-001",
+          "name": "Authority broker",
+          "defended_by": {
+            "component": "authority-broker",
+            "code_areas": ["packages/authority/src/**"]
+          },
+          "inside": "A declared role invoking a registered action.",
+          "outside": "Ambient environment state and undeclared callers.",
+          "assets": ["governed write paths"],
+          "threats": [
+            {
+              "id": "TH-AUTH-001",
+              "description": "A caller writes a governed path without the authorized role.",
+              "mitigation": "The broker refuses the write before mutation by path prefix.",
+              "invariants": ["INV-AUTH-001"],
+              "decisions": ["ADR-AUT-0001"]
+            }
+          ]
+        }
+      ],
+      "out_of_scope": ["Host operating system compromise."],
+      "decisions": ["ADR-SCR-0004"]
+    }
+  ]
+}

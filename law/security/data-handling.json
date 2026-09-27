@@ -1,0 +1,74 @@
+{
+  "$schema": "../schemas/data-handling.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "data-handling",
+  "title": "DEVAI framework repository data handling declaration",
+  "status": "active",
+  "authority": "Architect",
+  "date": "2026-09-27",
+  "subject": "aarusso-nyx/devai, the framework repository",
+  "personal_data": {
+    "stored": false,
+    "statement": "This repository stores no personal data: it holds no application database, no user records, and no data model with personal-data columns; every store below is source, policy, evidence, or state about the software itself.",
+    "attribution_note": "Commit metadata carries the git author identity and role declarations carry a constitutional role name; both are authorship attribution required by Article 41, not personal-data processing by the harness, and the harness never collects, classifies, or exports them as data."
+  },
+  "stores": [
+    {
+      "path": "law/",
+      "kind": "law",
+      "description": "Constitution, decision records, schemas, invariants, trace, security declarations, targets, and policy sources.",
+      "personal_data": false
+    },
+    {
+      "path": "product/",
+      "kind": "product",
+      "description": "Owner-authored journeys, use cases, and campaign plans.",
+      "personal_data": false
+    },
+    {
+      "path": "packages/",
+      "kind": "code",
+      "description": "Framework package sources and manifests.",
+      "personal_data": false
+    },
+    {
+      "path": "tests/",
+      "kind": "tests",
+      "description": "Test sources and fixtures; fixtures use synthetic identifiers only.",
+      "personal_data": false
+    },
+    {
+      "path": "docs/",
+      "kind": "docs",
+      "description": "Published human documentation.",
+      "personal_data": false
+    },
+    {
+      "path": ".devai/config/",
+      "kind": "config",
+      "description": "Materialized policy copies written only by init bind and init apply.",
+      "personal_data": false
+    },
+    {
+      "path": ".devai/state/",
+      "kind": "state",
+      "description": "Mutable head state written by executing verbs: counters, task records, bootstrap runner.",
+      "personal_data": false
+    },
+    {
+      "path": "record/",
+      "kind": "evidence",
+      "description": "Derived inventory and the append-only proof chain of readings, runs, and closures.",
+      "personal_data": false
+    },
+    {
+      "path": "scratch/",
+      "kind": "scratch",
+      "description": "Ephemeral working space never committed beyond its README.",
+      "personal_data": false
+    }
+  ],
+  "processors": [],
+  "invariants": ["INV-DATA-001", "INV-SEC-001"],
+  "decisions": ["ADR-SCR-0004", "ADR-SCR-0003"]
+}
