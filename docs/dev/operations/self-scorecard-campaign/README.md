@@ -144,6 +144,20 @@ is accepted and its policy amendment merged. The scorecard the campaign
 produces is an Auditor observation, not a readiness claim and not a
 publication authority.
 
+ADR-SCR-0001 is implemented by TASK-0211 (policy version 1.1.0). The
+self-dogfood policy now admits three sensing actions and nothing else:
+`sense run` with an aggregate effect of read is in every role's
+`may_initiate`; `sense record` and `audit observe` are harness-write actions
+in the inspector row only, and the schema rejects them with any other effect
+or initiator. A `sense run` whose population resolves to a write member, or
+that carries `--write`, is decided as harness-write and therefore admitted for
+the inspector alone, with explicit write consent; a population with a
+remote-write member is refused for every role. `--publish` on any sense
+action is refused before the matrix is consulted. A recorded reading must
+carry the declaring role and the human invocation, or `sense record` rejects
+it. The unit cases live in `packages/cli/tests/unit/self-dogfood-policy.test.ts`,
+one per inspector acceptance item of the record.
+
 ## 8. Reproducing the baseline
 
 ```text
