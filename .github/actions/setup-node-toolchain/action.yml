@@ -1,0 +1,46 @@
+name: Set up the pnpm and Node toolchain
+description: >-
+  Shared post-checkout toolchain setup used by pull-request-checks.yml,
+  release.yml, and devai-ledger-verify.yml (TASK-0254). Every external action
+  reference below is pinned by digest and validated against
+  .devai/config/toolchain.json by scripts/check-workflows.mjs, the same way
+  it validates inline workflow steps. Checkout itself stays inline in each
+  workflow: GitHub Actions can only resolve a local composite action after a
+  checkout has already populated the job's workspace, so the first checkout
+  of a job cannot itself be delegated here.
+
+inputs:
+  setup-pnpm:
+    description: Whether to run pnpm/action-setup before Node setup.
+    required: false
+    default: 'false'
+  cache:
+    description: Package manager to cache in actions/setup-node (e.g. pnpm). Empty disables caching.
+    required: false
+    default: ''
+  registry-url:
+    description: Registry URL forwarded to actions/setup-node.
+    required: false
+    default: ''
+  scope:
+    description: Package scope forwarded to actions/setup-node.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm
+      if: ${{ inputs.setup-pnpm == 'true' }}
+      uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+      with:
+        run_install: false
+
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
+        node-version: 24
+        cache: ${{ inputs.cache }}
+        registry-url: ${{ inputs.registry-url }}
+        scope: ${{ inputs.scope }}

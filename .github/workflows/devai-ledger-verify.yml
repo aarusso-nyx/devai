@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 concurrency:
   group: devai-ledger-verify-${{ github.sha }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 permissions:
   contents: read
 env:
