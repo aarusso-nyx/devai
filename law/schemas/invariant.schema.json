@@ -355,11 +355,11 @@
             "anchor": "article-7-human-roles"
           },
           {
-            "doc": "docs/meta/adr/ADR-003-runtime-authority-enforcement.md",
-            "anchor": "2-human-declarations-and-sessions"
+            "doc": "law/adr/ADR-AUT-0001-exact-effect-authorization-ledger.md",
+            "anchor": "decision"
           }
         ],
-        "decisions": ["ADR-003"]
+        "decisions": ["ADR-AUT-0001"]
       },
       "scope": {
         "components": ["authority-runtime", "authority-sessions", "machine-principals"],
