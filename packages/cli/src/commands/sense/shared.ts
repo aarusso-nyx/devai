@@ -1,7 +1,11 @@
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import Ajv2020, { type ValidateFunction } from 'ajv/dist/2020.js';
+import { loadSchema, type SchemaName } from '@devai-nyx/schemas';
 import { resolveSensorParams } from '@devai-nyx/skills';
 import type { SensorReading } from '@devai-nyx/sensors';
+import { isSensorKind } from '@devai-nyx/sensors/registry';
 import { EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 
 export const DEFAULT_REPO_ROOT = '.';
@@ -174,4 +178,261 @@ export function finishInventorySenseCommand(
     return;
   }
   finishSenseCommand(reading, opts);
+}
+
+// ---------------------------------------------------------------------------
+// ADR-SCR-0005: declared sensor inputs.
+// ---------------------------------------------------------------------------
+
+/** Adopter declaration of sensor inputs, relative to the repository root. */
+export const SENSOR_INPUTS_DECLARATION_PATH = '.devai/config/sensor-inputs.json';
+
+const SENSOR_INPUTS_SCHEMA_NAME = 'sensor-inputs.schema.json';
+
+/** Keys whose value is one repository-relative path. */
+const DECLARED_PATH_KEYS: ReadonlySet<string> = new Set([
+  'adrDir',
+  'invariantsDir',
+  'coveragePath',
+  'tsconfigPath',
+]);
+/** Keys whose value is a list of repository-relative test roots, one wildcard segment each. */
+const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set(['testGlobs']);
+
+export type SenseInputsErrorCode =
+  | 'SENSE_INPUTS_UNDECLARED_KEY'
+  | 'SENSE_INPUTS_UNKNOWN_KIND'
+  | 'SENSE_INPUTS_PATH_ESCAPES_ROOT'
+  | 'SENSE_INPUTS_INVALID'
+  | 'SENSE_INPUTS_SCHEMA_UNAVAILABLE';
+
+/** Structured refusal of a sensor inputs declaration; the code is also in the message. */
+export class SenseInputsError extends Error {
+  readonly code: SenseInputsErrorCode;
+
+  constructor(code: SenseInputsErrorCode, detail: string) {
+    super(`${code}: ${detail}`);
+    this.name = 'SenseInputsError';
+    this.code = code;
+  }
+}
+
+export type SensorInputs = Readonly<Record<string, unknown>>;
+
+interface SensorInputsSchema {
+  readonly validate: ValidateFunction;
+  /** Declared keys per kind, read from the schema's `inputs` properties. */
+  readonly keysByKind: ReadonlyMap<string, readonly string[]>;
+}
+
+interface RepositoryRoots {
+  readonly lexical: string;
+  readonly real: string;
+}
+
+let sensorInputsSchema: SensorInputsSchema | undefined;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function loadSensorInputsSchema(): SensorInputsSchema {
+  if (sensorInputsSchema !== undefined) return sensorInputsSchema;
+  let document: Record<string, unknown>;
+  try {
+    document = loadSchema(SENSOR_INPUTS_SCHEMA_NAME as string as SchemaName);
+  } catch (error) {
+    throw new SenseInputsError(
+      'SENSE_INPUTS_SCHEMA_UNAVAILABLE',
+      `cannot load the installed ${SENSOR_INPUTS_SCHEMA_NAME}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const defs = isRecord(document['$defs']) ? document['$defs'] : {};
+  const properties = isRecord(document['properties']) ? document['properties'] : {};
+  const inputs = isRecord(properties['inputs']) ? properties['inputs'] : {};
+  const kinds = isRecord(inputs['properties']) ? inputs['properties'] : {};
+  const keysByKind = new Map<string, readonly string[]>();
+  for (const [kind, contract] of Object.entries(kinds)) {
+    const ref = isRecord(contract) ? contract['$ref'] : undefined;
+    const definition =
+      typeof ref === 'string' && ref.startsWith('#/$defs/')
+        ? defs[ref.slice('#/$defs/'.length)]
+        : contract;
+    const keys =
+      isRecord(definition) && isRecord(definition['properties'])
+        ? Object.keys(definition['properties'])
+        : [];
+    keysByKind.set(kind, Object.freeze(keys));
+  }
+  const ajv = new Ajv2020({ strict: false, allErrors: true });
+  sensorInputsSchema = { validate: ajv.compile(document), keysByKind };
+  return sensorInputsSchema;
+}
+
+/** Input keys the schema lets a kind declare; empty for a kind that takes none. */
+export function declaredInputKeys(sensorKind: string): readonly string[] {
+  return loadSensorInputsSchema().keysByKind.get(sensorKind) ?? [];
+}
+
+function isInside(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
+/** Real path of `target`, resolving the nearest existing ancestor when it does not exist. */
+function nearestRealPath(target: string): string {
+  const rest: string[] = [];
+  let current = target;
+  for (;;) {
+    try {
+      return join(realpathSync(current), ...rest.reverse());
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return target;
+      rest.push(basename(current));
+      current = parent;
+    }
+  }
+}
+
+function assertInsideRoot(roots: RepositoryRoots, kind: string, key: string, value: string): void {
+  const target = isAbsolute(value) ? value : resolve(roots.lexical, value);
+  if (!isInside(roots.real, nearestRealPath(target))) {
+    throw new SenseInputsError(
+      'SENSE_INPUTS_PATH_ESCAPES_ROOT',
+      `${kind}.${key} '${value}' resolves outside the repository root`,
+    );
+  }
+}
+
+function assertGlobInsideRoot(
+  roots: RepositoryRoots,
+  kind: string,
+  key: string,
+  glob: string,
+): void {
+  const parts = glob.split('/');
+  const wildcard = parts.findIndex((part) => part.includes('*'));
+  if (wildcard < 0) {
+    assertInsideRoot(roots, kind, key, glob);
+    return;
+  }
+  const before = parts.slice(0, wildcard).join('/');
+  const after = parts.slice(wildcard + 1).join('/');
+  assertInsideRoot(roots, kind, key, before === '' ? '.' : before);
+  let entries: string[];
+  try {
+    entries = readdirSync(isAbsolute(before) ? before : resolve(roots.lexical, before));
+  } catch {
+    return;
+  }
+  // Each expansion is compared on real paths, so a symlinked entry cannot lead out.
+  for (const entry of entries) {
+    const expanded = [before, entry, after].filter((segment) => segment !== '').join('/');
+    assertInsideRoot(roots, kind, key, expanded);
+  }
+}
+
+function assertDeclaredKeys(schema: SensorInputsSchema, inputs: Record<string, unknown>): void {
+  for (const [kind, entry] of Object.entries(inputs)) {
+    if (!isSensorKind(kind)) {
+      throw new SenseInputsError(
+        'SENSE_INPUTS_UNKNOWN_KIND',
+        `'${kind}' is not a registered sensor kind`,
+      );
+    }
+    const accepted = schema.keysByKind.get(kind);
+    if (accepted === undefined) {
+      throw new SenseInputsError(
+        'SENSE_INPUTS_UNDECLARED_KEY',
+        `sensor kind '${kind}' takes no declared input`,
+      );
+    }
+    if (!isRecord(entry)) continue;
+    for (const key of Object.keys(entry)) {
+      if (!accepted.includes(key)) {
+        throw new SenseInputsError(
+          'SENSE_INPUTS_UNDECLARED_KEY',
+          `'${key}' is not a declared input of sensor kind '${kind}'`,
+        );
+      }
+    }
+  }
+}
+
+function assertPathsInsideRoot(repoRoot: string, inputs: Record<string, unknown>): void {
+  const lexical = resolve(repoRoot);
+  const roots: RepositoryRoots = { lexical, real: nearestRealPath(lexical) };
+  for (const [kind, entry] of Object.entries(inputs)) {
+    if (!isRecord(entry)) continue;
+    for (const [key, value] of Object.entries(entry)) {
+      if (DECLARED_PATH_KEYS.has(key) && typeof value === 'string') {
+        assertInsideRoot(roots, kind, key, value);
+      } else if (DECLARED_GLOB_KEYS.has(key) && Array.isArray(value)) {
+        for (const glob of value) {
+          if (typeof glob === 'string') assertGlobInsideRoot(roots, kind, key, glob);
+        }
+      }
+    }
+  }
+}
+
+function validateDeclaration(
+  repoRoot: string,
+  declaration: unknown,
+): Readonly<Record<string, SensorInputs>> {
+  const schema = loadSensorInputsSchema();
+  const inputs = isRecord(declaration) ? declaration['inputs'] : undefined;
+  if (isRecord(inputs)) {
+    // Specific refusals first, so the code names the defect; the schema pass then
+    // covers every remaining shape rule of the whole file.
+    assertDeclaredKeys(schema, inputs);
+    assertPathsInsideRoot(repoRoot, inputs);
+  }
+  if (!schema.validate(declaration)) {
+    const [first] = schema.validate.errors ?? [];
+    throw new SenseInputsError(
+      'SENSE_INPUTS_INVALID',
+      `${SENSOR_INPUTS_DECLARATION_PATH} does not match ${SENSOR_INPUTS_SCHEMA_NAME}` +
+        (first === undefined ? '' : ` at '${first.instancePath || '/'}': ${first.message ?? ''}`),
+    );
+  }
+  return (declaration as { readonly inputs: Readonly<Record<string, SensorInputs>> }).inputs;
+}
+
+/**
+ * Resolve the effective inputs of one sensor kind (ADR-SCR-0005).
+ *
+ * Reads `.devai/config/sensor-inputs.json` when present, validates the whole
+ * declaration against the installed schema and the sensor registry, refuses a
+ * declared path that leaves the repository root on real paths, and merges
+ * `explicit` over the declared entry key by key (a declared list is replaced,
+ * never concatenated). The explicit input is operator-supplied for one run: it
+ * is not path-checked here and never written back. Without a declaration the
+ * result is `explicit` alone, so sensor defaults stay in force.
+ */
+export function resolveDeclaredSensorInputs(args: {
+  readonly repoRoot: string;
+  readonly sensorKind: string;
+  readonly explicit?: SensorInputs;
+}): SensorInputs {
+  if (!isSensorKind(args.sensorKind)) {
+    throw new SenseInputsError(
+      'SENSE_INPUTS_UNKNOWN_KIND',
+      `'${args.sensorKind}' is not a registered sensor kind`,
+    );
+  }
+  const path = join(args.repoRoot, SENSOR_INPUTS_DECLARATION_PATH);
+  if (!existsSync(path)) return Object.freeze({ ...(args.explicit ?? {}) });
+  let declaration: unknown;
+  try {
+    declaration = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new SenseInputsError(
+      'SENSE_INPUTS_INVALID',
+      `${SENSOR_INPUTS_DECLARATION_PATH} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const declared = validateDeclaration(args.repoRoot, declaration)[args.sensorKind] ?? {};
+  return Object.freeze({ ...declared, ...(args.explicit ?? {}) });
 }

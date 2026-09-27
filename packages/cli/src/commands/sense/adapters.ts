@@ -99,6 +99,24 @@ function stringInput(
   return value;
 }
 
+function stringArrayInput(request: SenseAdapterRequest, name: string): string[] | undefined {
+  const value = request.inputs?.[name];
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.some((item) => typeof item !== 'string' || item.length === 0)
+  ) {
+    throw new Error(`SENSE_INPUT_INVALID:${name}`);
+  }
+  return [...(value as string[])];
+}
+
+/** Spread helper: `{ [name]: value }` when the input is present, `{}` otherwise. */
+function optional<K extends string, V>(name: K, value: V | undefined): { [P in K]?: V } {
+  return (value === undefined ? {} : { [name]: value }) as { [P in K]?: V };
+}
+
 function booleanInput(request: SenseAdapterRequest, name: string): boolean | undefined {
   const value = request.inputs?.[name];
   if (value === undefined) return undefined;
@@ -266,7 +284,11 @@ async function runtimeProbe(
 }
 
 const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze({
-  type_check: (request) => senseTypeCheck({ cwd: request.repoRoot }).aggregate,
+  type_check: (request) =>
+    senseTypeCheck({
+      cwd: request.repoRoot,
+      ...optional('argv', stringArrayInput(request, 'argv')),
+    }).aggregate,
   lint: (request) => senseLint({ cwd: request.repoRoot }),
   build: (request) => senseBuild({ cwd: request.repoRoot }),
   unit_test: (request) => senseTest({ cwd: request.repoRoot, suite: 'unit' }),
@@ -285,7 +307,11 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   test_weakening_review: (request) => senseTestWeakening({ cwd: request.repoRoot }),
   trace_resolution: (request) => senseTraceResolve({ repoRoot: request.repoRoot }),
   security_scan: (request) => senseSecurityScan({ repoRoot: request.repoRoot }),
-  perf_test: (request) => sensePerfTest({ repoRoot: request.repoRoot }),
+  perf_test: (request) =>
+    sensePerfTest({
+      repoRoot: request.repoRoot,
+      ...optional('scriptName', stringInput(request, 'scriptName')),
+    }),
   llm_judge: (request) => {
     const provider = stringInput(request, 'family') ?? process.env.DEVAI_LLM_BACKEND;
     const model = stringInput(request, 'model') ?? process.env.DEVAI_LLM_MODEL;
@@ -322,7 +348,12 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
     senseInventoryDepGraph({ repoRoot: request.repoRoot, persistBody: false }).reading,
   inventory_coverage: (request) =>
     senseInventoryCoverage({ repoRoot: request.repoRoot, persistBody: false }).reading,
-  spec_depth: (request) => senseSpecDepth({ repoRoot: request.repoRoot }).reading,
+  spec_depth: (request) =>
+    senseSpecDepth({
+      repoRoot: request.repoRoot,
+      ...optional('adrDir', stringInput(request, 'adrDir')),
+      ...optional('invariantsDir', stringInput(request, 'invariantsDir')),
+    }).reading,
   spec_idiomaticity: specIdiomaticity,
   spec_freshness: (request) => senseSpecFreshness({ repoRoot: request.repoRoot }).reading,
   plant_coverage: (request) => sensePlantCoverage({ repoRoot: request.repoRoot }),
@@ -357,12 +388,26 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   plant_depth: (request) => sensePlantDepth({ repoRoot: request.repoRoot }),
   plant_coherence: (request) => sensePlantCoherence({ repoRoot: request.repoRoot }),
   test_coherence: (request) => senseTestCoherence({ repoRoot: request.repoRoot }),
-  test_idiomaticity: (request) => senseTestIdiomaticity({ repoRoot: request.repoRoot }),
-  test_security_coverage: (request) => senseTestSecurityCoverage({ repoRoot: request.repoRoot }),
+  test_idiomaticity: (request) =>
+    senseTestIdiomaticity({
+      repoRoot: request.repoRoot,
+      ...optional('testGlobs', stringArrayInput(request, 'testGlobs')),
+    }),
+  test_security_coverage: (request) =>
+    senseTestSecurityCoverage({
+      repoRoot: request.repoRoot,
+      ...optional('testGlobs', stringArrayInput(request, 'testGlobs')),
+    }),
   test_performance_coverage: (request) =>
-    senseTestPerformanceCoverage({ repoRoot: request.repoRoot }),
+    senseTestPerformanceCoverage({
+      repoRoot: request.repoRoot,
+      ...optional('testGlobs', stringArrayInput(request, 'testGlobs')),
+    }),
   test_robustness_coverage: (request) =>
-    senseTestRobustnessCoverage({ repoRoot: request.repoRoot }),
+    senseTestRobustnessCoverage({
+      repoRoot: request.repoRoot,
+      ...optional('testGlobs', stringArrayInput(request, 'testGlobs')),
+    }),
   harness_coverage: (request) => senseHarnessCoverage({ repoRoot: request.repoRoot }),
   harness_depth: (request) => senseHarnessDepth({ repoRoot: request.repoRoot }),
   harness_coherence: (request) => senseHarnessCoherence({ repoRoot: request.repoRoot }),
