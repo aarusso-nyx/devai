@@ -28,6 +28,14 @@ const DEFAULT_CREDENTIAL_MANIFEST_PATH = fileURLToPath(
 );
 const GIT_OBJECT_ID = /^[0-9a-f]{40}$/u;
 const EXACT_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+$/u;
+// TASK-0254: the one recognized local composite action. It wraps only
+// post-checkout pnpm/Node setup (never the first checkout of a job — GitHub
+// Actions cannot resolve a local action before the repository containing it
+// has been checked out), and its own action.yml is pin-validated the same
+// way inline workflow steps are, by checkCompositeActionPins below. Any
+// other local ("./...") action reference stays forbidden.
+const SHARED_SETUP_ACTION = './.github/actions/setup-node-toolchain';
+const COMPOSITE_ACTIONS_RELATIVE_DIR = '.github/actions';
 
 /**
  * Reads and structurally validates a toolchain manifest. Only the fields the
@@ -248,73 +256,80 @@ function workflowSteps(workflow) {
  * ADR-CHK-0002: every action reference, node version, and restated repository
  * constant in every workflow must agree with the toolchain manifest. Each
  * divergence names the file, the manifest key, the observed value, and the
- * required value.
+ * required value. Shared by workflow files (via checkToolchainPins) and by
+ * the composite action file under .github/actions/ (via
+ * checkCompositeActionPins), so a pin drift is caught identically wherever
+ * the step now lives (TASK-0254).
  */
-function checkToolchainPins(file, workflow, pins, findings) {
+function validateActionStepPins(file, location, step, pins, findings) {
   const { manifest } = pins;
   const actions = object(manifest.actions);
   const nodeVersion = manifest.runtimes.node;
   const nodeMajor = nodeVersion.split('.')[0];
-  for (const { location, step } of workflowSteps(workflow)) {
-    const uses = typeof step.uses === 'string' ? step.uses : '';
-    const match = /^([^@/]+\/[^@/]+)(?:\/[^@]*)?@(.+)$/u.exec(uses);
-    if (match !== null) {
-      const [, key, observed] = match;
-      const pin = object(actions[key]);
-      if (typeof pin.digest !== 'string') {
-        findings.push(
-          finding(
-            'CI_TOOLCHAIN_ACTION_UNDECLARED',
-            file,
-            `${location} uses ${key}@${observed}; manifest actions.${key} is not declared`,
-          ),
-        );
-      } else if (observed !== pin.digest && observed !== pin.peeled_commit) {
-        findings.push(
-          finding(
-            'CI_TOOLCHAIN_ACTION_DIVERGENT',
-            file,
-            `${location} manifest actions.${key}: observed ${observed}, required ${pin.digest}`,
-          ),
-        );
-      }
-    }
-    const declaredNode = object(step.with)['node-version'];
-    if (declaredNode !== undefined) {
-      const observed = String(declaredNode).trim();
-      const exact = EXACT_VERSION.test(observed);
-      const observedMajor = /^v?([0-9]+)/u.exec(observed)?.[1];
-      if (exact ? observed !== nodeVersion : observedMajor !== nodeMajor) {
-        findings.push(
-          finding(
-            'CI_TOOLCHAIN_NODE_DIVERGENT',
-            file,
-            exact
-              ? `${location} manifest runtimes.node: observed node ${observed}, required node ${nodeVersion}`
-              : `${location} manifest runtimes.node: observed node major ${observedMajor ?? observed}, required node major ${nodeMajor}`,
-          ),
-        );
-      }
-    }
-    const run = typeof step.run === 'string' ? step.run : '';
-    const verifierVersion = /echo "version=([0-9]+\.[0-9]+\.[0-9]+)"/u.exec(run)?.[1];
-    // The preflight lane materializes the in-repository vendored verifier, not
-    // the trusted package, so only the ledger and release lanes restate
-    // manifest verifier.version.
-    if (
-      file !== PREFLIGHT_WORKFLOW_FILE &&
-      step.id === 'verifier-package' &&
-      verifierVersion !== undefined &&
-      verifierVersion !== manifest.verifier.version
-    ) {
+  const uses = typeof step.uses === 'string' ? step.uses : '';
+  const match = /^([^@/]+\/[^@/]+)(?:\/[^@]*)?@(.+)$/u.exec(uses);
+  if (match !== null) {
+    const [, key, observed] = match;
+    const pin = object(actions[key]);
+    if (typeof pin.digest !== 'string') {
       findings.push(
         finding(
-          'CI_TOOLCHAIN_VERIFIER_DIVERGENT',
+          'CI_TOOLCHAIN_ACTION_UNDECLARED',
           file,
-          `${location} manifest verifier.version: observed ${verifierVersion}, required ${String(manifest.verifier.version)}`,
+          `${location} uses ${key}@${observed}; manifest actions.${key} is not declared`,
+        ),
+      );
+    } else if (observed !== pin.digest && observed !== pin.peeled_commit) {
+      findings.push(
+        finding(
+          'CI_TOOLCHAIN_ACTION_DIVERGENT',
+          file,
+          `${location} manifest actions.${key}: observed ${observed}, required ${pin.digest}`,
         ),
       );
     }
+  }
+  const declaredNode = object(step.with)['node-version'];
+  if (declaredNode !== undefined) {
+    const observed = String(declaredNode).trim();
+    const exact = EXACT_VERSION.test(observed);
+    const observedMajor = /^v?([0-9]+)/u.exec(observed)?.[1];
+    if (exact ? observed !== nodeVersion : observedMajor !== nodeMajor) {
+      findings.push(
+        finding(
+          'CI_TOOLCHAIN_NODE_DIVERGENT',
+          file,
+          exact
+            ? `${location} manifest runtimes.node: observed node ${observed}, required node ${nodeVersion}`
+            : `${location} manifest runtimes.node: observed node major ${observedMajor ?? observed}, required node major ${nodeMajor}`,
+        ),
+      );
+    }
+  }
+  const run = typeof step.run === 'string' ? step.run : '';
+  const verifierVersion = /echo "version=([0-9]+\.[0-9]+\.[0-9]+)"/u.exec(run)?.[1];
+  // The preflight lane materializes the in-repository vendored verifier, not
+  // the trusted package, so only the ledger and release lanes restate
+  // manifest verifier.version.
+  if (
+    file !== PREFLIGHT_WORKFLOW_FILE &&
+    step.id === 'verifier-package' &&
+    verifierVersion !== undefined &&
+    verifierVersion !== manifest.verifier.version
+  ) {
+    findings.push(
+      finding(
+        'CI_TOOLCHAIN_VERIFIER_DIVERGENT',
+        file,
+        `${location} manifest verifier.version: observed ${verifierVersion}, required ${String(manifest.verifier.version)}`,
+      ),
+    );
+  }
+}
+
+function checkToolchainPins(file, workflow, pins, findings) {
+  for (const { location, step } of workflowSteps(workflow)) {
+    validateActionStepPins(file, location, step, pins, findings);
   }
   const environment = object(workflow.env);
   if (
@@ -329,6 +344,65 @@ function checkToolchainPins(file, workflow, pins, findings) {
         `env.EXPECTED_ACTION_COUNT manifest constants.expected_action_count: observed ${String(environment.EXPECTED_ACTION_COUNT)}, required ${String(pins.expectedActionCount)}`,
       ),
     );
+  }
+}
+
+/**
+ * TASK-0254: validates every composite action under .github/actions/ the same
+ * way checkToolchainPins validates inline workflow steps, and forbids a
+ * composite from referencing further local ("./...") actions (no recursive
+ * indirection around the pin check).
+ */
+function checkCompositeActionPins(root, pins, findings) {
+  const directory = join(root, COMPOSITE_ACTIONS_RELATIVE_DIR);
+  if (!existsSync(directory)) return;
+  const names = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  for (const name of names) {
+    const relDir = `${COMPOSITE_ACTIONS_RELATIVE_DIR}/${name}`;
+    const ymlPath = join(root, relDir, 'action.yml');
+    const yamlPath = join(root, relDir, 'action.yaml');
+    const actualPath = existsSync(ymlPath) ? ymlPath : existsSync(yamlPath) ? yamlPath : null;
+    if (actualPath === null) {
+      findings.push(
+        finding('CI_COMPOSITE_ACTION_MISSING', relDir, 'action.yml or action.yaml not found'),
+      );
+      continue;
+    }
+    const file = `${relDir}/${actualPath === ymlPath ? 'action.yml' : 'action.yaml'}`;
+    const source = readFileSync(actualPath, 'utf8');
+    const document = parseDocument(source, { uniqueKeys: true });
+    if (document.errors.length > 0) {
+      for (const error of document.errors) {
+        findings.push(finding('CI_WORKFLOW_YAML_INVALID', file, error.message));
+      }
+      continue;
+    }
+    const action = object(document.toJS());
+    if (object(action.runs).using !== 'composite') {
+      findings.push(finding('CI_COMPOSITE_ACTION_INVALID', file, 'runs.using must be composite'));
+      continue;
+    }
+    const steps = Array.isArray(object(action.runs).steps) ? object(action.runs).steps : [];
+    steps.forEach((rawStep, index) => {
+      const step = object(rawStep);
+      const location = `runs.steps[${String(index)}]`;
+      validateActionStepPins(file, location, step, pins, findings);
+      const uses = typeof step.uses === 'string' ? step.uses : '';
+      if (uses.startsWith('./')) {
+        findings.push(
+          finding(
+            'CI_COMPOSITE_ACTION_LOCAL_USE_FORBIDDEN',
+            file,
+            `${location} uses ${uses}; a composite action must not reference another local action`,
+          ),
+        );
+      } else if (uses !== '' && !/@[0-9a-f]{40}$/u.test(uses)) {
+        findings.push(finding('CI_ACTION_REFERENCE_MUTABLE', file, `${location} uses ${uses}`));
+      }
+    });
   }
 }
 
@@ -357,6 +431,7 @@ export function checkWorkflowTree(root = process.cwd()) {
     checkWorkflow(file, source, findings, pins);
   }
   checkCredentialBijection(root, sources, findings);
+  checkCompositeActionPins(root, pins, findings);
   return { ok: findings.length === 0, files, findings };
 }
 
@@ -575,7 +650,9 @@ function checkWorkflow(file, source, findings, pins) {
   for (const [index, step] of steps.entries()) {
     const location = `jobs.verify-ledger.steps[${String(index)}]`;
     const uses = typeof step.uses === 'string' ? step.uses : '';
-    if (uses.startsWith('./')) {
+    if (uses === SHARED_SETUP_ACTION) {
+      // Recognized, pin-validated by checkCompositeActionPins; never candidate code.
+    } else if (uses.startsWith('./')) {
       findings.push(
         finding('CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN', file, `${location} uses ${uses}`),
       );
@@ -583,8 +660,9 @@ function checkWorkflow(file, source, findings, pins) {
       findings.push(finding('CI_ACTION_REFERENCE_MUTABLE', file, `${location} uses ${uses}`));
     }
     if (
-      (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${pins.checkout}`) ||
-      (uses.startsWith('actions/setup-node@') && uses !== `actions/setup-node@${pins.setupNode}`)
+      uses !== SHARED_SETUP_ACTION &&
+      ((uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${pins.checkout}`) ||
+        (uses.startsWith('actions/setup-node@') && uses !== `actions/setup-node@${pins.setupNode}`))
     ) {
       findings.push(finding('CI_ACTION_PIN_MISMATCH', file, `${location} uses ${uses}`));
     }
@@ -916,7 +994,9 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     for (const [index, step] of steps.entries()) {
       const location = `jobs.${name}.steps[${String(index)}]`;
       const uses = typeof step.uses === 'string' ? step.uses : '';
-      if (uses.startsWith('./')) {
+      if (uses === SHARED_SETUP_ACTION) {
+        // Recognized, pin-validated by checkCompositeActionPins.
+      } else if (uses.startsWith('./')) {
         findings.push(
           finding('CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN', file, `${location} uses ${uses}`),
         );
@@ -924,12 +1004,13 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         findings.push(finding('CI_ACTION_REFERENCE_MUTABLE', file, `${location} uses ${uses}`));
       }
       if (
-        (uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${pins.checkout}`) ||
-        (uses.startsWith('actions/setup-node@') &&
-          uses !== `actions/setup-node@${pins.setupNode}`) ||
-        (uses.startsWith('pnpm/action-setup@') &&
-          uses !== `pnpm/action-setup@${pins.pnpmTagObject}` &&
-          uses !== `pnpm/action-setup@${pins.pnpmPeeledCommit}`)
+        uses !== SHARED_SETUP_ACTION &&
+        ((uses.startsWith('actions/checkout@') && uses !== `actions/checkout@${pins.checkout}`) ||
+          (uses.startsWith('actions/setup-node@') &&
+            uses !== `actions/setup-node@${pins.setupNode}`) ||
+          (uses.startsWith('pnpm/action-setup@') &&
+            uses !== `pnpm/action-setup@${pins.pnpmTagObject}` &&
+            uses !== `pnpm/action-setup@${pins.pnpmPeeledCommit}`))
       ) {
         findings.push(finding('CI_ACTION_PIN_MISMATCH', file, `${location} uses ${uses}`));
       }
@@ -1232,7 +1313,7 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
   );
   for (const { jobName, index, step } of steps) {
     const uses = typeof step.uses === 'string' ? step.uses : '';
-    if (uses === '') continue;
+    if (uses === '' || uses === SHARED_SETUP_ACTION) continue;
     const match = /^([^@]+)@(.+)$/u.exec(uses);
     const expected = match === null ? undefined : immutablePins.get(match[1]);
     if (match === null || !/^[0-9a-f]{40}$/u.test(match[2])) {
@@ -1336,12 +1417,20 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
       ),
     );
   }
-  const pnpmStep = steps.find(({ step }) =>
-    typeof step.uses === 'string' ? step.uses.startsWith('pnpm/action-setup@') : false,
-  );
+  const pnpmStep = steps.find(({ step }) => {
+    if (typeof step.uses !== 'string') return false;
+    if (step.uses.startsWith('pnpm/action-setup@')) return true;
+    // TASK-0254: pnpm setup may instead be delegated to the shared composite,
+    // which runs pnpm/action-setup internally when setup-pnpm is enabled;
+    // checkCompositeActionPins validates that internal step's own pin.
+    return step.uses === SHARED_SETUP_ACTION && object(step.with)['setup-pnpm'] === 'true';
+  });
   if (pnpmStep === undefined) {
     findings.push(finding('RELEASE_PNPM_SETUP_MISSING', file, pins.pnpmTagObject));
-  } else if (object(pnpmStep.step.with).version !== undefined) {
+  } else if (
+    pnpmStep.step.uses.startsWith('pnpm/action-setup@') &&
+    object(pnpmStep.step.with).version !== undefined
+  ) {
     findings.push(
       finding(
         'RELEASE_PNPM_VERSION_CONFLICT',
