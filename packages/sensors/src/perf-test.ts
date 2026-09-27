@@ -11,14 +11,16 @@ import {
 /**
  * Inventory sensor: perf-test (F2 × T7). Phase 30.H (closes S-2).
  *
- * Wraps an adopter-declared perf-suite script invoked via
- * `pnpm <script_name>` (default `test:perf`). When the script does
- * not exist in the adopter's package.json, the sensor emits
+ * Runs an adopter-declared perf-suite `argv` exactly, without a shell
+ * (ADR-SCR-0005). When no argv is declared it falls back to the legacy
+ * `scriptName` key, invoked as `pnpm <script_name>` (default
+ * `test:perf`). On that legacy path, when the script does not exist in
+ * the adopter's package.json, the sensor emits
  * `status: unknown + reason: no-perf-script` (per D-85 and the
  * standard graceful-degradation contract INV-DEVAI-012) — UNKNOWN
  * rather than FAIL, since the cell genuinely cannot be measured.
  *
- * The perf script is expected to emit a JSON line on stdout matching
+ * The perf command may emit to emit a JSON line on stdout matching
  * `{p50_ms, p95_ms, throughput_rps}` (subset acceptable). The sensor
  * grades each metric against pack-configurable thresholds and
  * downgrades to REVIEW when the script exits 0 but any metric is
@@ -36,6 +38,9 @@ export interface PerfTestThresholds {
 
 export interface PerfTestOptions {
   readonly repoRoot: string;
+  /** Declared perf-suite command, executable first; takes precedence over scriptName. */
+  readonly argv?: readonly string[];
+  /** Legacy: root package script run as `pnpm <scriptName>` when no argv is declared. */
   readonly scriptName?: string;
   readonly thresholds?: PerfTestThresholds;
   readonly timeoutMs?: number;
@@ -87,16 +92,21 @@ function parseMetrics(stdout: string): ParsedMetrics {
   return {};
 }
 
-export function sensePerfTest(opts: PerfTestOptions): SensorReading {
-  const scriptName = opts.scriptName ?? 'test:perf';
-  const command = ['pnpm', scriptName];
+/**
+ * Legacy scriptName path: an unreadable package.json or a missing script
+ * reads as UNKNOWN. Returns undefined when the script exists and should run.
+ */
+function legacyScriptReading(
+  opts: PerfTestOptions,
+  scriptName: string,
+  command: readonly string[],
+): SensorReading | undefined {
   const scripts = readScripts(opts.repoRoot);
-
   if (scripts === null) {
     return buildSensorReading({
       sensorName: 'perf-test',
       sensorKind: 'perf_test',
-      command,
+      command: [...command],
       status: 'unknown',
       deterministic: false,
       tier: 'L1',
@@ -111,12 +121,11 @@ export function sensePerfTest(opts: PerfTestOptions): SensorReading {
       metrics: { script_name: scriptName },
     });
   }
-
   if (scripts[scriptName] === undefined) {
     return buildSensorReading({
       sensorName: 'perf-test',
       sensorKind: 'perf_test',
-      command,
+      command: [...command],
       status: 'unknown',
       deterministic: false,
       tier: 'L1',
@@ -130,6 +139,20 @@ export function sensePerfTest(opts: PerfTestOptions): SensorReading {
       ],
       metrics: { script_name: scriptName, script_present: false },
     });
+  }
+  return undefined;
+}
+
+export function sensePerfTest(opts: PerfTestOptions): SensorReading {
+  const declaredArgv = opts.argv !== undefined && opts.argv.length > 0 ? [...opts.argv] : undefined;
+  const scriptName = declaredArgv === undefined ? (opts.scriptName ?? 'test:perf') : undefined;
+  const command = declaredArgv ?? ['pnpm', scriptName ?? 'test:perf'];
+  const label = scriptName ?? command.join(' ');
+  const identity: Record<string, string> =
+    scriptName === undefined ? { argv: label } : { script_name: scriptName };
+  if (scriptName !== undefined) {
+    const legacy = legacyScriptReading(opts, scriptName, command);
+    if (legacy !== undefined) return legacy;
   }
 
   const r = runCommand(command, { cwd: opts.repoRoot, timeoutMs: opts.timeoutMs ?? 600_000 });
@@ -153,10 +176,10 @@ export function sensePerfTest(opts: PerfTestOptions): SensorReading {
         {
           severity: 'error',
           code: 'PERF_TEST_SCRIPT_FAILED',
-          message: `${scriptName} exited ${String(r.exit_code)}: ${r.stderr.split('\n')[0] ?? ''}`,
+          message: `${label} exited ${String(r.exit_code)}: ${r.stderr.split('\n')[0] ?? ''}`,
         },
       ],
-      metrics: { script_name: scriptName, exit_code: r.exit_code, duration_ms: r.duration_ms },
+      metrics: { ...identity, exit_code: r.exit_code, duration_ms: r.duration_ms },
     });
   }
 
@@ -230,12 +253,12 @@ export function sensePerfTest(opts: PerfTestOptions): SensorReading {
     findings.push({
       severity: 'info',
       code: 'PERF_TEST_NO_METRICS_PARSED',
-      message: `${scriptName} exited 0 but emitted no parseable JSON metrics line.`,
+      message: `${label} exited 0 but emitted no parseable JSON metrics line.`,
     });
   }
 
   const outMetrics: Record<string, number | string | boolean> = {
-    script_name: scriptName,
+    ...identity,
     exit_code: r.exit_code,
     duration_ms: r.duration_ms,
   };
