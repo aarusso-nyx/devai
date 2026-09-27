@@ -24,12 +24,14 @@
     }
   },
   "scripts": {
-    "devai:prepare": "node scripts/check-mutation-free-delivery.mjs && node scripts/check-policy-materialization.mjs && node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-error-code-reference.mjs --check && node scripts/generate-action-registry.mjs",
+    "devai:prepare": "node scripts/check-mutation-free-delivery.mjs && node scripts/check-policy-materialization.mjs && node scripts/check-test-task-workspace-selectors.mjs && node scripts/generate-error-code-reference.mjs --check && node scripts/generate-scorecard-page.mjs --check && node scripts/generate-action-registry.mjs",
     "test-task-selectors:check": "node scripts/check-test-task-workspace-selectors.mjs --check",
     "action-registry:check": "node scripts/generate-action-registry.mjs --check",
     "campaign:check": "node scripts/check-campaign.mjs",
     "error-codes:generate": "node scripts/generate-error-code-reference.mjs",
     "error-codes:check": "node scripts/generate-error-code-reference.mjs --check",
+    "scorecard-page:generate": "node scripts/generate-scorecard-page.mjs",
+    "scorecard-page:check": "node scripts/generate-scorecard-page.mjs --check",
     "release:closure": "node scripts/check-publishable-closure.mjs",
     "release:static-integrity": "node scripts/check-release-static-integrity.mjs",
     "release:pr-gate": "node scripts/run-pr-release-gate.mjs",
