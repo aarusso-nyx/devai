@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/self-dogfood-policy.schema.json",
   "title": "Constrained self-dogfood policy",
-  "description": "Contract for DEVAI running its own governed checks against the DEVAI source repository. Self-consumption is verification configuration only: every run is human-invoked, no run performs autonomous work, no run widens a role, and no run carries publication authority. The role and effect matrix states, per role, exactly which effects a self-dogfood run may initiate; remote-write is forbidden for every role without exception. The check roster and the role rows are frozen by position and by exact value, so a duplicated, reordered, or substituted identifier, effect, or role fails rather than resolving to the entry it resembles.",
+  "description": "Contract for DEVAI running its own governed checks against the DEVAI source repository. Self-consumption is verification configuration only: every run is human-invoked, no run performs autonomous work, no run widens a role, and no run carries publication authority. The role and effect matrix states, per role, exactly which effects a self-dogfood run may initiate; remote-write is forbidden for every role without exception. The check roster and the role rows are frozen by position and by exact value, so a duplicated, reordered, or substituted identifier, effect, or role fails rather than resolving to the entry it resembles. ADR-SCR-0001 admits three sensing actions by addition: sense run with a read effect for every role, and sense record and audit observe with a harness-write effect for the inspector only. The harness-write sensing actions are structurally limited to rows that permit harness-write, and no sensing action carries a remote effect.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -146,11 +146,11 @@
     },
     "permitted_checks": {
       "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
+      "minItems": 12,
+      "maxItems": 12,
       "uniqueItems": true,
       "items": false,
-      "description": "The exact check identifiers a self-dogfood run may execute, in exactly this order, each with exactly the effect and initiator roles frozen here. Anything absent is not permitted by default, and a duplicated, reordered, or substituted identifier fails rather than resolving to the entry it resembles.",
+      "description": "The exact check and sensing identifiers a self-dogfood run may execute, in exactly this order, each with exactly the effect and initiator roles frozen here. Check identifiers name repository scripts; the three sensing identifiers (audit observe, sense record, sense run) name registered actions and are keyed by their action id. Anything absent is not permitted by default, and a duplicated, reordered, or substituted identifier fails rather than resolving to the entry it resembles.",
       "prefixItems": [
         {
           "$ref": "#/$defs/permitted_check",
@@ -163,6 +163,20 @@
             },
             "initiator_roles": {
               "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "audit observe"
+            },
+            "effect": {
+              "const": "harness-write"
+            },
+            "initiator_roles": {
+              "const": ["inspector"]
             }
           }
         },
@@ -227,6 +241,34 @@
           "properties": {
             "check_id": {
               "const": "release:static-integrity"
+            },
+            "effect": {
+              "const": "read"
+            },
+            "initiator_roles": {
+              "const": ["owner", "architect", "inspector", "engineer", "auditor"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "sense record"
+            },
+            "effect": {
+              "const": "harness-write"
+            },
+            "initiator_roles": {
+              "const": ["inspector"]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/permitted_check",
+          "properties": {
+            "check_id": {
+              "const": "sense run"
             },
             "effect": {
               "const": "read"
@@ -311,7 +353,8 @@
                 "release plan",
                 "release resume",
                 "release status",
-                "round status"
+                "round status",
+                "sense run"
               ]
             }
           }
@@ -340,7 +383,8 @@
                 "release plan",
                 "release resume",
                 "release status",
-                "round status"
+                "round status",
+                "sense run"
               ]
             }
           }
@@ -359,6 +403,7 @@
             },
             "may_initiate": {
               "const": [
+                "audit observe",
                 "audit scorecard",
                 "catalog actions",
                 "check",
@@ -370,7 +415,9 @@
                 "release plan",
                 "release resume",
                 "release status",
-                "round status"
+                "round status",
+                "sense record",
+                "sense run"
               ]
             }
           }
@@ -399,7 +446,8 @@
                 "release plan",
                 "release resume",
                 "release status",
-                "round status"
+                "round status",
+                "sense run"
               ]
             }
           }
@@ -427,7 +475,8 @@
                 "release plan",
                 "release resume",
                 "release status",
-                "round status"
+                "round status",
+                "sense run"
               ]
             }
           }
@@ -456,7 +505,8 @@
       "properties": {
         "check_id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]*(:[a-z0-9][a-z0-9-]*)*$"
+          "pattern": "^[a-z][a-z0-9-]*([: ][a-z0-9][a-z0-9-]*)*$",
+          "description": "A repository script identifier (segments joined by ':') or a registered action identifier (words joined by a single space)."
         },
         "effect": {
           "enum": ["read", "harness-write", "local-write"],
@@ -470,7 +520,48 @@
             "$ref": "#/$defs/role"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "check_id": {
+                "enum": ["sense record", "audit observe"]
+              }
+            },
+            "required": ["check_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "harness-write"
+              },
+              "initiator_roles": {
+                "const": ["inspector"]
+              }
+            },
+            "description": "sense record and audit observe are harness-write actions admitted for the inspector only. Any other effect or initiator set is rejected by the contract itself."
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "check_id": {
+                "const": "sense run"
+              }
+            },
+            "required": ["check_id"]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "read"
+              }
+            },
+            "description": "sense run is admitted with an aggregate effect of read. A population that resolves to a write member is decided by the inspector row at runtime, never by this roster."
+          }
+        }
+      ]
     },
     "role_row": {
       "type": "object",
@@ -508,7 +599,38 @@
             "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "may_initiate": {
+                "contains": {
+                  "enum": ["sense record", "audit observe"]
+                }
+              }
+            },
+            "required": ["may_initiate"]
+          },
+          "then": {
+            "properties": {
+              "permitted_effects": {
+                "contains": {
+                  "const": "harness-write"
+                }
+              },
+              "forbidden_effects": {
+                "not": {
+                  "contains": {
+                    "const": "harness-write"
+                  }
+                }
+              }
+            },
+            "description": "sense record and audit observe are harness-write actions. A row that lists either must permit harness-write; a row that forbids harness-write cannot list them."
+          }
+        }
+      ]
     }
   },
   "examples": [
@@ -517,7 +639,7 @@
       "id": "self-dogfood",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "1.0.0",
+      "policy_version": "1.1.0",
       "scope": {
         "subject": "devai-source-repository",
         "governs_human_maintainers": false,
@@ -551,6 +673,11 @@
           "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
         },
         {
+          "check_id": "audit observe",
+          "effect": "harness-write",
+          "initiator_roles": ["inspector"]
+        },
+        {
           "check_id": "error-codes:check",
           "effect": "read",
           "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
@@ -572,6 +699,16 @@
         },
         {
           "check_id": "release:static-integrity",
+          "effect": "read",
+          "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+        },
+        {
+          "check_id": "sense record",
+          "effect": "harness-write",
+          "initiator_roles": ["inspector"]
+        },
+        {
+          "check_id": "sense run",
           "effect": "read",
           "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
         },
@@ -606,7 +743,8 @@
             "release plan",
             "release resume",
             "release status",
-            "round status"
+            "round status",
+            "sense run"
           ]
         },
         {
@@ -624,7 +762,8 @@
             "release plan",
             "release resume",
             "release status",
-            "round status"
+            "round status",
+            "sense run"
           ]
         },
         {
@@ -632,6 +771,7 @@
           "permitted_effects": ["read", "harness-write", "local-write"],
           "forbidden_effects": ["remote-write"],
           "may_initiate": [
+            "audit observe",
             "audit scorecard",
             "catalog actions",
             "check",
@@ -643,7 +783,9 @@
             "release plan",
             "release resume",
             "release status",
-            "round status"
+            "round status",
+            "sense record",
+            "sense run"
           ]
         },
         {
@@ -661,7 +803,8 @@
             "release plan",
             "release resume",
             "release status",
-            "round status"
+            "round status",
+            "sense run"
           ]
         },
         {
@@ -678,11 +821,29 @@
             "release plan",
             "release resume",
             "release status",
-            "round status"
+            "round status",
+            "sense run"
           ]
         }
       ],
-      "fail_closed": ["undeclared-check-id"]
+      "fail_closed": [
+        "undeclared-check-id",
+        "undeclared-action-id",
+        "absent-human-invocation",
+        "inferred-role",
+        "elevated-role",
+        "cross-role-session",
+        "effect-outside-role-row",
+        "remote-effect-attempted",
+        "publication-inferred-from-check-pass",
+        "scheduled-or-timer-invocation",
+        "backlog-dequeue-attempted",
+        "self-dispatch-attempted",
+        "publication-attempted",
+        "write-consent-absent",
+        "remote-write-population-member",
+        "unattributed-reading"
+      ]
     }
   ]
 }

@@ -4,7 +4,7 @@
   "id": "self-dogfood",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "1.0.0",
+  "policy_version": "1.1.0",
   "scope": {
     "subject": "devai-source-repository",
     "governs_human_maintainers": false,
@@ -38,6 +38,11 @@
       "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
     },
     {
+      "check_id": "audit observe",
+      "effect": "harness-write",
+      "initiator_roles": ["inspector"]
+    },
+    {
       "check_id": "error-codes:check",
       "effect": "read",
       "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
@@ -59,6 +64,16 @@
     },
     {
       "check_id": "release:static-integrity",
+      "effect": "read",
+      "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
+    },
+    {
+      "check_id": "sense record",
+      "effect": "harness-write",
+      "initiator_roles": ["inspector"]
+    },
+    {
+      "check_id": "sense run",
       "effect": "read",
       "initiator_roles": ["owner", "architect", "inspector", "engineer", "auditor"]
     },
@@ -93,7 +108,8 @@
         "release plan",
         "release resume",
         "release status",
-        "round status"
+        "round status",
+        "sense run"
       ]
     },
     {
@@ -111,7 +127,8 @@
         "release plan",
         "release resume",
         "release status",
-        "round status"
+        "round status",
+        "sense run"
       ]
     },
     {
@@ -119,6 +136,7 @@
       "permitted_effects": ["read", "harness-write", "local-write"],
       "forbidden_effects": ["remote-write"],
       "may_initiate": [
+        "audit observe",
         "audit scorecard",
         "catalog actions",
         "check",
@@ -130,7 +148,9 @@
         "release plan",
         "release resume",
         "release status",
-        "round status"
+        "round status",
+        "sense record",
+        "sense run"
       ]
     },
     {
@@ -148,7 +168,8 @@
         "release plan",
         "release resume",
         "release status",
-        "round status"
+        "round status",
+        "sense run"
       ]
     },
     {
@@ -165,7 +186,8 @@
         "release plan",
         "release resume",
         "release status",
-        "round status"
+        "round status",
+        "sense run"
       ]
     }
   ],
@@ -181,6 +203,10 @@
     "publication-inferred-from-check-pass",
     "scheduled-or-timer-invocation",
     "backlog-dequeue-attempted",
-    "self-dispatch-attempted"
+    "self-dispatch-attempted",
+    "publication-attempted",
+    "write-consent-absent",
+    "remote-write-population-member",
+    "unattributed-reading"
   ]
 }
