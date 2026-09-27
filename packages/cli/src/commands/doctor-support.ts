@@ -1,0 +1,115 @@
+import { existsSync, readFileSync } from '@devai-nyx/authority';
+import { join } from 'node:path';
+import type { AdoptionProfile } from '@devai-nyx/utils';
+
+export const DEFAULT_REPO_ROOT = '.';
+export const DEFAULT_CHAIN_RELATIVE = 'record/proofs/chain.json';
+
+export const F1_PATHS = [
+  'product',
+  'law/invariants',
+  'law/schemas',
+  'law/adr',
+  'docs/dev/operations',
+  'docs/dev/security',
+  'law/glossary',
+] as const;
+
+export const READING_ORDER_SOURCES = [
+  'README.md',
+  'law/constitution.md',
+  'law/adr',
+  'law/schemas',
+] as const;
+export const FIVE_ROLES = ['Owner', 'Architect', 'Inspector', 'Engineer', 'Auditor'] as const;
+
+export interface DoctorOptions {
+  readonly repoRoot?: string;
+  readonly chain?: string;
+  readonly human?: boolean;
+  readonly probe?: string;
+  /** Comma-separated list of checks to skip, e.g. "docs-governance". */
+  readonly skip?: string;
+}
+
+export interface CheckResult {
+  readonly name: string;
+  readonly ok: boolean;
+  /** D-112: true when the check is above the declared adoption profile — reported, never failing the run. */
+  readonly advisory?: boolean;
+  readonly info?: Record<string, unknown>;
+  readonly errors?: readonly string[];
+}
+
+export interface Report {
+  readonly ok: boolean;
+  /** Declared adoption profile (D-112); absent project.json key resolves to tier3. */
+  readonly profile: AdoptionProfile;
+  readonly checks: readonly CheckResult[];
+}
+
+/**
+ * D-125: adopters whose docs substrate has legitimately relocated under a
+ * binding adopter ADR declare the relocation in
+ * `.devai/config/project.json`'s `docs.ia.path_overrides` — a map from the
+ * canonical F1/reading-order key (a `docs/`-rooted path with the `docs/`
+ * prefix stripped, e.g. `"framework/contracts"`) to the adopter's actual
+ * current relative path (e.g. `"reference/contracts"`). Absent config, or
+ * an absent/malformed key, resolves to `{}`, so `f1-paths-present` and
+ * `agents-claude-sync` stay byte-identical to pre-D-125 behavior for every
+ * adopter that hasn't declared an override.
+ */
+export function readPathOverrides(repoRoot: string): Record<string, string> {
+  const configPath = join(repoRoot, '.devai/config/project.json');
+  if (!existsSync(configPath)) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      docs?: { ia?: { path_overrides?: Record<string, string> } };
+    };
+    return parsed.docs?.ia?.path_overrides ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Resolves a canonical `docs/...`-rooted path through the override map.
+ * Root-level filenames (no `docs/` prefix — the other four
+ * `READING_ORDER_SOURCES` entries) pass through unchanged: the override
+ * only covers F1-substrate relocations, not adopter substitution of the
+ * root reading-order files themselves (that is a separate, adopter-local
+ * ADR concern, e.g. PEC's ADR-0008).
+ */
+export function applyPathOverride(
+  canonicalPath: string,
+  overrides: Readonly<Record<string, string>>,
+): string {
+  if (!canonicalPath.startsWith('docs/')) return canonicalPath;
+  const key = canonicalPath.slice('docs/'.length);
+  const override = overrides[key];
+  return override !== undefined ? `docs/${override}` : canonicalPath;
+}
+
+export interface CliProbe {
+  readonly family: 'claude-cli' | 'codex-cli';
+  readonly cli: string;
+  readonly onPath: boolean;
+  readonly version: string | null;
+  readonly usable: boolean;
+  readonly hint: string;
+}
+
+export interface CheckSpec {
+  readonly name: string;
+  /**
+   * D-112: lowest adoption profile at which this check is binding.
+   * Below it the check still runs but is reported advisory and
+   * excluded from the report's `ok`. Default tier1 (always binding).
+   */
+  readonly minProfile?: AdoptionProfile;
+  readonly run: (
+    repoRoot: string,
+    chainPath: string,
+    skipDocsGovernance?: boolean,
+  ) => CheckResult | Promise<CheckResult>;
+}
