@@ -10,17 +10,25 @@ import {
 /**
  * Inventory sensor: spec robustness targets (F1 × T8). Phase 27.E.
  * Per design note at docs/theory/architecture/sensors/spec_robustness_targets.md.
+ *
+ * ADR-SCR-0004 record layout: the targets record `law/targets/robustness.json`
+ * (kind `robustness`, at least one target naming a sensor kind and a metric)
+ * stands in for the error-contract files. PASS needs the robustness invariants
+ * and either an error-contract file or at least one declared target.
  */
 
 export interface SpecRobustnessTargetsOptions {
   readonly repoRoot: string;
   readonly invariantsDir?: string;
   readonly errorContractDirs?: readonly string[];
+  /** Default: `law/targets/robustness.json`. */
+  readonly targetsPath?: string;
   readonly now?: string;
 }
 
 const DEFAULT_INVARIANTS_DIR = 'law/invariants';
 const DEFAULT_ERROR_DIRS = ['docs/reference/contracts'];
+const DEFAULT_TARGETS_PATH = 'law/targets/robustness.json';
 const ERROR_FILE_RE = /^(errors?[-_].*|errors?\.json|error-.*\.(md|json))$/i;
 const ROBUSTNESS_STATEMENT_RE =
   /\b(error|retry|idempot(?:ent)?|circuit|timeout|fallback|graceful)\b/i;
@@ -92,6 +100,35 @@ function countErrorContracts(repoRoot: string, dirs: readonly string[]): number 
   return n;
 }
 
+/**
+ * Targets declared by a law/targets record (ADR-SCR-0004): the number of `targets[]`
+ * entries naming a sensor kind and a metric, when the record carries the expected
+ * `kind` and is not retired. Zero when the file is absent or unreadable.
+ */
+function countDeclaredTargets(repoRoot: string, path: string, kind: string): number {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(abs(repoRoot, path), 'utf8'));
+  } catch {
+    return 0;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return 0;
+  const record = parsed as { kind?: unknown; status?: unknown; targets?: unknown };
+  if (record.kind !== kind || record.status === 'retired' || !Array.isArray(record.targets)) {
+    return 0;
+  }
+  return (record.targets as unknown[]).filter((target) => {
+    if (typeof target !== 'object' || target === null) return false;
+    const t = target as { sensor_kind?: unknown; metric?: unknown };
+    return (
+      typeof t.sensor_kind === 'string' &&
+      t.sensor_kind.length > 0 &&
+      typeof t.metric === 'string' &&
+      t.metric.length > 0
+    );
+  }).length;
+}
+
 export function senseSpecRobustnessTargets(opts: SpecRobustnessTargetsOptions): SensorReading {
   const robustnessInv = countRobustnessInvariants(
     opts.repoRoot,
@@ -102,11 +139,17 @@ export function senseSpecRobustnessTargets(opts: SpecRobustnessTargetsOptions): 
     opts.errorContractDirs ?? DEFAULT_ERROR_DIRS,
   );
 
+  const robustnessTargets = countDeclaredTargets(
+    opts.repoRoot,
+    opts.targetsPath ?? DEFAULT_TARGETS_PATH,
+    'robustness',
+  );
+
   let status: SensorStatus;
   const findings: SensorFinding[] = [];
-  if (robustnessInv >= 1 && errorContracts >= 1) {
+  if (robustnessInv >= 1 && (errorContracts >= 1 || robustnessTargets >= 1)) {
     status = 'pass';
-  } else if (robustnessInv >= 1 || errorContracts >= 1) {
+  } else if (robustnessInv >= 1 || errorContracts >= 1 || robustnessTargets >= 1) {
     status = 'review';
     findings.push({
       severity: 'warning',

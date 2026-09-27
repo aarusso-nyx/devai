@@ -382,7 +382,12 @@ function devaiActionStart(words: readonly string[]): number | null {
   if (executable === 'node' || executable === 'nodejs') {
     index = skipOptions(words, index + 1);
     const script = (words[index] ?? '').replaceAll('\\', '/');
-    if (/(?:^|\/)packages\/cli\/(?:dist|src)\/bin\.(?:js|ts)$/.test(script)) {
+    // The workspace CLI, or the bootstrapped runner the pull-request lane installs
+    // (`node .devai/state/pr-bootstrap/cli/bin.js <action>`).
+    if (
+      /(?:^|\/)packages\/cli\/(?:dist|src)\/bin\.(?:js|ts)$/.test(script) ||
+      /(?:^|\/)\.devai\/state\/pr-bootstrap\/cli\/bin\.js$/.test(script)
+    ) {
       return index + 1;
     }
     return null;

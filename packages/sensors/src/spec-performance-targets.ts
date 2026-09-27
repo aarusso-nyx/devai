@@ -10,12 +10,19 @@ import {
 /**
  * Inventory sensor: spec performance targets (F1 × T7). Phase 27.D.
  * Per design note at docs/theory/architecture/sensors/spec_performance_targets.md.
+ *
+ * ADR-SCR-0004 record layout: the targets record `law/targets/performance.json`
+ * (kind `performance`, at least one target naming a sensor kind and a metric)
+ * stands in for the use-case signal. PASS needs the performance invariants and
+ * either the use-case signal or at least one declared target.
  */
 
 export interface SpecPerformanceTargetsOptions {
   readonly repoRoot: string;
   readonly invariantsDir?: string;
   readonly useCaseDirs?: readonly string[];
+  /** Default: `law/targets/performance.json`. */
+  readonly targetsPath?: string;
   readonly perfSignalPatterns?: readonly string[];
   /**
    * Phase 29.K (T-1): adopter-tunable minimum signal counts.
@@ -27,6 +34,7 @@ export interface SpecPerformanceTargetsOptions {
 
 const DEFAULT_INVARIANTS_DIR = 'law/invariants';
 const DEFAULT_USE_CASE_DIRS = ['product/use-cases'];
+const DEFAULT_TARGETS_PATH = 'law/targets/performance.json';
 const DEFAULT_PERF_SIGNALS = ['_probes/', '.bench.', '.perf.'];
 
 const PERF_KEYWORDS_RE =
@@ -125,6 +133,35 @@ function countPerfUseCases(repoRoot: string, dirs: readonly string[]): number {
   return n;
 }
 
+/**
+ * Targets declared by a law/targets record (ADR-SCR-0004): the number of `targets[]`
+ * entries naming a sensor kind and a metric, when the record carries the expected
+ * `kind` and is not retired. Zero when the file is absent or unreadable.
+ */
+function countDeclaredTargets(repoRoot: string, path: string, kind: string): number {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(abs(repoRoot, path), 'utf8'));
+  } catch {
+    return 0;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return 0;
+  const record = parsed as { kind?: unknown; status?: unknown; targets?: unknown };
+  if (record.kind !== kind || record.status === 'retired' || !Array.isArray(record.targets)) {
+    return 0;
+  }
+  return (record.targets as unknown[]).filter((target) => {
+    if (typeof target !== 'object' || target === null) return false;
+    const t = target as { sensor_kind?: unknown; metric?: unknown };
+    return (
+      typeof t.sensor_kind === 'string' &&
+      t.sensor_kind.length > 0 &&
+      typeof t.metric === 'string' &&
+      t.metric.length > 0
+    );
+  }).length;
+}
+
 function hasPerfRelevantCode(repoRoot: string, patterns: readonly string[]): boolean {
   const sink: string[] = [];
   walkPaths(repoRoot, sink);
@@ -147,13 +184,21 @@ export function senseSpecPerformanceTargets(opts: SpecPerformanceTargetsOptions)
     opts.repoRoot,
     opts.perfSignalPatterns ?? DEFAULT_PERF_SIGNALS,
   );
+  const perfTargets = countDeclaredTargets(
+    opts.repoRoot,
+    opts.targetsPath ?? DEFAULT_TARGETS_PATH,
+    'performance',
+  );
   const required = opts.signalsRequired ?? { invariants: 1, use_cases: 1 };
 
   const findings: SensorFinding[] = [];
   let status: SensorStatus;
-  if (perfInvariants >= required.invariants && perfUseCases >= required.use_cases) {
+  if (
+    perfInvariants >= required.invariants &&
+    (perfUseCases >= required.use_cases || perfTargets >= 1)
+  ) {
     status = 'pass';
-  } else if (perfInvariants >= 1 || perfUseCases >= 1 || perfRelevant) {
+  } else if (perfInvariants >= 1 || perfUseCases >= 1 || perfTargets >= 1 || perfRelevant) {
     status = 'review';
     if (perfInvariants === 0 && perfRelevant) {
       findings.push({
