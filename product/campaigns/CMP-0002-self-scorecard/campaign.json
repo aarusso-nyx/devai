@@ -834,7 +834,11 @@
                   "law/schemas/threat-model.schema.json",
                   "law/schemas/data-handling.schema.json",
                   "law/schemas/targets.schema.json",
-                  "packages/cli/src/commands/check/schemas.ts"
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
+                  "law/policy/change-taxonomy.json",
+                  "law/policy/adopter-defaults/change-taxonomy-binding.json",
+                  ".devai/config/change-taxonomy-binding.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/sensors/", "tests/"]
               },
@@ -868,11 +872,13 @@
                 "law(invariants)",
                 "law(security)",
                 "law(targets)",
-                "refactor(schemas)"
+                "law(taxonomy)",
+                "refactor(schemas)",
+                "test(schemas)"
               ],
               "prompt": {
                 "path": "prompts/TASK-0231.md",
-                "sha256": "e6f740f62d676f62c2ed1f3326160253e196749f1fc167420739de221a64c71f"
+                "sha256": "2dce24beab7f52f944f65fb0985ca1eeae8a1609cafc181c4ece388aab53e919"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1001,7 +1007,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["product/use-cases/devai-cli.json", "product/use-cases/"],
@@ -1041,8 +1047,8 @@
                 "path": "prompts/TASK-0234.md",
                 "sha256": "3e314a6e3b5b891cf377687bcc1a63ec5e1ceac0029aed9fc92eb8c38b3cd902"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/125",
+              "merged_as": "e98168b965697a825a863e9499574081c6f9f533",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
