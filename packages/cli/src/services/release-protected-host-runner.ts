@@ -1,472 +1,57 @@
-import { createHash } from 'node:crypto';
-import {
-  closeSync,
-  constants,
-  fstatSync,
-  lstatSync,
-  openSync,
-  readSync,
-  realpathSync,
-} from 'node:fs';
-import { isAbsolute, resolve, sep } from 'node:path';
-import { canonicalJson } from '@devai-nyx/utils';
-import {
-  createProtectedReleaseRepositoryContext,
-  withProtectedReleaseRepositoryContext,
-} from '@devai-nyx/authority';
-import {
-  assertCliInvocationIdle,
-  invokeDevaiCli,
-  type CliInvocationResult,
-} from '../cli-runtime.js';
-import {
-  installReleaseLifecycleCommandAdapters,
-  type ReleaseLifecycleCommandAdapters,
-} from '../commands/release/lifecycle.js';
+import { realpathSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
+
+import { withProtectedReleaseRepositoryContext } from '@devai-nyx/authority';
+import { assertCliInvocationIdle, invokeDevaiCli } from '../cli-runtime.js';
+import { installReleaseLifecycleCommandAdapters } from '../commands/release/lifecycle.js';
 import { assertBoundReleaseHostPackageSnapshot } from './release-host-package-binding.js';
-import {
-  isVerifiedReleaseCandidateSnapshot,
-  type ReleaseCandidateSnapshot,
-} from './release-candidate-snapshot.js';
-import type { ReleasePackageSnapshot } from './release-package-snapshot.js';
-import {
-  createResolvedReleasePlanInputResolver,
-  resolveReleasePolicySnapshot,
-  type ReleasePolicyExpectedIdentity,
-} from './release-policy-resolution.js';
-import { createReleasePolicyClosure, type ReleasePolicyClosure } from './release-policy-closure.js';
+
+import { createResolvedReleasePlanInputResolver } from './release-policy-resolution.js';
+import { createReleasePolicyClosure } from './release-policy-closure.js';
 import { encodeReleasePolicyClosure } from './release-policy-closure-transport.js';
-import {
-  createReleaseExportProvider,
-  type ReleaseExportProviderOptions,
-} from './release-export-provider.js';
-import { buildResolvedReleasePlanReceipt } from './release-lifecycle.js';
-import { canonicalContainerPath } from './container-archive.js';
+import { createReleaseExportProvider } from './release-export-provider.js';
+
 import {
   createContainerReleaseCertificationAdapters,
   createContainerReleasePreflightProvider,
-  type ContainerReleaseCertificationOptions,
-  type ContainerReleaseCertificationAdapters,
-  type ProtectedReleasePlanMaterial,
 } from './release-certification-provider.js';
-import type { ProtectedMutationPackageObserver } from './release-mutation-observation.js';
-import type { ReleaseMutationArtifactLimitsV21 } from './release-mutation-artifacts.js';
-import {
-  type ReleaseMutationInputControlsV21,
-  type ReleaseMutationInputPlanV21,
-} from './release-mutation-inputs.js';
-import {
-  createReleaseCertificationEvidenceStore,
-  type ReleaseCertificationEvidenceStoreOptions,
-} from './release-evidence-store.js';
-import {
-  createReleaseArtifactStore,
-  type ReleaseArtifactStoreOptions,
-} from './release-artifact-store.js';
+
+import { createReleaseCertificationEvidenceStore } from './release-evidence-store.js';
+import { createReleaseArtifactStore } from './release-artifact-store.js';
 import {
   RELEASE_PACK_SPEC_DIGEST,
   type ImmutableReleaseContentSource,
 } from './release-prepare-kernel.js';
 import {
   validateReleaseLifecycleRequest,
-  type PublicationSignatureVerifier,
   type ReleaseLifecycleRequest,
 } from './release-lifecycle-execution.js';
-
-/** A locator and raw-byte identity approved by the operator before it is read. */
-export interface ProtectedReleaseInputFile {
-  readonly path: string;
-  readonly sha256: string;
-}
-
-export interface ProtectedReleaseHostLaneControls {
-  readonly candidate: ReleaseCandidateSnapshot;
-  readonly expected: ReleasePolicyExpectedIdentity;
-  readonly repository_root: string;
-  readonly repository_identity: {
-    readonly authority_repository_id: string;
-    readonly read_expected_release_repository_id: () => string;
-  };
-  /** Must be the registered .devai/state/release-lifecycle namespace or a descendant. */
-  readonly state_root: string;
-  readonly maximum_input_bytes: number;
-  readonly unit: {
-    readonly intent: unknown;
-    readonly packages: readonly {
-      readonly manifest_path: string;
-      readonly source_entries: readonly string[];
-      readonly generated_entries: readonly { readonly path: string; readonly task_node: string }[];
-    }[];
-    /** Genuine prior protected result for a restarted certification process; independently reverified. */
-    readonly preflight_receipt?: unknown;
-  };
-  readonly execution: Pick<
-    ContainerReleaseCertificationOptions,
-    'controls' | 'dependencies' | 'environment' | 'toolchain' | 'timeout_ms'
-  >;
-}
-
-export interface ProtectedReleaseHostRunnerControls extends ProtectedReleaseHostLaneControls {
-  /** Use the exact object returned by bootstrapReleaseHost, never a source-mode snapshot. */
-  readonly installed_package: ReleasePackageSnapshot;
-  readonly producer?: Parameters<typeof resolveReleasePolicySnapshot>[0]['producer'];
-  /** A fixed diagnostic preflight lane, prebound in this same process. No store or signer. */
-  readonly toolchain_fixture?: ProtectedReleaseHostLaneControls;
-  readonly mutation_inputs?: Pick<
-    ReleaseMutationInputControlsV21,
-    'execution_coverage' | 'maximum_source_bytes' | 'maximum_source_entries'
-  >;
-  /** Externally protected, measured artifact bounds. This runner supplies no default. */
-  readonly mutation_limits?: ReleaseMutationArtifactLimitsV21;
-  /** Explicit host retention observer; never a candidate request or a reuse provider. */
-  readonly observe_mutation_package?: ProtectedMutationPackageObserver;
-  readonly certification_store: ReleaseCertificationEvidenceStoreOptions;
-  readonly artifact_store: Omit<ReleaseArtifactStoreOptions, 'binding'>;
-  readonly publication_signature_verifier: PublicationSignatureVerifier;
-  /** Protected host choices only; absent stages have no ambient fallback. */
-  readonly later_stages: {
-    readonly export: 'unavailable' | ProtectedReleaseHostExportControls;
-    readonly offline_verify: 'unavailable' | ProtectedReleaseHostOfflineControls;
-    readonly evidence_publish?: 'unavailable' | ProtectedReleaseHostEvidencePublicationControls;
-    readonly publish?: 'unavailable' | ProtectedReleaseHostPublicationControls;
-  };
-}
-
-export type ProtectedReleaseHostExportControls = Pick<
-  ReleaseExportProviderOptions,
-  'provider' | 'destination' | 'trust' | 'signer'
-> &
-  Pick<
-    ReleaseExportProviderOptions['store'],
-    'closure_limits' | 'transport_limits' | 'transcript_limits'
-  >;
-
-/** Installed control callbacks only; request files cannot select an offline verifier. */
-export interface ProtectedReleaseHostOfflineControls {
-  readonly provider: NonNullable<
-    ReturnType<ReleaseLifecycleCommandAdapters['offline_verification_provider']>
-  >;
-  readonly policy_closures: NonNullable<ReleaseLifecycleCommandAdapters['offline_policy_closures']>;
-}
-
-/** External effects remain unavailable unless installed controls explicitly supply every gate. */
-export interface ProtectedReleaseHostEvidencePublicationControls {
-  readonly provider: NonNullable<ReturnType<ReleaseLifecycleCommandAdapters['provider']>>;
-  readonly authorization: ReleaseLifecycleCommandAdapters['authorization'];
-  readonly offline_receipt_verifier: ReleaseLifecycleCommandAdapters['offline_receipt_verifier'];
-}
-export interface ProtectedReleaseHostPublicationControls {
-  readonly provider: NonNullable<ReturnType<ReleaseLifecycleCommandAdapters['provider']>>;
-  readonly authorization: ReleaseLifecycleCommandAdapters['authorization'];
-  readonly publication_controls: ReleaseLifecycleCommandAdapters['publication_controls'];
-}
-
-interface InvocationAuthority {
-  /** No role is inferred by this runner; the normal CLI checks this explicit declaration. */
-  readonly as_role: 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
-  readonly write: boolean;
-}
-
-export type ProtectedReleaseHostInvocation =
-  | { readonly action: 'release plan'; readonly intent: ProtectedReleaseInputFile }
-  | (InvocationAuthority & {
-      readonly action:
-        'release preflight' | 'release certify' | 'release prepare' | 'release export';
-      readonly request: ProtectedReleaseInputFile;
-    })
-  | (InvocationAuthority & {
-      readonly action: 'release evidence-publish' | 'release publish';
-      readonly request: ProtectedReleaseInputFile;
-      readonly allow_publish: boolean;
-    })
-  | {
-      readonly action: 'release offline-verify';
-      readonly request: ProtectedReleaseInputFile;
-      readonly exported_state: ProtectedReleaseInputFile;
-    }
-  | {
-      readonly action: 'release resume';
-      readonly request: ProtectedReleaseInputFile;
-      readonly receipts: ProtectedReleaseInputFile;
-      readonly publication_receipt?: ProtectedReleaseInputFile;
-    };
-
-export interface ProtectedReleaseHostRunner {
-  /** Copies, not live provider state. These methods do not persist receipts or advance the lifecycle. */
-  readonly readPlan: () => Readonly<Record<string, unknown>>;
-  readonly readPolicyClosure: () => ReleasePolicyClosure;
-  /** Independently reconstructed certification policies; never reads an exported carrier. */
-  readonly readCertificationTaskPolicies: (
-    request: ReleaseLifecycleRequest,
-  ) => ReturnType<ContainerReleaseCertificationAdapters['read_task_policies']>;
-  readonly readFixturePlan: () => Readonly<Record<string, unknown>>;
-  /** Serial diagnostic projection only, not a derived-plan brand or execution grant. */
-  readonly readMutationInputPlan: () => Omit<ReleaseMutationInputPlanV21, 'readProof'>;
-  readonly invoke: (input: ProtectedReleaseHostInvocation) => Promise<CliInvocationResult>;
-}
-
-const INVALID = 'release-host-controls-invalid';
-const INPUT_INVALID = 'release-host-input-mismatch';
+import type {
+  ProtectedReleaseHostRunnerControls,
+  ProtectedReleaseHostRunner,
+  ProtectedReleaseHostInvocation,
+} from './release-protected-host-runner-types.js';
+import {
+  fail,
+  closed,
+  captureReleaseHostLane,
+  same,
+  copy,
+  INPUT_INVALID,
+  regularInput,
+} from './release-protected-host-runner-lane.js';
+export type {
+  ProtectedReleaseInputFile,
+  ProtectedReleaseHostLaneControls,
+  ProtectedReleaseHostRunnerControls,
+  ProtectedReleaseHostExportControls,
+  ProtectedReleaseHostOfflineControls,
+  ProtectedReleaseHostEvidencePublicationControls,
+  ProtectedReleaseHostPublicationControls,
+  ProtectedReleaseHostInvocation,
+  ProtectedReleaseHostRunner,
+} from './release-protected-host-runner-types.js';
 let installed = false;
-const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
-function fail(code = INVALID): never {
-  throw new Error(code);
-}
-function same(a: unknown, b: unknown): boolean {
-  return canonicalJson(a) === canonicalJson(b);
-}
-function copy<T>(value: T): T {
-  return JSON.parse(canonicalJson(value)) as T;
-}
-function closed(
-  value: unknown,
-  required: readonly string[],
-  optional: readonly string[] = [],
-): void {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) fail();
-  const keys = Reflect.ownKeys(value);
-  if (
-    required.some((key) => !keys.includes(key)) ||
-    keys.some((key) => typeof key !== 'string' || ![...required, ...optional].includes(key))
-  )
-    fail();
-}
-function path(value: string): string {
-  if (typeof value !== 'string' || !isAbsolute(value) || value.includes('\0')) fail();
-  return resolve(value);
-}
-function regularInput(input: ProtectedReleaseInputFile, maximum: number): unknown {
-  try {
-    closed(input, ['path', 'sha256']);
-    const filename = path(input.path);
-    if (!/^[a-f0-9]{64}$/u.test(input.sha256)) fail();
-    const before = lstatSync(filename, { bigint: true });
-    if (!before.isFile() || before.nlink !== 1n || before.size > BigInt(maximum)) fail();
-    const descriptor = openSync(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
-    const equal = (stat: typeof before) =>
-      ['dev', 'ino', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs'].every(
-        (key) => stat[key as keyof typeof stat] === before[key as keyof typeof before],
-      );
-    try {
-      if (!equal(fstatSync(descriptor, { bigint: true }))) fail();
-      const bytes = Buffer.alloc(Number(before.size));
-      let offset = 0;
-      while (offset < bytes.length) {
-        const count = readSync(descriptor, bytes, offset, bytes.length - offset, offset);
-        if (count === 0) fail();
-        offset += count;
-      }
-      if (
-        readSync(descriptor, Buffer.alloc(1), 0, 1, offset) !== 0 ||
-        !equal(fstatSync(descriptor, { bigint: true })) ||
-        !equal(lstatSync(filename, { bigint: true })) ||
-        hash(bytes) !== input.sha256
-      )
-        fail();
-      return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
-    } finally {
-      closeSync(descriptor);
-    }
-  } catch {
-    return fail(INPUT_INVALID);
-  }
-}
-
-/** Capture one immutable lane without installing adapters or constructing stores. */
-function captureReleaseHostLane(
-  input: ProtectedReleaseHostLaneControls & {
-    readonly installed_package: ReleasePackageSnapshot;
-    readonly producer?: ProtectedReleaseHostRunnerControls['producer'];
-  },
-) {
-  if (!isVerifiedReleaseCandidateSnapshot(input.candidate)) fail();
-  if (
-    !Number.isSafeInteger(input.maximum_input_bytes) ||
-    input.maximum_input_bytes < 1 ||
-    input.maximum_input_bytes > 0x7fffffff
-  )
-    fail();
-  closed(input.unit, ['intent', 'packages'], ['preflight_receipt']);
-  closed(input.execution, ['controls', 'environment', 'toolchain', 'timeout_ms'], ['dependencies']);
-  const root = realpathSync(path(input.repository_root));
-  const stateRoot = path(input.state_root);
-  const stateNamespace = resolve(root, '.devai/state/release-lifecycle');
-  if (stateRoot !== stateNamespace && !stateRoot.startsWith(`${stateNamespace}${sep}`)) fail();
-  const execution: ProtectedReleaseHostLaneControls['execution'] = {
-    ...copy({
-      controls: input.execution.controls,
-      environment: input.execution.environment,
-      toolchain: input.execution.toolchain,
-      timeout_ms: input.execution.timeout_ms,
-    }),
-    ...(input.execution.dependencies === undefined
-      ? {}
-      : {
-          dependencies: input.execution.dependencies.map(({ archive, ...dependency }) => ({
-            ...copy(dependency),
-            archive: Buffer.from(archive),
-          })),
-        }),
-  };
-  const candidate = input.candidate;
-  const repository = copy(candidate.repository);
-  closed(input.repository_identity, [
-    'authority_repository_id',
-    'read_expected_release_repository_id',
-  ]);
-  const repositoryContext = createProtectedReleaseRepositoryContext({
-    repository_root: root,
-    authority_repository_id: input.repository_identity.authority_repository_id,
-    read_expected_release_repository_id:
-      input.repository_identity.read_expected_release_repository_id,
-    repository,
-  });
-  const unit = copy(input.unit);
-  const expected = copy(input.expected);
-  const resolution = resolveReleasePolicySnapshot({
-    expected,
-    installed_package: input.installed_package,
-    candidate,
-    ...(input.producer === undefined ? {} : { producer: input.producer }),
-  });
-  const receipt = buildResolvedReleasePlanReceipt({ intent: unit.intent, resolution });
-  if (receipt.verdict !== 'pass' || !Array.isArray(unit.packages) || unit.packages.length === 0)
-    fail();
-  const packages = unit.packages
-    .map((pkg) => {
-      closed(pkg, ['manifest_path', 'source_entries', 'generated_entries']);
-      if (
-        !canonicalContainerPath(pkg.manifest_path) ||
-        pkg.manifest_path.split('/').at(-1) !== 'package.json' ||
-        !Array.isArray(pkg.source_entries) ||
-        !Array.isArray(pkg.generated_entries) ||
-        !pkg.source_entries.includes('package.json')
-      )
-        fail();
-      const selectedPaths = [...pkg.source_entries];
-      for (const output of pkg.generated_entries) {
-        closed(output, ['path', 'task_node']);
-        if (
-          typeof output.task_node !== 'string' ||
-          !/^[a-zA-Z0-9][a-zA-Z0-9:._/-]*$/u.test(output.task_node)
-        )
-          fail();
-        selectedPaths.push(output.path);
-      }
-      if (
-        selectedPaths.some((entry) => !canonicalContainerPath(entry)) ||
-        new Set(selectedPaths).size !== selectedPaths.length
-      )
-        fail();
-      const prefix = pkg.manifest_path.slice(0, -'package.json'.length);
-      for (const entry of pkg.source_entries) candidate.read(`${prefix}${entry}`);
-      const raw = candidate.read(pkg.manifest_path);
-      const manifest = JSON.parse(raw.toString('utf8')) as { name?: unknown; version?: unknown };
-      if (
-        typeof manifest.name !== 'string' ||
-        manifest.version !== receipt.candidate.version ||
-        !pkg.source_entries.includes('package.json')
-      )
-        fail();
-      return {
-        mapping: {
-          package_id: manifest.name,
-          source_entries: pkg.source_entries,
-          generated_entries: pkg.generated_entries,
-        },
-        roster: {
-          package_id: manifest.name,
-          manifest_path: pkg.manifest_path,
-          manifest_digest_sha256: hash(raw),
-        },
-      };
-    })
-    .sort((a, b) =>
-      Buffer.compare(Buffer.from(a.roster.package_id), Buffer.from(b.roster.package_id)),
-    );
-  if (
-    new Set(packages.map((pkg) => pkg.roster.package_id)).size !== packages.length ||
-    new Set(packages.map((pkg) => pkg.roster.manifest_path)).size !== packages.length
-  )
-    fail();
-  const candidateLocator = {
-    commit: repository.commit,
-    tree: repository.tree,
-    release_units: [
-      {
-        release_unit: receipt.candidate.release_unit,
-        version: receipt.candidate.version,
-        package_roster: packages.map((pkg) => pkg.roster),
-      },
-    ],
-  };
-  // Copy the complete verified population once; no later Git or pathname reads in
-  // content resolution. The existing provider still rechecks its exact checkout.
-  const objects = candidate.readProof(candidate.paths);
-  const format = repository.commit.length === 40 ? 'sha1' : 'sha256';
-  const assertRepository = (value: unknown) => {
-    if (!same(value, repository)) fail(INPUT_INVALID);
-  };
-  const git: Pick<ImmutableReleaseContentSource, 'readGitObject' | 'readGitBlob'> = {
-    readGitObject(value) {
-      assertRepository(value.repository);
-      const object = objects.get(value.object_id);
-      if (value.object_format !== format || object?.type !== value.type) return fail(INPUT_INVALID);
-      return Buffer.from(object.bytes);
-    },
-    readGitBlob(value) {
-      assertRepository(value.repository);
-      const locator = value.locator;
-      const object = objects.get(value.object_id);
-      if (
-        value.candidate.commit !== repository.commit ||
-        value.candidate.tree !== repository.tree ||
-        locator.repository !== repository.id ||
-        locator.commit !== repository.commit ||
-        locator.tree !== repository.tree ||
-        locator.object_format !== format ||
-        locator.object_id !== value.object_id ||
-        object?.type !== 'blob'
-      )
-        return fail(INPUT_INVALID);
-      const bytes = candidate.read(locator.path);
-      if (
-        !bytes.equals(Buffer.from(object.bytes)) ||
-        bytes.length !== locator.size_bytes ||
-        hash(bytes) !== locator.content_digest_sha256
-      )
-        return fail(INPUT_INVALID);
-      return bytes;
-    },
-  };
-  const material: ProtectedReleasePlanMaterial = {
-    receipt,
-    resolution,
-    intent_path: 'invocation',
-    intent: unit.intent,
-    release_verification_profile: resolution.readInput('release-verification-profile'),
-    release_lifecycle_policy: resolution.readInput('release-lifecycle-policy'),
-    action_registry: resolution.readInput('action-registry-policy'),
-    packages: packages.map((pkg) => pkg.mapping),
-    ...(unit.preflight_receipt === undefined ? {} : { preflight_receipt: unit.preflight_receipt }),
-  };
-  return {
-    root,
-    stateRoot,
-    candidate,
-    expected,
-    repository,
-    repositoryContext,
-    unit,
-    resolution,
-    receipt,
-    candidateLocator,
-    git,
-    material,
-    execution,
-    maximum: input.maximum_input_bytes,
-  };
-}
 
 /**
  * Package-owned host composition, called once on the approved bootstrap runtime.
