@@ -293,4 +293,39 @@ describe('senseSiteDrift journal-based provenance (ADR-SCR-0005 IA-005)', () => 
     expect(reading.status).toBe('pass');
     expect(reading.metrics).toMatchObject({ published_source: head, journal_intent_id: '9' });
   });
+
+  it('reads a verified site-only publication with the highest id as the published source (ADR-REL-0029)', () => {
+    const base = commit('base');
+    const head = commit('site change');
+    const siteOnly = deployment(12, head, 'v1.6.0');
+    const payload = siteOnly.payload as { identity: Record<string, unknown> };
+    payload.identity = {
+      repository: 'aarusso-nyx/devai',
+      mode: 'site-only',
+      tag: 'v1.6.0',
+      commit: head,
+      tree: 'b'.repeat(40),
+      siteSha256: 'd'.repeat(64),
+      sourceRun: '789',
+      sourceAttempt: '1',
+      controlCommit: head,
+    };
+
+    const reading = withScope(() => senseSiteDrift({ repoRoot: root, now: NOW }), {
+      gh: {
+        [DEPLOYMENTS_PATH]: {
+          status: 0,
+          stdout: JSON.stringify([deployment(9, base, 'v1.6.0'), siteOnly]),
+        },
+        [statusesPath(12)]: { status: 0, stdout: JSON.stringify([verifiedStatus(2, 'pages-2')]) },
+      },
+    });
+
+    expect(reading.status).toBe('pass');
+    expect(reading.metrics).toMatchObject({
+      published_source_provenance: 'journal',
+      published_source: head,
+      journal_intent_id: '12',
+    });
+  });
 });

@@ -15,7 +15,18 @@ const identity = {
   siteSha256: 'd'.repeat(64),
   controlCommit: 'e'.repeat(40),
 };
-function fixture() {
+const siteIdentity = {
+  repository: 'aarusso-nyx/devai',
+  mode: 'site-only',
+  tag: 'v1.6.0',
+  commit: 'f'.repeat(40),
+  tree: 'b'.repeat(40),
+  siteSha256: 'd'.repeat(64),
+  sourceRun: '789',
+  sourceAttempt: '1',
+  controlCommit: 'f'.repeat(40),
+};
+function fixture(selected: Record<string, unknown> = identity) {
   const records: Record<string, unknown>[] = [];
   const events: string[] = [];
   const controls = {
@@ -25,7 +36,7 @@ function fixture() {
       events.push('intent');
       records.push({
         schemaVersion: '1.0.0',
-        identity,
+        identity: selected,
         intentId: '9',
         artifactId: '45',
         pagesId: null,
@@ -53,7 +64,12 @@ function fixture() {
       records[0] = record;
     }),
   };
-  return { records, events, controls, args: { identity, artifactId: '45', controls } };
+  return {
+    records,
+    events,
+    controls,
+    args: { identity: selected, artifactId: '45', controls },
+  };
 }
 it('persists intent before submitting, then records the exact ID before observing and verifying', async () => {
   const f = fixture();
@@ -187,5 +203,37 @@ it('requires strings for external identifiers before invoking any control', asyn
   await expect(
     publishPages({ ...f.args, identity: { ...identity, rehearsalRun: 123 } }),
   ).rejects.toThrow('IDENTITY_INVALID');
+  expect(f.controls.readJournal).not.toHaveBeenCalled();
+});
+it('publishes a site-only identity through the same journaled controller', async () => {
+  const f = fixture(siteIdentity);
+  expect(await publishPages(f.args)).toMatchObject({
+    outcome: 'verified',
+    pagesId: 'pages-17',
+    buildInvocations: 0,
+  });
+  expect(f.events).toEqual(['intent', 'submit', 'submitted', 'observe', 'verify', 'verified']);
+});
+it('accepts a prerelease package version tag on a site-only identity', async () => {
+  const f = fixture({ ...siteIdentity, tag: 'v1.7.0-rc.1' });
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified' });
+});
+const { tree: _omittedTree, ...siteIdentityWithoutTree } = siteIdentity;
+it.each([
+  ['an extra rehearsalRun key', { ...siteIdentity, rehearsalRun: '123' }],
+  ['a release mode', { ...siteIdentity, mode: 'release' }],
+  ['a non-string tag', { ...siteIdentity, tag: 160 }],
+  ['a tag without the v prefix', { ...siteIdentity, tag: '1.6.0' }],
+  ['a numeric source run', { ...siteIdentity, sourceRun: 789 }],
+  ['a short commit', { ...siteIdentity, commit: 'f'.repeat(39) }],
+  ['a missing tree', siteIdentityWithoutTree],
+])('rejects a site-only identity with %s before any control', async (_label, selected) => {
+  const f = fixture(selected);
+  await expect(publishPages(f.args)).rejects.toThrow('PAGES_PUBLICATION_IDENTITY_INVALID');
+  expect(f.controls.readJournal).not.toHaveBeenCalled();
+});
+it('rejects a release identity which carries a mode key', async () => {
+  const f = fixture({ ...identity, mode: 'release' });
+  await expect(publishPages(f.args)).rejects.toThrow('PAGES_PUBLICATION_IDENTITY_INVALID');
   expect(f.controls.readJournal).not.toHaveBeenCalled();
 });

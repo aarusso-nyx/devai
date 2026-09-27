@@ -21,23 +21,44 @@ const identity = {
 };
 const root = 'https://api.github.com/repos/aarusso-nyx/devai';
 const environment = 'devai-pages-publication';
-function fixture() {
+const siteIdentity = {
+  repository: 'aarusso-nyx/devai',
+  mode: 'site-only',
+  tag: 'v1.6.0',
+  commit: 'f'.repeat(40),
+  tree: 'b'.repeat(40),
+  siteSha256: 'd'.repeat(64),
+  sourceRun: '789',
+  sourceAttempt: '1',
+  controlCommit: 'f'.repeat(40),
+};
+function auditFor(audited: Record<string, unknown>) {
   const auditBytes = Buffer.from(
     JSON.stringify({
       schemaVersion: '1.0.0',
-      repository: identity.repository,
-      tag: identity.tag,
-      controlCommit: identity.controlCommit,
+      repository: audited.repository,
+      tag: audited.tag,
+      controlCommit: audited.controlCommit,
       legacyEffects: 'confirmed-absent-for-tag',
       singleWriterGroup: environment,
       reviewedAt: '2026-09-07T00:00:00Z',
     }),
   );
-  const auditSha256 = createHash('sha256').update(auditBytes).digest('hex');
+  return { auditBytes, auditSha256: createHash('sha256').update(auditBytes).digest('hex') };
+}
+function fixture(selected: Record<string, unknown> = identity) {
+  const { auditBytes, auditSha256 } = auditFor(identity);
   const deployments: Record<string, unknown>[] = [],
     statuses: Record<string, unknown>[] = [],
     records: unknown[] = [],
     calls: { url: string; method: string; body: string }[] = [];
+  // `statuses` is the history of the first intent this fixture creates (id 9);
+  // seeded or later intents keep their own status histories.
+  const statusesById = new Map<number, Record<string, unknown>[]>([[9, statuses]]);
+  const statusesOf = (id: number) => {
+    if (!statusesById.has(id)) statusesById.set(id, []);
+    return statusesById.get(id) as Record<string, unknown>[];
+  };
   let pagesState = 'succeed',
     pagesStates: string[] = [],
     live = false,
@@ -47,7 +68,9 @@ function fixture() {
     const parsed = new URL(url);
     const path = parsed.pathname;
     const data = options.body ? JSON.parse(options.body) : null;
-    if (options.method === 'GET' && path.endsWith('/statuses')) return Response.json(statuses);
+    const deploymentId = Number(/\/deployments\/(\d+)\/statuses$/u.exec(path)?.[1]);
+    if (options.method === 'GET' && path.endsWith('/statuses'))
+      return Response.json(statusesOf(deploymentId));
     if (options.method === 'GET' && path.endsWith('/deployments'))
       return Response.json(deployments);
     if (options.method === 'GET' && path.endsWith('/pages/deployments/pages-17')) {
@@ -60,12 +83,18 @@ function fixture() {
       return Response.json({ id: 'pages-17' }, { status: 200 });
     }
     if (options.method === 'POST' && path.endsWith('/statuses')) {
-      const status = { ...data, id: statuses.length + 1, deployment_url: `${root}/deployments/9` };
-      statuses.push(status);
+      const history = statusesOf(deploymentId);
+      const status = {
+        ...data,
+        id: history.length + 1,
+        deployment_url: `${root}/deployments/${deploymentId}`,
+      };
+      history.push(status);
       return Response.json(status, { status: 201 });
     }
     if (options.method === 'POST' && path.endsWith('/deployments')) {
-      const deployment = { ...data, id: 9, sha: data.ref };
+      const id = Math.max(8, ...deployments.map((item) => Number(item.id))) + 1;
+      const deployment = { ...data, id, sha: data.ref };
       deployments.push(deployment);
       return Response.json(deployment, { status: 201 });
     }
@@ -73,7 +102,7 @@ function fixture() {
   });
   const options = {
     token: 'secret-github-token',
-    identity,
+    identity: selected,
     runId: '456',
     attempt: '1',
     auditBytes,
@@ -94,11 +123,18 @@ function fixture() {
     controls,
     deployments,
     statuses,
+    statusesOf,
     records,
     calls,
-    args: { identity, artifactId: '45', controls },
-    setLive: () => {
-      live = true;
+    args: { identity: selected, artifactId: '45', controls },
+    // A later publication of another identity against the same journal state.
+    argsFor: (next: Record<string, unknown>) => ({
+      identity: next,
+      artifactId: '46',
+      controls: githubPagesControls({ ...options, ...auditFor(next), identity: next }),
+    }),
+    setLive: (value = true) => {
+      live = value;
     },
     loseSubmission: () => {
       loseSubmission = true;
@@ -290,24 +326,30 @@ it('an unavailable OIDC token fails before any durable intent or Pages POST', as
  */
 function selectSiteDriftProvenance(
   deployments: readonly Record<string, unknown>[],
-  statuses: readonly Record<string, unknown>[],
+  statusesOf: (id: number) => readonly Record<string, unknown>[],
 ): { readonly commit: string; readonly tag: string; readonly intentId: string } | undefined {
-  const matchedDeployment = deployments.find(
-    (deployment) =>
-      deployment.environment === environment &&
-      deployment.task === 'devai:pages-publication' &&
-      (deployment.payload as Record<string, unknown> | undefined)?.kind ===
-        'devai-pages-publication-intent' &&
-      (deployment.payload as Record<string, unknown>).schemaVersion === '1.0.0' &&
-      ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
-        ?.repository === identity.repository &&
-      typeof ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
-        .commit === 'string' &&
-      ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
-        .commit === deployment.sha,
-  );
+  // Like the sensor: the highest-id matching deployment is the latest intent.
+  const matchedDeployment = deployments
+    .filter(
+      (deployment) =>
+        typeof deployment.id === 'number' &&
+        deployment.environment === environment &&
+        deployment.task === 'devai:pages-publication' &&
+        (deployment.payload as Record<string, unknown> | undefined)?.kind ===
+          'devai-pages-publication-intent' &&
+        (deployment.payload as Record<string, unknown>).schemaVersion === '1.0.0' &&
+        ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+          ?.repository === identity.repository &&
+        typeof ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+          .commit === 'string' &&
+        ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+          .commit === deployment.sha &&
+        typeof ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+          .tag === 'string',
+    )
+    .sort((a, b) => (b.id as number) - (a.id as number))[0];
   if (matchedDeployment === undefined) return undefined;
-  const verified = statuses.find(
+  const verified = statusesOf(matchedDeployment.id as number).find(
     (status) =>
       status.environment === environment &&
       status.state === 'success' &&
@@ -330,7 +372,7 @@ it('journals a verified deployment record the site_drift sensor can read as publ
   const f = fixture();
   expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified' });
 
-  const provenance = selectSiteDriftProvenance(f.deployments, f.statuses);
+  const provenance = selectSiteDriftProvenance(f.deployments, f.statusesOf);
   expect(provenance).toEqual({
     commit: identity.commit,
     tag: identity.tag,
@@ -343,5 +385,135 @@ it('leaves no site_drift-readable provenance for a submitted-but-unverified inte
   f.setPagesState('deployment_failed');
   await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
 
-  expect(selectSiteDriftProvenance(f.deployments, f.statuses)).toBeUndefined();
+  expect(selectSiteDriftProvenance(f.deployments, f.statusesOf)).toBeUndefined();
+});
+
+/** ADR-REL-0029: site-only publication from main under the same journal. */
+type JournalFixture = ReturnType<typeof fixture>;
+function seedVerifiedRelease(f: JournalFixture, id = 5) {
+  f.deployments.push({
+    id,
+    task: 'devai:pages-publication',
+    environment,
+    sha: identity.commit,
+    payload: {
+      kind: 'devai-pages-publication-intent',
+      schemaVersion: '1.0.0',
+      identity,
+      artifactId: '40',
+      runId: '400',
+      attempt: '1',
+    },
+  });
+  const deploymentUrl = `${root}/deployments/${id}`;
+  f.statusesOf(id).push(
+    {
+      id: 1,
+      state: 'in_progress',
+      environment,
+      deployment_url: deploymentUrl,
+      description: 'devai-pages:submitted:pages-5',
+    },
+    {
+      id: 2,
+      state: 'success',
+      environment,
+      deployment_url: deploymentUrl,
+      description: 'devai-pages:verified:pages-5',
+    },
+  );
+}
+const pagesPosts = (f: JournalFixture) =>
+  f.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/pages/deployments'));
+
+it('refuses a site-only publication without a verified release baseline before any write', async () => {
+  const f = fixture(siteIdentity);
+  await expect(publishPages(f.args)).rejects.toThrow('PAGES_JOURNAL_SITE_BASELINE_MISSING');
+  expect(f.calls.every((c) => c.method === 'GET')).toBe(true);
+  expect(f.options.getOidcToken).not.toHaveBeenCalled();
+});
+it('does not count a verified site-only record as a site-only baseline', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  await publishPages(f.args);
+  f.deployments.shift();
+  f.setLive(false);
+  const next = { ...siteIdentity, commit: 'c'.repeat(40), controlCommit: 'c'.repeat(40) };
+  await expect(publishPages(f.argsFor(next))).rejects.toThrow(
+    'PAGES_JOURNAL_SITE_BASELINE_MISSING',
+  );
+  expect(pagesPosts(f)).toHaveLength(1);
+});
+it('does not count an unverified release intent as a site-only baseline', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  f.statusesOf(5).pop();
+  await expect(publishPages(f.args)).rejects.toThrow('OTHER_PUBLICATION_UNRESOLVED');
+  expect(pagesPosts(f)).toHaveLength(0);
+});
+it('publishes a site-only identity over a verified release baseline without a migration audit', async () => {
+  const f = fixture(siteIdentity);
+  f.options.auditBytes = Buffer.from('');
+  seedVerifiedRelease(f);
+  const controls = githubPagesControls(f.options);
+  expect(await publishPages({ ...f.args, controls })).toMatchObject({
+    outcome: 'verified',
+    pagesId: 'pages-17',
+  });
+  const intent = JSON.parse(f.calls.find((c) => c.method === 'POST')?.body ?? '');
+  expect(intent).toMatchObject({
+    ref: siteIdentity.commit,
+    payload: { identity: siteIdentity },
+    description: `Pages publication intent for v1.6.0 (site-only from ${siteIdentity.commit})`,
+  });
+  expect(f.statusesOf(9).at(-1)).toMatchObject({ description: 'devai-pages:verified:pages-17' });
+  expect(pagesPosts(f)).toHaveLength(1);
+});
+it('keeps the migration audit mandatory for release identities', () => {
+  const f = fixture();
+  expect(() => githubPagesControls({ ...f.options, auditBytes: Buffer.from('') })).toThrow(
+    'MIGRATION_AUDIT_DIGEST',
+  );
+});
+it('treats a verified site-only record as plain history for a later release', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  await publishPages(f.args);
+  f.setLive(false);
+  const release = { ...identity, tag: 'v1.7.0', commit: 'c'.repeat(40) };
+  expect(await publishPages(f.argsFor(release))).toMatchObject({ outcome: 'verified' });
+  expect(f.deployments.map((d) => d.id)).toEqual([5, 9, 10]);
+  expect(pagesPosts(f)).toHaveLength(2);
+});
+it('blocks a release identity while a site-only intent is submitted but unverified', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  f.setPagesState('deployment_failed');
+  await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+  const release = { ...identity, tag: 'v1.7.0', commit: 'c'.repeat(40) };
+  const later = f.argsFor(release);
+  await expect(publishPages(later)).rejects.toThrow('OTHER_PUBLICATION_UNRESOLVED');
+  expect(pagesPosts(f)).toHaveLength(1);
+});
+it('blocks a site-only identity while a release intent is submitted but unverified', async () => {
+  const f = fixture();
+  seedVerifiedRelease(f);
+  f.setPagesState('deployment_failed');
+  const pending = { ...identity, tag: 'v1.7.0', commit: 'c'.repeat(40) };
+  const first = f.argsFor(pending);
+  await expect(publishPages(first)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+  await expect(publishPages(f.argsFor(siteIdentity))).rejects.toThrow(
+    'OTHER_PUBLICATION_UNRESOLVED',
+  );
+  expect(pagesPosts(f)).toHaveLength(1);
+});
+it('reads a verified site-only publication with the highest id as site_drift provenance', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified' });
+  expect(selectSiteDriftProvenance(f.deployments, f.statusesOf)).toEqual({
+    commit: siteIdentity.commit,
+    tag: siteIdentity.tag,
+    intentId: '9',
+  });
 });
