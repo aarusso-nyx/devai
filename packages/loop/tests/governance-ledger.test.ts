@@ -15,15 +15,8 @@ import {
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
-// Unresolved citations that sit outside TASK-0241's boundary. Each names one of the retired
-// identities and is reported for a follow-up change; no other citation may be unresolved.
+// Identities retired by TASK-0241; no active file may cite them again.
 const RETIRED_IDENTITIES = new Set(['ADR-001', 'ADR-003', 'DII-103', 'DII-104']);
-const OUT_OF_BOUNDARY_CITATIONS = new Set([
-  'docs/dev/operations/self-scorecard-campaign/README.md',
-  'packages/skills/src/inv-override/index.ts',
-  'product/campaigns/CMP-0002-self-scorecard/campaign.json',
-  'product/campaigns/CMP-0002-self-scorecard/prompts/TASK-0241.md',
-]);
 
 const roots: string[] = [];
 afterEach(() => {
@@ -273,16 +266,8 @@ describe('the governance ledger sensors on the repository (ADR-SCR-0006 IA-004)'
     expect(decisionRecordIntegrity({ repoRoot: REPO_ROOT })).toEqual({ ok: true, findings: [] });
   });
 
-  it('decision_citation_resolution resolves every citation inside the task boundary', () => {
-    const report = decisionCitationResolution({ repoRoot: REPO_ROOT });
-    const inBoundary = report.findings.filter(
-      (finding) => !OUT_OF_BOUNDARY_CITATIONS.has(finding.path ?? ''),
-    );
-    expect(inBoundary).toEqual([]);
-    for (const finding of report.findings) {
-      const cited = /cites missing (\S+)\.$/u.exec(finding.message)?.[1] ?? finding.message;
-      expect(RETIRED_IDENTITIES.has(cited), finding.message).toBe(true);
-    }
+  it('decision_citation_resolution reports zero findings over the repository', () => {
+    expect(decisionCitationResolution({ repoRoot: REPO_ROOT })).toEqual({ ok: true, findings: [] });
   });
 
   it('the repointed schema examples and scorecard notes cite no retired identity', () => {
@@ -290,6 +275,7 @@ describe('the governance ledger sensors on the repository (ADR-SCR-0006 IA-004)'
       'law/schemas/adr.schema.json',
       'law/schemas/invariant.schema.json',
       'packages/loop/src/loop/scorecard.ts',
+      'packages/skills/src/inv-override/index.ts',
     ]) {
       const source = readFileSync(join(REPO_ROOT, path), 'utf8');
       for (const retired of RETIRED_IDENTITIES) {
