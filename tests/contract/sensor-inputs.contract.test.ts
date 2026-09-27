@@ -123,6 +123,24 @@ describe('DEVAI sensor inputs declaration', () => {
     expect(existsSync(resolve(ROOT, config))).toBe(true);
     expect(statSync(resolve(ROOT, argv[argv.length - 1] as string)).isDirectory()).toBe(true);
   });
+
+  it.each([
+    ['unit_test', 'tests/contract'],
+    ['integration_test', 'tests/integration'],
+    ['e2e_test', 'tests/e2e'],
+  ])('declares the %s suite argv in the governed vitest shape over %s', (kind, dir) => {
+    const argv = declaration.inputs[kind]?.['argv'] as string[];
+    expect(argv).toEqual([
+      'pnpm',
+      'vitest',
+      'run',
+      '--config',
+      'tests/config/local.config.ts',
+      dir,
+    ]);
+    expect(existsSync(resolve(ROOT, argv[4] as string))).toBe(true);
+    expect(statSync(resolve(ROOT, dir)).isDirectory()).toBe(true);
+  });
 });
 
 describe('sensor inputs schema', () => {

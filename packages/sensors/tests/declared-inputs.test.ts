@@ -21,6 +21,9 @@
 //     through runCommand, with no package.json lookup (TASK-0264). The legacy
 //     `{ repoRoot, scriptName }` runs `pnpm <scriptName>` only when no argv is
 //     declared.
+//   - senseTest accepts `{ cwd, suite, argv }` and runs the declared vector exactly
+//     through runCommand for the unit, integration, and e2e suites (TASK-0267); with
+//     no argv it keeps the suite's hardcoded t1/t3/t5 vitest configuration.
 //   - senseHarnessIdiomaticity accepts `{ repoRoot, minWorkflowsForReusableCheck }`
 //     and drops the reusable-workflow signal from both the score and its
 //     denominator when workflow_count is below the declared threshold
@@ -46,6 +49,7 @@ import { senseHarnessIdiomaticity } from '../src/harness-idiomaticity.js';
 import { sensePerfTest } from '../src/perf-test.js';
 import { sensePlantDepth } from '../src/plant-depth.js';
 import { senseSpecDepth } from '../src/spec-depth.js';
+import { senseTest, type TestSuite } from '../src/test.js';
 import { senseTestCoverageDepth } from '../src/test-coverage-depth.js';
 import { senseTestIdiomaticity } from '../src/test-idiomaticity.js';
 import { senseTestPerformanceCoverage } from '../src/test-performance-coverage.js';
@@ -344,6 +348,67 @@ describe('declared argv reaches perf_test', () => {
     sensePerfTest({ repoRoot: root });
     expect(run.runCommand.mock.calls[0]?.[0]).toEqual(['pnpm', 'test:perf']);
   });
+});
+
+describe('declared argv reaches unit_test, integration_test, and e2e_test', () => {
+  const suiteArgv = (dir: string): readonly string[] => [
+    'pnpm',
+    'vitest',
+    'run',
+    '--config',
+    'tests/config/local.config.ts',
+    dir,
+  ];
+  const cases: readonly (readonly [TestSuite, string, string, string])[] = [
+    ['unit', 'unit_test', 'tests/contract', 'tests/config/t1.unit.config.ts'],
+    [
+      'integration',
+      'integration_test',
+      'tests/integration',
+      'tests/config/t3.integration.config.ts',
+    ],
+    ['e2e', 'e2e_test', 'tests/e2e', 'tests/config/t5.e2e.config.ts'],
+  ];
+
+  it.each(cases)(
+    'the %s suite runs the declared argv exactly and reads it as its command',
+    (suite, kind, dir) => {
+      run.runCommand.mockReturnValue({
+        stdout: ' Test Files  2 passed (2)\n      Tests  9 passed (9)\n',
+        stderr: '',
+        exit_code: 0,
+        duration_ms: 11,
+        killed: false,
+      });
+      const argv = suiteArgv(dir);
+      const reading = senseTest({ cwd: root, suite, argv });
+
+      expect(run.runCommand).toHaveBeenCalledTimes(1);
+      expect(run.runCommand.mock.calls[0]?.[0]).toEqual([...argv]);
+      expect(reading.sensor.kind).toBe(kind);
+      expect(reading.status).toBe('pass');
+      expect(reading.command).toBe(argv.join(' '));
+      expect(metric(reading, 'tests_passed')).toBe(9);
+    },
+  );
+
+  it.each(cases)(
+    'the %s suite keeps its hardcoded configuration when no argv is declared',
+    (suite, _kind, _dir, config) => {
+      run.runCommand.mockReturnValue({
+        stdout: '',
+        stderr: '',
+        exit_code: 0,
+        duration_ms: 1,
+        killed: false,
+      });
+      senseTest({ cwd: root, suite, argv: [] });
+      senseTest({ cwd: root, suite });
+      for (const call of run.runCommand.mock.calls) {
+        expect(call[0]).toEqual(['pnpm', 'vitest', 'run', '--config', config]);
+      }
+    },
+  );
 });
 
 describe('declared minWorkflowsForReusableCheck reaches harness_idiomaticity', () => {

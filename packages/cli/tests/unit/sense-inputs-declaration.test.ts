@@ -36,9 +36,11 @@
 //      sensors, adrDir and invariantsDir to senseSpecDepth, coveragePath to the coverage
 //      normalizer, tsconfigPath to senseActionEffectInference, argv to senseTypeCheck
 //      (`{ cwd, argv }`), argv and the legacy scriptName to sensePerfTest
-//      (`{ repoRoot, argv, scriptName }`).
+//      (`{ repoRoot, argv, scriptName }`), argv to senseTest for unit_test,
+//      integration_test, and e2e_test (`{ cwd, suite, argv }`).
 //      Real sensors run for the walkers, spec depth, and coverage depth; type check,
-//      perf test, and effect inference are stubbed so nothing is spawned.
+//      perf test, the suite test sensors, and effect inference are stubbed so nothing
+//      is spawned.
 import {
   existsSync,
   mkdirSync,
@@ -62,6 +64,7 @@ const adapterCalls = vi.hoisted(
 const stubs = vi.hoisted(() => ({
   senseTypeCheck: vi.fn(),
   sensePerfTest: vi.fn(),
+  senseTest: vi.fn(),
   senseActionEffectInference: vi.fn(),
 }));
 
@@ -80,6 +83,15 @@ vi.mock('@devai-nyx/sensors', async (importOriginal) => {
     perProject: [],
   }));
   stubs.sensePerfTest.mockImplementation(() => reading('perf_test'));
+  stubs.senseTest.mockImplementation((options: { readonly suite: string }) =>
+    reading(
+      options.suite === 'integration'
+        ? 'integration_test'
+        : options.suite === 'e2e'
+          ? 'e2e_test'
+          : 'unit_test',
+    ),
+  );
   stubs.senseActionEffectInference.mockImplementation(() =>
     Promise.resolve({ report: {}, reading: reading('action_effect_inference') }),
   );
@@ -359,6 +371,7 @@ beforeEach(() => {
   adapterCalls.length = 0;
   stubs.senseTypeCheck.mockClear();
   stubs.sensePerfTest.mockClear();
+  stubs.senseTest.mockClear();
   stubs.senseActionEffectInference.mockClear();
 });
 
@@ -661,6 +674,31 @@ describe('sense run delivers each declared key to its sensor', () => {
     ];
     expect(options.argv).toEqual(argv);
     expect(options.scriptName).toBeUndefined();
+  });
+
+  it.each([
+    ['unit_test', 'unit', 'tests/contract'],
+    ['integration_test', 'integration', 'tests/integration'],
+    ['e2e_test', 'e2e', 'tests/e2e'],
+  ] as const)('%s delivers the declared suite argv', async (kind, suite, dir) => {
+    const argv = ['pnpm', 'vitest', 'run', '--config', 'tests/config/local.config.ts', dir];
+    const root = makeRepo({ schemaVersion: '1.0.0', inputs: { [kind]: { argv } } });
+    readingOf(await senseRun(kind, { repoRoot: root }));
+    expect(stubs.senseTest).toHaveBeenCalledTimes(1);
+    const [options] = stubs.senseTest.mock.calls[0] as [
+      { readonly cwd: string; readonly suite: string; readonly argv?: readonly string[] },
+    ];
+    expect(options.suite).toBe(suite);
+    expect(options.argv).toEqual(argv);
+    expect(canonical(root, options.cwd)).toBe(canonical(root, '.'));
+  });
+
+  it('unit_test keeps the sensor default when no argv is declared', async () => {
+    const root = makeRepo(null);
+    readingOf(await senseRun('unit_test', { repoRoot: root }));
+    expect(stubs.senseTest).toHaveBeenCalledTimes(1);
+    const [options] = stubs.senseTest.mock.calls[0] as [{ readonly argv?: readonly string[] }];
+    expect(options.argv).toBeUndefined();
   });
 
   it('plant_depth leaves the declared exclusion globs out of the plant', async () => {
