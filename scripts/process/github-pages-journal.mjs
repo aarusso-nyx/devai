@@ -48,7 +48,11 @@ export function githubPagesControls({
   retainRecord,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
-  inspectPagesMigrationAudit(auditBytes, auditSha256, identity);
+  // A site-only publication has no tag-bound migration audit: it replaces site
+  // bytes the journal already covers, so readJournal requires a verified release
+  // baseline instead (ADR-REL-0029).
+  const siteOnly = identity?.mode === 'site-only';
+  if (!siteOnly) inspectPagesMigrationAudit(auditBytes, auditSha256, identity);
   if (!token || !/^[1-9][0-9]*$/u.test(runId) || !/^[1-9][0-9]*$/u.test(attempt))
     fail('CONFIGURATION');
   let preparedOidcToken;
@@ -114,6 +118,7 @@ export function githubPagesControls({
   async function readJournal() {
     const deployments = await collection(`${ROOT}/deployments?task=${encodeURIComponent(TASK)}`);
     const records = [];
+    let releaseBaseline = false;
     for (const deployment of deployments) {
       const payload = deployment.payload;
       if (
@@ -155,6 +160,7 @@ export function githubPagesControls({
         pagesId = match[2];
         phase = match[1];
       }
+      if (phase === 'verified' && !Object.hasOwn(payload.identity, 'mode')) releaseBaseline = true;
       const matchingIdentity =
         payload.identity !== null &&
         typeof payload.identity === 'object' &&
@@ -173,6 +179,9 @@ export function githubPagesControls({
         phase,
       });
     }
+    // Site-only publication replaces bytes a verified release already covered;
+    // with no verified release in the journal there is nothing to replace.
+    if (siteOnly && !releaseBaseline) fail('SITE_BASELINE_MISSING');
     return { complete: true, migrationAudited: true, records };
   }
   async function writeStatus(record, verified) {
@@ -226,7 +235,9 @@ export function githubPagesControls({
         required_contexts: [],
         transient_environment: false,
         production_environment: false,
-        description: `Pages publication intent for ${selected.tag}`,
+        description: `Pages publication intent for ${selected.tag}${
+          selected.mode === 'site-only' ? ` (site-only from ${selected.commit})` : ''
+        }`,
       });
       if (!numericId(result?.id)) fail('INTENT_RESPONSE_INVALID');
       await retainRecord({ phase: 'intent-created', intentId: String(result.id), payload });

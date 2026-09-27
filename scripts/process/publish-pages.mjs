@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { appendFileSync, closeSync, fsyncSync, mkdirSync, openSync } from 'node:fs';
+import { appendFileSync, closeSync, mkdirSync, openSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { inspectAssets } from './rehearsal.mjs';
 import { githubPagesControls } from './github-pages-journal.mjs';
 import { publishPages } from './pages-publication.mjs';
+import { getOidcToken, retainRecord as retainRecordTo } from './pages-runtime.mjs';
 import { readPublicFile, siteMembers, verifyPagesBytes } from './verify-pages-bytes.mjs';
 
 const [assetsDirectory, siteDirectory, recordDirectory] = process.argv.slice(2);
@@ -30,37 +31,7 @@ const identity = {
 mkdirSync(recordDirectory, { recursive: true, mode: 0o700 });
 const recordPath = join(recordDirectory, 'pages-publication.jsonl');
 const descriptor = openSync(recordPath, 'ax', 0o600);
-function retainRecord(record) {
-  appendFileSync(descriptor, `${JSON.stringify(record)}\n`);
-  fsyncSync(descriptor);
-}
-async function getOidcToken() {
-  const endpoint = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL);
-  if (
-    endpoint.protocol !== 'https:' ||
-    !endpoint.hostname.endsWith('.actions.githubusercontent.com') ||
-    endpoint.username ||
-    endpoint.password ||
-    !env.ACTIONS_ID_TOKEN_REQUEST_TOKEN
-  )
-    throw new Error('PAGES_OIDC_CONTEXT');
-  const response = await fetch(endpoint, {
-    redirect: 'error',
-    signal: AbortSignal.timeout(15000),
-    headers: { Authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
-  });
-  if (response.status !== 200 || !response.body) throw new Error('PAGES_OIDC_UNAVAILABLE');
-  const chunks = [];
-  let bytes = 0;
-  for await (const chunk of response.body) {
-    bytes += chunk.length;
-    if (bytes > 65536) throw new Error('PAGES_OIDC_UNAVAILABLE');
-    chunks.push(chunk);
-  }
-  const result = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  if (typeof result.value !== 'string' || !result.value) throw new Error('PAGES_OIDC_UNAVAILABLE');
-  return result.value;
-}
+const retainRecord = (record) => retainRecordTo(descriptor, record);
 try {
   const controls = githubPagesControls({
     token: env.GH_TOKEN,
@@ -69,7 +40,7 @@ try {
     attempt: env.GITHUB_RUN_ATTEMPT,
     auditBytes: Buffer.from(env.PAGES_MIGRATION_AUDIT_JSON ?? ''),
     auditSha256: env.PAGES_MIGRATION_AUDIT_SHA256,
-    getOidcToken,
+    getOidcToken: () => getOidcToken(env),
     retainRecord,
     verifyLiveBytes: () => verifyPagesBytes(resolve(siteDirectory), readPublicFile),
   });
