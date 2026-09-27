@@ -5,7 +5,7 @@
     {
       "id": "UC-devai-cli-current-actions",
       "title": "Use the current DEVAI CLI",
-      "goal": "Select and run one of the 41 supported release-candidate actions.",
+      "goal": "Select and run one of the 61 registered actions. This catalogue case lists the 41 general actions; the five journey cases that follow cover the remaining 20 (audit, backlog, release ceremony, round tracking, triage) in the order an operator uses them.",
       "actors": ["operator", "owner", "architect", "inspector", "engineer", "auditor"],
       "preconditions": [
         "DEVAI is installed in an adopter repository.",
@@ -513,7 +513,747 @@
       ],
       "acceptanceCriteria": [
         "Every action reference resolves exactly once in the current action registry.",
-        "The use case describes exactly the current registered action population."
+        "Together with the journey cases in this file, the use cases reference exactly the current registered action population."
+      ]
+    },
+    {
+      "id": "UC-devai-audit-observe-head",
+      "title": "Observe one exact commit as the Auditor",
+      "goal": "Compute a deterministic scorecard for one exact commit and, when evidence is wanted, record a non-promoting Auditor observation of it.",
+      "actors": ["auditor"],
+      "preconditions": [
+        "The repository carries a bound harness and the full commit sha of the head to observe is known.",
+        "The session declares the auditor role; `audit observe` admits no other initiator."
+      ],
+      "triggers": [
+        "A maintainer wants a reproducible assessment of one exact commit that neither promotes readiness nor authorizes a release."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `audit scorecard --at <full-sha> --repo-root . --format json`: compute the deterministic scorecard for that exact commit without persisting audit artifacts or evidence.",
+          "actorRole": "auditor",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "audit scorecard"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Read the scorecard cells. PASS is a measurement; review, unknown, fail, and N/A remain non-claims and none of them ratifies anything.",
+          "actorRole": "auditor"
+        },
+        {
+          "id": "step-03",
+          "action": "Run `audit observe --at <full-sha> --repo-root . --as-role auditor --write`: regenerate inventory, scorecard, assessment, and backlog for that exact commit as non-promoting Auditor evidence through the harness boundary.",
+          "actorRole": "auditor",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "audit observe"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-04",
+          "action": "Run `evidence verify` over the declared scope to confirm the recorded observation is intact before citing it.",
+          "actorRole": "auditor",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "evidence verify"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "The observation belongs to a round whose governance tracking is enabled.",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "Run `audit observe --at <full-sha> --round <round-id> --as-role auditor --write`: the observation is recorded as a `finding_emitted` tracking event, as an observation and never as a verdict. Without `--round` nothing is attributed; a round is never inferred.",
+              "actorRole": "auditor",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "audit observe"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "`--at` names an abbreviated sha or a commit that is not the exact commit under audit.",
+          "handling": "The action refuses fail-closed; no partial artifact is written."
+        },
+        {
+          "id": "exc-02",
+          "when": "The session role is not auditor or `--write` is absent.",
+          "handling": "`audit observe` is refused before any effect; `audit scorecard` still runs read-only."
+        }
+      ],
+      "postconditions": [
+        "Any recorded audit artifact is bound to the exact commit, is non-promoting, and grants no authority to merge, publish, or close a round."
+      ],
+      "acceptanceCriteria": [
+        "`audit scorecard` returns byte-identical results for the same commit and inputs.",
+        "`audit observe` requires the auditor role plus explicit write consent and records only Auditor evidence."
+      ]
+    },
+    {
+      "id": "UC-devai-backlog-work",
+      "title": "Work the repository backlog as the Engineer",
+      "goal": "Record, inspect, and resolve repository backlog items (finding, proposition, note, or flaky-test) without opening or altering a round gap.",
+      "actors": ["engineer", "owner", "architect", "inspector", "auditor"],
+      "preconditions": [
+        "The backlog store under .devai/state/backlog/ sits behind the harness boundary.",
+        "The session declares one of the roles the registry admits for backlog writes: owner, architect, inspector, engineer, or auditor."
+      ],
+      "triggers": [
+        "A finding, proposition, note, or flaky test surfaces during work and must be kept without a round gap or a network call."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `backlog list --repo-root .`: list open repository backlog items without network access.",
+          "actorRole": "engineer",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "backlog list"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `backlog add --kind <finding|proposition|note|flaky-test> --title <title> --body <body> --as-role engineer --write`: record one schema-validated item under .devai/state/backlog/ through the harness boundary.",
+          "actorRole": "engineer",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "backlog add"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Run `backlog show <item-id>`: read the recorded item back by id without network access.",
+          "actorRole": "engineer",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "backlog show"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-04",
+          "action": "Do the remediation under the authority of the task that owns it; the backlog item grants none.",
+          "actorRole": "engineer"
+        },
+        {
+          "id": "step-05",
+          "action": "Run `backlog resolve <item-id> --resolution <commit|pull-request|record|task|item reference> --as-role engineer --write`: mark the item resolved with its resolution reference. The command never pauses, resolves, or otherwise alters a round gap.",
+          "actorRole": "engineer",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "backlog resolve"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "The item belongs to a governed round.",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "Run `backlog add ... --round <round-id>`: round attribution is opt-in at creation and is never inferred from the session, the branch, or the active round. With governance tracking enabled the item is projected as a `backlog_item_projected` event.",
+              "actorRole": "engineer",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "backlog add"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "alt-01-02",
+              "action": "Run `backlog list --round <round-id>`: narrow the listing to items attributed to that round at creation.",
+              "actorRole": "engineer",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "backlog list"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "alt-01-03",
+              "action": "Run `backlog resolve <item-id> --resolution <reference> --write`: attribution is read from the item, never inferred at resolution.",
+              "actorRole": "engineer",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "backlog resolve"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "The kind is not one of finding, proposition, note, or flaky-test, or the title or body is missing.",
+          "handling": "`backlog add` refuses with a structured error and writes nothing."
+        },
+        {
+          "id": "exc-02",
+          "when": "`backlog resolve` names an unknown item id or an empty resolution reference.",
+          "handling": "The action refuses; the item and every round gap stay untouched."
+        }
+      ],
+      "postconditions": [
+        "Every recorded item validates against backlog-item.schema.json and carries its own round attribution or none.",
+        "Round gaps are unchanged by any backlog action."
+      ],
+      "acceptanceCriteria": [
+        "Add and resolve require a permitted role plus explicit write consent; list and show are read-only and make no network call.",
+        "No backlog action infers a round."
+      ]
+    },
+    {
+      "id": "UC-devai-release-rehearse-promote",
+      "title": "Rehearse and promote one exact release candidate as the Owner",
+      "goal": "Take one exact candidate through the recorded release lifecycle, from plan receipt to publication, rehearsing each state before granting any remote effect.",
+      "actors": ["owner", "inspector", "architect"],
+      "preconditions": [
+        "The candidate is one exact commit under the bound release lifecycle policy.",
+        "Each persisted state requires its predecessor as law/policy/release-lifecycle.json orders them: preflight_passed, certified, prepared, exported, evidence_published, publication_dispatched.",
+        "The Owner holds a separate one-time authorization for each remote-write step and passes `--publish` explicitly."
+      ],
+      "triggers": [
+        "The Owner decides to promote a candidate that has passed governed checks and wants every transition recorded and verifiable."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `release plan` for the candidate: resolve the lifecycle plan from canonical inputs and emit a deterministic plan receipt. Nothing is persisted; the candidate is `planned`.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release plan"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `release check`: evaluate release eligibility without granting publication authority.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release check"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Run `release preflight --as-role inspector --write`: record `preflight_passed` for the exact candidate against the bound valid plan receipt. It grants no packaging or publication authority.",
+          "actorRole": "inspector",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release preflight"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-04",
+          "action": "Run `release certify --as-role inspector --write`: record the Inspector certification transition through the protected certification provider and its content-addressed evidence sink; the candidate is `certified`.",
+          "actorRole": "inspector",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release certify"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-05",
+          "action": "Run `release prepare --write`: compose the certified candidate release material in memory and expose it only through the injected trusted two-phase artifact sink under Architect authority; the candidate is `prepared`. No remote effect, no pathname destination, no npm or tool subprocess.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release prepare"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-06",
+          "action": "Run `release export --write`: export the prepared candidate through the append-only artifact-sink extension with one protected aggregate signer; the candidate is `exported`. No remote effect.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release export"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-07",
+          "action": "Run `release offline-verify`: verify the exported candidate and its evidence bundle without network access and emit the deterministic offline-verification receipt. It persists no state and grants no transition.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release offline-verify"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-08",
+          "action": "Run `release evidence-publish --publish --as-role owner --write`: publish the exported evidence bundle under an Owner-issued one-time authorization bound to the passing offline-verification receipt; the candidate is `evidence_published`. The product is not published.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release evidence-publish"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-09",
+          "action": "Run `release publish --publish --as-role owner --write`: dispatch the product publication under a separate Owner-issued one-time authorization and record `publication_dispatched`. Published evidence never authorizes it.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release publish"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-10",
+          "action": "Run `release resume`: report the exact recorded lifecycle head and the states verifiable from receipts; `published` is derived only from a verified signed publication receipt.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release resume"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-11",
+          "action": "Run `release verify`: verify the post-deployment release state under the release controller.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "release verify"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "The Owner rehearses the ceremony before granting any authority.",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "Run `release status --repo-root . --format json`: read release-control status without persisting evidence or state.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "release status"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "alt-01-02",
+              "action": "Run `release plan`: read the deterministic plan receipt the ceremony will bind to.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "release plan"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "alt-01-03",
+              "action": "Run `release resume`: read the recorded head for the candidate; the observation advances, repairs, and revives nothing.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "release resume"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "alt-02",
+          "when": "The ceremony is interrupted after a persisted state.",
+          "steps": [
+            {
+              "id": "alt-02-01",
+              "action": "Run `release resume` to learn the exact recorded head, then continue from the next state; no state is re-recorded and no gap in the chain is repaired implicitly.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "release resume"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "alt-03",
+          "when": "Runtime drift is suspected after publication.",
+          "steps": [
+            {
+              "id": "alt-03-01",
+              "action": "Run `release drift`: inspect and record release-runtime drift under the release controller.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "release drift"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "A state is requested whose required predecessor is not recorded for the exact candidate.",
+          "handling": "The action refuses; the lifecycle head is unchanged."
+        },
+        {
+          "id": "exc-02",
+          "when": "`release evidence-publish` or `release publish` is invoked without `--publish` or without its own Owner one-time authorization.",
+          "handling": "The remote effect is refused before dispatch."
+        },
+        {
+          "id": "exc-03",
+          "when": "`release offline-verify` fails or its receipt does not bind the exported artifacts byte for byte.",
+          "handling": "`release evidence-publish` refuses; nothing leaves the repository."
+        }
+      ],
+      "postconditions": [
+        "Every persisted state is an appendable record bound to the exact candidate, and each remote effect was separately authorized by the Owner."
+      ],
+      "acceptanceCriteria": [
+        "Read-only leaves (plan, check, status, offline-verify, resume) persist nothing and grant no transition.",
+        "The remote-write leaves require the owner role, explicit write consent, and `--publish`."
+      ]
+    },
+    {
+      "id": "UC-devai-round-tracking",
+      "title": "Track one governed round in a GitHub issue",
+      "goal": "Opt one round into governance tracking, project its public-safe events into one GitHub issue, watch projection health, and switch tracking off without losing what was published.",
+      "actors": ["architect", "owner"],
+      "preconditions": [
+        "The round exists under law/policy/round-execution.json.",
+        "An authenticated `gh` boundary is available; DEVAI stores no token.",
+        "Tracking is disabled by default and remains so until the Owner activates it for exactly one round."
+      ],
+      "triggers": [
+        "The Owner wants a public-safe projection of one round's governed findings and mediated actions."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `init bind --tracking-adapter github-issues --tracking-repository <owner/name> --as-role architect --write` (dry run by default): bind the repository capability, materializing the tracking config, the reconciliation workflow, and the project binding.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init bind"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `round tracking enable --round <round-id> --publish --as-role owner --write`: record the Owner authorization that activates tracking and bounded public projection for exactly that round. `--publish` is never inferred from the binding.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round tracking enable"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Run `round tracking status --round <round-id>`: report canonical event counts and remote projection health as independent axes, with no network call.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round tracking status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-04",
+          "action": "Run `round tracking sync --round <round-id> --publish --as-role owner --write`: reconcile the round's sealed projection outbox against the remote issue idempotently; a missing issue is never recreated implicitly.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round tracking sync"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-05",
+          "action": "Run `round tracking disable --round <round-id> --pending freeze --as-role owner --write`: disable tracking for the round, freezing pending events and never deleting an already published projection.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round tracking disable"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "The projection lags or the remote is unreachable.",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "Run `round tracking status --round <round-id>`: the projection reads pending, failed, or unreachable while round readiness stays a separate axis; a remote failure never manufactures or withdraws a verdict.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "round tracking status"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "alt-01-02",
+              "action": "Run `round tracking sync --round <round-id> --publish --as-role owner --write` again once the remote is reachable; the reconciliation is idempotent.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "round tracking sync"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "`round tracking enable` or `round tracking sync` is invoked without `--publish`.",
+          "handling": "The remote-write is refused; publication consent is never inferred."
+        },
+        {
+          "id": "exc-02",
+          "when": "The bound tracking repository does not match the remote, or a supplied authority session fails validation.",
+          "handling": "The action refuses rather than re-targeting or silently downgrading the chain identity."
+        }
+      ],
+      "postconditions": [
+        "Only DEVAI-mediated actions are tracked, every projected event is public-safe, and a disabled round keeps its published projection."
+      ],
+      "acceptanceCriteria": [
+        "Enable, sync, and disable require the owner role, explicit write consent, and `--publish`; status is read-only and offline.",
+        "A repository without a tracking binding behaves exactly as before the feature existed."
+      ]
+    },
+    {
+      "id": "UC-devai-triage-classify",
+      "title": "Classify a sensor failure before remediation",
+      "goal": "Turn one failing or reviewing SensorReading into a recorded, deterministic classification and remediation route before anything is changed.",
+      "actors": ["inspector", "owner", "architect", "engineer", "auditor"],
+      "preconditions": [
+        "One schema-valid SensorReading is available as a file.",
+        "The session declares a role the registry admits for `triage classify`: owner, architect, inspector, engineer, or auditor."
+      ],
+      "triggers": [
+        "A sensor reports fail or review and the route to remediation must be chosen before any product code, sensor, or policy is touched."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `sense run <kind> --repo-root . --format json` and keep the reading: one SensorReading is the only input triage accepts.",
+          "actorRole": "inspector",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "sense run"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `triage classify --input <reading.json> --as-role inspector --write`: deterministically classify the reading as plant_bug, sensor_error, policy_issue, reference_gap, or inconclusive, and record its route (discipline and action) through the harness boundary.",
+          "actorRole": "inspector",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "triage classify"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Follow the recorded route under its own authority and cost; the classification is neither proof that remediation succeeded nor permission to mutate product code.",
+          "actorRole": "inspector"
+        },
+        {
+          "id": "step-04",
+          "action": "Run `sense run <kind>` for a fresh observation and `check` for governed validation once the route is worked.",
+          "actorRole": "inspector",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "sense run"
+              },
+              {
+                "id": "check"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "The classification is inconclusive.",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "`triage classify` records the `escalate_to_human` route; the uncertainty is explicit and never becomes a positive claim.",
+              "actorRole": "inspector",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "triage classify"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "alt-02",
+          "when": "The classification is reference_gap and the route is `emit_rgr`.",
+          "steps": [
+            {
+              "id": "alt-02-01",
+              "action": "Run `round gap create` for the active round: the reference gap becomes a governed round gap record through the harness boundary.",
+              "actorRole": "inspector",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "round gap create"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "alt-03",
+          "when": "The reading belongs to a round whose governance tracking is enabled.",
+          "steps": [
+            {
+              "id": "alt-03-01",
+              "action": "Run `triage classify --input <reading.json> --round <round-id> --as-role inspector --write`: the classification is recorded as a `finding_classified` tracking event. Without `--round` nothing is attributed; a round is never inferred.",
+              "actorRole": "inspector",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "triage classify"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "`--input` is missing, unreadable, or not a schema-valid SensorReading.",
+          "handling": "The action refuses fail-closed and records no route."
+        },
+        {
+          "id": "exc-02",
+          "when": "The session role is not admitted or `--write` is absent.",
+          "handling": "The harness-write is refused before any classification is persisted."
+        }
+      ],
+      "postconditions": [
+        "One classification and route are recorded for the reading; the reading itself and the sensed surface are unchanged."
+      ],
+      "acceptanceCriteria": [
+        "The same reading classifies identically on every run.",
+        "An inconclusive reading always routes to a human."
       ]
     }
   ]
