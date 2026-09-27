@@ -1073,7 +1073,7 @@
       "id": "R-0204",
       "title": "Governance ledger sensors on ADR v2",
       "goal": "The decision record integrity and citation resolution sensors validate the second-generation decision records and report zero findings on main.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0006"],
       "depends_on": ["R-0201"],
       "attestation_reissue": false,
@@ -1100,7 +1100,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F1"],
               "boundary": {
                 "paths": [
@@ -1109,7 +1109,11 @@
                   "law/schemas/adr.schema.json",
                   "law/schemas/invariant.schema.json",
                   "packages/loop/src/loop/scorecard.ts",
-                  "law/adr/README.md"
+                  "law/adr/README.md",
+                  "product/campaigns/CMP-0002-self-scorecard/campaign.json",
+                  "product/campaigns/CMP-0002-self-scorecard/prompts/TASK-0241.md",
+                  "docs/dev/operations/self-scorecard-campaign/README.md",
+                  "packages/skills/src/inv-override/index.ts"
                 ],
                 "forbidden": [".github/workflows/", "law/adr/ADR-"]
               },
@@ -1130,13 +1134,21 @@
                   "json"
                 ]
               ],
-              "commit_types": ["fix(loop)", "test(loop)", "law(schemas)", "docs(law)"],
+              "commit_types": [
+                "fix(loop)",
+                "test(loop)",
+                "law(schemas)",
+                "docs(law)",
+                "plan(campaign)",
+                "docs(dev)",
+                "fix(skills)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-0241.md",
-                "sha256": "1a071c09a0063ed2d41c360da0625588057cb4bbbd840e9abb950bf073418cdc"
+                "sha256": "b6b08aa01cc2256386d1e4480e586fca117d5ec8afa6a8f8ae6be61dd36b6649"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/133",
+              "merged_as": "c4ad27a992cf5a5f85c01ab280091585de359959",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1145,7 +1157,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "2928b5cc7039a9c1fbfb92549c9483e6cca5f418",
+        "closed_at": "2026-09-27T15:24:22Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0205",
