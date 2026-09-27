@@ -1169,7 +1169,7 @@
       "id": "R-0205",
       "title": "Plant and observation hygiene",
       "goal": "The dependency audit is clean, tests are classified so the security, performance, and robustness coverage sensors count them, the largest plant files are within depth thresholds, and the workflows satisfy the harness idiomaticity sensor.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0004", "ADR-SCR-0005"],
       "depends_on": ["R-0202", "R-0203"],
       "attestation_reissue": false,
@@ -1520,7 +1520,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1539,7 +1539,8 @@
                   "law/schemas/sensor-inputs.schema.json",
                   ".devai/config/sensor-inputs.json",
                   "law/policy/adopter-defaults/sensor-inputs.json",
-                  "docs/adopters/sensor-inputs.md"
+                  "docs/adopters/sensor-inputs.md",
+                  ".devai/config/change-taxonomy-binding.json"
                 ],
                 "forbidden": ["law/adr/", ".github/workflows/", "packages/cli/src/generated/"]
               },
@@ -1571,14 +1572,15 @@
                 "law(sensors)",
                 "feat(sensors)",
                 "test(plant)",
-                "docs(adopters)"
+                "docs(adopters)",
+                "chore(taxonomy)"
               ],
               "prompt": {
                 "path": "prompts/TASK-0256.md",
-                "sha256": "896a646b5ec7f846bf5562210936a2dabe7834b12a51a0ca96f1c4fb881e5fe9"
+                "sha256": "68ba6dbd3bd00fa0c39418ee56546d59910d2f235c7d9922bbc2ccc071aead03"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/142",
+              "merged_as": "b401b5e9319e0ad75fc19d2b89476657cfeb7282",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1587,13 +1589,19 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "b401b5e9319e0ad75fc19d2b89476657cfeb7282",
+        "closed_at": "2026-09-27T17:14:50Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0206",
       "title": "Persist readings and the first scorecard",
       "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed with every scoreable cell at PASS.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
       "depends_on": ["R-0204", "R-0205"],
       "attestation_reissue": false,
@@ -1619,7 +1627,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
