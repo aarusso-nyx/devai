@@ -258,7 +258,7 @@
       "id": "R-0202",
       "title": "Sensor inputs for the framework repository",
       "goal": "Every read-effect sensor that failed or reported review for a missing input runs against DEVAI with inputs declared in adopter configuration, and the harness sensors may call the GitHub CLI read-only.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0005", "ADR-SCR-0003"],
       "depends_on": ["R-0201"],
       "attestation_reissue": false,
@@ -285,7 +285,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -471,7 +471,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -720,7 +720,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
