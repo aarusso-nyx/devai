@@ -19,6 +19,11 @@
 //     local type and the argv cases fail until the sensor honors it.
 //   - sensePerfTest accepts `{ repoRoot, scriptName }` and runs that root script
 //     through runCommand (exists today).
+//   - senseHarnessIdiomaticity accepts `{ repoRoot, minWorkflowsForReusableCheck }`
+//     and drops the reusable-workflow signal from both the score and its
+//     denominator when workflow_count is below the declared threshold
+//     (exists today, TASK-0254/Phase 35.D). TASK-0255 wires the declared
+//     key through the adapter; the sensor's own default of 1 is unchanged.
 // runCommand is mocked so no compiler or package manager is ever spawned.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,6 +37,7 @@ const effects = vi.hoisted(() => ({ analyzeEffectProgram: vi.fn() }));
 vi.mock('@devai-nyx/effects-check', () => effects);
 
 import { senseActionEffectInference } from '../src/action-effect-inference.js';
+import { senseHarnessIdiomaticity } from '../src/harness-idiomaticity.js';
 import { sensePerfTest } from '../src/perf-test.js';
 import { senseSpecDepth } from '../src/spec-depth.js';
 import { senseTestCoverageDepth } from '../src/test-coverage-depth.js';
@@ -276,5 +282,65 @@ describe('declared scriptName reaches perf_test', () => {
     expect(run.runCommand).not.toHaveBeenCalled();
     expect(reading.status).toBe('unknown');
     expect(metric(reading, 'script_name')).toBe('bench:ci');
+  });
+});
+
+describe('declared minWorkflowsForReusableCheck reaches harness_idiomaticity', () => {
+  // Two workflows, each with a composite-action use and a cache use but no
+  // reusable-workflow use: everything the DEVAI declaration (5) describes,
+  // short of the threshold.
+  beforeEach(() => {
+    write(
+      '.github/workflows/first.yml',
+      `name: first
+jobs:
+  check:
+    steps:
+      - uses: ./.github/actions/build
+      - uses: actions/cache@v4
+`,
+    );
+    write(
+      '.github/workflows/second.yml',
+      `name: second
+jobs:
+  check:
+    steps:
+      - uses: ./.github/actions/test
+      - uses: actions/cache@v4
+`,
+    );
+  });
+
+  it('drops the reusable-workflow signal from the score when the declared threshold is above the workflow count', () => {
+    const reading = senseHarnessIdiomaticity({ repoRoot: root, minWorkflowsForReusableCheck: 5 });
+
+    expect(reading).toMatchObject({
+      status: 'pass',
+      metrics: {
+        workflow_count: 2,
+        reusable_workflow_uses: 0,
+        idiomaticity_score: 2,
+      },
+    });
+    expect(reading.findings?.map((f) => f.code)).not.toContain(
+      'HARNESS_IDIOMATICITY_NO_REUSABLE_WORKFLOWS',
+    );
+  });
+
+  it('keeps today’s behavior when the threshold is undeclared', () => {
+    const reading = senseHarnessIdiomaticity({ repoRoot: root });
+
+    expect(reading).toMatchObject({
+      status: 'review',
+      metrics: {
+        workflow_count: 2,
+        reusable_workflow_uses: 0,
+        idiomaticity_score: 2,
+      },
+    });
+    expect(reading.findings?.map((f) => f.code)).toContain(
+      'HARNESS_IDIOMATICITY_NO_REUSABLE_WORKFLOWS',
+    );
   });
 });
