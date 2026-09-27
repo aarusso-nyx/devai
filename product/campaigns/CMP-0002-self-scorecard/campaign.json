@@ -1945,11 +1945,169 @@
           ]
         },
         {
+          "id": "CTG-0266",
+          "title": "Make audit observe read the canonical sensor-readings store through the loop resolver",
+          "type": "single-role",
+          "records": ["ADR-SCR-0002"],
+          "depends_on": [],
+          "lock_scopes": ["packages/skills/src/post-merge-auditor/observation-bundle.ts"],
+          "gates": ["test:skills"],
+          "tasks": [
+            {
+              "id": "TASK-0266",
+              "title": "Make audit observe read the canonical sensor-readings store through the loop resolver",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "in_progress",
+              "target_substrates": ["F4", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/src/post-merge-auditor/observation-bundle.ts",
+                  "packages/skills/tests/unit/post-merge-boundaries.test.ts",
+                  "packages/skills/tests/unit/post-merge-observation-boundaries.test.ts",
+                  "docs/theory/framework/scorecard.md"
+                ],
+                "forbidden": ["law/", ".github/workflows/", "packages/loop/", "packages/cli/"]
+              },
+              "deliverables": [
+                "audit observe computes its scorecard from `.devai/state/sensor-readings` through the loop resolver, matching audit scorecard at the same head.",
+                "The skills suites are green with fixtures on the canonical store."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:skills"],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-diagnostics.test.ts"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(auditor)", "test(auditor)", "docs(theory)"],
+              "prompt": {
+                "path": "prompts/TASK-0266.md",
+                "sha256": "3447993b30b7e7e62e0f392262d3aaa6c49c10bf7cd5a7634e0bb98ffdf12426"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0267",
+          "title": "Declare the unit, integration, and e2e suite invocations as sensor inputs",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": ["law/schemas/sensor-inputs.schema.json", "packages/sensors/src/test.ts"],
+          "gates": ["test:sensors", "test:cli", "test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0267",
+              "title": "Declare the unit, integration, and e2e suite invocations as sensor inputs",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "in_progress",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-inputs.schema.json",
+                  ".devai/config/sensor-inputs.json",
+                  "packages/sensors/src/test.ts",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "packages/sensors/tests/unit/test-sensor.test.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "packages/cli/src/commands/sense/shared.ts",
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "packages/cli/tests/unit/sense-adapter-acceptance.test.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": [
+                  ".github/workflows/",
+                  "law/policy/",
+                  "packages/cli/src/authority/",
+                  "package.json"
+                ]
+              },
+              "deliverables": [
+                "The schema admits argv inputs for the three test sensors; DEVAI declares them; the hardcoded suite configurations remain the fallback for adopters.",
+                "`sense run unit_test`, `integration_test`, and `e2e_test` report pass on the repository under the broker's governed vitest shape.",
+                "test:sensors, test:cli, and test:root are green."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "unit_test",
+                  "--repo-root",
+                  ".",
+                  "--as-role",
+                  "engineer",
+                  "--write",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "integration_test",
+                  "--repo-root",
+                  ".",
+                  "--as-role",
+                  "engineer",
+                  "--write",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:root"]
+              ],
+              "commit_types": ["law(sensors)", "feat(sensors)", "test(sensors)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0267.md",
+                "sha256": "7dd0afec15c94eefb3ed48dcc08ab0763a1e45947283fb49f4eecda287fb1ba7"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        },
+        {
           "id": "CTG-0261",
           "title": "Record and audit",
           "type": "single-role",
           "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
-          "depends_on": ["CTG-0262", "CTG-0263", "CTG-0264", "CTG-0265"],
+          "depends_on": ["CTG-0262", "CTG-0263", "CTG-0264", "CTG-0265", "CTG-0266", "CTG-0267"],
           "lock_scopes": [
             ".devai/state/sensor-readings/",
             "record/proofs/compliance/scorecards/",
@@ -1963,7 +2121,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "planned",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
