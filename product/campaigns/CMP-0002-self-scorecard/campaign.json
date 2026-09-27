@@ -1712,7 +1712,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": ["package.json"],
@@ -1742,8 +1742,8 @@
                 "path": "prompts/TASK-0263.md",
                 "sha256": "51b918f1560889cc6cb65ef70bb91bdbde59dbe945e64ed46d2fe89c59e64413"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/148",
+              "merged_as": "042b232694db1fa45975ec382ebe438c31c3cb67",
               "execution": {
                 "tier": "worker",
                 "effort": "low",
@@ -1773,7 +1773,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F3", "F4"],
               "boundary": {
                 "paths": [
@@ -1847,8 +1847,8 @@
                 "path": "prompts/TASK-0264.md",
                 "sha256": "6398a7a56169f3be85b0cbc16cf960975664c93afc85123c7e8d1da21dfe1f7c"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/148",
+              "merged_as": "042b232694db1fa45975ec382ebe438c31c3cb67",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1876,7 +1876,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
