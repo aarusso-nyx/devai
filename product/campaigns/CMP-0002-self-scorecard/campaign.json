@@ -1602,7 +1602,7 @@
       "title": "Persist readings and the first scorecard",
       "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed with every scoreable cell at PASS.",
       "status": "open",
-      "records": ["ADR-SCR-0001", "ADR-SCR-0002", "ADR-SCR-0005"],
+      "records": ["ADR-SCR-0001", "ADR-SCR-0002", "ADR-SCR-0005", "ADR-SCR-0003"],
       "depends_on": ["R-0204", "R-0205"],
       "attestation_reissue": false,
       "owner_effects_required": [],
@@ -1753,11 +1753,115 @@
           ]
         },
         {
+          "id": "CTG-0264",
+          "title": "Performance sensor invocation",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005", "ADR-SCR-0003"],
+          "depends_on": ["CTG-0263"],
+          "lock_scopes": [
+            "law/schemas/sensor-inputs.schema.json",
+            "law/policy/subprocess-effects.json",
+            ".devai/config/",
+            "packages/sensors/src/perf-test.ts",
+            "packages/cli/src/authority/broker.ts"
+          ],
+          "gates": ["format:check", "test:sensors", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0264",
+              "title": "Declare the performance suite invocation as a sensor input and run it under the broker",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "in_progress",
+              "target_substrates": ["F2", "F3", "F4"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-inputs.schema.json",
+                  "law/policy/subprocess-effects.json",
+                  ".devai/config/sensor-inputs.json",
+                  ".devai/config/subprocess-effects.json",
+                  "packages/sensors/src/perf-test.ts",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "packages/cli/src/authority/broker.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "packages/cli/tests/unit/authority-broker-readonly-process.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-command.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-execution.test.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts",
+                  "packages/cli/tests/unit/sense-adapter-acceptance.test.ts",
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "packages/skills/tests/unit/authority-host-test-scope.ts",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": [
+                  ".github/workflows/",
+                  "package.json",
+                  "packages/cli/src/commands/sense/run-set.ts",
+                  "packages/cli/src/commands/sense/record.ts"
+                ]
+              },
+              "deliverables": [
+                "sense run perf_test and sense run type_check report pass on the repository under the broker, with no shell and no package-runner indirection.",
+                "The schema admits perf_test.argv, DEVAI declares it, and adopters can keep the legacy scriptName key.",
+                "test:sensors and test:cli are green, the frozen doctor digest matches, and the commit range is single-family per commit."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "perf_test",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "type_check",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:cli"],
+                ["node", "scripts/check-workflows.mjs"]
+              ],
+              "commit_types": [
+                "law(sensors)",
+                "law(authority)",
+                "feat(sensors)",
+                "feat(authority)",
+                "test(sensors)",
+                "test(authority)",
+                "docs(adopters)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0264.md",
+                "sha256": "867dccd7b7254356c80752d23500750604587f13b28764e8797955f771840bdc"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        },
+        {
           "id": "CTG-0261",
           "title": "Record and audit",
           "type": "single-role",
           "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
-          "depends_on": ["CTG-0262", "CTG-0263"],
+          "depends_on": ["CTG-0262", "CTG-0263", "CTG-0264"],
           "lock_scopes": [
             ".devai/state/sensor-readings/",
             "record/proofs/compliance/scorecards/",
