@@ -1191,7 +1191,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1218,8 +1218,8 @@
                 "path": "prompts/TASK-0251.md",
                 "sha256": "74aeeb9de20401f15897ea4d58f50762c1f8a772544e9e374b0a67218a76d895"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/132",
+              "merged_as": "3de4b8acae979aaacd12cb7219dae4cf3942df22",
               "execution": {
                 "tier": "clerk",
                 "effort": "low",
@@ -1247,7 +1247,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1291,8 +1291,8 @@
                 "path": "prompts/TASK-0252.md",
                 "sha256": "4fd4cb1de615b4e90755bf5c21bad0947e17303d78f12e682c2edb3f47ffc5a6"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/138",
+              "merged_as": "a37388c252f59a03f9a5004a6ee5184a10e02b2d",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1316,7 +1316,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1356,8 +1356,8 @@
                 "path": "prompts/TASK-0253.md",
                 "sha256": "86869f3933c8b2e5fcfcd47cac2dfe9b864b19092f00ce18d4217e7b8f8c2a3d"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/138",
+              "merged_as": "a37388c252f59a03f9a5004a6ee5184a10e02b2d",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1381,7 +1381,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1407,8 +1407,8 @@
                 "path": "prompts/TASK-0254.md",
                 "sha256": "da50b99ecd9f81a3dd8a77cb469755d31154de602d6122bd2fa7f2c728a8ff6f"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/138",
+              "merged_as": "a37388c252f59a03f9a5004a6ee5184a10e02b2d",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1436,7 +1436,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1495,8 +1495,8 @@
                 "path": "prompts/TASK-0255.md",
                 "sha256": "8847cdeb96fec1d910192a65e7e68c23306343f1c2516c0b6599c820a8f0d3aa"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/138",
+              "merged_as": "a37388c252f59a03f9a5004a6ee5184a10e02b2d",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1520,7 +1520,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
