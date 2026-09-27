@@ -822,7 +822,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -872,7 +872,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0231.md",
-                "sha256": null
+                "sha256": "e6f740f62d676f62c2ed1f3326160253e196749f1fc167420739de221a64c71f"
               },
               "pull_request": null,
               "merged_as": null,
@@ -982,6 +982,71 @@
                 "tier": "worker-high",
                 "effort": "high",
                 "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0232",
+          "title": "Action use-case links",
+          "type": "single-role",
+          "records": ["ADR-SCR-0004"],
+          "depends_on": [],
+          "lock_scopes": ["product/use-cases/"],
+          "gates": ["test:spec"],
+          "tasks": [
+            {
+              "id": "TASK-0234",
+              "title": "Link every registered action from a use case so the coverage sensors measure the whole registry",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "ready",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": ["product/use-cases/devai-cli.json", "product/use-cases/"],
+                "forbidden": ["law/", "packages/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "Every entry of law/policy/action-registry.json is referenced through refs.actionRefs in a use-case flow under product/use-cases, grouped by the operator journey it belongs to (audit, backlog, release, round tracking, triage).",
+                "plant_coverage and inventory_coverage report action_coverage_pct 100 and pass on the repository."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:spec"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "plant_coverage",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "inventory_coverage",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["plan(use-cases)"],
+              "prompt": {
+                "path": "prompts/TASK-0234.md",
+                "sha256": "3e314a6e3b5b891cf377687bcc1a63ec5e1ceac0029aed9fc92eb8c38b3cd902"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 90
               }
             }
           ]
