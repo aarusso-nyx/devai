@@ -258,7 +258,7 @@
       "id": "R-0202",
       "title": "Sensor inputs for the framework repository",
       "goal": "Every read-effect sensor that failed or reported review for a missing input runs against DEVAI with inputs declared in adopter configuration, and the harness sensors may call the GitHub CLI read-only.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0005", "ADR-SCR-0003"],
       "depends_on": ["R-0201"],
       "attestation_reissue": false,
@@ -285,7 +285,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -331,8 +331,8 @@
                 "path": "prompts/TASK-0221.md",
                 "sha256": "732c5934211efbb23d33d010285801c35a58fe1ed97b612b0020cd1d4ad5c133"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/118",
+              "merged_as": "c6b92e1e45229e9a95bfa53859265e3077a6ea8b",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -345,7 +345,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0221",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -381,8 +381,8 @@
                 "path": "prompts/TASK-0222.md",
                 "sha256": "b7f21b42e2036abcc5754c5cb1a33e12be03eec5f3e71ff51f5a3eead7fcc75a"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/121",
+              "merged_as": "935151db5edd174a1146a1abf3f95c16a704682d",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -395,7 +395,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0222",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -463,8 +463,8 @@
                 "path": "prompts/TASK-0223.md",
                 "sha256": "f3841a3e9325da0adbb1ffdb313fee35da90d8aae8a87afd0b6a78cf546201bb"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/121",
+              "merged_as": "935151db5edd174a1146a1abf3f95c16a704682d",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -493,7 +493,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -529,8 +529,8 @@
                 "path": "prompts/TASK-0224.md",
                 "sha256": "07e9e74e339ee2ef99d00a17afcfa4b94c61503ee2d94c8f7ad682255abeade1"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/120",
+              "merged_as": "11243609b6ad07c64f18ec1f96b980757a699a1d",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -559,7 +559,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F1", "F4", "F5"],
               "boundary": {
                 "paths": [
@@ -568,7 +568,8 @@
                   "law/policy/adopter-defaults/sensor-inputs.json",
                   "packages/loop/src/loop/scorecard.ts",
                   "docs/theory/framework/scorecard.md",
-                  "docs/adopters/sensor-inputs.md"
+                  "docs/adopters/sensor-inputs.md",
+                  "packages/loop/tests/scorecard.test.ts"
                 ],
                 "forbidden": [".github/workflows/", "packages/sensors/"]
               },
@@ -599,10 +600,10 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0226.md",
-                "sha256": null
+                "sha256": "05569e8cd02dd8979b80f98880cddffff6aa1796f2cdeb3578be954842b426ab"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/122",
+              "merged_as": "df545e13371372c255c14b627bac9f7c04972071",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -615,12 +616,13 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0226",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
                   "packages/sensors/tests/declared-surfaces.test.ts",
-                  "tests/contract/declared-surfaces.contract.test.ts"
+                  "tests/contract/declared-surfaces.contract.test.ts",
+                  "packages/loop/tests/unit/scorecard-aggregation-boundaries.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -644,13 +646,13 @@
                   "tests/contract/declared-surfaces.contract.test.ts"
                 ]
               ],
-              "commit_types": ["test(sensors)"],
+              "commit_types": ["test(sensors)", "test(scorecard)"],
               "prompt": {
                 "path": "prompts/TASK-0227.md",
-                "sha256": null
+                "sha256": "0528452e5f007d7164bf7995d7d5b855259400d17ba866edfff22ddfed58c6f2"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/122",
+              "merged_as": "df545e13371372c255c14b627bac9f7c04972071",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -663,7 +665,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0227",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F2", "F4"],
               "boundary": {
                 "paths": [
@@ -674,7 +676,10 @@
                   "packages/sensors/src/inventory-data-handling.ts",
                   "packages/sensors/src/inventory-coverage.ts",
                   "packages/sensors/src/plant-coverage.ts",
-                  "packages/sensors/src/inventory-performance.ts"
+                  "packages/sensors/src/inventory-performance.ts",
+                  "packages/sensors/src/declared-surfaces.ts",
+                  "packages/cli/src/commands/sense/shared.ts",
+                  "packages/cli/src/commands/sense/adapters.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -712,10 +717,10 @@
               "commit_types": ["feat(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0228.md",
-                "sha256": null
+                "sha256": "bd45263d7ea5a1f165ff61af3d898af8ba34fb52cbc18e5f633a946636638d73"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/122",
+              "merged_as": "df545e13371372c255c14b627bac9f7c04972071",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -743,7 +748,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -773,8 +778,8 @@
                 "path": "prompts/TASK-0225.md",
                 "sha256": "9193de9b941ceda184f842731d07c2f8e1e78848bcb702235077e0d4f915f209"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/117",
+              "merged_as": "dacacbd9a577eed0edef4afeeea1c723ae13722c",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -783,13 +788,19 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "df545e13371372c255c14b627bac9f7c04972071",
+        "closed_at": "2026-09-27T05:54:32Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0203",
       "title": "Specification substrate",
       "goal": "The framework's reference signal exists as records: invariants derived from the constitution and accepted decisions, a threat model, a data handling declaration, and performance and robustness targets, each traceable to tests.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0004"],
       "depends_on": ["R-0201"],
       "attestation_reissue": false,
@@ -811,7 +822,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
