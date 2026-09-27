@@ -1914,6 +1914,8 @@
                   "inventory_performance",
                   "--repo-root",
                   ".",
+                  "--as-role",
+                  "engineer",
                   "--format",
                   "json"
                 ],
@@ -1930,7 +1932,7 @@
               "commit_types": ["feat(sensors)", "test(sensors)", "docs(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0265.md",
-                "sha256": "ed1778350b1972a9e6482a9d6c573563050d226cd5271bdbe1893044a1921af2"
+                "sha256": "c10e2aa5229c6667c30923a0ce02c3268bff092143363ee50de3d269c2035a09"
               },
               "pull_request": null,
               "merged_as": null,
