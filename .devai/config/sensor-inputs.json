@@ -27,7 +27,14 @@
       "argv": ["pnpm", "run", "typecheck"]
     },
     "perf_test": {
-      "scriptName": "test:perf"
+      "argv": [
+        "pnpm",
+        "vitest",
+        "run",
+        "--config",
+        "tests/config/rc.performance.config.ts",
+        "tests/regression"
+      ]
     },
     "harness_idiomaticity": {
       "minWorkflowsForReusableCheck": 5
