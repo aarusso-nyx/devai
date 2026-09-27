@@ -53,7 +53,7 @@ const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
   readCheckPolicyGitSync: new Set(['packages/cli/src/services/check-runner/policy-git.ts']),
   readExactGitTreeSync: new Set([
     'packages/cli/src/services/check-runner/authority-process.ts',
-    'packages/cli/src/services/release-certification-provider.ts',
+    'packages/cli/src/services/release-certification-provider-requests.ts',
   ]),
 };
 const GOVERNANCE_PROJECTION_EXCEPTION = 'writeGovernanceProjectionSync';
