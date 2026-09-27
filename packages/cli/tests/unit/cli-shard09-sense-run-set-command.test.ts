@@ -10,6 +10,10 @@ vi.mock('../../src/commands/sense/adapters.js', () => ({
 
 const { senseRunSetCmd } = await import('../../src/commands/sense/run-set.js');
 
+// ADR-SCR-0005: the repository root declares a type_check argv in
+// .devai/config/sensor-inputs.json, so it reaches the adapter and the dry run.
+const DECLARED_TYPE_CHECK_INPUTS = { argv: ['pnpm', 'run', 'typecheck'] };
+
 interface Options {
   readonly preset?: string;
   readonly round?: string;
@@ -123,7 +127,15 @@ describe('CLI shard 09 sense run set command', () => {
 
     const dryRun = await invoke(action, 'type_check', { dryRun: true });
     expect(dryRun).toEqual({
-      stdout: `${JSON.stringify({ ok: true, dry_run: true, ...resolved })}\n`,
+      stdout: `${JSON.stringify({
+        ok: true,
+        dry_run: true,
+        ...resolved,
+        members: resolved.members.map((member) => ({
+          ...member,
+          effective_inputs: DECLARED_TYPE_CHECK_INPUTS,
+        })),
+      })}\n`,
       stderr: '',
       exit: 0,
     });
@@ -158,7 +170,10 @@ describe('CLI shard 09 sense run set command', () => {
       exit: 0,
     });
     expect(mocks.sensorAdapter).toHaveBeenCalledExactlyOnceWith('type_check');
-    expect(adapter).toHaveBeenCalledExactlyOnceWith({ repoRoot: '.' });
+    expect(adapter).toHaveBeenCalledExactlyOnceWith({
+      repoRoot: '.',
+      inputs: DECLARED_TYPE_CHECK_INPUTS,
+    });
   });
 
   it('keeps optional-dependency and usage diagnostics at exact boundaries', async () => {

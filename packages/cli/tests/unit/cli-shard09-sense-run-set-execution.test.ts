@@ -232,7 +232,11 @@ describe('CLI shard 09 sense run set execution', () => {
     mocks.sensorAdapter.mockReturnValue(adapter);
     const defaulted = await run('type_check', {});
     expect(defaulted).toMatchObject({ stderr: '', exit: EXIT_PASS });
-    expect(adapter).toHaveBeenLastCalledWith({ repoRoot: '.' });
+    // ADR-SCR-0005: the repository root declares a type_check argv, which reaches the adapter.
+    expect(adapter).toHaveBeenLastCalledWith({
+      repoRoot: '.',
+      inputs: { argv: ['pnpm', 'run', 'typecheck'] },
+    });
 
     const explicit = await run('type_check', { repoRoot: '/repo', input: '{"value":false}' });
     expect(explicit).toMatchObject({ stderr: '', exit: EXIT_PASS });
