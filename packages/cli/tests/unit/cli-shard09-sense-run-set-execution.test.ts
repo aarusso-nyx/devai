@@ -16,6 +16,7 @@ import {
   routeSensorChildArgv,
   senseRunSetCmd,
 } from '../../src/commands/sense/run-set.js';
+import { declareSelfDogfoodInvocation } from '../../src/services/self-dogfood.js';
 
 interface Options {
   readonly preset?: string;
@@ -49,9 +50,19 @@ beforeAll(() => {
 
 beforeEach(() => {
   mocks.sensorAdapter.mockReset();
+  // The default root is the framework checkout: ADR-SCR-0001 admits a
+  // read-effect sense run for a declared role.
+  declareSelfDogfoodInvocation({
+    role: 'engineer',
+    human_invoked: true,
+    declaration_source: 'cli-flag',
+    write_consent: false,
+    publish: false,
+  });
 });
 
 afterEach(() => {
+  declareSelfDogfoodInvocation(undefined);
   process.exitCode = originalExitCode;
   process.stdout.write = originalStdout;
   process.stderr.write = originalStderr;

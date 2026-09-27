@@ -18,6 +18,7 @@ vi.mock('@devai-nyx/skills', () => ({ runAuditObservation: mocks.runAuditObserva
 vi.mock('@devai-nyx/loop', () => ({ trackGovernanceEvent: mocks.trackGovernanceEvent }));
 
 import { auditObserve } from '../../src/commands/audit/observe.js';
+import { declareSelfDogfoodInvocation } from '../../src/services/self-dogfood.js';
 
 const SHA = 'a'.repeat(40);
 const TREE = 'b'.repeat(40);
@@ -76,9 +77,19 @@ beforeEach(() => {
   mocks.loadChain.mockReturnValue({ records: [] });
   mocks.appendVerbEvidence.mockReturnValue({ ok: true, id: 'EVIDENCE-1' });
   mocks.execFileSync.mockReturnValue(`${TREE}\n`);
+  // The default root is the framework checkout, where ADR-SCR-0001 admits an
+  // observation for the inspector with write consent only.
+  declareSelfDogfoodInvocation({
+    role: 'inspector',
+    human_invoked: true,
+    declaration_source: 'cli-flag',
+    write_consent: true,
+    publish: false,
+  });
 });
 
 afterEach(() => {
+  declareSelfDogfoodInvocation(undefined);
   process.exitCode = originalExitCode;
   vi.restoreAllMocks();
 });
