@@ -457,6 +457,10 @@ const GH_RUN_LIST_CREATED =
  * The declared read-only GitHub CLI shapes (ADR-SCR-0005 IA-004): `gh auth` (usage),
  * `gh auth status`, and the exact argv the harness sensors emit:
  * `gh run list --branch <ref> --json <fields> --limit <n> [--created >=<date>]`.
+ * Declared by templates gh-auth-status, gh-run-list, and gh-run-list-created in
+ * law/policy/subprocess-effects.json. Those templates are descriptive for the
+ * effect-inference sensor and are not loaded here, so this matcher mirrors them;
+ * it is not gated by parent action, so `sense run` and `check` both admit it.
  * Every other gh argv is refused.
  */
 function readOnlyGhProcess(args: readonly unknown[]): boolean {
