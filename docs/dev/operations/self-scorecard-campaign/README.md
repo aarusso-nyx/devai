@@ -280,3 +280,18 @@ requests #134 to #137 are closed as superseded once #138 is green. One
 conflict was resolved in the combination: TASK-0255's threshold wiring was
 reapplied onto the adapters module after TASK-0253's split moved the input
 helpers into `adapter-readers.ts`.
+
+### R-0204 closed 2026-09-27 at `2928b5cc`
+
+- TASK-0241 through [#133](https://github.com/aarusso-nyx/devai/pull/133).
+  Both governance ledger sensors report zero findings on the repository:
+  records validate against the second-generation schema, supersession is
+  judged from the `supersedes` array, and scoped citations resolve.
+
+Follow-ups recorded at close:
+
+1. `law/adr/README.md` is byte-pinned in the adr-validation exception
+   catalog, so the lifecycle paragraph the sensors enforce could not land
+   without a catalog digest update in law policy. The draft text is kept in
+   the session scratchpad; a law task applies it with the catalog change.
+2. Sealed-history checks still apply only to first-generation records.
