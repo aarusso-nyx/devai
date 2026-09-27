@@ -19,7 +19,7 @@
     { "selector": { "kind": "prefix", "pattern": "packages/cli/src/commands/" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/cli/src/services/" }, "class": "code" },
     { "selector": { "kind": "glob", "pattern": "packages/cli/src/*" }, "class": "code" },
-    { "selector": { "kind": "exact", "pattern": "packages/effects-check/src/index.ts" }, "class": "code" },
+    { "selector": { "kind": "glob", "pattern": "packages/effects-check/src/*" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/evidence/src/" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/loop/src/" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/schemas/src/" }, "class": "code" },
