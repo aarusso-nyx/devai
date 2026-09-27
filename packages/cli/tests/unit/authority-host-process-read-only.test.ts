@@ -2,6 +2,8 @@
 // ADR-SCR-0005 IA-004: gh run list with the declared argv shape is admitted as a
 // read-only process without a host adapter; gh with any other subcommand is refused.
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,21 +28,29 @@ const { senseHarnessGreenMain, senseHarnessPerformance, senseHarnessRobustness }
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const entries = canonicalRegistry();
-const senseRun = (() => {
-  const entry = entries.find((entry) => entry.name === 'sense run');
-  if (entry === undefined) throw new Error('missing action sense run');
+function action(name: string) {
+  const entry = entries.find((entry) => entry.name === name);
+  if (entry === undefined) throw new Error(`missing action ${name}`);
   return entry;
-})();
+}
 
 function effect(executable: unknown, args: unknown): AuthorityHostEffectRequest {
   return { kind: 'process', symbol: 'spawnSync', arguments: [executable, args] };
 }
 
-function invoke(kind: string, executable: unknown, args: unknown): () => unknown {
+function invoke(
+  kind: string,
+  executable: unknown,
+  args: unknown,
+  actionName = 'sense run',
+): () => unknown {
   const host = createAuthorityHostBroker({
-    entry: senseRun,
+    entry: action(actionName),
     entries,
-    argv: [process.execPath, 'devai', 'sense', 'run', kind],
+    argv:
+      actionName === 'sense run'
+        ? [process.execPath, 'devai', 'sense', 'run', kind]
+        : [process.execPath, 'devai', 'check'],
     role: 'auditor',
     declaration: { as_role: 'auditor' },
     repository_root: ROOT,
@@ -211,5 +221,47 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
     expect(invoke('harness_green_main', executable, args)).toThrow(
       'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED',
     );
+  });
+
+  it('admits the harness_performance argv under check, where it also runs', () => {
+    senseHarnessPerformance({ repoRoot: ROOT });
+    const [call] = spawned;
+    expect(invoke('harness_performance', call?.executable, call?.args, 'check')()).toBe('allowed');
+    expect(invoke('harness_performance', 'gh', ['run', 'cancel', '1'], 'check')).toThrow(
+      /^AUTHORITY_[A-Z_]+$/u,
+    );
+  });
+
+  it('admits exactly the argv shapes the subprocess-effects templates declare', () => {
+    const samples: Readonly<Record<string, string>> = {
+      '<ref>': 'main',
+      '<fields>': 'conclusion,createdAt',
+      '<n>': '50',
+      '>=<date>': '>=2026-09-01',
+    };
+    for (const path of [
+      'law/policy/subprocess-effects.json',
+      '.devai/config/subprocess-effects.json',
+    ]) {
+      const registry = JSON.parse(readFileSync(resolve(ROOT, path), 'utf8')) as {
+        templates: { template_id: string; executable: string; argv_shape: string[] }[];
+      };
+      const declared = registry.templates.filter((template) =>
+        ['gh-auth-status', 'gh-run-list', 'gh-run-list-created'].includes(template.template_id),
+      );
+      expect(declared.map((template) => template.template_id).sort()).toEqual([
+        'gh-auth-status',
+        'gh-run-list',
+        'gh-run-list-created',
+      ]);
+      for (const template of declared) {
+        const argv = template.argv_shape.map((token) => samples[token] ?? token);
+        expect(template.executable).toBe('gh');
+        expect(invoke('harness_green_main', 'gh', argv)()).toBe('allowed');
+        expect(invoke('harness_green_main', 'gh', [...argv, '--web'])).toThrow(
+          /^AUTHORITY_[A-Z_]+$/u,
+        );
+      }
+    }
   });
 });
