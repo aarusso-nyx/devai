@@ -1959,7 +1959,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
@@ -2000,8 +2000,8 @@
                 "path": "prompts/TASK-0266.md",
                 "sha256": "3447993b30b7e7e62e0f392262d3aaa6c49c10bf7cd5a7634e0bb98ffdf12426"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/150",
+              "merged_as": "86d8cceab1d0c2a4ea3891e151d23150ac22dab1",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -2025,7 +2025,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -2092,8 +2092,8 @@
                 "path": "prompts/TASK-0267.md",
                 "sha256": "914eb6f01fab3be3c79aed79211bed63f56f2b349a7442f6d8b544529d5854af"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/150",
+              "merged_as": "86d8cceab1d0c2a4ea3891e151d23150ac22dab1",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -2121,7 +2121,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
