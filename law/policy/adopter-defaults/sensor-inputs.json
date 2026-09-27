@@ -1,4 +1,10 @@
 {
   "schemaVersion": "1.0.0",
-  "inputs": {}
+  "inputs": {},
+  "surfaces": {
+    "http": true,
+    "database": true,
+    "rbac": true,
+    "actions": false
+  }
 }
