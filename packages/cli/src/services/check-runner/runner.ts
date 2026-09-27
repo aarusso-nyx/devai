@@ -1,20 +1,9 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-
-import { resolveReleaseTaskNodes } from '../release-profile.js';
-import {
-  PREFLIGHT_CAPABILITIES,
-  verifyReleasePreflightReceipt,
-  type ReleasePreflightReceipt,
-} from '../release-preflight.js';
-import { CheckCache } from './cache.js';
-import { sha256Hex } from './canonical.js';
-
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   currentRepositoryState,
   exactCandidateRepositoryState,
   isPreflightNode,
-  runnerToolchainDigest,
 } from './policy.js';
 import {
   evaluatePreflightProbes,
@@ -22,22 +11,13 @@ import {
   type PreflightEvaluation,
 } from './preflight.js';
 import type {
-  CandidateReceipt,
   CheckRunnerOptions,
   CheckRunnerReport,
   ExecutedTask,
   TaskExecutionResult,
   TaskResult,
 } from './types.js';
-import {
-  descriptorFor,
-  requiredEnvironmentKeys,
-  requiredTaskNodes,
-  resolvedRunnerToolchain,
-  planWithCache,
-  unattestedNodeIds,
-  taskEnvironment,
-} from './runner-plan.js';
+import { descriptorFor, planWithCache, unattestedNodeIds, taskEnvironment } from './runner-plan.js';
 import { bindReleaseRequest } from './runner-release-binding.js';
 import {
   type TaskExecutionEffect,
@@ -46,32 +26,15 @@ import {
   executionOutcome,
   outputDigests,
 } from './runner-execution.js';
+import { attestCheckRun, releaseVerificationEntries } from './runner-attestation.js';
+import { prepareCheckRunInputs, verifyCertifyPreflightReceipt } from './runner-inputs.js';
+import { retainProtectedCompletedTaskResults, snapshotTaskResult } from './runner-results.js';
+export { readProtectedCompletedTaskResults } from './runner-results.js';
+
 export { PROTECTED_MUTATION_PRODUCER } from './runner-release-binding.js';
 export { resolveRunnerToolchain } from './runner-plan.js';
 
 const DEFAULT_TIMEOUT_MS = 15 * 60_000;
-const protectedCompletedTaskResults = new WeakMap<CheckRunnerReport, readonly TaskResult[]>();
-
-function snapshotTaskResult(value: TaskResult): TaskResult {
-  return Object.freeze({
-    ...value,
-    dependencyResultDigests: Object.freeze({ ...value.dependencyResultDigests }),
-    outputDigests: Object.freeze({ ...value.outputDigests }),
-  });
-}
-
-/**
- * A protected certification host may retain the canonical task-result population
- * while it is still live. This never consults a cache path and is unavailable for
- * reports that did not produce an attestable candidate receipt.
- */
-export function readProtectedCompletedTaskResults(
-  report: CheckRunnerReport,
-): readonly TaskResult[] {
-  const results = protectedCompletedTaskResults.get(report);
-  if (results === undefined) throw new Error('release-certification-task-results-unavailable');
-  return results.map(snapshotTaskResult);
-}
 
 type AsyncTaskExecutor = (
   ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
@@ -170,59 +133,7 @@ function* runCheckTaskSteps(
   // an ordinary receipt never grants access to protected completed results.
   const requiresProtectedOutputCapture =
     options.target === 'release' || options.protectedExecutionIdentity !== undefined;
-  const requiredEnvironment = requiredEnvironmentKeys(options);
-  // Protected execution binds the complete selected DAG, including dependencies, but does
-  // not require credentials or tools belonging only to unselected task nodes. Refuse before
-  // ambient environment/toolchain resolution; those values are not protected host inputs.
-  if (
-    options.protectedExecutionIdentity !== undefined &&
-    requiredTaskNodes(options, 'selected').some(
-      (task) =>
-        task.allowlistedEnv.some((key) => options.environment?.[key] === undefined) ||
-        task.toolchainKeys.some((key) => options.toolchain?.[key] === undefined),
-    )
-  ) {
-    throw new Error('release-certification-environment-unbound');
-  }
-  const configuredDbTests = options.environment?.['DEVAI_DB_TESTS'] ?? process.env.DEVAI_DB_TESTS;
-  if (
-    (options.target === 'rc' || options.target === 'release') &&
-    requiredEnvironment.includes('DEVAI_DB_TESTS') &&
-    configuredDbTests !== '1'
-  ) {
-    throw new Error(
-      'CHECK_RC_DB_TESTS_REQUIRED: RC and release profiles require DEVAI_DB_TESTS=1 when database tasks are selected so cases cannot silently skip',
-    );
-  }
-  const cacheRoot = resolve(
-    options.cacheRoot ?? join(options.repoRoot, '.devai/state/check-cache/v1'),
-  );
-  const cache = new CheckCache(options.repoRoot, cacheRoot);
-  const toolchain = options.toolchain ?? resolvedRunnerToolchain(options);
-  const toolchainDigest = runnerToolchainDigest(options.repoRoot, toolchain);
-  const environment: Record<string, string> = { ...(options.environment ?? {}) };
-  const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
-  if (requiredEnvironment.includes(authorityDigestKey)) {
-    const authorityPolicyPath = join(options.repoRoot, '.devai/config/authority-policy.json');
-    if (!existsSync(authorityPolicyPath)) {
-      throw new Error(
-        'CHECK_AUTHORITY_POLICY_REQUIRED: materialize .devai/config/authority-policy.json before planning release evidence',
-      );
-    }
-    const authorityDigest = sha256Hex(readFileSync(authorityPolicyPath));
-    if (
-      options.protectedExecutionIdentity !== undefined &&
-      environment[authorityDigestKey] !== authorityDigest
-    )
-      throw new Error('release-certification-environment-unbound');
-    environment[authorityDigestKey] = authorityDigest;
-  }
-  for (const key of requiredEnvironment) {
-    const inheritedValue = process.env[key];
-    if (environment[key] === undefined && inheritedValue !== undefined) {
-      environment[key] = inheritedValue;
-    }
-  }
+  const { cache, toolchain, environment, toolchainDigest } = prepareCheckRunInputs({ options });
   const rawPlan = planWithCache(options, cache, toolchain, environment);
   const releaseBinding = request.binding;
   if (releaseBinding !== undefined) {
@@ -242,41 +153,15 @@ function* runCheckTaskSteps(
           toolchainDigest,
           releaseDecision: releaseBinding.decision,
         };
-  if (options.target === 'release' && options.releaseStage === 'certify') {
-    if (options.preflightReceipt === undefined || releaseBinding === undefined) {
-      throw new Error('CHECK_RELEASE_PREFLIGHT_REQUIRED');
-    }
-    const knownNodes = descriptorFor(options).tasks.map((task) => task.nodeId);
-    const preflightPlan = planWithCache(
-      {
-        ...options,
-        releaseStage: 'preflight',
-        releaseAffectedSelection: false,
-        releaseTaskBindings: {},
-        releaseRequiredNodes: resolveReleaseTaskNodes(
-          {
-            ...releaseBinding.decision,
-            capabilities: releaseBinding.decision.capabilities.filter((capability) =>
-              (PREFLIGHT_CAPABILITIES as readonly string[]).includes(capability),
-            ),
-          },
-          releaseBinding.preflightCapabilityTasks,
-          knownNodes,
-        ),
-      },
-      cache,
-      toolchain,
-      environment,
-    );
-    verifyReleasePreflightReceipt(options.preflightReceipt, {
-      repository: plan.repository,
-      base: releaseBinding.base,
-      releaseIntentDigest: releaseBinding.digest,
-      releaseProfileDigest: releaseBinding.profileDigest,
-      taskPolicyDigest: preflightPlan.taskPolicyDigest,
-      toolchainDigest,
-    });
-  }
+  verifyCertifyPreflightReceipt({
+    options,
+    releaseBinding,
+    cache,
+    toolchain,
+    environment,
+    plan,
+    toolchainDigest,
+  });
   if (options.operation !== 'run') {
     return { schemaVersion: '1.0.0', operation: options.operation, plan, exitCode: 0 };
   }
@@ -550,105 +435,20 @@ function* runCheckTaskSteps(
     });
   }
 
-  let receipt: CheckRunnerReport['receipt'];
-  let preflightReceipt: CheckRunnerReport['preflightReceipt'];
-  let receiptRefusal: string | undefined;
-  const allPass = execution.every((task) => task.outcome === 'PASS');
-  const blocked = execution
-    .filter((task) => task.outcome === 'BLOCKED')
-    .map((task) => ({
-      nodeId: task.nodeId,
-      disposition:
-        task.disposition === 'blocked-environment'
-          ? ('blocked-environment' as const)
-          : ('executed' as const),
-      reason: task.reason,
-      remediation: task.remediation ?? [],
-    }));
-  const finalState = repositoryState();
-  if (
-    requiresProtectedOutputCapture &&
-    !protectedOutputCapture &&
-    plan.tasks.some((task) => task.outputContract.generated_namespaces !== undefined)
-  )
-    receiptRefusal = 'protected-namespace-closure-unproven';
-  else if (options.target === 'local') receiptRefusal = 'local-target-not-attestable';
-  else if (options.target === 'preflight') receiptRefusal = 'preflight-target-not-attestable';
-  else if (blocked.length > 0) receiptRefusal = 'environment-blocked';
-  else if (!plan.clean || !initialState.clean) receiptRefusal = 'dirty-start';
-  else if (!allPass) receiptRefusal = 'task-population-not-pass';
-  else if (
-    !finalState.clean ||
-    finalState.commit !== initialState.commit ||
-    finalState.tree !== initialState.tree ||
-    finalState.commit !== plan.repository.commit ||
-    finalState.tree !== plan.repository.tree
-  ) {
-    receiptRefusal = 'repository-changed-during-run';
-  } else if (
-    options.target === 'release' &&
-    options.releaseStage === 'preflight' &&
-    releaseBinding !== undefined
-  ) {
-    const checks = PREFLIGHT_CAPABILITIES.map((capability) => {
-      const nodes = releaseBinding.preflightCapabilityTasks[capability] ?? [];
-      const digests = nodes.map((nodeId) => {
-        const digest = resultDigests.get(nodeId);
-        if (digest === undefined)
-          throw new Error(`CHECK_RELEASE_PREFLIGHT_RESULT_MISSING:${nodeId}`);
-        return { nodeId, digest };
-      });
-      const reused = nodes.every((nodeId) =>
-        execution.some((entry) => entry.nodeId === nodeId && entry.disposition === 'reused'),
-      );
-      return {
-        capability,
-        status: reused ? ('reused' as const) : ('executed' as const),
-        reasonCode: 'required-floor',
-        resultDigest: sha256Hex(digests),
-      };
-    });
-    const value: ReleasePreflightReceipt = {
-      schemaVersion: '1.0.0',
-      repository: plan.repository,
-      base: releaseBinding.base,
-      releaseIntentDigest: releaseBinding.digest,
-      releaseProfileDigest: releaseBinding.profileDigest,
-      taskPolicyDigest: plan.taskPolicyDigest,
-      toolchainDigest,
-      checks,
-      verdict: 'pass',
-      blockingReasons: [],
-      createdAt: now(),
-    };
-    verifyReleasePreflightReceipt(value, {
-      repository: plan.repository,
-      base: releaseBinding.base,
-      releaseIntentDigest: releaseBinding.digest,
-      releaseProfileDigest: releaseBinding.profileDigest,
-      taskPolicyDigest: plan.taskPolicyDigest,
-      toolchainDigest,
-    });
-    const written = cache.writePreflightReceipt(value);
-    preflightReceipt = { ...written, value };
-    receiptRefusal = 'release-preflight-only';
-  } else {
-    const candidateReceipt: CandidateReceipt = {
-      schemaVersion: '1.1.0',
-      repository: plan.repository,
-      profile: options.target === 'affected' ? 'affected' : 'rc',
-      taskPolicyDigest: plan.taskPolicyDigest,
-      createdAt: now(),
-      tasks: plan.tasks.map((task) => {
-        const resultDigest = resultDigests.get(task.nodeId);
-        if (resultDigest === undefined)
-          throw new Error('CHECK_RUNNER_INTERNAL: missing task result');
-        return { nodeId: task.nodeId, taskKey: task.taskKey, resultDigest };
-      }),
-    };
-    const written = cache.writeReceipt(candidateReceipt);
-    receipt = { ...written, value: candidateReceipt };
-  }
+  const { receipt, preflightReceipt, receiptRefusal, blocked, allPass } = attestCheckRun({
+    execution,
+    repositoryState,
+    requiresProtectedOutputCapture,
+    protectedOutputCapture,
+    plan,
+    options,
+    initialState,
+    releaseBinding,
+    resultDigests,
+    toolchainDigest,
+    now,
+    cache,
+  });
   const report: CheckRunnerReport = {
     schemaVersion: '1.0.0',
     operation: options.operation,
@@ -657,40 +457,7 @@ function* runCheckTaskSteps(
     ...(receipt !== undefined && { receipt }),
     ...(preflightReceipt !== undefined && { preflightReceipt }),
     ...(options.target === 'release' && {
-      releaseVerification: descriptorFor(options).tasks.map((task) => {
-        const result = execution.find((entry) => entry.nodeId === task.nodeId);
-        if (result === undefined) {
-          return {
-            nodeId: task.nodeId,
-            status: 'not-required' as const,
-            reasonCode: 'capability-not-selected',
-          };
-        }
-        const status =
-          result.outcome === 'PASS'
-            ? result.disposition === 'reused'
-              ? ('reused' as const)
-              : ('executed' as const)
-            : result.disposition === 'aborted' || result.outcome === 'BLOCKED'
-              ? ('blocked' as const)
-              : result.outcome === 'FAIL'
-                ? ('failed' as const)
-                : ('unknown' as const);
-        return {
-          nodeId: task.nodeId,
-          status,
-          reasonCode: result.reason,
-          ...(['failed', 'blocked', 'unknown'].includes(status) && {
-            failureClass:
-              status === 'failed'
-                ? ('product-regression' as const)
-                : status === 'blocked'
-                  ? ('environment-drift' as const)
-                  : ('unknown' as const),
-          }),
-          ...(result.resultDigest !== undefined && { resultDigest: result.resultDigest }),
-        };
-      }),
+      releaseVerification: releaseVerificationEntries(options, execution),
     }),
     ...(receiptRefusal !== undefined && { receiptRefusal }),
     ...(blocked.length > 0 && { blocked }),
@@ -702,7 +469,7 @@ function* runCheckTaskSteps(
     taskResults.size === plan.tasks.length &&
     plan.tasks.every((task) => taskResults.get(task.nodeId)?.taskKey === task.taskKey)
   ) {
-    protectedCompletedTaskResults.set(
+    retainProtectedCompletedTaskResults(
       report,
       Object.freeze(
         plan.tasks.map((task) => {
