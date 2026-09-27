@@ -78,6 +78,7 @@ export const ROSTER = [
   'scorecard-na-config.schema.json',
   'scorecard.schema.json',
   'sense-presets.schema.json',
+  'sensor-inputs.schema.json',
   'sensor-reading.schema.json',
   'sensor-registry.schema.json',
   'self-dogfood-policy.schema.json',
