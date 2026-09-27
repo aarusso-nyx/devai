@@ -14,7 +14,42 @@ function exactKeys(value, keys) {
     Object.keys(value).sort().join(',') === [...keys].sort().join(',')
   );
 }
+// A site-only identity publishes the documentation site from a main commit
+// without a release: no rehearsal, no manifest; the tag is the package version
+// string the site documents and the source run replaces the rehearsal run.
+function siteOnlyIdentityBytes(identity) {
+  const keys = [
+    'repository',
+    'mode',
+    'tag',
+    'commit',
+    'tree',
+    'siteSha256',
+    'sourceRun',
+    'sourceAttempt',
+    'controlCommit',
+  ];
+  if (
+    !exactKeys(identity, keys) ||
+    keys.some((key) => typeof identity[key] !== 'string') ||
+    identity.repository !== 'aarusso-nyx/devai' ||
+    identity.mode !== 'site-only' ||
+    !/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(identity.tag) ||
+    ['commit', 'tree', 'controlCommit'].some((key) => !/^[a-f0-9]{40}$/u.test(identity[key])) ||
+    !/^[a-f0-9]{64}$/u.test(identity.siteSha256) ||
+    ['sourceRun', 'sourceAttempt'].some((key) => !/^[1-9][0-9]*$/u.test(identity[key]))
+  )
+    fail('IDENTITY_INVALID');
+  return JSON.stringify(Object.fromEntries(keys.map((key) => [key, identity[key]])));
+}
 function identityBytes(identity) {
+  if (
+    identity !== null &&
+    typeof identity === 'object' &&
+    !Array.isArray(identity) &&
+    identity.mode === 'site-only'
+  )
+    return siteOnlyIdentityBytes(identity);
   const keys = [
     'repository',
     'tag',
