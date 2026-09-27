@@ -345,7 +345,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0221",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -379,7 +379,7 @@
               "commit_types": ["test(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0222.md",
-                "sha256": null
+                "sha256": "b7f21b42e2036abcc5754c5cb1a33e12be03eec5f3e71ff51f5a3eead7fcc75a"
               },
               "pull_request": null,
               "merged_as": null,
@@ -395,7 +395,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0222",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -407,7 +407,8 @@
                   "packages/sensors/src/test-coverage-depth.ts",
                   "packages/sensors/src/action-effect-inference.ts",
                   "packages/sensors/src/type-check.ts",
-                  "packages/sensors/src/perf-test.ts"
+                  "packages/sensors/src/perf-test.ts",
+                  "packages/cli/src/commands/sense/adapters.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -446,7 +447,7 @@
               "commit_types": ["feat(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0223.md",
-                "sha256": null
+                "sha256": "c505e40861b904dc896c65b59a0d845887da4fab0cda6a7b0e2dc0c18687da5a"
               },
               "pull_request": null,
               "merged_as": null,
