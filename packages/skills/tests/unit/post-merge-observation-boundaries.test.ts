@@ -32,6 +32,7 @@ import {
   verifyPostMergeHostReceipt,
 } from '../../src/post-merge-auditor/index.js';
 import { runWithAuthorityHostEffects } from '@devai-nyx/authority';
+import { resolveScorecardInputs } from '@devai-nyx/loop';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -117,7 +118,7 @@ interface FixtureOptions {
   readonly constitution?: string | null;
   /** Extra files committed with the baseline, visible in every observed worktree. */
   readonly files?: Readonly<Record<string, string>>;
-  /** Freshness readings committed with each merge, one entry per round. */
+  /** Readings committed to the canonical store with each merge, one entry per round. */
   readonly readings?: readonly (readonly unknown[])[];
   /** Binds the adapter to the merge itself rather than to the pre-merge baseline. */
   readonly installedAtHead?: boolean;
@@ -141,6 +142,23 @@ function reading(kind: string, status: string): JsonRecord {
   };
 }
 
+/**
+ * The canonical readings store (ADR-SCR-0002). Each round replaces the store
+ * with its readings at `<kind>/<id>.json`, the layout `sense record` writes.
+ */
+const READINGS_STORE = '.devai/state/sensor-readings';
+
+function writeReadingsRound(root: string, round: readonly unknown[]): void {
+  rmSync(join(root, READINGS_STORE), { recursive: true, force: true });
+  for (const entry of round) {
+    const { id, sensor } = entry as {
+      readonly id: string;
+      readonly sensor: { readonly kind: string };
+    };
+    put(root, `${READINGS_STORE}/${sensor.kind}/${id}.json`, `${JSON.stringify(entry, null, 2)}\n`);
+  }
+}
+
 function fixture(options: FixtureOptions = {}): HostFixture {
   const mergeCount = options.merges ?? 1;
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-observation-')));
@@ -160,13 +178,7 @@ function fixture(options: FixtureOptions = {}): HostFixture {
     git(root, ['checkout', '-qb', `feature-${String(index)}`]);
     put(root, `feature-${String(index)}.txt`, `feature ${String(index)}\n`);
     const round = options.readings?.[index - 1];
-    if (round !== undefined) {
-      put(
-        root,
-        'record/proofs/freshness/readings/sensors.json',
-        `${JSON.stringify(round, null, 2)}\n`,
-      );
-    }
+    if (round !== undefined) writeReadingsRound(root, round);
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', `feature ${String(index)}`]);
     git(root, ['checkout', '-q', 'main']);
@@ -420,7 +432,7 @@ describe('post-merge observation refusal diagnostics', () => {
   it.each([
     [
       'a readings path that is not a directory',
-      { 'record/proofs/freshness/readings': 'not a directory\n' },
+      { [READINGS_STORE]: 'not a directory\n' },
       /ENOTDIR/u,
     ],
     [
@@ -650,6 +662,30 @@ describe('post-merge audit observation facade', () => {
         'status'
       ],
     ).toBe('completed');
+  });
+
+  it('computes its scorecard from the canonical store exactly as audit scorecard does', async () => {
+    const { root, at } = observationFixture();
+    writeReadingsRound(root, [reading('type_check', 'fail'), reading('lint', 'pass')]);
+    put(
+      root,
+      'record/proofs/freshness/readings/sensors.json',
+      `${JSON.stringify([reading('security_scan', 'fail')])}\n`,
+    );
+    const timestamp = git(root, ['show', '-s', '--format=%cI', at]);
+    const facade = resolveScorecardInputs({
+      repoRoot: root,
+      inputs: undefined,
+      timestamp,
+      integrationHead: at,
+    });
+    expect(facade.source).toBe('disk');
+
+    await withAuthorityHostTestScope(() => runAuditObservation({ repoRoot: root, at }));
+    const observed = JSON.parse(
+      readFileSync(join(root, '.devai/state/audit-observations', at, 'scorecard.json'), 'utf8'),
+    ) as unknown;
+    expect(observed).toEqual(facade.scorecard);
   });
 
   it('reports a head whose commit object is unreadable as a missing timestamp', async () => {
