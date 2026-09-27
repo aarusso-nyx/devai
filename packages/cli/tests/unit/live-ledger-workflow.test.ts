@@ -37,6 +37,31 @@ const CHECKED_IN_PREFLIGHT = readFileSync(
   join(ROOT, '.github/workflows', PREFLIGHT_WORKFLOW_FILE),
   'utf8',
 );
+// TASK-0254: pnpm and Node setup moved out of pull-request-checks.yml and
+// release.yml into this pinned composite action; scripts/check-workflows.mjs
+// validates its pins through checkCompositeActionPins.
+const COMPOSITE_ACTION_FILE = '.github/actions/setup-node-toolchain/action.yml';
+const CHECKED_IN_COMPOSITE = readFileSync(join(ROOT, COMPOSITE_ACTION_FILE), 'utf8');
+const SHARED_SETUP_USES = 'uses: ./.github/actions/setup-node-toolchain';
+const PNPM_TAG_OBJECT = '7088e561eb65bb68695d245aa206f005ef30921d';
+const PNPM_PEELED_COMMIT = 'a7487c7e89a18df4991f7f222e4898a00d66ddda';
+const RELEASE_SHARED_PNPM_SETUP =
+  "        uses: ./.github/actions/setup-node-toolchain\n        with:\n          setup-pnpm: 'true'\n          cache: pnpm\n";
+
+/**
+ * The release checker still governs an inline pnpm/action-setup step. Replace
+ * the one shared-composite step that enables pnpm with an inline pnpm step at
+ * `reference` (plus any extra `with` lines) followed by the composite for Node
+ * only, so the case exercises the release-workflow pnpm rules directly.
+ */
+function inlineReleasePnpmSetup(source: string, reference: string, extraWith = ''): string {
+  expect(source.split(RELEASE_SHARED_PNPM_SETUP)).toHaveLength(2);
+  return source.replace(
+    RELEASE_SHARED_PNPM_SETUP,
+    `        uses: pnpm/action-setup@${reference}\n        with:\n${extraWith}          run_install: false\n` +
+      `      - name: Set up Node with GitHub Packages\n        ${SHARED_SETUP_USES}\n        with:\n          cache: pnpm\n`,
+  );
+}
 const VERIFIER_POLICY = JSON.parse(
   readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
 ) as {
@@ -79,9 +104,15 @@ const REQUIRED_WORKFLOWS = [
   PREFLIGHT_WORKFLOW_FILE,
 ] as const;
 
-function fixture(source = CHECKED_IN_LEDGER, file = 'devai-ledger-verify.yml') {
+function fixture(
+  source = CHECKED_IN_LEDGER,
+  file = 'devai-ledger-verify.yml',
+  composite = CHECKED_IN_COMPOSITE,
+) {
   const root = mkdtempSync(join(tmpdir(), 'devai-ledger-workflow-'));
   roots.push(root);
+  mkdirSync(join(root, COMPOSITE_ACTION_FILE, '..'), { recursive: true });
+  writeFileSync(join(root, COMPOSITE_ACTION_FILE), composite);
   const directory = join(root, '.github/workflows');
   mkdirSync(directory, { recursive: true });
   for (const required of REQUIRED_WORKFLOWS) {
@@ -787,16 +818,12 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'redundant pnpm version input',
       mutate: (source: string) =>
-        source.replace('run_install: false', 'version: 9.15.0\n          run_install: false'),
+        inlineReleasePnpmSetup(source, PNPM_TAG_OBJECT, '          version: 9.15.0\n'),
       diagnostic: 'RELEASE_PNPM_VERSION_CONFLICT',
     },
     {
       name: 'peeled pnpm commit substituted for the authentic annotated-tag object',
-      mutate: (source: string) =>
-        source.replace(
-          '7088e561eb65bb68695d245aa206f005ef30921d',
-          'a7487c7e89a18df4991f7f222e4898a00d66ddda',
-        ),
+      mutate: (source: string) => inlineReleasePnpmSetup(source, PNPM_PEELED_COMMIT),
       diagnostic: 'CI_ACTION_PIN_MISMATCH',
     },
     {
@@ -893,7 +920,11 @@ describe('remote preflight workflow', () => {
       ]),
     );
     expect(CHECKED_IN_PREFLIGHT).toContain(`actions/checkout@${CHECKOUT_COMMIT}`);
-    expect(CHECKED_IN_PREFLIGHT).toContain(`actions/setup-node@${SETUP_NODE_COMMIT}`);
+    expect(CHECKED_IN_PREFLIGHT).toContain(SHARED_SETUP_USES);
+    expect(CHECKED_IN_PREFLIGHT).not.toMatch(/actions\/setup-node@|pnpm\/action-setup@/u);
+    expect(CHECKED_IN_COMPOSITE).toContain(`actions/setup-node@${SETUP_NODE_COMMIT}`);
+    expect(CHECKED_IN_COMPOSITE).toContain(`pnpm/action-setup@${PNPM_TAG_OBJECT}`);
+    expect(CHECKED_IN_COMPOSITE).not.toMatch(/\b(?:secrets|vars)\b/u);
     expect(CHECKED_IN_PREFLIGHT).toContain('persist-credentials: false');
     expect(CHECKED_IN_PREFLIGHT).not.toMatch(/:rc\b/u);
     expect(CHECKED_IN_PREFLIGHT).not.toContain('secrets.');
@@ -945,8 +976,8 @@ describe('remote preflight workflow', () => {
       name: 'any secret reference',
       mutate: (source: string) =>
         source.replace(
-          '          node-version: 24',
-          '          node-version: 24\n          token: ${{ secrets.PACKAGES_READ_TOKEN }}',
+          '          cache: pnpm',
+          '          cache: pnpm\n          token: ${{ secrets.PACKAGES_READ_TOKEN }}',
         ),
       diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
     },
@@ -960,8 +991,8 @@ describe('remote preflight workflow', () => {
       name: `protected input expression ${reference}`,
       mutate: (source: string) =>
         source.replace(
-          '          node-version: 24',
-          '          node-version: 24\n          token: ${{ ' + reference + ' }}',
+          '          cache: pnpm',
+          '          cache: pnpm\n          token: ${{ ' + reference + ' }}',
         ),
       diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
     })),
@@ -1003,8 +1034,7 @@ describe('remote preflight workflow', () => {
     },
     {
       name: 'a mutable action reference',
-      mutate: (source: string) =>
-        source.replace(`actions/setup-node@${SETUP_NODE_COMMIT}`, 'actions/setup-node@v7'),
+      mutate: (source: string) => source.replace(SHARED_SETUP_USES, 'uses: actions/setup-node@v7'),
       diagnostic: 'CI_ACTION_REFERENCE_MUTABLE',
     },
     {
@@ -1035,6 +1065,33 @@ describe('remote preflight workflow', () => {
   ])('rejects $name', ({ mutate, diagnostic }) => {
     expect(mutate(CHECKED_IN_PREFLIGHT)).not.toBe(CHECKED_IN_PREFLIGHT);
     const result = check(fixture(mutate(CHECKED_IN_PREFLIGHT), PREFLIGHT_WORKFLOW_FILE));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(diagnostic);
+  });
+
+  it.each([
+    {
+      name: 'a mutable setup-node reference',
+      mutate: (source: string) =>
+        source.replace(`actions/setup-node@${SETUP_NODE_COMMIT}`, 'actions/setup-node@v7'),
+      diagnostic: 'CI_ACTION_REFERENCE_MUTABLE',
+    },
+    {
+      name: 'a mutable pnpm reference',
+      mutate: (source: string) =>
+        source.replace(`pnpm/action-setup@${PNPM_TAG_OBJECT}`, 'pnpm/action-setup@v4'),
+      diagnostic: 'CI_ACTION_REFERENCE_MUTABLE',
+    },
+    {
+      name: 'a setup-node digest outside the toolchain manifest',
+      mutate: (source: string) => source.replace(SETUP_NODE_COMMIT, 'b'.repeat(40)),
+      diagnostic: 'CI_TOOLCHAIN_ACTION_DIVERGENT',
+    },
+  ])('rejects $name in the shared setup composite', ({ mutate, diagnostic }) => {
+    expect(mutate(CHECKED_IN_COMPOSITE)).not.toBe(CHECKED_IN_COMPOSITE);
+    const result = check(
+      fixture(CHECKED_IN_PREFLIGHT, PREFLIGHT_WORKFLOW_FILE, mutate(CHECKED_IN_COMPOSITE)),
+    );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(diagnostic);
   });
