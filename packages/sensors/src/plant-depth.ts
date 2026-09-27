@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   buildSensorReading,
   type SensorFinding,
@@ -15,6 +15,12 @@ import {
 export interface PlantDepthOptions {
   readonly repoRoot: string;
   readonly sourceGlobs?: readonly string[];
+  /**
+   * Repository-relative file globs left out of the measured plant (ADR-SCR-0005),
+   * such as a generated view derived from a law policy. `*` matches within one
+   * path segment and a `**` segment matches any number of segments. Default: none.
+   */
+  readonly excludeGlobs?: readonly string[];
   readonly thresholds?: { readonly pass: number; readonly review: number };
   readonly now?: string;
 }
@@ -88,6 +94,30 @@ function expandWildcardOneLevel(repoRoot: string, glob: string, sink: string[]):
   }
 }
 
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Compile one exclusion glob to a matcher over repository-relative POSIX paths. */
+function compileExcludeGlob(glob: string): RegExp {
+  const segments = glob.replace(/\/+$/, '').split('/');
+  let pattern = '';
+  segments.forEach((segment, index) => {
+    const last = index === segments.length - 1;
+    if (segment === '**') {
+      pattern += last ? '.*' : '(?:[^/]+/)*';
+      return;
+    }
+    pattern += segment.split('*').map(escapeRegExp).join('[^/]*');
+    if (!last) pattern += '/';
+  });
+  return new RegExp(`^${pattern}$`);
+}
+
+function repositoryRelative(repoRoot: string, file: string): string {
+  return relative(resolve(repoRoot), file).split(sep).join('/');
+}
+
 function percentile(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) return 0;
   // Nearest-rank method: P-th percentile = sorted[ceil(p * n) - 1].
@@ -102,10 +132,15 @@ export function sensePlantDepth(opts: PlantDepthOptions): SensorReading {
 
   const files: string[] = [];
   for (const g of globs) expandWildcardOneLevel(opts.repoRoot, g, files);
+  const excluded = (opts.excludeGlobs ?? []).map(compileExcludeGlob);
+  const measured = [...new Set(files)].filter((f) => {
+    const path = repositoryRelative(opts.repoRoot, f);
+    return !excluded.some((matcher) => matcher.test(path));
+  });
 
   const lineCounts: number[] = [];
   let linesTotal = 0;
-  for (const f of new Set(files)) {
+  for (const f of measured) {
     try {
       const content = readFileSync(f, 'utf8');
       const lines = content.split('\n').length;
