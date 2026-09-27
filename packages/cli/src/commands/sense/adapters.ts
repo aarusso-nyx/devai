@@ -55,6 +55,7 @@ import {
   senseTraceResolve,
   senseTypeCheck,
   SENSOR_READING_KINDS,
+  type PlantCoverageOptions,
   type RuntimeProbeCharter,
   type SensorFinding,
   type SensorKind,
@@ -122,6 +123,32 @@ function booleanInput(request: SenseAdapterRequest, name: string): boolean | und
   if (value === undefined) return undefined;
   if (typeof value !== 'boolean') throw new Error(`SENSE_INPUT_INVALID:${name}`);
   return value;
+}
+
+type DeclaredSurfaces = NonNullable<PlantCoverageOptions['surfaces']>;
+
+const SURFACE_NAMES = ['http', 'database', 'rbac', 'actions'] as const;
+
+/** The declared plant surfaces (ADR-SCR-0003); absent means every surface is presumed. */
+function surfacesInput(request: SenseAdapterRequest): DeclaredSurfaces | undefined {
+  const value = request.inputs?.['surfaces'];
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== SURFACE_NAMES.length ||
+    SURFACE_NAMES.some((name) => typeof (value as Record<string, unknown>)[name] !== 'boolean')
+  ) {
+    throw new Error('SENSE_INPUT_INVALID:surfaces');
+  }
+  const surfaces = value as Record<(typeof SURFACE_NAMES)[number], boolean>;
+  return {
+    http: surfaces.http,
+    database: surfaces.database,
+    rbac: surfaces.rbac,
+    actions: surfaces.actions,
+  };
 }
 
 function absolute(root: string, path: string): string {
@@ -335,19 +362,43 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   runtime_probe_auth: (request) => runtimeProbe(request, 'auth'),
   runtime_probe_data: (request) => runtimeProbe(request, 'data'),
   inventory_api: (request) =>
-    senseInventoryApi({ repoRoot: request.repoRoot, persistBody: false }).reading,
+    senseInventoryApi({
+      repoRoot: request.repoRoot,
+      persistBody: false,
+      ...optional('surfaces', surfacesInput(request)),
+    }).reading,
   inventory_routes: (request) =>
-    senseInventoryRoutes({ repoRoot: request.repoRoot, persistBody: false }).reading,
+    senseInventoryRoutes({
+      repoRoot: request.repoRoot,
+      persistBody: false,
+      ...optional('surfaces', surfacesInput(request)),
+    }).reading,
   inventory_data_model: (request) =>
-    senseInventoryDataModel({ repoRoot: request.repoRoot, persistBody: false }).reading,
+    senseInventoryDataModel({
+      repoRoot: request.repoRoot,
+      persistBody: false,
+      ...optional('surfaces', surfacesInput(request)),
+    }).reading,
   inventory_rbac: (request) =>
-    senseInventoryRbac({ repoRoot: request.repoRoot, persistBody: false }).reading,
+    senseInventoryRbac({
+      repoRoot: request.repoRoot,
+      persistBody: false,
+      ...optional('surfaces', surfacesInput(request)),
+    }).reading,
   inventory_data_handling: (request) =>
-    senseInventoryDataHandling({ repoRoot: request.repoRoot, persistBody: false }).reading,
+    senseInventoryDataHandling({
+      repoRoot: request.repoRoot,
+      persistBody: false,
+      ...optional('surfaces', surfacesInput(request)),
+    }).reading,
   inventory_dep_graph: (request) =>
     senseInventoryDepGraph({ repoRoot: request.repoRoot, persistBody: false }).reading,
   inventory_coverage: (request) =>
-    senseInventoryCoverage({ repoRoot: request.repoRoot, persistBody: false }).reading,
+    senseInventoryCoverage({
+      repoRoot: request.repoRoot,
+      persistBody: false,
+      ...optional('surfaces', surfacesInput(request)),
+    }).reading,
   spec_depth: (request) =>
     senseSpecDepth({
       repoRoot: request.repoRoot,
@@ -356,7 +407,11 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
     }).reading,
   spec_idiomaticity: specIdiomaticity,
   spec_freshness: (request) => senseSpecFreshness({ repoRoot: request.repoRoot }).reading,
-  plant_coverage: (request) => sensePlantCoverage({ repoRoot: request.repoRoot }),
+  plant_coverage: (request) =>
+    sensePlantCoverage({
+      repoRoot: request.repoRoot,
+      ...optional('surfaces', surfacesInput(request)),
+    }),
   test_coverage_depth: (request) => {
     const coveragePath = absolute(
       request.repoRoot,
@@ -416,7 +471,11 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   harness_idiomaticity: (request) => senseHarnessIdiomaticity({ repoRoot: request.repoRoot }),
   harness_performance: (request) => senseHarnessPerformance({ repoRoot: request.repoRoot }),
   harness_robustness: (request) => senseHarnessRobustness({ repoRoot: request.repoRoot }),
-  inventory_performance: (request) => senseInventoryPerformance({ repoRoot: request.repoRoot }),
+  inventory_performance: (request) =>
+    senseInventoryPerformance({
+      repoRoot: request.repoRoot,
+      ...optional('surfaces', surfacesInput(request)),
+    }),
   decision_record_integrity: (request) =>
     governanceReading(
       'decision_record_integrity',

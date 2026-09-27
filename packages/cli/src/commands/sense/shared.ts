@@ -219,6 +219,22 @@ export class SenseInputsError extends Error {
 
 export type SensorInputs = Readonly<Record<string, unknown>>;
 
+/**
+ * ADR-SCR-0003: the sensor kinds bound to a declared plant surface. Each receives the
+ * declaration's `surfaces` object as the effective input `surfaces`; when the object
+ * is omitted nothing is added and the sensor presumes every surface present.
+ */
+export const SURFACE_BOUND_SENSOR_KINDS: ReadonlySet<string> = new Set([
+  'inventory_api',
+  'inventory_routes',
+  'inventory_data_model',
+  'inventory_rbac',
+  'inventory_data_handling',
+  'inventory_coverage',
+  'plant_coverage',
+  'inventory_performance',
+]);
+
 interface SensorInputsSchema {
   readonly validate: ValidateFunction;
   /** Declared keys per kind, read from the schema's `inputs` properties. */
@@ -409,7 +425,9 @@ function validateDeclaration(
  * `explicit` over the declared entry key by key (a declared list is replaced,
  * never concatenated). The explicit input is operator-supplied for one run: it
  * is not path-checked here and never written back. Without a declaration the
- * result is `explicit` alone, so sensor defaults stay in force.
+ * result is `explicit` alone, so sensor defaults stay in force. A kind bound to a
+ * plant surface also receives the declared `surfaces` object (ADR-SCR-0003); when
+ * the declaration omits it every surface is presumed present.
  */
 export function resolveDeclaredSensorInputs(args: {
   readonly repoRoot: string;
@@ -434,5 +452,9 @@ export function resolveDeclaredSensorInputs(args: {
     );
   }
   const declared = validateDeclaration(args.repoRoot, declaration)[args.sensorKind] ?? {};
-  return Object.freeze({ ...declared, ...(args.explicit ?? {}) });
+  // The schema pass above has validated `surfaces` when present.
+  const surfaces = isRecord(declaration) ? declaration['surfaces'] : undefined;
+  const bound =
+    surfaces !== undefined && SURFACE_BOUND_SENSOR_KINDS.has(args.sensorKind) ? { surfaces } : {};
+  return Object.freeze({ ...declared, ...bound, ...(args.explicit ?? {}) });
 }
