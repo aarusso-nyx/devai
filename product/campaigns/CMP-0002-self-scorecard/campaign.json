@@ -2064,7 +2064,7 @@
                   "--repo-root",
                   ".",
                   "--as-role",
-                  "engineer",
+                  "inspector",
                   "--write",
                   "--format",
                   "json"
@@ -2078,7 +2078,7 @@
                   "--repo-root",
                   ".",
                   "--as-role",
-                  "engineer",
+                  "inspector",
                   "--write",
                   "--format",
                   "json"
@@ -2090,7 +2090,7 @@
               "commit_types": ["law(sensors)", "feat(sensors)", "test(sensors)", "docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0267.md",
-                "sha256": "7dd0afec15c94eefb3ed48dcc08ab0763a1e45947283fb49f4eecda287fb1ba7"
+                "sha256": "914eb6f01fab3be3c79aed79211bed63f56f2b349a7442f6d8b544529d5854af"
               },
               "pull_request": null,
               "merged_as": null,
