@@ -1903,7 +1903,8 @@
                   ".",
                   "--at",
                   "HEAD_SHA",
-                  "--human"
+                  "--format",
+                  "human"
                 ],
                 [
                   "node",
@@ -1918,7 +1919,7 @@
               "commit_types": ["plan(scorecard)", "docs(dev)"],
               "prompt": {
                 "path": "prompts/TASK-0261.md",
-                "sha256": null
+                "sha256": "e75d3b8eb29881b15908d43b41c4c86af0dbd2133e6c527bb09389dec7be339e"
               },
               "pull_request": null,
               "merged_as": null,
