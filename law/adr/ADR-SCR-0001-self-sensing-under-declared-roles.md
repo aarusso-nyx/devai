@@ -2,8 +2,8 @@
 id: ADR-SCR-0001
 title: Admit sensing and recording on the framework repository under declared roles
 type: adr
-status: proposed
-date: 2026-09-26
+status: accepted
+date: 2026-09-27
 authority: Architect
 supersedes: []
 provenance:
@@ -28,7 +28,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-26 by maintainer decision. Implemented by campaign CMP-0002, round R-0201. Amends the matrix of ADR-GOV-0002 by addition; it supersedes nothing.
+Accepted on 2026-09-27 by maintainer decision. Implemented by campaign CMP-0002, round R-0201. Amends the matrix of ADR-GOV-0002 by addition; it supersedes nothing.
 
 ## Context
 
