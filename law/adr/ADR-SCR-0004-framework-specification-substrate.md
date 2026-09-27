@@ -2,8 +2,8 @@
 id: ADR-SCR-0004
 title: The framework carries its own specification substrate as records
 type: adr
-status: proposed
-date: 2026-09-26
+status: accepted
+date: 2026-09-27
 authority: Architect
 supersedes: []
 provenance:
@@ -31,7 +31,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-26 by maintainer decision. Implemented by campaign CMP-0002, rounds R-0203 and R-0205.
+Accepted on 2026-09-27 by maintainer decision. Implemented by campaign CMP-0002, rounds R-0203 and R-0205.
 
 ## Context
 
