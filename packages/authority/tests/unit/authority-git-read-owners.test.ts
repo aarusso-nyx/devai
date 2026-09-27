@@ -49,10 +49,16 @@ describe('immutable Git read helper ownership', () => {
     const source =
       "import { readCheckPolicyGitSync as read } from '@devai-nyx/authority';\nread();";
     expect(
-      await inventoryFor({ 'packages/cli/src/services/check-runner/policy.ts': source }),
+      await inventoryFor({ 'packages/cli/src/services/check-runner/policy-git.ts': source }),
     ).toMatchObject({ ok: true });
     expectBoundaryFailure(
       await inventoryFor({ 'packages/cli/src/services/untrusted.ts': source }),
+      'refused',
+      'AUTHORITY_DIRECT_MUTATOR_INVENTORY_STALE',
+    );
+    // TASK-0253 moved the owner out of policy.ts; the old path keeps no approval.
+    expectBoundaryFailure(
+      await inventoryFor({ 'packages/cli/src/services/check-runner/policy.ts': source }),
       'refused',
       'AUTHORITY_DIRECT_MUTATOR_INVENTORY_STALE',
     );
