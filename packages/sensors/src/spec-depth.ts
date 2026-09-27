@@ -32,7 +32,7 @@ export interface SpecDepthOptions {
   readonly repoRoot: string;
   /** Default: `law/invariants` */
   readonly invariantsDir?: string;
-  /** Default: `docs/adr` */
+  /** Default: `docs/meta/adr` */
   readonly adrDir?: string;
   /** Default: `product/use-cases` */
   readonly useCasesDir?: string;

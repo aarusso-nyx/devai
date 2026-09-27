@@ -30,6 +30,13 @@ export interface TypeCheckOptions {
    * Only applies when `strategy === 'per-package'`.
    */
   readonly scanDirs?: readonly string[];
+  /**
+   * ADR-SCR-0005 declared input: the exact argument vector to execute from `cwd`,
+   * executable first, never joined through a shell. When set it replaces
+   * `npx tsc --noEmit` (and `project` / `strategy`), and its stdout is parsed for
+   * tsc diagnostics the same way.
+   */
+  readonly argv?: readonly string[];
 }
 
 export interface TypeCheckResult {
@@ -56,6 +63,10 @@ const DEFAULT_SCAN_DIRS: readonly string[] = ['packages', 'apps', 'reference', '
  * This keeps package findings attributable to their source package.
  */
 export function senseTypeCheck(opts: TypeCheckOptions): TypeCheckResult {
+  if (opts.argv !== undefined) {
+    if (opts.argv.length === 0) throw new Error('TYPE_CHECK_ARGV_EMPTY');
+    return { aggregate: runSingle(opts), perProject: [] };
+  }
   const strategy: TypecheckStrategy = opts.strategy ?? 'root';
   if (strategy === 'per-package' && opts.project === undefined) {
     return runPerPackage(opts);
@@ -65,8 +76,11 @@ export function senseTypeCheck(opts: TypeCheckOptions): TypeCheckResult {
 
 function runSingle(opts: TypeCheckOptions, projectOverride?: string): SensorReading {
   const project = projectOverride ?? opts.project;
-  const args = ['npx', 'tsc', '--noEmit'];
-  if (project !== undefined) args.push('-p', project);
+  const args =
+    projectOverride === undefined && opts.argv !== undefined
+      ? [...opts.argv]
+      : ['npx', 'tsc', '--noEmit'];
+  if (project !== undefined && opts.argv === undefined) args.push('-p', project);
   const result = runCommand(args, { cwd: opts.cwd, timeoutMs: opts.timeoutMs ?? 120_000 });
 
   const findings: SensorFinding[] = [];
