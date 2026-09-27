@@ -822,7 +822,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -838,7 +838,8 @@
                   "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
                   "law/policy/change-taxonomy.json",
                   "law/policy/adopter-defaults/change-taxonomy-binding.json",
-                  ".devai/config/change-taxonomy-binding.json"
+                  ".devai/config/change-taxonomy-binding.json",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
                 ],
                 "forbidden": [".github/workflows/", "packages/sensors/", "tests/"]
               },
@@ -878,7 +879,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0231.md",
-                "sha256": "2dce24beab7f52f944f65fb0985ca1eeae8a1609cafc181c4ece388aab53e919"
+                "sha256": "b6bfc7623257fc528ab4d35d678b5e250ed6069e154e5f860228673b05a1a43c"
               },
               "pull_request": null,
               "merged_as": null,
@@ -894,7 +895,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0231",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -923,7 +924,7 @@
               "commit_types": ["test(spec)"],
               "prompt": {
                 "path": "prompts/TASK-0232.md",
-                "sha256": null
+                "sha256": "a00c2fe8a71172c79d561576a14e2a3c3e1c8d33fbee7a5234e20339db3205bf"
               },
               "pull_request": null,
               "merged_as": null,
@@ -939,7 +940,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0232",
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F3"],
               "boundary": {
                 "paths": [
@@ -950,7 +951,10 @@
                   "packages/sensors/src/test-invariant-alignment.ts",
                   "packages/sensors/src/harness-invariant-alignment.ts",
                   "packages/cli/tests/",
-                  "tests/contract/"
+                  "tests/contract/",
+                  "packages/sensors/src/spec-depth.ts",
+                  "packages/sensors/tests/harness-invariant-alignment.test.ts",
+                  "tests/contract/data-handling-declaration.contract.test.ts"
                 ],
                 "forbidden": [
                   ".github/workflows/",
@@ -980,7 +984,7 @@
               "commit_types": ["law(trace)", "feat(sensors)", "test(spec)"],
               "prompt": {
                 "path": "prompts/TASK-0233.md",
-                "sha256": null
+                "sha256": "ef1407abe55444c28b483eab54847d57dab6cec19ebba14f86c915cd8888e5af"
               },
               "pull_request": null,
               "merged_as": null,
