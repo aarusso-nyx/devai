@@ -32,6 +32,7 @@ const WORKFLOWS_DIR = resolve(ROOT, '.github/workflows');
 const TOOLCHAIN_MANIFEST_PATH = resolve(ROOT, '.devai/config/toolchain.json');
 const CREDENTIAL_MANIFEST_PATH = resolve(ROOT, 'law/policy/credential-requirements.json');
 const LEDGER_WORKFLOW_FILE = 'devai-ledger-verify.yml';
+const SITE_WORKFLOW_PATH = '.github/workflows/site-publish.yml';
 
 interface CredentialManifest {
   readonly entries: ReadonlyArray<{ readonly id: string; readonly consumer: readonly unknown[] }>;
@@ -124,5 +125,37 @@ it('names the missing entry when a manifest entry a workflow still references is
   const result = checkWorkflowTree(root);
 
   const named = result.findings.find((item) => item.detail.includes(removedId));
+  expect(named, JSON.stringify(result.findings)).toBeDefined();
+});
+
+it('names jobs.publish-site when the site publication token consumer is removed from the manifest', () => {
+  const root = fixture();
+  const manifestPath = join(root, 'law/policy/credential-requirements.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    entries: Array<{ id: string; consumer: Array<{ workflow?: string; job?: string }> }>;
+  };
+  const token = manifest.entries.find((candidate) => candidate.id === 'GITHUB_TOKEN');
+  expect(
+    token?.consumer.some(
+      (consumer) => consumer.workflow === SITE_WORKFLOW_PATH && consumer.job === 'publish-site',
+    ),
+    'fixture assumption: GITHUB_TOKEN must declare the publish-site consumer',
+  ).toBe(true);
+  if (token !== undefined) {
+    token.consumer = token.consumer.filter(
+      (consumer) => !(consumer.workflow === SITE_WORKFLOW_PATH && consumer.job === 'publish-site'),
+    );
+  }
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+  const result = checkWorkflowTree(root);
+
+  const named = result.findings.find(
+    (item) =>
+      item.code === 'CI_CREDENTIAL_UNDECLARED' &&
+      item.file === 'site-publish.yml' &&
+      item.detail.includes('jobs.publish-site') &&
+      item.detail.includes('GITHUB_TOKEN'),
+  );
   expect(named, JSON.stringify(result.findings)).toBeDefined();
 });
