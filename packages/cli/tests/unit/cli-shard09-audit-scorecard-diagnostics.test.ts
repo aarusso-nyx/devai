@@ -7,24 +7,17 @@ const controls = vi.hoisted(() => ({
   validateScorecard: Object.assign(vi.fn(), { errors: null as unknown }),
 }));
 
+// ADR-SCR-0002: the facade's only loop dependency is the shared input
+// resolver, which walks .devai/state/sensor-readings and applies the
+// N/A ledger. Mocking that one seam is the whole loop surface.
 const mocks = vi.hoisted(() => ({
-  computeScorecard: vi.fn(),
-  loadReadingsFromDir: vi.fn(),
-  loadScorecardFailureMaxAgeMs: vi.fn(),
-  loadScorecardNaConfig: vi.fn(),
-  resolveScorecardNaPath: vi.fn(),
-  scorecardNaCellSet: vi.fn(),
+  resolveScorecardInputs: vi.fn(),
   spawnSync: vi.fn(),
 }));
 
 vi.mock('@devai-nyx/authority', () => ({ spawnSync: mocks.spawnSync }));
 vi.mock('@devai-nyx/loop', () => ({
-  computeScorecard: mocks.computeScorecard,
-  loadReadingsFromDir: mocks.loadReadingsFromDir,
-  loadScorecardFailureMaxAgeMs: mocks.loadScorecardFailureMaxAgeMs,
-  loadScorecardNaConfig: mocks.loadScorecardNaConfig,
-  resolveScorecardNaPath: mocks.resolveScorecardNaPath,
-  scorecardNaCellSet: mocks.scorecardNaCellSet,
+  resolveScorecardInputs: mocks.resolveScorecardInputs,
 }));
 vi.mock('@devai-nyx/schemas', () => ({
   validators: { scorecard: controls.validateScorecard },
@@ -33,6 +26,7 @@ vi.mock('@devai-nyx/schemas', () => ({
 import { auditScorecard } from '../../src/commands/audit/scorecard.js';
 
 const AT = 'a'.repeat(40);
+const TIMESTAMP = '2026-09-11T12:00:00Z';
 const SCORECARD = { overall: { verdict: 'PASS' }, cells: [] };
 
 function actionForScorecard(): (options: {
@@ -65,16 +59,13 @@ beforeEach(() => {
   mocks.spawnSync.mockImplementation((_command, args: readonly string[]) =>
     args[0] === 'rev-parse'
       ? { status: 0, stdout: `${controls.head}\n`, stderr: '' }
-      : { status: 0, stdout: '2026-09-11T12:00:00Z\n', stderr: '' },
+      : { status: 0, stdout: `${TIMESTAMP}\n`, stderr: '' },
   );
-  mocks.loadReadingsFromDir.mockReturnValue([]);
-  mocks.resolveScorecardNaPath.mockReturnValue(
-    '/fixture/repository/.devai/config/scorecard-na.json',
-  );
-  mocks.loadScorecardNaConfig.mockReturnValue({ schemaVersion: '1.0.0', cells: [] });
-  mocks.scorecardNaCellSet.mockReturnValue(new Set());
-  mocks.loadScorecardFailureMaxAgeMs.mockReturnValue(86_400_000);
-  mocks.computeScorecard.mockReturnValue(SCORECARD);
+  mocks.resolveScorecardInputs.mockReturnValue({
+    scorecard: SCORECARD,
+    readings: [],
+    source: 'empty',
+  });
   originalExitCode = process.exitCode;
   process.exitCode = undefined;
   stdout = '';
@@ -158,13 +149,39 @@ describe('CLI shard 09 audit scorecard diagnostics', () => {
     expect(stdout).toBe(`audit scorecard: PASS ${AT}\n`);
   });
 
-  it('loads readings from the canonical repository freshness directory', () => {
+  it('resolves readings through the loop input resolver for the exact head and commit time', () => {
     actionForScorecard()({ repoRoot: '/fixture/repository', at: AT });
 
     expect(process.exitCode).toBe(EXIT_PASS);
-    expect(mocks.loadReadingsFromDir).toHaveBeenCalledOnce();
-    expect(mocks.loadReadingsFromDir).toHaveBeenCalledWith(
-      '/fixture/repository/record/proofs/freshness/readings',
+    expect(mocks.resolveScorecardInputs).toHaveBeenCalledOnce();
+    // No pre-populated inputs: the resolver falls through to its disk
+    // walk of <repoRoot>/.devai/state/sensor-readings, the one store
+    // sense record writes. The retired record/proofs/freshness/readings
+    // path is never named by the facade.
+    expect(mocks.resolveScorecardInputs).toHaveBeenCalledWith({
+      repoRoot: '/fixture/repository',
+      inputs: undefined,
+      timestamp: TIMESTAMP,
+      integrationHead: AT,
+    });
+    expect(stdout).toBe(`${JSON.stringify(SCORECARD)}\n`);
+  });
+
+  it('names the readings store only through the resolver, never a second path', async () => {
+    const source = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../../src/commands/audit/scorecard.ts', import.meta.url), 'utf8'),
     );
+    expect(source).not.toContain('record/proofs/freshness/readings');
+    expect(source).not.toContain('loadReadingsFromDir');
+    expect(source).toContain('resolveScorecardInputs');
+  });
+
+  it('does not resolve readings when the head guard or Git fails first', () => {
+    controls.head = 'b'.repeat(40);
+
+    actionForScorecard()({ repoRoot: '/fixture/repository', at: AT });
+
+    expect(process.exitCode).toBe(EXIT_FAIL);
+    expect(mocks.resolveScorecardInputs).not.toHaveBeenCalled();
   });
 });

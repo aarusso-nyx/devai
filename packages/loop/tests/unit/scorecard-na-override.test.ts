@@ -198,34 +198,32 @@ describe('computeScorecard respects N/A overlay (Phase 34.B, closes D-91)', () =
     expect(f4t6?.verdict).toBe('PASS');
   });
 
-  it('global DEGENERATE_CELLS still wins over reading-driven verdicts (no regression)', () => {
-    // F4×T5 (Inventory × Idiomaticity) is in the global
-    // DEGENERATE_CELLS set per Article 5 (derived inventory
-    // artifacts are mechanically generated; idiomaticity applies
-    // to authored code). Without ANY naCells overlay, the cell
-    // stays N/A. This guards against the 34.B overlay timing
-    // accidentally regressing the pre-existing global path.
-    const sc = computeScorecard({
+  it('only the ledger yields N/A: F4:T5 scores without a ledger entry and is N/A with one', () => {
+    // ADR-SCR-0002: the classifier holds no degenerate list of its
+    // own. F4×T5 (Inventory × Idiomaticity) is the cell Article 5
+    // names as degenerate, yet it is N/A only because the ledger
+    // lists it with a reason. Without an entry every cell in the
+    // 5×9 grid is scoreable.
+    const withoutLedger = computeScorecard({
       timestamp: '2026-05-18T12:00:00.000Z',
       integrationHead: 'x'.repeat(40),
     });
-    const f4t5 = sc.cells.find((c) => c.substrate === 'F4' && c.property === 'T5');
-    expect(f4t5?.verdict).toBe('N/A');
-  });
+    expect(withoutLedger.cells).toHaveLength(45);
+    expect(withoutLedger.cells.filter((c) => c.verdict === 'N/A')).toEqual([]);
+    const scoreable = withoutLedger.cells.find((c) => c.substrate === 'F4' && c.property === 'T5');
+    expect(scoreable?.verdict).toBe('UNKNOWN');
 
-  it('naCells overlay composes with DEGENERATE_CELLS (cell in both stays N/A)', () => {
-    // A repo can redundantly declare F4×T5 in its overlay; the
-    // global N/A already wins, but the overlay path doesn't cause
-    // a regression — both lead to N/A.
-    const sc = computeScorecard({
+    const withLedger = computeScorecard({
       timestamp: '2026-05-18T12:00:00.000Z',
       integrationHead: 'x'.repeat(40),
       naCells: new Set(['F4:T5', 'F2:T4']),
     });
-    const f4t5 = sc.cells.find((c) => c.substrate === 'F4' && c.property === 'T5');
-    const f2t4 = sc.cells.find((c) => c.substrate === 'F2' && c.property === 'T4');
-    expect(f4t5?.verdict).toBe('N/A');
-    expect(f2t4?.verdict).toBe('N/A');
+    expect(
+      withLedger.cells
+        .filter((c) => c.verdict === 'N/A')
+        .map((c) => `${c.substrate}:${c.property}`)
+        .sort(),
+    ).toEqual(['F2:T4', 'F4:T5']);
   });
 });
 
