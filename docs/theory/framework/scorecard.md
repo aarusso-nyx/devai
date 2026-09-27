@@ -11,26 +11,29 @@ sidebar_position: 5
 
 Each cell of the scorecard is a single verdict, one of:
 
-| Verdict     | Meaning                                                                                                                        |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **PASS**    | Sensor measured the cell at or above threshold.                                                                                |
-| **REVIEW**  | Sensor measured below pass threshold but above review threshold. Triggers the tie-breaker ladder.                              |
-| **FAIL**    | Sensor measured below review threshold. Blocks merge unconditionally.                                                          |
-| **N/A**     | Cell is listed in the N/A ledger (`law/policy/scorecard-na.json`) with a reason; the ledger is the only source of N/A.         |
-| **UNKNOWN** | Sensor produced no reading, or reading is stale / inconclusive. Treated as `unknown` per [Article 39](../../reference/law.md). |
+| Verdict     | Meaning                                                                                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **PASS**    | Sensor measured the cell at or above threshold.                                                                                                                                                                                                  |
+| **REVIEW**  | Sensor measured below pass threshold but above review threshold. Triggers the tie-breaker ladder.                                                                                                                                                |
+| **FAIL**    | Sensor measured below review threshold. Blocks merge unconditionally.                                                                                                                                                                            |
+| **N/A**     | Cell is listed in the N/A ledger (`law/policy/scorecard-na.json`) with a reason, or every reading in it is `skipped` for a surface the repository declared absent (the [skipped-reading rule](#declared-surfaces-and-the-skipped-reading-rule)). |
+| **UNKNOWN** | Sensor produced no reading, or reading is stale / inconclusive. Treated as `unknown` per [Article 39](../../reference/law.md).                                                                                                                   |
 
 The overall scorecard verdict is the worst per-cell verdict, with the tie-breaker ladder applied to any REVIEW.
 
 ## Grid size and N/A cells
 
-The grid is 5 substrates × 9 properties = 45 cells. A cell is N/A only because the N/A ledger
-`law/policy/scorecard-na.json` lists it with a written reason (ADR-SCR-0002); the loop derives its
-set of degenerate cells from the ledger and holds no list of its own, so a change to that set is a
-law change reviewed like any other ledger edit. The ledger is materialized byte-for-byte at
-`.devai/config/scorecard-na.json`, which is the copy the scorecard reads.
+The grid is 5 substrates × 9 properties = 45 cells. A cell is N/A for one of two stated reasons and
+no other. The first is the N/A ledger `law/policy/scorecard-na.json`, which lists a degenerate cell
+with a written reason (ADR-SCR-0002); the loop derives its set of degenerate cells from the ledger
+and holds no list of its own, so a change to that set is a law change reviewed like any other ledger
+edit. The ledger is materialized byte-for-byte at `.devai/config/scorecard-na.json`, which is the
+copy the scorecard reads. The second is a plant surface the repository declared absent, which makes
+every sensor bound to it skip; that path is reading-driven and described under
+[Declared surfaces and the skipped-reading rule](#declared-surfaces-and-the-skipped-reading-rule).
 
-For the framework repository the ledger lists two cells, so DEVAI scores **45 cells, 2 N/A, 43
-scoreable**:
+For the framework repository the ledger lists two cells, so DEVAI's ledger fixes **45 cells, 2 N/A,
+43 scoreable** before any reading lands:
 
 | Cell  | Substrate × property     | Why N/A                                                                                                                                                                |
 | ----- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -41,6 +44,57 @@ F4:T5 ships in the adopter default ledger, so every adopter starts at 45 cells, 
 scoreable; F1:T1 is specific to this repository. See
 [Scorecard N/A overrides](../../adopters/scorecard-na-overrides.md) for how an adopter edits its
 ledger.
+
+## Declared surfaces and the skipped-reading rule
+
+The inventory and plant sensors identify a plant through HTTP endpoints, routes, tables, roles, and
+PII columns. A repository that has none of those is not failing to cover them; it never claimed
+them. ADR-SCR-0003 therefore lets an adopter declare its plant surfaces once, in
+`.devai/config/sensor-inputs.json` under `surfaces`: `http`, `database`, `rbac`, and `actions`,
+each `true` or `false` (see [Sensor inputs](../../adopters/sensor-inputs.md#surfaces)). A sensor
+bound only to surfaces declared absent emits a `skipped` reading carrying the declaration as its
+reason (the message of its first finding); a sensor that finds evidence of a surface declared absent
+reports `review` instead, so a false declaration is caught rather than honored.
+
+The composer applies one rule to a skipped reading, in this order of precedence:
+
+1. **A ledger N/A wins over everything.** A cell the ledger lists takes no reading at all, skipped
+   or measured; its record carries neither `sensor_readings` nor `notes`.
+2. **A measured reading makes its skipped siblings inert.** A cell that holds any measured reading
+   (`pass`, `review`, `fail`, `unknown`, `error`, `killed`) takes its verdict from the worst-of
+   collapse of the measured readings alone, exactly as before the record; each skipped reading is
+   listed in the cell's `sensor_readings` and moves neither the verdict nor the `deterministic`
+   flag.
+3. **An all-skipped cell is N/A by declaration.** A cell whose readings are all skipped is recorded
+   `N/A`, never `UNKNOWN` or `REVIEW`. Its `sensor_readings` list the skipped readings and its
+   `notes` open with the marker `N/A-declaration:` followed by one `<kind>: <reason>` entry per
+   skipped reading, joined by `; `.
+
+The two N/A sources stay distinguishable in the cell record without a new field, because
+`scorecard.schema.json` closes the cell object: a ledger N/A has no readings and no notes, a
+declaration N/A has both, and `scorecardCellNaSource(cell)` in the loop package reads back
+`ledger` or `declaration`. Substrate aggregates and the overall verdict leave a declaration N/A
+out the way they leave a ledger N/A out. Declaring a surface absent changes no threshold and no
+verdict rule; the only cells it can move are the cells whose every sensor is bound to that
+surface.
+
+For the framework repository, which declares `http`, `database`, and `rbac` absent and `actions`
+present, the sensor registry binds the affected cells as follows once the sensors honor the
+declaration:
+
+| Cell  | Substrate × property             | Sensors bound to it                                                               | Result                                                                                     |
+| ----- | -------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| F2:T1 | Plant × Coverage                 | `plant_coverage`                                                                  | Measured: registered actions against their specification links.                            |
+| F4:T1 | Inventory × Coverage             | all seven inventory kinds                                                         | Measured: `inventory_coverage` (actions) and `inventory_dep_graph` measure, the rest skip. |
+| F4:T2 | Inventory × Depth                | `inventory_api`, `inventory_routes`, `inventory_data_model`, `inventory_coverage` | Measured: `inventory_coverage` (actions) measures, the rest skip.                          |
+| F4:T6 | Inventory × Security and Privacy | `inventory_rbac`, `inventory_data_handling`                                       | N/A by declaration: both sensors skip for the absent `rbac` surface.                       |
+
+So the DEVAI grid reads **45 cells, 2 ledger N/A (F1:T1, F4:T5), 1 declaration N/A (F4:T6), 42
+scoreable** once the sweep records the inventory sensors under the declaration; the three other
+cells the absent surfaces used to drag to review are measured through the action surface instead.
+The declaration N/A is a property of the readings, not of the ledger, so it appears only in a
+scorecard composed from readings taken under the declaration, and the ledger count above is
+unchanged.
 
 ## One readings store
 
