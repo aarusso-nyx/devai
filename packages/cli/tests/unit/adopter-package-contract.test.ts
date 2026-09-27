@@ -959,7 +959,7 @@ describe('targeted dependency security floor', () => {
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@1\.1\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@2\.1\.4:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@5\.0\.9:/mu);
-    expect(resolvedPackages).toMatch(/^ {2}js-yaml@4\.3\.1:/mu);
+    expect(resolvedPackages).toMatch(/^ {2}js-yaml@4\.3\.2:/mu);
     expect(resolvedPackages).toMatch(/^ {2}nanoid@3\.3\.18:/mu);
     expect(resolvedPackages).toMatch(/^ {2}postcss@8\.5\.23:/mu);
     // qs belonged to the removed mutation engine; retain its security override only.
