@@ -1,4 +1,56 @@
 {
-  "head": null,
-  "records": []
+  "head": "e0bf483d2f568767c650826861fb5cc807007ab8fbe26a4d2a0b966d5606915a",
+  "records": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "EV-3828f67e05ca4896",
+      "timestamp": "2026-09-27T21:05:35.684Z",
+      "actor": "devai-cli",
+      "actor_role": "harness",
+      "action": "audit.observe",
+      "status": "completed",
+      "context": {
+        "repo_root": "/Volumes/Thiamat II/stech/devai/.claude/worktrees/agent-a2e681443660969a6",
+        "git": {
+          "head_sha": "86d8cceab1d0c2a4ea3891e151d23150ac22dab1",
+          "dirty_files": []
+        }
+      },
+      "artifacts": [
+        {
+          "path": ".devai/state/audit-observations/86d8cceab1d0c2a4ea3891e151d23150ac22dab1/inventory.json",
+          "sha256": "91dcbd17c356e7d222e138e6289b03fad7ff666c9874955a2a5cdd4f9f15a6b3",
+          "kind": "audit"
+        },
+        {
+          "path": ".devai/state/audit-observations/86d8cceab1d0c2a4ea3891e151d23150ac22dab1/scorecard.json",
+          "sha256": "846e324b723b9401caab90127973f14e56308dc11ea34ebc432e0b229d40bd79",
+          "kind": "audit"
+        },
+        {
+          "path": ".devai/state/audit-observations/86d8cceab1d0c2a4ea3891e151d23150ac22dab1/backlog.json",
+          "sha256": "d2324772396f5093ab92743978e365cc63dae1f08454c198a48a4270494616fd",
+          "kind": "audit"
+        },
+        {
+          "path": ".devai/state/audit-observations/86d8cceab1d0c2a4ea3891e151d23150ac22dab1/assessment.json",
+          "sha256": "f9f24879cf19b46221ef450bd78504fc40b3f919547ee1a6d0a7198db3c09f57",
+          "kind": "audit"
+        },
+        {
+          "path": ".devai/state/audit-observations/86d8cceab1d0c2a4ea3891e151d23150ac22dab1/status.json",
+          "sha256": "b140a8f0867fadb0542964ebc9222fd2a6ea5a416b2ecb12b7822c19e3d34d27",
+          "kind": "audit"
+        }
+      ],
+      "notes": [
+        "exact_sha=86d8cceab1d0c2a4ea3891e151d23150ac22dab1",
+        "readiness_promoting=false"
+      ],
+      "previous_run_hash": null,
+      "manifest_hash": "e0bf483d2f568767c650826861fb5cc807007ab8fbe26a4d2a0b966d5606915a",
+      "sequence": 1,
+      "previous_hash": "GENESIS"
+    }
+  ]
 }
