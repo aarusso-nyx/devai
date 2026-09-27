@@ -62,6 +62,7 @@ import {
   optional,
   stringArrayInput,
   stringInput,
+  integerInput,
   runtimeProbe,
   surfacesInput,
   specIdiomaticity,
@@ -231,7 +232,14 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   harness_coherence: (request) => senseHarnessCoherence({ repoRoot: request.repoRoot }),
   harness_invariant_alignment: (request) =>
     senseHarnessInvariantAlignment({ repoRoot: request.repoRoot }),
-  harness_idiomaticity: (request) => senseHarnessIdiomaticity({ repoRoot: request.repoRoot }),
+  harness_idiomaticity: (request) =>
+    senseHarnessIdiomaticity({
+      repoRoot: request.repoRoot,
+      ...optional(
+        'minWorkflowsForReusableCheck',
+        integerInput(request, 'minWorkflowsForReusableCheck'),
+      ),
+    }),
   harness_performance: (request) => senseHarnessPerformance({ repoRoot: request.repoRoot }),
   harness_robustness: (request) => senseHarnessRobustness({ repoRoot: request.repoRoot }),
   inventory_performance: (request) =>
