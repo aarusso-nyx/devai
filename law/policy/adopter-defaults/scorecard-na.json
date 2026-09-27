@@ -1,4 +1,10 @@
 {
   "schemaVersion": "1.0.0",
-  "cells": []
+  "cells": [
+    {
+      "cell": "F4:T5",
+      "reason": "Inventory x Idiomaticity is the degenerate cell Article 5 names: inventory artifacts are derived deterministically from F1, F2 and F3 and never authored, so idiomaticity has no authored subject to measure.",
+      "constitution_anchor": "Article 5"
+    }
+  ]
 }

@@ -5,6 +5,11 @@
       "cell": "F1:T1",
       "reason": "Contract validation has no live emitter, so contract_validation is explicitly N/A rather than presented as reachable.",
       "constitution_anchor": "Article 5"
+    },
+    {
+      "cell": "F4:T5",
+      "reason": "Inventory x Idiomaticity is the degenerate cell Article 5 names: inventory artifacts are derived deterministically from F1, F2 and F3 and never authored, so idiomaticity has no authored subject to measure.",
+      "constitution_anchor": "Article 5"
     }
   ]
 }
