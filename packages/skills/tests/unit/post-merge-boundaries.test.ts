@@ -124,6 +124,23 @@ function reading(kind: string, status: string): Record<string, unknown> {
   };
 }
 
+/**
+ * The canonical readings store (ADR-SCR-0002). Each round replaces the store
+ * with its readings at `<kind>/<id>.json`, the layout `sense record` writes.
+ */
+const READINGS_STORE = '.devai/state/sensor-readings';
+
+function writeReadingsRound(root: string, round: readonly unknown[]): void {
+  rmSync(join(root, READINGS_STORE), { recursive: true, force: true });
+  for (const entry of round) {
+    const { id, sensor } = entry as {
+      readonly id: string;
+      readonly sensor: { readonly kind: string };
+    };
+    put(root, `${READINGS_STORE}/${sensor.kind}/${id}.json`, `${JSON.stringify(entry, null, 2)}\n`);
+  }
+}
+
 function fixture(mergeCount = 1, readings: readonly (readonly unknown[])[] = []): HostFixture {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-boundary-')));
   roots.push(root);
@@ -138,13 +155,7 @@ function fixture(mergeCount = 1, readings: readonly (readonly unknown[])[] = [])
     git(root, ['checkout', '-qb', `feature-${String(index)}`]);
     put(root, `feature-${String(index)}.txt`, `feature ${String(index)}\n`);
     const round = readings[index - 1];
-    if (round !== undefined) {
-      put(
-        root,
-        'record/proofs/freshness/readings/sensors.json',
-        `${JSON.stringify(round, null, 2)}\n`,
-      );
-    }
+    if (round !== undefined) writeReadingsRound(root, round);
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', `feature ${String(index)}`]);
     git(root, ['checkout', '-q', 'main']);
