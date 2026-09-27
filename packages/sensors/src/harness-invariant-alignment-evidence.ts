@@ -19,7 +19,7 @@ export function safeStat(p: string): Stats | null {
 /**
  * Normalized alignment-evidence view. R21 accepts this shape directly for
  * host-produced evidence, and also derives it from DEVAI's canonical pair:
- * a SensorReading under `record/proofs/sensor-readings/` plus the matching
+ * a SensorReading under `.devai/state/sensor-readings/` plus the matching
  * `sense.readings.record` entry in `record/proofs/chain.json`.
  */
 interface AlignmentEvidence {

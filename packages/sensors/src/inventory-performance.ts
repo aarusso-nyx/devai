@@ -15,8 +15,8 @@ import {
 /**
  * F4 inventory performance sensor (Phase 29.F; F4×T7).
  *
- * Reads every persisted SR under `record/proofs/sensor-readings/
- * inventory_*<asterisk>/` and aggregates `duration_ms` per kind plus an
+ * Reads every persisted SR under `.devai/state/sensor-readings/
+ * inventory_*<asterisk>/` (the store `sense record` writes, ADR-SCR-0002) and aggregates `duration_ms` per kind plus an
  * overall p95. The last UNKNOWN-without-sensor cell from D-77's
  * carry-forward register (substrate-expansion trilogy residual).
  *
@@ -34,7 +34,12 @@ export interface InventoryPerformanceOptions {
   readonly now?: string;
 }
 
-const DEFAULT_READINGS_DIR = 'record/proofs/sensor-readings';
+/**
+ * The canonical readings store (ADR-SCR-0002). Kept in parity with
+ * `SENSOR_READINGS_DIR` in `packages/loop/src/scorecard/inputs.ts`; declared
+ * locally because the sensors package does not depend on the loop package.
+ */
+const DEFAULT_READINGS_DIR = '.devai/state/sensor-readings';
 const DEFAULT_THRESHOLDS = { pass: 2000, review: 5000 } as const;
 
 function abs(repoRoot: string, p: string): string {

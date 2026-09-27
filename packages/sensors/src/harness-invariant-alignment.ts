@@ -36,6 +36,12 @@ export interface HarnessInvariantAlignmentOptions {
 }
 
 const DEFAULT_INVARIANTS_DIR = 'law/invariants';
+/**
+ * The canonical readings store (ADR-SCR-0002). Kept in parity with
+ * `SENSOR_READINGS_DIR` in `packages/loop/src/scorecard/inputs.ts`; declared
+ * locally because the sensors package does not depend on the loop package.
+ */
+const DEFAULT_READINGS_DIR = '.devai/state/sensor-readings';
 
 function abs(repoRoot: string, p: string): string {
   return isAbsolute(p) ? p : resolve(repoRoot, p);
@@ -83,7 +89,7 @@ export function senseHarnessInvariantAlignment(
     opts.evidenceDir !== undefined
       ? loadEvidence(opts.repoRoot, abs(opts.repoRoot, opts.evidenceDir))
       : [
-          ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, 'record/proofs/sensor-readings')),
+          ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, DEFAULT_READINGS_DIR)),
           ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, 'record/proofs/work/test-results')),
         ];
   const nowMs = Date.parse(opts.now ?? new Date().toISOString());
