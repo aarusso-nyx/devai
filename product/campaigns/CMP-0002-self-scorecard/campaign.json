@@ -1602,7 +1602,7 @@
       "title": "Persist readings and the first scorecard",
       "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed with every scoreable cell at PASS.",
       "status": "open",
-      "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
+      "records": ["ADR-SCR-0001", "ADR-SCR-0002", "ADR-SCR-0005"],
       "depends_on": ["R-0204", "R-0205"],
       "attestation_reissue": false,
       "owner_effects_required": [],
@@ -1627,7 +1627,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1687,8 +1687,8 @@
                 "path": "prompts/TASK-0262.md",
                 "sha256": "2f92d4cc0c1b96b105cfa76fc5565f71a558e4f98f274d9448e4460a316c9fe7"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/144",
+              "merged_as": "54c69297f866b2562de3aa62773ff27be601d87a",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1698,11 +1698,66 @@
           ]
         },
         {
+          "id": "CTG-0263",
+          "title": "Performance script",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": ["package.json"],
+          "gates": ["format:check"],
+          "tasks": [
+            {
+              "id": "TASK-0263",
+              "title": "Add the test:perf script the sensor inputs declare so the performance cell can be measured",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "in_progress",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": ["package.json"],
+                "forbidden": ["law/", ".github/workflows/", "test-tasks.json", "packages/"]
+              },
+              "deliverables": [
+                "A root test:perf script that runs the existing performance observations deterministically with vitest, fast enough for the declared performance targets, with no new dependency and no placeholder test.",
+                "perf_test reports pass with script_present true on the repository."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:perf"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "perf_test",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-workflows.mjs"]
+              ],
+              "commit_types": ["build(scripts)"],
+              "prompt": {
+                "path": "prompts/TASK-0263.md",
+                "sha256": "51b918f1560889cc6cb65ef70bb91bdbde59dbe945e64ed46d2fe89c59e64413"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "low",
+                "time_budget_minutes": 30
+              }
+            }
+          ]
+        },
+        {
           "id": "CTG-0261",
           "title": "Record and audit",
           "type": "single-role",
           "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
-          "depends_on": ["CTG-0262"],
+          "depends_on": ["CTG-0262", "CTG-0263"],
           "lock_scopes": [
             ".devai/state/sensor-readings/",
             "record/proofs/compliance/scorecards/",
