@@ -21,7 +21,9 @@ const ENGINEER = {
 
 // ADR-SCR-0005: the repository root declares a type_check argv in
 // .devai/config/sensor-inputs.json, so it reaches the adapter and the dry run.
-const DECLARED_TYPE_CHECK_INPUTS = { argv: ['pnpm', 'run', 'typecheck'] };
+const DECLARED_TYPE_CHECK_INPUTS = {
+  argv: ['npx', 'tsc', '--noEmit', '-p', 'tsconfig.typecheck.json'],
+};
 
 interface Options {
   readonly preset?: string;
