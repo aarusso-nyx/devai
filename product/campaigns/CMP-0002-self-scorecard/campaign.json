@@ -285,7 +285,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -293,7 +293,9 @@
                   "law/policy/adopter-defaults/sensor-inputs.json",
                   ".devai/config/sensor-inputs.json",
                   "packages/cli/src/commands/check/schemas.ts",
-                  "docs/adopters/sensor-inputs.md"
+                  "docs/adopters/sensor-inputs.md",
+                  "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
                 ],
                 "forbidden": [
                   ".github/workflows/",
@@ -319,10 +321,15 @@
                 ],
                 ["node", "scripts/check-policy-materialization.mjs"]
               ],
-              "commit_types": ["law(sensors)", "docs(adopters)"],
+              "commit_types": [
+                "law(sensors)",
+                "refactor(schemas)",
+                "test(schemas)",
+                "docs(adopters)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-0221.md",
-                "sha256": null
+                "sha256": "732c5934211efbb23d33d010285801c35a58fe1ed97b612b0020cd1d4ad5c133"
               },
               "pull_request": null,
               "merged_as": null,
@@ -471,14 +478,14 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "in_progress",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
                   "packages/cli/src/authority/broker.ts",
                   "packages/cli/src/services/check-runner/authority-process.ts",
-                  "law/policy/authority-policy.json",
-                  ".devai/config/authority-policy.json",
+                  "law/policy/subprocess-effects.json",
+                  ".devai/config/subprocess-effects.json",
                   "packages/cli/tests/unit/authority-host-process-read-only.test.ts",
                   "packages/sensors/src/harness-green-main.ts",
                   "packages/sensors/src/harness-performance.ts",
@@ -504,7 +511,7 @@
               "commit_types": ["law(authority)", "feat(authority)", "test(authority)"],
               "prompt": {
                 "path": "prompts/TASK-0224.md",
-                "sha256": null
+                "sha256": "732486bfeefebd74d4f54a8cd6893229a239c719d20f63b50465aa42dae4c858"
               },
               "pull_request": null,
               "merged_as": null,
@@ -720,7 +727,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "in_progress",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -748,7 +755,7 @@
               "commit_types": ["ci(release)", "fix(sensors)", "test(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0225.md",
-                "sha256": null
+                "sha256": "9193de9b941ceda184f842731d07c2f8e1e78848bcb702235077e0d4f915f209"
               },
               "pull_request": null,
               "merged_as": null,
@@ -830,7 +837,12 @@
                   "json"
                 ]
               ],
-              "commit_types": ["law(invariants)", "law(security)", "law(targets)"],
+              "commit_types": [
+                "law(invariants)",
+                "law(security)",
+                "law(targets)",
+                "refactor(schemas)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-0231.md",
                 "sha256": null
