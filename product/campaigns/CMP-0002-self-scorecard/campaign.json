@@ -479,7 +479,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -490,7 +490,8 @@
                   "packages/cli/tests/unit/authority-host-process-read-only.test.ts",
                   "packages/sensors/src/harness-green-main.ts",
                   "packages/sensors/src/harness-performance.ts",
-                  "packages/sensors/src/harness-robustness.ts"
+                  "packages/sensors/src/harness-robustness.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts"
                 ],
                 "forbidden": [".github/workflows/"]
               },
@@ -512,7 +513,7 @@
               "commit_types": ["law(authority)", "feat(authority)", "test(authority)"],
               "prompt": {
                 "path": "prompts/TASK-0224.md",
-                "sha256": "732486bfeefebd74d4f54a8cd6893229a239c719d20f63b50465aa42dae4c858"
+                "sha256": "07e9e74e339ee2ef99d00a17afcfa4b94c61503ee2d94c8f7ad682255abeade1"
               },
               "pull_request": null,
               "merged_as": null,
