@@ -1,0 +1,120 @@
+{
+  "$schema": "../schemas/targets.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "performance",
+  "kind": "performance",
+  "title": "DEVAI framework repository performance targets",
+  "status": "active",
+  "authority": "Architect",
+  "date": "2026-09-27",
+  "targets": [
+    {
+      "id": "TGT-PERF-001",
+      "title": "Check runner median wall time on main",
+      "subject": "check runner",
+      "statement": "The median wall time of the sampled successful check-runner workflow runs on main is at most 600000 ms.",
+      "sensor_kind": "harness_performance",
+      "metric": "median_ms",
+      "metric_source": "metrics",
+      "comparator": "lte",
+      "threshold": 600000,
+      "unit": "ms",
+      "invariants": ["INV-PERF-001", "INV-CORE-003"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-16-cycles"
+      },
+      "decisions": ["ADR-SCR-0004"]
+    },
+    {
+      "id": "TGT-PERF-002",
+      "title": "Check runner p95 wall time on main",
+      "subject": "check runner",
+      "statement": "The 95th percentile wall time of the sampled successful check-runner workflow runs on main is at most 1800000 ms.",
+      "sensor_kind": "harness_performance",
+      "metric": "p95_ms",
+      "metric_source": "metrics",
+      "comparator": "lte",
+      "threshold": 1800000,
+      "unit": "ms",
+      "invariants": ["INV-PERF-001", "INV-CORE-003"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-16-cycles"
+      },
+      "decisions": ["ADR-SCR-0004"]
+    },
+    {
+      "id": "TGT-PERF-003",
+      "title": "Sweep type-check member wall time",
+      "subject": "sweep",
+      "statement": "The type_check reading produced by a sweep run carries a duration_ms of at most 300000 ms.",
+      "sensor_kind": "type_check",
+      "metric": "duration_ms",
+      "metric_source": "reading",
+      "comparator": "lte",
+      "threshold": 300000,
+      "unit": "ms",
+      "invariants": ["INV-PERF-001"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-16-cycles"
+      },
+      "decisions": ["ADR-SCR-0004", "ADR-SCR-0005"]
+    },
+    {
+      "id": "TGT-PERF-004",
+      "title": "Sweep lint member wall time",
+      "subject": "sweep",
+      "statement": "The lint reading produced by a sweep run carries a duration_ms of at most 180000 ms.",
+      "sensor_kind": "lint",
+      "metric": "duration_ms",
+      "metric_source": "reading",
+      "comparator": "lte",
+      "threshold": 180000,
+      "unit": "ms",
+      "invariants": ["INV-PERF-001"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-16-cycles"
+      },
+      "decisions": ["ADR-SCR-0004", "ADR-SCR-0005"]
+    },
+    {
+      "id": "TGT-PERF-005",
+      "title": "Release candidate performance suite wall time",
+      "subject": "release candidate",
+      "statement": "The declared performance script the perf_test sensor runs for the release candidate completes within 900000 ms.",
+      "sensor_kind": "perf_test",
+      "metric": "duration_ms",
+      "metric_source": "metrics",
+      "comparator": "lte",
+      "threshold": 900000,
+      "unit": "ms",
+      "invariants": ["INV-PERF-001"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-17-hard-gate"
+      },
+      "decisions": ["ADR-SCR-0004", "ADR-SCR-0005"]
+    },
+    {
+      "id": "TGT-PERF-006",
+      "title": "Release candidate performance suite exit status",
+      "subject": "release candidate",
+      "statement": "The declared performance script the perf_test sensor runs for the release candidate exits with status 0.",
+      "sensor_kind": "perf_test",
+      "metric": "exit_code",
+      "metric_source": "metrics",
+      "comparator": "eq",
+      "threshold": 0,
+      "unit": "count",
+      "invariants": ["INV-PERF-001", "INV-CORE-003"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-17-hard-gate"
+      },
+      "decisions": ["ADR-SCR-0004"]
+    }
+  ]
+}
