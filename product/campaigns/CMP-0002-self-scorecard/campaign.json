@@ -1875,7 +1875,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
@@ -1934,8 +1934,8 @@
                 "path": "prompts/TASK-0265.md",
                 "sha256": "c10e2aa5229c6667c30923a0ce02c3268bff092143363ee50de3d269c2035a09"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/149",
+              "merged_as": "58886e2f68dd3eac1d0e58c77ab2b29aadd053a2",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1963,7 +1963,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
