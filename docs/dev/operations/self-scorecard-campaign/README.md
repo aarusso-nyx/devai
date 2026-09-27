@@ -267,3 +267,16 @@ Follow-ups recorded at close:
    reads the declaration file itself.
 3. `harness_invariant_alignment` reads review until readings exist (R-0206).
 4. Records for Articles 25, 27 and 37 remain to be authored in a later round.
+
+### R-0205 in progress: combined pull request
+
+On 2026-09-27 the maintainer directed that the four single-role waves of
+R-0205 (TASK-0252, TASK-0253, TASK-0254, TASK-0255) merge through one pull
+request, [#138](https://github.com/aarusso-nyx/devai/pull/138), carrying their
+forty commits in order, because the strict-up-to-date gate would otherwise
+run four times in series. The execution policy's one-pull-request-per-wave
+preference is deviated from here by that decision. The per-task pull
+requests #134 to #137 are closed as superseded once #138 is green. One
+conflict was resolved in the combination: TASK-0255's threshold wiring was
+reapplied onto the adapters module after TASK-0253's split moved the input
+helpers into `adapter-readers.ts`.
