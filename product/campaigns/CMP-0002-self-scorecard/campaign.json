@@ -1601,11 +1601,92 @@
       "close_checks": ["law:validate", "release:static-integrity", "docs:validate"],
       "waves": [
         {
+          "id": "CTG-0262",
+          "title": "Self-dogfood service wired into the command paths",
+          "type": "single-role",
+          "records": ["ADR-SCR-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/commands/sense/",
+            "packages/cli/src/commands/audit/",
+            "packages/cli/src/services/self-dogfood.ts"
+          ],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0262",
+              "title": "Wire the self-dogfood service into the sense and audit command paths before readings are recorded",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/sense/run-set.ts",
+                  "packages/cli/src/commands/sense/record.ts",
+                  "packages/cli/src/commands/sense/facade.ts",
+                  "packages/cli/src/commands/audit/observe.ts",
+                  "packages/cli/src/services/self-dogfood.ts",
+                  "packages/cli/src/cli-runtime.ts",
+                  "packages/cli/tests/unit/self-dogfood-policy.test.ts",
+                  "packages/cli/tests/unit/self-dogfood-command-paths.test.ts",
+                  "docs/dev/operations/self-scorecard-campaign/README.md"
+                ],
+                "forbidden": ["law/", ".github/workflows/", "packages/sensors/"]
+              },
+              "deliverables": [
+                "On the framework repository, sense run, sense record and audit observe consult the self-dogfood service before acting: a read-effect sense run is admitted for every declared role; sense run with write consent, sense record and audit observe are admitted for the inspector only; any --publish is refused before the policy is parsed; a population with a remote-write member is refused for every role.",
+                "The refusals are structured errors with the policy's fail-closed reason, printed on stderr with nothing on stdout, and the dry run shows the decision.",
+                "Tests cover each inspector acceptance item of ADR-SCR-0001 through the command paths, not only the service."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/self-dogfood-policy.test.ts",
+                  "packages/cli/tests/unit/self-dogfood-command-paths.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "--preset",
+                  "sweep",
+                  "--round",
+                  "R-0206",
+                  "--repo-root",
+                  ".",
+                  "--dry-run",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(dogfood)", "test(dogfood)", "docs(dev)"],
+              "prompt": {
+                "path": "prompts/TASK-0262.md",
+                "sha256": "7aa264564524c0e917df6659c16de76c4e6dc9e495e807d36f54f1203c0ef9fa"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        },
+        {
           "id": "CTG-0261",
           "title": "Record and audit",
           "type": "single-role",
           "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
-          "depends_on": [],
+          "depends_on": ["CTG-0262"],
           "lock_scopes": [
             ".devai/state/sensor-readings/",
             "record/proofs/compliance/scorecards/",
