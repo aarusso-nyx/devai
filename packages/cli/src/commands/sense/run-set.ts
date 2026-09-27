@@ -2,6 +2,12 @@ import type { CAC } from 'cac';
 import { routeArgv } from '../../command-router.js';
 import { defineCommand, type RegistryEntry } from '../../define-command.js';
 import { EXIT_FAIL, EXIT_GATE, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
+import { declaredInvocationAuthority } from '../../authority/index.js';
+import {
+  gateSelfDogfoodCommand,
+  resolveSelfDogfoodDeclaration,
+  selfDogfoodRefusal,
+} from '../../services/self-dogfood.js';
 import { sensorAdapter } from './adapters.js';
 import {
   resolveSenseSelection,
@@ -300,13 +306,37 @@ export const senseRunSetCmd = defineCommand({
             repoRoot,
             ...(explicit === undefined ? {} : { explicit }),
           });
+          // ADR-SCR-0001: on the framework repository the self-dogfood matrix
+          // decides the run from the declared role, the consent and the whole
+          // resolved population, after the invocation is validated and before
+          // any adapter runs.
+          const selfDogfood = gateSelfDogfoodCommand({
+            repoRoot,
+            action_id: 'sense run',
+            declaration: resolveSelfDogfoodDeclaration(declaredInvocationAuthority()),
+            population: {
+              aggregate_effect: resolved.aggregate_effect,
+              member_effects: resolved.members.map((member) => member.effect),
+            },
+          });
+          if (options.dryRun !== true && selfDogfood.applies && !selfDogfood.decision.ok) {
+            process.stderr.write(selfDogfoodRefusal(selfDogfood));
+            process.exitCode = EXIT_USAGE;
+            return;
+          }
           if (options.dryRun === true) {
             const members = resolved.members.map((member) => ({
               ...member,
               effective_inputs: memberInputs.get(member.kind) ?? {},
             }));
             process.stdout.write(
-              `${JSON.stringify({ ok: true, dry_run: true, ...resolved, members })}\n`,
+              `${JSON.stringify({
+                ok: true,
+                dry_run: true,
+                ...resolved,
+                members,
+                ...(selfDogfood.applies ? { self_dogfood: selfDogfood } : {}),
+              })}\n`,
             );
             process.exitCode = EXIT_PASS;
             return;

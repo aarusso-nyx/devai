@@ -1,4 +1,5 @@
 import { cac, type CAC } from 'cac';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { routeArgv } from './command-router.js';
 import {
@@ -17,6 +18,14 @@ import {
   validateLiveAuthorityActionRegistry,
 } from './authority/index.js';
 import { resolveCliVersion } from './version.js';
+import {
+  declareSelfDogfoodInvocation,
+  gateSelfDogfoodCommand,
+  isSelfDogfoodRole,
+  isSelfDogfoodSenseAction,
+  readSelfDogfoodPolicy,
+  selfDogfoodRefusal,
+} from './services/self-dogfood.js';
 import {
   attachActionOutputBoundaries,
   emitPreDispatchActionResult,
@@ -244,6 +253,68 @@ function preserveHumanOutputBeforeExplicitExit(): void {
   }
 }
 
+function argvFlag(argv: readonly string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  return index < 0 ? undefined : argv[index + 1];
+}
+
+/**
+ * Capture the human declaration of a sensing action on the framework
+ * repository before generic authority runs (ADR-SCR-0001).
+ *
+ * `--publish` on a sensing action is refused here, before the policy is
+ * parsed. A read-effect `sense run` is decided by the self-dogfood matrix, so
+ * the role and write consent it declares are handed to the handler and kept
+ * from the generic authority layer, which admits no declaration on a read
+ * effect. Every other population keeps its declaration for generic authority.
+ * A repository that does not carry the framework's policy is unaffected.
+ */
+async function captureSelfDogfoodDeclaration(
+  argv: readonly string[],
+  action: RegistryEntry | undefined,
+): Promise<{ readonly argv: readonly string[]; readonly refusal?: string }> {
+  declareSelfDogfoodInvocation(undefined);
+  if (action === undefined || !isSelfDogfoodSenseAction(action.name)) return { argv };
+  if (argv.some((value) => value === '--help' || value === '-h')) return { argv };
+  const repoRoot = resolve(argvFlag(argv, '--repo-root') ?? '.');
+  const declaredRole = argvFlag(argv, '--as-role');
+  const role = isSelfDogfoodRole(declaredRole) ? declaredRole : undefined;
+  const declaration = {
+    role,
+    human_invoked: role !== undefined && !argv.includes('--machine-actor'),
+    declaration_source: role === undefined ? undefined : 'cli-flag',
+    write_consent: argv.includes('--write'),
+    publish: argv.includes('--publish'),
+  };
+  if (declaration.publish) {
+    const gate = gateSelfDogfoodCommand({ repoRoot, action_id: action.name, declaration });
+    return gate.applies ? { argv, refusal: selfDogfoodRefusal(gate) } : { argv };
+  }
+  if (!readSelfDogfoodPolicy(repoRoot).applies) return { argv };
+  declareSelfDogfoodInvocation(declaration);
+  if (action.name !== 'sense run' || argv.includes('--authority-session')) return { argv };
+  let aggregate: string;
+  try {
+    const { resolveSenseInvocation } = await import('./authority/sense-selection.js');
+    aggregate = resolveSenseInvocation(action, argv)?.selection.aggregate_effect ?? 'read';
+  } catch {
+    // An invalid selection is reported by generic authority and the handler.
+    return { argv };
+  }
+  if (aggregate !== 'read') return { argv };
+  const kept: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index] as string;
+    if (value === '--as-role' && role !== undefined) {
+      index += 1;
+      continue;
+    }
+    if (value === '--write') continue;
+    kept.push(value);
+  }
+  return { argv: kept };
+}
+
 async function main(captureOutput: boolean): Promise<void> {
   const pkgVersion = resolveCliVersion();
   const cli = cac('devai');
@@ -295,8 +366,22 @@ async function main(captureOutput: boolean): Promise<void> {
   });
   if (!initialized.ok) return;
 
+  const selfDogfood = await captureSelfDogfoodDeclaration(process.argv, invocationAction);
+  if (selfDogfood.refusal !== undefined) {
+    if (
+      !emitPreDispatchActionResult(machineAction, {
+        exit: 2,
+        stdout: '',
+        stderr: selfDogfood.refusal,
+      })
+    ) {
+      process.stderr.write(selfDogfood.refusal);
+      process.exitCode = 2;
+    }
+    return;
+  }
   const authorized = invocationStage(machineAction, 'authorization', () =>
-    authorizeCliArgv(process.argv, registry),
+    authorizeCliArgv(selfDogfood.argv, registry),
   );
   const authorityResult = authorized.ok ? authorized.value : undefined;
   if (!authorized.ok) return;
@@ -461,6 +546,7 @@ async function invoke(
       process.exit = previous.exit;
       process.stdout.write = previous.stdout;
       process.stderr.write = previous.stderr;
+      declareSelfDogfoodInvocation(undefined);
       invocationActive = false;
     }
   }
