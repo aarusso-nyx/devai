@@ -1,5 +1,4 @@
-import { createHash } from 'node:crypto';
-import { canonicalJson, canonicalSha256 } from '@devai-nyx/utils';
+import { canonicalSha256 } from '@devai-nyx/utils';
 import {
   isVerifiedReleaseCandidateSnapshot,
   type ReleaseCandidateSnapshot,
@@ -30,154 +29,36 @@ import {
 import type { ContainerArchiveEntry } from './container-archive.js';
 import type { TaskDescriptor, PlannedTask } from './check-runner/types.js';
 import type { ReleaseLifecycleRequest } from './release-lifecycle-execution.js';
-
-type Json = Readonly<Record<string, unknown>>;
-const INVALID = 'release-toolchain-fixture-compatibility-invalid';
-const NODE = 'diagnostic:mutation-toolchain';
-const WORKSPACE = 'packages/fixture';
-const RAW = `${WORKSPACE}/reports/mutation/raw.json`;
-const COMPATIBILITY = `${WORKSPACE}/reports/mutation/compatibility.json`;
-const OUTPUTS = [COMPATIBILITY, RAW];
-const DYNAMIC_PATHS = [
-  '.devai/config/adopter-policy-binding.json',
-  '.devai/config/domains.json',
-  '.devai/config/glob-guards.json',
-  '.devai/config/project.json',
-  '.devai/config/release-verification.json',
-  '.devai/config/scorecard-na.json',
-  '.devai/config/thresholds.json',
-  '.devai/constitution.md',
-  '.devai/pin/constitution.md',
-  'host/devai.tgz',
-  'pnpm-lock.yaml',
-];
-const VERSIONS = {
-  node: 'v24.20.0',
-  pnpm: '9.15.0',
-  vitest: '4.1.10',
-  typescript: '5.9.3',
-};
-const RUNTIME_KEYS = [
-  'protocol',
-  'image',
-  'engine_version',
-  'node_version',
-  'docker_binary_sha256',
-  'executables',
-  'network',
-  'rootfs',
-  'capabilities',
-  'privilege_escalation',
-  'pids_limit',
-  'memory_bytes',
-  'cpus',
-];
-
-/** Opaque host construction control, not a candidate document or execution grant. */
-export interface ProtectedToolchainFixtureContext {
-  readonly __fixture_context?: never;
-}
-/** Process-local compatibility only. Deliberately no receipt, read method, or reusable data. */
-export interface ProtectedToolchainFixtureCompatibility {
-  readonly __fixture_compatibility?: never;
-}
-interface ContextData {
-  identity: Json;
-  readonly candidate: ReleaseCandidateSnapshot;
-  readonly source: readonly ContainerArchiveEntry[];
-  readonly descriptor: Json;
-  readonly fixture_resolution: VerifiedReleasePolicyResolution;
-  readonly production_resolution: VerifiedReleasePolicyResolution;
-  readonly container: Json;
-  readonly runtime: Json;
-  readonly toolchain: Json;
-  readonly template: Json;
-  readonly subject: Buffer;
-  readonly zero: Buffer;
-  bound: boolean;
-  attempted: boolean;
-  observed: boolean;
-  attached: boolean;
-  request?: ReleaseLifecycleRequest;
-  binding?: Json;
-}
-const contexts = new WeakMap<object, ContextData>();
-const custodyContexts = new WeakMap<object, ContextData>();
-const attachedCustodies = new WeakSet<object>();
-const compatibilities = new WeakMap<object, ContextData>();
-function fail(): never {
-  throw new Error(INVALID);
-}
-function object(value: unknown): Json {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Json)
-    : fail();
-}
-function same(a: unknown, b: unknown): boolean {
-  return canonicalJson(a) === canonicalJson(b);
-}
-function copy<T>(value: T): T {
-  return JSON.parse(canonicalJson(value)) as T;
-}
-function hash(value: Uint8Array): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-function compare(a: string, b: string): number {
-  return Buffer.compare(Buffer.from(a), Buffer.from(b));
-}
-function json(bytes: Buffer, maximum = 1024 * 1024): Json {
-  if (bytes.length === 0 || bytes.length > maximum) fail();
-  return object(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
-}
-function opaque(): object {
-  return Object.freeze(
-    Object.defineProperty(Object.create(null) as object, 'toJSON', { value: fail }),
-  );
-}
-function runtime(container: Json): Json {
-  const expected = [...RUNTIME_KEYS, 'dependencies', 'dependency_transport_sha256'];
-  if (Object.hasOwn(container, 'local_image')) expected.push('local_image');
-  if (!same(Object.keys(container).sort(), expected.sort())) fail();
-  return copy(
-    Object.fromEntries(
-      Object.entries(container).filter(
-        ([key]) => key !== 'dependencies' && key !== 'dependency_transport_sha256',
-      ),
-    ),
-  );
-}
-
-/** Recover mode/object IDs only from an already verified complete Git tree proof. */
-function sourceCensus(candidate: ReleaseCandidateSnapshot) {
-  const proof = candidate.readProof([]),
-    width = candidate.repository.commit.length / 2;
-  const pending = [{ id: candidate.repository.tree, prefix: '' }];
-  const result: { path: string; mode: string; object_id: string; size: number; sha256: string }[] =
-    [];
-  for (let cursor = 0; cursor < pending.length; cursor += 1) {
-    const current = pending[cursor];
-    if (!current) return fail();
-    const tree = proof.get(current.id);
-    if (tree?.type !== 'tree') return fail();
-    const bytes = Buffer.from(tree.bytes);
-    for (let offset = 0; offset < bytes.length;) {
-      const space = bytes.indexOf(32, offset),
-        nul = bytes.indexOf(0, space + 1);
-      if (space <= offset || nul <= space + 1 || nul + 1 + width > bytes.length) fail();
-      const mode = bytes.subarray(offset, space).toString('ascii');
-      const path = current.prefix + bytes.subarray(space + 1, nul).toString('utf8');
-      const id = bytes.subarray(nul + 1, nul + 1 + width).toString('hex');
-      offset = nul + 1 + width;
-      if (mode === '40000') pending.push({ id, prefix: path + '/' });
-      else {
-        if (mode !== '100644') fail();
-        const content = candidate.read(path);
-        result.push({ path, mode, object_id: id, size: content.length, sha256: hash(content) });
-      }
-    }
-  }
-  return result.sort((a, b) => compare(a.path, b.path));
-}
+import {
+  type ProtectedToolchainFixtureContext,
+  same,
+  VERSIONS,
+  fail,
+  object,
+  DYNAMIC_PATHS,
+  compare,
+  sourceCensus,
+  copy,
+  hash,
+  runtime,
+  opaque,
+  contexts,
+  json,
+  WORKSPACE,
+  type Json,
+  NODE,
+  OUTPUTS,
+  attachedCustodies,
+  custodyContexts,
+} from './release-toolchain-fixture-compatibility-support.js';
+export {
+  issueProtectedToolchainFixtureCompatibility,
+  assertProtectedToolchainFixtureCompatibility,
+} from './release-toolchain-fixture-compatibility-reports.js';
+export type {
+  ProtectedToolchainFixtureContext,
+  ProtectedToolchainFixtureCompatibility,
+} from './release-toolchain-fixture-compatibility-support.js';
 
 /** Bind all dynamic identities before the fixed diagnostic provider can be invoked. */
 export function createProtectedToolchainFixtureContext(input: {
@@ -421,189 +302,4 @@ export function attachProtectedToolchainFixtureCustody(
     fail();
   attachedCustodies.add(custody);
   custodyContexts.set(custody, data);
-}
-
-/** Pure bounded interpretation of private fixture bytes; never normalize into production evidence. */
-function assertReports(custody: ProtectedFixtureDiagnosticCustody, data: ContextData): void {
-  const captured = custody.read();
-  if (
-    captured.outcome !== 'success' ||
-    data.request === undefined ||
-    data.binding === undefined ||
-    !same(captured.request, data.request) ||
-    captured.runs.length !== 1 ||
-    !same(captured.fixture_input_identity, data.identity) ||
-    !same(captured.runtime_identity, data.runtime) ||
-    !same(captured.execution_identity['container'], data.container)
-  )
-    fail();
-  const run = captured.runs[0];
-  if (
-    !run ||
-    run.task_node !== NODE ||
-    !same(run.binding, data.binding) ||
-    !same(run.process, { status: 0, signal: null, errorAbsent: true }) ||
-    !same(
-      run.output_census.map((entry) => entry.path),
-      OUTPUTS,
-    )
-  )
-    fail();
-  const read = (path: string, maximum: number): Json => {
-    const member = run.output_census.find((entry) => entry.path === path);
-    if (
-      !member ||
-      member.mode !== '100644' ||
-      member.task_node !== NODE ||
-      member.size_bytes > maximum
-    )
-      return fail();
-    const bytes = custody.readOutput({ run_index: 0, path, sha256: member.sha256 });
-    if (bytes.length !== member.size_bytes || hash(bytes) !== member.sha256) fail();
-    return json(bytes, maximum);
-  };
-  const compatibility = read(COMPATIBILITY, 8192);
-  const discovery = object(compatibility['discovery']);
-  const emitted = discovery['emitted'];
-  if (!Array.isArray(emitted) || emitted.length !== 1) fail();
-  const emittedFile = object(emitted[0]);
-  const emittedIds = emittedFile['mutant_ids'];
-  if (
-    !Array.isArray(emittedIds) ||
-    emittedIds.length === 0 ||
-    emittedIds.length > 1000 ||
-    emittedIds.some((id: unknown) => typeof id !== 'string') ||
-    new Set(emittedIds).size !== emittedIds.length ||
-    !same([...emittedIds].sort(), emittedIds) ||
-    !same(emittedFile, {
-      path: 'src/subject.ts',
-      mutant_ids: emittedIds,
-      mutant_count: emittedIds.length,
-    }) ||
-    !same(discovery, {
-      algorithm: 'devai.fixed-fixture-instrumenter.v1',
-      instrumenter_version: '9.6.1',
-      options: { plugins: null, excludedMutations: [], ignorers: [] },
-      selected: [
-        { path: 'src/subject.ts', source_sha256: hash(data.subject) },
-        { path: 'src/zero.ts', source_sha256: hash(data.zero) },
-      ],
-      instrumented: ['src/subject.ts', 'src/zero.ts'],
-      emitted,
-    })
-  )
-    fail();
-  if (
-    !same(compatibility, {
-      scope: 'toolchain-compatibility-diagnostic-only',
-      core: '9.6.1',
-      checker: '9.6.1',
-      runner: '9.6.1',
-      vitest: VERSIONS.vitest,
-      typescript: VERSIONS.typescript,
-      node: VERSIONS.node,
-      projectVitestResolved: true,
-      readonlyDependencies: true,
-      realMutationObserved: true,
-      certification: false,
-      reusable: false,
-      discovery,
-    })
-  )
-    fail();
-  const raw = read(RAW, 1024 * 1024),
-    framework = object(raw['framework']);
-  if (
-    raw['schemaVersion'] !== '1.0' ||
-    raw['projectRoot'] !== '/workspace/candidate/packages/fixture' ||
-    framework['name'] !== 'StrykerJS' ||
-    framework['version'] !== '9.6.1' ||
-    !same(raw['thresholds'], { break: 60, high: 60, low: 60 })
-  )
-    fail();
-  const files = object(raw['files']);
-  if (!same(Object.keys(files), ['src/subject.ts'])) fail();
-  let killed = 0,
-    detected = 0,
-    survived = 0,
-    scored = 0,
-    total = 0;
-  const ids = new Set<string>();
-  for (const value of Object.values(files)) {
-    const file = object(value);
-    if (
-      file['source'] !== data.subject.toString('utf8') ||
-      file['language'] !== 'typescript' ||
-      !Array.isArray(file['mutants']) ||
-      file['mutants'].length > 1000
-    )
-      fail();
-    for (const value of file['mutants']) {
-      const mutant = object(value),
-        status = mutant['status'];
-      if (
-        typeof mutant['id'] !== 'string' ||
-        typeof status !== 'string' ||
-        ids.has(mutant['id']) ||
-        !['CompileError', 'Ignored', 'Killed', 'NoCoverage', 'Survived', 'Timeout'].includes(status)
-      )
-        fail();
-      ids.add(mutant['id']);
-      total += 1;
-      if (status === 'Killed') killed += 1;
-      if (status === 'Killed' || status === 'Timeout') detected += 1;
-      if (status === 'Survived') survived += 1;
-      if (['Killed', 'NoCoverage', 'Survived', 'Timeout'].includes(status)) scored += 1;
-    }
-  }
-  if (
-    total === 0 ||
-    killed === 0 ||
-    scored === 0 ||
-    survived > 50 ||
-    detected * 100 < scored * 60 ||
-    !same([...ids].sort(), emittedIds)
-  )
-    fail();
-}
-
-export function issueProtectedToolchainFixtureCompatibility(
-  custody: ProtectedFixtureDiagnosticCustody,
-): ProtectedToolchainFixtureCompatibility {
-  const data = custodyContexts.get(custody);
-  custodyContexts.delete(custody);
-  try {
-    if (!data || !isVerifiedProtectedFixtureDiagnosticCustody(custody)) return fail();
-    assertReports(custody, data);
-    const result = opaque();
-    compatibilities.set(result, data);
-    return result;
-  } catch {
-    return fail();
-  }
-}
-
-/** This only checks compatibility. It neither changes a plan nor clears any production gate. */
-export function assertProtectedToolchainFixtureCompatibility(
-  compatibility: ProtectedToolchainFixtureCompatibility,
-  input: {
-    readonly resolution: VerifiedReleasePolicyResolution;
-    readonly container_identity: Json;
-    readonly toolchain: Json;
-    readonly environment: Json;
-  },
-): void {
-  const data = compatibilities.get(compatibility);
-  if (
-    !data ||
-    input.resolution !== data.production_resolution ||
-    !same(
-      object(input.resolution.readInput('release-verification-profile'))['mutation_execution'],
-      data.template,
-    ) ||
-    !same(runtime(input.container_identity), data.runtime) ||
-    !same(input.toolchain, data.toolchain) ||
-    !same(input.environment, {})
-  )
-    fail();
 }
