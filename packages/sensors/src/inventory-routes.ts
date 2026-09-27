@@ -4,6 +4,12 @@ import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { validators } from '@devai-nyx/schemas';
+import {
+  allBoundSurfacesAbsent,
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import { DEFAULT_IGNORE_DIRS, parseSource, walkTsxJsx } from './inventory-walker.js';
 
@@ -101,6 +107,10 @@ export interface RoutesInventoryBody {
 
 export interface InventoryRoutesOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   /**
    * Source directories to walk and merge. Absent directories are skipped;
    * an absent list scans `repoRoot`.
@@ -461,7 +471,7 @@ function sortRoutes(routes: readonly RoutesInventoryRoute[]): RoutesInventoryRou
   });
 }
 
-export function senseInventoryRoutes(opts: InventoryRoutesOptions): InventoryRoutesResult {
+function measureInventoryRoutes(opts: InventoryRoutesOptions): InventoryRoutesResult {
   const t0 = Date.now();
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
   const scanDirs = uniqueExistingDirs(opts.scanDirs ?? [], opts.repoRoot);
@@ -593,4 +603,18 @@ export function senseInventoryRoutes(opts: InventoryRoutesOptions): InventoryRou
   });
 
   return { reading, body, bodyPath };
+}
+
+/** Surfaces this sensor is bound to (ADR-SCR-0003). */
+const BOUND_SURFACES: readonly PlantSurface[] = ['http'];
+
+export function senseInventoryRoutes(opts: InventoryRoutesOptions): InventoryRoutesResult {
+  // A declared-absent surface is still scanned, so a contradiction is caught; its
+  // body is never materialized.
+  const absent = allBoundSurfacesAbsent(opts.surfaces, BOUND_SURFACES);
+  const result = measureInventoryRoutes(absent ? { ...opts, persistBody: false } : opts);
+  const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, [
+    { surface: 'http', items: result.body.routes.map((r) => r.path) },
+  ]);
+  return { ...result, reading };
 }

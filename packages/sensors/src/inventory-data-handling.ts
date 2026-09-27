@@ -3,6 +3,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
+import {
+  allBoundSurfacesAbsent,
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import type { DataModelBody, DataModelColumn, DataModelTable } from './inventory-data-model.js';
 
@@ -139,6 +145,10 @@ function classifyColumn(col: DataModelColumn): string | null {
 
 export interface InventoryDataHandlingOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   readonly dataModelPath?: string;
   readonly bodyPath?: string;
   /** False for pure observation callers that must not materialize canonical state. */
@@ -152,7 +162,7 @@ export interface InventoryDataHandlingResult {
   readonly bodyPath: string | null;
 }
 
-export function senseInventoryDataHandling(
+function measureInventoryDataHandling(
   opts: InventoryDataHandlingOptions,
 ): InventoryDataHandlingResult {
   const t0 = Date.now();
@@ -279,4 +289,25 @@ export function senseInventoryDataHandling(
   });
 
   return { reading, body, bodyPath };
+}
+
+/** Surfaces this sensor is bound to (ADR-SCR-0003). */
+const BOUND_SURFACES: readonly PlantSurface[] = ['rbac'];
+
+export function senseInventoryDataHandling(
+  opts: InventoryDataHandlingOptions,
+): InventoryDataHandlingResult {
+  // A declared-absent surface is still scanned, so a contradiction is caught; its
+  // body is never materialized.
+  const absent = allBoundSurfacesAbsent(opts.surfaces, BOUND_SURFACES);
+  const result = measureInventoryDataHandling(absent ? { ...opts, persistBody: false } : opts);
+  const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, [
+    {
+      surface: 'rbac',
+      items: (result.body?.tables ?? []).flatMap((t) =>
+        t.columns.filter((c) => c.pii_class !== undefined).map((c) => `${t.name}.${c.name}`),
+      ),
+    },
+  ]);
+  return { ...result, reading };
 }

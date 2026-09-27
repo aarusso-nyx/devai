@@ -6,6 +6,11 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
+import {
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
 
 /**
  * F4 inventory performance sensor (Phase 29.F; F4×T7).
@@ -20,6 +25,10 @@ import {
 
 export interface InventoryPerformanceOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   readonly readingsDir?: string;
   readonly thresholds?: { readonly pass: number; readonly review: number };
   readonly now?: string;
@@ -51,7 +60,7 @@ interface PersistedSR {
   readonly duration_ms?: number;
 }
 
-export function senseInventoryPerformance(opts: InventoryPerformanceOptions): SensorReading {
+function measureInventoryPerformance(opts: InventoryPerformanceOptions): SensorReading {
   const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
   const readingsDir = abs(opts.repoRoot, opts.readingsDir ?? DEFAULT_READINGS_DIR);
 
@@ -191,4 +200,19 @@ export function senseInventoryPerformance(opts: InventoryPerformanceOptions): Se
       ...perKindMetrics,
     },
   });
+}
+
+/**
+ * Bound to every surface (ADR-SCR-0003): it times the inventory readings, so it skips
+ * only when nothing is inventoried.
+ */
+const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'database', 'rbac', 'actions'];
+
+export function senseInventoryPerformance(opts: InventoryPerformanceOptions): SensorReading {
+  return applySurfaceDeclaration(
+    measureInventoryPerformance(opts),
+    opts.surfaces,
+    BOUND_SURFACES,
+    [],
+  );
 }

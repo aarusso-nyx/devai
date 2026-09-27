@@ -4,6 +4,12 @@ import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { validators } from '@devai-nyx/schemas';
+import {
+  allBoundSurfacesAbsent,
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import {
   DEFAULT_IGNORE_DIRS,
@@ -55,6 +61,10 @@ const PARAM_DECORATORS: Record<string, ParamLoc> = {
 
 export interface InventoryApiOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   /**
    * Source directories to walk and merge. Non-existent directories are
    * skipped; an absent list scans `repoRoot`.
@@ -304,7 +314,7 @@ function sortEndpoints(endpoints: readonly ApiMapEndpoint[]): ApiMapEndpoint[] {
   });
 }
 
-export function senseInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
+function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
   const t0 = Date.now();
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
   const scanDirs = uniqueExistingApiDirs(opts.scanDirs ?? [], opts.repoRoot);
@@ -440,4 +450,18 @@ export function senseInventoryApi(opts: InventoryApiOptions): InventoryApiResult
   });
 
   return { reading, body, bodyPath };
+}
+
+/** Surfaces this sensor is bound to (ADR-SCR-0003). */
+const BOUND_SURFACES: readonly PlantSurface[] = ['http'];
+
+export function senseInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
+  // A declared-absent surface is still scanned, so a contradiction is caught; its
+  // body is never materialized.
+  const absent = allBoundSurfacesAbsent(opts.surfaces, BOUND_SURFACES);
+  const result = measureInventoryApi(absent ? { ...opts, persistBody: false } : opts);
+  const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, [
+    { surface: 'http', items: result.body.endpoints.map((e) => `${e.method} ${e.path}`) },
+  ]);
+  return { ...result, reading };
 }

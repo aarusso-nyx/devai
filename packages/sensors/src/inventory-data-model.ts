@@ -3,6 +3,12 @@ import { readFileSync, statSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, join, relative } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
+import {
+  allBoundSurfacesAbsent,
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import { DEFAULT_IGNORE_DIRS, walkFiles } from './inventory-walker.js';
 
@@ -85,6 +91,10 @@ export interface DataModelBody {
 
 export interface InventoryDataModelOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   /** Directories under repo-root to scan for `.sql` files (default: ['migrations', 'db/migrations', 'db', 'database']). */
   readonly migrationDirs?: readonly string[];
   readonly ignoreDirs?: ReadonlySet<string>;
@@ -767,7 +777,7 @@ function existingDir(repoRoot: string, rel: string): string | null {
   }
 }
 
-export function senseInventoryDataModel(opts: InventoryDataModelOptions): InventoryDataModelResult {
+function measureInventoryDataModel(opts: InventoryDataModelOptions): InventoryDataModelResult {
   const t0 = Date.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const dialect = opts.dialect ?? 'postgres';
@@ -907,4 +917,18 @@ export function senseInventoryDataModel(opts: InventoryDataModelOptions): Invent
   });
 
   return { reading, body, bodyPath };
+}
+
+/** Surfaces this sensor is bound to (ADR-SCR-0003). */
+const BOUND_SURFACES: readonly PlantSurface[] = ['database'];
+
+export function senseInventoryDataModel(opts: InventoryDataModelOptions): InventoryDataModelResult {
+  // A declared-absent surface is still scanned, so a contradiction is caught; its
+  // body is never materialized.
+  const absent = allBoundSurfacesAbsent(opts.surfaces, BOUND_SURFACES);
+  const result = measureInventoryDataModel(absent ? { ...opts, persistBody: false } : opts);
+  const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, [
+    { surface: 'database', items: result.body.tables.map((t) => t.name) },
+  ]);
+  return { ...result, reading };
 }
