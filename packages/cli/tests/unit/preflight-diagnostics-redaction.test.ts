@@ -204,7 +204,7 @@ function expectNoMarker(label: string, value: unknown): void {
   }
 }
 
-describe('preflight diagnostics redaction (ADR-CHK-0001 IA-004)', () => {
+describe('sec: preflight diagnostics redaction (ADR-CHK-0001 IA-004)', () => {
   it('redacts an intrinsic FAIL probe observation in the report, cache, and PR diagnostics', async () => {
     const prFailureDiagnostics = await loadPrFailureDiagnostics();
     const root = repository('intrinsic');
