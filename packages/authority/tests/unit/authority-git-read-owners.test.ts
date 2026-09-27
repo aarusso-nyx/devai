@@ -36,13 +36,23 @@ describe('immutable Git read helper ownership', () => {
         "import { readExactGitTreeSync as readTree } from '@devai-nyx/authority';",
         'readTree();',
       ].join('\n'),
-      'packages/cli/src/services/release-certification-provider.ts': [
+      'packages/cli/src/services/release-certification-provider-requests.ts': [
         "import { readExactGitTreeSync } from '@devai-nyx/authority';",
         'readExactGitTreeSync();',
       ].join('\n'),
     });
 
     expect(result).toMatchObject({ ok: true, value: { unauthorized_call_sites: 0 } });
+    // TASK-0256 moved the certification tree reads out of release-certification-provider.ts;
+    // the old path keeps no approval.
+    expectBoundaryFailure(
+      await inventoryFor({
+        'packages/cli/src/services/release-certification-provider.ts':
+          "import { readExactGitTreeSync } from '@devai-nyx/authority';\nreadExactGitTreeSync();",
+      }),
+      'refused',
+      'AUTHORITY_DIRECT_MUTATOR_INVENTORY_STALE',
+    );
   });
 
   it('limits policy inspection to the policy builder owner', async () => {
