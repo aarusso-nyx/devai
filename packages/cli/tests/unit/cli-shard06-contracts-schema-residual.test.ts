@@ -400,6 +400,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'inv-override.schema.json',
   'preflight-probe.schema.json',
   'prompt-composition.schema.json',
+  'sensor-inputs.schema.json',
   'stack-adapter.schema.json',
   'task-freshness.schema.json',
   'test-task-descriptor.schema.json',
@@ -436,7 +437,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
 
     expect(checkSchemaCanon(root)).toEqual({
       ok: true,
-      canonical_total: 16,
+      canonical_total: 17,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -511,7 +512,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     put(source, 'packages/schemas/src/roster.ts', 'source roster');
     expect(checkSchemasForRepository(source)).toEqual({
       ok: true,
-      canonical_total: 16,
+      canonical_total: 17,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
