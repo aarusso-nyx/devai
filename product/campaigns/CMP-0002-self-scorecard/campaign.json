@@ -3,7 +3,7 @@
   "id": "CMP-0002",
   "title": "Self-scorecard",
   "type": "campaign",
-  "status": "proposed",
+  "status": "active",
   "date": "2026-09-26",
   "authority": "Architect",
   "mandate": {
@@ -81,7 +81,7 @@
       "id": "R-0201",
       "title": "Governance for self-sensing",
       "goal": "The self-dogfood policy admits sensing and recording under declared roles, the scorecard reads one canonical readings store, and the N/A ledger states the scoreable cell count once.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -107,7 +107,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -178,7 +178,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F4", "F5"],
               "boundary": {
                 "paths": [
