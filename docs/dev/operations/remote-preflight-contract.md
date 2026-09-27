@@ -24,6 +24,7 @@ execution. These observations answer different questions.
 | `pull-request-checks.yml` | Unprivileged merge preflight                                       |
 | `devai-ledger-verify.yml` | Protected post-merge observation and explicit dispatch             |
 | `release.yml`             | Candidate rehearsal, tag validation, authorized artifact promotion |
+| `site-publish.yml`        | Owner-dispatched documentation site publication from main          |
 
 The PR lane has `contents: read`, no environment, secrets or protected variables,
 pinned actions, exact head checkout without persisted credentials, Linux runners and
