@@ -6,7 +6,7 @@ const cases = [
   ['runWithAuthorityHostEffects', 'packages/cli/src/authority/broker.ts'],
   ['applyAuthorityHostEffectsAtomically', 'packages/cli/src/authority/broker.ts'],
   ['readProcessSync', 'packages/cli/src/version.ts'],
-  ['readProcessSync', 'packages/loop/src/governance-ledger/index.ts'],
+  ['readProcessSync', 'packages/loop/src/governance-ledger/history.ts'],
   ['writeGovernanceProjectionSync', 'packages/cli/src/commands/docs/governance-render.ts'],
 ] as const;
 
