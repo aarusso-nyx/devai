@@ -544,6 +544,15 @@ describe('resolveDeclaredSensorInputs refuses with a structured error', () => {
         return withInputs({ test_idiomaticity: { testGlobs: ['packages/*/tests'] } });
       },
     },
+    {
+      label: 'a plant_depth exclusion glob whose prefix is a symlink out of the root',
+      code: 'SENSE_INPUTS_PATH_ESCAPES_ROOT',
+      kind: 'plant_depth',
+      setup: (root, outside) => {
+        symlinkSync(outside, join(root, 'generated'), 'dir');
+        return withInputs({ plant_depth: { excludeGlobs: ['generated/**'] } });
+      },
+    },
   ];
 
   for (const testCase of cases) {
@@ -632,6 +641,18 @@ describe('sense run delivers each declared key to its sensor', () => {
     expect(stubs.sensePerfTest).toHaveBeenCalledTimes(1);
     const [options] = stubs.sensePerfTest.mock.calls[0] as [{ readonly scriptName?: string }];
     expect(options.scriptName).toBe('bench:ci');
+  });
+
+  it('plant_depth leaves the declared exclusion globs out of the plant', async () => {
+    const root = makeRepo({
+      schemaVersion: '1.0.0',
+      inputs: { plant_depth: { excludeGlobs: ['packages/cli/src/generated/**'] } },
+    });
+    write(root, 'packages/cli/src/main.ts', 'export const main = 1;\n');
+    write(root, 'packages/cli/src/generated/registry.ts', 'export const x = 1;\n'.repeat(1200));
+    const reading = readingOf(await senseRun('plant_depth', { repoRoot: root }));
+    expect(reading.metrics?.['files_count']).toBe(1);
+    expect(reading.status).toBe('pass');
   });
 
   it('keeps the sensor default when the repository declares nothing', async () => {

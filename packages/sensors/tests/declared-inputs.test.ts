@@ -24,6 +24,9 @@
 //     denominator when workflow_count is below the declared threshold
 //     (exists today, TASK-0254/Phase 35.D). TASK-0255 wires the declared
 //     key through the adapter; the sensor's own default of 1 is unchanged.
+//   - sensePlantDepth accepts `{ repoRoot, excludeGlobs }` and leaves every file a
+//     declared glob matches out of the measured plant (TASK-0256); with nothing
+//     declared it measures every source file as before.
 // runCommand is mocked so no compiler or package manager is ever spawned.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,6 +42,7 @@ vi.mock('@devai-nyx/effects-check', () => effects);
 import { senseActionEffectInference } from '../src/action-effect-inference.js';
 import { senseHarnessIdiomaticity } from '../src/harness-idiomaticity.js';
 import { sensePerfTest } from '../src/perf-test.js';
+import { sensePlantDepth } from '../src/plant-depth.js';
 import { senseSpecDepth } from '../src/spec-depth.js';
 import { senseTestCoverageDepth } from '../src/test-coverage-depth.js';
 import { senseTestIdiomaticity } from '../src/test-idiomaticity.js';
@@ -342,5 +346,54 @@ jobs:
     expect(reading.findings?.map((f) => f.code)).toContain(
       'HARNESS_IDIOMATICITY_NO_REUSABLE_WORKFLOWS',
     );
+  });
+});
+
+describe('declared excludeGlobs reach plant_depth', () => {
+  function lines(count: number): string {
+    return Array.from(
+      { length: count },
+      (_, i) => `export const v${String(i)} = ${String(i)};`,
+    ).join('\n');
+  }
+
+  beforeEach(() => {
+    write('packages/app/src/a.ts', lines(10));
+    write('packages/app/src/b.ts', lines(20));
+    write('packages/app/src/generated/registry.ts', lines(2000));
+    write('packages/app/src/generated/nested/view.ts', lines(1500));
+    write('packages/app/src/generator.ts', lines(30));
+  });
+
+  it('measures every source file when nothing is declared', () => {
+    const reading = sensePlantDepth({ repoRoot: root });
+
+    expect(reading.status).toBe('fail');
+    expect(metric(reading, 'files_count')).toBe(5);
+    expect(metric(reading, 'lines_max')).toBe(2000);
+  });
+
+  it('leaves every file a declared ** glob matches out of the plant, at any depth', () => {
+    const reading = sensePlantDepth({
+      repoRoot: root,
+      excludeGlobs: ['packages/app/src/generated/**'],
+    });
+
+    expect(reading.status).toBe('pass');
+    expect(metric(reading, 'files_count')).toBe(3);
+    expect(metric(reading, 'lines_max')).toBe(30);
+    expect(metric(reading, 'lines_total')).toBe(60);
+  });
+
+  it('matches * within one path segment only and keeps the thresholds', () => {
+    const reading = sensePlantDepth({
+      repoRoot: root,
+      excludeGlobs: ['packages/*/src/generated/*.ts'],
+    });
+
+    expect(metric(reading, 'files_count')).toBe(4);
+    expect(metric(reading, 'lines_max')).toBe(1500);
+    expect(metric(reading, 'threshold_pass')).toBe(500);
+    expect(metric(reading, 'threshold_review')).toBe(1000);
   });
 });
