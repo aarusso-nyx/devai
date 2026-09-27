@@ -343,3 +343,9 @@ Wave CTG-0262 (TASK-0262, wiring the self-dogfood service into the `sense`
 and `audit` command paths) runs first; the recording wave CTG-0261 depends on
 it. Still blocked by the maintainer: the two read-only `gh api` GET shapes the
 site drift sensor needs (see R-0202 follow-ups).
+
+Follow-ups recorded during the round:
+
+1. `sense record` enforces the reading's attribution (declaring role and
+   human invocation) at record time, but does not store it, because the
+   closed reading schema admits no attribution field.
