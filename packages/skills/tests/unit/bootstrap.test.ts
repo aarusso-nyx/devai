@@ -204,7 +204,7 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
     ).toThrow(/forbidden-actions\.json.*schema/i);
   });
 
-  it('seeds adopter-safe empty guards and scorecard N/A declarations', () => {
+  it('seeds adopter-safe empty guards and the adopter default scorecard N/A ledger', () => {
     const plan = buildBootstrapPlan({ targetRoot: dir });
     const globGuards = plan.entries.find(
       (entry) => entry.path === '.devai/config/glob-guards.json',
@@ -216,10 +216,15 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
       schemaVersion: '1.0.0',
       guards: [],
     });
-    expect(JSON.parse(scorecardNa?.content ?? '{}')).toEqual({
-      schemaVersion: '1.0.0',
-      cells: [],
-    });
+    const seeded = JSON.parse(scorecardNa?.content ?? '{}') as {
+      schemaVersion: string;
+      cells: { cell: string; constitution_anchor: string }[];
+    };
+    expect(seeded.schemaVersion).toBe('1.0.0');
+    // ADR-SCR-0002: the adopter default carries only the Article 5 degenerate cell.
+    expect(seeded.cells.map((cell) => [cell.cell, cell.constitution_anchor])).toEqual([
+      ['F4:T5', 'Article 5'],
+    ]);
   });
 });
 
