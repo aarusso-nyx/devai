@@ -237,7 +237,7 @@ function nodeIndex(root: string, nodeId: string): Record<string, unknown> | unde
     : undefined;
 }
 
-describe('preflight-v1 BLOCKED semantics (ADR-CHK-0001 IA-001)', () => {
+describe('robust: preflight-v1 BLOCKED semantics (ADR-CHK-0001 IA-001)', () => {
   it('blocks an unreachable extrinsic registry probe and never runs or fails the dependent', () => {
     const root = repository([
       preflightNode([registryProbe()]),

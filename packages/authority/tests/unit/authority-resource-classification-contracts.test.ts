@@ -136,7 +136,7 @@ describe('git-ref operation and protection contracts', () => {
   );
 
   // The protected marker takes only a boolean; any other shape is malformed input and is
-  // refused rather than read as unprotected (see authority-fail-closed-regressions.test.ts
+  // refused rather than read as unprotected (see authority-fail-closed-regressions.sec.test.ts
   // for the contract references). An absent marker classifies as unprotected.
   it.each(['true', 1, {}, null])('refuses a non-boolean protected marker %s', (marker) => {
     expectBoundaryFailure(
@@ -283,7 +283,7 @@ describe('filesystem containment dependency contracts', () => {
 
   // A runtime that supplies a realpath must supply a string repository root; otherwise
   // containment cannot be established and the target is refused, never admitted unchecked
-  // (see authority-fail-closed-regressions.test.ts for the contract references).
+  // (see authority-fail-closed-regressions.sec.test.ts for the contract references).
   it.each([[undefined], [42], [null], [['/workspace/devai']]])(
     'refuses containment resolution when a realpath is supplied but the root is %s',
     (repository_root) => {

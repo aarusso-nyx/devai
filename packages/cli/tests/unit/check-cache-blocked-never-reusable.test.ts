@@ -145,7 +145,7 @@ function check(root: string, operation: TaskOperation) {
   );
 }
 
-describe('a BLOCKED result is never reusable (ADR-CHK-0001 IA-002)', () => {
+describe('robust: a BLOCKED result is never reusable (ADR-CHK-0001 IA-002)', () => {
   it('plans the probe node as execute after a BLOCKED run with identical inputs', () => {
     const root = repository();
     const first = check(root, 'run');
