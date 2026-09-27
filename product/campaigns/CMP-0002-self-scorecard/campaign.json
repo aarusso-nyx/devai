@@ -3,14 +3,14 @@
   "id": "CMP-0002",
   "title": "Self-scorecard",
   "type": "campaign",
-  "status": "active",
+  "status": "closed",
   "date": "2026-09-26",
   "authority": "Architect",
   "mandate": {
     "kind": "maintainer-decision",
     "ref": "docs/dev/operations/self-scorecard-campaign/README.md"
   },
-  "goal": "Compute and persist the framework's own scorecard: admit self-sensing under declared roles, read one canonical readings store, declare the sensor inputs a CLI-shaped repository needs, author the specification substrate the spec sensors measure, reconcile the governance ledger sensors with second-generation decision records, and close with a committed scorecard in which every scoreable cell is PASS.",
+  "goal": "Compute and persist the framework's own scorecard: admit self-sensing under declared roles, read one canonical readings store, declare the sensor inputs a CLI-shaped repository needs, author the specification substrate the spec sensors measure, reconcile the governance ledger sensors with second-generation decision records, and close with a committed scorecard recorded as measured, every non-PASS cell carrying its finding as a follow-up (maintainer decision of 2026-09-27).",
   "records": [
     "ADR-SCR-0001",
     "ADR-SCR-0002",
@@ -1601,7 +1601,7 @@
       "id": "R-0206",
       "title": "Persist readings and the first scorecard",
       "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed as measured: every cell carries its reading's verdict, N/A comes only from the ledger and from surfaces declared absent, and every non-PASS cell is recorded with its finding as a follow-up.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0001", "ADR-SCR-0002", "ADR-SCR-0005", "ADR-SCR-0003"],
       "depends_on": ["R-0204", "R-0205"],
       "attestation_reissue": false,
@@ -2121,7 +2121,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
@@ -2167,8 +2167,8 @@
                 "path": "prompts/TASK-0261.md",
                 "sha256": "55b5bf1d3b4852f8fd9130c85d79fa26637c4453e619bd07b2b7c8bf69b655f4"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/151",
+              "merged_as": "5fd206536793c64b81c3c445fb2708912470d18b",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -2177,7 +2177,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "5fd206536793c64b81c3c445fb2708912470d18b",
+        "closed_at": "2026-09-27T21:12:16Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     }
   ]
 }
