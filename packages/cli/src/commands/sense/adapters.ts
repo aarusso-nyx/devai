@@ -101,6 +101,7 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   perf_test: (request) =>
     sensePerfTest({
       repoRoot: request.repoRoot,
+      ...optional('argv', stringArrayInput(request, 'argv')),
       ...optional('scriptName', stringInput(request, 'scriptName')),
     }),
   llm_judge: (request) => {
