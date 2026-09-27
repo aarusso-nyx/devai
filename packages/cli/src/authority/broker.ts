@@ -325,6 +325,17 @@ function readOnlyGhProcess(args: readonly unknown[]): boolean {
   );
 }
 
+/** One repository-relative path under tests/: no option, no absolute path, no parent segment. */
+function governedTestPath(value: unknown): boolean {
+  if (typeof value !== 'string' || isAbsolute(value)) return false;
+  const segments = value.split(/[\\/]/u);
+  return (
+    segments[0] === 'tests' &&
+    segments.length > 1 &&
+    segments.every((segment) => segment.length > 0 && segment !== '..' && segment !== '.')
+  );
+}
+
 function readOnlyProcess(
   request: AuthorityHostEffectRequest,
   parentAction?: string,
@@ -377,7 +388,11 @@ function readOnlyProcess(
     return true;
   }
   if (parentAction === 'sense run' && basename(executable) === 'pnpm') {
+    // Mirrors template pnpm-vitest-run-governed-config in law/policy/subprocess-effects.json.
+    // A literal list: never read from disk, never a bare package script.
     const governedConfigs = [
+      'tests/config/local.config.ts',
+      'tests/config/rc.performance.config.ts',
       'tests/config/t1.unit.config.ts',
       'tests/config/t3.integration.config.ts',
       'tests/config/t4.regression.config.ts',
@@ -387,7 +402,7 @@ function readOnlyProcess(
       return true;
     }
     if (
-      args.length === 4 &&
+      (args.length === 4 || (args.length === 5 && governedTestPath(args[4]))) &&
       args[0] === 'vitest' &&
       args[1] === 'run' &&
       args[2] === '--config' &&
