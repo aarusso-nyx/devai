@@ -37,7 +37,7 @@ export const ACTION_REGISTRY = [
         actor: 'harness',
         transition: 'harness-write',
         initiator: {
-          allowed_roles: ['auditor'],
+          allowed_roles: ['inspector', 'auditor'],
           preserve_in_context: true,
         },
       },
