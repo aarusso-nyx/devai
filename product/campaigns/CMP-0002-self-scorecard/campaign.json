@@ -107,7 +107,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -146,7 +146,7 @@
               "commit_types": ["law(dogfood)", "feat(dogfood)", "test(dogfood)"],
               "prompt": {
                 "path": "prompts/TASK-0211.md",
-                "sha256": null
+                "sha256": "9683cabaf79ab48fec93b3ea5e61262a69f97d8f07b6d031c7e56786fa2c3089"
               },
               "pull_request": null,
               "merged_as": null,
@@ -178,7 +178,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F4", "F5"],
               "boundary": {
                 "paths": [
@@ -191,7 +191,10 @@
                   "docs/adopters/scorecard-na-overrides.md",
                   "docs/theory/framework/scorecard.md",
                   "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts",
-                  "packages/loop/tests/scorecard-inputs.test.ts"
+                  "packages/loop/tests/scorecard-inputs.test.ts",
+                  "packages/loop/tests/unit/scorecard-na-override.test.ts",
+                  "packages/loop/tests/unit/scorecard-aggregation-boundaries.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-diagnostics.test.ts"
                 ],
                 "forbidden": [".github/workflows/", "packages/sensors/"]
               },
@@ -229,7 +232,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0212.md",
-                "sha256": null
+                "sha256": "3883fee1d0105e0025ea313d39fa29fd858b6681daa5ceb5486a7b40891f9164"
               },
               "pull_request": null,
               "merged_as": null,
