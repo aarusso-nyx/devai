@@ -1627,7 +1627,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1639,9 +1639,17 @@
                   "packages/cli/src/cli-runtime.ts",
                   "packages/cli/tests/unit/self-dogfood-policy.test.ts",
                   "packages/cli/tests/unit/self-dogfood-command-paths.test.ts",
-                  "docs/dev/operations/self-scorecard-campaign/README.md"
+                  "docs/dev/operations/self-scorecard-campaign/README.md",
+                  "law/policy/action-registry.json",
+                  "packages/cli/src/generated/action-registry.ts",
+                  "packages/effects-check/src/generated/action-catalog.ts",
+                  "packages/sensors/src/generated/action-kinds.ts",
+                  "packages/cli/tests/unit/audit-observe-depth.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-command.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-execution.test.ts",
+                  "packages/cli/tests/unit/sense-run-command-depth.test.ts"
                 ],
-                "forbidden": ["law/", ".github/workflows/", "packages/sensors/"]
+                "forbidden": [".github/workflows/", "packages/sensors/"]
               },
               "deliverables": [
                 "On the framework repository, sense run, sense record and audit observe consult the self-dogfood service before acting: a read-effect sense run is admitted for every declared role; sense run with write consent, sense record and audit observe are admitted for the inspector only; any --publish is refused before the policy is parsed; a population with a remote-write member is refused for every role.",
@@ -1674,10 +1682,10 @@
                   "json"
                 ]
               ],
-              "commit_types": ["feat(dogfood)", "test(dogfood)", "docs(dev)"],
+              "commit_types": ["feat(dogfood)", "test(dogfood)", "docs(dev)", "law(actions)"],
               "prompt": {
                 "path": "prompts/TASK-0262.md",
-                "sha256": "7aa264564524c0e917df6659c16de76c4e6dc9e495e807d36f54f1203c0ef9fa"
+                "sha256": "2f92d4cc0c1b96b105cfa76fc5565f71a558e4f98f274d9448e4460a316c9fe7"
               },
               "pull_request": null,
               "merged_as": null,
