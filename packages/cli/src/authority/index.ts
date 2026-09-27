@@ -1,14 +1,11 @@
 import { resolve } from 'node:path';
-
 import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
 import type { Command } from 'cac';
-
 import {
   createPostMergeHostScope,
   verifyPostMergeHostReceipt,
 } from '@devai-nyx/skills/post-merge-auditor';
 import type { RegistryEntry } from '../define-command.js';
-
 import { invocationIsNonMutating } from '../command-router.js';
 import { createAuthorityHostBroker } from './broker.js';
 import { resolveInvocationEntry } from './sense-selection.js';
@@ -16,7 +13,6 @@ import {
   runWithAuthorityPolicyMaterialization,
   runWithAuthoritySessionOperation,
 } from './command-capabilities.js';
-
 import { trackGovernanceEvent } from '@devai-nyx/loop';
 import {
   createTrackingReconcileScope,
@@ -26,7 +22,6 @@ import {
 import { resolveCliVersion } from '../version.js';
 import {
   type HumanRole,
-  ROLES,
   flagValue,
   type FailureCategory,
   taggedFailure,
@@ -35,16 +30,28 @@ import {
   formatFor,
   renderAuthorityResult,
   authorityErrorCode,
-  SESSION_ID,
 } from './authority-results.js';
-import { entryForArgv, routeRoles } from './authority-registry.js';
+import { entryForArgv } from './authority-registry.js';
 import {
   targetRoot,
   authorityDecisionRecordable,
   taggedAuthorityFailure,
   sessionRole,
-  authorityBindingMissing,
 } from './authority-session.js';
+import {
+  declaredRoleConsentRefusal,
+  governedRenderDeclarationRefusal,
+  mutatingDeclarationRefusal,
+  planOnlyAuthorityAllow,
+  readDeclarationRefusal,
+} from './authority-declarations.js';
+import {
+  clearResolvedInvocationAuthority,
+  declaredInvocationRole,
+  rememberResolvedInvocationAuthority,
+} from './invocation-authority.js';
+export { declaredInvocationAuthority, declaredInvocationRole } from './invocation-authority.js';
+
 export { createAuthorityCliHarness, stripAuthorityArgv } from './authority-harness.js';
 export { authorityDecisionRecordable } from './authority-session.js';
 export {
@@ -66,73 +73,6 @@ export {
   formatFor,
   taggedFailure,
 } from './authority-results.js';
-/**
- * The human authority the pre-dispatch layer resolved for this invocation,
- * from either `--as-role` or a validated session, together with the consent it
- * admitted. Handlers cannot read the declaration themselves — it is stripped
- * before dispatch — so anything that must attribute work or bind consent reads
- * it here rather than re-parsing argv and risking a different answer than the
- * one authority actually allowed.
- */
-let resolvedInvocationRole: HumanRole | undefined;
-let resolvedInvocationDeclarationSource: 'cli-flag' | 'session-state' | undefined;
-let resolvedInvocationConsent:
-  | Readonly<{
-      write: true;
-      allow_publish: boolean;
-      experimental: false;
-    }>
-  | undefined;
-
-export function declaredInvocationRole(): HumanRole | undefined {
-  return resolvedInvocationRole;
-}
-
-export function declaredInvocationAuthority():
-  | Readonly<{
-      actor: Readonly<{
-        kind: 'human';
-        role: HumanRole;
-        declaration_source: 'cli-flag' | 'session-state';
-      }>;
-      consent: Readonly<{
-        write: true;
-        allow_publish: boolean;
-        experimental: false;
-      }>;
-    }>
-  | undefined {
-  return resolvedInvocationRole === undefined ||
-    resolvedInvocationDeclarationSource === undefined ||
-    resolvedInvocationConsent === undefined
-    ? undefined
-    : Object.freeze({
-        actor: Object.freeze({
-          kind: 'human',
-          role: resolvedInvocationRole,
-          declaration_source: resolvedInvocationDeclarationSource,
-        }),
-        consent: resolvedInvocationConsent,
-      });
-}
-
-function rememberResolvedInvocationAuthority(
-  role: HumanRole,
-  declarationSource: 'cli-flag' | 'session-state',
-  argv: readonly string[],
-): void {
-  // A stable action cannot acquire experimental consent. Keeping the context
-  // absent fails closed if a caller somehow routes that undeclared flag past
-  // command parsing instead of letting a handler reinterpret it.
-  if (argv.includes('--experimental')) return;
-  resolvedInvocationRole = role;
-  resolvedInvocationDeclarationSource = declarationSource;
-  resolvedInvocationConsent = Object.freeze({
-    write: true,
-    allow_publish: argv.includes('--publish'),
-    experimental: false,
-  });
-}
 
 let pendingHostScope: AuthorityHostEffectScope | undefined;
 let pendingHostDispose: (() => void) | undefined;
@@ -163,9 +103,7 @@ export function disposeCliInvocationAuthority(): void {
   pendingSessionOperation = undefined;
   pendingPolicyMaterialization = undefined;
   pendingExactCommit = undefined;
-  resolvedInvocationRole = undefined;
-  resolvedInvocationDeclarationSource = undefined;
-  resolvedInvocationConsent = undefined;
+  clearResolvedInvocationAuthority();
   dispose?.();
   if (invocationDisposalFailed) throw new Error('AUTHORITY_INVOCATION_DISPOSAL_FAILED');
 }
@@ -305,9 +243,7 @@ export function authorizeCliArgv(
   argv: readonly string[],
   entries: readonly RegistryEntry[],
 ): CliResult | undefined {
-  resolvedInvocationRole = undefined;
-  resolvedInvocationDeclarationSource = undefined;
-  resolvedInvocationConsent = undefined;
+  clearResolvedInvocationAuthority();
   if (argv.some((value) => value === '--help' || value === '-h')) {
     return undefined;
   }
@@ -431,43 +367,15 @@ export function authorizeCliArgv(
     ['docs decisions render', 'docs rounds render'].includes(entry.name) &&
     flagValue(argv, '--out') !== undefined;
   if (governedRenderWrite) {
-    if (asRole !== undefined && sessionId !== undefined) {
-      return renderAuthorityResult(
-        taggedFailure('usage-error', 'AUTHORITY_DECLARATION_CONFLICT'),
-        format,
-      );
-    }
-    if (asRole === undefined && sessionId === undefined) {
-      return renderAuthorityResult(
-        taggedFailure('usage-error', 'AUTHORITY_DECLARATION_MISSING'),
-        format,
-      );
-    }
-    if (!argv.includes('--write')) {
-      return renderAuthorityResult(
-        taggedFailure('usage-error', 'AUTHORITY_WRITE_CONSENT_REQUIRED'),
-        format,
-      );
-    }
-    const resolvedSession =
-      sessionId === undefined
-        ? undefined
-        : sessionRole(sessionId, targetRoot(entry, argv), entries);
-    if (resolvedSession && resolvedSession.ok !== true) {
-      return renderAuthorityResult(resolvedSession, format);
-    }
-    const role =
-      asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
-    if (role !== 'architect') {
-      return renderAuthorityResult(
-        taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {
-          action_id: entry.name,
-          allowed_roles: ['architect'],
-          supplied_role: role ?? null,
-        }),
-        format,
-      );
-    }
+    const refusal = governedRenderDeclarationRefusal(
+      argv,
+      entry,
+      asRole,
+      sessionId,
+      format,
+      entries,
+    );
+    if (refusal !== undefined) return refusal;
     try {
       // The registry remains read for stdout generation. The conditional
       // --out branch has completed its separate Architect/write-consent
@@ -482,27 +390,8 @@ export function authorizeCliArgv(
     return undefined;
   }
   if (entry.effects === 'read') {
-    if (
-      asRole !== undefined ||
-      sessionId !== undefined ||
-      argv.includes('--write') ||
-      argv.includes('--publish')
-    ) {
-      return renderAuthorityResult(
-        taggedFailure('usage-error', 'AUTHORITY_DECLARATION_NOT_APPLICABLE', {
-          action_id: entry.name,
-          effect: entry.effects,
-          declared: {
-            as_role: asRole !== undefined,
-            authority_session: sessionId !== undefined,
-            write: argv.includes('--write'),
-            allow_publish: argv.includes('--publish'),
-          },
-          required: entry.authority_contract.consent,
-        }),
-        format,
-      );
-    }
+    const refusal = readDeclarationRefusal(argv, entry, asRole, sessionId, format);
+    if (refusal !== undefined) return refusal;
     try {
       stageHostScope(entry, entries, argv, 'owner', { as_role: 'owner' });
     } catch (error) {
@@ -512,42 +401,8 @@ export function authorizeCliArgv(
     }
     return undefined;
   }
-  if (argv.includes('--machine-actor')) {
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_MACHINE_DECLARATION_FORBIDDEN'),
-      format,
-    );
-  }
-  if (asRole !== undefined && sessionId !== undefined) {
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_DECLARATION_CONFLICT'),
-      format,
-    );
-  }
-  if (asRole === undefined && sessionId === undefined) {
-    if (entry.name === 'check' && authorityBindingMissing(entry, argv)) {
-      return renderAuthorityResult(
-        taggedAuthorityFailure('refused', 'AUTHORITY_POLICY_MISSING', entry, argv),
-        format,
-      );
-    }
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_DECLARATION_MISSING'),
-      format,
-    );
-  }
-  if (sessionId !== undefined && !SESSION_ID.test(sessionId)) {
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_SESSION_ID_INVALID'),
-      format,
-    );
-  }
-  if (asRole !== undefined && !ROLES.has(asRole as HumanRole)) {
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_DECLARATION_INVALID'),
-      format,
-    );
-  }
+  const declarationRefusal = mutatingDeclarationRefusal(argv, entry, asRole, sessionId, format);
+  if (declarationRefusal !== undefined) return declarationRefusal;
   const resolvedSession =
     sessionId === undefined ? undefined : sessionRole(sessionId, targetRoot(entry, argv), entries);
   if (resolvedSession && resolvedSession.ok !== true) {
@@ -555,57 +410,13 @@ export function authorizeCliArgv(
   }
   const role =
     asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
-  if (!role || !routeRoles(entry, argv).includes(role as HumanRole)) {
-    return renderAuthorityResult(
-      taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {
-        action_id: entry.name,
-        allowed_roles: routeRoles(entry, argv),
-        supplied_role: role ?? null,
-      }),
-      format,
-    );
-  }
-  if (!argv.includes('--write')) {
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_WRITE_CONSENT_REQUIRED'),
-      format,
-    );
-  }
-  if (
-    entry.effects === 'remote-write' &&
-    !argv.includes('--dry-run') &&
-    !argv.includes('--publish')
-  ) {
-    return renderAuthorityResult(
-      taggedFailure('usage-error', 'AUTHORITY_PUBLISH_CONSENT_REQUIRED'),
-      format,
-    );
-  }
+  const roleRefusal = declaredRoleConsentRefusal(argv, entry, asRole, sessionId, format, role);
+  if (roleRefusal !== undefined) return roleRefusal;
   const handlerSupportsDryRun = entry.runtime_options?.some(
     (option) => option.flags === '--dry-run',
   );
   if (argv.includes('--plan') || (argv.includes('--dry-run') && !handlerSupportsDryRun)) {
-    return renderAuthorityResult(
-      {
-        ok: true,
-        authority: {
-          code: 'POLICY_ALLOW',
-          principal: {
-            kind: 'human',
-            role,
-            declaration_source: sessionId === undefined ? 'cli-flag' : 'session-state',
-            ...(sessionId === undefined ? {} : { session_id: sessionId }),
-          },
-          origin:
-            sessionId === undefined
-              ? { kind: 'direct-cli' }
-              : { kind: 'interactive-session', session_id: sessionId },
-          readiness_eligible: false,
-        },
-        applied: false,
-      },
-      format,
-    );
+    return renderAuthorityResult(planOnlyAuthorityAllow(role as string, sessionId), format);
   }
   if (argv.includes('--dry-run')) {
     try {
