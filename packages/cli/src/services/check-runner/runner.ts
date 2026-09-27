@@ -1,13 +1,7 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { spawnSync } from '@devai-nyx/authority';
-import { getValidator } from '@devai-nyx/schemas';
-import {
-  resolveReleaseMutationTaskNodes,
-  resolveReleaseTaskNodes,
-  resolveReleaseVerification,
-  type MutationRosterEntry,
-} from '../release-profile.js';
+
+import { resolveReleaseTaskNodes } from '../release-profile.js';
 import {
   PREFLIGHT_CAPABILITIES,
   verifyReleasePreflightReceipt,
@@ -15,25 +9,15 @@ import {
 } from '../release-preflight.js';
 import { CheckCache } from './cache.js';
 import { sha256Hex } from './canonical.js';
-import { bindReleaseTaskProcessOptions } from './authority-process.js';
+
 import {
-  buildTaskPlan,
   currentRepositoryState,
   exactCandidateRepositoryState,
-  exactCommitFile,
-  exactCommitTree,
-  parseTaskDescriptor,
-  readTaskDescriptor,
   isPreflightNode,
   runnerToolchainDigest,
-  withSyntheticNode,
 } from './policy.js';
 import {
-  ADOPTER_PREFLIGHT_NODE_ID,
-  ADOPTER_PREFLIGHT_PROBES_PATH,
-  adopterPreflightNode,
   evaluatePreflightProbes,
-  loadAdopterPreflightProbes,
   resolveBaseCommit,
   type PreflightEvaluation,
 } from './preflight.js';
@@ -42,16 +26,30 @@ import type {
   CheckRunnerOptions,
   CheckRunnerReport,
   ExecutedTask,
-  PlannedTask,
-  TaskDescriptorNode,
   TaskExecutionResult,
-  TaskOutcome,
   TaskResult,
 } from './types.js';
+import {
+  descriptorFor,
+  requiredEnvironmentKeys,
+  requiredTaskNodes,
+  resolvedRunnerToolchain,
+  planWithCache,
+  unattestedNodeIds,
+  taskEnvironment,
+} from './runner-plan.js';
+import { bindReleaseRequest } from './runner-release-binding.js';
+import {
+  type TaskExecutionEffect,
+  defaultExecute,
+  probeEffect,
+  executionOutcome,
+  outputDigests,
+} from './runner-execution.js';
+export { PROTECTED_MUTATION_PRODUCER } from './runner-release-binding.js';
+export { resolveRunnerToolchain } from './runner-plan.js';
 
 const DEFAULT_TIMEOUT_MS = 15 * 60_000;
-/** Exact declaration a protected host producer must return; nothing else lifts the refusal. */
-export const PROTECTED_MUTATION_PRODUCER = 'protected-mutation-producer-v21';
 const protectedCompletedTaskResults = new WeakMap<CheckRunnerReport, readonly TaskResult[]>();
 
 function snapshotTaskResult(value: TaskResult): TaskResult {
@@ -75,496 +73,9 @@ export function readProtectedCompletedTaskResults(
   return results.map(snapshotTaskResult);
 }
 
-function descriptorFor(options: CheckRunnerOptions) {
-  const descriptor =
-    options.descriptorDocument === undefined
-      ? readTaskDescriptor(
-          resolve(options.descriptorPath ?? join(options.repoRoot, 'test-tasks.json')),
-        )
-      : parseTaskDescriptor(options.descriptorDocument);
-  if (options.target !== 'preflight') return descriptor;
-  // The --preflight target also plans the adopter-owned probe list as a synthetic
-  // root node; it is never part of the task policy the verifier rebuilds.
-  const probes = loadAdopterPreflightProbes(options.repoRoot);
-  const augmented =
-    probes === undefined ? descriptor : withSyntheticNode(descriptor, adopterPreflightNode(probes));
-  if (!augmented.tasks.some((task) => isPreflightNode(task))) {
-    throw new Error(
-      `CHECK_PREFLIGHT_PROBES_MISSING: declare a preflight-v1 node in test-tasks.json or probes in ${ADOPTER_PREFLIGHT_PROBES_PATH}`,
-    );
-  }
-  return augmented;
-}
-
-/** Planned nodes outside the task policy: the synthetic adopter preflight root. */
-function unattestedNodeIds(options: CheckRunnerOptions): readonly string[] {
-  return options.target === 'preflight' &&
-    existsSync(join(options.repoRoot, ADOPTER_PREFLIGHT_PROBES_PATH))
-    ? [ADOPTER_PREFLIGHT_NODE_ID]
-    : [];
-}
-
-function commandVersion(command: string, args: readonly string[], cwd: string): string {
-  const result = spawnSync(command, [...args], { cwd, encoding: 'utf8', timeout: 10_000 });
-  if (result.error !== undefined || result.status !== 0) {
-    throw new Error(
-      `CHECK_RUNNER_TOOLCHAIN_MISSING: ${command}: ${result.error?.message ?? String(result.stderr).trim()}`,
-    );
-  }
-  return String(result.stdout).trim();
-}
-
-function packageVersion(repoRoot: string, packageName: string): string {
-  try {
-    const value = JSON.parse(
-      readFileSync(join(repoRoot, 'node_modules', packageName, 'package.json'), 'utf8'),
-    ) as { version?: unknown };
-    if (typeof value.version !== 'string' || value.version === '')
-      throw new Error('version missing');
-    return `${packageName}@${value.version}`;
-  } catch (error) {
-    throw new Error(
-      `CHECK_RUNNER_TOOLCHAIN_MISSING: ${packageName}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-export function resolveRunnerToolchain(
-  repoRoot: string,
-  requiredKeys: readonly string[],
-): Readonly<Record<string, string>> {
-  const resolved: Record<string, string> = {};
-  for (const key of [...new Set(requiredKeys)].sort()) {
-    if (key === 'node') resolved[key] = process.version;
-    else if (key === 'pnpm') resolved[key] = commandVersion('pnpm', ['--version'], repoRoot);
-    else if (key === 'git') resolved[key] = commandVersion('git', ['--version'], repoRoot);
-    else if (key === 'eslint') resolved[key] = packageVersion(repoRoot, 'eslint');
-    else if (key === 'vitest') resolved[key] = packageVersion(repoRoot, 'vitest');
-    else if (key === 'typescript') resolved[key] = packageVersion(repoRoot, 'typescript');
-    else if (key === 'postgres') {
-      resolved[key] = commandVersion('psql', ['--version'], repoRoot);
-    } else {
-      throw new Error(`CHECK_RUNNER_TOOLCHAIN_MISSING: unsupported key ${key}`);
-    }
-  }
-  return resolved;
-}
-
-function defaultExecute(
-  argv: readonly string[],
-  cwd: string,
-  timeoutMs: number,
-  environment: Readonly<Record<string, string>>,
-  releaseBinding?: Parameters<typeof bindReleaseTaskProcessOptions>[1],
-): TaskExecutionResult {
-  const executionEnvironment: NodeJS.ProcessEnv = {
-    ...(process.env.PATH !== undefined && { PATH: process.env.PATH }),
-    ...(process.env.HOME !== undefined && { HOME: process.env.HOME }),
-    ...(process.env.TMPDIR !== undefined && { TMPDIR: process.env.TMPDIR }),
-    CI: '1',
-    NO_COLOR: '1',
-    ...environment,
-  };
-  const spawnOptions = {
-    cwd,
-    encoding: 'utf8',
-    timeout: timeoutMs,
-    maxBuffer: 64 * 1024 * 1024,
-    env: executionEnvironment,
-    shell: false,
-  } as const;
-  const result = spawnSync(
-    argv[0] ?? '',
-    argv.slice(1),
-    releaseBinding === undefined
-      ? spawnOptions
-      : bindReleaseTaskProcessOptions({ ...spawnOptions }, releaseBinding),
-  );
-  return {
-    status: result.status,
-    signal: result.signal,
-    stdout: String(result.stdout ?? ''),
-    stderr: String(result.stderr ?? ''),
-    ...(result.error !== undefined && {
-      errorCode:
-        'code' in result.error && typeof result.error.code === 'string'
-          ? result.error.code
-          : result.error.name,
-    }),
-  };
-}
-
-function executionOutcome(result: TaskExecutionResult): TaskOutcome {
-  if (result.status === 0 && result.errorCode === undefined && result.signal === null)
-    return 'PASS';
-  if (result.errorCode === 'ETIMEDOUT') return 'TIMEOUT';
-  if (result.signal !== null) return 'KILLED';
-  return 'FAIL';
-}
-
-function outputDigests(
-  repoRoot: string,
-  task: PlannedTask,
-  execution: TaskExecutionResult,
-  readTaskOutput?: (path: string) => Buffer,
-  capturedTaskOutputPaths?: (task: PlannedTask) => readonly string[],
-): Readonly<Record<string, string>> {
-  const digests: Record<string, string> = {
-    stdout: sha256Hex(Buffer.from(execution.stdout, 'utf8')),
-    stderr: sha256Hex(Buffer.from(execution.stderr, 'utf8')),
-  };
-  const paths = task.outputContract.paths ?? [];
-  if (paths !== undefined) {
-    if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string'))
-      throw new Error(`CHECK_RUNNER_OUTPUT_CONTRACT: ${task.nodeId} has malformed paths`);
-    for (const path of new Set([
-      ...(paths as string[]),
-      ...(capturedTaskOutputPaths?.(task) ?? []),
-    ])) {
-      try {
-        digests[path] = sha256Hex(
-          readTaskOutput === undefined ? readFileSync(join(repoRoot, path)) : readTaskOutput(path),
-        );
-      } catch {
-        throw new Error(`CHECK_RUNNER_OUTPUT_MISSING: ${task.nodeId}: ${path}`);
-      }
-    }
-  }
-  return digests;
-}
-
-function planWithCache(
-  options: CheckRunnerOptions,
-  cache: CheckCache,
-  toolchain: Readonly<Record<string, string>>,
-  environment: Readonly<Record<string, string>>,
-) {
-  const descriptor = descriptorFor(options);
-  const reusableDigests = new Map<string, string>();
-  const unattested = unattestedNodeIds(options);
-  return buildTaskPlan({
-    repoRoot: options.repoRoot,
-    descriptor,
-    target: options.target,
-    ...(options.baseCommit !== undefined && { baseCommit: options.baseCommit }),
-    ...(options.releaseCandidate !== undefined && { releaseCandidate: options.releaseCandidate }),
-    ...(options.releaseRequiredNodes !== undefined && {
-      releaseRequiredNodes: options.releaseRequiredNodes,
-    }),
-    ...(options.releaseAffectedSelection !== undefined && {
-      releaseAffectedSelection: options.releaseAffectedSelection,
-    }),
-    ...(options.releaseTaskBindings !== undefined && {
-      releaseTaskBindings: options.releaseTaskBindings,
-    }),
-    toolchain,
-    environment,
-    ...(unattested.length > 0 && { unattestedNodes: unattested }),
-    ...(options.resolveExecutable === undefined
-      ? {}
-      : { resolveExecutable: options.resolveExecutable }),
-    ...(options.protectedExecutionIdentity === undefined
-      ? {}
-      : { protectedExecutionIdentity: options.protectedExecutionIdentity }),
-    cacheState(task) {
-      // The "ready for a pull request" probes always observe the present environment.
-      if (unattested.includes(task.nodeId)) {
-        return { cacheState: 'execute' as const, reason: 'preflight-always-executes' };
-      }
-      const dependencies: Record<string, string> = {};
-      for (const dependency of task.dependencies) {
-        const digest = reusableDigests.get(dependency);
-        if (digest === undefined) {
-          return { cacheState: 'execute' as const, reason: 'dependency-not-reusable' };
-        }
-        dependencies[dependency] = digest;
-      }
-      const inspection = cache.inspect(task as PlannedTask, dependencies);
-      if (inspection.cachedResultDigest !== undefined) {
-        reusableDigests.set(task.nodeId, inspection.cachedResultDigest);
-      }
-      return {
-        cacheState: inspection.cacheState,
-        reason: inspection.reason,
-        ...(inspection.cachedResultDigest !== undefined && {
-          cachedResultDigest: inspection.cachedResultDigest,
-        }),
-      };
-    },
-  });
-}
-
-function requiredTaskNodes(
-  options: CheckRunnerOptions,
-  releaseScope: 'selected' | 'complete' = 'complete',
-): readonly TaskDescriptorNode[] {
-  const descriptor = descriptorFor(options);
-  // Preflight nodes are selected for every target (ADR-CHK-0001).
-  const preflightRoots = descriptor.tasks
-    .filter((task) => isPreflightNode(task))
-    .map((task) => task.nodeId);
-  if (options.target === 'affected') {
-    const profile = descriptor.profiles.find((entry) => entry.profileId === 'affected');
-    const eligible = new Set([...(profile?.eligibleNodes ?? []), ...preflightRoots]);
-    return descriptor.tasks.filter((task) => eligible.has(task.nodeId));
-  }
-  const roots = [
-    ...preflightRoots,
-    ...(options.target === 'preflight'
-      ? []
-      : options.target === 'release'
-        ? releaseScope === 'complete'
-          ? (options.releaseAllNodes ?? options.releaseRequiredNodes ?? [])
-          : (options.releaseRequiredNodes ?? [])
-        : options.target === 'local'
-          ? [descriptor.fallbackNodeId]
-          : (descriptor.profiles.find((entry) => entry.profileId === 'rc')?.requiredNodes ?? [])),
-  ];
-  const byId = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
-  const selected = new Set<string>();
-  const pending = roots.filter((nodeId): nodeId is string => nodeId !== null);
-  for (let index = 0; index < pending.length; index += 1) {
-    const nodeId = pending[index];
-    if (nodeId === undefined || selected.has(nodeId)) continue;
-    selected.add(nodeId);
-    pending.push(...(byId.get(nodeId)?.dependencies ?? []));
-  }
-  return descriptor.tasks.filter((task) => selected.has(task.nodeId));
-}
-
-function requiredToolchainKeys(options: CheckRunnerOptions): readonly string[] {
-  return requiredTaskNodes(options).flatMap((task) => task.toolchainKeys);
-}
-
-function resolvedRunnerToolchain(options: CheckRunnerOptions): Readonly<Record<string, string>> {
-  // A PATH or node_modules resolution is needed to execute a task, but is host
-  // state, not portable policy.  Only an explicitly supplied protected
-  // executable identity may be included in the task key.
-  return resolveRunnerToolchain(options.repoRoot, requiredToolchainKeys(options));
-}
-
-function requiredEnvironmentKeys(options: CheckRunnerOptions): readonly string[] {
-  return requiredTaskNodes(options, 'selected').flatMap((task) => task.allowlistedEnv);
-}
-
-function taskEnvironment(
-  task: TaskDescriptorNode,
-  environment: Readonly<Record<string, string>>,
-): Readonly<Record<string, string>> {
-  const selected: Record<string, string> = {};
-  for (const key of task.allowlistedEnv) {
-    const value = environment[key];
-    if (value !== undefined) selected[key] = value;
-  }
-  return selected;
-}
-
-function bindReleaseRequest(input: CheckRunnerOptions): Readonly<{
-  options: CheckRunnerOptions;
-  binding?: Readonly<{
-    digest: string;
-    profileDigest: string;
-    decision: ReturnType<typeof resolveReleaseVerification>;
-    base: Readonly<{ commit: string; tree: string }>;
-    preflightCapabilityTasks: Readonly<Record<string, readonly string[]>>;
-  }>;
-}> {
-  if (input.releaseIntent === undefined && input.releaseProfile === undefined) {
-    return { options: input };
-  }
-  if (input.releaseIntent === undefined || input.releaseProfile === undefined) {
-    throw new Error('CHECK_RELEASE_INTENT_AND_PROFILE_REQUIRED');
-  }
-  const validateIntent = getValidator('release-intent.schema.json');
-  const validateProfile = getValidator('release-verification-profile.schema.json');
-  if (!validateIntent(input.releaseIntent)) {
-    throw new Error(`CHECK_RELEASE_INTENT_INVALID:${JSON.stringify(validateIntent.errors)}`);
-  }
-  if (!validateProfile(input.releaseProfile)) {
-    throw new Error(`CHECK_RELEASE_PROFILE_INVALID:${JSON.stringify(validateProfile.errors)}`);
-  }
-  const intent = input.releaseIntent as {
-    release_unit: string;
-    current_version: string;
-    target_version: string;
-    support: 'preview' | 'current' | 'lts';
-    support_promotion?: boolean;
-    change_kind?: 'documentation' | 'metadata' | 'behavioral';
-    channel?: 'alpha' | 'beta' | 'rc' | 'stable';
-    changed_paths?: string[];
-    changed_packages?: string[];
-    risks?: string[];
-    owner_escalations?: import('../release-profile.js').ReleaseCapability[];
-    candidate: { commit: string; tree: string };
-    base: { commit: string; tree: string };
-  };
-  const profile = input.releaseProfile as {
-    release_unit: string;
-    version_source: string;
-    capability_tasks: Record<string, string[]>;
-    risk_capabilities: Record<string, import('../release-profile.js').ReleaseCapability[]>;
-    mutation_roster: readonly MutationRosterEntry[];
-  };
-  if (intent.release_unit !== profile.release_unit) {
-    throw new Error('CHECK_RELEASE_UNIT_MISMATCH');
-  }
-  const candidate = exactCandidateRepositoryState(input.repoRoot, intent.candidate);
-  if (!candidate.clean) {
-    throw new Error('CHECK_RELEASE_CANDIDATE_WORKTREE_MISMATCH');
-  }
-  if (input.baseCommit === undefined || intent.base.commit !== input.baseCommit) {
-    throw new Error('CHECK_RELEASE_INTENT_BASE_MISMATCH');
-  }
-  if (exactCommitTree(input.repoRoot, intent.base.commit) !== intent.base.tree) {
-    throw new Error('CHECK_RELEASE_INTENT_BASE_TREE_MISMATCH');
-  }
-  const versionAt = (commit: string): string => {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(exactCommitFile(input.repoRoot, commit, profile.version_source));
-    } catch (error) {
-      if (error instanceof Error && error.message === 'CHECK_RELEASE_VERSION_SOURCE_UNREADABLE') {
-        throw error;
-      }
-      throw new Error('CHECK_RELEASE_VERSION_SOURCE_INVALID');
-    }
-    if (
-      parsed === null ||
-      typeof parsed !== 'object' ||
-      Array.isArray(parsed) ||
-      typeof (parsed as { version?: unknown }).version !== 'string'
-    ) {
-      throw new Error('CHECK_RELEASE_VERSION_SOURCE_INVALID');
-    }
-    return (parsed as { version: string }).version;
-  };
-  if (versionAt(intent.base.commit) !== intent.current_version) {
-    throw new Error('CHECK_RELEASE_CURRENT_VERSION_SOURCE_MISMATCH');
-  }
-  if (versionAt(intent.candidate.commit) !== intent.target_version) {
-    throw new Error('CHECK_RELEASE_TARGET_VERSION_SOURCE_MISMATCH');
-  }
-  const decision = resolveReleaseVerification({
-    currentVersion: intent.current_version,
-    targetVersion: intent.target_version,
-    support: intent.support,
-    riskCapabilities: profile.risk_capabilities,
-    mutationRosterSize: profile.mutation_roster.length,
-    ...(intent.support_promotion !== undefined && { supportPromotion: intent.support_promotion }),
-    ...(intent.change_kind !== undefined && { changeKind: intent.change_kind }),
-    ...(intent.channel !== undefined && { channel: intent.channel }),
-    ...(intent.risks !== undefined && { risks: intent.risks }),
-    ...(intent.owner_escalations !== undefined && { ownerEscalations: intent.owner_escalations }),
-  });
-  if (decision.verdict !== 'ready') {
-    throw new Error(`CHECK_RELEASE_INTENT_BLOCKED:${decision.blockingReasons.join(',')}`);
-  }
-  const descriptor = descriptorFor(input);
-  const allRoots = resolveReleaseTaskNodes(
-    decision,
-    profile.capability_tasks,
-    descriptor.tasks.map((task) => task.nodeId),
-  );
-  const mutationSelection = resolveReleaseMutationTaskNodes(
-    decision,
-    profile.mutation_roster,
-    intent.changed_packages ?? [],
-    intent.changed_paths ?? [],
-    intent.risks ?? [],
-    descriptor.tasks.map((task) => task.nodeId),
-  );
-  const selectedRoots = [...new Set([...allRoots, ...mutationSelection.taskNodes])].sort();
-  const profileDigest = sha256Hex(input.releaseProfile);
-  const mutationTaskBindings = Object.fromEntries(
-    mutationSelection.taskNodes.map((nodeId) => [
-      nodeId,
-      {
-        schemaVersion: '1.0.0',
-        mutation: decision.mutation,
-        profileDigest,
-        rosterEntries: profile.mutation_roster
-          .filter((entry) => mutationSelection.rosterEntryIds.includes(entry.id))
-          .filter((entry) => entry.task_node === nodeId),
-      },
-    ]),
-  );
-  const preflightDecision = {
-    ...decision,
-    capabilities: decision.capabilities.filter((capability) =>
-      (PREFLIGHT_CAPABILITIES as readonly string[]).includes(capability),
-    ),
-  };
-  const preflightRoots = resolveReleaseTaskNodes(
-    preflightDecision,
-    profile.capability_tasks,
-    descriptor.tasks.map((task) => task.nodeId),
-  );
-  const stage = input.releaseStage ?? 'preflight';
-  // Exit codes and output digests alone cannot satisfy required mutation. Required
-  // mutation may be planned for execution only when a protected semantic producer
-  // declares it will retain the evidence; read-only planning and the unconditional
-  // preflight floor stay usable either way.
-  if (
-    stage === 'certify' &&
-    input.operation === 'run' &&
-    decision.mutation !== 'none' &&
-    input.resolveProtectedMutationProducer?.() !== PROTECTED_MUTATION_PRODUCER
-  )
-    throw new Error('CHECK_RELEASE_MUTATION_EVIDENCE_UNAVAILABLE');
-  return {
-    options: {
-      ...input,
-      target: 'release',
-      releaseStage: stage,
-      releaseCandidate: intent.candidate,
-      releaseRequiredNodes: stage === 'preflight' ? preflightRoots : selectedRoots,
-      releaseAllNodes: selectedRoots,
-      releaseTaskBindings: stage === 'preflight' ? {} : mutationTaskBindings,
-      releaseAffectedSelection:
-        stage === 'certify' && decision.capabilities.includes('affected-checks'),
-    },
-    binding: {
-      digest: sha256Hex(input.releaseIntent),
-      profileDigest,
-      decision,
-      base: intent.base,
-      preflightCapabilityTasks: Object.fromEntries(
-        PREFLIGHT_CAPABILITIES.map((capability) => [
-          capability,
-          profile.capability_tasks[capability] ?? [],
-        ]),
-      ),
-    },
-  };
-}
-
 type AsyncTaskExecutor = (
   ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
 ) => TaskExecutionResult | Promise<TaskExecutionResult>;
-
-type TaskExecutionEffect = () => TaskExecutionResult | Promise<TaskExecutionResult>;
-
-/**
- * A probe process the host refuses or cannot start is an observation that could
- * not be made: it resolves to an error result (BLOCKED), never to a crashed run.
- */
-function probeEffect(effect: TaskExecutionEffect): TaskExecutionEffect {
-  const refused = (error: unknown): TaskExecutionResult => ({
-    status: null,
-    signal: null,
-    stdout: '',
-    stderr: error instanceof Error ? error.message : String(error),
-    errorCode: 'PROBE_PROCESS_REFUSED',
-  });
-  return () => {
-    try {
-      const result = effect();
-      return result instanceof Promise ? result.catch(refused) : result;
-    } catch (error) {
-      return refused(error);
-    }
-  };
-}
 
 /** The synchronous API and protected asynchronous host share every planning/result rule. */
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
