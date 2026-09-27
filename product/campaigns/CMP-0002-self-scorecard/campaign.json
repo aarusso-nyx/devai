@@ -1173,7 +1173,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1181,7 +1181,8 @@
                   "pnpm-lock.yaml",
                   "packages/cli/package.json",
                   "packages/loop/package.json",
-                  "packages/sensors/package.json"
+                  "packages/sensors/package.json",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/", "packages/*/src/"]
               },
@@ -1194,10 +1195,10 @@
                 ["pnpm", "run", "build"],
                 ["pnpm", "run", "test:cli"]
               ],
-              "commit_types": ["build(deps)"],
+              "commit_types": ["build(deps)", "test(unit)"],
               "prompt": {
                 "path": "prompts/TASK-0251.md",
-                "sha256": "5c5704eaa2b1748d79aeef587f89347077b582aa3a3817b7005bb1f796db58f0"
+                "sha256": "74aeeb9de20401f15897ea4d58f50762c1f8a772544e9e374b0a67218a76d895"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1228,7 +1229,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1297,7 +1298,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1362,7 +1363,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1394,6 +1395,176 @@
                 "tier": "worker",
                 "effort": "medium",
                 "time_budget_minutes": 90
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0255",
+          "title": "Harness idiomaticity threshold as a declared input",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/sensor-inputs.schema.json",
+            ".devai/config/sensor-inputs.json",
+            "packages/sensors/src/harness-idiomaticity.ts"
+          ],
+          "gates": ["schemas", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0255",
+              "title": "Declare the reusable-workflow threshold of the harness idiomaticity sensor as a sensor input",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "pre_merge",
+              "target_substrates": ["F1", "F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-inputs.schema.json",
+                  ".devai/config/sensor-inputs.json",
+                  "law/policy/adopter-defaults/sensor-inputs.json",
+                  "docs/adopters/sensor-inputs.md",
+                  "packages/cli/src/commands/sense/shared.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "packages/sensors/src/harness-idiomaticity.ts",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ],
+                "forbidden": [".github/workflows/", "law/adr/"]
+              },
+              "deliverables": [
+                "The sensor inputs schema declares minWorkflowsForReusableCheck for harness_idiomaticity; DEVAI declares 5 with its reason on the adopter page; the adopter default leaves it undeclared.",
+                "The resolver exposes the key and the adapter passes it to the sensor instead of a hardcoded default; undeclared keeps today's behavior.",
+                "Tests prove a declared threshold above the workflow count drops the reusable-workflow signal, and harness_idiomaticity reads pass on the repository together with the composite action from TASK-0254."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "harness_idiomaticity",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(sensors)", "feat(sensors)", "test(sensors)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0255.md",
+                "sha256": "8847cdeb96fec1d910192a65e7e68c23306343f1c2516c0b6599c820a8f0d3aa"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0256",
+          "title": "Plant depth to pass",
+          "type": "single-role",
+          "records": ["ADR-SCR-0004"],
+          "depends_on": ["CTG-0253"],
+          "lock_scopes": ["packages/"],
+          "gates": ["typecheck", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0256",
+              "title": "Bring the plant depth tail under the pass threshold across every package",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/authority/src/",
+                  "packages/cli/src/",
+                  "packages/loop/src/",
+                  "packages/sensors/src/",
+                  "packages/spec/src/",
+                  "packages/skills/src/",
+                  "packages/effects-check/src/",
+                  "packages/schemas/src/",
+                  "packages/evidence/src/",
+                  "packages/*/tests/",
+                  "tests/contract/",
+                  "packages/cli/tests/unit/live-ledger-workflow.test.ts",
+                  "law/schemas/sensor-inputs.schema.json",
+                  ".devai/config/sensor-inputs.json",
+                  "law/policy/adopter-defaults/sensor-inputs.json",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": ["law/adr/", ".github/workflows/", "packages/cli/src/generated/"]
+              },
+              "deliverables": [
+                "plant_depth reports pass on the repository: p95 under 500 lines with the generated action registry declared out of the plant as a derived F4 artifact through an excludeGlobs sensor input under ADR-SCR-0005.",
+                "Every remaining file at or over 500 lines is split along a seam or has cohesive function bodies extracted into named helpers with no behavior change; public module paths stay stable through re-exports; the source-text pin in live-ledger-workflow.test.ts moves to the new module paths.",
+                "The authority broker keeps every admission decision in one module; only pure helpers leave it."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:authority"],
+                ["pnpm", "run", "test:loop"],
+                ["pnpm", "run", "test:sensors"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "plant_depth",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "refactor(plant)",
+                "law(sensors)",
+                "feat(sensors)",
+                "test(plant)",
+                "docs(adopters)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0256.md",
+                "sha256": "896a646b5ec7f846bf5562210936a2dabe7834b12a51a0ca96f1c4fb881e5fe9"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 240
               }
             }
           ]
