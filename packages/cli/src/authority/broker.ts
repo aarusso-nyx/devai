@@ -118,7 +118,6 @@ const CONSTITUTION_BOOTSTRAP_TARGETS = new Set([
 const READ_ONLY_PROCESS_COMMANDS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   command: ['-v'],
   docker: ['version', 'ps'],
-  gh: ['auth'],
   git: [
     'cat-file',
     'diff',
@@ -448,6 +447,40 @@ function fsTarget(
   };
 }
 
+const GH_RUN_LIST_BRANCH = /^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,255}$/u;
+const GH_RUN_LIST_JSON_FIELDS = /^[A-Za-z]+(?:,[A-Za-z]+){0,15}$/u;
+const GH_RUN_LIST_LIMIT = /^[1-9][0-9]{0,3}$/u;
+const GH_RUN_LIST_CREATED =
+  /^>=[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9:.]+(?:Z|[+-][0-9]{2}:?[0-9]{2})?)?$/u;
+
+/**
+ * The declared read-only GitHub CLI shapes (ADR-SCR-0005 IA-004): `gh auth` (usage),
+ * `gh auth status`, and the exact argv the harness sensors emit:
+ * `gh run list --branch <ref> --json <fields> --limit <n> [--created >=<date>]`.
+ * Every other gh argv is refused.
+ */
+function readOnlyGhProcess(args: readonly unknown[]): boolean {
+  if (args.some((argument) => typeof argument !== 'string')) return false;
+  const argv = args as readonly string[];
+  if (argv[0] === 'auth' && (argv.length === 1 || (argv.length === 2 && argv[1] === 'status'))) {
+    return true;
+  }
+  if (argv.length !== 8 && argv.length !== 10) return false;
+  const [run, list, branchFlag, branch, jsonFlag, fields, limitFlag, limit, createdFlag, created] =
+    argv;
+  return (
+    run === 'run' &&
+    list === 'list' &&
+    branchFlag === '--branch' &&
+    GH_RUN_LIST_BRANCH.test(branch ?? '') &&
+    jsonFlag === '--json' &&
+    GH_RUN_LIST_JSON_FIELDS.test(fields ?? '') &&
+    limitFlag === '--limit' &&
+    GH_RUN_LIST_LIMIT.test(limit ?? '') &&
+    (argv.length === 8 || (createdFlag === '--created' && GH_RUN_LIST_CREATED.test(created ?? '')))
+  );
+}
+
 function readOnlyProcess(
   request: AuthorityHostEffectRequest,
   parentAction?: string,
@@ -529,6 +562,7 @@ function readOnlyProcess(
     return true;
   }
   if (args.length === 1 && ['--version', '--help'].includes(String(args[0]))) return true;
+  if (executable === 'gh') return readOnlyGhProcess(args);
   if (
     basename(executable) === 'pnpm' &&
     args.length === 2 &&
