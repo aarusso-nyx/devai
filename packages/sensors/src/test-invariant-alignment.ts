@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
 import {
   buildSensorReading,
   type SensorFinding,
@@ -20,6 +20,10 @@ import {
  *     incomplete. This is a discipline signal, not a hard failure.)
  *   - FAIL: trace.json is missing. (No alignment substrate at all.)
  *
+ * ADR-SCR-0004 record layout: every invariant record under `invariantsDir`
+ * (default `law/invariants`) must have a trace entry. A record the trace does
+ * not name is unaligned exactly like an entry with an empty `tests[]`.
+ *
  * F3×T4 = Observation × Alignment per Article 5. This sensor asks
  * "do the tests we run actually exercise the invariants we declared?"
  * — the canonical alignment question.
@@ -29,6 +33,8 @@ export interface TestInvariantAlignmentOptions {
   readonly repoRoot: string;
   /** Default: `law/trace.json`. */
   readonly tracePath?: string;
+  /** Default: `law/invariants`. */
+  readonly invariantsDir?: string;
   readonly now?: string;
 }
 
@@ -37,6 +43,26 @@ interface TraceFile {
     readonly id?: string;
     readonly tests?: ReadonlyArray<unknown>;
   }>;
+}
+
+/** Ids of the invariant records under `dir`, sorted; empty when the directory is absent. */
+function recordedInvariantIds(dir: string): string[] {
+  let names: string[];
+  try {
+    names = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  const ids: string[] = [];
+  for (const name of names) {
+    try {
+      const id = (JSON.parse(readFileSync(join(dir, name), 'utf8')) as { id?: unknown }).id;
+      if (typeof id === 'string' && id.length > 0) ids.push(id);
+    } catch {
+      // An unreadable record is the invariant validator's finding, not this sensor's.
+    }
+  }
+  return ids.sort();
 }
 
 export function senseTestInvariantAlignment(opts: TestInvariantAlignmentOptions): SensorReading {
@@ -83,6 +109,21 @@ export function senseTestInvariantAlignment(opts: TestInvariantAlignmentOptions)
         message: `Invariant ${inv.id ?? '<unknown>'} has no tests[] entries in trace.json.`,
       });
     }
+  }
+
+  const rawInvariantsDir = opts.invariantsDir ?? 'law/invariants';
+  const invariantsDir = isAbsolute(rawInvariantsDir)
+    ? rawInvariantsDir
+    : resolve(opts.repoRoot, rawInvariantsDir);
+  const tracedIds = new Set(invariants.map((inv) => inv.id));
+  for (const id of recordedInvariantIds(invariantsDir)) {
+    if (tracedIds.has(id)) continue;
+    unaligned += 1;
+    findings.push({
+      severity: 'warning',
+      code: 'TEST_INVARIANT_ALIGNMENT_UNTRACED_RECORD',
+      message: `Invariant record ${id} has no entry in trace.json.`,
+    });
   }
 
   let status: SensorStatus;

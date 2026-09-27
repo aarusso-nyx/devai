@@ -6,11 +6,26 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
+import {
+  SURFACES_DECLARATION_PATH,
+  surfacePresent,
+  type DeclaredSurfaces,
+} from './declared-surfaces.js';
 
 /**
  * Inventory sensor: spec security coverage (F1 × T6). Phase 27.C.
  * Three presence checks per the design note at
  * docs/theory/architecture/sensors/spec_security_coverage.md.
+ *
+ * ADR-SCR-0004 record layout: the threat model is the structured record
+ * `law/security/threat-model.json` (at least one trust boundary), falling back
+ * to a markdown threat model under `threatModelGlobs`. The PII signal is met by
+ * `law/security/data-handling.json` declaring `personal_data.stored: false`,
+ * falling back to the `INSERT INTO <piiRegistryTable>` migration row. The RBAC
+ * invariant signal is demanded only while the rbac surface is present: when the
+ * surfaces declaration (the `surfaces` option, else
+ * `<repoRoot>/.devai/config/sensor-inputs.json`) states rbac false, that signal
+ * leaves the denominator and an info finding says so.
  */
 
 export interface SpecSecurityCoverageOptions {
@@ -19,12 +34,69 @@ export interface SpecSecurityCoverageOptions {
   readonly threatModelGlobs?: readonly string[];
   readonly piiRegistryTable?: string;
   readonly piiMigrationsGlobs?: readonly string[];
+  /** Default: `law/security/threat-model.json`. */
+  readonly threatModelRecordPath?: string;
+  /** Default: `law/security/data-handling.json`. */
+  readonly dataHandlingPath?: string;
+  /** Declared plant surfaces (ADR-SCR-0003); read from the declaration file when omitted. */
+  readonly surfaces?: DeclaredSurfaces;
   readonly now?: string;
 }
 
 const DEFAULT_INVARIANTS_DIR = 'law/invariants';
 const DEFAULT_THREAT_MODEL_GLOBS = ['docs/meta/security'];
 const DEFAULT_PII_TABLE = 'core.pii_map';
+const DEFAULT_THREAT_MODEL_RECORD = 'law/security/threat-model.json';
+const DEFAULT_DATA_HANDLING = 'law/security/data-handling.json';
+
+function readJsonObject(path: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The structured threat model record, when it names at least one trust boundary. */
+function findThreatModelRecord(repoRoot: string, recordPath: string): string | null {
+  const path = abs(repoRoot, recordPath);
+  const record = readJsonObject(path);
+  const boundaries = record?.['boundaries'];
+  return Array.isArray(boundaries) && boundaries.length > 0 ? path : null;
+}
+
+/** The data handling declaration, when it states that no personal data is stored. */
+function findNoPersonalDataDeclaration(repoRoot: string, declarationPath: string): string | null {
+  const path = abs(repoRoot, declarationPath);
+  const personal = readJsonObject(path)?.['personal_data'];
+  return typeof personal === 'object' &&
+    personal !== null &&
+    (personal as { stored?: unknown }).stored === false
+    ? path
+    : null;
+}
+
+/** The surfaces declaration from the option, else the committed declaration file. */
+function resolveSurfaces(
+  repoRoot: string,
+  surfaces: DeclaredSurfaces | undefined,
+): DeclaredSurfaces | undefined {
+  if (surfaces !== undefined) return surfaces;
+  const declared = readJsonObject(abs(repoRoot, SURFACES_DECLARATION_PATH))?.['surfaces'];
+  if (typeof declared !== 'object' || declared === null) return undefined;
+  const value = declared as Record<string, unknown>;
+  const names = ['http', 'database', 'rbac', 'actions'] as const;
+  if (names.some((name) => typeof value[name] !== 'boolean')) return undefined;
+  return {
+    http: value['http'] as boolean,
+    database: value['database'] as boolean,
+    rbac: value['rbac'] as boolean,
+    actions: value['actions'] as boolean,
+  };
+}
 
 function abs(repoRoot: string, p: string): string {
   return isAbsolute(p) ? p : resolve(repoRoot, p);
@@ -139,9 +211,16 @@ export function senseSpecSecurityCoverage(opts: SpecSecurityCoverageOptions): Se
   const piiTable = opts.piiRegistryTable ?? DEFAULT_PII_TABLE;
   const invariantsDir = opts.invariantsDir ?? DEFAULT_INVARIANTS_DIR;
 
-  const threatModel = findThreatModel(opts.repoRoot, securityDirs);
-  const piiRegistry = findPiiRegistry(opts.repoRoot, migGlobs, piiTable);
+  const threatModel =
+    findThreatModelRecord(
+      opts.repoRoot,
+      opts.threatModelRecordPath ?? DEFAULT_THREAT_MODEL_RECORD,
+    ) ?? findThreatModel(opts.repoRoot, securityDirs);
+  const piiRegistry =
+    findNoPersonalDataDeclaration(opts.repoRoot, opts.dataHandlingPath ?? DEFAULT_DATA_HANDLING) ??
+    findPiiRegistry(opts.repoRoot, migGlobs, piiTable);
   const rbacInvariant = findRbacInvariant(opts.repoRoot, invariantsDir);
+  const rbacDemanded = surfacePresent(resolveSurfaces(opts.repoRoot, opts.surfaces), 'rbac');
 
   const findings: SensorFinding[] = [];
   if (threatModel === null) {
@@ -158,7 +237,14 @@ export function senseSpecSecurityCoverage(opts: SpecSecurityCoverageOptions): Se
       message: `No \`INSERT INTO ${piiTable}\` row found across migration dirs: ${migGlobs.join(', ')}`,
     });
   }
-  if (rbacInvariant === null) {
+  if (!rbacDemanded) {
+    findings.push({
+      severity: 'info',
+      code: 'SPEC_SECURITY_RBAC_DECLARED_ABSENT',
+      message: `The RBAC invariant signal is not demanded: ${SURFACES_DECLARATION_PATH} declares the rbac surface absent.`,
+      file: SURFACES_DECLARATION_PATH,
+    });
+  } else if (rbacInvariant === null) {
     findings.push({
       severity: 'warning',
       code: 'SPEC_SECURITY_NO_RBAC_INVARIANT',
@@ -166,9 +252,12 @@ export function senseSpecSecurityCoverage(opts: SpecSecurityCoverageOptions): Se
     });
   }
 
-  const presentCount = [threatModel, piiRegistry, rbacInvariant].filter((v) => v !== null).length;
+  const demanded = rbacDemanded
+    ? [threatModel, piiRegistry, rbacInvariant]
+    : [threatModel, piiRegistry];
+  const presentCount = demanded.filter((v) => v !== null).length;
   let status: SensorStatus;
-  if (presentCount === 3) status = 'pass';
+  if (presentCount === demanded.length) status = 'pass';
   else if (presentCount === 0) status = 'fail';
   else status = 'review';
 
