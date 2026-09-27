@@ -44,6 +44,7 @@ for that run only; the sweep dry run prints the effective inputs per member.
 | `type_check`                                                                                           | `argv`                         | `npx tsc --noEmit` against the root | The command the sensor executes for F2:T8, executable first, never joined through a shell. A workspace built from project references declares its own type check command instead of a bare root compile.                                                                                                                                                                             |
 | `perf_test`                                                                                            | `scriptName`                   | `test:perf`                         | The root package script the sensor runs and parses for a JSON metrics line for F2:T7. A missing script reads as unmeasurable.                                                                                                                                                                                                                                                        |
 | `harness_idiomaticity`                                                                                 | `minWorkflowsForReusableCheck` | `1` (always graded)                 | The workflow count at or above which the harness idiomaticity sensor grades the reusable-workflow signal for F5:T5. Below the declared threshold the signal is dropped from both the score and its denominator, not counted as missing, so a repository whose CI is too small to benefit from factoring out a reusable workflow is not graded against a shape it has not grown into. |
+| `plant_depth`                                                                                          | `excludeGlobs`                 | none (every `packages/*/src` file)  | Repository-relative file globs left out of the plant whose file sizes F2:T2 grades; `*` matches within one path segment and a `**` segment matches any number of segments. Declare a glob only for files that are derived rather than authored, such as a view generated from a law policy (an F4 artifact); the pass and review thresholds stay the same.                           |
 
 A kind that appears under `inputs` must declare at least one key. Kinds not listed above take
 no declared input, and naming one is refused as an undeclared key.
@@ -112,13 +113,17 @@ for the four test pattern sensors, `law/adr` and `law/invariants` for `spec_dept
 `scratch/coverage/rc/coverage-final.json` (the report the RC coverage gate writes) for
 `test_coverage_depth`, `tests/config/tsconfig.effects.json` for `action_effect_inference`,
 `pnpm run typecheck` (the workspace type check over its project references) for `type_check`,
-`test:perf` for `perf_test`, and `5` for `harness_idiomaticity`'s `minWorkflowsForReusableCheck`.
+`test:perf` for `perf_test`, `5` for `harness_idiomaticity`'s `minWorkflowsForReusableCheck`,
+and `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`.
 DEVAI's CI is three single-purpose workflows (`devai-ledger-verify`, `pull-request-checks`,
 `release`) that share their setup steps through a composite action, and none of them has a
 job the others would reuse; factoring one of the three out as a reusable workflow would not
 earn its keep at this size. Five is the point where it would, so below it the sensor drops
 the reusable-workflow signal instead of grading DEVAI's CI against a shape it has not grown
-into. The file is adopter-owned by the framework as its own adopter, so it differs from the
+into. The generated action registry view under `packages/cli/src/generated/` is rendered from
+`law/policy/action-registry.json` and checked against it, so it is a derived F4 artifact, not
+authored plant, and it stays out of the file sizes `plant_depth` grades. The file is
+adopter-owned by the framework as its own adopter, so it differs from the
 adopter default and is not bound by `check-policy-materialization`.
 
 DEVAI is a command-line framework with no routes, tables, or roles, and sixty-one registered
