@@ -1,6 +1,489 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.0.0",
-  "invariants": [],
+  "version": "1.1.0",
+  "invariants": [
+    {
+      "id": "INV-AUTH-001",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/authority-decision-contracts.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/authority-resource-boundaries.red.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/forbidden-role-paths.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-AUTH-002",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/authority-declaration-context.red.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/authority-runtime-helper-contracts.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/self-dogfood-policy.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-AUTH-003",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/effect-authorization-ledger.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/release-transition-authorization-boundaries.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "packages/schemas/tests/contract/governance-v15-authorization.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-AUTH-004",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/self-dogfood-policy.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/self-dogfood-depth.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "packages/schemas/tests/contract/governance-v15-self-dogfood.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-001",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/sense-run-readiness.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/init-interactive-no-tty.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-runner-preflight-blocked.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-002",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/unit/sensor-reading.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/readings-rebuild-depth.test.ts"
+        },
+        {
+          "suite": "int",
+          "path": "tests/integration/installed-inventory-api-sensor.integration.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-003",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-runner-async.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-runner.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/preflight-lane-parity.contract.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-004",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-cache-blocked-never-reusable.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-runner-preflight-blocked.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-005",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/triage-input-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/cli-shard06-control-facades.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-006",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/repository-backlog-store.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/backlog-actions.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-007",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/evidence/tests/unit/chain.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/evidence/tests/unit/verb-evidence.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-008",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/round-task-service-acceptance.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/rgr-persistence-boundaries.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-CORE-009",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/campaign-plan.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/round-task-service-acceptance.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/round-runner-independent-order.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DATA-001",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/data-handling-declaration.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/spec-substrate.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DATA-002",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/schemas/tests/unit/schema-layout.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/execution-surface-inventory-output.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DEVAI-001",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/invariant-validator.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/invariant-input-validity.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DEVAI-002",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/invariant-resolution.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/trace-validator.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/unit/trace-resolve.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DEVAI-003",
+      "tests": [
+        {
+          "suite": "int",
+          "path": "tests/integration/translation-validation.integration.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/invariant-resolution.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/rtd-manifest.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DEVAI-004",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/adr-input-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/adr-frontmatter.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DEVAI-005",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/commit-range-hygiene.contract.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/commit-grammar-hook.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-taxonomy-member.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-DEVAI-006",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/unit/test-weakening-evidence-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/unit/test-weakening-config.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-HARNESS-001",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/check-workflows-manifest.contract.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/toolchain-manifest.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/check-runner-toolchain-digest.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-HARNESS-002",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/adopter-policy-binding.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/doctor-adopter-policy-binding.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/authority-materialization-contracts.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-HARNESS-003",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/sensor-inputs.contract.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/declared-surfaces.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/sense-inputs-declaration.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-HARNESS-004",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/scorecard-inputs.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/scorecard.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-HARNESS-005",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/post-merge-auditor.test.ts"
+        },
+        {
+          "suite": "e2e",
+          "path": "tests/e2e/post-merge-auditor.e2e.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/governance-tracking.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-HARNESS-006",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/scorecard.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/scorecard-inventory-mapping.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/scorecard-aggregation-boundaries.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-PERF-001",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/targets-resolution.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/unit/perf-test-metric-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/sensors/tests/unit/mutation-wave8-perf-test.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-SEC-001",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/credential-scan.contract.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/check-workflows-credentials.contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/doctor-credential-probe.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/preflight-diagnostics-redaction.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "INV-SEC-002",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/release-lifecycle-execution.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/release-repository-identity.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/loop/tests/unit/release-publication-runtime-coverage.test.ts"
+        }
+      ]
+    }
+  ],
   "test_corpus": []
 }
