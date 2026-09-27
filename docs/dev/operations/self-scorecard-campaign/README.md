@@ -383,3 +383,28 @@ code change. Maintainer decisions on 2026-09-27:
    files outside the boundary.
 7. **The scorecard acceptance flag was wrong.** `audit scorecard` takes
    `--format human`, not `--human`; the ledger and prompt were corrected.
+
+The second inspector attempt at `58886e2f` (after CTG-0265) recorded the 49
+sweep readings and the four write-effect readings into the canonical store,
+then stopped again before committing, for reasons that belong to the tools,
+not to the substrate:
+
+8. **`audit observe` read the retired store.** The post-merge Auditor's
+   observation bundle loaded `record/proofs/freshness/readings`, so its
+   scorecard was 43 UNKNOWN while `audit scorecard` at the same head read
+   PASS 32, REVIEW 4, FAIL 3, UNKNOWN 3, N/A 3. Wave CTG-0266 routes the bundle
+   through the loop resolver.
+9. **The test sensors named suite configurations that do not exist.**
+   `unit_test`, `integration_test`, and `e2e_test` ran
+   `tests/config/t1.unit.config.ts` and siblings, so F3:T1 read FAIL by a
+   missing file. Wave CTG-0267 declares their argv as sensor inputs, the way
+   TASK-0264 did for `perf_test`.
+10. **`build` is not admitted by the broker** (`AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED`),
+    so F2:T4 and F2:T9 read UNKNOWN; `inventory_regeneration` touches no kinds
+    on a CLI, so F4:T9 reads REVIEW and F4:T4 UNKNOWN. Both stay follow-ups of
+    this round.
+11. **Nothing writes the scorecards directory.** `audit observe` persists the
+    observation under the ignored `.devai/state/audit-observations/<head>/` and
+    appends its evidence to `record/proofs/chain.json`. The inspector copies
+    the scorecard, assessment, and backlog to
+    `record/proofs/compliance/scorecards/` and commits them with the chain.
