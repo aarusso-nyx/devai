@@ -1,5 +1,5 @@
 import { platform } from 'node:os';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import type { CAC } from 'cac';
 import {
@@ -17,15 +17,12 @@ import { senseTestWeakening } from '@devai-nyx/sensors';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 import {
-  requireGit,
   safeRepoPath,
   type StateChange,
   type Execution,
   canonicalRef,
   type TranslationValidationOptions,
   json,
-  type TranslationWitness,
-  type TaskRecord,
   jsonAtCommit,
   type TraceRecord,
   registeredTraceRef,
@@ -48,6 +45,14 @@ import {
   stateChanges,
   LINUX_IMAGE,
 } from './translation-execution.js';
+import {
+  assertTranslationAncestry,
+  readTranslationTask,
+  readTranslationWitness,
+  translationDiffPaths,
+  translationOverlayPaths,
+} from './translation-preconditions.js';
+import { translationFrameVerdict, translationRunFrames } from './translation-run-frames.js';
 export type { TranslationValidationOptions } from './translation-support.js';
 
 export async function executeTranslationValidation(
@@ -58,25 +63,8 @@ export async function executeTranslationValidation(
   if (options.databaseUrl === undefined || options.databaseUrl.length === 0) {
     throw new Error('DATABASE_URL_REQUIRED');
   }
-  const witnessPath = resolve(repoRoot, options.witness);
-  const witnessRelative = relative(repoRoot, witnessPath);
-  if (witnessRelative.startsWith('..') || isAbsolute(witnessRelative)) {
-    throw new Error('WITNESS_PATH_OUTSIDE_REPOSITORY');
-  }
-  const rawWitness = json(witnessPath);
-  if (!validators.translationWitness(rawWitness)) {
-    throw new Error(
-      `TRANSLATION_WITNESS_INVALID: ${JSON.stringify(validators.translationWitness.errors ?? [])}`,
-    );
-  }
-  const witness = rawWitness as TranslationWitness;
-  const taskPath = resolve(repoRoot, `.devai/state/tasks/${witness.task_id}.json`);
-  const rawTask = json(taskPath);
-  if (!validators.task(rawTask)) throw new Error('TRANSLATION_TASK_INVALID');
-  const task = rawTask as TaskRecord;
-  if (task.id !== witness.task_id || task.discipline !== witness.frame.authority_role) {
-    throw new Error('TRANSLATION_TASK_AUTHORITY_MISMATCH');
-  }
+  const { rawWitness, witness } = readTranslationWitness(repoRoot, options.witness);
+  const task = readTranslationTask(repoRoot, witness);
   const taskScope = task.intent_diff?.planned_files ?? [];
   if (taskScope.length === 0) throw new Error('TRANSLATION_TASK_SCOPE_MISSING');
 
@@ -116,98 +104,9 @@ export async function executeTranslationValidation(
   if (!isDeepStrictEqual(recipeRecord.evidence?.translation_witness, rawWitness)) {
     throw new Error('TRANSLATION_RECIPE_RECORD_WITNESS_MISMATCH');
   }
-  requireGit(repoRoot, ['cat-file', '-e', `${witness.base_sha}^{commit}`], 'BASE_OBJECT_INVALID');
-  requireGit(
-    repoRoot,
-    ['cat-file', '-e', `${witness.candidate_sha}^{commit}`],
-    'CANDIDATE_OBJECT_INVALID',
-  );
-  if (witness.strategy === 'feature-overlay') {
-    if (witness.test_overlay_sha === undefined) throw new Error('TEST_OVERLAY_OBJECT_MISSING');
-    requireGit(
-      repoRoot,
-      ['cat-file', '-e', `${witness.test_overlay_sha}^{commit}`],
-      'TEST_OVERLAY_OBJECT_INVALID',
-    );
-    const parents = requireGit(
-      repoRoot,
-      ['rev-list', '--parents', '-n', '1', witness.test_overlay_sha],
-      'TEST_OVERLAY_PARENT_INVALID',
-    )
-      .split(' ')
-      .filter((parent) => parent.length > 0)
-      .slice(1);
-    if (parents.length !== 1 || parents[0] !== witness.base_sha) {
-      throw new Error('TEST_OVERLAY_PARENT_MISMATCH');
-    }
-    const ancestry = git(repoRoot, [
-      'merge-base',
-      '--is-ancestor',
-      witness.test_overlay_sha,
-      witness.candidate_sha,
-    ]);
-    if (ancestry.status !== 0) throw new Error('CANDIDATE_NOT_DESCENDANT_OF_TEST_OVERLAY');
-  } else {
-    const ancestry = git(repoRoot, [
-      'merge-base',
-      '--is-ancestor',
-      witness.base_sha,
-      witness.candidate_sha,
-    ]);
-    if (ancestry.status !== 0) throw new Error('CANDIDATE_NOT_DESCENDANT_OF_BASE');
-  }
-  const diffBase =
-    witness.strategy === 'feature-overlay'
-      ? (witness.test_overlay_sha as string)
-      : witness.base_sha;
-  const diffPaths = requireGit(
-    repoRoot,
-    ['diff', '--name-only', diffBase, witness.candidate_sha, '--'],
-    'VALIDATION_DIFF_FAILED',
-  )
-    .split('\n')
-    .filter((path) => path.length > 0);
-  let overlayPaths: readonly string[] = [];
-  if (witness.strategy === 'feature-overlay') {
-    const overlaySha = witness.test_overlay_sha as string;
-    overlayPaths = requireGit(
-      repoRoot,
-      ['diff', '--name-only', witness.base_sha, overlaySha, '--'],
-      'TEST_OVERLAY_DIFF_FAILED',
-    )
-      .split('\n')
-      .filter((path) => path.length > 0);
-    const citedPaths = new Set(refs.map((ref) => ref.path));
-    const registeredPaths = new Set(
-      trace.invariants
-        .filter((invariant) => implemented.has(invariant.id))
-        .flatMap((invariant) => invariant.tests.map((test) => test.path)),
-    );
-    if (
-      overlayPaths.length === 0 ||
-      overlayPaths.some((path) => !isTestPath(path) || !registeredPaths.has(path)) ||
-      [...citedPaths].some((path) => !overlayPaths.includes(path))
-    ) {
-      throw new Error('TEST_OVERLAY_SCOPE_INVALID');
-    }
-    const deleted = requireGit(
-      repoRoot,
-      ['diff', '--name-only', '--diff-filter=D', witness.base_sha, overlaySha, '--'],
-      'TEST_OVERLAY_DELETE_CHECK_FAILED',
-    );
-    if (deleted.length > 0) throw new Error('TEST_OVERLAY_DELETES_TEST');
-    const rawDiff = requireGit(
-      repoRoot,
-      ['diff', '--raw', '--no-abbrev', witness.base_sha, overlaySha, '--'],
-      'TEST_OVERLAY_MODE_CHECK_FAILED',
-    );
-    for (const line of rawDiff.split('\n').filter((entry) => entry.length > 0)) {
-      const modes = /^:\d{6} (\d{6}) [a-f0-9]{40} [a-f0-9]{40} [A-Z]\t/u.exec(line);
-      if (modes === null || !['100644', '100755'].includes(modes[1] ?? '')) {
-        throw new Error('TEST_OVERLAY_FILE_MODE_INVALID');
-      }
-    }
-  }
+  assertTranslationAncestry(repoRoot, witness);
+  const diffPaths = translationDiffPaths(repoRoot, witness);
+  const overlayPaths = translationOverlayPaths({ repoRoot, witness, refs, trace, implemented });
   const stateBefore = snapshotValidationState(repoRoot);
 
   const suffix = sha256({ witness: witness.id, started_at: startedAt, pid: process.pid }).slice(
@@ -432,43 +331,15 @@ export async function executeTranslationValidation(
     observed_state_changes: provisionalObserved,
     strategy_coverage: strategyCoverage,
   });
-  const extraFrames = [
-    effectiveInfrastructureFinding === undefined
-      ? { name: 'infrastructure', status: 'PASS' as const, evidence_refs: [] }
-      : {
-          name: 'infrastructure',
-          status: 'FAIL' as const,
-          evidence_refs: [],
-          finding: `Validation infrastructure failed: ${effectiveInfrastructureFinding}`,
-        },
-    networkDenialProven
-      ? { name: 'network-egress', status: 'PASS' as const, evidence_refs: [] }
-      : {
-          name: 'network-egress',
-          status: 'REVIEW' as const,
-          evidence_refs: [],
-          finding:
-            platform() !== 'linux'
-              ? 'Native isolation is best-effort; network denial is not proven.'
-              : isolationAttempts === 0
-                ? 'Registered execution did not reach the Linux isolation boundary.'
-                : 'Linux isolation proof is unavailable because validation infrastructure failed.',
-        },
-    worktreeCleanup && databaseCleanup
-      ? { name: 'cleanup', status: 'PASS' as const, evidence_refs: [] }
-      : {
-          name: 'cleanup',
-          status: 'FAIL' as const,
-          evidence_refs: [],
-          finding: 'Exact worktree or database cleanup could not be verified.',
-        },
-  ];
+  const extraFrames = translationRunFrames({
+    effectiveInfrastructureFinding,
+    networkDenialProven,
+    isolationAttempts,
+    worktreeCleanup,
+    databaseCleanup,
+  });
   const preliminaryFrameSet = [...preliminaryFrames.frames, ...extraFrames];
-  const preliminaryVerdict = preliminaryFrameSet.some((frame) => frame.status === 'FAIL')
-    ? 'FAIL'
-    : preliminaryFrameSet.some((frame) => frame.status === 'REVIEW')
-      ? 'REVIEW'
-      : 'PASS';
+  const preliminaryVerdict = translationFrameVerdict(preliminaryFrameSet);
   const evidence = appendVerbEvidence({
     repoRoot,
     action: 'verify.translation',
@@ -516,11 +387,7 @@ export async function executeTranslationValidation(
     strategy_coverage: strategyCoverage,
   });
   const frames = [...frameEvaluation.frames, ...extraFrames];
-  const verdict = frames.some((frame) => frame.status === 'FAIL')
-    ? 'FAIL'
-    : frames.some((frame) => frame.status === 'REVIEW')
-      ? 'REVIEW'
-      : 'PASS';
+  const verdict = translationFrameVerdict(frames);
   const expectedKeys = new Set(expected.map((change) => `${change.operation}:${change.path}`));
   const unexpected = observed.filter(
     (change) => !expectedKeys.has(`${change.operation}:${change.path}`),
