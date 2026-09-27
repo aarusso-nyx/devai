@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { SENSOR_READING_KINDS, type SensorKind } from '@devai-nyx/sensors';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { SENSE_SENSOR_ADAPTERS, sensorAdapter } from '../../src/commands/sense/adapters.js';
+import { resolveDeclaredSensorInputs } from '../../src/commands/sense/shared.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const LOCAL_READ_KINDS = [
@@ -65,7 +66,11 @@ describe('sense adapter acceptance', () => {
   it('executes the complete local read-safe adapter population without implicit persistence', async () => {
     const results = [];
     for (const kind of LOCAL_READ_KINDS) {
-      results.push(await withAuthorityHostTestScope(() => sensorAdapter(kind)({ repoRoot: ROOT })));
+      // Read-safe under the inputs the repository declares, as `sense run` calls the adapters.
+      const inputs = resolveDeclaredSensorInputs({ repoRoot: ROOT, sensorKind: kind });
+      results.push(
+        await withAuthorityHostTestScope(() => sensorAdapter(kind)({ repoRoot: ROOT, inputs })),
+      );
     }
     expect(results).toHaveLength(LOCAL_READ_KINDS.length);
     expect(results.map((reading) => reading.sensor.kind)).toEqual(LOCAL_READ_KINDS);
