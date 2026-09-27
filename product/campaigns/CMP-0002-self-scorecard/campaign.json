@@ -1,0 +1,1439 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "CMP-0002",
+  "title": "Self-scorecard",
+  "type": "campaign",
+  "status": "proposed",
+  "date": "2026-09-26",
+  "authority": "Architect",
+  "mandate": {
+    "kind": "maintainer-decision",
+    "ref": "docs/dev/operations/self-scorecard-campaign/README.md"
+  },
+  "goal": "Compute and persist the framework's own scorecard: admit self-sensing under declared roles, read one canonical readings store, declare the sensor inputs a CLI-shaped repository needs, author the specification substrate the spec sensors measure, reconcile the governance ledger sensors with second-generation decision records, and close with a committed scorecard in which every scoreable cell is PASS.",
+  "records": [
+    "ADR-SCR-0001",
+    "ADR-SCR-0002",
+    "ADR-SCR-0003",
+    "ADR-SCR-0004",
+    "ADR-SCR-0005",
+    "ADR-SCR-0006"
+  ],
+  "constraints": {
+    "self_dogfood": true,
+    "human_invoked_only": true,
+    "one_role_per_session": true,
+    "remote_effects": "forbidden"
+  },
+  "owner_effects": [
+    {
+      "id": "OE-01",
+      "description": "Repoint DEVAI_PROCESS_CONTROL_COMMIT to the merged head of R-0202 so the Pages provenance change is the approved process control before the next release.",
+      "required_before": "R-0206",
+      "performed_at": null
+    }
+  ],
+  "prompts": {
+    "preamble": "prompts/preamble.md"
+  },
+  "models": {
+    "schemaVersion": "1.0.0",
+    "hosts": ["claude", "codex"],
+    "tiers": {
+      "architect": {
+        "rank": 1,
+        "claude": "Fable 5.1",
+        "codex": "Astra 6",
+        "default_effort": "high",
+        "use_for": "orchestration, contracts, schemas, policy, decision records"
+      },
+      "worker-high": {
+        "rank": 2,
+        "claude": "Opus 5.5",
+        "codex": "Sol 6",
+        "default_effort": "high",
+        "use_for": "implementation across several modules, sensor and authority changes, tests of runtime semantics"
+      },
+      "worker": {
+        "rank": 3,
+        "claude": "Sonnet 5",
+        "codex": "Terra 6",
+        "default_effort": "medium",
+        "use_for": "bounded tests, documentation, single-module changes"
+      },
+      "clerk": {
+        "rank": 4,
+        "claude": "Haiku 4.5",
+        "codex": "Luna 6",
+        "default_effort": "low",
+        "use_for": "mechanical edits, regeneration, dependency bumps, formatting"
+      }
+    },
+    "escalation": {
+      "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+      "step": "one-rank-up",
+      "ceiling": "architect",
+      "authority": "orchestrator"
+    }
+  },
+  "rounds": [
+    {
+      "id": "R-0201",
+      "title": "Governance for self-sensing",
+      "goal": "The self-dogfood policy admits sensing and recording under declared roles, the scorecard reads one canonical readings store, and the N/A ledger states the scoreable cell count once.",
+      "status": "planned",
+      "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
+      "depends_on": [],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "test:cli"],
+      "waves": [
+        {
+          "id": "CTG-0211",
+          "title": "Self-sensing admission",
+          "type": "single-role",
+          "records": ["ADR-SCR-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/self-dogfood.json",
+            "law/schemas/self-dogfood-policy.schema.json",
+            "packages/cli/src/services/self-dogfood.ts"
+          ],
+          "gates": ["law:validate", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0211",
+              "title": "Admit sense run, sense record, and audit observe in the self-dogfood policy",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/self-dogfood.json",
+                  "law/schemas/self-dogfood-policy.schema.json",
+                  "packages/cli/src/services/self-dogfood.ts",
+                  "packages/cli/tests/unit/self-dogfood-policy.test.ts",
+                  "docs/dev/operations/self-scorecard-campaign/README.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/sensors/"]
+              },
+              "deliverables": [
+                "The policy names sense run with effect read for every role, sense record and audit observe with effect harness-write for the inspector only, and keeps remote-write forbidden in every row.",
+                "The schema rejects a row that admits sense record or audit observe with any effect other than harness-write.",
+                "The self-dogfood service refuses sense run --write from every role except the inspector and refuses any sense action that names --publish.",
+                "Unit tests cover admission, refusal, and the fail-closed remainder for the three actions."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/self-dogfood-policy.test.ts"
+                ]
+              ],
+              "commit_types": ["law(dogfood)", "feat(dogfood)", "test(dogfood)"],
+              "prompt": {
+                "path": "prompts/TASK-0211.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0212",
+          "title": "Canonical readings store and N/A ledger",
+          "type": "single-role",
+          "records": ["ADR-SCR-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/commands/audit/scorecard.ts",
+            "packages/loop/src/scorecard/",
+            "law/policy/scorecard-na.json",
+            ".devai/config/scorecard-na.json"
+          ],
+          "gates": ["law:validate", "test:cli", "test:loop"],
+          "tasks": [
+            {
+              "id": "TASK-0212",
+              "title": "Read one readings store from the scorecard facade and record F4:T5 in the N/A ledger",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F4", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/audit/scorecard.ts",
+                  "packages/loop/src/scorecard/inputs.ts",
+                  "packages/loop/src/loop/scorecard.ts",
+                  "law/policy/scorecard-na.json",
+                  "law/policy/adopter-defaults/scorecard-na.json",
+                  ".devai/config/scorecard-na.json",
+                  "docs/adopters/scorecard-na-overrides.md",
+                  "docs/theory/framework/scorecard.md",
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts",
+                  "packages/loop/tests/scorecard-inputs.test.ts"
+                ],
+                "forbidden": [".github/workflows/", "packages/sensors/"]
+              },
+              "deliverables": [
+                "audit scorecard reads readings through the loop input resolver, so the facade and the Auditor see the same store under .devai/state/sensor-readings.",
+                "The law N/A ledger lists F4:T5 with its Article 5 reason, the adopter default and the materialized copy carry the same entry, and the degenerate set in the loop is derived from the ledger rather than duplicated.",
+                "The scorecard theory page states the scoreable cell count for DEVAI as 43 and explains the two N/A cells.",
+                "Tests prove that a reading persisted through sense record is visible to audit scorecard and that the ledger is the only source of N/A cells."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts",
+                  "packages/loop/tests/scorecard-inputs.test.ts"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"]
+              ],
+              "commit_types": [
+                "law(scorecard)",
+                "refactor(scorecard)",
+                "test(scorecard)",
+                "docs(theory)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0212.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0202",
+      "title": "Sensor inputs for the framework repository",
+      "goal": "Every read-effect sensor that failed or reported review for a missing input runs against DEVAI with inputs declared in adopter configuration, and the harness sensors may call the GitHub CLI read-only.",
+      "status": "planned",
+      "records": ["ADR-SCR-0005", "ADR-SCR-0003"],
+      "depends_on": ["R-0201"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "test:cli", "test:sensors", "test:loop"],
+      "waves": [
+        {
+          "id": "CTG-0221",
+          "title": "Declared sensor inputs",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/sensor-inputs.schema.json",
+            ".devai/config/sensor-inputs.json",
+            "packages/cli/src/commands/sense/",
+            "packages/sensors/src/"
+          ],
+          "gates": ["schemas", "test:cli", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0221",
+              "title": "Declare the sensor inputs schema and the DEVAI inputs file",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-inputs.schema.json",
+                  "law/policy/adopter-defaults/sensor-inputs.json",
+                  ".devai/config/sensor-inputs.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": [
+                  ".github/workflows/",
+                  "packages/sensors/",
+                  "packages/cli/src/commands/sense/"
+                ]
+              },
+              "deliverables": [
+                "A schema mapping a sensor kind to its declared inputs: test roots, ADR directory, invariants directory, coverage path, effects tsconfig path, typecheck argv, performance script name.",
+                "DEVAI's own file declaring packages/*/tests and tests as test roots, law/adr as the ADR directory, the RC coverage summary path, tests/config/tsconfig.effects.json, the workspace typecheck argv, and test:perf.",
+                "An adopter default with the same shape and empty declarations.",
+                "The schema catalogued as a source-only schema and documented for adopters."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"]
+              ],
+              "commit_types": ["law(sensors)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0221.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0222",
+              "title": "Prove that declared inputs are honored and undeclared inputs are refused",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0221",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/sensors/src/"
+                ]
+              },
+              "deliverables": [
+                "Failing tests for each inspector acceptance item of ADR-SCR-0005: a declared test root is walked, a declared ADR directory is counted, a declared coverage path is read, a declared effects tsconfig is used, an undeclared key is refused with a structured error, and a declared path outside the repository is refused.",
+                "A contract test that DEVAI's own sensor-inputs.json validates and names only registered sensor kinds."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0222.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0223",
+              "title": "Merge declared inputs into sensor runs and honor them in the sensors",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0222",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/sense/shared.ts",
+                  "packages/cli/src/commands/sense/run-set.ts",
+                  "packages/cli/src/commands/sense/facade.ts",
+                  "packages/sensors/src/test-pattern-walker.ts",
+                  "packages/sensors/src/spec-depth.ts",
+                  "packages/sensors/src/test-coverage-depth.ts",
+                  "packages/sensors/src/action-effect-inference.ts",
+                  "packages/sensors/src/type-check.ts",
+                  "packages/sensors/src/perf-test.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "sense run resolves .devai/config/sensor-inputs.json, validates it, merges it under any explicit --input, and shows the effective inputs in --dry-run.",
+                "The test walker, spec depth, coverage depth, effect inference, type check, and perf test sensors consume their declared inputs instead of hardcoded defaults.",
+                "All tests from TASK-0222 pass and the sweep dry run lists the effective inputs per member."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/sense-inputs-declaration.test.ts",
+                  "packages/sensors/tests/declared-inputs.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:sensors",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "--preset",
+                  "sweep",
+                  "--round",
+                  "R-0206",
+                  "--repo-root",
+                  ".",
+                  "--dry-run",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0223.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0222",
+          "title": "Read-only GitHub CLI for harness sensors",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/authority/",
+            "packages/cli/src/services/check-runner/authority-process.ts",
+            "law/policy/authority-policy.json",
+            ".devai/config/authority-policy.json"
+          ],
+          "gates": ["test:authority", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0224",
+              "title": "Admit gh run list as a read-only host process for the harness sensors",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/authority/broker.ts",
+                  "packages/cli/src/services/check-runner/authority-process.ts",
+                  "law/policy/authority-policy.json",
+                  ".devai/config/authority-policy.json",
+                  "packages/cli/tests/unit/authority-host-process-read-only.test.ts",
+                  "packages/sensors/src/harness-green-main.ts",
+                  "packages/sensors/src/harness-performance.ts",
+                  "packages/sensors/src/harness-robustness.ts"
+                ],
+                "forbidden": [".github/workflows/"]
+              },
+              "deliverables": [
+                "The authority policy declares gh run list, with a fixed argv shape and --json, as a read-only process the broker admits without a host adapter, the same way preflight probes were admitted.",
+                "harness_green_main, harness_performance, and harness_robustness produce readings instead of AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED.",
+                "A test proves that gh with any mutating subcommand is still refused."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:authority",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/authority-host-process-read-only.test.ts"
+                ]
+              ],
+              "commit_types": ["law(authority)", "feat(authority)", "test(authority)"],
+              "prompt": {
+                "path": "prompts/TASK-0224.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0224",
+          "title": "Declared plant surfaces",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0003"],
+          "depends_on": ["CTG-0221"],
+          "lock_scopes": [
+            "law/schemas/sensor-inputs.schema.json",
+            ".devai/config/sensor-inputs.json",
+            "packages/loop/src/loop/scorecard.ts",
+            "packages/sensors/src/"
+          ],
+          "gates": ["schemas", "test:loop", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0226",
+              "title": "Declare plant surfaces and the skipped-reading rule for absent surfaces",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F4", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-inputs.schema.json",
+                  ".devai/config/sensor-inputs.json",
+                  "law/policy/adopter-defaults/sensor-inputs.json",
+                  "packages/loop/src/loop/scorecard.ts",
+                  "docs/theory/framework/scorecard.md",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/sensors/"]
+              },
+              "deliverables": [
+                "The sensor inputs schema gains a surfaces declaration: http, database, rbac, and actions, each true or false, with DEVAI declaring only actions.",
+                "The scorecard composer ignores skipped readings when a cell has any measured reading, and records a cell with only skipped readings as N/A with the declaration as its reason, never as UNKNOWN or REVIEW.",
+                "The theory page and the adopter guide state the rule and the resulting DEVAI grid."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "exec", "vitest", "run", "packages/loop/tests/scorecard.test.ts"],
+                ["node", "scripts/check-policy-materialization.mjs"]
+              ],
+              "commit_types": [
+                "law(sensors)",
+                "feat(scorecard)",
+                "test(scorecard)",
+                "docs(theory)",
+                "docs(adopters)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0226.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0227",
+              "title": "Prove that absent surfaces skip and present surfaces still measure",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0226",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/tests/declared-surfaces.test.ts",
+                  "tests/contract/declared-surfaces.contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/"
+                ]
+              },
+              "deliverables": [
+                "Tests that every inventory and plant sensor emits skipped with the declaration reason when its surface is declared absent, and emits a measured reading when the surface is declared present, using fixtures for both a CLI-shaped and a service-shaped repository.",
+                "A contract test that plant_coverage and inventory_coverage measure the action registry when actions is the only declared surface and report pass on a fixture mirroring DEVAI."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/sensors/tests/declared-surfaces.test.ts",
+                  "tests/contract/declared-surfaces.contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0227.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0228",
+              "title": "Make the inventory and plant sensors honor declared surfaces and measure the action registry",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0227",
+              "status": "planned",
+              "target_substrates": ["F2", "F4"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/src/inventory-api.ts",
+                  "packages/sensors/src/inventory-routes.ts",
+                  "packages/sensors/src/inventory-data-model.ts",
+                  "packages/sensors/src/inventory-rbac.ts",
+                  "packages/sensors/src/inventory-data-handling.ts",
+                  "packages/sensors/src/inventory-coverage.ts",
+                  "packages/sensors/src/plant-coverage.ts",
+                  "packages/sensors/src/inventory-performance.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "Each inventory and plant sensor reads the surfaces declaration, emits skipped with the reason for an absent surface, and emits a review finding when the declaration contradicts what it finds.",
+                "plant_coverage and inventory_coverage count action registry entries against their spec links when actions is declared, so F2:T1 and F4:T2 measure DEVAI.",
+                "All tests from TASK-0227 pass and the sweep dry run shows the surfaces per member."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/sensors/tests/declared-surfaces.test.ts",
+                  "tests/contract/declared-surfaces.contract.test.ts"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:sensors",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "--preset",
+                  "sweep",
+                  "--round",
+                  "R-0206",
+                  "--repo-root",
+                  ".",
+                  "--dry-run",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0228.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0223",
+          "title": "Pages provenance message",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": [
+            "scripts/process/publish-pages.mjs",
+            "scripts/process/pages-publication.mjs",
+            "packages/sensors/src/site-drift.ts"
+          ],
+          "gates": ["test:root", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0225",
+              "title": "Publish Pages with the provenance message the site drift sensor verifies",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "scripts/process/pages-publication.mjs",
+                  "packages/sensors/src/site-drift.ts",
+                  "tests/contract/github-pages-journal.test.ts",
+                  "packages/sensors/tests/site-drift.test.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The Pages publication path records the provenance message docs: publish from <40-hex-sha> so site_drift can verify the published tip, or the sensor reads the provenance the publication path already writes; one of the two, decided by the sensor note.",
+                "site_drift reports pass against the currently published site once the next publication lands, and unknown with a precise finding before."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/github-pages-journal.test.ts",
+                  "packages/sensors/tests/site-drift.test.ts"
+                ]
+              ],
+              "commit_types": ["ci(release)", "fix(sensors)", "test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0225.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0203",
+      "title": "Specification substrate",
+      "goal": "The framework's reference signal exists as records: invariants derived from the constitution and accepted decisions, a threat model, a data handling declaration, and performance and robustness targets, each traceable to tests.",
+      "status": "planned",
+      "records": ["ADR-SCR-0004"],
+      "depends_on": ["R-0201"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "test:spec"],
+      "waves": [
+        {
+          "id": "CTG-0231",
+          "title": "Invariants, threat model, and targets",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0004"],
+          "depends_on": [],
+          "lock_scopes": ["law/invariants/", "law/trace.json", "law/security/", "law/targets/"],
+          "gates": ["law:validate", "test:spec"],
+          "tasks": [
+            {
+              "id": "TASK-0231",
+              "title": "Author the invariant records, the threat model, and the target declarations",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/invariants/",
+                  "law/security/threat-model.json",
+                  "law/security/data-handling.json",
+                  "law/targets/performance.json",
+                  "law/targets/robustness.json",
+                  "law/schemas/threat-model.schema.json",
+                  "law/schemas/data-handling.schema.json",
+                  "law/schemas/targets.schema.json",
+                  "packages/cli/src/commands/check/schemas.ts"
+                ],
+                "forbidden": [".github/workflows/", "packages/sensors/", "tests/"]
+              },
+              "deliverables": [
+                "One invariant record per constitutional obligation that a sensor or test can measure, validated by law/schemas/invariant.schema.json, with severity from the readiness-bearing set where the constitution says so.",
+                "A threat model naming the trust boundaries the authority broker, the evidence transport, and the release workflow defend, and a data handling declaration stating that the repository stores no personal data.",
+                "Performance targets for the check runner, the sweep, and the RC, and robustness targets for the error contract, each with a measurable statement.",
+                "Schemas for the three new record kinds, catalogued as source-only."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "law:validate",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(invariants)", "law(security)", "law(targets)"],
+              "prompt": {
+                "path": "prompts/TASK-0231.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "max",
+                "time_budget_minutes": 240
+              }
+            },
+            {
+              "id": "TASK-0232",
+              "title": "Prove that every invariant resolves to a test and every target to a sensor",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0231",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/invariant-resolution.contract.test.ts",
+                  "tests/contract/targets-resolution.contract.test.ts",
+                  "packages/sensors/tests/spec-substrate.test.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/", "packages/sensors/src/"]
+              },
+              "deliverables": [
+                "A contract test that every invariant id appears in law/trace.json with at least one existing test path, and that every readiness-bearing invariant is referenced by a test.",
+                "A contract test that every performance and robustness target names a sensor kind from the registry and a threshold the sensor emits as a metric.",
+                "Sensor tests asserting spec_depth, spec_alignment, spec_security_coverage, spec_performance_targets, and spec_robustness_targets read the new records and report pass on a fixture mirroring DEVAI."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/invariant-resolution.contract.test.ts",
+                  "tests/contract/targets-resolution.contract.test.ts",
+                  "packages/sensors/tests/spec-substrate.test.ts"
+                ]
+              ],
+              "commit_types": ["test(spec)"],
+              "prompt": {
+                "path": "prompts/TASK-0232.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0233",
+              "title": "Link tests to invariants in the trace and align the spec sensors with the record layout",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0232",
+              "status": "planned",
+              "target_substrates": ["F1", "F3"],
+              "boundary": {
+                "paths": [
+                  "law/trace.json",
+                  "packages/sensors/src/spec-security-coverage.ts",
+                  "packages/sensors/src/spec-performance-targets.ts",
+                  "packages/sensors/src/spec-robustness-targets.ts",
+                  "packages/sensors/src/test-invariant-alignment.ts",
+                  "packages/sensors/src/harness-invariant-alignment.ts",
+                  "packages/cli/tests/",
+                  "tests/contract/"
+                ],
+                "forbidden": [
+                  ".github/workflows/",
+                  "law/invariants/",
+                  "law/security/",
+                  "law/targets/"
+                ]
+              },
+              "deliverables": [
+                "law/trace.json maps every invariant to the tests that observe it; tests gain invariant references where the trace needs them.",
+                "The five spec sensors and the two invariant alignment sensors read the record layout from TASK-0231 rather than guessing file names.",
+                "All tests from TASK-0232 pass and the sweep dry run shows the spec sensors with their declared inputs."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/invariant-resolution.contract.test.ts",
+                  "tests/contract/targets-resolution.contract.test.ts",
+                  "packages/sensors/tests/spec-substrate.test.ts"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:spec",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:sensors",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(trace)", "feat(sensors)", "test(spec)"],
+              "prompt": {
+                "path": "prompts/TASK-0233.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0204",
+      "title": "Governance ledger sensors on ADR v2",
+      "goal": "The decision record integrity and citation resolution sensors validate the second-generation decision records and report zero findings on main.",
+      "status": "planned",
+      "records": ["ADR-SCR-0006"],
+      "depends_on": ["R-0201"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "test:loop"],
+      "waves": [
+        {
+          "id": "CTG-0241",
+          "title": "Ledger sensor reconciliation",
+          "type": "single-role",
+          "records": ["ADR-SCR-0006"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/loop/src/governance-ledger/",
+            "law/schemas/adr.schema.json",
+            "law/schemas/invariant.schema.json",
+            "packages/loop/src/loop/scorecard.ts"
+          ],
+          "gates": ["law:validate", "test:loop"],
+          "tasks": [
+            {
+              "id": "TASK-0241",
+              "title": "Validate decision records against the v2 schema and resolve the five stale citations",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F1"],
+              "boundary": {
+                "paths": [
+                  "packages/loop/src/governance-ledger/index.ts",
+                  "packages/loop/tests/governance-ledger.test.ts",
+                  "law/schemas/adr.schema.json",
+                  "law/schemas/invariant.schema.json",
+                  "packages/loop/src/loop/scorecard.ts",
+                  "law/adr/README.md"
+                ],
+                "forbidden": [".github/workflows/", "law/adr/ADR-"]
+              },
+              "deliverables": [
+                "decision_record_integrity validates each record against law/schemas/adr-v2.schema.json, treats proposed, accepted, rejected, and superseded as the lifecycle, and checks supersession symmetry through the supersedes array alone.",
+                "decision_citation_resolution resolves scoped ids; the legacy citations ADR-001 and ADR-003 in the two schemas and DII-103 and DII-104 in scorecard.ts are replaced by resolvable references or removed with a comment naming the replacement.",
+                "Both sensors report zero findings on the merged head, proven by a test that runs them against the repository."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "exec", "vitest", "run", "packages/loop/tests/governance-ledger.test.ts"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "law:validate",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["fix(loop)", "test(loop)", "law(schemas)", "docs(law)"],
+              "prompt": {
+                "path": "prompts/TASK-0241.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0205",
+      "title": "Plant and observation hygiene",
+      "goal": "The dependency audit is clean, tests are classified so the security, performance, and robustness coverage sensors count them, the largest plant files are within depth thresholds, and the workflows satisfy the harness idiomaticity sensor.",
+      "status": "planned",
+      "records": ["ADR-SCR-0004", "ADR-SCR-0005"],
+      "depends_on": ["R-0202", "R-0203"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["test:local-full", "release:static-integrity"],
+      "waves": [
+        {
+          "id": "CTG-0251",
+          "title": "Dependency audit",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": ["package.json", "pnpm-lock.yaml", "packages/*/package.json"],
+          "gates": ["build", "test:local-full"],
+          "tasks": [
+            {
+              "id": "TASK-0251",
+              "title": "Clear the high-severity audit finding",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2"],
+              "boundary": {
+                "paths": [
+                  "package.json",
+                  "pnpm-lock.yaml",
+                  "packages/cli/package.json",
+                  "packages/loop/package.json",
+                  "packages/sensors/package.json"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/", "packages/*/src/"]
+              },
+              "deliverables": [
+                "pnpm audit reports zero high or critical findings; moderate findings are listed in the report with their advisories.",
+                "The workspace builds and the local full suite passes after the bump."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "audit", "--audit-level", "high"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "build",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:local-full",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["build(deps)"],
+              "prompt": {
+                "path": "prompts/TASK-0251.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "clerk",
+                "effort": "low",
+                "time_budget_minutes": 45
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0252",
+          "title": "Test classification",
+          "type": "single-role",
+          "records": ["ADR-SCR-0004"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/*/tests/",
+            "tests/",
+            "packages/sensors/src/test-pattern-walker.ts"
+          ],
+          "gates": ["test:sensors", "test:local-full"],
+          "tasks": [
+            {
+              "id": "TASK-0252",
+              "title": "Classify security, performance, and robustness tests so the coverage sensors count them",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/",
+                  "packages/authority/tests/",
+                  "packages/loop/tests/",
+                  "tests/contract/",
+                  "tests/e2e/",
+                  "packages/sensors/src/test-security-coverage.ts",
+                  "packages/sensors/src/test-performance-coverage.ts",
+                  "packages/sensors/src/test-robustness-coverage.ts",
+                  "docs/dev/testing.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The three coverage sensors document the classification they count (file name segment or describe prefix) and DEVAI's existing authority, forbidden-action, and error-contract tests carry it.",
+                "test_security_coverage, test_performance_coverage, and test_robustness_coverage report pass in the sweep against the merged head.",
+                "The testing guide states the classification convention."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:sensors",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "--preset",
+                  "sweep",
+                  "--round",
+                  "R-0206",
+                  "--repo-root",
+                  ".",
+                  "--dry-run",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["test(classification)", "docs(dev)", "fix(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0252.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0253",
+          "title": "Plant depth",
+          "type": "single-role",
+          "records": ["ADR-SCR-0004"],
+          "depends_on": [],
+          "lock_scopes": ["packages/cli/src/", "packages/loop/src/", "packages/sensors/src/"],
+          "gates": ["test:local-full"],
+          "tasks": [
+            {
+              "id": "TASK-0253",
+              "title": "Split the plant files above the depth threshold",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/",
+                  "packages/loop/src/",
+                  "packages/sensors/src/",
+                  "packages/cli/tests/",
+                  "packages/loop/tests/"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "Every file the plant_depth sensor flags is split along existing module seams with no behavior change, and plant_depth reports pass in the sweep.",
+                "The local full suite and typecheck pass."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "typecheck",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "test:local-full",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "--preset",
+                  "sweep",
+                  "--round",
+                  "R-0206",
+                  "--repo-root",
+                  ".",
+                  "--dry-run",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["refactor(plant)"],
+              "prompt": {
+                "path": "prompts/TASK-0253.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0254",
+          "title": "Harness idiomaticity",
+          "type": "single-role",
+          "records": ["ADR-SCR-0005"],
+          "depends_on": [],
+          "lock_scopes": [".github/workflows/", "scripts/check-workflows.mjs"],
+          "gates": ["test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0254",
+              "title": "Bring the workflows to the harness coherence and idiomaticity thresholds",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/pull-request-checks.yml",
+                  ".github/workflows/release.yml",
+                  ".github/workflows/devai-ledger-verify.yml",
+                  ".github/actions/",
+                  "scripts/check-workflows.mjs",
+                  "tests/contract/workflow-shape.contract.test.ts"
+                ],
+                "forbidden": ["law/", "product/", "packages/"]
+              },
+              "deliverables": [
+                "harness_coherence and harness_idiomaticity report pass: shared setup steps are a composite action, dependency caching is present, and concurrency and permissions blocks are uniform.",
+                "The workflow checker keeps every pin and the secret bijection intact."
+              ],
+              "acceptance_commands": [
+                ["node", "scripts/check-workflows.mjs"],
+                ["pnpm", "exec", "vitest", "run", "tests/contract/workflow-shape.contract.test.ts"]
+              ],
+              "commit_types": ["ci(workflows)", "test(workflows)"],
+              "prompt": {
+                "path": "prompts/TASK-0254.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0206",
+      "title": "Persist readings and the first scorecard",
+      "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed with every scoreable cell at PASS.",
+      "status": "planned",
+      "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
+      "depends_on": ["R-0204", "R-0205"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "release:static-integrity", "docs:validate"],
+      "waves": [
+        {
+          "id": "CTG-0261",
+          "title": "Record and audit",
+          "type": "single-role",
+          "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            ".devai/state/sensor-readings/",
+            "record/proofs/compliance/scorecards/",
+            "record/derived/inventory/"
+          ],
+          "gates": ["law:validate", "docs:validate"],
+          "tasks": [
+            {
+              "id": "TASK-0261",
+              "title": "Record the sweep, observe the head, and commit the first scorecard",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F4", "F5"],
+              "boundary": {
+                "paths": [
+                  ".devai/state/sensor-readings/",
+                  "record/proofs/compliance/scorecards/",
+                  "record/derived/inventory/",
+                  "docs/dev/operations/self-scorecard-campaign/README.md",
+                  "docs/theory/framework/scorecard.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "law/"]
+              },
+              "deliverables": [
+                "Readings for every sweep member recorded through sense record under the inspector role with write consent, plus the build, unit, integration, and e2e readings and the regenerated inventory.",
+                "audit observe at the exact merged head writes the scorecard, assessment, and backlog under record/, and audit scorecard --at that head reports overall PASS with 43 PASS and 2 N/A.",
+                "The campaign guide records the scorecard id, the head, and the command sequence; the theory page links the first record."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "audit",
+                  "scorecard",
+                  "--repo-root",
+                  ".",
+                  "--at",
+                  "HEAD_SHA",
+                  "--human"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs:validate",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["plan(scorecard)", "docs(dev)"],
+              "prompt": {
+                "path": "prompts/TASK-0261.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
