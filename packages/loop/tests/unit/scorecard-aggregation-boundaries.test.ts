@@ -34,7 +34,8 @@ const pairs: ReadonlyArray<
   readonly [SensorReading['status'], SensorReading['status'], CellVerdict]
 > = [
   ['unknown', 'pass', 'UNKNOWN'],
-  ['skipped', 'pass', 'UNKNOWN'],
+  // ADR-SCR-0003: a skipped reading beside a measured reading is ignored.
+  ['skipped', 'pass', 'PASS'],
   ['pass', 'pass', 'PASS'],
   ['pass', 'review', 'REVIEW'],
   ['unknown', 'review', 'REVIEW'],
