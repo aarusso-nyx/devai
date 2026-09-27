@@ -277,3 +277,71 @@ it('an unavailable OIDC token fails before any durable intent or Pages POST', as
   expect(f.calls.every((call) => call.method === 'GET')).toBe(true);
   expect(f.deployments).toHaveLength(0);
 });
+
+/**
+ * ADR-SCR-0005 IA-005: the site_drift sensor (packages/sensors/src/site-drift.ts)
+ * reads published-source provenance through a read-only `gh api` GitHub
+ * deployments read for environment devai-pages-publication, rather than
+ * requiring a `docs: publish from <sha>` gh-pages branch commit the Pages
+ * deployment API path never writes. It filters the deployment and status
+ * records this journal writes to exactly this shape; this test pins the
+ * journal's real output against that filter so the two paths cannot silently
+ * diverge.
+ */
+function selectSiteDriftProvenance(
+  deployments: readonly Record<string, unknown>[],
+  statuses: readonly Record<string, unknown>[],
+): { readonly commit: string; readonly tag: string; readonly intentId: string } | undefined {
+  const matchedDeployment = deployments.find(
+    (deployment) =>
+      deployment.environment === environment &&
+      deployment.task === 'devai:pages-publication' &&
+      (deployment.payload as Record<string, unknown> | undefined)?.kind ===
+        'devai-pages-publication-intent' &&
+      (deployment.payload as Record<string, unknown>).schemaVersion === '1.0.0' &&
+      ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+        ?.repository === identity.repository &&
+      typeof ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+        .commit === 'string' &&
+      ((deployment.payload as Record<string, unknown>).identity as Record<string, unknown>)
+        .commit === deployment.sha,
+  );
+  if (matchedDeployment === undefined) return undefined;
+  const verified = statuses.find(
+    (status) =>
+      status.environment === environment &&
+      status.state === 'success' &&
+      typeof status.description === 'string' &&
+      /^devai-pages:verified:[A-Za-z0-9_-]{1,100}$/.test(status.description),
+  );
+  if (verified === undefined) return undefined;
+  const matchedIdentity = (matchedDeployment.payload as Record<string, unknown>).identity as Record<
+    string,
+    unknown
+  >;
+  return {
+    commit: matchedIdentity.commit as string,
+    tag: matchedIdentity.tag as string,
+    intentId: String(matchedDeployment.id),
+  };
+}
+
+it('journals a verified deployment record the site_drift sensor can read as published-source provenance', async () => {
+  const f = fixture();
+  expect(await publishPages(f.args)).toMatchObject({ outcome: 'verified' });
+
+  const provenance = selectSiteDriftProvenance(f.deployments, f.statuses);
+  expect(provenance).toEqual({
+    commit: identity.commit,
+    tag: identity.tag,
+    intentId: String(f.deployments[0]?.id),
+  });
+});
+
+it('leaves no site_drift-readable provenance for a submitted-but-unverified intent', async () => {
+  const f = fixture();
+  f.setPagesState('deployment_failed');
+  await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+
+  expect(selectSiteDriftProvenance(f.deployments, f.statuses)).toBeUndefined();
+});
