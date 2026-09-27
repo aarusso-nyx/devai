@@ -1,16 +1,9 @@
 import { spawnSync } from '@devai-nyx/authority';
-import {
-  computeScorecard,
-  loadReadingsFromDir,
-  loadScorecardFailureMaxAgeMs,
-  loadScorecardNaConfig,
-  resolveScorecardNaPath,
-  scorecardNaCellSet,
-} from '@devai-nyx/loop';
+import { resolveScorecardInputs } from '@devai-nyx/loop';
 import { validators } from '@devai-nyx/schemas';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import type { CAC } from 'cac';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { defineCommand } from '../../define-command.js';
 
 interface AuditScorecardOptions {
@@ -29,7 +22,14 @@ function git(repoRoot: string, args: readonly string[], code: string): string {
   return result.stdout.trim();
 }
 
-/** Compute the exact-HEAD scorecard without persisting any audit or evidence artifact. */
+/**
+ * Compute the exact-HEAD scorecard without persisting any audit or evidence artifact.
+ *
+ * Readings come from the one readings store (ADR-SCR-0002): the facade calls the loop
+ * input resolver, which walks `.devai/state/sensor-readings` (where `sense record`
+ * persists) and applies the repository N/A ledger, so the on-demand scorecard is the
+ * same read the Auditor performs. The facade reads no other store.
+ */
 export const auditScorecard = defineCommand({
   name: 'audit scorecard',
   description: 'Compute the deterministic scorecard for the exact current repository commit.',
@@ -60,13 +60,11 @@ export const auditScorecard = defineCommand({
             ['show', '-s', '--format=%cI', options.at],
             'AUDIT_SCORECARD_TIMESTAMP_UNAVAILABLE',
           );
-          const readings = loadReadingsFromDir(join(repoRoot, 'record/proofs/freshness/readings'));
-          const scorecard = computeScorecard({
+          const { scorecard } = resolveScorecardInputs({
+            repoRoot,
+            inputs: undefined,
             timestamp,
             integrationHead: options.at,
-            readings,
-            naCells: scorecardNaCellSet(loadScorecardNaConfig(resolveScorecardNaPath(repoRoot))),
-            staleFailAfterMs: loadScorecardFailureMaxAgeMs(repoRoot),
           });
           if (!validators.scorecard(scorecard)) {
             throw new Error(
