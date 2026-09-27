@@ -78,7 +78,9 @@ describe('DEVAI sensor inputs declaration', () => {
     expect(declaration.inputs['action_effect_inference']).toEqual({
       tsconfigPath: 'tests/config/tsconfig.effects.json',
     });
-    expect(declaration.inputs['type_check']).toEqual({ argv: ['pnpm', 'run', 'typecheck'] });
+    expect(declaration.inputs['type_check']).toEqual({
+      argv: ['npx', 'tsc', '--noEmit', '-p', 'tsconfig.typecheck.json'],
+    });
   });
 
   it('declares directories and projects that exist inside the repository', () => {
@@ -108,13 +110,18 @@ describe('DEVAI sensor inputs declaration', () => {
     }
   });
 
-  it('declares a type check argv that names an existing root script', () => {
+  it('declares a type check argv that names an existing typecheck project', () => {
     const argv = declaration.inputs['type_check']?.['argv'] as string[];
-    const scripts = readJson<{ readonly scripts: Readonly<Record<string, string>> }>(
-      resolve(ROOT, 'package.json'),
-    ).scripts;
-    expect(argv.slice(0, 2)).toEqual(['pnpm', 'run']);
-    expect(Object.keys(scripts)).toContain(argv[2]);
+    expect(argv.slice(0, 4)).toEqual(['npx', 'tsc', '--noEmit', '-p']);
+    expect(existsSync(resolve(ROOT, argv[4] as string))).toBe(true);
+  });
+
+  it('declares a performance argv whose vitest configuration and scope exist', () => {
+    const argv = declaration.inputs['perf_test']?.['argv'] as string[];
+    expect(argv.slice(0, 3)).toEqual(['pnpm', 'vitest', 'run']);
+    const config = argv[argv.indexOf('--config') + 1] as string;
+    expect(existsSync(resolve(ROOT, config))).toBe(true);
+    expect(statSync(resolve(ROOT, argv[argv.length - 1] as string)).isDirectory()).toBe(true);
   });
 });
 
