@@ -29,5 +29,11 @@
     "perf_test": {
       "scriptName": "test:perf"
     }
+  },
+  "surfaces": {
+    "http": false,
+    "database": false,
+    "rbac": false,
+    "actions": true
   }
 }
