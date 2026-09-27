@@ -9,6 +9,15 @@ vi.mock('../../src/commands/sense/adapters.js', () => ({
 }));
 
 const { senseRunSetCmd } = await import('../../src/commands/sense/run-set.js');
+const { declareSelfDogfoodInvocation } = await import('../../src/services/self-dogfood.js');
+
+const ENGINEER = {
+  role: 'engineer',
+  human_invoked: true,
+  declaration_source: 'cli-flag',
+  write_consent: false,
+  publish: false,
+} as const;
 
 // ADR-SCR-0005: the repository root declares a type_check argv in
 // .devai/config/sensor-inputs.json, so it reaches the adapter and the dry run.
@@ -93,9 +102,13 @@ async function invoke(
 
 beforeEach(() => {
   mocks.sensorAdapter.mockReset();
+  // The default root is the framework checkout: ADR-SCR-0001 admits a
+  // read-effect sense run for a declared role.
+  declareSelfDogfoodInvocation(ENGINEER);
 });
 
 afterEach(() => {
+  declareSelfDogfoodInvocation(undefined);
   process.exitCode = originalExitCode;
   process.stdout.write = originalStdout;
   process.stderr.write = originalStderr;
@@ -135,6 +148,21 @@ describe('CLI shard 09 sense run set command', () => {
           ...member,
           effective_inputs: DECLARED_TYPE_CHECK_INPUTS,
         })),
+        self_dogfood: {
+          applies: true,
+          policy: 'law/policy/self-dogfood.json',
+          action_id: 'sense run',
+          declared_role: 'engineer',
+          write_consent: false,
+          decision: {
+            ok: true,
+            check_id: 'sense run',
+            role: 'engineer',
+            effect: 'read',
+            produces_readiness_claim: false,
+            grants_publication_authority: false,
+          },
+        },
       })}\n`,
       stderr: '',
       exit: 0,
