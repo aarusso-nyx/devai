@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-AUTH-002",
+  "domain": "AUTH",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "governance",
+  "title": "One declared role per session, never inferred or elevated",
+  "statement": "Every governed action MUST identify exactly one caller-declared constitutional role, MUST ignore ambient role or session state for authorization, and MUST refuse rather than elevate when the declared role initiates an action reserved to another role.",
+  "rationale": "Articles 7 and 10 make the role declaration the only source of authority and forbid one discipline from setting its own reference and actuating against it.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "e2e"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-7-human-roles"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-10-authority-separation-in-a-single-loop-iteration"
+      },
+      {
+        "doc": "law/adr/ADR-GOV-0002-constrained-self-dogfood.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-GOV-0002"]
+  },
+  "scope": {
+    "components": ["authority-broker", "task-lifecycle"],
+    "code_areas": ["packages/authority/src/**", "packages/cli/src/commands/task/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["authority", "role-declaration", "non-elevation", "article-7", "article-10"],
+  "measurable_via": ["task start", "task status", "task finish"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

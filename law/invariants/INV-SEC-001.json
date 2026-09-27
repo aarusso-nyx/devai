@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-SEC-001",
+  "domain": "SEC",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "security",
+  "title": "Credentials are declared by requirement and never read, printed, or committed",
+  "statement": "Every workflow secret reference MUST appear in the credential requirements manifest, every credential probe MUST report presence, absence, insufficient scope, or expiry without emitting any substring of the value, redacted diagnostics MUST NOT leak a raw observed value, and a literal token shape in any committed configuration MUST fail the repository-wide scan.",
+  "rationale": "ADR-SEC-0001 and ADR-CHK-0001 keep credential values out of every file, log, and diagnostic; a leak through diagnostics is the same breach as a committed token.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "sec"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-41-evidence"
+      },
+      {
+        "doc": "law/adr/ADR-SEC-0001-credential-requirements-manifest.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-CHK-0001-preflight-probes-as-dag-nodes.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-SEC-0001", "ADR-CHK-0001"]
+  },
+  "scope": {
+    "components": ["credential-probe", "evidence-redaction", "workflow-checker"],
+    "code_areas": [
+      "packages/cli/src/services/credential-probe.ts",
+      "packages/utils/src/redact.ts",
+      "packages/cli/src/commands/evidence/**",
+      "scripts/check-workflows.mjs"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["credentials", "redaction", "secrets-scan", "article-41"],
+  "measurable_via": ["evidence redact", "evidence render", "evidence collect", "doctor"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

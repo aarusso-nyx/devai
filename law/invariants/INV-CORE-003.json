@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-003",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "governance",
+  "title": "The hard gate is deterministic and fully green before a merge",
+  "statement": "The pre-merge hard gate MUST require type-check clean, lint clean on errors, a successful build, every assigned test passing, contract validation with byte-identical regeneration, and inventory regeneration without error, and a merge MUST be blocked while any member fails.",
+  "rationale": "Article 17 makes the hard gate the deterministic component of the error signal and declares it non-negotiable.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "e2e"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-17-hard-gate"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-16-cycles"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["check-runner"],
+    "code_areas": ["packages/cli/src/commands/check/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["hard-gate", "pre-merge", "deterministic", "article-17", "article-16"],
+  "measurable_via": ["check"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

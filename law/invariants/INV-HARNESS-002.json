@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-002",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "Materialized policy copies are written only by init bind or init apply and equal their law source",
+  "statement": "Every file under .devai/config/ and .devai/pin/ MUST be written only through a registered init bind or init apply action materialized from its canonical package or policy source, MUST equal the law source it mirrors, and a checker MUST NOT write its own inputs.",
+  "rationale": "Article 6 forbids a checker from writing its inputs; ADR-SCR-0002 and ADR-CFG-0001 make the materialized copy a derived view of law.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-6-substrate-authority-by-path"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-40-constitution-changes"
+      },
+      {
+        "doc": "law/adr/ADR-SCR-0002-one-readings-store-and-the-na-ledger.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-SCR-0002"]
+  },
+  "scope": {
+    "components": ["init", "policy-materialization"],
+    "code_areas": [
+      "packages/cli/src/commands/init/**",
+      "packages/cli/src/services/adopter-policy.ts",
+      "scripts/check-policy-materialization.mjs"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["materialization", "init-bind", "policy-copy", "article-6", "article-40"],
+  "measurable_via": [
+    "init bind",
+    "init apply architect",
+    "init apply harness",
+    "init apply owner",
+    "check"
+  ],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

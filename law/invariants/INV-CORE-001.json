@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-001",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "error_semantics",
+  "title": "Every failure is a closed error envelope and an error is never a verdict",
+  "statement": "Every failure the runtime reports MUST be an error envelope validating against law/schemas/error.schema.json with a code, a class, an exit code, and a message, and a crash, timeout, missing input, or infrastructure failure MUST NOT manufacture a PASS, a FAIL, or a readiness claim.",
+  "rationale": "Article 41 separates a failure to observe from an observation. The error contract is the one shape every package uses to say so.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "e2e"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-41-evidence"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-39-explicit-uncertainty-over-false-precision"
+      },
+      {
+        "doc": "law/adr/ADR-CHK-0001-preflight-probes-as-dag-nodes.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-CHK-0001"]
+  },
+  "scope": {
+    "components": ["error-contract", "cli-runtime", "sensors", "loop"],
+    "code_areas": ["packages/*/src/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["error-contract", "fail-closed", "no-synthetic-verdict", "article-41", "article-39"],
+  "measurable_via": ["check", "doctor", "catalog actions"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

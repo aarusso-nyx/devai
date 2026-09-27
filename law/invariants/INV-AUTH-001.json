@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-AUTH-001",
+  "domain": "AUTH",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "governance",
+  "title": "Substrate authority is enforced by path prefix before mutation",
+  "statement": "Every write performed through the DEVAI runtime MUST be decided by a fixed path prefix of at most two segments against the declared role, and a write whose prefix is not authorized for that role MUST be refused before any mutation, with zero exemptions and no wildcard remainder.",
+  "rationale": "Article 6 makes authority a table lookup on the filesystem path. A default remainder or an exemption would turn the authority boundary into advisory metadata.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "e2e"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-6-substrate-authority-by-path"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-9-authority-chain"
+      },
+      {
+        "doc": "law/adr/ADR-AUT-0001-exact-effect-authorization-ledger.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-AUT-0001"]
+  },
+  "scope": {
+    "components": ["authority-broker", "cli-runtime"],
+    "code_areas": ["packages/authority/src/**", "packages/cli/src/authority/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["authority", "path-prefix", "fail-closed", "article-6", "article-9"],
+  "measurable_via": [
+    "init bind",
+    "init apply architect",
+    "init apply owner",
+    "init apply harness",
+    "init plan"
+  ],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-004",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "One readings store feeds the scorecard and one ledger declares N/A cells",
+  "statement": "A reading persisted by sense record MUST be visible to audit scorecard at the same head without any copy or rebuild step, a recorded reading MUST carry the declaring role and the human invocation, every N/A cell MUST come from the single ledger with a reason and lie inside the declared grid, and a cell whose readings are all skipped MUST be recorded as N/A with the declaration reason.",
+  "rationale": "Articles 33 and 36 make the scorecard a state estimate over one evidence store; ADR-SCR-0001, ADR-SCR-0002, and ADR-SCR-0003 fix the store and the ledger.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-33-auditor-as-state-estimator"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-5-transversal-properties"
+      },
+      {
+        "doc": "law/adr/ADR-SCR-0002-one-readings-store-and-the-na-ledger.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-SCR-0001-self-sensing-under-declared-roles.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-SCR-0003-declared-plant-surfaces.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-SCR-0002", "ADR-SCR-0001", "ADR-SCR-0003"]
+  },
+  "scope": {
+    "components": ["readings-store", "scorecard", "na-ledger"],
+    "code_areas": [
+      "packages/loop/src/scorecard/**",
+      "packages/cli/src/commands/audit/**",
+      "packages/cli/src/commands/sense/**"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["readings-store", "na-ledger", "scorecard", "article-33", "article-5"],
+  "measurable_via": ["sense record", "audit scorecard", "audit observe"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

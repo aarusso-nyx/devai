@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-002",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "api_contract",
+  "title": "Every executable sensor emits a normalized SensorReading",
+  "statement": "Every executable sensor MUST emit its output through the SensorReading schema with status, evidence path, timestamp, command, command hash, failure mode, and optional structured findings, so that scorecard composition is polymorphic over sensor kinds.",
+  "rationale": "Article 32 makes the reading contract the only interface between sensors and the scorecard.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-32-sensor-adapter-uniformity"
+      },
+      {
+        "doc": "law/adr/ADR-SCR-0001-self-sensing-under-declared-roles.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-SCR-0001"]
+  },
+  "scope": {
+    "components": ["sensors", "sense-runtime"],
+    "code_areas": ["packages/sensors/src/**", "packages/cli/src/commands/sense/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["sensor-reading", "uniformity", "article-32"],
+  "measurable_via": ["sense run", "sense inventory", "sense migrate"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-AUTH-003",
+  "domain": "AUTH",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "security",
+  "title": "A remote-write effect consumes exactly one exact Owner authorization",
+  "statement": "Every remote-write effect MUST consume exactly one unexpired, unrevoked Owner authorization whose action, effect, resource, repository, candidate, consuming role, and consent equal the invocation; a replayed, mismatched, cross-role, or glob-widened authorization MUST be denied, and an absent, gapped, or digest-broken ledger MUST deny every authorization it holds.",
+  "rationale": "ADR-AUT-0001 binds publication to a one-time exact grant. Possession of authorization bytes is not authority, and absence of a ledger is a failure to observe, never an absence of restriction (Article 41).",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "sec"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-9-authority-chain"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-41-evidence"
+      },
+      {
+        "doc": "law/adr/ADR-AUT-0001-exact-effect-authorization-ledger.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-AUT-0001"]
+  },
+  "scope": {
+    "components": ["authority-broker", "effect-ledger", "release-lifecycle"],
+    "code_areas": ["packages/authority/src/**", "packages/cli/src/commands/release/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["authorization", "ledger", "one-time", "remote-write", "article-9", "article-41"],
+  "measurable_via": ["release publish", "release evidence-publish"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}
