@@ -9,6 +9,13 @@ import { countPatternMatches } from './test-pattern-walker.js';
 /**
  * Inventory sensor: test robustness coverage (F3 × T8). Phase 27.L.
  * Per design note at docs/theory/architecture/sensors/test_robustness_coverage.md.
+ *
+ * Classification convention (see docs/dev/testing.md): a test file is counted as a
+ * robustness observation when its path or content matches one of the DEFAULT_PATTERNS
+ * words below. The deliberate, authored classification is the bare word `robust`, which
+ * matches either a `<name>.robust.test.ts` filename segment or a `robust:` prefix on a
+ * `describe` title, for tests whose path cannot be renamed because law/trace.json names
+ * it.
  */
 
 export interface TestRobustnessCoverageOptions {
@@ -20,6 +27,7 @@ export interface TestRobustnessCoverageOptions {
 }
 
 const DEFAULT_PATTERNS = [
+  'robust',
   'throws',
   'reject',
   'toThrow',

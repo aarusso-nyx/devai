@@ -9,6 +9,13 @@ import { countPatternMatches } from './test-pattern-walker.js';
 /**
  * Inventory sensor: test performance coverage (F3 × T7). Phase 27.K.
  * Per design note at docs/theory/architecture/sensors/test_performance_coverage.md.
+ *
+ * Classification convention (see docs/dev/testing.md): a test file is counted as a
+ * performance observation when its path or content matches one of the DEFAULT_PATTERNS
+ * words below. The deliberate, authored classification is the bare word `perf`, already
+ * present below, which matches either a `<name>.perf.test.ts` filename segment or a
+ * `perf:` prefix on a `describe` title, for tests whose path cannot be renamed because
+ * law/trace.json names it.
  */
 
 export interface TestPerformanceCoverageOptions {
