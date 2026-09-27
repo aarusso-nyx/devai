@@ -153,6 +153,31 @@ prohibit update/deletion of `v*` tags, require signed annotated release tags, pr
 release and Pages environments, and select GitHub Actions as the Pages source. None of those
 settings is changed by the source workflow itself.
 
+## Publish the documentation site without a release
+
+A change that touches only the documentation site, with no semantic or product
+effect, may reach the live site without a version, tag, or rehearsal
+([ADR-REL-0029](../../../law/adr/ADR-REL-0029-site-only-pages-publication.md)).
+The `site-publish.yml` workflow runs only on an explicit `workflow_dispatch` from
+`main`; it has no inputs and reads no repository secret or variable. Its single
+`publish-site` job checks out the dispatched commit without persisted credentials,
+binds the source ref, commit, and tree, then runs `npm --prefix docs/site ci`, the
+site `security:check`, `typecheck`, and `build`, and verifies the local bytes before
+uploading the exact Pages artifact.
+
+Deployment goes through `scripts/process/publish-site.mjs`, which records a
+site-only identity in the same Pages journal the release path uses and shares the
+`devai-pages-publication` concurrency group, so a site-only publication and a
+release deploy never interleave. A site-only publication requires a verified
+release deployment already in the journal, and any submitted but unverified
+publication of either mode blocks the other until it is resolved. The job retains
+its publication record for 30 days and verifies the live bytes after deployment.
+
+The Owner dispatches with `gh workflow run site-publish.yml --ref main` and approves
+the pending `github-pages` environment deployment. That environment's deployment
+branch policy must admit `main`. Use a release instead whenever the change alters
+product behavior, policy, schemas, or package contents.
+
 ## Installed host publication controls
 
 The 1.5 installed host runner exposes the existing `release evidence-publish` and
