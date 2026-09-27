@@ -1600,7 +1600,7 @@
     {
       "id": "R-0206",
       "title": "Persist readings and the first scorecard",
-      "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed with every scoreable cell at PASS.",
+      "goal": "The inspector records a full sweep, the Auditor observes the merged head, and the first compliance scorecard for the framework is committed as measured: every cell carries its reading's verdict, N/A comes only from the ledger and from surfaces declared absent, and every non-PASS cell is recorded with its finding as a follow-up.",
       "status": "open",
       "records": ["ADR-SCR-0001", "ADR-SCR-0002", "ADR-SCR-0005", "ADR-SCR-0003"],
       "depends_on": ["R-0204", "R-0205"],
@@ -1858,11 +1858,96 @@
           ]
         },
         {
+          "id": "CTG-0265",
+          "title": "Canonical readings store for the consuming sensors",
+          "type": "single-role",
+          "records": ["ADR-SCR-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/sensors/src/inventory-performance.ts",
+            "packages/sensors/src/harness-invariant-alignment.ts"
+          ],
+          "gates": ["test:sensors", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0265",
+              "title": "Point the readings-consuming sensors at the canonical sensor-readings store",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "in_progress",
+              "target_substrates": ["F4", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/src/inventory-performance.ts",
+                  "packages/sensors/src/harness-invariant-alignment.ts",
+                  "packages/sensors/src/harness-invariant-alignment-evidence.ts",
+                  "packages/sensors/tests/declared-surfaces.test.ts",
+                  "packages/sensors/tests/unit/mutation-wave2-alignment.test.ts",
+                  "packages/sensors/tests/unit/harness-alignment-receipt-boundaries.test.ts",
+                  "packages/sensors/tests/unit/inventory-performance-evidence-boundaries.test.ts",
+                  "packages/sensors/tests/unit/inventory-sensor-cases.ts",
+                  "packages/sensors/tests/unit/alignment-candidate-binding.test.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "docs/theory/architecture/sensors/"
+                ],
+                "forbidden": [
+                  "law/",
+                  ".github/workflows/",
+                  "packages/loop/",
+                  "packages/cli/src/commands/sense/record.ts"
+                ]
+              },
+              "deliverables": [
+                "inventory_performance and harness_invariant_alignment read .devai/state/sensor-readings by default, matching the loop resolver, with the explicit overrides preserved.",
+                "The sensors suites are green with fixtures on the canonical path; the sensor docs name the canonical store.",
+                "On the framework repository with recorded readings, inventory_performance no longer reports \"No sensor-readings directory\"."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:cli"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "inventory_performance",
+                  "--repo-root",
+                  ".",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(sensors)", "test(sensors)", "docs(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0265.md",
+                "sha256": "ed1778350b1972a9e6482a9d6c573563050d226cd5271bdbe1893044a1921af2"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        },
+        {
           "id": "CTG-0261",
           "title": "Record and audit",
           "type": "single-role",
           "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
-          "depends_on": ["CTG-0262", "CTG-0263", "CTG-0264"],
+          "depends_on": ["CTG-0262", "CTG-0263", "CTG-0264", "CTG-0265"],
           "lock_scopes": [
             ".devai/state/sensor-readings/",
             "record/proofs/compliance/scorecards/",
@@ -1876,7 +1961,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "planned",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
@@ -1890,7 +1975,7 @@
               },
               "deliverables": [
                 "Readings for every sweep member recorded through sense record under the inspector role with write consent, plus the build, unit, integration, and e2e readings and the regenerated inventory.",
-                "audit observe at the exact merged head writes the scorecard, assessment, and backlog under record/, and audit scorecard --at that head reports overall PASS with 43 PASS and 2 N/A.",
+                "audit observe at the exact merged head writes the scorecard, assessment, and backlog under record/, and audit scorecard --at that head reports the measured verdicts: N/A only from the ledger (F1:T1, F4:T5) and from surfaces declared absent, every other cell carrying its reading, with each non-PASS cell and its finding listed in the campaign guide as a follow-up.",
                 "The campaign guide records the scorecard id, the head, and the command sequence; the theory page links the first record."
               ],
               "acceptance_commands": [
@@ -1919,7 +2004,7 @@
               "commit_types": ["plan(scorecard)", "docs(dev)"],
               "prompt": {
                 "path": "prompts/TASK-0261.md",
-                "sha256": "e75d3b8eb29881b15908d43b41c4c86af0dbd2133e6c527bb09389dec7be339e"
+                "sha256": "97d1ccb627629e9c4a86600fbdb2f2895900b5e5637acc52458736c50a53b37f"
               },
               "pull_request": null,
               "merged_as": null,
