@@ -26,6 +26,11 @@ globalThis.fetch = async (input, options = {}) => {
     return Response.json(state.deployments);
   if (method === 'GET' && url.pathname === `${root}/deployments/9/statuses`)
     return Response.json(state.statuses);
+  // Optional read-only status histories for seeded journal deployments (e.g. a
+  // verified release baseline under a site-only publication).
+  const seeded = new RegExp(`^${root}/deployments/([1-9][0-9]*)/statuses$`, 'u').exec(url.pathname);
+  if (method === 'GET' && seeded && state.seededStatuses?.[seeded[1]])
+    return Response.json(state.seededStatuses[seeded[1]]);
   if (method === 'GET' && url.pathname === `${root}/pages/deployments/pages-17`) {
     state.live = true;
     save();
