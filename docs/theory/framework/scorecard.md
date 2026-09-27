@@ -104,6 +104,10 @@ scorecard consumer resolves readings from that directory through the loop input 
 inspector records is visible to the on-demand scorecard at the same head without any copy or
 rebuild step.
 
+The first scorecard recorded this way is
+[SC-20260927T205906-001](../../../record/proofs/compliance/scorecards/SC-20260927T205906-001.json),
+observed on DEVAI's own main branch in round R-0206.
+
 ## Hard gate (Article 17)
 
 The hard gate is the deterministic component of error _Error(0)_. It comprises:
