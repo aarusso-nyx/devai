@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "inputs": {
+    "test_security_coverage": {
+      "testGlobs": ["packages/*/tests", "tests"]
+    },
+    "test_performance_coverage": {
+      "testGlobs": ["packages/*/tests", "tests"]
+    },
+    "test_robustness_coverage": {
+      "testGlobs": ["packages/*/tests", "tests"]
+    },
+    "test_idiomaticity": {
+      "testGlobs": ["packages/*/tests", "tests"]
+    },
+    "spec_depth": {
+      "adrDir": "law/adr",
+      "invariantsDir": "law/invariants"
+    },
+    "test_coverage_depth": {
+      "coveragePath": "scratch/coverage/rc/coverage-final.json"
+    },
+    "action_effect_inference": {
+      "tsconfigPath": "tests/config/tsconfig.effects.json"
+    },
+    "type_check": {
+      "argv": ["pnpm", "run", "typecheck"]
+    },
+    "perf_test": {
+      "scriptName": "test:perf"
+    }
+  }
+}
