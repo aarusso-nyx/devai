@@ -10,6 +10,8 @@ export const RELEASE_WORKFLOW_FILE = 'release.yml';
 // Required own-repository non-attesting preflight lane. Contract:
 // docs/dev/operations/remote-preflight-contract.md
 export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
+// ADR-REL-0029: the site-only Pages publication lane, dispatched from main.
+export const SITE_WORKFLOW_FILE = 'site-publish.yml';
 // Toolchain identity is owned by the adopter manifest (ADR-CHK-0002). The
 // exported pin constants below are derived from this repository's manifest at
 // load time; checkWorkflowTree(root) compares each workflow against the
@@ -410,7 +412,12 @@ export function checkWorkflowTree(root = process.cwd()) {
   const findings = [];
   const pins = rootPins(root, findings);
   const files = workflowFiles(root);
-  const required = [LEDGER_WORKFLOW_FILE, RELEASE_WORKFLOW_FILE, PREFLIGHT_WORKFLOW_FILE].sort();
+  const required = [
+    LEDGER_WORKFLOW_FILE,
+    RELEASE_WORKFLOW_FILE,
+    PREFLIGHT_WORKFLOW_FILE,
+    SITE_WORKFLOW_FILE,
+  ].sort();
   const permitted = required;
   const missing = required.filter((name) => !files.includes(name));
   const unexpected = files.filter((name) => !permitted.includes(name));
@@ -572,6 +579,10 @@ function checkWorkflow(file, source, findings, pins) {
   }
   if (file === PREFLIGHT_WORKFLOW_FILE) {
     checkPreflightWorkflow(file, workflow, source, findings, pins);
+    return;
+  }
+  if (file === SITE_WORKFLOW_FILE) {
+    checkSiteWorkflow(file, workflow, source, findings);
     return;
   }
   if (file !== LEDGER_WORKFLOW_FILE) {
@@ -1074,6 +1085,201 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         );
       }
     }
+  }
+}
+
+const SITE_JOB = 'publish-site';
+const SITE_MAIN_CONDITION =
+  "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}";
+const SITE_BUILD_LINES = [
+  'npm --prefix docs/site ci',
+  'npm --prefix docs/site run security:check',
+  'npm --prefix docs/site run typecheck',
+  'npm --prefix docs/site run build',
+  'node scripts/process/verify-pages-bytes.mjs local docs/site/build',
+];
+const SITE_PUBLISH_COMMAND =
+  'node scripts/process/publish-site.mjs docs/site/build site-publication-record';
+const SITE_PUBLISH_ENVIRONMENT = {
+  GH_TOKEN: '${{ github.token }}',
+  PAGES_ARTIFACT_ID: '${{ steps.pages-artifact.outputs.artifact_id }}',
+  SOURCE_TREE: '${{ steps.source.outputs.tree }}',
+};
+const SITE_LIVE_VERIFY_LINE = 'node scripts/process/verify-pages-bytes.mjs live docs/site/build';
+
+function runLines(step) {
+  return String(step.run ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
+
+/**
+ * ADR-REL-0029: the site-only Pages lane builds the documentation site from
+ * the dispatched main commit and publishes it through the same single-writer
+ * journal and concurrency group as the release deploy. It takes no input, reads
+ * no secret or variable, and never uses the upstream deploy action.
+ */
+function checkSiteWorkflow(file, workflow, source, findings) {
+  const triggers = object(workflow.on);
+  if (
+    JSON.stringify(Object.keys(triggers)) !== JSON.stringify(['workflow_dispatch']) ||
+    Object.keys(object(triggers.workflow_dispatch)).length !== 0
+  ) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_TRIGGER_INVALID',
+        file,
+        'site publication accepts workflow_dispatch only, with no inputs',
+      ),
+    );
+  }
+  const permissions = object(workflow.permissions);
+  if (Object.keys(permissions).length !== 1 || permissions.contents !== 'read') {
+    findings.push(
+      finding('CI_WORKFLOW_PERMISSIONS_INVALID', file, 'only contents: read is permitted'),
+    );
+  }
+  const concurrency = object(workflow.concurrency);
+  if (
+    Object.keys(concurrency).length !== 2 ||
+    concurrency.group !== 'devai-pages-publication' ||
+    concurrency['cancel-in-progress'] !== false
+  ) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_CONCURRENCY_INVALID',
+        file,
+        'site publication must share group devai-pages-publication with cancel-in-progress: false',
+      ),
+    );
+  }
+  const jobs = object(workflow.jobs);
+  if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify([SITE_JOB])) {
+    findings.push(
+      finding('SITE_WORKFLOW_JOB_SET_INVALID', file, `exactly one job ${SITE_JOB} is permitted`),
+    );
+  }
+  const job = object(jobs[SITE_JOB]);
+  const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+  const checkouts = steps.filter(
+    (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
+  );
+  const identity = steps.find((step) => step.id === 'source');
+  const identityLines = identity === undefined ? [] : runLines(identity);
+  if (
+    job.if !== SITE_MAIN_CONDITION ||
+    checkouts.length !== 1 ||
+    object(checkouts[0].with).ref !== '${{ github.sha }}' ||
+    object(checkouts[0].with)['persist-credentials'] !== false ||
+    object(checkouts[0].with).repository !== undefined ||
+    !identityLines.includes('test "$GITHUB_REF" = refs/heads/main') ||
+    !identityLines.includes('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"')
+  ) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_MAIN_GUARD_MISSING',
+        file,
+        'publish-site must run only for a main dispatch and bind the checkout to github.sha',
+      ),
+    );
+  }
+  const environment = object(job.environment);
+  if (
+    environment.name !== 'github-pages' ||
+    environment.url !== '${{ steps.deployment.outputs.page_url }}' ||
+    JSON.stringify(object(job.permissions)) !==
+      JSON.stringify({
+        contents: 'read',
+        pages: 'write',
+        deployments: 'write',
+        'id-token': 'write',
+      })
+  ) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_ENVIRONMENT_INVALID',
+        file,
+        'publish-site must use environment github-pages with contents read and pages, deployments, id-token write',
+      ),
+    );
+  }
+  const buildStep = steps.find((step) =>
+    runLines(step).includes('npm --prefix docs/site run build'),
+  );
+  const buildLines = buildStep === undefined ? [] : runLines(buildStep);
+  const buildIndexes = SITE_BUILD_LINES.map((line) => buildLines.indexOf(line));
+  if (
+    buildIndexes.some((index) => index < 0) ||
+    buildIndexes.some((index, position) => position > 0 && index <= buildIndexes[position - 1])
+  ) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_BUILD_REQUIRED',
+        file,
+        `the site build step must run in order: ${SITE_BUILD_LINES.join('; ')}`,
+      ),
+    );
+  }
+  const deployment = steps.filter((step) => step.id === 'deployment');
+  const pagesArtifact = steps.find((step) => step.id === 'pages-artifact');
+  const retain = steps.find((step) => step.name === 'Retain site publication identifiers');
+  const liveVerify = steps.find((step) => step.name === 'Verify live documentation');
+  const deploymentEnvironment = object(deployment[0]?.env);
+  if (
+    deployment.length !== 1 ||
+    deployment[0].run !== SITE_PUBLISH_COMMAND ||
+    deployment[0].if !== undefined ||
+    JSON.stringify(Object.keys(deploymentEnvironment).sort()) !==
+      JSON.stringify(Object.keys(SITE_PUBLISH_ENVIRONMENT).sort()) ||
+    !Object.entries(SITE_PUBLISH_ENVIRONMENT).every(
+      ([key, value]) => deploymentEnvironment[key] === value,
+    ) ||
+    typeof pagesArtifact?.uses !== 'string' ||
+    !pagesArtifact.uses.startsWith('actions/upload-pages-artifact@') ||
+    object(pagesArtifact.with).path !== 'docs/site/build' ||
+    object(pagesArtifact.with).name !== 'github-pages-${{ github.run_attempt }}' ||
+    object(pagesArtifact.with)['retention-days'] !== 30 ||
+    retain?.if !== '${{ always() }}' ||
+    typeof retain?.uses !== 'string' ||
+    !retain.uses.startsWith('actions/upload-artifact@') ||
+    object(retain.with).path !== 'site-publication-record/*' ||
+    object(retain.with)['retention-days'] !== 30 ||
+    liveVerify === undefined ||
+    !runLines(liveVerify).includes(SITE_LIVE_VERIFY_LINE) ||
+    steps.some(
+      (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/deploy-pages@'),
+    )
+  ) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_PUBLISH_STEP_UNBOUND',
+        file,
+        'site publication requires the journal-bound deployment step, the exact Pages artifact, retained identifiers and live verification',
+      ),
+    );
+  }
+  for (const [index, step] of steps.entries()) {
+    const uses = typeof step.uses === 'string' ? step.uses : '';
+    if (uses === '' || uses === SHARED_SETUP_ACTION) continue;
+    if (uses.startsWith('./') || !/@[0-9a-f]{40}$/u.test(uses)) {
+      findings.push(
+        finding(
+          'CI_ACTION_REFERENCE_MUTABLE',
+          file,
+          `jobs.${SITE_JOB}.steps[${String(index)}] uses ${uses}`,
+        ),
+      );
+    }
+  }
+  if (/\bsecrets\s*[.[]/u.test(source) || /\bvars\s*\./u.test(source)) {
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_PROTECTED_INPUT_FORBIDDEN',
+        file,
+        'site publication must not read repository secrets or variables',
+      ),
+    );
   }
 }
 

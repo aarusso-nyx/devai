@@ -1,0 +1,88 @@
+name: DEVAI site publication
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: devai-pages-publication
+  cancel-in-progress: false
+jobs:
+  publish-site:
+    name: Publish the documentation site from main
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: write
+      deployments: write
+      id-token: write
+    steps:
+      - name: Check out the dispatched main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: ./.github/actions/setup-node-toolchain
+      - name: Bind source identity
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          printf 'tree=%s\n' "$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: Build and verify the documentation site
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix docs/site ci
+          npm --prefix docs/site run security:check
+          npm --prefix docs/site run typecheck
+          npm --prefix docs/site run build
+          node scripts/process/verify-pages-bytes.mjs local docs/site/build
+      - name: Upload exact Pages artifact
+        id: pages-artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
+        with:
+          path: docs/site/build
+          name: github-pages-${{ github.run_attempt }}
+          retention-days: 30
+      - name: Reconcile and deploy exact Pages artifact
+        id: deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}
+          SOURCE_TREE: ${{ steps.source.outputs.tree }}
+        run: node scripts/process/publish-site.mjs docs/site/build site-publication-record
+      - name: Retain site publication identifiers
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-site-publication-${{ github.run_attempt }}
+          path: site-publication-record/*
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Verify live documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='https://aarusso-nyx.github.io/devai/'
+          expected="$(sha256sum docs/site/build/index.html | cut -d ' ' -f 1)"
+          for attempt in {1..12}; do
+            if live="$(curl --fail --location --silent --show-error "${root}index.html?commit=${GITHUB_SHA}&attempt=$attempt" | sha256sum | cut -d ' ' -f 1)" &&
+              test "$live" = "$expected"; then
+              printf '%s\n' "$expected"
+              break
+            fi
+            if test "$attempt" -eq 12; then
+              echo "Published documentation did not serve index.html $expected after 12 attempts." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          node scripts/process/verify-pages-bytes.mjs live docs/site/build
