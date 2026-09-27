@@ -5,7 +5,13 @@ import type { CAC } from 'cac';
 import { validators } from '@devai-nyx/schemas';
 import { isSensorKind, type SensorReading } from '@devai-nyx/sensors';
 import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
+import { declaredInvocationAuthority } from '../../authority/index.js';
 import { defineCommand } from '../../define-command.js';
+import {
+  gateSelfDogfoodCommand,
+  resolveSelfDogfoodDeclaration,
+  selfDogfoodRefusal,
+} from '../../services/self-dogfood.js';
 import { rebuildSensorReadings } from './readings-rebuild.js';
 
 interface RecordOptions {
@@ -76,13 +82,34 @@ export const senseRecordCmd = defineCommand({
           return;
         }
         const repoRoot = resolve(options.repoRoot ?? '.');
+        // ADR-SCR-0001: on the framework repository only the inspector, with
+        // write consent, records readings, and every reading it records carries
+        // the declaring role and the human invocation. Refused before any write.
+        const declaration = resolveSelfDogfoodDeclaration(declaredInvocationAuthority());
+        const attribution = {
+          declaring_role: declaration?.role,
+          human_invocation:
+            declaration?.human_invoked === true ? declaration.declaration_source : undefined,
+        };
+        const selfDogfood = gateSelfDogfoodCommand({
+          repoRoot,
+          action_id: 'sense record',
+          declaration,
+          reading: attribution,
+        });
+        if (selfDogfood.applies && !selfDogfood.decision.ok) {
+          process.stderr.write(selfDogfoodRefusal(selfDogfood));
+          process.exitCode = EXIT_USAGE;
+          return;
+        }
+        const attributed = selfDogfood.applies ? { attribution } : {};
         try {
           if (options.rebuild === true) {
             const result = rebuildSensorReadings(repoRoot);
             process.stdout.write(
               options.human === true
                 ? `devai sense record --rebuild: ${result.reading.status.toUpperCase()} created=${String(result.report.created)} skipped=${String(result.report.skipped)}\n`
-                : `${JSON.stringify(result)}\n`,
+                : `${JSON.stringify({ ...result, ...attributed })}\n`,
             );
             process.exitCode =
               result.reading.status === 'pass'
@@ -96,7 +123,7 @@ export const senseRecordCmd = defineCommand({
           process.stdout.write(
             options.human === true
               ? `devai sense record: ${result.action} ${result.path}\n`
-              : `${JSON.stringify(result)}\n`,
+              : `${JSON.stringify({ ...result, ...attributed })}\n`,
           );
           process.exitCode = EXIT_PASS;
         } catch (error) {

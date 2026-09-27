@@ -5,7 +5,13 @@ import { trackGovernanceEvent } from '@devai-nyx/loop';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import type { CAC } from 'cac';
 import { resolve } from 'node:path';
+import { declaredInvocationAuthority } from '../../authority/index.js';
 import { defineCommand } from '../../define-command.js';
+import {
+  gateSelfDogfoodCommand,
+  resolveSelfDogfoodDeclaration,
+  selfDogfoodRefusal,
+} from '../../services/self-dogfood.js';
 
 /**
  * Exact tree of a commit. A commit SHA is not a tree SHA, so an unresolvable
@@ -53,6 +59,19 @@ export const auditObserve = defineCommand({
           return;
         }
         const repoRoot = resolve(options.repoRoot ?? process.cwd());
+        // ADR-SCR-0001: on the framework repository an observation is a
+        // harness-write the matrix admits for the inspector with write consent
+        // only. Refused before any artifact or evidence is written.
+        const selfDogfood = gateSelfDogfoodCommand({
+          repoRoot,
+          action_id: 'audit observe',
+          declaration: resolveSelfDogfoodDeclaration(declaredInvocationAuthority()),
+        });
+        if (selfDogfood.applies && !selfDogfood.decision.ok) {
+          process.stderr.write(selfDogfoodRefusal(selfDogfood));
+          process.exitCode = EXIT_USAGE;
+          return;
+        }
         try {
           const observation = await runAuditObservation({ repoRoot, at: options.at });
           const observationArtifacts = observation.artifacts.map((artifact) => ({

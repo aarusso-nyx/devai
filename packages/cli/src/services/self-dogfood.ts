@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parsers } from '@devai-nyx/schemas';
 
 export type SelfDogfoodRole = 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
@@ -164,4 +166,191 @@ export function authorizeSelfDogfoodCheck(
     produces_readiness_claim: false,
     grants_publication_authority: false,
   };
+}
+
+/** The file whose presence puts a repository under the self-dogfood policy. */
+export const SELF_DOGFOOD_POLICY_PATH = 'law/policy/self-dogfood.json' as const;
+/** The subject the framework's policy names in `scope.subject`. */
+export const SELF_DOGFOOD_SUBJECT = 'devai-source-repository';
+
+/**
+ * The human declaration a sensing command was invoked under, as the CLI
+ * resolved it from the invocation. It is never inferred: an absent role stays
+ * absent and the matrix refuses it.
+ */
+export interface SelfDogfoodCommandDeclaration {
+  readonly role: SelfDogfoodRole | undefined;
+  readonly human_invoked: boolean;
+  /** How the human declared the role (`cli-flag` or `session-state`). */
+  readonly declaration_source: string | undefined;
+  readonly write_consent: boolean;
+  readonly publish: boolean;
+}
+
+/** The resolved population of a `sense run`, as the facade reports it. */
+export interface SelfDogfoodPopulation {
+  readonly aggregate_effect: SelfDogfoodEffect;
+  readonly member_effects: readonly SelfDogfoodEffect[];
+}
+
+export type SelfDogfoodCommandGate =
+  | { readonly applies: false }
+  | {
+      readonly applies: true;
+      readonly policy: typeof SELF_DOGFOOD_POLICY_PATH;
+      readonly action_id: SelfDogfoodSenseAction;
+      readonly declared_role: SelfDogfoodRole | null;
+      readonly write_consent: boolean;
+      readonly decision: SelfDogfoodDecision;
+    };
+
+const SELF_DOGFOOD_ROLES: readonly SelfDogfoodRole[] = [
+  'owner',
+  'architect',
+  'inspector',
+  'engineer',
+  'auditor',
+];
+
+export function isSelfDogfoodRole(value: unknown): value is SelfDogfoodRole {
+  return typeof value === 'string' && (SELF_DOGFOOD_ROLES as readonly string[]).includes(value);
+}
+
+let invocationDeclaration: SelfDogfoodCommandDeclaration | undefined;
+
+/** Hold the declaration the CLI resolved for the current invocation. */
+export function declareSelfDogfoodInvocation(
+  declaration: SelfDogfoodCommandDeclaration | undefined,
+): void {
+  invocationDeclaration = declaration === undefined ? undefined : Object.freeze({ ...declaration });
+}
+
+export function selfDogfoodInvocationDeclaration(): SelfDogfoodCommandDeclaration | undefined {
+  return invocationDeclaration;
+}
+
+/**
+ * Read the policy the repository carries, or report that it carries none.
+ *
+ * The policy governs only the framework's own repository: an adopter without
+ * the file, or with a policy whose subject names another repository, is not
+ * governed by it. A present but unreadable policy is handed to the service
+ * as-is so it fails closed as an invalid policy rather than disappearing.
+ */
+export function readSelfDogfoodPolicy(
+  repoRoot: string,
+): { readonly applies: false } | { readonly applies: true; readonly policy: unknown } {
+  const path = join(repoRoot, SELF_DOGFOOD_POLICY_PATH);
+  if (!existsSync(path)) return { applies: false };
+  let policy: unknown;
+  try {
+    policy = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch {
+    return { applies: true, policy: undefined };
+  }
+  const subject =
+    typeof policy === 'object' && policy !== null && !Array.isArray(policy)
+      ? (policy as { readonly scope?: { readonly subject?: unknown } }).scope?.subject
+      : undefined;
+  if (subject !== undefined && subject !== SELF_DOGFOOD_SUBJECT) return { applies: false };
+  return { applies: true, policy };
+}
+
+/**
+ * Decide one sensing command on the repository it targets.
+ *
+ * Publication is refused before the policy is parsed (IA-003). A repository
+ * that does not carry the framework's policy is unaffected.
+ */
+export function gateSelfDogfoodCommand(input: {
+  readonly repoRoot: string;
+  readonly action_id: SelfDogfoodSenseAction;
+  readonly declaration: SelfDogfoodCommandDeclaration | undefined;
+  readonly population?: SelfDogfoodPopulation;
+  readonly reading?: SelfDogfoodReadingAttribution;
+}): SelfDogfoodCommandGate {
+  const declaration = input.declaration;
+  const base = {
+    applies: true as const,
+    policy: SELF_DOGFOOD_POLICY_PATH,
+    action_id: input.action_id,
+    declared_role: declaration?.role ?? null,
+    write_consent: declaration?.write_consent === true,
+  };
+  if (declaration?.publish === true) {
+    if (!existsSync(join(input.repoRoot, SELF_DOGFOOD_POLICY_PATH))) return { applies: false };
+    return { ...base, decision: { ok: false, reasons: ['publication-attempted'] } };
+  }
+  const loaded = readSelfDogfoodPolicy(input.repoRoot);
+  if (!loaded.applies) return { applies: false };
+  const decision = authorizeSelfDogfoodCheck(loaded.policy, {
+    human_invoked: declaration?.human_invoked === true,
+    role: declaration?.role,
+    action_id: input.action_id,
+    check_id: input.action_id,
+    effect:
+      input.action_id === 'sense run'
+        ? (input.population?.aggregate_effect ?? 'read')
+        : 'harness-write',
+    write_consent: declaration?.write_consent === true,
+    publish: false,
+    ...(input.population === undefined
+      ? {}
+      : { population_effects: input.population.member_effects }),
+    ...(input.reading === undefined ? {} : { reading: input.reading }),
+  });
+  return { ...base, decision };
+}
+
+/**
+ * The structured fail-closed refusal a sensing command writes to stderr.
+ * `POLICY_DENY` is the stable routing-authority code; the policy's own
+ * fail-closed identifiers travel in `context.reasons`.
+ */
+export function selfDogfoodRefusal(
+  gate: Extract<SelfDogfoodCommandGate, { readonly applies: true }>,
+): string {
+  const reasons = gate.decision.ok ? [] : gate.decision.reasons;
+  return `${JSON.stringify({
+    schemaVersion: '1.0.0',
+    code: 'POLICY_DENY',
+    class: 'routing-authority',
+    exit: 2,
+    message: `self-dogfood policy refused ${gate.action_id}: ${reasons.join(', ')}`,
+    remediation:
+      'Declare a role the self-dogfood matrix admits for this action, with the consent it requires; publication is never admitted.',
+    refs: { doc: 'law/adr/ADR-SCR-0001-self-sensing-under-declared-roles.md' },
+    context: {
+      policy: gate.policy,
+      action_id: gate.action_id,
+      declared_role: gate.declared_role,
+      write_consent: gate.write_consent,
+      reasons,
+    },
+  })}\n`;
+}
+
+/**
+ * The declaration a sensing handler decides under: the role and consent the
+ * pre-dispatch authority layer resolved when it resolved one, otherwise the
+ * declaration the CLI captured for a read-effect `sense run`, whose flags the
+ * generic authority layer does not accept.
+ */
+export function resolveSelfDogfoodDeclaration(
+  authority:
+    | Readonly<{
+        actor: Readonly<{ kind: 'human'; role: string; declaration_source: string }>;
+        consent: Readonly<{ write: boolean; allow_publish: boolean }>;
+      }>
+    | undefined,
+): SelfDogfoodCommandDeclaration | undefined {
+  const captured = selfDogfoodInvocationDeclaration();
+  if (authority === undefined) return captured;
+  return Object.freeze({
+    role: isSelfDogfoodRole(authority.actor.role) ? authority.actor.role : undefined,
+    human_invoked: authority.actor.kind === 'human',
+    declaration_source: authority.actor.declaration_source,
+    write_consent: authority.consent.write,
+    publish: authority.consent.allow_publish || captured?.publish === true,
+  });
 }
