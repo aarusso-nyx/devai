@@ -77,6 +77,8 @@ describe('scorecard merges independent sensor evidence conservatively', () => {
   );
 
   it('lets the first passing reading populate an initially unobserved cell', () => {
+    // Without a ledger no cell is N/A (ADR-SCR-0002): 45 cells, 2 PASS
+    // (F4×T1 presence and F4×T2 depth), 43 UNKNOWN.
     const result = score([reading('inventory_api', 'pass', 'a')]);
     expect(result.cells.find((c) => c.substrate === 'F4' && c.property === 'T1')?.verdict).toBe(
       'PASS',
@@ -86,8 +88,30 @@ describe('scorecard merges independent sensor evidence conservatively', () => {
       pass: 2,
       fail: 0,
       review: 0,
-      unknown: 42,
-      na: 1,
+      unknown: 43,
+      na: 0,
+    });
+  });
+
+  it('counts a ledger cell as N/A instead of UNKNOWN and drops a reading that maps to it', () => {
+    // The framework ledger lists F1:T1 and F4:T5; a ledger that also
+    // lists F4×T2 masks the depth reading while F4×T1 still scores.
+    const result = computeScorecard({
+      timestamp,
+      integrationHead: 'a'.repeat(40),
+      readings: [reading('inventory_api', 'pass', 'a')],
+      naCells: new Set(['F1:T1', 'F4:T5', 'F4:T2']),
+    });
+    expect(result.cells.find((c) => c.substrate === 'F4' && c.property === 'T2')).toMatchObject({
+      verdict: 'N/A',
+    });
+    expect(summarizeCells(result.cells)).toEqual({
+      total: 45,
+      pass: 1,
+      fail: 0,
+      review: 0,
+      unknown: 41,
+      na: 3,
     });
   });
 
