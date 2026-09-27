@@ -1,0 +1,172 @@
+/**
+ * Forbidden-action runtime gate. The canonical registry lives at
+ * law/policy/forbidden-actions.json;
+ * adopters receive its materialized copy under .devai/config/. The gate scans recent git
+ * activity for matches against `detect_patterns` and reports findings.
+ *
+ * The scanner is intentionally CONSERVATIVE: it reports likely
+ * violations but cannot prove they were unauthorised — the human is
+ * the authoriser per LAW-12.FORBID.1, and this scanner can't see
+ * authorisation grants. CI consumes the findings as warnings unless
+ * configured otherwise.
+ */
+
+export interface ForbiddenActionEntry {
+  readonly id: string;
+  readonly action: string;
+  readonly rationale: string;
+  readonly severity: 'critical' | 'high' | 'medium';
+  readonly detect_patterns?: readonly string[];
+  readonly allowed_change_line_patterns?: readonly string[];
+  readonly safer_alternative?: string;
+}
+
+/**
+ * D-123 (item 6): the single source of truth for the canonical
+ * 16-entry registry. `buildBootstrapPlan` (packages/skills/src/bootstrap/index.ts)
+ * seeds a fresh repo's `forbidden-actions.json` from this exact list;
+ * `checkForbiddenRegistryCoverage` below compares a repo's actual
+ * registry against it. Previously these lived as two independently
+ * hand-maintained copies (a bootstrap-plan JSON literal and this
+ * module's own knowledge of "the canonical 16") — a single constant
+ * makes drift between "what we seed" and "what we check" structurally
+ * impossible.
+ */
+export const CANONICAL_FORBIDDEN_ACTIONS: readonly ForbiddenActionEntry[] = [
+  {
+    id: 'FORBID-FORCE-PUSH',
+    action: 'Force-push to any branch',
+    rationale: 'Overwrites history',
+    severity: 'critical',
+    detect_patterns: ['\\bgit\\s+push\\s+--force\\b', '\\bgit\\s+push\\s+\\+'],
+    safer_alternative: 'Open a new PR; merge via the platform',
+  },
+  {
+    id: 'FORBID-PUSH-MAIN',
+    action: 'Push to `main` directly',
+    rationale: 'Bypasses review',
+    severity: 'critical',
+    detect_patterns: ['\\bgit\\s+push\\s+.*\\bmain\\b'],
+    safer_alternative: 'Push to a feature branch + PR',
+  },
+  {
+    id: 'FORBID-RESET-HARD',
+    action: '`git reset --hard` on tracked changes',
+    rationale: 'Data loss',
+    severity: 'critical',
+    detect_patterns: ['\\bgit\\s+reset\\s+--hard\\b'],
+    safer_alternative: 'git stash or branch the work first',
+  },
+  {
+    id: 'FORBID-REBASE-I',
+    action: '`git rebase --interactive`',
+    rationale: 'Rewrites history',
+    severity: 'high',
+    detect_patterns: ['\\bgit\\s+rebase\\s+(--interactive|-i)\\b'],
+    safer_alternative: 'Stack the change into a new commit',
+  },
+  {
+    id: 'FORBID-NO-VERIFY',
+    action: 'Any `--no-verify` flag',
+    rationale: 'Bypasses hooks',
+    severity: 'high',
+    detect_patterns: ['(?:^|[\\s"\'`])--no-verify(?![\\w-])'],
+    safer_alternative: 'Fix the underlying hook failure',
+  },
+  {
+    id: 'FORBID-NO-GPG-SIGN',
+    action: 'Any `--no-gpg-sign` flag',
+    rationale: 'Bypasses signing',
+    severity: 'high',
+    detect_patterns: ['(?:^|[\\s"\'`])--no-gpg-sign(?![\\w-])', 'commit\\.gpgsign=false'],
+    safer_alternative: 'Configure signing in the environment',
+  },
+  {
+    id: 'FORBID-DELETE-BRANCH',
+    action: 'Deleting any branch',
+    rationale: 'Loss of work',
+    severity: 'high',
+    detect_patterns: ['\\bgit\\s+branch\\s+-D\\b', '\\bgit\\s+push\\s+.*--delete\\b'],
+    safer_alternative: 'Archive the branch; merge first if work survives',
+  },
+  {
+    id: 'FORBID-DROP-PROD',
+    action: '`DROP TABLE` / `DROP DATABASE` / `TRUNCATE` outside dev',
+    rationale: 'Data loss',
+    severity: 'critical',
+    detect_patterns: ['\\bDROP\\s+TABLE\\b', '\\bDROP\\s+DATABASE\\b', '\\bTRUNCATE\\s+TABLE\\b'],
+    allowed_change_line_patterns: [
+      '\\b(?:DROP\\s+(?:TABLE|DATABASE)|TRUNCATE\\s+TABLE)\\s+(?:IF\\s+EXISTS\\s+)?(?:devai_task_[A-Za-z0-9_]+\\b|devai_task_<id>|devai_template\\b)(?=\\s*(?:[\\"\'`]|;|$))',
+    ],
+    safer_alternative: 'Soft-delete; run on dev with verified backup',
+  },
+  {
+    id: 'FORBID-RM-RF',
+    action: '`rm -rf` on uncommitted work',
+    rationale: 'Data loss',
+    severity: 'high',
+    detect_patterns: ['\\brm\\s+-rf\\b'],
+    safer_alternative: 'Commit first; rm -rf only on confirmed paths',
+  },
+  {
+    id: 'FORBID-DELETE-AUTHORITY-DOCS',
+    action:
+      'Deleting law, product intent, runtime audit output, or machine proofs outside the owning authority path',
+    rationale: 'Authority violation',
+    severity: 'critical',
+    detect_patterns: [
+      '\\b(?:git\\s+rm|rm)\\s+[^\\n]*(?:law|product|record|\\.devai/local/rounds)/',
+    ],
+    safer_alternative: 'Use the owning role and explicit action authority',
+  },
+  {
+    id: 'FORBID-EXTERNAL-MESSAGES',
+    action: 'Sending external messages (Slack, email, GitHub issue comments outside the PR)',
+    rationale: 'Visible action',
+    severity: 'medium',
+    detect_patterns: ['\\b(?:slack|sendmail|mail)\\b', '\\bgh\\s+(?:issue|pr)\\s+comment\\b'],
+    safer_alternative: 'Comment in the PR; let a human relay externally',
+  },
+  {
+    id: 'FORBID-CI-WITHOUT-ADR',
+    action: 'Modifying CI/CD pipelines without explicit review',
+    rationale: 'Gate weakening',
+    severity: 'high',
+    detect_patterns: ['(?:\\.github/workflows/|scripts/(?:run-ci-stages|check-workflows)\\.mjs)'],
+    safer_alternative: 'Record the gate change rationale and obtain explicit review',
+  },
+  {
+    id: 'FORBID-SECRETS-PROD',
+    action: 'Modifying KMS, IAM, SSM, Secrets Manager in stage or prod',
+    rationale: 'Security surface',
+    severity: 'critical',
+    detect_patterns: ['\\baws\\s+(?:kms|iam|ssm|secretsmanager)\\b'],
+    safer_alternative: 'Use the ops authority path with per-action authorisation',
+  },
+  {
+    id: 'FORBID-PUBLISH',
+    action: '`npm publish` / `pnpm publish` (or equivalent)',
+    rationale: 'Release action',
+    severity: 'high',
+    detect_patterns: ['\\b(npm|pnpm|yarn)\\s+publish\\b'],
+    safer_alternative: 'Release via the platform pipeline',
+  },
+  {
+    id: 'FORBID-AWS-DELETE-PROD',
+    action: '`aws s3 rm`, `aws s3 sync --delete`, `aws ecs delete-*` outside dev',
+    rationale: 'Data/service loss',
+    severity: 'critical',
+    detect_patterns: ['\\baws\\s+s3\\s+rm\\b', '\\baws\\s+s3\\s+sync\\s+.*--delete\\b'],
+    safer_alternative: 'Soft-delete + dev verification first',
+  },
+  {
+    id: 'FORBID-MUTATE-INVARIANTS',
+    action: 'Modifying law or committed policy materializations without Architect authority',
+    rationale: 'Constitutional change',
+    severity: 'critical',
+    detect_patterns: [
+      '\\b(?:git\\s+(?:add|rm)|rm)\\s+[^\\n]*(?:law/|product/|record/|\\.devai/(?:config|local/rounds)/)',
+    ],
+    safer_alternative: 'Use Architect authority and record the current rationale',
+  },
+] as const;
