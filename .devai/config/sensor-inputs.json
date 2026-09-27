@@ -26,6 +26,29 @@
     "type_check": {
       "argv": ["npx", "tsc", "--noEmit", "-p", "tsconfig.typecheck.json"]
     },
+    "unit_test": {
+      "argv": [
+        "pnpm",
+        "vitest",
+        "run",
+        "--config",
+        "tests/config/local.config.ts",
+        "tests/contract"
+      ]
+    },
+    "integration_test": {
+      "argv": [
+        "pnpm",
+        "vitest",
+        "run",
+        "--config",
+        "tests/config/local.config.ts",
+        "tests/integration"
+      ]
+    },
+    "e2e_test": {
+      "argv": ["pnpm", "vitest", "run", "--config", "tests/config/local.config.ts", "tests/e2e"]
+    },
     "perf_test": {
       "argv": [
         "pnpm",
