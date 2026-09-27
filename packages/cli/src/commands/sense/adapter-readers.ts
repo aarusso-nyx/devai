@@ -65,6 +65,15 @@ export function optional<K extends string, V>(name: K, value: V | undefined): { 
   return (value === undefined ? {} : { [name]: value }) as { [P in K]?: V };
 }
 
+export function integerInput(request: SenseAdapterRequest, name: string): number | undefined {
+  const value = request.inputs?.[name];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new Error(`SENSE_INPUT_INVALID:${name}`);
+  }
+  return value;
+}
+
 function booleanInput(request: SenseAdapterRequest, name: string): boolean | undefined {
   const value = request.inputs?.[name];
   if (value === undefined) return undefined;
