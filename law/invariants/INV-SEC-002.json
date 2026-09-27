@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-SEC-002",
+  "domain": "SEC",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "security",
+  "title": "Release lifecycle actions bind exact identity and accept only their registry role",
+  "statement": "Every release lifecycle action MUST accept only the initiator role the action registry declares, MUST bind the canonical repository identity, candidate commit and tree, plan digest, and trust identity exactly with a near match treated as a mismatch, MUST derive published only from a verified signed publication receipt, and release plan, release offline-verify, release resume, and release status MUST leave the repository byte-identical.",
+  "rationale": "Articles 9 and 41 make authority explicit and evidence exact; ADR-REL-0001, ADR-REL-0002, ADR-REL-0016, and ADR-REL-0023 define the release trust boundary the workflow defends.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int", "e2e"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-9-authority-chain"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-41-evidence"
+      },
+      {
+        "doc": "law/adr/ADR-REL-0001-release-lifecycle-actions-and-state.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-REL-0002-nine-state-release-lifecycle-and-observed-publication.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-REL-0016-protected-preflight-execution-authority.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-REL-0023-separate-authority-and-release-repository-identity.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-REL-0001", "ADR-REL-0002", "ADR-REL-0016", "ADR-REL-0023"]
+  },
+  "scope": {
+    "components": ["release-lifecycle", "release-workflow"],
+    "code_areas": [
+      "packages/cli/src/commands/release/**",
+      "packages/loop/src/release-lifecycle/**",
+      "packages/loop/src/release/**"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["release", "trust-boundary", "pure-reads", "exact-identity", "article-9", "article-41"],
+  "measurable_via": [
+    "release plan",
+    "release preflight",
+    "release certify",
+    "release prepare",
+    "release export",
+    "release offline-verify",
+    "release resume",
+    "release status",
+    "release verify",
+    "release check",
+    "release drift"
+  ],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-008",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "lifecycle",
+  "title": "Escalation and reference gaps preserve work and route upward, never revert or replace",
+  "statement": "When a task exhausts its iteration cap or emits a reference gap report, the framework MUST preserve its branch and recoverable work, release its locks, change the backlog status to escalated or rgr-pending, MUST NOT spawn a replacement task, and MUST NOT roll back integration HEAD as automated remediation.",
+  "rationale": "Articles 20 to 22 keep convergence failure a human decision and make the RGR the only upward semantic feedback path.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-20-no-automatic-revert"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-21-escalation-lifecycle-convergence-failure"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-22-reference-gap-report-rgr"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["task-lifecycle", "round-gaps", "rgr"],
+    "code_areas": [
+      "packages/cli/src/commands/task/**",
+      "packages/loop/src/rgr/**",
+      "packages/cli/src/commands/round/**"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["escalation", "rgr", "no-revert", "article-20", "article-21", "article-22"],
+  "measurable_via": [
+    "task escalate",
+    "task pause",
+    "task resume",
+    "round gap create",
+    "round gap list",
+    "round gap show",
+    "round gap resolve"
+  ],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

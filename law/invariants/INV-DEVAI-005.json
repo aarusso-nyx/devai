@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-DEVAI-005",
+  "domain": "DEVAI",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "Every tracked path has one change class and every commit stays in one family",
+  "statement": "Every tracked path MUST classify into exactly one change class declared in law/policy/change-taxonomy.json with a path bound to two classes rejected at policy load, and every commit MUST carry a subject of the form type(scope): subject whose type allows the classes of its paths and whose paths stay inside one change family except for the pairings the policy lists.",
+  "rationale": "ADR-GOV-0017 and ADR-GOV-0018 make the governance and implementation families separable in history so authority by path (Article 6) survives the commit.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-6-substrate-authority-by-path"
+      },
+      {
+        "doc": "law/adr/ADR-GOV-0017-change-class-taxonomy.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-GOV-0018-commit-grammar-and-single-family-commits.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-GOV-0017", "ADR-GOV-0018"]
+  },
+  "scope": {
+    "components": ["change-taxonomy", "commit-grammar"],
+    "code_areas": [
+      "scripts/check-commit-range.mjs",
+      "scripts/classify-paths.mjs",
+      "scripts/check-change-hygiene.mjs"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["taxonomy", "commit-grammar", "single-family", "article-6"],
+  "measurable_via": ["check"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

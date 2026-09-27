@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-005",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "lifecycle",
+  "title": "The Auditor observes after merges or on request and never on a timer",
+  "statement": "The Auditor MUST run after a merge to integration, on explicit human request, or before a task batch when a human or an explicitly enabled experimental controller requests it, MUST NOT run on a timer, MUST NOT actuate, and its round records and tracking projections MUST recommend without ratifying the reference signal.",
+  "rationale": "Articles 33 and 34 keep the Auditor outside the loop and the framework quiescent when integration is quiet.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-34-auditor-spawn-cadence"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-33-auditor-as-state-estimator"
+      },
+      {
+        "doc": "law/adr/ADR-GOV-0019-backlog-action-family.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-GOV-0019"]
+  },
+  "scope": {
+    "components": ["round-lifecycle", "round-tracking", "post-merge-auditor"],
+    "code_areas": [
+      "packages/loop/src/round-lifecycle/**",
+      "packages/loop/src/tracking/**",
+      "packages/skills/src/post-merge-auditor/**"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["auditor", "cadence", "no-timer", "article-34", "article-33"],
+  "measurable_via": [
+    "round status",
+    "round tracking enable",
+    "round tracking disable",
+    "round tracking status",
+    "round tracking sync"
+  ],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

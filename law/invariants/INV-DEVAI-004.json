@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-DEVAI-004",
+  "domain": "DEVAI",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "Decision records carry explicit identity and validate fail-closed",
+  "statement": "Every Markdown file under law/adr/ MUST carry an explicit id in its frontmatter and MUST be scanned wherever it sits, an unreadable or unparseable file MUST fail the scan, a supersedes entry MUST name a known identity, and a catalogued exception MUST be bound to its pinned sha256 so that editing its bytes fails the scan.",
+  "rationale": "ADR-GOV-0001 makes decision identity explicit and validation fail-closed so the reference signal cannot be quietly edited or extended.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-9-authority-chain"
+      },
+      {
+        "doc": "law/adr/ADR-GOV-0001-adr-identity-and-fail-closed-validation.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-GOV-0001"]
+  },
+  "scope": {
+    "components": ["adr-validation"],
+    "code_areas": ["packages/spec/src/adr/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["adr", "identity", "fail-closed", "article-9"],
+  "measurable_via": ["check"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

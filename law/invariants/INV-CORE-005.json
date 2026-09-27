@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-005",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "state_machine",
+  "title": "Triage classifies every failure into exactly one class before remediation",
+  "statement": "Every failure entering the framework MUST be classified into exactly one of plant-bug, sensor-error, policy-issue, or reference-gap before any discipline begins remediation, and a classification below confidence MUST be reported as inconclusive rather than forced.",
+  "rationale": "Article 15 makes triage the loop entry; Article 39 forbids false precision when the classification is uncertain.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-15-loop-entry-through-triage"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-39-explicit-uncertainty-over-false-precision"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["triage"],
+    "code_areas": ["packages/cli/src/commands/triage/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["triage", "loop-entry", "article-15", "article-39"],
+  "measurable_via": ["triage classify"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

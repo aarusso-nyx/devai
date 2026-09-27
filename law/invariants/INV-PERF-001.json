@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-PERF-001",
+  "domain": "PERF",
+  "lifecycle": "supported",
+  "severity": "warn",
+  "type": "performance",
+  "title": "The check runner, the sweep, and the release candidate stay within declared latency targets",
+  "statement": "The check runner, the sweep, and the release-candidate verification MUST each complete within the performance targets declared in law/targets/performance.json, measured by the registered sensor and metric each target names, and a run outside a target MUST surface as a finding rather than a silent pass.",
+  "rationale": "Article 5 scores F5 x T7 and Article 16 sizes Cycle A for within-iteration use; the targets file holds the numbers so the invariant stays stable while thresholds move by decision.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["perf", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "Wall-time sensors emit numeric metrics compared deterministically against the declared targets."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-16-cycles"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-5-transversal-properties"
+      },
+      {
+        "doc": "law/adr/ADR-SCR-0004-framework-specification-substrate.md",
+        "anchor": "decision"
+      }
+    ],
+    "decisions": ["ADR-SCR-0004"]
+  },
+  "scope": {
+    "components": ["check-runner", "sense-runtime", "release-workflow"],
+    "code_areas": [
+      "packages/cli/src/commands/check/**",
+      "packages/sensors/src/harness-performance.ts",
+      "packages/sensors/src/perf-test.ts"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["latency", "targets", "f5-t7", "article-16", "article-5"],
+  "measurable_via": ["sense run", "check"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

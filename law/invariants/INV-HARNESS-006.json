@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-006",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "gate",
+  "type": "governance",
+  "title": "Gate verdicts are tri-state and a merge requires both gates at threshold",
+  "statement": "Every gate verdict MUST be PASS, REVIEW, or FAIL, the hard gate MUST emit only PASS or FAIL, a merge MUST require both gates at or above the thresholds in .devai/config/thresholds.json, and a soft-gate evaluation MUST be performed by a model instance distinct from the working agent with no shared context.",
+  "rationale": "Article 18 makes the soft gate stochastic but bounded by thresholds an adopter may tune, which is why this obligation is a gate rather than a constitutional absolute.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-18-soft-gate"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-23-tie-breaking-ladder"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["scorecard", "thresholds"],
+    "code_areas": ["packages/loop/src/scorecard/**", "packages/loop/src/loop/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["soft-gate", "tri-state", "thresholds", "article-18", "article-23"],
+  "measurable_via": ["audit scorecard"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}

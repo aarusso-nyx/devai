@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-DEVAI-006",
+  "domain": "DEVAI",
+  "lifecycle": "supported",
+  "severity": "constitutional",
+  "type": "governance",
+  "title": "Tests are sensors and unjustified weakening fails the hard gate",
+  "statement": "Every test MUST reference the invariant or invariants it probes, a test MUST NOT be modified to make failing code pass, and a commit touching F3 whose AST-diff weakening exceeds the configured thresholds without a tracked invariant change MUST produce a hard-gate FAIL while weakening within thresholds without a tracked change MUST produce REVIEW.",
+  "rationale": "Articles 29 and 30 keep the observation substrate honest: a sensor that is tuned to the plant measures nothing.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "int"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-29-test-as-sensor"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-30-test-weakening-prohibition"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["test-weakening", "trace"],
+    "code_areas": [
+      "packages/sensors/src/test-weakening.ts",
+      "packages/spec/src/spec/test-trace-validator.ts"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["test-weakening", "sensor-integrity", "article-29", "article-30"],
+  "measurable_via": ["sense run", "check"],
+  "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
+  "supersedes": null,
+  "superseded_by": null
+}
