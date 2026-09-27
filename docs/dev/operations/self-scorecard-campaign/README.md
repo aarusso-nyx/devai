@@ -408,3 +408,69 @@ not to the substrate:
     appends its evidence to `record/proofs/chain.json`. The inspector copies
     the scorecard, assessment, and backlog to
     `record/proofs/compliance/scorecards/` and commits them with the chain.
+
+### R-0206 recorded 2026-09-27 at `86d8ccea`
+
+The inspector recorded the first self-scorecard as measured at
+`86d8cceab1d0c2a4ea3891e151d23150ac22dab1` (main after #150). Scorecard
+`SC-20260927T205906-001` is committed at
+`record/proofs/compliance/scorecards/SC-20260927T205906-001.json`, with its
+`.assessment.json` and `.backlog.json` beside it; the observation's evidence
+record `EV-3828f67e05ca4896` is the first entry of `record/proofs/chain.json`.
+
+Command sequence, with `devai` standing for
+`node .devai/state/pr-bootstrap/cli/bin.js` and the authority policy copied
+from the bound checkout:
+
+```bash
+pnpm run build
+pnpm run release:bootstrap
+devai sense run --preset sweep --round R-0206 --repo-root . --as-role inspector --write --dry-run --format json
+devai sense run --preset sweep --round R-0206 --repo-root . --as-role inspector --write --format json
+devai sense record --repo-root . --input <reading> --as-role inspector --write --format json   # once per reading
+devai sense run unit_test --repo-root . --as-role inspector --write --format json
+devai sense run integration_test --repo-root . --as-role inspector --write --format json
+devai sense run e2e_test --repo-root . --as-role inspector --write --format json
+devai sense run build --repo-root . --as-role inspector --write --format json
+devai sense run inventory_regeneration --repo-root . --as-role inspector --write --format json
+devai audit observe --repo-root . --at 86d8cceab1d0c2a4ea3891e151d23150ac22dab1 --round R-0206 --as-role inspector --write --format json
+devai audit scorecard --repo-root . --at 86d8cceab1d0c2a4ea3891e151d23150ac22dab1 --format human
+devai audit scorecard --repo-root . --at 86d8cceab1d0c2a4ea3891e151d23150ac22dab1 --format json
+```
+
+The sweep ran 49 members (exit 3, as expected with failing members). 53
+readings were recorded, 49 from the sweep and 4 from the separate runs, with
+no conflicts; `build` was refused by the broker with
+`AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED` and produced no reading. The
+observation scorecard and `audit scorecard --at` agree on all 45 cells.
+Overall verdict FAIL: PASS 31, REVIEW 5, FAIL 3, UNKNOWN 3, N/A 3.
+
+Non-PASS cells, each a follow-up:
+
+1. F1:T1 N/A, no sensor: declared inapplicable in the N/A ledger.
+2. F2:T4 UNKNOWN, `build`: no reading, since the broker refuses the build
+   sensor (finding 10).
+3. F2:T9 UNKNOWN, `build`: same cause as F2:T4.
+4. F3:T1 FAIL, `unit_test`, `integration_test`, `e2e_test`: unit and
+   integration pass; `e2e_test` reads error because the local configuration
+   finds no test files under `tests/e2e`.
+5. F3:T2 REVIEW, `test_coverage_depth`: no coverage report, since
+   `test:coverage:rc` needs a test database (decision 3).
+6. F4:T4 UNKNOWN, `inventory_adherence`: the input
+   `.devai/state/inventory/inventory.json` is absent.
+7. F4:T5 N/A, no sensor: declared inapplicable in the N/A ledger.
+8. F4:T6 N/A, `inventory_rbac`, `inventory_data_handling`: the rbac surface
+   is declared absent (ADR-SCR-0003).
+9. F4:T7 REVIEW, `inventory_performance`: it ran inside the sweep before any
+   reading was recorded, so it found no readings store in the fresh worktree.
+10. F4:T9 REVIEW, `inventory_regeneration`: no inventory bodies exist on a CLI,
+    so no kinds were touched (finding 10).
+11. F5:T4 REVIEW, `harness_invariant_alignment`: gate invariants
+    INV-DEVAI-002 and INV-HARNESS-006 have no fail-closed CI step with fresh
+    candidate-bound evidence.
+12. F5:T7 FAIL, `harness_performance`: CI median 503 s and p95 3925 s over 50
+    runs on main, inflated by the ledger approval waits (decision 2).
+13. F5:T8 REVIEW, `harness_robustness`: flakiness 6.0% over 100 runs, above
+    the 5% pass threshold.
+14. F5:T9 FAIL, `harness_green_main`: 20 of the last 50 runs on main succeeded
+    (40%), since the ledger runs wait on the protected environment (decision 2).
