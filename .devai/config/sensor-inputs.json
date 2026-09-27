@@ -24,7 +24,7 @@
       "tsconfigPath": "tests/config/tsconfig.effects.json"
     },
     "type_check": {
-      "argv": ["pnpm", "run", "typecheck"]
+      "argv": ["npx", "tsc", "--noEmit", "-p", "tsconfig.typecheck.json"]
     },
     "perf_test": {
       "argv": [
