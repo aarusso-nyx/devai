@@ -50,7 +50,7 @@ const ATOMIC_HOST_EFFECTS_OWNER = 'packages/cli/src/authority/broker.ts';
 const READ_PROCESS_EXCEPTION = 'readProcessSync';
 const READ_PROCESS_OWNERS = new Set([
   'packages/cli/src/version.ts',
-  'packages/loop/src/governance-ledger/index.ts',
+  'packages/loop/src/governance-ledger/history.ts',
 ]);
 const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
   readGitObjectSync: new Set<string>(),
