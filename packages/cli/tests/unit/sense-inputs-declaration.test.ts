@@ -35,7 +35,8 @@
 //   5. Each declared key reaches its sensor function: testGlobs to the four test pattern
 //      sensors, adrDir and invariantsDir to senseSpecDepth, coveragePath to the coverage
 //      normalizer, tsconfigPath to senseActionEffectInference, argv to senseTypeCheck
-//      (`{ cwd, argv }`), scriptName to sensePerfTest (`{ repoRoot, scriptName }`).
+//      (`{ cwd, argv }`), argv and the legacy scriptName to sensePerfTest
+//      (`{ repoRoot, argv, scriptName }`).
 //      Real sensors run for the walkers, spec depth, and coverage depth; type check,
 //      perf test, and effect inference are stubbed so nothing is spawned.
 import {
@@ -641,6 +642,25 @@ describe('sense run delivers each declared key to its sensor', () => {
     expect(stubs.sensePerfTest).toHaveBeenCalledTimes(1);
     const [options] = stubs.sensePerfTest.mock.calls[0] as [{ readonly scriptName?: string }];
     expect(options.scriptName).toBe('bench:ci');
+  });
+
+  it('perf_test delivers the declared argv', async () => {
+    const argv = [
+      'pnpm',
+      'vitest',
+      'run',
+      '--config',
+      'tests/config/rc.performance.config.ts',
+      'tests/regression',
+    ];
+    const root = makeRepo({ schemaVersion: '1.0.0', inputs: { perf_test: { argv } } });
+    readingOf(await senseRun('perf_test', { repoRoot: root }));
+    expect(stubs.sensePerfTest).toHaveBeenCalledTimes(1);
+    const [options] = stubs.sensePerfTest.mock.calls[0] as [
+      { readonly argv?: readonly string[]; readonly scriptName?: string },
+    ];
+    expect(options.argv).toEqual(argv);
+    expect(options.scriptName).toBeUndefined();
   });
 
   it('plant_depth leaves the declared exclusion globs out of the plant', async () => {

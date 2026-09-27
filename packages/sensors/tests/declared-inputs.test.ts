@@ -17,8 +17,10 @@
 //     stdout for tsc diagnostics the same way the default command is parsed. NEW:
 //     today TypeCheckOptions has no `argv`, so the option is passed through a widened
 //     local type and the argv cases fail until the sensor honors it.
-//   - sensePerfTest accepts `{ repoRoot, scriptName }` and runs that root script
-//     through runCommand (exists today).
+//   - sensePerfTest accepts `{ repoRoot, argv }` and runs the declared vector exactly
+//     through runCommand, with no package.json lookup (TASK-0264). The legacy
+//     `{ repoRoot, scriptName }` runs `pnpm <scriptName>` only when no argv is
+//     declared.
 //   - senseHarnessIdiomaticity accepts `{ repoRoot, minWorkflowsForReusableCheck }`
 //     and drops the reusable-workflow signal from both the score and its
 //     denominator when workflow_count is below the declared threshold
@@ -274,7 +276,7 @@ describe('declared scriptName reaches perf_test', () => {
 
     expect(run.runCommand).toHaveBeenCalledTimes(1);
     const executed = run.runCommand.mock.calls[0]?.[0] as readonly string[];
-    expect(executed).toContain('bench:ci');
+    expect(executed).toEqual(['pnpm', 'bench:ci']);
     expect(executed).not.toContain('test:perf');
     expect(metric(reading, 'script_name')).toBe('bench:ci');
     expect(reading.findings?.map((f) => f.code)).not.toContain('PERF_TEST_NO_PERF_SCRIPT');
@@ -286,6 +288,61 @@ describe('declared scriptName reaches perf_test', () => {
     expect(run.runCommand).not.toHaveBeenCalled();
     expect(reading.status).toBe('unknown');
     expect(metric(reading, 'script_name')).toBe('bench:ci');
+  });
+});
+
+describe('declared argv reaches perf_test', () => {
+  const PERF_ARGV = [
+    'pnpm',
+    'vitest',
+    'run',
+    '--config',
+    'tests/config/rc.performance.config.ts',
+    'tests/regression',
+  ] as const;
+
+  it('runs the declared argv exactly and grades exit code and duration', () => {
+    run.runCommand.mockReturnValue({
+      stdout: 'Test Files  3 passed\n',
+      stderr: '',
+      exit_code: 0,
+      duration_ms: 42,
+      killed: false,
+    });
+    const reading = sensePerfTest({ repoRoot: root, argv: PERF_ARGV, scriptName: 'bench:ci' });
+
+    expect(run.runCommand).toHaveBeenCalledTimes(1);
+    expect(run.runCommand.mock.calls[0]?.[0]).toEqual([...PERF_ARGV]);
+    expect(reading.status).toBe('pass');
+    expect(metric(reading, 'duration_ms')).toBe(42);
+    expect(metric(reading, 'argv')).toBe(PERF_ARGV.join(' '));
+    expect(reading.findings?.map((f) => f.code)).not.toContain('PERF_TEST_NO_PERF_SCRIPT');
+  });
+
+  it('fails when the declared argv exits non-zero', () => {
+    run.runCommand.mockReturnValue({
+      stdout: '',
+      stderr: 'boom',
+      exit_code: 1,
+      duration_ms: 7,
+      killed: false,
+    });
+    const reading = sensePerfTest({ repoRoot: root, argv: PERF_ARGV });
+    expect(reading.status).toBe('fail');
+    expect(reading.findings?.map((f) => f.code)).toContain('PERF_TEST_SCRIPT_FAILED');
+  });
+
+  it('falls back to pnpm test:perf when neither argv nor scriptName is declared', () => {
+    write('package.json', JSON.stringify({ name: 'fixture', scripts: { 'test:perf': 'x' } }));
+    run.runCommand.mockReturnValue({
+      stdout: '',
+      stderr: '',
+      exit_code: 0,
+      duration_ms: 1,
+      killed: false,
+    });
+    sensePerfTest({ repoRoot: root });
+    expect(run.runCommand.mock.calls[0]?.[0]).toEqual(['pnpm', 'test:perf']);
   });
 });
 
