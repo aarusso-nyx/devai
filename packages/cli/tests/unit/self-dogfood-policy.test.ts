@@ -306,7 +306,10 @@ describe('ADR-SCR-0001 self-dogfood admission of the sensing actions', () => {
       {
         ...policy,
         role_effect_matrix: swap(rows, (r) => r.role === 'owner', {
-          may_initiate: [...rows[0].may_initiate, 'sense record'].sort(),
+          may_initiate: [
+            ...(rows.find((r) => r.role === 'owner')?.may_initiate ?? []),
+            'sense record',
+          ].sort(),
         }),
       },
       // Remote-write can neither be permitted nor dropped from the forbidden list.
