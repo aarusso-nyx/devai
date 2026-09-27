@@ -1115,7 +1115,7 @@
               },
               "deliverables": [
                 "decision_record_integrity validates each record against law/schemas/adr-v2.schema.json, treats proposed, accepted, rejected, and superseded as the lifecycle, and checks supersession symmetry through the supersedes array alone.",
-                "decision_citation_resolution resolves scoped ids; the legacy citations ADR-001 and ADR-003 in the two schemas and DII-103 and DII-104 in scorecard.ts are replaced by resolvable references or removed with a comment naming the replacement.",
+                "decision_citation_resolution resolves scoped ids; the two legacy numeric ADR citations in the schema examples and the two draft DII identities in the scorecard composer are replaced by resolvable references or removed with a comment naming the replacement.",
                 "Both sensors report zero findings on the merged head, proven by a test that runs them against the repository."
               ],
               "acceptance_commands": [
