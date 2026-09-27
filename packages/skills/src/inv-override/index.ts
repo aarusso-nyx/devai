@@ -10,7 +10,10 @@ import { join, relative } from 'node:path';
  *   // ticket: ENG-1234
  *   // expires: 2026-Q4   (or 2026-12-31)
  *   // approver: @handle
- *   // adr: ADR-001       (optional)
+ *   // adr: ADR-<SCOPE>-<NNNN>   (optional; the adopter's own record)
+ *
+ * The `adr` value is a placeholder, not a citation: no decision record governs this
+ * scanner. Invariant overrides are governed by constitution Article 11.
  *
  * Constitutional + hard-fail invariants are NOT overridable — the
  * scanner reports those as errors. Expired overrides are also errors.
