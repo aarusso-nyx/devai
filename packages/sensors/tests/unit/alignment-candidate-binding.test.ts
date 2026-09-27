@@ -57,7 +57,7 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
  */
 describe('canonical evidence pairs', () => {
   function readingPair(receiptPatch: Record<string, unknown> = {}): void {
-    writeJson('record/proofs/sensor-readings/2026/dependency.json', {
+    writeJson('.devai/state/sensor-readings/2026/dependency.json', {
       command: `devai ${ACTION}`,
       status: 'pass',
     });
@@ -69,7 +69,7 @@ describe('canonical evidence pairs', () => {
           status: 'completed',
           timestamp: RECENT,
           context: { git: { head_sha: CANDIDATE } },
-          artifacts: [{ path: 'record/proofs/sensor-readings/2026/dependency.json' }],
+          artifacts: [{ path: '.devai/state/sensor-readings/2026/dependency.json' }],
           ...receiptPatch,
         },
       ],
@@ -112,7 +112,7 @@ describe('canonical evidence pairs', () => {
 
   it.each([
     { action: 'sense.readings.other' },
-    { artifacts: [{ path: 'record/proofs/sensor-readings/other.json' }] },
+    { artifacts: [{ path: '.devai/state/sensor-readings/other.json' }] },
     { artifacts: [] },
     { context: { git: { head_sha: 'not-a-commit' } } },
   ])('refuses a sensor reading whose receipt does not bind it: %j', (patch) => {

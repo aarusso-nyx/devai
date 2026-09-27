@@ -162,7 +162,7 @@ function writeInventoryTimings(root: string): void {
   ] as const) {
     write(
       root,
-      `record/proofs/sensor-readings/${kind}/SR-${kind}.json`,
+      `.devai/state/sensor-readings/${kind}/SR-${kind}.json`,
       JSON.stringify({ sensor: { kind }, duration_ms: duration }),
     );
   }
