@@ -3,9 +3,7 @@ import { join, relative, sep } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import { mkdirSync, renameSync, writeFileSync } from '@devai-nyx/authority';
 import { regenerateInventory } from '@devai-nyx/loop';
-import { assessScorecard, computeScorecard, loadScorecardFailureMaxAgeMs } from '@devai-nyx/loop';
-import { loadScorecardNaConfig, resolveScorecardNaPath, scorecardNaCellSet } from '@devai-nyx/loop';
-import { loadReadingsFromDir } from '@devai-nyx/loop';
+import { assessScorecard, resolveScorecardInputs } from '@devai-nyx/loop';
 import { compileBacklogObservation as compileBacklog } from '../operations/backlog.js';
 import { canonicalSha256, git, gitText, isRecord, sha256, type JsonRecord } from './support.js';
 
@@ -149,14 +147,13 @@ export async function writeBundle(
       timestamp,
       integrationHead: mergeSha,
     });
-    const readings = loadReadingsFromDir(join(worktreeRoot, 'record/proofs/freshness/readings'));
-    const naCells = scorecardNaCellSet(loadScorecardNaConfig(resolveScorecardNaPath(worktreeRoot)));
-    const scorecard = computeScorecard({
+    // ADR-SCR-0002: one readings store. The observation reads the same
+    // readings and N/A ledger as `audit scorecard` through the loop resolver.
+    const { scorecard, readings } = resolveScorecardInputs({
+      repoRoot: worktreeRoot,
+      inputs: undefined,
       timestamp,
       integrationHead: mergeSha,
-      readings,
-      naCells,
-      staleFailAfterMs: loadScorecardFailureMaxAgeMs(worktreeRoot),
     });
     const assessment = assessScorecard(scorecard, timestamp, 1, readings);
     const backlogCurrent = await compileBacklogObservation(worktreeRoot, scorecard, timestamp);
