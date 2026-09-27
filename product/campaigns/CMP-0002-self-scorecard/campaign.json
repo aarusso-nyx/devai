@@ -194,7 +194,9 @@
                   "packages/loop/tests/scorecard-inputs.test.ts",
                   "packages/loop/tests/unit/scorecard-na-override.test.ts",
                   "packages/loop/tests/unit/scorecard-aggregation-boundaries.test.ts",
-                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-diagnostics.test.ts"
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-diagnostics.test.ts",
+                  "packages/skills/tests/unit/bootstrap.test.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts"
                 ],
                 "forbidden": [".github/workflows/", "packages/sensors/"]
               },
@@ -232,7 +234,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0212.md",
-                "sha256": "3883fee1d0105e0025ea313d39fa29fd858b6681daa5ceb5486a7b40891f9164"
+                "sha256": "36db1f3bec7279b6e93fdb1c865dea6f9ad82eb8d2315bb749f452509bb14914"
               },
               "pull_request": null,
               "merged_as": null,
