@@ -246,7 +246,7 @@ describe('CLI shard 09 sense run set execution', () => {
     // ADR-SCR-0005: the repository root declares a type_check argv, which reaches the adapter.
     expect(adapter).toHaveBeenLastCalledWith({
       repoRoot: '.',
-      inputs: { argv: ['pnpm', 'run', 'typecheck'] },
+      inputs: { argv: ['npx', 'tsc', '--noEmit', '-p', 'tsconfig.typecheck.json'] },
     });
 
     const explicit = await run('type_check', { repoRoot: '/repo', input: '{"value":false}' });
