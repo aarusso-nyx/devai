@@ -188,6 +188,19 @@ maintainer before R-0206 records readings:
 1. The self-dogfood service decides `sense run`, `sense record`, and
    `audit observe`, but the `sense` and `audit` command paths do not yet call
    it. Wire the service before the inspector records readings.
+   Closed by TASK-0262 (R-0206). On a repository whose
+   `law/policy/self-dogfood.json` names `devai-source-repository`, the CLI
+   refuses `--publish` on the three actions before the policy is parsed, and
+   hands the role and write consent of a read-effect `sense run` to the matrix,
+   since generic authority admits no declaration on a read effect. `sense run`,
+   `sense record`, and `audit observe` then decide from the declared role, the
+   consent, the resolved population, and for `sense record` the reading's
+   attribution. A refusal writes a `POLICY_DENY` error carrying the policy's
+   fail-closed reasons to stderr before any adapter runs or anything is
+   written. The dry run of `sense run` reports the decision as `self_dogfood`.
+   Adopter repositories without the policy are unaffected. The acceptance items
+   are exercised through the command paths in
+   `packages/cli/tests/unit/self-dogfood-command-paths.test.ts`.
 2. The three sensing ids were added to `permitted_checks` as roster entries
    keyed by action id. No runner reads them. Drop them if row-only admission
    is preferred.
