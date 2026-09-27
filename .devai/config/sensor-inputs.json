@@ -31,6 +31,9 @@
     },
     "harness_idiomaticity": {
       "minWorkflowsForReusableCheck": 5
+    },
+    "plant_depth": {
+      "excludeGlobs": ["packages/cli/src/generated/**"]
     }
   },
   "surfaces": {
