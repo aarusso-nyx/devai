@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -849,7 +850,14 @@ describe('live ledger-verification workflow', () => {
   });
 
   it('exposes only the current init scaffold help surface', () => {
-    const source = readFileSync(join(ROOT, 'packages/cli/src/commands/init/index.ts'), 'utf8');
+    // The init command family spans every module under commands/init: the plan
+    // command's options, the apply definition's CI scaffold help, and bind.
+    const initDir = join(ROOT, 'packages/cli/src/commands/init');
+    const source = readdirSync(initDir)
+      .filter((entry) => entry.endsWith('.ts'))
+      .sort()
+      .map((entry) => readFileSync(join(initDir, entry), 'utf8'))
+      .join('\n');
     expect(source).toContain('.github/workflows/devai-ledger-verify.yml');
     expect(source).not.toContain('--devai-ref');
     expect(source).not.toContain('--chain-file');
