@@ -239,3 +239,31 @@ Follow-ups recorded at close:
 6. The three harness sensors now return honest readings: green-main fails at
    46 percent success over the last 50 runs, performance fails at a 503 s
    median, robustness reviews at 6 percent flaky. R-0205 owns them.
+
+### R-0203 closed 2026-09-27 at `dae76911`
+
+- TASK-0231 through [#127](https://github.com/aarusso-nyx/devai/pull/127);
+  TASK-0232 and TASK-0233 through the wave pull request
+  [#129](https://github.com/aarusso-nyx/devai/pull/129); TASK-0234 through
+  [#125](https://github.com/aarusso-nyx/devai/pull/125); the ledger through
+  [#124](https://github.com/aarusso-nyx/devai/pull/124),
+  [#126](https://github.com/aarusso-nyx/devai/pull/126) and
+  [#128](https://github.com/aarusso-nyx/devai/pull/128).
+- The framework now carries 30 invariant records (29 readiness-bearing), a
+  threat model with three trust boundaries, a data-handling declaration, six
+  performance and four robustness targets, and a trace that links every
+  invariant to existing tests. All five spec sensors, test invariant
+  alignment, plant coverage and inventory coverage read pass on the
+  repository.
+
+Follow-ups recorded at close:
+
+1. Four invariants have partial observations only: INV-AUTH-001 (the
+   two-segment path-prefix rule), INV-HARNESS-006 (hard-gate binarity),
+   INV-DATA-001 (the inventory data handling sensor does not yet read the
+   declaration), INV-CORE-003. An Architect or Inspector strengthens them
+   before R-0206.
+2. The `spec_security_coverage` adapter does not pass `surfaces`; the sensor
+   reads the declaration file itself.
+3. `harness_invariant_alignment` reads review until readings exist (R-0206).
+4. Records for Articles 25, 27 and 37 remain to be authored in a later round.
