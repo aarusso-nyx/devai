@@ -1,0 +1,84 @@
+{
+  "$schema": "../schemas/targets.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "robustness",
+  "kind": "robustness",
+  "title": "DEVAI framework repository robustness targets",
+  "status": "active",
+  "authority": "Architect",
+  "date": "2026-09-27",
+  "targets": [
+    {
+      "id": "TGT-ROB-001",
+      "title": "Check runner rerun rate on main",
+      "subject": "error contract",
+      "statement": "At most 5 percent of the sampled check-runner workflow runs on main needed a rerun attempt, so a failure reported by the runner is an observation and not noise.",
+      "sensor_kind": "harness_robustness",
+      "metric": "flakiness_pct",
+      "metric_source": "metrics",
+      "comparator": "lte",
+      "threshold": 5,
+      "unit": "percent",
+      "invariants": ["INV-CORE-001", "INV-CORE-004"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-41-evidence"
+      },
+      "decisions": ["ADR-SCR-0004", "ADR-CHK-0001"]
+    },
+    {
+      "id": "TGT-ROB-002",
+      "title": "Green main success rate",
+      "subject": "error contract",
+      "statement": "At least 95 percent of the sampled workflow runs on main conclude successfully, so a red run on main is a real error rather than the steady state.",
+      "sensor_kind": "harness_green_main",
+      "metric": "success_pct",
+      "metric_source": "metrics",
+      "comparator": "gte",
+      "threshold": 95,
+      "unit": "percent",
+      "invariants": ["INV-CORE-001", "INV-CORE-003"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-17-hard-gate"
+      },
+      "decisions": ["ADR-SCR-0004"]
+    },
+    {
+      "id": "TGT-ROB-003",
+      "title": "Robustness test share",
+      "subject": "error contract",
+      "statement": "At least 10 percent of the declared test files exercise error, retry, timeout, or fallback behavior, so the error contract is observed by tests and not only declared.",
+      "sensor_kind": "test_robustness_coverage",
+      "metric": "robust_pct",
+      "metric_source": "metrics",
+      "comparator": "gte",
+      "threshold": 10,
+      "unit": "percent",
+      "invariants": ["INV-CORE-001", "INV-DEVAI-006"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-29-test-as-sensor"
+      },
+      "decisions": ["ADR-SCR-0004"]
+    },
+    {
+      "id": "TGT-ROB-004",
+      "title": "Inventory regeneration determinism",
+      "subject": "error contract",
+      "statement": "Two regenerations of the inventory at the same head produce byte-identical canonical output, reported as equal 1 by the inventory determinism sensor.",
+      "sensor_kind": "inventory_determinism",
+      "metric": "equal",
+      "metric_source": "metrics",
+      "comparator": "eq",
+      "threshold": 1,
+      "unit": "boolean",
+      "invariants": ["INV-CORE-003", "INV-CORE-007"],
+      "source": {
+        "doc": "law/constitution.md",
+        "anchor": "article-17-hard-gate"
+      },
+      "decisions": ["ADR-SCR-0004"]
+    }
+  ]
+}
