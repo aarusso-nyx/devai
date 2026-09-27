@@ -75,7 +75,7 @@ describe('harness alignment receipt and freshness boundaries', () => {
   });
 
   it('refuses a sensor receipt that names the artifact without a git context', () => {
-    writeJson('record/proofs/sensor-readings/2026/dependency.json', {
+    writeJson('.devai/state/sensor-readings/2026/dependency.json', {
       command: `devai ${ACTION}`,
       status: 'pass',
     });
@@ -87,7 +87,7 @@ describe('harness alignment receipt and freshness boundaries', () => {
           status: 'completed',
           timestamp: RECENT,
           context: {},
-          artifacts: [{ path: 'record/proofs/sensor-readings/2026/dependency.json' }],
+          artifacts: [{ path: '.devai/state/sensor-readings/2026/dependency.json' }],
         },
       ],
     });

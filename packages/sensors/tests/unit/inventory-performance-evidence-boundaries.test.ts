@@ -6,7 +6,7 @@ import { senseInventoryPerformance } from '../../src/inventory-performance.js';
 
 let root: string;
 const now = '2026-09-08T12:00:00Z';
-const defaults = 'record/proofs/sensor-readings';
+const defaults = '.devai/state/sensor-readings';
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'devai-inventory-timing-'));
 });

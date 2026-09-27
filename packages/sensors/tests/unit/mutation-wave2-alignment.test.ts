@@ -141,7 +141,7 @@ describe('wave 2 harness alignment boundaries', () => {
       rmSync(join(root, 'evidence/result.json'));
       const sensor = kind === 'sensor';
       const path = sensor
-        ? 'record/proofs/sensor-readings/2026/dependency.json'
+        ? '.devai/state/sensor-readings/2026/dependency.json'
         : 'record/proofs/work/test-results/run-1.json';
       writeJson(path, {
         command: `devai ${ACTION}`,

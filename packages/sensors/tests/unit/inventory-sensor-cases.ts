@@ -719,15 +719,15 @@ jobs:
     );
     write(
       root,
-      'record/proofs/sensor-readings/inventory_api/one.json',
+      '.devai/state/sensor-readings/inventory_api/one.json',
       JSON.stringify({ sensor: { kind: 'inventory_api' }, duration_ms: 25 }),
     );
     write(
       root,
-      'record/proofs/sensor-readings/inventory_api/two.json',
+      '.devai/state/sensor-readings/inventory_api/two.json',
       JSON.stringify({ sensor: { kind: 'inventory_api' }, duration_ms: 250 }),
     );
-    write(root, 'record/proofs/sensor-readings/inventory_api/bad.json', '{bad');
+    write(root, '.devai/state/sensor-readings/inventory_api/bad.json', '{bad');
 
     const readings = [
       senseDocsDrift({ repoRoot: root, now: NOW }),
