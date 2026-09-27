@@ -110,9 +110,13 @@
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
+        "argv": {
+          "$ref": "#/$defs/argv",
+          "description": "Performance suite command the sensor executes, without a shell, and grades by exit code, duration, and an optional JSON metrics line. When declared it takes precedence over scriptName."
+        },
         "scriptName": {
           "$ref": "#/$defs/script_name",
-          "description": "Package script the sensor runs and parses for a JSON metrics line, instead of the sensor default of test:perf."
+          "description": "Legacy key: the root package script the sensor runs as pnpm <scriptName> when no argv is declared, instead of the sensor default of test:perf."
         }
       }
     },
@@ -251,7 +255,14 @@
           "argv": ["pnpm", "run", "typecheck"]
         },
         "perf_test": {
-          "scriptName": "test:perf"
+          "argv": [
+            "pnpm",
+            "vitest",
+            "run",
+            "--config",
+            "tests/config/rc.performance.config.ts",
+            "tests/regression"
+          ]
         }
       },
       "surfaces": {
