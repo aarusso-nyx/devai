@@ -2,8 +2,8 @@
 id: ADR-SCR-0003
 title: Declared plant surfaces and the skipped-reading rule for absent surfaces
 type: adr
-status: proposed
-date: 2026-09-26
+status: accepted
+date: 2026-09-27
 authority: Architect
 supersedes: []
 provenance:
@@ -29,7 +29,7 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-26 by maintainer decision. Implemented by campaign CMP-0002, round R-0202.
+Accepted on 2026-09-27 by maintainer decision. Implemented by campaign CMP-0002, round R-0202.
 
 ## Context
 
