@@ -110,7 +110,10 @@ export interface ComputeScorecardOptions {
    * scoreable.
    */
   readonly naCells?: ReadonlySet<string>;
-  /** DII-103 freshness boundary. Omit until policy supplies an authorized value. */
+  /**
+   * Freshness boundary. Omit until policy supplies an authorized value; the readings it bounds
+   * are governed by ADR-SCR-0002.
+   */
   readonly staleFailAfterMs?: number;
 }
 
@@ -302,7 +305,10 @@ export function scorecardCellsForSensorKind(
   );
 }
 
-/** DII-104 scheduled reachability, derived entirely from the sensor registry. */
+/**
+ * Scheduled reachability, derived entirely from the sensor registry. Scorecard composition is
+ * governed by ADR-SCR-0002.
+ */
 export function scheduledScorecardCells(): ReadonlyArray<{
   substrate: Substrate;
   property: Property;
