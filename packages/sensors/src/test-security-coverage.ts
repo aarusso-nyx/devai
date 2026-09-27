@@ -9,6 +9,13 @@ import { countPatternMatches } from './test-pattern-walker.js';
 /**
  * Inventory sensor: test security coverage (F3 × T6). Phase 27.J.
  * Per design note at docs/theory/architecture/sensors/test_security_coverage.md.
+ *
+ * Classification convention (see docs/dev/testing.md): a test file is counted as a
+ * security observation when its path or content matches one of the DEFAULT_PATTERNS
+ * words below. The deliberate, authored classification is the bare word `sec`, which
+ * matches either a `<name>.sec.test.ts` filename segment (the convention already used
+ * by `dependency-security.sec.test.ts`) or a `sec:` prefix on a `describe` title, for
+ * tests whose path cannot be renamed because law/trace.json names it.
  */
 
 export interface TestSecurityCoverageOptions {
@@ -20,6 +27,7 @@ export interface TestSecurityCoverageOptions {
 }
 
 const DEFAULT_PATTERNS = [
+  'sec',
   'auth',
   'rbac',
   'permission',
