@@ -295,3 +295,38 @@ Follow-ups recorded at close:
    without a catalog digest update in law policy. The draft text is kept in
    the session scratchpad; a law task applies it with the catalog change.
 2. Sealed-history checks still apply only to first-generation records.
+
+### R-0205 closed 2026-09-27 at `b401b5e9`
+
+- TASK-0251 through [#132](https://github.com/aarusso-nyx/devai/pull/132);
+  TASK-0252, TASK-0253, TASK-0254 and TASK-0255 through the combined
+  [#138](https://github.com/aarusso-nyx/devai/pull/138); TASK-0256 through
+  [#142](https://github.com/aarusso-nyx/devai/pull/142); the ledger through
+  [#131](https://github.com/aarusso-nyx/devai/pull/131),
+  [#139](https://github.com/aarusso-nyx/devai/pull/139) and
+  [#141](https://github.com/aarusso-nyx/devai/pull/141).
+- On the merged head the security scan, the three test coverage sensors,
+  harness coherence, harness idiomaticity and plant depth read pass. Plant
+  depth took two tasks: thirty seam splits (p95 921 to 624) and then
+  seventeen more splits plus twelve function-body extractions with the
+  generated action registry declared out of the plant (p95 630 to 454).
+
+Follow-ups recorded at close:
+
+1. The authority broker stays above 500 authored lines by design: its single
+   admission function cannot be split under the pure-helpers rule.
+2. Two moderate advisories remain in the test runner below 4.1.11; a minor
+   bump is a separate decision.
+3. The workflow checker does not yet reject a peeled pnpm commit or a
+   `version:` input inside the composite action; two small checker cases.
+4. Several function-body extractions kept behavior identical through small
+   textual changes (a sequence counter helper, a reentrancy holder object, one
+   extra `await` in the lifecycle executor, two literal-type casts); listed
+   in #142.
+
+### R-0206 opened 2026-09-27
+
+Wave CTG-0262 (TASK-0262, wiring the self-dogfood service into the `sense`
+and `audit` command paths) runs first; the recording wave CTG-0261 depends on
+it. Still blocked by the maintainer: the two read-only `gh api` GET shapes the
+site drift sensor needs (see R-0202 follow-ups).
