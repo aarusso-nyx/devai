@@ -103,6 +103,7 @@ const REQUIRED_WORKFLOWS = [
   'devai-ledger-verify.yml',
   'release.yml',
   PREFLIGHT_WORKFLOW_FILE,
+  'site-publish.yml',
 ] as const;
 
 function fixture(
@@ -875,7 +876,7 @@ describe('live ledger-verification workflow', () => {
     expect(source).not.toContain('tests/config/t1-t3.coverage.config.ts');
 
     const economy = checkCiEconomy({ repoRoot: ROOT });
-    expect(economy.workflows_scanned).toBe(3);
+    expect(economy.workflows_scanned).toBe(4);
     expect(
       economy.findings.find((finding) => finding.ruleId === 'ci-economy.evidence-gate-wired'),
     ).toMatchObject({ severity: 'pass' });
@@ -886,7 +887,7 @@ describe('live ledger-verification workflow', () => {
 });
 
 describe('remote preflight workflow', () => {
-  it('accepts the checked-in three-workflow set', () => {
+  it('accepts the checked-in four-workflow set', () => {
     const result = check(fixture(CHECKED_IN_PREFLIGHT, PREFLIGHT_WORKFLOW_FILE));
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('workflow contract: PASS\n');

@@ -46,12 +46,17 @@ const REQUIRED_WORKFLOWS = [
   'pull-request-checks.yml',
   'release.yml',
   'devai-ledger-verify.yml',
+  'site-publish.yml',
 ] as const;
 // devai-ledger-verify.yml keeps its single Node setup step inline rather than
 // delegating to the shared composite: tests/contract/check-workflows-manifest.contract.test.ts
 // (outside this task's boundary paths) asserts on the literal `node-version: 24`
 // inside that exact file, and TASK-0254's boundary forbids editing it.
-const WORKFLOWS_USING_SHARED_SETUP = ['pull-request-checks.yml', 'release.yml'] as const;
+const WORKFLOWS_USING_SHARED_SETUP = [
+  'pull-request-checks.yml',
+  'release.yml',
+  'site-publish.yml',
+] as const;
 
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
@@ -93,7 +98,7 @@ describe('shared setup composite action exists and is used uniformly', () => {
     expect(action).toContain('using: composite');
   });
 
-  it('is referenced by pull-request-checks.yml and release.yml, so their repeated setup steps are shared rather than duplicated', () => {
+  it('is referenced by pull-request-checks.yml, release.yml and site-publish.yml, so their repeated setup steps are shared rather than duplicated', () => {
     for (const file of WORKFLOWS_USING_SHARED_SETUP) {
       const source = readFileSync(join(WORKFLOWS_DIR, file), 'utf8');
       expect(source, `${file} must delegate setup to ${SHARED_SETUP_ACTION}`).toContain(
@@ -181,7 +186,7 @@ describe('composite action pins are validated the same way inline steps are', ()
   });
 });
 
-describe('concurrency and permissions blocks are uniform across the three workflows', () => {
+describe('concurrency and permissions blocks are uniform across the four workflows', () => {
   it('declares a top-level permissions block in every workflow', () => {
     for (const file of REQUIRED_WORKFLOWS) {
       const source = readFileSync(join(WORKFLOWS_DIR, file), 'utf8');
