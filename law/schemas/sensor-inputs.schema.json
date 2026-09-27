@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/sensor-inputs.schema.json",
+  "title": "Sensor inputs declaration",
+  "description": "One adopter-owned declaration of the inputs its sensors read, materialized at .devai/config/sensor-inputs.json from the law default under law/policy/adopter-defaults/sensor-inputs.json (ADR-SCR-0005). Every entry under inputs is keyed by a registered sensor kind from law/policy/sensor-registry.json and carries only the inputs that kind reads: test roots, the decision record directory, the invariants directory, the coverage report path, the effects tsconfig path, the type check argv, and the performance script name. A kind that declares nothing keeps the sensor's own default; sense run refuses a key this schema does not list, a kind the registry does not hold, and a path that leaves the repository root, and merges an explicit --input for the same key over the declaration for one run only. Declaring an input never changes a threshold or a verdict rule.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "inputs"],
+  "$defs": {
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\.\\.(?:/|$))(?!.*/\\.\\.(?:/|$))[A-Za-z0-9_.@-][A-Za-z0-9_.@/-]*$",
+      "description": "Repository-relative path without a leading slash, a wildcard, or a parent segment. The sensor resolves it against the repository root and refuses a resolved path outside it."
+    },
+    "repository_root_glob": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\.\\.(?:/|$))(?!.*/\\.\\.(?:/|$))[A-Za-z0-9_.@*-][A-Za-z0-9_.@*/-]*$",
+      "description": "Repository-relative directory, or a directory pattern with one wildcard segment such as packages/*/tests, without a leading slash or a parent segment. Each expansion is walked recursively for *.test.* and *.spec.* files."
+    },
+    "argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Exact argument vector the sensor executes from the repository root, executable first, never joined through a shell."
+    },
+    "script_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]*$",
+      "description": "Name of a script in the root package.json that the sensor runs through the package manager."
+    },
+    "test_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "testGlobs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_root_glob"
+          },
+          "description": "Test roots the pattern walker expands and walks instead of the sensor default of packages/*/test and packages/*/src."
+        }
+      }
+    },
+    "spec_depth_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "adrDir": {
+          "$ref": "#/$defs/repository_path",
+          "description": "Directory holding the decision records the sensor counts, instead of the sensor default of docs/meta/adr."
+        },
+        "invariantsDir": {
+          "$ref": "#/$defs/repository_path",
+          "description": "Directory holding the invariant files the sensor tallies, instead of the sensor default of law/invariants."
+        }
+      }
+    },
+    "test_coverage_depth_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "coveragePath": {
+          "$ref": "#/$defs/repository_path",
+          "description": "Istanbul per-file coverage report (coverage-final.json shape) the sensor normalizes, instead of the sensor default of coverage/coverage-final.json."
+        }
+      }
+    },
+    "action_effect_inference_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "tsconfigPath": {
+          "$ref": "#/$defs/repository_path",
+          "description": "TypeScript project the effect analyzer loads, instead of the sensor default of tsconfig.effects.json at the repository root."
+        }
+      }
+    },
+    "type_check_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "argv": {
+          "$ref": "#/$defs/argv",
+          "description": "Type check command the sensor executes instead of its default of npx tsc --noEmit against the root tsconfig; its diagnostics are parsed the same way."
+        }
+      }
+    },
+    "perf_test_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "scriptName": {
+          "$ref": "#/$defs/script_name",
+          "description": "Package script the sensor runs and parses for a JSON metrics line, instead of the sensor default of test:perf."
+        }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Declared inputs keyed by registered sensor kind. Only the kinds listed here read a declared input; every other registered kind takes no input and is refused as an undeclared key.",
+      "properties": {
+        "test_security_coverage": {
+          "$ref": "#/$defs/test_inputs"
+        },
+        "test_performance_coverage": {
+          "$ref": "#/$defs/test_inputs"
+        },
+        "test_robustness_coverage": {
+          "$ref": "#/$defs/test_inputs"
+        },
+        "test_idiomaticity": {
+          "$ref": "#/$defs/test_inputs"
+        },
+        "spec_depth": {
+          "$ref": "#/$defs/spec_depth_inputs"
+        },
+        "test_coverage_depth": {
+          "$ref": "#/$defs/test_coverage_depth_inputs"
+        },
+        "action_effect_inference": {
+          "$ref": "#/$defs/action_effect_inference_inputs"
+        },
+        "type_check": {
+          "$ref": "#/$defs/type_check_inputs"
+        },
+        "perf_test": {
+          "$ref": "#/$defs/perf_test_inputs"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "inputs": {}
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "inputs": {
+        "test_security_coverage": {
+          "testGlobs": ["packages/*/tests", "tests"]
+        },
+        "spec_depth": {
+          "adrDir": "law/adr"
+        },
+        "test_coverage_depth": {
+          "coveragePath": "scratch/coverage/rc/coverage-final.json"
+        },
+        "action_effect_inference": {
+          "tsconfigPath": "tests/config/tsconfig.effects.json"
+        },
+        "type_check": {
+          "argv": ["pnpm", "run", "typecheck"]
+        },
+        "perf_test": {
+          "scriptName": "test:perf"
+        }
+      }
+    }
+  ]
+}
