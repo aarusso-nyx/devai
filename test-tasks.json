@@ -27,6 +27,18 @@
         {
           "kind": "exact",
           "pattern": "pnpm-lock.yaml"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/generate-scorecard-page.mjs"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "record/proofs/compliance/scorecards/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "docs/reference/scorecard.md"
         }
       ],
       "toolchainKeys": ["node", "pnpm"],
