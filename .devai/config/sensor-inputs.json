@@ -28,6 +28,9 @@
     },
     "perf_test": {
       "scriptName": "test:perf"
+    },
+    "harness_idiomaticity": {
+      "minWorkflowsForReusableCheck": 5
     }
   },
   "surfaces": {
