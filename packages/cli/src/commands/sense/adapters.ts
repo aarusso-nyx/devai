@@ -82,9 +82,24 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
     }).aggregate,
   lint: (request) => senseLint({ cwd: request.repoRoot }),
   build: (request) => senseBuild({ cwd: request.repoRoot }),
-  unit_test: (request) => senseTest({ cwd: request.repoRoot, suite: 'unit' }),
-  integration_test: (request) => senseTest({ cwd: request.repoRoot, suite: 'integration' }),
-  e2e_test: (request) => senseTest({ cwd: request.repoRoot, suite: 'e2e' }),
+  unit_test: (request) =>
+    senseTest({
+      cwd: request.repoRoot,
+      suite: 'unit',
+      ...optional('argv', stringArrayInput(request, 'argv')),
+    }),
+  integration_test: (request) =>
+    senseTest({
+      cwd: request.repoRoot,
+      suite: 'integration',
+      ...optional('argv', stringArrayInput(request, 'argv')),
+    }),
+  e2e_test: (request) =>
+    senseTest({
+      cwd: request.repoRoot,
+      suite: 'e2e',
+      ...optional('argv', stringArrayInput(request, 'argv')),
+    }),
   migration_check: (request) =>
     senseMigrateCheck({
       cwd: request.repoRoot,
