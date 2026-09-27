@@ -99,7 +99,7 @@ spec_depth, spec_alignment, spec_security_coverage, spec_performance_targets, sp
 
 ### E. Governance diagnostics failing today (Round 4)
 
-decision_record_integrity: 65 ADRs do not satisfy `decision-record.schema.json` and 40 supersession links are asymmetric. decision_citation_resolution: 5 unresolved citations (ADR-001, ADR-003 in schemas, DII-103 and DII-104 in `scorecard.ts`). These are diagnostics rather than cells, but they fail the sweep gate, so the sweep can never report readiness until they are clean.
+decision_record_integrity: 65 ADRs do not satisfy `decision-record.schema.json` and 40 supersession links are asymmetric. decision_citation_resolution: 5 unresolved citations (two legacy numeric ADR citations in the schema examples, two draft DII identities in `scorecard.ts`). These are diagnostics rather than cells, but they fail the sweep gate, so the sweep can never report readiness until they are clean.
 
 ### F. Write-effect sensors (Round 6)
 
