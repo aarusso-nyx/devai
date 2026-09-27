@@ -48,6 +48,17 @@ const READ_PROCESS_VERBS: Readonly<Record<string, readonly string[]>> = {
   sh: ['-lc'],
 };
 
+/** One repository-relative path under tests/, as the broker admits after a governed config. */
+function governedTestPath(value: unknown): boolean {
+  if (typeof value !== 'string' || value.startsWith('/')) return false;
+  const segments = value.split(/[\\/]/u);
+  return (
+    segments[0] === 'tests' &&
+    segments.length > 1 &&
+    segments.every((segment) => segment.length > 0 && segment !== '..' && segment !== '.')
+  );
+}
+
 export function processIsReadOnlyForTest(request: AuthorityHostEffectRequest): boolean {
   const executable = request.arguments[0];
   const args = request.arguments[1];
@@ -97,9 +108,13 @@ export function processIsReadOnlyForTest(request: AuthorityHostEffectRequest): b
       (args[0] === 'vitest' &&
         args[1] === 'run' &&
         (args.length === 2 ||
-          (args.length === 4 &&
+          ((args.length === 4 || (args.length === 5 && governedTestPath(args[4]))) &&
             args[2] === '--config' &&
             [
+              // Mirrors the broker's governed vitest configurations (subprocess-effects
+              // template pnpm-vitest-run-governed-config), plus the scope's own t2 and t6.
+              'tests/config/local.config.ts',
+              'tests/config/rc.performance.config.ts',
               'tests/config/t1.unit.config.ts',
               'tests/config/t2.contract.config.ts',
               'tests/config/t3.integration.config.ts',
