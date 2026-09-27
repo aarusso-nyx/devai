@@ -203,3 +203,39 @@ maintainer before R-0206 records readings:
    `law:validate` runs as `check --only adrs` and `docs:validate` as
    `check --only cli-reference`. Round `close_checks` keep the test-task node
    ids, which the check runner executes.
+
+### R-0202 closed 2026-09-27 at `df545e13`
+
+- TASK-0221 through [#118](https://github.com/aarusso-nyx/devai/pull/118);
+  TASK-0222 and TASK-0223 through the wave pull request
+  [#121](https://github.com/aarusso-nyx/devai/pull/121); TASK-0224 through
+  [#120](https://github.com/aarusso-nyx/devai/pull/120); TASK-0225 through
+  [#117](https://github.com/aarusso-nyx/devai/pull/117); TASK-0226 to
+  TASK-0228 through the wave pull request
+  [#122](https://github.com/aarusso-nyx/devai/pull/122); the ledger through
+  [#119](https://github.com/aarusso-nyx/devai/pull/119).
+- Coupled waves ship as one pull request from the engineer's head, because the
+  inspector's tests are red until the engineer's commits and the gate does not
+  merge red tests. The architect's task keeps its own pull request.
+- Boundaries were widened by the orchestrator for frozen catalogue and
+  digest tests, the generated error-code reference, the published validator
+  roster, and the sense resolver and adapters.
+
+Follow-ups recorded at close:
+
+1. The two read-only `gh api` GET shapes the site drift sensor needs were not
+   admitted in the authority broker: the session's permission classifier
+   refused that edit as a security weakening. The maintainer adds them (see
+   the notes on #120), or `site_drift` stays unknown with a precise finding.
+2. Only 41 of 61 registered actions are linked from `product/use-cases`, so
+   `plant_coverage` and `inventory_coverage` read review at 67 percent. The
+   20 links are Owner-authored specification and belong to R-0203.
+3. The sensor inputs adopter default is not registered in the skills copy
+   policy or the bootstrap file list, so `init bind` does not materialize it
+   for adopters yet.
+4. DEVAI's declared type check runs `tsc -b`, whose diagnostics may not print
+   in the one-line form the sensor parses; confirm in the R-0206 sweep.
+5. `inventory_performance` reads review until readings are persisted.
+6. The three harness sensors now return honest readings: green-main fails at
+   46 percent success over the last 50 runs, performance fails at a 503 s
+   median, robustness reviews at 6 percent flaky. R-0205 owns them.
