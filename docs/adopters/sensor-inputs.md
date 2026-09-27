@@ -113,7 +113,9 @@ DEVAI's own file declares the framework layout: `packages/*/tests` and `tests` a
 for the four test pattern sensors, `law/adr` and `law/invariants` for `spec_depth`,
 `scratch/coverage/rc/coverage-final.json` (the report the RC coverage gate writes) for
 `test_coverage_depth`, `tests/config/tsconfig.effects.json` for `action_effect_inference`,
-`pnpm run typecheck` (the workspace type check over its project references) for `type_check`,
+`npx tsc --noEmit -p tsconfig.typecheck.json` (a read-only check of the workspace against its
+built project references; the broker refuses a bare package script such as `pnpm run typecheck`)
+for `type_check`,
 `pnpm vitest run --config tests/config/rc.performance.config.ts tests/regression` (the
 performance configuration over the regression suite) as `perf_test`'s `argv`, `5` for `harness_idiomaticity`'s `minWorkflowsForReusableCheck`,
 and `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`.
