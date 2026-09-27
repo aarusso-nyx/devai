@@ -581,7 +581,9 @@ function checkWorkflow(file, source, findings, pins) {
 
   const triggers = object(workflow.on);
   const triggerNames = Object.keys(triggers).sort();
-  const expectedTriggers = ['push', 'workflow_dispatch'];
+  // Ledger verification runs only on manual dispatch: a push trigger left one run
+  // waiting on the protected environment per merge to main (issue #153).
+  const expectedTriggers = ['workflow_dispatch'];
   if (
     triggerNames.length !== expectedTriggers.length ||
     triggerNames.some((name, index) => name !== expectedTriggers[index])
@@ -590,7 +592,7 @@ function checkWorkflow(file, source, findings, pins) {
       finding(
         'CI_WORKFLOW_TRUST_BOUNDARY_INVALID',
         file,
-        'workflow must use unprivileged pull_request preflight, push, and workflow_dispatch only',
+        'workflow must use workflow_dispatch only',
       ),
     );
   }

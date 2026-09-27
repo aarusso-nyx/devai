@@ -1,8 +1,5 @@
 name: DEVAI ledger verification
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch: {}
 concurrency:
   group: devai-ledger-verify-${{ github.sha }}
