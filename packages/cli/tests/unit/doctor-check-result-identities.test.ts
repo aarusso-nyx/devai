@@ -394,7 +394,7 @@ describe('Doctor whole CheckResult identities', () => {
               {
                 "actual_sha256": "missing",
                 "file": "scorecard-na.json",
-                "installed_sha256": "811858d9a230f84ef027b3281fd97d6dbeb2e819f0c4169585ce13080dc94460",
+                "installed_sha256": "55956d3426a42ecad07ad04ad18eb6c6758852aa03c39f0e3b58c440a6ec8c62",
                 "target": "<repo>/.devai/config/scorecard-na.json",
               },
               {
