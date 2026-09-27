@@ -81,7 +81,7 @@
       "id": "R-0201",
       "title": "Governance for self-sensing",
       "goal": "The self-dogfood policy admits sensing and recording under declared roles, the scorecard reads one canonical readings store, and the N/A ledger states the scoreable cell count once.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0001", "ADR-SCR-0002"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -107,7 +107,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -148,8 +148,8 @@
                 "path": "prompts/TASK-0211.md",
                 "sha256": "9683cabaf79ab48fec93b3ea5e61262a69f97d8f07b6d031c7e56786fa2c3089"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/112",
+              "merged_as": "d41b530d5d2630e8f2389db407de303f64c9f357",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -178,7 +178,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F4", "F5"],
               "boundary": {
                 "paths": [
@@ -236,8 +236,8 @@
                 "path": "prompts/TASK-0212.md",
                 "sha256": "36db1f3bec7279b6e93fdb1c865dea6f9ad82eb8d2315bb749f452509bb14914"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/113",
+              "merged_as": "f4dde40fb07ffa60c760e096a9cc455c330fb6fe",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -246,7 +246,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "cbf2d1325805a26ad17fda2ff45c6cadf91577c5",
+        "closed_at": "2026-09-27T03:17:30Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0202",
@@ -413,15 +419,7 @@
                   "packages/sensors/tests/declared-inputs.test.ts",
                   "tests/contract/sensor-inputs.contract.test.ts"
                 ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:sensors",
-                  "--format",
-                  "json"
-                ],
+                ["pnpm", "run", "test:sensors"],
                 [
                   "node",
                   ".devai/state/pr-bootstrap/cli/bin.js",
@@ -494,15 +492,7 @@
                 "A test proves that gh with any mutating subcommand is still refused."
               ],
               "acceptance_commands": [
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:authority",
-                  "--format",
-                  "json"
-                ],
+                ["pnpm", "run", "test:authority"],
                 [
                   "pnpm",
                   "exec",
@@ -679,15 +669,7 @@
                   "packages/sensors/tests/declared-surfaces.test.ts",
                   "tests/contract/declared-surfaces.contract.test.ts"
                 ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:sensors",
-                  "--format",
-                  "json"
-                ],
+                ["pnpm", "run", "test:sensors"],
                 [
                   "node",
                   ".devai/state/pr-bootstrap/cli/bin.js",
@@ -843,7 +825,7 @@
                   ".devai/state/pr-bootstrap/cli/bin.js",
                   "check",
                   "--only",
-                  "law:validate",
+                  "adrs",
                   "--format",
                   "json"
                 ]
@@ -947,24 +929,8 @@
                   "tests/contract/targets-resolution.contract.test.ts",
                   "packages/sensors/tests/spec-substrate.test.ts"
                 ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:spec",
-                  "--format",
-                  "json"
-                ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:sensors",
-                  "--format",
-                  "json"
-                ]
+                ["pnpm", "run", "test:spec"],
+                ["pnpm", "run", "test:sensors"]
               ],
               "commit_types": ["law(trace)", "feat(sensors)", "test(spec)"],
               "prompt": {
@@ -1039,7 +1005,7 @@
                   ".devai/state/pr-bootstrap/cli/bin.js",
                   "check",
                   "--only",
-                  "law:validate",
+                  "adrs",
                   "--format",
                   "json"
                 ]
@@ -1105,24 +1071,8 @@
               ],
               "acceptance_commands": [
                 ["pnpm", "audit", "--audit-level", "high"],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "build",
-                  "--format",
-                  "json"
-                ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:local-full",
-                  "--format",
-                  "json"
-                ]
+                ["pnpm", "run", "build"],
+                ["pnpm", "run", "test:cli"]
               ],
               "commit_types": ["build(deps)"],
               "prompt": {
@@ -1180,15 +1130,7 @@
                 "The testing guide states the classification convention."
               ],
               "acceptance_commands": [
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:sensors",
-                  "--format",
-                  "json"
-                ],
+                ["pnpm", "run", "test:sensors"],
                 [
                   "node",
                   ".devai/state/pr-bootstrap/cli/bin.js",
@@ -1252,24 +1194,8 @@
                 "The local full suite and typecheck pass."
               ],
               "acceptance_commands": [
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "typecheck",
-                  "--format",
-                  "json"
-                ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "test:local-full",
-                  "--format",
-                  "json"
-                ],
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:cli"],
                 [
                   "node",
                   ".devai/state/pr-bootstrap/cli/bin.js",
@@ -1418,7 +1344,7 @@
                   ".devai/state/pr-bootstrap/cli/bin.js",
                   "check",
                   "--only",
-                  "docs:validate",
+                  "cli-reference",
                   "--format",
                   "json"
                 ]
