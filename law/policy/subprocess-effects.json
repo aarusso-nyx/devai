@@ -30,6 +30,35 @@
       "owner": "architect"
     },
     {
+      "template_id": "gh-run-list",
+      "executable": "gh",
+      "argv_shape": ["run", "list", "--branch", "<ref>", "--json", "<fields>", "--limit", "<n>"],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "Harness sensors read GitHub Actions run history (ADR-SCR-0005 IA-004); the broker admits exactly this shape without a host adapter under sense run and check: <ref> is letters, digits, dot, underscore, slash, or hyphen without a leading hyphen or '..'; <fields> is one to sixteen comma-separated alphabetic names; <n> is 1 to 9999; gh-run-list-created adds the --created filter. Every other gh argv except auth, auth status, --version, and --help is refused.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "gh-run-list-created",
+      "executable": "gh",
+      "argv_shape": [
+        "run",
+        "list",
+        "--branch",
+        "<ref>",
+        "--json",
+        "<fields>",
+        "--limit",
+        "<n>",
+        "--created",
+        ">=<date>"
+      ],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "The harness_green_main sensor narrows gh-run-list by creation date (ADR-SCR-0005 IA-004); the broker admits exactly this shape without a host adapter under sense run and check, with gh-run-list value constraints and <date> an ISO date or datetime after the literal >= prefix.",
+      "owner": "architect"
+    },
+    {
       "template_id": "git-dynamic-read",
       "executable": "git",
       "argv_shape": ["<dynamic-argv>"],
