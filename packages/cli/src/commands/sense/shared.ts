@@ -196,8 +196,12 @@ const DECLARED_PATH_KEYS: ReadonlySet<string> = new Set([
   'coveragePath',
   'tsconfigPath',
 ]);
-/** Keys whose value is a list of repository-relative test roots, one wildcard segment each. */
-const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set(['testGlobs']);
+/**
+ * Keys whose value is a list of repository-relative globs: test roots with one wildcard
+ * segment each, and plant_depth's file exclusions, whose fixed prefix and first
+ * wildcard expansion must stay inside the root the same way.
+ */
+const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set(['testGlobs', 'excludeGlobs']);
 
 export type SenseInputsErrorCode =
   | 'SENSE_INPUTS_UNDECLARED_KEY'

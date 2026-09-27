@@ -204,7 +204,11 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   spec_performance_targets: (request) =>
     senseSpecPerformanceTargets({ repoRoot: request.repoRoot }),
   spec_robustness_targets: (request) => senseSpecRobustnessTargets({ repoRoot: request.repoRoot }),
-  plant_depth: (request) => sensePlantDepth({ repoRoot: request.repoRoot }),
+  plant_depth: (request) =>
+    sensePlantDepth({
+      repoRoot: request.repoRoot,
+      ...optional('excludeGlobs', stringArrayInput(request, 'excludeGlobs')),
+    }),
   plant_coherence: (request) => sensePlantCoherence({ repoRoot: request.repoRoot }),
   test_coherence: (request) => senseTestCoherence({ repoRoot: request.repoRoot }),
   test_idiomaticity: (request) =>
