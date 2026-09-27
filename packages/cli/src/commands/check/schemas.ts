@@ -47,13 +47,16 @@ const SOURCE_ONLY_SCHEMAS = [
   'commit-grammar.schema.json',
   'credential-requirements.schema.json',
   'claim-runtime-inputs.schema.json',
+  'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
   'preflight-probe.schema.json',
   'prompt-composition.schema.json',
   'stack-adapter.schema.json',
+  'targets.schema.json',
   'task-freshness.schema.json',
   'test-task-descriptor.schema.json',
+  'threat-model.schema.json',
   'toolchain-manifest.schema.json',
 ] as const;
 
