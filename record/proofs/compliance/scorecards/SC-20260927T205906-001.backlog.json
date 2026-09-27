@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0.0",
+  "merge_sha": "86d8cceab1d0c2a4ea3891e151d23150ac22dab1",
+  "previous_merge_sha": null,
+  "current": {
+    "count": 8,
+    "items": [
+      {
+        "id": "BL-F3-T1",
+        "title": "F3 × T1 → FAIL",
+        "priority": 80,
+        "cell": "F3×T1",
+        "verdict": "FAIL"
+      },
+      {
+        "id": "BL-F3-T2",
+        "title": "F3 × T2 → REVIEW",
+        "priority": 50,
+        "cell": "F3×T2",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F4-T7",
+        "title": "F4 × T7 → REVIEW",
+        "priority": 50,
+        "cell": "F4×T7",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F4-T9",
+        "title": "F4 × T9 → REVIEW",
+        "priority": 50,
+        "cell": "F4×T9",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F5-T4",
+        "title": "F5 × T4 → REVIEW",
+        "priority": 50,
+        "cell": "F5×T4",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F5-T7",
+        "title": "F5 × T7 → FAIL",
+        "priority": 80,
+        "cell": "F5×T7",
+        "verdict": "FAIL"
+      },
+      {
+        "id": "BL-F5-T8",
+        "title": "F5 × T8 → REVIEW",
+        "priority": 50,
+        "cell": "F5×T8",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F5-T9",
+        "title": "F5 × T9 → FAIL",
+        "priority": 80,
+        "cell": "F5×T9",
+        "verdict": "FAIL"
+      }
+    ]
+  },
+  "deltas": {
+    "additions": [
+      {
+        "id": "BL-F3-T1",
+        "title": "F3 × T1 → FAIL",
+        "priority": 80,
+        "cell": "F3×T1",
+        "verdict": "FAIL"
+      },
+      {
+        "id": "BL-F3-T2",
+        "title": "F3 × T2 → REVIEW",
+        "priority": 50,
+        "cell": "F3×T2",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F4-T7",
+        "title": "F4 × T7 → REVIEW",
+        "priority": 50,
+        "cell": "F4×T7",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F4-T9",
+        "title": "F4 × T9 → REVIEW",
+        "priority": 50,
+        "cell": "F4×T9",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F5-T4",
+        "title": "F5 × T4 → REVIEW",
+        "priority": 50,
+        "cell": "F5×T4",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F5-T7",
+        "title": "F5 × T7 → FAIL",
+        "priority": 80,
+        "cell": "F5×T7",
+        "verdict": "FAIL"
+      },
+      {
+        "id": "BL-F5-T8",
+        "title": "F5 × T8 → REVIEW",
+        "priority": 50,
+        "cell": "F5×T8",
+        "verdict": "REVIEW"
+      },
+      {
+        "id": "BL-F5-T9",
+        "title": "F5 × T9 → FAIL",
+        "priority": 80,
+        "cell": "F5×T9",
+        "verdict": "FAIL"
+      }
+    ],
+    "completions": []
+  }
+}
