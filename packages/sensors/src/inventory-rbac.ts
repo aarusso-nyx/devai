@@ -3,6 +3,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
+import {
+  allBoundSurfacesAbsent,
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import type { DataModelBody, DataModelTable } from './inventory-data-model.js';
 
@@ -55,6 +61,10 @@ const RBAC_JOIN_PATTERNS = [
 
 export interface InventoryRbacOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   readonly dataModelPath?: string;
   /**
    * Optional path to the inventory_api body. When supplied (and the
@@ -128,7 +138,7 @@ function endpointIdOf(e: ApiMapEndpoint): string {
   return e.id ?? `${e.method} ${e.path}`;
 }
 
-export function senseInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
+function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
   const t0 = Date.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const dataModelPath =
@@ -395,4 +405,26 @@ export function senseInventoryRbac(opts: InventoryRbacOptions): InventoryRbacRes
   });
 
   return { reading, body, bodyPath };
+}
+
+/** Surfaces this sensor is bound to (ADR-SCR-0003). */
+const BOUND_SURFACES: readonly PlantSurface[] = ['rbac'];
+
+export function senseInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
+  // A declared-absent surface is still scanned, so a contradiction is caught; its
+  // body is never materialized.
+  const absent = allBoundSurfacesAbsent(opts.surfaces, BOUND_SURFACES);
+  const result = measureInventoryRbac(absent ? { ...opts, persistBody: false } : opts);
+  const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, [
+    { surface: 'rbac', items: rbacEvidence(result.body) },
+  ]);
+  return { ...result, reading };
+}
+
+/** Role, permission, and assignment tables the body inventories. */
+function rbacEvidence(body: unknown): readonly string[] {
+  const tables = (body as { readonly rbacIlfTables?: unknown }).rbacIlfTables;
+  return Array.isArray(tables)
+    ? tables.filter((name): name is string => typeof name === 'string')
+    : [];
 }

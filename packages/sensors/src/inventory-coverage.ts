@@ -3,6 +3,17 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
+import {
+  actionEvidence,
+  allBoundSurfacesAbsent,
+  applySurfaceDeclaration,
+  measureActionLinkage,
+  surfacePresent,
+  unlinkedActionFindings,
+  type DeclaredSurfaces,
+  type PlantSurface,
+  type SurfaceEvidence,
+} from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 
 /**
@@ -53,6 +64,12 @@ interface ApiMapShape {
 
 export interface InventoryCoverageOptions {
   readonly repoRoot: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
+   * With http absent the api-map and routes bodies are not demanded; with actions
+   * present the action registry is measured against its use-case links.
+   */
+  readonly surfaces?: DeclaredSurfaces;
   readonly apiMapPath?: string;
   readonly routesPath?: string;
   readonly bodyPath?: string;
@@ -351,7 +368,7 @@ function resolveRoutesPath(
   return { kind: 'missing', directory: dir };
 }
 
-export function senseInventoryCoverage(opts: InventoryCoverageOptions): InventoryCoverageResult {
+function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCoverageResult {
   const t0 = Date.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const apiMapPath =
@@ -367,8 +384,11 @@ export function senseInventoryCoverage(opts: InventoryCoverageOptions): Inventor
   let status: SensorStatus = 'pass';
   let apiMap: ApiMapShape | null = null;
   let routesInventory: RoutesInventoryShape | null = null;
+  const httpPresent = surfacePresent(opts.surfaces, 'http');
 
-  if (!existsSync(apiMapPath)) {
+  if (!httpPresent) {
+    // ADR-SCR-0003: http declared absent; no HTTP inventory is demanded.
+  } else if (!existsSync(apiMapPath)) {
     status = 'review';
     findings.push({
       severity: 'warning',
@@ -388,7 +408,9 @@ export function senseInventoryCoverage(opts: InventoryCoverageOptions): Inventor
     }
   }
 
-  if (routesResolution.kind === 'ambiguous') {
+  if (!httpPresent) {
+    // As above: the routes body is not demanded either.
+  } else if (routesResolution.kind === 'ambiguous') {
     if (status === 'pass') status = 'review';
     findings.push({
       severity: 'warning',
@@ -515,6 +537,16 @@ export function senseInventoryCoverage(opts: InventoryCoverageOptions): Inventor
     }
   }
 
+  // ADR-SCR-0003 IA-004: registered actions measured against their specification links,
+  // the way unmapped routes and endpoints read review above.
+  const linkage = surfacePresent(opts.surfaces, 'actions')
+    ? measureActionLinkage(opts.repoRoot, useCasesDir)
+    : null;
+  if (linkage !== null && linkage.unlinkedIds.length > 0) {
+    if (status === 'pass') status = 'review';
+    findings.push(...unlinkedActionFindings(linkage, 'COVERAGE_UNLINKED_ACTION'));
+  }
+
   let bodyPath: string | null = null;
   if ((status === 'pass' || status === 'review') && opts.persistBody !== false) {
     bodyPath =
@@ -593,9 +625,50 @@ export function senseInventoryCoverage(opts: InventoryCoverageOptions): Inventor
       unmapped_endpoint_count: unmappedEndpoints.length,
       inferred_path_match_count: inferredPathMatchCount,
       coverage_hash: coverageHash,
+      ...(linkage !== null && linkage.metrics),
     },
     ...(bodyPath !== null && { evidence_path: bodyPath }),
   });
 
   return { reading, body, bodyPath };
+}
+
+/** Surfaces this sensor is bound to (ADR-SCR-0003). */
+const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'actions'];
+
+/** Endpoints and routes an existing HTTP inventory body holds. */
+function httpEvidence(opts: InventoryCoverageOptions): SurfaceEvidence {
+  const items: string[] = [];
+  const apiMapPath =
+    opts.apiMapPath ?? join(opts.repoRoot, 'record/proofs/sensors/inventory_api/api-map.json');
+  try {
+    const apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as Partial<ApiMapShape>;
+    for (const endpoint of apiMap.endpoints ?? []) items.push(endpointId(endpoint));
+  } catch {
+    // No readable api-map: no endpoint evidence.
+  }
+  const routes = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework);
+  if (routes.kind === 'resolved') {
+    try {
+      const inventory = JSON.parse(
+        readFileSync(routes.path, 'utf8'),
+      ) as Partial<RoutesInventoryShape>;
+      for (const route of inventory.routes ?? []) items.push(route.path);
+    } catch {
+      // No readable routes body: no route evidence.
+    }
+  }
+  return { surface: 'http', items };
+}
+
+export function senseInventoryCoverage(opts: InventoryCoverageOptions): InventoryCoverageResult {
+  // Declared-absent surfaces are still checked for evidence; the matrix body of a
+  // skipped reading is never materialized.
+  const absent = allBoundSurfacesAbsent(opts.surfaces, BOUND_SURFACES);
+  const result = measureInventoryCoverage(absent ? { ...opts, persistBody: false } : opts);
+  const evidence: SurfaceEvidence[] = [];
+  if (!surfacePresent(opts.surfaces, 'http')) evidence.push(httpEvidence(opts));
+  if (!surfacePresent(opts.surfaces, 'actions')) evidence.push(actionEvidence(opts.repoRoot));
+  const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, evidence);
+  return { ...result, reading };
 }
