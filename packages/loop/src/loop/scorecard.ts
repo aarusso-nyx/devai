@@ -19,6 +19,44 @@ export interface ScorecardCell {
   notes?: string;
 }
 
+/**
+ * Marker that opens the `notes` of a cell recorded N/A by declaration
+ * (ADR-SCR-0003). scorecard.schema.json closes the cell record, so the
+ * source of an N/A verdict travels in `notes`: a ledger N/A carries no
+ * readings and no marker; a declaration N/A lists its skipped readings in
+ * `sensor_readings` and opens `notes` with this marker followed by one
+ * `<kind>: <reason>` entry per skipped reading, joined by `; `.
+ */
+export const NA_DECLARATION_NOTE_PREFIX = 'N/A-declaration:';
+
+/** Where an N/A verdict came from: the ledger (ADR-SCR-0002) or a surfaces declaration (ADR-SCR-0003). */
+export type CellNaSource = 'ledger' | 'declaration';
+
+/**
+ * Read the source of a cell's N/A verdict from its record, or null when the
+ * cell is not N/A. Ledger and declaration are the only two sources.
+ */
+export function scorecardCellNaSource(
+  cell: Pick<ScorecardCell, 'verdict' | 'notes'>,
+): CellNaSource | null {
+  if (cell.verdict !== 'N/A') return null;
+  return cell.notes?.startsWith(NA_DECLARATION_NOTE_PREFIX) === true ? 'declaration' : 'ledger';
+}
+
+/**
+ * The declaration reason a skipped reading carries (ADR-SCR-0003): the
+ * message of its first finding, else its err_head or out_head, else a
+ * generic statement naming the sensor. A sensor skipping for an absent
+ * surface therefore states the declaration in its first finding.
+ */
+export function skippedReadingReason(reading: SensorReading): string {
+  const finding = reading.findings?.[0];
+  if (finding !== undefined && finding.message.length > 0) return finding.message;
+  if (reading.err_head !== undefined && reading.err_head.length > 0) return reading.err_head;
+  if (reading.out_head !== undefined && reading.out_head.length > 0) return reading.out_head;
+  return `skipped by ${reading.sensor.kind} without a stated reason`;
+}
+
 export interface SubstrateAggregate {
   verdict: AggregateVerdict;
   score?: number;
@@ -58,11 +96,14 @@ export interface ComputeScorecardOptions {
   /**
    * The N/A ledger projection (ADR-SCR-0002): cell coordinates in
    * `Fx:Ty` form forced to verdict `N/A` regardless of any reading,
-   * applied BEFORE reading-driven verdicts. This is the sole source
-   * of N/A cells; the classifier holds no list of its own, so a
-   * degenerate cell under Constitution Article 5 (for example
+   * applied BEFORE reading-driven verdicts and winning over every
+   * reading, skipped or measured. The classifier holds no list of its
+   * own, so a degenerate cell under Constitution Article 5 (for example
    * Inventory × Idiomaticity, F4:T5) is N/A only because the ledger
-   * says so with a reason. Build it with `loadScorecardNaConfig` +
+   * says so with a reason. The one other path to N/A is a surfaces
+   * declaration (ADR-SCR-0003): a cell whose readings are all
+   * `skipped` is recorded N/A with the declaration reason, marked by
+   * `NA_DECLARATION_NOTE_PREFIX` in its notes. Build the ledger set with `loadScorecardNaConfig` +
    * `scorecardNaCellSet` from the repo's materialized
    * `.devai/config/scorecard-na.json`, which mirrors
    * `law/policy/scorecard-na.json`. Omitted or empty, every cell is
@@ -94,11 +135,18 @@ function scorecardId(isoTimestamp: string, sequence: number, prefix: 'SC' | 'AS'
  * Compute a scorecard from a set of recent SensorReadings.
  *
  * - Every substrate × property cell starts as 'UNKNOWN'.
- * - Cells listed in the N/A ledger (`naCells`, ADR-SCR-0002) are marked 'N/A'.
+ * - Cells listed in the N/A ledger (`naCells`, ADR-SCR-0002) are marked 'N/A'
+ *   and take no reading at all.
  * - For each SensorReading we map sensor.kind → substrate/property and
- *   set the cell's verdict from the reading's status. Multiple readings
- *   for one cell collapse to the worst (FAIL > REVIEW > UNKNOWN > PASS).
- * - Per-cell deterministic flag = AND of contributing readings'
+ *   set the cell's verdict from the reading's status. Multiple measured
+ *   readings for one cell collapse to the worst (FAIL > REVIEW > UNKNOWN > PASS).
+ * - A 'skipped' reading (ADR-SCR-0003: its sensor is bound to a surface the
+ *   repository declared absent) is listed in the cell's readings but never
+ *   enters the collapse. A cell whose readings are all skipped is recorded
+ *   'N/A' with the declaration reason in its notes, never 'UNKNOWN' or
+ *   'REVIEW'; one measured reading in the cell makes its skipped siblings
+ *   inert.
+ * - Per-cell deterministic flag = AND of the measured readings'
  *   deterministic flags (any non-deterministic reading taints the cell).
  *
  * Returns a Scorecard record conformant to scorecard.schema.json.
@@ -123,6 +171,9 @@ export function computeScorecard(opts: ComputeScorecardOptions): Scorecard {
   const currentReadings = filterLatestPerKind(opts.readings ?? []);
   const staleFailAfterMs = opts.staleFailAfterMs;
   const generatedAtMs = Date.parse(opts.timestamp);
+  // Per cell: how many measured readings landed, and the declaration
+  // reasons of the skipped ones (ADR-SCR-0003).
+  const tallies = new Map<string, { measured: number; skipped: string[] }>();
   for (const reading of currentReadings) {
     // mapSensorToCell may return more than one cell.
     // cell — e.g. an inventory SR contributes to both the F4×T1
@@ -131,20 +182,33 @@ export function computeScorecard(opts: ComputeScorecardOptions): Scorecard {
     // worst-wins merge semantics on each.
     const mappings = scorecardCellsForSensorKind(reading.sensor.kind);
     for (const mapping of mappings) {
+      const cellKey = `${mapping.substrate}:${mapping.property}`;
       const cell = cells.find(
         (c) => c.substrate === mapping.substrate && c.property === mapping.property,
       );
-      if (cell === undefined || cell.verdict === 'N/A') continue;
-      const staleFail = isStaleFailure(reading, generatedAtMs, staleFailAfterMs);
-      const incoming = staleFail ? 'REVIEW' : sensorStatusToVerdict(reading.status);
-      // Only an unobserved cell is replaced outright. An explicit UNKNOWN
-      // reading is evidence of a gap and participates in worst-wins merging.
-      cell.verdict =
-        cell.sensor_readings === undefined ? incoming : worseVerdict(cell.verdict, incoming);
-      cell.deterministic = cell.deterministic && reading.deterministic;
+      // A ledger N/A wins over every reading and lists none of them.
+      if (cell === undefined || naOverlay.has(cellKey)) continue;
+      let tally = tallies.get(cellKey);
+      if (tally === undefined) {
+        tally = { measured: 0, skipped: [] };
+        tallies.set(cellKey, tally);
+      }
       const refs = cell.sensor_readings ?? [];
       refs.push(reading.id);
       cell.sensor_readings = refs;
+      if (reading.status === 'skipped') {
+        // Listed, never collapsed: the surface was declared absent.
+        tally.skipped.push(`${reading.sensor.kind}: ${skippedReadingReason(reading)}`);
+        continue;
+      }
+      const staleFail = isStaleFailure(reading, generatedAtMs, staleFailAfterMs);
+      const incoming = staleFail ? 'REVIEW' : sensorStatusToVerdict(reading.status);
+      // Only a cell with no measured reading yet is replaced outright. An
+      // explicit UNKNOWN reading is evidence of a gap and participates in
+      // worst-wins merging.
+      cell.verdict = tally.measured === 0 ? incoming : worseVerdict(cell.verdict, incoming);
+      tally.measured += 1;
+      cell.deterministic = cell.deterministic && reading.deterministic;
       if (staleFail) {
         const marker = `REVIEW-stale: latest ${reading.sensor.kind} failure at ${reading.timestamp}`;
         cell.notes = cell.notes === undefined ? marker : `${cell.notes}; ${marker}`;
@@ -153,6 +217,16 @@ export function computeScorecard(opts: ComputeScorecardOptions): Scorecard {
         cell.notes = cell.notes === undefined ? marker : `${cell.notes}; ${marker}`;
       }
     }
+  }
+
+  // ADR-SCR-0003: a cell whose readings are all skipped is N/A by
+  // declaration, with the reasons in its notes behind the marker.
+  for (const cell of cells) {
+    const tally = tallies.get(`${cell.substrate}:${cell.property}`);
+    if (tally === undefined || tally.measured > 0 || tally.skipped.length === 0) continue;
+    cell.verdict = 'N/A';
+    const marker = `${NA_DECLARATION_NOTE_PREFIX} ${tally.skipped.join('; ')}`;
+    cell.notes = cell.notes === undefined ? marker : `${cell.notes}; ${marker}`;
   }
 
   // Substrate aggregates: each substrate's worst cell.
@@ -285,7 +359,11 @@ function sensorStatusToVerdict(s: SensorReading['status']): CellVerdict {
     case 'review':
       return 'REVIEW';
     case 'unknown':
+      return 'UNKNOWN';
     case 'skipped':
+      // Unreachable from computeScorecard, which lists a skipped reading
+      // without collapsing it (ADR-SCR-0003); kept so the switch stays
+      // total over SensorStatus.
       return 'UNKNOWN';
   }
 }
@@ -452,8 +530,9 @@ export function assessScorecard(
       const detail = describeReviewFromRefs(refs, readingById);
       perCellLines.push(`  - ${cellKey} REVIEW: ${detail}`);
     } else if (c.verdict === 'UNKNOWN' && refs.length > 0) {
-      // SR(s) present but classifier returned UNKNOWN — this would
-      // happen if the SR's status was `unknown` or `skipped`.
+      // SR(s) present but classifier returned UNKNOWN — this happens
+      // when the SR's status was `unknown` (a skipped SR records N/A
+      // by declaration instead, ADR-SCR-0003).
       const kinds = Array.from(
         new Set(refs.map((id) => readingById.get(id)?.sensor.kind ?? '<unknown>')),
       ).join(', ');
