@@ -2,14 +2,27 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SensorReading } from '@devai-nyx/sensors';
 import { computeScorecard, type Scorecard } from '../loop/scorecard.js';
+import {
+  loadScorecardNaConfig,
+  resolveScorecardNaPath,
+  scorecardNaCellSet,
+} from '../loop/scorecard-na.js';
 import { loadScorecardFailureMaxAgeMs } from './freshness-policy.js';
 import { filterLatestPerKind } from './latest.js';
 
 export { filterLatestPerKind } from './latest.js';
 
 /**
- * Shared scorecard-input resolver used by deterministic scorecard
- * computation and assessment recipes. Precedence:
+ * The one readings store (ADR-SCR-0002): `sense record` persists every
+ * reading at `<repoRoot>/.devai/state/sensor-readings/<kind>/<id>.json`
+ * and every scorecard consumer resolves readings from that directory
+ * through `resolveScorecardInputs`. No consumer reads another store.
+ */
+export const SENSOR_READINGS_DIR = '.devai/state/sensor-readings';
+
+/**
+ * Shared scorecard-input resolver used by `audit scorecard`, deterministic
+ * scorecard computation and assessment recipes. Precedence:
  *   1. `inputs.scorecard` if pre-populated → return as-is (caller
  *      supplied a fully-computed scorecard).
  *   2. `inputs.readings` if pre-populated → compute scorecard from
@@ -18,8 +31,12 @@ export { filterLatestPerKind } from './latest.js';
  *      (or `inputs.readings_dir` override) one level deep into
  *      `<kind>/<id>.json` subdirectories.
  *
- * The per-cell classifier remains in `loop/scorecard.ts`; this module
- * keeps input resolution identical for every consumer.
+ * Every computed scorecard applies the repository's N/A ledger
+ * (`.devai/config/scorecard-na.json`, the materialized copy of
+ * `law/policy/scorecard-na.json`) as the sole source of N/A cells, and
+ * the repository stale-failure policy. The per-cell classifier remains in
+ * `loop/scorecard.ts`; this module keeps input resolution identical for
+ * every consumer.
  */
 export interface ScorecardInputs {
   readonly repoRoot: string;
@@ -42,6 +59,11 @@ export interface ResolvedScorecardInputs {
 
 const DEFAULT_INTEGRATION_HEAD = '0'.repeat(39) + 'f';
 
+/** Project the repository N/A ledger into the classifier's `naCells` option. */
+export function resolveScorecardNaCells(repoRoot: string): ReadonlySet<string> {
+  return scorecardNaCellSet(loadScorecardNaConfig(resolveScorecardNaPath(repoRoot)));
+}
+
 export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecardInputs {
   const inputs = opts.inputs ?? {};
   const integrationHead = opts.integrationHead ?? DEFAULT_INTEGRATION_HEAD;
@@ -63,6 +85,7 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
       timestamp: opts.timestamp,
       integrationHead,
       readings: preReadings,
+      naCells: resolveScorecardNaCells(opts.repoRoot),
       staleFailAfterMs: loadScorecardFailureMaxAgeMs(opts.repoRoot),
     });
     return { scorecard, readings: preReadings, source: 'inputs' };
@@ -70,13 +93,13 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
 
   // (3) Disk fallback.
   const readingsDir =
-    (inputs['readings_dir'] as string | undefined) ??
-    join(opts.repoRoot, '.devai/state/sensor-readings');
+    (inputs['readings_dir'] as string | undefined) ?? join(opts.repoRoot, SENSOR_READINGS_DIR);
   const readings = loadReadingsFromDir(readingsDir);
   const scorecard = computeScorecard({
     timestamp: opts.timestamp,
     integrationHead,
     readings,
+    naCells: resolveScorecardNaCells(opts.repoRoot),
     staleFailAfterMs: loadScorecardFailureMaxAgeMs(opts.repoRoot),
   });
   return { scorecard, readings, source: readings.length > 0 ? 'disk' : 'empty' };

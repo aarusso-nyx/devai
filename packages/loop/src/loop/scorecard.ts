@@ -49,25 +49,6 @@ export interface Scorecard {
 const SUBSTRATES: readonly Substrate[] = ['F1', 'F2', 'F3', 'F4', 'F5'];
 const PROPERTIES: readonly Property[] = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9'];
 
-/**
- * Degenerate (N/A) cells per Constitution Article 5: cells where
- * the substrate × property combination has no meaningful sensor.
- *
- * F4×T5 (Inventory × Idiomaticity): derived inventory artifacts
- * are mechanically generated; "idiomaticity" applies to authored
- * code, not to derived data structures.
- *
- * F4×T6 is intentionally excluded from this set. The
- * inventory_data_handling + inventory_rbac sensors specifically
- * surface security and privacy concerns at the inventory layer
- * (PII classifications, RBAC mappings), so F4×T6 is the natural
- * cell for those readings. Pre-22.D the cell was marked N/A and
- * the 21.E mapping silently dropped on the floor.
- */
-const DEGENERATE_CELLS: ReadonlySet<string> = new Set([
-  'F4:T5', // inventory × idiomaticity
-]);
-
 export interface ComputeScorecardOptions {
   readonly timestamp: string;
   readonly integrationHead: string;
@@ -75,13 +56,17 @@ export interface ComputeScorecardOptions {
   /** Counter suffix; defaults to 001. Use to disambiguate sub-second runs. */
   readonly sequence?: number;
   /**
-   * Phase 34.B (D-91): per-repo N/A overlay. Cell coordinates in
-   * `Fx:Ty` form forced to verdict `N/A` regardless of any reading
-   * — applied AFTER global `DEGENERATE_CELLS` and BEFORE reading-
-   * driven verdicts. Cells already in `DEGENERATE_CELLS` are a no-
-   * op (the global structural claim wins). Use
-   * `loadScorecardNaConfig` + `scorecardNaCellSet` to build this
-   * from the repo's `.devai/config/scorecard-na.json` file.
+   * The N/A ledger projection (ADR-SCR-0002): cell coordinates in
+   * `Fx:Ty` form forced to verdict `N/A` regardless of any reading,
+   * applied BEFORE reading-driven verdicts. This is the sole source
+   * of N/A cells; the classifier holds no list of its own, so a
+   * degenerate cell under Constitution Article 5 (for example
+   * Inventory × Idiomaticity, F4:T5) is N/A only because the ledger
+   * says so with a reason. Build it with `loadScorecardNaConfig` +
+   * `scorecardNaCellSet` from the repo's materialized
+   * `.devai/config/scorecard-na.json`, which mirrors
+   * `law/policy/scorecard-na.json`. Omitted or empty, every cell is
+   * scoreable.
    */
   readonly naCells?: ReadonlySet<string>;
   /** DII-103 freshness boundary. Omit until policy supplies an authorized value. */
@@ -109,7 +94,7 @@ function scorecardId(isoTimestamp: string, sequence: number, prefix: 'SC' | 'AS'
  * Compute a scorecard from a set of recent SensorReadings.
  *
  * - Every substrate × property cell starts as 'UNKNOWN'.
- * - Degenerate cells (per Article 5) are marked 'N/A'.
+ * - Cells listed in the N/A ledger (`naCells`, ADR-SCR-0002) are marked 'N/A'.
  * - For each SensorReading we map sensor.kind → substrate/property and
  *   set the cell's verdict from the reading's status. Multiple readings
  *   for one cell collapse to the worst (FAIL > REVIEW > UNKNOWN > PASS).
@@ -124,10 +109,8 @@ export function computeScorecard(opts: ComputeScorecardOptions): Scorecard {
   for (const substrate of SUBSTRATES) {
     for (const property of PROPERTIES) {
       const key = `${substrate}:${property}`;
-      // Phase 34.B (D-91): per-repo N/A overlay applies in addition
-      // to the global DEGENERATE_CELLS structural claim. Either
-      // matching path forces verdict to N/A.
-      const isDegenerate = DEGENERATE_CELLS.has(key) || naOverlay.has(key);
+      // The ledger projection is the only path to N/A (ADR-SCR-0002).
+      const isDegenerate = naOverlay.has(key);
       cells.push({
         substrate,
         property,
