@@ -72,10 +72,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up verifier runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
+        uses: ./.github/actions/setup-node-toolchain
       - name: Probe declared credential prerequisites
         shell: bash
         # Presence flags only (ADR-SEC-0001): each variable is true or false, never a value.
@@ -289,15 +286,11 @@ jobs:
           ref: ${{ needs.verify-ledger.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Set up pnpm
-        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d
+      - name: Set up pnpm and Node with GitHub Packages
+        uses: ./.github/actions/setup-node-toolchain
         with:
-          run_install: false
-      - name: Set up Node and GitHub Packages
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
+          setup-pnpm: 'true'
+          cache: pnpm
           registry-url: https://npm.pkg.github.com
           scope: '@aarusso-nyx'
       - name: Verify immutable source identity
@@ -396,10 +389,7 @@ jobs:
       contents: read
     steps:
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
+        uses: ./.github/actions/setup-node-toolchain
       - name: Download exact release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -514,10 +504,8 @@ jobs:
           [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Set up Node and GitHub Packages
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: ./.github/actions/setup-node-toolchain
         with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: '@aarusso-nyx'
       - name: Bind parameterized release identity
@@ -653,10 +641,7 @@ jobs:
           [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Set up Node for Pages verification
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
+        uses: ./.github/actions/setup-node-toolchain
       - name: Download canonical release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -746,10 +731,7 @@ jobs:
           [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
+        uses: ./.github/actions/setup-node-toolchain
       - name: Download exact rehearsal assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -810,10 +792,7 @@ jobs:
           [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
-          node-version: 24
+        uses: ./.github/actions/setup-node-toolchain
       - name: Verify selected rehearsal
         env:
           GH_TOKEN: ${{ github.token }}
