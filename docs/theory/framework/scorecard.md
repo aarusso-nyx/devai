@@ -16,10 +16,39 @@ Each cell of the scorecard is a single verdict, one of:
 | **PASS**    | Sensor measured the cell at or above threshold.                                                                                |
 | **REVIEW**  | Sensor measured below pass threshold but above review threshold. Triggers the tie-breaker ladder.                              |
 | **FAIL**    | Sensor measured below review threshold. Blocks merge unconditionally.                                                          |
-| **N/A**     | Cell is degenerate (Article 5) or per-repo overridden as inapplicable.                                                         |
+| **N/A**     | Cell is listed in the N/A ledger (`law/policy/scorecard-na.json`) with a reason; the ledger is the only source of N/A.         |
 | **UNKNOWN** | Sensor produced no reading, or reading is stale / inconclusive. Treated as `unknown` per [Article 39](../../reference/law.md). |
 
 The overall scorecard verdict is the worst per-cell verdict, with the tie-breaker ladder applied to any REVIEW.
+
+## Grid size and N/A cells
+
+The grid is 5 substrates × 9 properties = 45 cells. A cell is N/A only because the N/A ledger
+`law/policy/scorecard-na.json` lists it with a written reason (ADR-SCR-0002); the loop derives its
+set of degenerate cells from the ledger and holds no list of its own, so a change to that set is a
+law change reviewed like any other ledger edit. The ledger is materialized byte-for-byte at
+`.devai/config/scorecard-na.json`, which is the copy the scorecard reads.
+
+For the framework repository the ledger lists two cells, so DEVAI scores **45 cells, 2 N/A, 43
+scoreable**:
+
+| Cell  | Substrate × property     | Why N/A                                                                                                                                                                |
+| ----- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1:T1 | Specification × Coverage | Contract validation has no live emitter, so the cell is declared N/A rather than presented as reachable.                                                               |
+| F4:T5 | Inventory × Idiomaticity | The degenerate cell Article 5 names: inventory artifacts are derived deterministically from F1, F2 and F3 and never authored, so idiomaticity has no authored subject. |
+
+F4:T5 ships in the adopter default ledger, so every adopter starts at 45 cells, 1 N/A, 44
+scoreable; F1:T1 is specific to this repository. See
+[Scorecard N/A overrides](../../adopters/scorecard-na-overrides.md) for how an adopter edits its
+ledger.
+
+## One readings store
+
+`sense record` persists every reading at `.devai/state/sensor-readings/<kind>/<id>.json`, and every
+scorecard consumer resolves readings from that directory through the loop input resolver:
+`audit scorecard` on demand and the Auditor after a merge read the same store, so a reading the
+inspector records is visible to the on-demand scorecard at the same head without any copy or
+rebuild step.
 
 ## Hard gate (Article 17)
 
