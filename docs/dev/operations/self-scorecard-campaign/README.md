@@ -169,3 +169,37 @@ node <cli> audit scorecard --repo-root . --at <head>
 The real sweep run has aggregate effect read and persists nothing; its
 per-member readings are printed in the action payload. The baseline in
 section 2 was taken from that payload on main `f5bd9d17`.
+
+## 9. Round ledger and follow-ups
+
+### R-0201 closed 2026-09-27 at `cbf2d132`
+
+- TASK-0211 merged through [#112](https://github.com/aarusso-nyx/devai/pull/112);
+  TASK-0212 through [#113](https://github.com/aarusso-nyx/devai/pull/113); the
+  ledger through [#114](https://github.com/aarusso-nyx/devai/pull/114).
+- TASK-0212's boundary was widened twice by the orchestrator: to the three
+  tests that pinned the pre-record N/A list and the retired readings path,
+  then to the bootstrap seed test and the doctor identity snapshot, which read
+  the built package and only fail after a rebuild.
+
+Follow-ups recorded at close, to be scheduled as tasks or decided by the
+maintainer before R-0206 records readings:
+
+1. The self-dogfood service decides `sense run`, `sense record`, and
+   `audit observe`, but the `sense` and `audit` command paths do not yet call
+   it. Wire the service before the inspector records readings.
+2. The three sensing ids were added to `permitted_checks` as roster entries
+   keyed by action id. No runner reads them. Drop them if row-only admission
+   is preferred.
+3. `packages/skills/src/post-merge-auditor` still reads the retired
+   `record/proofs/freshness/readings` store; switch it to the loop resolver.
+4. `.devai/config/adopter-policy-binding.json` pins a stale digest for
+   `scorecard-na.json` and was already failing at the base head over a
+   version mismatch. Regenerating it through `init bind` would materialize
+   the adopter default rather than the law ledger. Decide which source the
+   framework's own binding materializes from.
+5. Task acceptance commands in R-0202 to R-0206 were remapped from
+   `check --only <test task>` to the runnable `pnpm run <script>` form;
+   `law:validate` runs as `check --only adrs` and `docs:validate` as
+   `check --only cli-reference`. Round `close_checks` keep the test-task node
+   ids, which the check runner executes.
